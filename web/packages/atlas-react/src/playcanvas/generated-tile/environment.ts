@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import type { RenderCaps } from '@exulanica/atlas-core';
 import { isRenderLook, sunDirection, type RenderLook, type Rgb, type TileLook, type TileLookV1 } from './look.js';
 import { cubeFaceDirection, renderSkyFaces } from './sky.js';
 import { ShadowDetail } from './shadow-detail.js';
@@ -198,7 +199,16 @@ function finishFrame(frame: pc.CameraFrame, look: RenderLook): void {
   frame.taa.enabled = post.taa;
 }
 
-export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: TileLook): TileEnvironment {
+/** How many samples the frame is multisampled with, at full quality, for every look. */
+const FRAME_SAMPLES = 4;
+
+/**
+ * `caps`, the render budget's for the scene's form (`render-budget.ts` in atlas-core), may lower the
+ * frame's multisampling and the fraction of the screen's resolution it is drawn at. None, or caps at
+ * their ceilings, draws the frame exactly as without them. The look's own shadows and contact
+ * shadowing are lowered before they reach here (`budgetedLook`).
+ */
+export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: TileLook, caps: RenderCaps | null = null): TileEnvironment {
   const scene = app.scene;
   const component = camera.camera;
   if (component === undefined || component === null) throw new Error('The tile environment needs a camera component');
@@ -304,7 +314,8 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
     if (disposed || frame !== null || device.width <= 0 || device.height <= 0) return;
     const created = new pc.CameraFrame(app, component);
     created.rendering.toneMapping = TONE_MAPPING[look.toneMapping];
-    created.rendering.samples = 4;
+    created.rendering.samples = caps === null ? FRAME_SAMPLES : Math.min(FRAME_SAMPLES, caps.msaaSamples);
+    if (caps !== null && caps.renderScale < 1) created.rendering.renderTargetScale = caps.renderScale;
     created.ssao.type = look.contactShadow.mode === 'combine' ? pc.SSAOTYPE_COMBINE : pc.SSAOTYPE_LIGHTING;
     created.ssao.radius = look.contactShadow.radiusM;
     created.ssao.intensity = look.contactShadow.intensity;

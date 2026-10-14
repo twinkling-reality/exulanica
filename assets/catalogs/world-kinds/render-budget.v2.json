@@ -1,0 +1,206 @@
+{
+ "schema_version": 1,
+ "catalog_id": "render-budget",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "open_site",
+   "reason": "A place under the sky drawn from its site drawing: a garden, a camp, a village green. Its sun shadows reach the whole view, so the shadow caps matter most here.",
+   "caps": {
+    "sun_shadow_cascades": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "Measured on a drafted garden site on 14 October 2026 (headless Chrome on Metal, 1280 by 860, three fixed views, median of three interleaved 300-frame samples): two cascades instead of four removed about 200 draws a frame at every view (495, 738 and 697 to 292, 548 and 542) with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_resolution_px": {
+     "most": 4096,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: a 2048-texel shadow map instead of 4096 changed graphics time by less than the noise between runs and no draw. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_distance_m": {
+     "most": 400,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: an 80 m shadow distance instead of 140 m removed about 100 draws a frame with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_samples": {
+     "most": 64,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: contact shadowing is about half of the graphics frame (3.5, 2.3 and 5.0 ms with it, 1.3, 0.9 and 2.8 ms without), and without it a shrub's crown loses its inner shading and the shadows under a bench go pale. Its depth pass also gives the frame its scene depth, so a cap that removes it must first give any material that reads the scene depth a depth map of its own. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the frame's resolution contact shadowing is computed at, in thousandths: the lever on that same half of the frame that keeps the shading. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "msaa_samples": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "The frame is multisampled with 4 samples for every look. Measured on a market town's street view (4 October 2026, Chrome on Metal, 1280 by 860), 4x multisampling is 0.5 ms of a 1.7 to 1.8 ms frame; its cost grows with the pixels drawn. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "render_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the screen's resolution the frame is drawn at. Almost every cost of a frame grows with its pixels, and a 1440 by 900 window on a 2x laptop screen is drawn at 2160 by 1350, 2.65 times the pixels the looks were measured at, so this is the lever for a computer that cannot keep up. Not yet measured on such a computer. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    }
+   },
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "indoor_site",
+   "reason": "A place under a roof drawn from its site drawing: a hall, a shop, a cafe. The sun reaches it only through openings, so it carries the same caps until an indoor measurement says otherwise.",
+   "caps": {
+    "sun_shadow_cascades": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "Measured on a drafted garden site on 14 October 2026 (headless Chrome on Metal, 1280 by 860, three fixed views, median of three interleaved 300-frame samples): two cascades instead of four removed about 200 draws a frame at every view (495, 738 and 697 to 292, 548 and 542) with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_resolution_px": {
+     "most": 4096,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: a 2048-texel shadow map instead of 4096 changed graphics time by less than the noise between runs and no draw. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_distance_m": {
+     "most": 400,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: an 80 m shadow distance instead of 140 m removed about 100 draws a frame with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_samples": {
+     "most": 64,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: contact shadowing is about half of the graphics frame (3.5, 2.3 and 5.0 ms with it, 1.3, 0.9 and 2.8 ms without), and without it a shrub's crown loses its inner shading and the shadows under a bench go pale. Its depth pass also gives the frame its scene depth, so a cap that removes it must first give any material that reads the scene depth a depth map of its own. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the frame's resolution contact shadowing is computed at, in thousandths: the lever on that same half of the frame that keeps the shading. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "msaa_samples": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "The frame is multisampled with 4 samples for every look. Measured on a market town's street view (4 October 2026, Chrome on Metal, 1280 by 860), 4x multisampling is 0.5 ms of a 1.7 to 1.8 ms frame; its cost grows with the pixels drawn. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "render_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the screen's resolution the frame is drawn at. Almost every cost of a frame grows with its pixels, and a 1440 by 900 window on a 2x laptop screen is drawn at 2160 by 1350, 2.65 times the pixels the looks were measured at, so this is the lever for a computer that cannot keep up. Not yet measured on such a computer. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    }
+   },
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "terrain",
+   "reason": "A place drawn from its admitted terrain: one heightfield mesh under the sun. It carries the same caps until a terrain measurement says otherwise.",
+   "caps": {
+    "sun_shadow_cascades": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "Measured on a drafted garden site on 14 October 2026 (headless Chrome on Metal, 1280 by 860, three fixed views, median of three interleaved 300-frame samples): two cascades instead of four removed about 200 draws a frame at every view (495, 738 and 697 to 292, 548 and 542) with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_resolution_px": {
+     "most": 4096,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: a 2048-texel shadow map instead of 4096 changed graphics time by less than the noise between runs and no draw. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_distance_m": {
+     "most": 400,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: an 80 m shadow distance instead of 140 m removed about 100 draws a frame with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_samples": {
+     "most": 64,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: contact shadowing is about half of the graphics frame (3.5, 2.3 and 5.0 ms with it, 1.3, 0.9 and 2.8 ms without), and without it a shrub's crown loses its inner shading and the shadows under a bench go pale. Its depth pass also gives the frame its scene depth, so a cap that removes it must first give any material that reads the scene depth a depth map of its own. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the frame's resolution contact shadowing is computed at, in thousandths: the lever on that same half of the frame that keeps the shading. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "msaa_samples": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "The frame is multisampled with 4 samples for every look. Measured on a market town's street view (4 October 2026, Chrome on Metal, 1280 by 860), 4x multisampling is 0.5 ms of a 1.7 to 1.8 ms frame; its cost grows with the pixels drawn. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "render_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the screen's resolution the frame is drawn at. Almost every cost of a frame grows with its pixels, and a 1440 by 900 window on a 2x laptop screen is drawn at 2160 by 1350, 2.65 times the pixels the looks were measured at, so this is the lever for a computer that cannot keep up. Not yet measured on such a computer. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    }
+   },
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "town_tiles",
+   "reason": "A town drawn from its baked tiles through the tile runtime: streets of facades under the sun. Measured on a market town's street view (4 October 2026, a production build, Chrome on Metal, 1280 by 860), the tile look takes 1.7 to 1.8 ms of graphics time a frame, of which contact shadowing is 0.7 ms and sun shadows 0.6 ms; a town carries the same caps until a town measurement with pictures says otherwise.",
+   "caps": {
+    "sun_shadow_cascades": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "Measured on a drafted garden site on 14 October 2026 (headless Chrome on Metal, 1280 by 860, three fixed views, median of three interleaved 300-frame samples): two cascades instead of four removed about 200 draws a frame at every view (495, 738 and 697 to 292, 548 and 542) with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_resolution_px": {
+     "most": 4096,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: a 2048-texel shadow map instead of 4096 changed graphics time by less than the noise between runs and no draw. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "sun_shadow_distance_m": {
+     "most": 400,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: an 80 m shadow distance instead of 140 m removed about 100 draws a frame with graphics time within the noise. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_samples": {
+     "most": 64,
+     "class": "ceiling",
+     "reason": "Measured on the same garden and views: contact shadowing is about half of the graphics frame (3.5, 2.3 and 5.0 ms with it, 1.3, 0.9 and 2.8 ms without), and without it a shrub's crown loses its inner shading and the shadows under a bench go pale. Its depth pass also gives the frame its scene depth, so a cap that removes it must first give any material that reads the scene depth a depth map of its own. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "contact_shadow_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the frame's resolution contact shadowing is computed at, in thousandths: the lever on that same half of the frame that keeps the shading. Version 2 caps at the look's own ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "msaa_samples": {
+     "most": 4,
+     "class": "ceiling",
+     "reason": "The frame is multisampled with 4 samples for every look. Measured on a market town's street view (4 October 2026, Chrome on Metal, 1280 by 860), 4x multisampling is 0.5 ms of a 1.7 to 1.8 ms frame; its cost grows with the pixels drawn. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    },
+    "render_scale_permille": {
+     "most": 1000,
+     "class": "ceiling",
+     "reason": "The fraction of the screen's resolution the frame is drawn at. Almost every cost of a frame grows with its pixels, and a 1440 by 900 window on a 2x laptop screen is drawn at 2160 by 1350, 2.65 times the pixels the looks were measured at, so this is the lever for a computer that cannot keep up. Not yet measured on such a computer. Version 2 caps at the ceiling, so no look draws differently; the cap is lowered only by a later version whose before and after pictures show the trade is worth it."
+    }
+   },
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ],
+ "levels": [
+  {
+   "level": 0,
+   "caps": {},
+   "reason": "Full quality: each form's own caps and nothing lower. Lower levels arrive in a later version, each with its measured cost and before and after pictures, after one ordinary laptop has been measured; until then a computer that falls behind has no lower level to step to."
+  }
+ ]
+}

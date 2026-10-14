@@ -714,8 +714,10 @@ export { ROOF_FORM_CATALOG_ID, readRoofForms } from './roof-form.js';
 export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
 export type { BorderNeighbour, GroundBorder, GroundBorders, GroundPlane, PlaneBorder } from './ground-border.js';
 export { BORDER_NEIGHBOURS_MOST, GROUND_BORDER_CATALOG_ID, borderReachMm, planBorders, readGroundBorders } from './ground-border.js';
-export type { RenderBudget, RenderCapClass, RenderCaps, RenderForm } from './render-budget.js';
-export { RENDER_BUDGET_CATALOG_ID, RENDER_CAP_RANGES, RENDER_FORMS, readRenderBudget, renderCapsFor } from './render-budget.js';
+export type { RenderBudget, RenderCapClass, RenderCaps, RenderForm, RenderLevel } from './render-budget.js';
+export { RENDER_BUDGET_CATALOG_ID, RENDER_CAP_RANGES, RENDER_FORMS, capsAtLevel, readRenderBudget, renderCapsFor } from './render-budget.js';
+export type { FrameGovernorOptions, FrameGovernorRules, FrameGovernorState, FrameSample, FrameVerdict, FrameWindow } from './frame-governor.js';
+export { FRAME_GOVERNOR_RULES, FrameGovernor } from './frame-governor.js';
 
 export type { SiteInterior, SiteInteriorCatalog } from './site-interior.js';
 export { SITE_INTERIOR_CATALOG_ID, readSiteInterior } from './site-interior.js';

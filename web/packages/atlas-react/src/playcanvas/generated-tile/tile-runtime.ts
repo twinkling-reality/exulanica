@@ -727,7 +727,7 @@ function attachTile(
   const device = host.app.graphicsDevice;
   const look = tile.look;
   // Only the light is budgeted: the uploads and batches below read the look's surface and shading.
-  const environment = applyTileEnvironment(host.app, host.camera, caps === null ? look : budgetedLook(look, caps));
+  const environment = applyTileEnvironment(host.app, host.camera, caps === null ? look : budgetedLook(look, caps), caps);
   const uploads = new TileTextureUploads(device, look);
   const roots: pc.Entity[] = [];
   const meshes: pc.Mesh[] = [];

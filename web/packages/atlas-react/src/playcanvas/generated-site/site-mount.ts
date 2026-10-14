@@ -1,5 +1,5 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type RenderBudget, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
@@ -93,10 +93,15 @@ export interface SiteMountOptions {
   readonly renderBudget?: RenderBudget;
 }
 
-/** The look a site of `form` is drawn in: the chosen look within the budget's caps for that form. */
-function lookWithin(options: SiteMountOptions, form: RenderForm): TileLook {
+/**
+ * The look a site of `form` is drawn in, and the caps its frame is drawn within: the chosen look
+ * within the budget's caps for that form. No budget draws the look as chosen, with no caps.
+ */
+function drawnWithin(options: SiteMountOptions, form: RenderForm): { readonly look: TileLook; readonly caps: RenderCaps | null } {
   const look = options.look ?? TILE_LOOK_V1;
-  return options.renderBudget === undefined ? look : budgetedLook(look, renderCapsFor(options.renderBudget, form));
+  if (options.renderBudget === undefined) return { look, caps: null };
+  const caps = renderCapsFor(options.renderBudget, form);
+  return { look: budgetedLook(look, caps), caps };
 }
 
 /**
@@ -120,7 +125,7 @@ export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null 
 /** The mount for a checked site drawing. */
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
   if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
-  const look = lookWithin(options, drawing.extent.enclosure === 'open' ? 'open_site' : 'indoor_site');
+  const { look, caps } = drawnWithin(options, drawing.extent.enclosure === 'open' ? 'open_site' : 'indoor_site');
   const navigationWorld = siteNavigationWorld(drawing);
   return Object.freeze({
     kindLabel: drawing.kind.label,
@@ -128,7 +133,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
     navigationWorld,
     start: siteStart(drawing, navigationWorld),
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      const environment = applyTileEnvironment(host.app, host.camera, look);
+      const environment = applyTileEnvironment(host.app, host.camera, look, caps);
       const materials = options.materials ?? null;
       const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials, options.roofForms ?? null);
       host.environmentRoot.addChild(slots.root);
@@ -226,7 +231,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
 
 /** Draw the original admitted triangles; scene dressing never supplies navigation authority. */
 function terrainMount(drawing: TerrainSiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
-  const look = lookWithin(options, 'terrain');
+  const { look, caps } = drawnWithin(options, 'terrain');
   const dressed = drawing.profile === 'exulanica.site-drawing/v4';
   const prepared = options.preparedDressing;
   if (dressed && (prepared === undefined || prepared.dressing !== drawing.dressing)) throw new TypeError('The exact terrain dressing must be prepared before mounting.');
@@ -235,7 +240,7 @@ function terrainMount(drawing: TerrainSiteDrawing, options: SiteMountOptions): G
   const navigationWorld = siteNavigationWorld(drawing, () => dressed && !readiness.read() ? {status: 'unavailable'} : proof());
   return Object.freeze({drawing, dressingReadiness: readiness, kindLabel: 'Terrain', navigationWorld, start: siteStart(drawing, navigationWorld),
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      const environment = applyTileEnvironment(host.app, host.camera, look);
+      const environment = applyTileEnvironment(host.app, host.camera, look, caps);
       // An infinite presentation floor would obscure the bounded admitted surface.
       if (environment.ground !== null) environment.ground.enabled = false;
       const mesh = createHeightfieldMesh(host.app.graphicsDevice, drawing.terrain.geometry);

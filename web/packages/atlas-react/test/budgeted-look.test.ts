@@ -17,7 +17,7 @@ import { TILE_LOOK_V1, validateRenderLook, validateTileLook, type TileLook } fro
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 // Relative to web/, where the suite runs: the files a deployment ships.
-const text = readFileSync('../assets/catalogs/world-kinds/render-budget.v1.json', 'utf8');
+const text = readFileSync('../assets/catalogs/world-kinds/render-budget.v2.json', 'utf8');
 const BUDGET = readRenderBudget(text);
 const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy-town/manifest.json', 'utf8')) as {
   light: { default_preset: string; presets: Record<string, never> }; shading: never; edge: never;
@@ -32,6 +32,8 @@ const capsAt = (end: 'least' | 'most'): RenderCaps => ({
   sunShadowDistanceM: range.sun_shadow_distance_m[end],
   contactShadowSamples: range.contact_shadow_samples[end],
   contactShadowScale: range.contact_shadow_scale_permille[end] / 1000,
+  msaaSamples: range.msaa_samples[end],
+  renderScale: range.render_scale_permille[end] / 1000,
 });
 
 /** A budget whose one form is lowered, read through the catalog's own reader. */
@@ -98,10 +100,11 @@ function yard(enclosure: 'open' | 'indoor') {
   });
 }
 
-function nullApp() {
+/** A scene on a device with no drawing; `sizePx` above 0 gives it a size, so the camera frame is built. */
+function nullApp(sizePx = 0) {
   const canvas = document.createElement('canvas');
-  canvas.width = 0;
-  canvas.height = 0;
+  canvas.width = sizePx;
+  canvas.height = sizePx;
   const app = new pc.AppBase(canvas);
   const options = new pc.AppOptions();
   options.graphicsDevice = new pc.NullGraphicsDevice(canvas);
@@ -132,6 +135,21 @@ describe('a site drawn within the budget', () => {
     const indoorLow = lowered('indoor_site', { sun_shadow_cascades: 1, sun_shadow_resolution_px: 1024 });
     expect(sunOf('open', indoorLow)).toEqual(chosen);
     expect(sunOf('indoor', indoorLow)).toEqual({ ...chosen, cascades: 1, resolution: 1024 });
+  });
+
+  it('draws its frame with the multisampling and resolution its form\'s caps allow, and as before at the ceilings', () => {
+    const frameOf = (renderBudget?: RenderBudget) => {
+      const host = nullApp(320);
+      const attachment = siteMount(yard('open'), { servedBytes: 1, look: RENDER_LOOK, ...(renderBudget === undefined ? {} : { renderBudget }) }).attach(host);
+      const pass = host.camera.camera!.framePasses[0] as unknown as { options: { samples: number }; renderTargetScale: number };
+      const seen = { samples: pass.options.samples, scale: pass.renderTargetScale };
+      attachment.dispose();
+      return seen;
+    };
+    expect(frameOf()).toEqual({ samples: 4, scale: 1 });
+    expect(frameOf(BUDGET)).toEqual({ samples: 4, scale: 1 });
+    expect(frameOf(lowered('indoor_site', { msaa_samples: 1, render_scale_permille: 600 }))).toEqual({ samples: 4, scale: 1 });
+    expect(frameOf(lowered('open_site', { msaa_samples: 2, render_scale_permille: 700 }))).toEqual({ samples: 2, scale: 0.7 });
   });
 });
 

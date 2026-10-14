@@ -392,10 +392,13 @@ frame has at 60 frames a second.
 
 A look chooses its sun shadows and contact shadowing for how a world should look; what they cost
 depends on what the scene holds. The render budget catalog
-(`assets/catalogs/world-kinds/render-budget.v1.json`, read by `readRenderBudget` in atlas-core's
-`render-budget.ts`) states, for each scene form (`open_site`, `indoor_site` and `terrain`, which a
-site mount draws, and `town_tiles`, which the tile runtime draws), a cap on the shadow cascades, the
-shadow map size, the shadow distance, and the contact shadowing's samples and resolution fraction.
+(`assets/catalogs/world-kinds/render-budget.v2.json`, read by `readRenderBudget` in atlas-core's
+`render-budget.ts`, which still reads version 1) states, for each scene form (`open_site`,
+`indoor_site` and `terrain`, which a site mount draws, and `town_tiles`, which the tile runtime
+draws), a cap on the shadow cascades, the shadow map size, the shadow distance, the contact
+shadowing's samples and resolution fraction, the frame's multisampling (1, 2 or 4 samples) and the
+fraction of the screen's resolution the frame is drawn at (from 0.5). The environment draws its frame
+within the last two; with no budget, or with both at their ceilings, the frame is as without one.
 Both draw their light through `budgetedLook` (`generated-tile/budgeted-look.ts`), which lowers each
 value above its form's cap to the cap and never raises one; a look within every cap is drawn as the
 same object. The tile runtime budgets only the light: a tile's texture sets are uploaded and batched
@@ -403,9 +406,9 @@ in its look as chosen, and a tile relit in another look keeps its caps. The read
 does not know, a missing form, an unknown cap, a cap outside the range both look descriptors accept
 and a cap with no reason, by name, so a look lowered to any cap is still a valid look.
 
-Every cap has a class (`ceiling`, `measured` or `chosen`) and a reason. Version 1 sets every cap at
-the looks' own ceiling (four cascades, 4096 texels, 400 m, 64 samples, the full frame), so no look
-draws differently; its reasons cite the measurement a later version would lower a cap from. On a
+Every cap has a class (`ceiling`, `measured` or `chosen`) and a reason. Version 2 sets every cap at
+its ceiling (four cascades, 4096 texels, 400 m, 64 samples, contact shadowing over the full frame,
+four multisamples, the full resolution), so no look draws differently; its reasons cite the measurement a later version would lower a cap from. On a
 drafted garden site (14 October 2026, headless Chrome on Metal, 1280 by 860, three fixed views, the
 median of three interleaved 300-frame samples), two cascades instead of four removed about 200 draws
 a frame at every view with graphics time within the noise, a 2048-texel map or an 80 m distance changed
@@ -418,8 +421,20 @@ the scene depth a depth map of its own.
 A town's caps also cite the market town measured in section 6.1, where contact shadowing was 0.7 ms
 and sun shadows 0.6 ms of a 1.7 to 1.8 ms frame. A saved world's tiles (section 7.3) are drawn
 within the `town_tiles` caps; the evaluation entries (sections 7 and 7.1) draw their tile without a
-budget, so they show the look as chosen. Multisampling is not capped: the environment sets it to
-four samples for every look.
+budget, so they show the look as chosen.
+
+Quality levels are for a computer that cannot draw a world's frames in time. Level 0 is full quality
+and caps nothing; each lower level would state caps that hold in every form, and `capsAtLevel` draws a
+form within the least of its own cap and its level's. Version 2 states level 0 alone: lower levels
+arrive with their measured cost and before and after pictures, once an ordinary laptop has been
+measured. Which level a computer draws at is read from its frames, never guessed from its hardware,
+by the frame governor (atlas-core's `frame-governor.ts`). It reads the display's interval from the
+frames, counts a frame late beyond one and a half intervals (taking no display as slower than 60 Hz),
+and judges each five seconds of frames, leaving out the settling seconds after a load or a look
+change, a hidden tab, a pause and a still scene. Where the browser offers graphics timer queries it
+steps down only when the graphics are the cause; without them it steps down once and, when that does
+not help, steps back and stops for the session. It steps up only on timer evidence. Its stepping is
+off: it judges and advises, the page draws at level 0, and no page reads it yet.
 
 ## 7. The evaluation entry
 
