@@ -58,9 +58,9 @@ from exulanica.world.composers import (
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import (
-    REQUIREMENTS_PROFILE,
     KindDocument,
     KindRefused,
+    bounds_version_of,
     read_kind,
 )
 from exulanica.world.kinds.routine import kind_overlay, overlay_routine
@@ -367,9 +367,7 @@ def compose_kind(
             "descriptor_sha256": _descriptor_sha256(),
         },
         "catalogs": dict(
-            load_kind_catalogs(
-                bounds_version=2 if kind.document["profile"] == REQUIREMENTS_PROFILE else 1
-            ).sha256
+            load_kind_catalogs(bounds_version=bounds_version_of(kind.document)).sha256
         ),
         "plan_sha256": world.plan_sha256,
         "routine": {"base": base_routine.binding(), "overlay": overlay, "sha256": routine.sha256},

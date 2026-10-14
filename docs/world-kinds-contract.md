@@ -35,6 +35,7 @@ wherever it appears. A kind is identified by its key (`[a-z][a-z0-9_]{0,31}`), i
 | `parts` | Each part's key, label, description, form, engine roles, look role, use class and the sizes its form needs |
 | `zones` | Each zone's placement, share of the site, access, pattern and the parts it holds with counts |
 | `parameters`, `presets` | At most sixteen values a person may change, each with its range and step, and one to eight named presets |
+| `bounds` | Optional, in both profiles: `{"version": 3}`, the bounds catalog the kind is read, sampled and regenerated with. Absent, a kind is read with its profile's own (version 1 for `exulanica.world-kind/v1`, version 2 for `v2`), exactly as every kind written before the key existed |
 
 What a kind's society reads where the kind states nothing is the
 [kind society catalog](../assets/catalogs/world-kinds/kind-society.v1.json), resolved once as the
@@ -49,7 +50,11 @@ per placed thing, a span the seed draws from (`{"from": a, "to": b}`). Lengths a
 are whole modules of the site: 500 mm outdoors and 100 mm indoors. The
 [bounds catalog](../assets/catalogs/world-kinds/kind-bound.v1.json) states every figure's range
 with its reason, for example a site from 8 m to 256 m on each side and a path from 1.5 m, two
-people passing, to 12 m.
+people passing, to 12 m. [Version 2](../assets/catalogs/world-kinds/kind-bound.v2.json), which a
+kind with requirements is read with, allows taller and thicker boundaries and bounds a fixture's
+height on its own, from 20 mm; [version 3](../assets/catalogs/world-kinds/kind-bound.v3.json) is
+version 2 with more storeys, and is read only for a kind that names it. A world's receipt names
+the digest of the bounds its kind was read with.
 
 A **form** says how the generator lays a part out and draws it: `path`, `area`, `structure`,
 `room`, `fixture` or `boundary`. A **placement** says where a zone lies: `front`, `middle` and
@@ -687,7 +692,9 @@ town's receipt or digest depends on the adapter.
   the erasure routes below; a retained world receipt prevents erasure.
 - The library ships the town's adapter and no site-grammar kind. The three kinds under
   `tests/fixtures/world-kinds` are hand-written test fixtures.
-- Only the ground storey of a structure is walked inside.
+- Only the ground storey of a structure is walked inside. A structure stands at most six storeys,
+  or as many as bounds version 3 states for a kind that names it; every storey above the ground is
+  drawn, not walked, and a taller structure adds no slot to the drawing and no place to the walk.
 - Roads and parking are drawn as surfaces and kept clear; nothing drives in a site world. Water is
   never walked, and nothing moves on it.
 - A kind's sample worlds house at most 128 people and lay at most 962 walking places, the bounds

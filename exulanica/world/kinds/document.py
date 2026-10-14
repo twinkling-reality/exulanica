@@ -81,11 +81,18 @@ __all__ = [
     "KindParameter",
     "KindRefused",
     "KindValueRefused",
+    "bounds_version_of",
     "read_kind",
 ]
 
 PROFILE: Final = "exulanica.world-kind/v1"
 REQUIREMENTS_PROFILE: Final = "exulanica.world-kind/v2"
+#: The kind bounds each profile is read with when the kind names none, so a kind written before a
+#: later bounds version reads exactly as it always did.
+PROFILE_BOUNDS: Final = {PROFILE: 1, REQUIREMENTS_PROFILE: 2}
+#: The bounds versions a kind may name in its optional ``bounds``: 3, version 2's bounds with
+#: taller structures (the bounds catalog states how tall and why).
+NAMED_BOUNDS: Final = (3,)
 #: The composer that generates every kind this module reads: the site grammar's.
 GENERATOR_KEY: Final = "site-plan"
 GENERATOR_VERSION: Final = 1
@@ -1142,6 +1149,22 @@ def _strings(node: object, where: str = "") -> Iterator[tuple[str, str]]:
             yield from _strings(value, f"{where}[{index}]")
 
 
+def bounds_version_of(document: object) -> int:
+    """The kind bounds version ``document`` is read with: the version its optional ``bounds``
+    names, else its profile's own (``PROFILE_BOUNDS``). A statement that is not one of
+    ``NAMED_BOUNDS`` is left to :func:`read_kind` to refuse by name; until then it chooses
+    nothing."""
+    if not isinstance(document, Mapping):
+        return 1
+    stated = document.get("bounds")
+    if isinstance(stated, Mapping) and set(stated) == {"version"}:
+        version = stated["version"]
+        if type(version) is int and version in NAMED_BOUNDS:
+            return version
+    profile = document.get("profile")
+    return PROFILE_BOUNDS.get(profile, 1) if isinstance(profile, str) else 1
+
+
 def read_kind(
     document: object,
     *,
@@ -1159,7 +1182,7 @@ def read_kind(
         routine = town_routine()
     profile = document.get("profile") if isinstance(document, dict) else None
     catalogs = (
-        load_kind_catalogs(bounds_version=2 if profile == REQUIREMENTS_PROFILE else 1)
+        load_kind_catalogs(bounds_version=bounds_version_of(document))
         if catalogs is None
         else catalogs
     )
@@ -1171,10 +1194,23 @@ def read_kind(
         "",
         document,
         _TOP_KEYS
-        | ({"requirement_source", "requirements"} if profile == REQUIREMENTS_PROFILE else set()),
+        | ({"requirement_source", "requirements"} if profile == REQUIREMENTS_PROFILE else set())
+        | ({"bounds"} if isinstance(document, dict) and "bounds" in document else set()),
     )
     if raw["profile"] not in (PROFILE, REQUIREMENTS_PROFILE):
         raise _invalid("profile", f"is {PROFILE} or {REQUIREMENTS_PROFILE}")
+    if "bounds" in raw:
+        # Optional in both profiles: absent, a kind reads with its profile's own bounds, as every
+        # kind written before it did. Named, the kind is read, sampled and regenerated with it.
+        stated = _keys("bounds", raw["bounds"], frozenset({"version"}))
+        if type(stated["version"]) is not int or stated["version"] not in NAMED_BOUNDS:
+            raise _invalid("bounds.version", f"is one of {list(NAMED_BOUNDS)}")
+        if catalogs.bounds_version != stated["version"]:
+            raise _invalid(
+                "bounds.version",
+                f"names bounds {stated['version']}, and this reader was given bounds "
+                f"{catalogs.bounds_version}",
+            )
     kind = raw["kind"]
     if type(kind) is not str or _KIND.fullmatch(kind) is None:
         raise _invalid("kind", "is a lowercase key of at most 32 characters")

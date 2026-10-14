@@ -11,7 +11,9 @@
 * ``kind-role.v1.json``: the engine roles a part may take, each with the part forms that may take
   it and what the engine does with it.
 * ``kind-bound.v1.json``: every figure a kind is held to, each with its least and greatest value
-  and why.
+  and why; ``kind-bound.v2.json`` the bounds a kind with requirements is read with, and
+  ``kind-bound.v3.json`` version 2 with taller structures, for a kind that names it
+  (:func:`~exulanica.world.kinds.document.bounds_version_of`).
 * ``kind-society.v1.json``: what a kind's society reads where the kind states nothing: the use
   class a seat and a home take when they name none, the words and use class of the home at the
   entry of everybody who lives off the site, and the words said of where its people are and walk.
@@ -42,6 +44,7 @@ from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.grammars.site.plan import FORMS, LOOK_FAMILIES, ROLES
 
 __all__ = [
+    "BOUNDS_VERSIONS",
     "CATALOG_DIRECTORY",
     "DRESSINGS",
     "FITS",
@@ -52,6 +55,9 @@ __all__ = [
     "load_kind_catalogs",
 ]
 
+#: The kind bounds versions this code reads: 1 and 2, each a profile's own, and 3, version 2 with
+#: taller structures, read only for a kind that names it.
+BOUNDS_VERSIONS: Final = (1, 2, 3)
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[3].joinpath("assets", "catalogs", "world-kinds")
 )
@@ -198,7 +204,7 @@ def load_kind_catalogs(
         raise CatalogError(
             f"the kind-role catalog states {sorted(roles)}, the site grammar {ROLES}"
         )
-    if bounds_version not in (1, 2):
+    if bounds_version not in BOUNDS_VERSIONS:
         raise CatalogError(f"unknown kind-bound version {bounds_version}")
     bounds = _read(directory, "kind-bound", bounds_version)
     defaults = _read(directory, "kind-society")
