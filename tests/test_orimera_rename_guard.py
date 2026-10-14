@@ -58,6 +58,7 @@ ALLOWED_PATHS: dict[str, str] = {
     "scripts/reference_instance.py": (
         "strips inherited ORIMERA_ variables so they cannot leak into a child"
     ),
+    "tests/guard_selection.py": "names the rename guard's own test file in the list of guards",
     "tests/test_documentation_links.py": (
         "records why the gitignored .orimera working area is not a source of references"
     ),
