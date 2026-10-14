@@ -1106,13 +1106,9 @@ forbidden_modules = [
 # or model call: it is handed what it reads.
 # The reach figures the engines share with the composition of authored objects (which reads the
 # store) are stated in `exulanica.world.society_reach` for that reason, so no engine imports the
-# composition. Indirect imports count, except one edge: `exulanica.world.crossings` names the
-# connection type in the port a door's crossings stream fills, and holds the door's lookup of a
-# version's society beside the checks a society of things runs on each crossing. The engine opens
-# no connection through it.
+# composition. Indirect imports count.
 name = "A society engine reaches no database, store, door, spending authority or model call"
 type = "forbidden"
-ignore_imports = ["exulanica.world.crossings -> psycopg"]
 source_modules = [
   "exulanica.world.society_decision_contract",
   "exulanica.world.society_living",

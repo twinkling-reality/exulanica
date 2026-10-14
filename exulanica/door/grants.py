@@ -102,7 +102,6 @@ from exulanica.door.protocol import words_fault
 from exulanica.door.retention import prune
 from exulanica.errors import ExulanicaError
 from exulanica.models.manifest import Manifest
-from exulanica.world.crossings import society_of_version
 from exulanica.world.deciders import DECIDED_BY, model_of
 from exulanica.world.placed_things import PLACED_THING_ID_PATTERN
 from exulanica.world.society import UnknownSociety
@@ -136,6 +135,7 @@ __all__ = [
     "IssuedSecret",
     "Scope",
     "grant_actor",
+    "society_of_version",
     "visitors_society",
 ]
 
@@ -251,6 +251,21 @@ def grant_actor(grant_id: uuid.UUID) -> uuid.UUID:
 
 def _utc(value: dt.datetime) -> str:
     return value.astimezone(dt.UTC).isoformat(timespec="microseconds")
+
+
+def society_of_version(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, version_id: uuid.UUID
+) -> dict[str, Any] | None:
+    """The society a world version holds, by its id and engine, or None where it holds none: what
+    a door asks before it records a crossing, on its own workspace-scoped connection."""
+    row = connection.execute(
+        "select society_id,engine_version from world_society where workspace_id=%s "
+        "and world_id=%s and version_id=%s",
+        (workspace_id, world_id, version_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"society_id": row["society_id"], "engine_version": row["engine_version"]}
 
 
 def visitors_society(

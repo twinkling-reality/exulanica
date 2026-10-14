@@ -23,12 +23,12 @@ import uuid
 
 import pytest
 from exulanica.abilities.registry import PURPOSEFUL_BY_KIND_WEIGHTS
+from exulanica.door.grants import society_of_version
 from exulanica.world.crossings import (
     CROSSINGS_PER_MINUTE,
     BoundCrossing,
     ConsumedCrossing,
     register_crossing_stream,
-    society_of_version,
 )
 from fastapi.testclient import TestClient
 

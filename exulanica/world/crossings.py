@@ -31,7 +31,8 @@ grant, and what the visitor is called in the world is its kind's.
 
 With no stream registered, nothing crosses and a society of things advances without visitors.
 
-Pure apart from :func:`society_of_version`, which reads one row on the caller's connection.
+Pure: the door's stream is handed the minute's connection (:data:`MinuteConnection`), which this
+module passes through and never uses.
 """
 
 from __future__ import annotations
@@ -41,8 +42,6 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, NamedTuple, Protocol
-
-import psycopg
 
 from exulanica.things.origin import OriginRefused, read_origin
 from exulanica.world.deciders import BRIDGE, DECIDED_BY
@@ -67,7 +66,6 @@ __all__ = [
     "crossing_stream",
     "is_carry_out_list",
     "register_crossing_stream",
-    "society_of_version",
 ]
 
 ARRIVAL_PROFILE: Final = "exulanica.thing-arrival/v1"
@@ -155,13 +153,18 @@ class ConsumedCrossing:
     bound: BoundCrossing
 
 
+#: The minute's database connection, which a society's repository hands the door's stream with its
+#: transaction open. This module passes it through and never uses it, so it names no driver.
+MinuteConnection = Any
+
+
 class CrossingStream(Protocol):
     """The door's side of crossings, called on the minute's connection and transaction, under the
     society's lock, so a crossing is consumed by one minute exactly once."""
 
     def pending(
         self,
-        connection: psycopg.Connection,
+        connection: MinuteConnection,
         workspace_id: uuid.UUID,
         society_id: uuid.UUID,
         tick: int,
@@ -174,7 +177,7 @@ class CrossingStream(Protocol):
 
     def bind(
         self,
-        connection: psycopg.Connection,
+        connection: MinuteConnection,
         workspace_id: uuid.UUID,
         society_id: uuid.UUID,
         tick: int,
@@ -185,7 +188,7 @@ class CrossingStream(Protocol):
         ...
 
     def consumed(
-        self, connection: psycopg.Connection, workspace_id: uuid.UUID, society_id: uuid.UUID
+        self, connection: MinuteConnection, workspace_id: uuid.UUID, society_id: uuid.UUID
     ) -> Sequence[ConsumedCrossing]:
         """Every crossing a minute of this society consumed, by minute and in binding order."""
         ...
@@ -328,18 +331,3 @@ def check_crossing(crossing: Crossing) -> Mapping[str, Any]:
     if str(crossing.crossing_id) != named:
         raise CrossingRefused("a crossing's id is its document's own")
     return checked
-
-
-def society_of_version(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, version_id: uuid.UUID
-) -> dict[str, Any] | None:
-    """The society a world version holds, by its id and engine, or None where it holds none: what
-    a door asks before it records a crossing, on its own workspace-scoped connection."""
-    row = connection.execute(
-        "select society_id,engine_version from world_society where workspace_id=%s "
-        "and world_id=%s and version_id=%s",
-        (workspace_id, world_id, version_id),
-    ).fetchone()
-    if row is None:
-        return None
-    return {"society_id": row["society_id"], "engine_version": row["engine_version"]}
