@@ -78,12 +78,17 @@ class Snapshot:
 
 
 def _missing_file(path: list[Any]) -> bool:
-    """A file lookup on a branch commit: GitHub reports a path the commit lacks as NOT_FOUND."""
+    """A file lookup on a commit: GitHub reports a path the commit lacks as NOT_FOUND."""
     return (
         len(path) == 4
         and path[0] == "repository"
-        and path[1] in ("ref", "base", "head")
-        and path[2] == "target"
+        and (path[1], path[2])
+        in (
+            ("ref", "target"),
+            ("base", "target"),
+            ("head", "target"),
+            ("pullRequest", "mergeCommit"),
+        )
         and path[3] in ("file", "evidence")
     )
 
@@ -822,3 +827,72 @@ class RepositoryCreation:
             "default_branch": made["default_branch"],
             "url": f"https://github.com/{made['full_name']}",
         }
+
+
+# Reading a merged pull request: whether it merged, into which branch, and the project files at
+# its merge commit. Read only; apply-back builds a new world version from what this returns.
+
+_MERGED_QUERY = (
+    """query($owner:String!, $name:String!, $number:Int!) {
+  repository(owner:$owner, name:$name) {
+    nameWithOwner
+    pullRequest(number:$number) {
+      number state merged mergedAt baseRefName headRefName
+      mergeCommit { oid """
+    + _FILES
+    + """ }
+    }
+  }
+}"""
+)
+
+
+@dataclass(frozen=True)
+class MergedPullRequest:
+    repository: str
+    number: int
+    base: str
+    head: str
+    merge_commit: str
+    world: dict[str, Any]
+    sessions: dict[str, dict[str, Any]]
+
+
+def read_merged(
+    repository: str,
+    number: int,
+    request: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+) -> MergedPullRequest:
+    """The project files a merged pull request left on its base branch, validated."""
+    Target(repository, "main")
+    if type(number) is not int or not 1 <= number <= 10_000_000:
+        raise ProjectError("pull request number must be a positive integer")
+    owner, name = repository.split("/")
+    data = (request or gh_graphql)(_MERGED_QUERY, {"owner": owner, "name": name, "number": number})
+    try:
+        repo = data["repository"]
+        if repo is None or repo["nameWithOwner"].lower() != repository.lower():
+            raise ProjectError("repository missing or redirected; select the exact destination")
+        pull = repo["pullRequest"]
+        if pull is None or pull["number"] != number:
+            raise ProjectError("pull request not found")
+        if pull["merged"] is not True or pull["state"] != "MERGED" or pull["mergeCommit"] is None:
+            raise ProjectError("pull request is not merged; nothing to apply")
+        commit = pull["mergeCommit"]
+        if re.fullmatch(r"[0-9a-f]{40}", commit["oid"]) is None:
+            raise ProjectError("GitHub did not return a merge commit identity")
+        files = _files(commit)
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ProjectError("GitHub returned incomplete pull request metadata") from exc
+    world = _world(files)
+    if world is None:
+        raise ProjectError("the merge commit holds no world-project.json")
+    return MergedPullRequest(
+        repository=repo["nameWithOwner"],
+        number=number,
+        base=pull["baseRefName"],
+        head=pull["headRefName"],
+        merge_commit=commit["oid"],
+        world=world,
+        sessions=_sessions(files),
+    )

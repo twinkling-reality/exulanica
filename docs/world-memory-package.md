@@ -893,6 +893,38 @@ both branch heads, the pull request, each commit's message and file digests, and
 it and refuses any difference. A failed step stops publication, names the steps already done and
 is not retried.
 
+**Applying a merged pull request.** A merged pull request becomes a new alternate version of the
+running world through the World API's own routes; the version the project was captured from is
+never edited.
+
+```sh
+uv run python -m exulanica.world_package.projects review-apply ./my-project --pull-request 1 --api http://localhost:PORT --token-file TOKEN
+uv run python -m exulanica.world_package.projects apply ./my-project --pull-request 1 --api http://localhost:PORT --token-file TOKEN --review-sha256 REVIEW_DIGEST --allow-world-write
+```
+
+`review-apply` reads the pull request through the project's link (GitHub reads only): it must be
+merged into the link's base branch, and the merge commit's `world-project.json` and evidence files
+must pass their closed schemas and the value scan. The review compares the project's selected
+things with the source version and lists the edits that would make a new version hold them:
+additions, moves and turns within a region, and removals, worded like the summaries. Things the
+project never selected are left as they are. It refuses, writing nothing, when the source version
+is invalidated or its state digest differs from the checkpoint's (the world changed since capture;
+the project carries no per-thing base values, so there is no three-way merge), and when a thing
+would change region, kind or origin, be restored after removal, or use a workspace kind the
+workspace does not hold, since no route does those. A merge that changes only evidence applies
+nothing. Model assignments are listed as to assign after the world is started: a new version has
+no society until it is started, and recording an assignment authorizes later model spending.
+Evidence, the link and dependency files are never applied.
+
+`apply` needs `--allow-world-write` and the review digest, which binds the merge commit, the edits,
+the refusals and the version state; it recomputes the review and refuses any difference. It
+branches one version from the source version, titled `From OWNER/REPO commit SHA (pull request
+#N)`, checks that the branch inherited what the review saw, then sends each edit with the state
+token of the one before. Creating a version is not idempotent, so a write is never retried: a
+later review finds the version by its title and resumes with the remaining edits, and a finished
+merge reviews as already applied. Writes need `world.write`; this applies to an isolated copy or a
+workspace the caller is authorized to change, never by editing a running version in place.
+
 **Single file.** The first transport writes only the root `world-project.json` to an existing
 branch:
 

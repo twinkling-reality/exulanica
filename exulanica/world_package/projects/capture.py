@@ -1,8 +1,9 @@
 """Build a checkpoint selection from a running world through its World API, by GET only.
 
-Capture is a client of the API. It sends the bearer it is given to the one base URL it is given,
-never in a URL, log or error, and it imports nothing from the API package. The world authorizes
-every read; capture grants nothing and writes nothing to the world.
+Capture is a client of the API; only apply-back uses the client's write method. It sends the
+bearer it is given to the one base URL it is given, never in a URL, log or error, and it imports
+nothing from the API package. The world authorizes every read and write; capture itself grants
+nothing and writes nothing to the world.
 """
 
 from __future__ import annotations
@@ -77,7 +78,7 @@ def _origin(url: str) -> tuple[str, EgressAllowlist]:
         ) from exc
 
 
-def _segment(value: str) -> str:
+def segment(value: str) -> str:
     if not isinstance(value, str) or _SEGMENT.fullmatch(value) is None:
         raise ProjectError("an identifier read from the world has an unsupported form")
     return quote(value, safe=":._-")
@@ -106,7 +107,7 @@ class WorldReader:
             transport=allowlisted_transport(egress, inner=transport),
         )
         self.world_id = world_id
-        _segment(world_id)
+        segment(world_id)
 
     def close(self) -> None:
         self._client.close()
@@ -136,6 +137,23 @@ class WorldReader:
 
     def raw(self, route: str, path: str) -> bytes:
         return self._get(route, path, {}).content
+
+    def post(self, route: str, path: str, body: dict[str, Any]) -> tuple[int, Any]:
+        """One world write, used only by apply-back. Never retried: its outcome may be unknown.
+
+        Returns the status and the decoded body, so a caller can read a refusal's code. Neither
+        is echoed in an error, since either may carry selected values.
+        """
+        try:
+            response = self._client.post(path, params={"world_id": self.world_id}, json=body)
+        except (httpx.HTTPError, EgressError) as exc:
+            raise ProjectError(
+                f"world API write {route} did not complete; its outcome may be unknown"
+            ) from exc
+        try:
+            return response.status_code, response.json()
+        except ValueError:
+            return response.status_code, None
 
 
 def subject_id(world_id: str, thing_id: str) -> str:
@@ -231,7 +249,7 @@ def capture(
     checkpoint, which then holds the world and its model assignments only.
     """
     note = progress or (lambda _: None)
-    version = _segment(version_id)
+    version = segment(version_id)
     view = reader.json("GET version", f"/world/versions/{version}")
     if view.get("world_id") != reader.world_id or view.get("version_id") != version_id:
         raise ProjectError("world API returned another world or version")
@@ -281,7 +299,7 @@ def capture(
     for thing in things:
         sha = thing["kind"]["sha256"]
         if thing["kind"].get("source") == "workspace":
-            data = reader.raw("GET thing kind", f"/things/kinds/{_segment(sha)}")
+            data = reader.raw("GET thing kind", f"/things/kinds/{segment(sha)}")
             if digest(data) != sha:
                 raise ProjectError("world API returned kind bytes that do not match their digest")
             declare("thing-kind", data, sha, f"workspace-kind:{sha[:16]}")
@@ -309,7 +327,7 @@ def capture(
         events = _events(reader, version, set(latest)) if include_decisions and latest else []
         records = {}
         for event in events[-max_decisions:]:
-            request_id = _segment(event["document"]["request_id"])
+            request_id = segment(event["document"]["request_id"])
             records[request_id] = (
                 event,
                 reader.json(

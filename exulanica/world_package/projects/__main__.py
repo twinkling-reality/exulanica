@@ -10,6 +10,8 @@ import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
+from exulanica.world_package.projects.apply import apply as apply_merge
+from exulanica.world_package.projects.apply import review as review_apply
 from exulanica.world_package.projects.capture import Capture, WorldReader, capture, read_token
 from exulanica.world_package.projects.checkpoint import (
     MAX_BYTES,
@@ -31,6 +33,7 @@ from exulanica.world_package.projects.github import (
     RepositoryCreation,
     RollingPullRequests,
     Target,
+    read_merged,
 )
 from exulanica.world_package.projects.link import resolve
 from exulanica.world_package.projects.repository import (
@@ -121,6 +124,19 @@ def parser() -> argparse.ArgumentParser:
         if name == "create-repository":
             command.add_argument("--review-sha256", required=True)
             command.add_argument("--allow-publication", action="store_true")
+    for name in ("review-apply", "apply"):
+        command = commands.add_parser(
+            name, help="a merged pull request as a new version of the running world"
+        )
+        command.add_argument("folder", type=Path, help="the linked project folder")
+        command.add_argument("--pull-request", type=int, required=True)
+        command.add_argument(
+            "--api", required=True, help="http://localhost:PORT or an https origin"
+        )
+        command.add_argument("--token-file", type=Path, required=True)
+        if name == "apply":
+            command.add_argument("--review-sha256", required=True)
+            command.add_argument("--allow-world-write", action="store_true")
     command = commands.add_parser("link", help="record where a project folder publishes")
     command.add_argument("folder", type=Path)
     command.add_argument("--repository", required=True)
@@ -341,6 +357,25 @@ def main(argv: list[str] | None = None) -> int:
                     reviewed_sha256=args.review_sha256,
                     allow_publication=args.allow_publication,
                 )
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
+        if args.command in ("review-apply", "apply"):
+            if args.command == "apply" and not args.allow_world_write:
+                raise ProjectError("applying to a world requires explicit authorization")
+            linked = resolve(args.folder, None, None, None)
+            merged = read_merged(linked["repository"], args.pull_request)
+            world_id = merged.world["source"]["world_id"]
+            with WorldReader(args.api, read_token(args.token_file), world_id) as client:
+                if args.command == "review-apply":
+                    result = review_apply(client, merged, linked["base"])
+                else:
+                    result = apply_merge(
+                        client,
+                        merged,
+                        linked["base"],
+                        reviewed_sha256=args.review_sha256,
+                        allow_world_write=args.allow_world_write,
+                    )
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command in ("review-branch", "publish-branch"):

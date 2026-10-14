@@ -14,7 +14,7 @@ from typing import Any
 from exulanica.world_package.projects.checkpoint import changes, document
 
 
-def _names(things: list[dict[str, Any]]) -> dict[str, str]:
+def thing_names(things: list[dict[str, Any]]) -> dict[str, str]:
     """Call a thing by its shipped kind when that kind is unique in the selection."""
     kinds = Counter(
         thing["kind"].get("kind") for thing in things if thing["kind"].get("kind") is not None
@@ -30,13 +30,13 @@ def _names(things: list[dict[str, Any]]) -> dict[str, str]:
     return names
 
 
-def _metres(mm: int) -> str:
+def metres(mm: int) -> str:
     value = abs(mm) / 1000
     text = f"{value:.1f}".rstrip("0").rstrip(".")
     return f"{text} m"
 
 
-def _movement(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+def movement(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     """Region-local x grows east, z grows south and y grows up (millimetres)."""
     parts = []
     for axis, positive, negative in (
@@ -46,7 +46,7 @@ def _movement(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     ):
         delta = after[axis] - before[axis]
         if delta:
-            parts.append(f"{_metres(delta)} {positive if delta > 0 else negative}")
+            parts.append(f"{metres(delta)} {positive if delta > 0 else negative}")
     return parts
 
 
@@ -81,7 +81,7 @@ def summarize(before: Any | None, after: Any) -> list[str]:
     if old["source"] != new["source"]:
         lines.append(f"moved to source world version {new['source']['version_id']}")
 
-    names = {**_names(old["things"]), **_names(new["things"])}
+    names = {**thing_names(old["things"]), **thing_names(new["things"])}
     before_things = {t["thing_id"]: t for t in old["things"]}
     after_things = {t["thing_id"]: t for t in new["things"]}
     for thing_id in sorted(after_things.keys() - before_things.keys()):
@@ -96,9 +96,9 @@ def summarize(before: Any | None, after: Any) -> list[str]:
         if was["region_id"] != now["region_id"]:
             lines.append(f"moved {name} to region {now['region_id']}")
         else:
-            movement = _movement(was["transform"], now["transform"])
-            if movement:
-                lines.append(f"moved {name} {' and '.join(movement)}")
+            moved = movement(was["transform"], now["transform"])
+            if moved:
+                lines.append(f"moved {name} {' and '.join(moved)}")
         turn = _turn(was["transform"], now["transform"])
         if turn:
             lines.append(f"turned {name} {turn}")
