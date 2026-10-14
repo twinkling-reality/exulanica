@@ -1549,7 +1549,7 @@ async function mountWorld(): Promise<void> {
   // so the next step is prepared against it. A placed thing's answer is a version, as an object's is.
   const PLANNED_EDITS = new Set([
     'objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place',
-    'things.place', 'things.move', 'things.remove',
+    'things.place', 'things.move', 'things.remove', 'things.undo', 'things.redo',
   ]);
   const sendPlanned = async (
     request: PlannedRequest,

@@ -48,7 +48,7 @@ export function patchSource(file, code, here) {
     if (found !== 1) throw Error(`World workspace seam "${one.seam}" occurs ${found} times in ${file}; it must occur exactly once.`);
   }
   if (file === SELECTION) {
-    return code.replace(seam('picker hook'), '    atlas.__workspacePick = pickedAlong;\n' + seam('picker hook'));
+    return code.replace(seam('picker hook'), '    atlas.__workspacePick = pickedAlong;\n    atlas.__workspaceThings = () => things;\n' + seam('picker hook'));
   }
   return `import { mountContextualWorld } from '/@fs/${here}/contextual-world.ts';
 import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here}/front-door.ts';
@@ -64,7 +64,7 @@ import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-pre
     .replace(seam('begin() await'), 'await environmentSelection.begin();')
     .replace(seam('objects.begin mount'), `await objects.begin(state.activeWorldEntry?.authoredVersionId);
       if (scenePreviewPage()) mountScenePreview({ state, renderer });
-      else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects});`)
+      else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects, send: sendPlanned, binding: activeEntryWriteBinding});`)
     .replace(seam('Your worlds pictures'), '    picture: (entry) => frontDoorPicture(entry) ?? worldPicture(entry),')
     .replace(seam('Your worlds open'), '  const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => openFromFrontDoor(entry.entryId);')
     .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries });');

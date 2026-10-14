@@ -3,6 +3,7 @@ import { ACTION_LABELS, ACTIVITY_LABELS } from '/src/society-activity-words.ts';
 import { buildInventoryRows, inventoryDetailPath, rowForSceneSelection } from './inventory-records.ts';
 import { assertSelectedOffer, inspectionFacts } from './entity-inspection.mjs';
 import { mountEntitySheet } from './entity-sheet.ts';
+import { mountBuildMode } from './build-mode.ts';
 import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { DECIDER_MARKS } from '/src/decider-marks.ts';
 import { DISCOVERY, attentionCandidates, inspectionReach, promptPresentation, layoutDiscovery, markerAt } from './discovery-policy.mjs';
@@ -16,7 +17,7 @@ import './contextual-world.css';
 let disposePrior = () => {};
 
 /** Targeting and inspection use real native hits and authorized inventory identities. */
-export async function mountContextualWorld({ state, renderer, selection, objects }) {
+export async function mountContextualWorld({ state, renderer, selection, objects, send, binding }) {
   disposePrior();
   const b = renderer.atlas.binding, canvas = document.getElementById('atlas');
   const entry = state.activeWorldEntry;
@@ -100,6 +101,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!response.ok) throw Error(response.status === 424 ? 'This source is no longer available.' : 'This world could not be read. Try again.');
     return response.json();
   };
+  // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
+  const build = send && binding && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1'
+    ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, inspecting: () => !panel.hidden }) : null;
   function node(tag, words = '', cls = '') {
     const item = document.createElement(tag); item.textContent = String(words); item.className = cls; return item;
   }
@@ -400,11 +404,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!panel.hidden) return;
     pointer = { x: event.clientX, y: event.clientY };
     pointerIntent = !press.moved || !target;
+    if (!press.moved && press.button === 0) build?.click(event.clientX, event.clientY);
     // The centre aim controls E. Canvas clicks do not select whatever lies under a spare cursor.
   }, { capture: true, signal: lifetime.signal });
   canvas.addEventListener('contextmenu', event => event.preventDefault(), { signal: lifetime.signal });
   window.addEventListener('blur', () => { dragging = null; pointer = null; pointerIntent = false; mouseHint.textContent = 'Drag to look'; }, { signal: lifetime.signal });
   window.addEventListener('keydown', event => {
+    if (panel.hidden && build?.key(event)) { event.stopImmediatePropagation(); return; }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (!panel.hidden) {
       if (entitySheet?.key(event)) { event.stopImmediatePropagation(); return; }
@@ -438,6 +444,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       discoveryCosts.push(performance.now() - discoveryStart); if (discoveryCosts.length > 120) discoveryCosts.shift();
     }
     positionMarkers();
+    build?.frame(now);
     if (panel.hidden && now - lastPick >= 33) {
       lastPick = now;
       const row = picked(innerWidth / 2, innerHeight / 2);
@@ -494,6 +501,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   disposePrior = () => {
     stopFollowing();
     disposeFrameMeasurement();
+    build?.dispose();
     entitySheet?.dispose(); entitySheet = null;
     lifetime.abort(); sizeObserver.disconnect(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
     b.controls.onPointerPick = priorCallbacks.pick; b.controls.onInteract = priorCallbacks.interact;
