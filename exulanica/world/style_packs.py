@@ -357,6 +357,42 @@ def _sun(value: Any, path: str) -> dict[str, Any]:
     return sun
 
 
+def _haze(value: Any, path: str) -> dict[str, Any]:
+    # Haze thinning with height, in place of the preset's fog when stated.
+    return _object(
+        value,
+        path,
+        {
+            "density_micro": _integer(1, 6000),
+            "falloff_micro": _integer(100, 50_000),
+            "base_mm": _integer(-50_000, 50_000),
+            "max_depth_permille": _integer(1, 8000),
+            "colour": _nullable(_srgb8),
+        },
+    )
+
+
+def _water(value: Any, path: str) -> dict[str, Any]:
+    # How a water surface is finished: colour by depth, what it absorbs, its foam and reflection.
+    def absorption(v: Any, p: str) -> list[int]:
+        if not isinstance(v, list) or len(v) != 3:
+            _fail("shape", p, "must be three absorptions per kilometre")
+        return [_integer(0, 5000)(n, f"{p}[{i}]") for i, n in enumerate(v)]
+
+    return _object(
+        value,
+        path,
+        {
+            "shallow": _srgb8,
+            "deep": _srgb8,
+            "absorption_per_km": absorption,
+            "depth_scale_mm": _integer(500, 50_000),
+            "foam_width_mm": _integer(0, 2000),
+            "reflection_permille": _integer(0, 2000),
+        },
+    )
+
+
 def _light_preset(value: Any, path: str) -> dict[str, Any]:
     clouds = _nullable(
         lambda c, q: _object(
@@ -444,6 +480,8 @@ def _light_preset(value: Any, path: str) -> dict[str, Any]:
                 },
             ),
             "post": lambda v, p: _object(v, p, post),
+            # Added within the profile: a preset written before it draws its fog.
+            "haze": _Optional(_haze),
         },
     )
 
@@ -700,6 +738,8 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                     },
                 )
             ),
+            # Added within the profile: a pack written before it draws water as its surface states.
+            "water": _Optional(_water),
             "palette": lambda v, p: _object(
                 v,
                 p,

@@ -45,9 +45,10 @@ is the text as stored, in the order it is stored.
 | `licence`, `authors` | `CC0-1.0`, or `CC-BY-4.0` with its attribution, or for an uploaded pack only `LicenseRef-Exulanica-Own-Work` with none (a person's own work, used in their own workspace and never public); who made it |
 | `preview` | A listed picture (`.jpg`, `.png` or `.webp`, at most 512 KiB) that shows what the pack looks like, for a person choosing one, or none; absent, none |
 | `base` | The pack this one is drawn on, by id, version and manifest digest, or none |
-| `light` | Named presets (at most six) and the default one; each preset is a sky, a fog, a sun with a one-tap, three-tap or five-tap shadow filter, image light, contact shadowing and a finish, in whole-number units. A pack may not choose soft (PCSS) shadows: they alone cost more than a frame ([render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses)) |
+| `light` | Named presets (at most six) and the default one; each preset is a sky, a fog, a sun with a one-tap, three-tap or five-tap shadow filter, image light, contact shadowing and a finish, in whole-number units, and optionally a haze that thins with height (`haze`: density and falloff per million metres, base height, a cap on its depth, and a colour or the sky's horizon), drawn in place of the fog. A preset written before haze existed states none and draws its fog. A pack may not choose soft (PCSS) shadows: they alone cost more than a frame ([render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses)) |
 | `shading` | `pbr`, `toon` with its bands, or `flat`, and an ink colour or none |
 | `edge` | The ground beyond the world: a colour, how far below the tiles it lies, how far it reaches |
+| `water` | Optional: how the pack finishes water under physically based shading: a shallow and a deep colour, absorption per kilometre for each colour channel, the depth over which the colour turns from shallow to deep, the width of the foam where water meets what stands in it, and the strength of its reflection. Absent, as in every pack written before it, water is drawn as its surface states; nearer packs of a chain replace a base's finish whole |
 | `palette` | At most 64 swatches, each a distinct sRGB colour with roughness, metalness and emission |
 | `look_family_catalog` | Optional retained appearance catalog pin, `{version, sha256}`; the digest names the exact catalog file bytes. Absence retains version 1 and adds nothing to the manifest's canonical bytes |
 | `surfaces` | A look role of a surface family to a swatch or a texture set, with an optional swatch for upward faces |
@@ -291,7 +292,13 @@ Texture surfaces retain their served rectangle rather than expanding for a cosme
 The ground beyond uses the base ground's physical texture scale. Water swatches in PBR shading
 carry animated normal ripples; these are cosmetic, with no change to basin geometry, keep-outs,
 movement or simulation. Toon water keeps its static pattern. Glazing samples the drawn scene;
-water reflects the environment, without a separate planar reflection pass.
+water reflects the environment, without a separate planar reflection pass. A pack that states a
+`water` finish has its PBR water coloured by its own depth: the scene's depth behind the surface
+gives the water's thickness, what lies under shallow water shows through, deep water takes the deep
+colour, and thin water foams against what stands in it. It is blended over the drawn scene with
+one transmittance (the mean of the three channels' absorption), so it needs no copy of the scene's
+colour; the per-channel tint of the seabed is approximated by that mean. It is GLSL only: on a
+WebGPU device the finish is not applied and the water keeps its ripples.
 
 The optional `?measure=1` review mode records a bounded frame-interval sample, draw calls, canvas
 resolution, graphics backend, camera position and facing, and accounted texture bytes on the canvas. Frame intervals are not

@@ -18,7 +18,7 @@ import { swatchMaterial } from './swatch-material.js';
 import { SiteTextures } from './site-textures.js';
 import { WaterRipples } from './water-material.js';
 import type { PreparedTextureSet } from '../generated-tile/texture-materials.js';
-import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
+import { TILE_LOOK_V1, isRenderLook, type TileLook } from '../generated-tile/look.js';
 import { seatGeometry, type SeatGeometry } from '../generated-site/site-seating.js';
 
 /**
@@ -140,6 +140,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const device = host.app.graphicsDevice;
     const textures = new SiteTextures(device, dressing.look ?? TILE_LOOK_V1, dressing.textures);
     const water = new WaterRipples(host.app);
+    // A look's water finish, when it states one; otherwise water keeps its ripples alone.
+    const waterFinish = dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.water ?? null : null;
     const texturedSlots = new Set<string>();
     const made: pc.StandardMaterial[] = [];
     const replaced: (readonly [pc.MeshInstance, pc.Material])[] = [];
@@ -195,7 +197,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         let material = surfaceMaterials.get(resolved.role);
         if (material === undefined) {
           material = swatchMaterial(resolved.material.swatch, null, shading, `style-pack:material:${resolved.role}`);
-          if (slot.family === 'water' && shading.model === 'pbr') water.add(material);
+          if (slot.family === 'water' && shading.model === 'pbr') water.add(material, waterFinish);
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
           made.push(material);
           surfaceMaterials.set(resolved.role, material);
@@ -218,7 +220,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         let material = surfaceMaterials.get(key);
         if (material === undefined) {
           material = swatchMaterial(resolved.swatch, resolved.up, shading, `style-pack:surface:${key}`);
-          if (slot.family === 'water' && shading.model === 'pbr') water.add(material);
+          if (slot.family === 'water' && shading.model === 'pbr') water.add(material, waterFinish);
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
           made.push(material);
           surfaceMaterials.set(key, material);

@@ -37,8 +37,10 @@ export function renderLookOfPreset(
   shading: NonNullable<StylePackManifest['shading']>,
   edge: StylePackManifest['edge'],
   version = 1,
+  water?: StylePackManifest['water'],
 ): RenderLook {
   const sky = preset.sky;
+  const haze = preset.haze;
   const post = preset.post;
   const look: RenderLook = {
     id: RENDER_LOOK_ID,
@@ -125,6 +127,25 @@ export function renderLookOfPreset(
       ink: shading.ink === null ? null : linearRgb(shading.ink),
     },
     edge: edge === null ? null : { ground: linearRgb(edge.ground), dropM: edge.drop_mm / 1000, reachM: edge.reach_mm / 1000 },
+    ...(haze === undefined ? {} : {
+      haze: {
+        density: haze.density_micro / 1_000_000,
+        falloff: haze.falloff_micro / 1_000_000,
+        baseM: haze.base_mm / 1000,
+        maxDepth: haze.max_depth_permille / 1000,
+        colour: haze.colour === null ? null : linearRgb(haze.colour),
+      },
+    }),
+    ...(water === undefined ? {} : {
+      water: {
+        shallow: linearRgb(water.shallow),
+        deep: linearRgb(water.deep),
+        absorption: [water.absorption_per_km[0] / 1000, water.absorption_per_km[1] / 1000, water.absorption_per_km[2] / 1000] as const,
+        depthScaleM: water.depth_scale_mm / 1000,
+        foamWidthM: water.foam_width_mm / 1000,
+        reflection: water.reflection_permille / 1000,
+      },
+    }),
     unavailable: TILE_LOOK_V1.unavailable,
   };
   return validateRenderLook(look);

@@ -83,6 +83,26 @@ export interface StylePackSkyPreset {
   readonly face_texels: number;
 }
 
+/** Haze that thins with height, drawn in place of the preset's fog when stated. */
+export interface StylePackHaze {
+  readonly density_micro: number;
+  readonly falloff_micro: number;
+  readonly base_mm: number;
+  readonly max_depth_permille: number;
+  /** Null: the colour of the sky at the horizon. */
+  readonly colour: Srgb8 | null;
+}
+
+/** How a pack finishes water: colour by depth, what it absorbs, its foam and its reflection. */
+export interface StylePackWater {
+  readonly shallow: Srgb8;
+  readonly deep: Srgb8;
+  readonly absorption_per_km: readonly [number, number, number];
+  readonly depth_scale_mm: number;
+  readonly foam_width_mm: number;
+  readonly reflection_permille: number;
+}
+
 export type StylePackFog =
   | { readonly kind: 'linear'; readonly start_mm: number; readonly end_mm: number; readonly colour: Srgb8 }
   | { readonly kind: 'exp2'; readonly density_micro: number; readonly colour: Srgb8 };
@@ -120,6 +140,8 @@ export interface StylePackLightPreset {
     } | null;
     readonly taa: boolean;
   };
+  /** Absent in a preset written before it: the preset's fog is drawn. */
+  readonly haze?: StylePackHaze;
 }
 
 export interface StylePackSwatch {
@@ -184,6 +206,8 @@ export interface StylePackManifest {
     readonly ink: Srgb8 | null;
   } | null;
   readonly edge: { readonly ground: Srgb8; readonly drop_mm: number; readonly reach_mm: number } | null;
+  /** Absent in a pack written before it: water is drawn as its surface states. */
+  readonly water?: StylePackWater;
   readonly palette: { readonly encoding: typeof STYLE_PACK_COLOUR_ENCODING; readonly swatches: readonly StylePackSwatch[] };
   readonly look_family_catalog?: { readonly version: number; readonly sha256: string };
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
@@ -358,6 +382,11 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
       })),
       taa: boolean,
     }),
+    // Added within the profile: a preset written before it draws its fog.
+    haze: optional((v, p) => object(v, p, {
+      density_micro: integer(1, 6000), falloff_micro: integer(100, 50_000), base_mm: integer(-50_000, 50_000),
+      max_depth_permille: permille(1, 8000), colour: nullable(srgb8),
+    })),
   }) as unknown as StylePackLightPreset;
 }
 
@@ -437,6 +466,18 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
       ink: nullable(srgb8),
     })),
     edge: nullable((v, p) => object(v, p, { ground: srgb8, drop_mm: integer(200, 5000), reach_mm: integer(200_000, 8_000_000) })),
+    // Added within the profile: a pack written before it draws water as its surface states.
+    water: optional((v, p) => object(v, p, {
+      shallow: srgb8,
+      deep: srgb8,
+      absorption_per_km: (a, q) => {
+        if (!Array.isArray(a) || a.length !== 3) return fail('shape', q, 'must be three absorptions per kilometre');
+        return a.map((n, i) => integer(0, 5000)(n, `${q}[${i}]`));
+      },
+      depth_scale_mm: integer(500, 50_000),
+      foam_width_mm: integer(0, 2000),
+      reflection_permille: permille(0, 2000),
+    })),
     palette: (v, p) => object(v, p, {
       encoding: literal(STYLE_PACK_COLOUR_ENCODING),
       swatches: list((s, q) => object(s, q, {
@@ -597,6 +638,8 @@ export interface ResolvedStylePack {
   readonly light: NonNullable<StylePackManifest['light']>;
   readonly shading: NonNullable<StylePackManifest['shading']>;
   readonly edge: StylePackManifest['edge'];
+  /** The nearest water finish the chain states; absent when none does. */
+  readonly water?: StylePackWater;
   readonly swatches: ReadonlyMap<string, StylePackSwatch>;
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
   readonly modules: Readonly<Record<string, ResolvedModule>>;
@@ -646,6 +689,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   let light: StylePackManifest['light'] = null;
   let shading: StylePackManifest['shading'] = null;
   let edge: StylePackManifest['edge'] | undefined;
+  let water: StylePackWater | undefined;
   for (let index = chain.length - 1; index >= 0; index -= 1) {
     const manifest = chain[index]!;
     for (const swatch of manifest.palette.swatches) swatches.set(swatch.key, swatch);
@@ -655,8 +699,9 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     if (manifest.light !== null) light = manifest.light;
     if (manifest.shading !== null) shading = manifest.shading;
     if (manifest.base === null || manifest.edge !== null) edge = manifest.edge;
+    if (manifest.water !== undefined) water = manifest.water;
   }
-  return { chain, light: light!, shading: shading!, edge: edge ?? null, swatches, surfaces, modules };
+  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, modules };
 }
 
 /** A slot as a world kind states it: millimetres, base centre, front +y, up +z. */

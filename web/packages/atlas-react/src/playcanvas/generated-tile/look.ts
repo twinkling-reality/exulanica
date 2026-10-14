@@ -192,7 +192,11 @@ type Shape =
   /** The shape, or null: a section a look may leave out by saying so. */
   | { readonly kind: 'nullable'; readonly shape: Shape }
   /** One of several object shapes, chosen by the value of one key every variant has. */
-  | { readonly kind: 'variant'; readonly key: string; readonly variants: Readonly<Record<string, Shape>> };
+  | { readonly kind: 'variant'; readonly key: string; readonly variants: Readonly<Record<string, Shape>> }
+  /** A field a look may leave out: absent keeps the meaning a look had before the field existed. */
+  | { readonly kind: 'optional'; readonly shape: Shape }
+  /** Three finite numbers within a range, one per colour channel. */
+  | { readonly kind: 'triple'; readonly min: number; readonly max: number };
 
 const num = (min: number, max: number, integer = false): Shape => ({ kind: 'number', min, max, integer });
 const rgb: Shape = { kind: 'rgb' };
@@ -280,11 +284,23 @@ function check(value: unknown, shape: Shape, path: string): void {
         if (!(key in shape.fields)) fail(`has an unknown key ${JSON.stringify(key)}`);
       }
       for (const [key, field] of Object.entries(shape.fields)) {
-        if (!(key in record)) fail(`is missing ${JSON.stringify(key)}`);
-        check(record[key], field, path === '' ? key : `${path}.${key}`);
+        if (!(key in record)) {
+          if (field.kind === 'optional') continue;
+          fail(`is missing ${JSON.stringify(key)}`);
+        }
+        check(record[key], field.kind === 'optional' ? field.shape : field, path === '' ? key : `${path}.${key}`);
       }
       return;
     }
+    case 'optional':
+      check(value, shape.shape, path);
+      return;
+    case 'triple':
+      if (!Array.isArray(value) || value.length !== 3 ||
+          !value.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= shape.min && n <= shape.max)) {
+        fail(`must be three numbers within ${shape.min} to ${shape.max}`);
+      }
+      return;
     case 'nullable':
       if (value !== null) check(value, shape.shape, path);
       return;
@@ -374,6 +390,33 @@ export interface RenderSky {
   readonly faceTexels: number;
 }
 
+/** Haze thinning with height, integrated along each view ray; drawn in place of the fog. */
+export interface RenderHaze {
+  /** Extinction per metre at the base height. */
+  readonly density: number;
+  /** Exponential falloff per metre of height above the base. */
+  readonly falloff: number;
+  readonly baseM: number;
+  /** The most optical depth any ray reaches, so the far sky line keeps a trace of land. */
+  readonly maxDepth: number;
+  /** Linear colour of the haze away from the sun; null: the sky's horizon. */
+  readonly colour: Rgb | null;
+}
+
+/** How water surfaces are finished under physically based shading. */
+export interface RenderWater {
+  readonly shallow: Rgb;
+  readonly deep: Rgb;
+  /** Absorption per metre of water, per colour channel. */
+  readonly absorption: readonly [number, number, number];
+  /** Water depth over which the body colour turns from shallow to deep, metres. */
+  readonly depthScaleM: number;
+  /** Water thinner than this foams against what it meets, metres. */
+  readonly foamWidthM: number;
+  /** Scale of the surface's reflection, 0 to 2. */
+  readonly reflection: number;
+}
+
 export type RenderFog =
   | { readonly kind: 'linear'; readonly startM: number; readonly endM: number; readonly colour: Rgb }
   | { readonly kind: 'exp2'; readonly density: number; readonly colour: Rgb };
@@ -444,6 +487,10 @@ export interface RenderLook {
   readonly post: RenderPost;
   readonly shading: RenderShading;
   readonly edge: RenderEdge | null;
+  /** Absent: the fog is drawn. */
+  readonly haze?: RenderHaze;
+  /** Absent: water is drawn as its surface states. */
+  readonly water?: RenderWater;
   readonly unavailable: TileLookV1['unavailable'];
 }
 
@@ -457,6 +504,7 @@ export type TileLook = TileLookV1 | RenderLook;
 export const isRenderLook = (look: TileLook): look is RenderLook => look.id === RENDER_LOOK_ID;
 
 const nullable = (shape: Shape): Shape => ({ kind: 'nullable', shape });
+const optional = (shape: Shape): Shape => ({ kind: 'optional', shape });
 const enumOf = (...values: string[]): Shape => ({ kind: 'enum', values });
 
 /** The tile look's sections a render look keeps unchanged, by the same bounds. */
@@ -517,6 +565,10 @@ const RENDER_SHAPE: Shape = obj({
     ink: nullable(rgb),
   }),
   edge: nullable(obj({ ground: rgb, dropM: num(0.2, 5), reachM: num(200, 8000) })),
+  haze: optional(obj({ density: num(0.000001, 0.006), falloff: num(0.0001, 0.05), baseM: num(-50, 50), maxDepth: num(0.001, 8), colour: nullable(rgb) })),
+  water: optional(obj({
+    shallow: rgb, deep: rgb, absorption: { kind: 'triple', min: 0, max: 5 }, depthScaleM: num(0.5, 50), foamWidthM: num(0, 2), reflection: num(0, 2),
+  })),
   unavailable: tileField('unavailable'),
 });
 

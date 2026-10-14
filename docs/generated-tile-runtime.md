@@ -355,12 +355,19 @@ and sets them and can never supply shader code.
 | Sky (`sky.ts`) | A high dynamic range sky from a function of direction: horizon to zenith, the ground below, a glow and a disc toward the sun, and clouds above the horizon from integer-hashed noise, so one seed draws one sky on every machine. Drawn at `faceTexels` per face |
 | Image light | Prefiltered from the same function with the look's `bounceGround` below the horizon and no sun disc, so a coloured ground does not tint every wall and the sun is not counted twice |
 | Fog | Linear, held to the 40 to 60 m onset target, or exponential, at most 0.006 per metre |
+| Haze (`aerial-haze.ts`), optional | Exponential height fog integrated along each view ray, so a far valley fades while a high ridge stays a silhouette, turning toward the sun's colour when looking toward the sun; drawn in place of the fog. One block inserted before tone mapping in the device's lit end chunk, guarded by a uniform: with no haze the block is skipped and the end chunk computes what it did. A program built before a hazy look installed the block draws without haze. GLSL only; on WebGPU the fog is drawn |
+| Water finish (`water-material.ts`), optional | Water coloured by its own thickness from the scene's depth map: absorbed light, the seabed through shallow water, the deep colour, and foam at thin edges; blended over the scene without a colour copy (see the style pack contract). GLSL only |
 | Sun and shadows | Elevation, azimuth, colour and intensity; shadow maps up to 4096 texels in up to four cascades; one-tap, three-tap or five-tap filtering, or soft (PCSS) filtering with a penumbra, which a person may choose as a quality setting and a style pack may not, since it alone costs more than a frame (below) |
 | Contact shadowing and the probe | As the tile look: neither has an off switch |
 | Finish | The camera frame's bloom, grading, colour enhancement, vignette and temporal anti-aliasing, each optional or bounded |
 | Shading model (`shading.ts`) | `pbr`, the engine's own; `toon`, two lit bands whose edges and share the look states; `flat`, each fragment's normal from screen-space derivatives, so every triangle is a facet. The chunk text is this module's in GLSL and WGSL; only validated numbers reach it. Each texture set's material takes the model when it is uploaded, all but glass, whose own chunk draws its reflection |
 | Edge ground | A ground plane round the world's origin, below every carriageway, so a world never stands in a void; the environment adds it and takes it away |
 | Ink (`ink.ts`) | `attachTileInk` lays one-pixel lines on the creases and outlines of the opaque meshes a tile drew (never glass or leaves), matching edges by end points to a tenth of a millimetre, so triangulation diagonals and seams between coplanar pieces are never drawn, and lifting each line 25 mm off its faces |
+
+A look leaves both optional parts out unless its pack states them, and a look without them is the
+same object it was before they existed; `web/packages/atlas-react/test/render-look-finish.test.ts`
+holds their conversion, refusals, the haze block's placement and the water material with and
+without a finish. Their cost is not yet measured in the product; no authored pack states them.
 
 `web/packages/atlas-react/test/generated-tile-render-look.test.ts` holds the descriptor's refusals,
 the sky's colours at the zenith, horizon and nadir, the disc kept out of the image light, the clouds'

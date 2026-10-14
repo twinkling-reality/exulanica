@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import { isRenderLook, sunDirection, type RenderLook, type Rgb, type TileLook, type TileLookV1 } from './look.js';
 import { cubeFaceDirection, renderSkyFaces } from './sky.js';
 import { ShadowDetail } from './shadow-detail.js';
+import { installAerialHaze, setAerialHaze } from './aerial-haze.js';
 
 /**
  * The light a generated street stands in, built from one {@link TileLook}.
@@ -268,6 +269,13 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
   app.root.addChild(sun);
   // Small casters keep their shadows near the eye and leave the coarse far cascades (`shadow-detail.ts`).
   const shadowDetail = new ShadowDetail(app);
+  // A render look's haze, when it states one, is drawn in place of its fog (`aerial-haze.ts`).
+  const haze = isRenderLook(look) ? look.haze ?? null : null;
+  const hazeDrawn = haze !== null && installAerialHaze(device);
+  if (hazeDrawn) {
+    scene.fog.type = pc.FOG_NONE;
+    setAerialHaze(device, haze, look.sky.horizon, look.sun.colour, [-dx, -dy, -dz]);
+  }
 
   // A render look's ground beyond the tiles: a plane round the world's origin, below every
   // carriageway, so a world never stands on its tiles in a void.
@@ -347,6 +355,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
       sky.destroy();
       scene.exposure = saved.exposure;
       scene.ambientLight = saved.ambient;
+      if (hazeDrawn) setAerialHaze(device, null, look.sky.horizon, look.sun.colour, [0, 1, 0]);
       scene.fog.type = saved.fogType;
       scene.fog.start = saved.fogStart;
       scene.fog.end = saved.fogEnd;
