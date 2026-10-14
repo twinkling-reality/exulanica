@@ -194,11 +194,17 @@ refusal is said by its code: a wrong code, a day's guests all admitted (with whe
 by the server itself. The developer's token entry stays last, under "or, for developers".
 
 A generated town opens where a person arrives, facing the middle of what was placed in it (a scene
-dressed for an arrival stands across the street); where a vehicle parked at the kerb, or anything the
-town's tiles state at a standing person's eye height (a building, a trunk, a lamp post), would stand
-between them, the first view steps along the footway, then back from the kerb, to the nearest spot on
-drawn ground with a clear sight of it (`composition/arrival-view.ts`), and keeps the arrival where none
-is near. A town with nothing placed in it is not looked at straight across the road, at the wall
+dressed for an arrival stands across the street). A spot sees what was placed when nothing the town's
+tiles state at a standing person's eye height (a building, a trunk, a lamp post) stands between them,
+and nothing of that kind stands dead ahead nearer than the distance the first view keeps clear
+(below), so the view is never of a wall a few steps away. Where the arrival does not see it, or a
+vehicle parked at the kerb stands in the way, the first view steps along the footway, then back from
+the kerb, to the nearest spot on drawn ground that sees it past every parked vehicle
+(`composition/arrival-view.ts`); where a parked vehicle is in the way from every such spot, it takes
+the one whose nearest vehicle in the way is farthest. Where no spot near the footway sees it at all,
+because it stands inside or close against a building, the view steps out toward and across the
+street, at most 12 m, to the nearest spot that does, and where none does, the town opens as one with
+nothing placed in it. A town with nothing placed in it is not looked at straight across the road, at the wall
 opposite: the first view looks along the street at a slant, one way or the other, from the served spot
 or a few steps from it on drawn ground (back from the kerb, off the line people walk, or along the
 footway). It takes the spot and the way that hold most of the town's life: its seats, found among its

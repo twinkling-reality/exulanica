@@ -23,6 +23,17 @@ export function worldAddress(entryId, origin) {
   return target.href;
 }
 
+/**
+ * Where the address goes once the workspace's world view has opened the saved world `entryId` on the
+ * page at `href`: that world's own address, so a reload opens it again, or null where the address
+ * already names it. A scene preview's address never changes.
+ */
+export function openWorldAddress(href, entryId) {
+  const current = new URL(href);
+  if (isScenePreview(current) || current.searchParams.get('entry') === entryId) return null;
+  return worldAddress(entryId, current.origin);
+}
+
 /** The live background for the chosen world: the same saved world, drawn read-only. */
 export function scenePreviewAddress(entryId, origin) {
   const target = new URL(worldAddress(entryId, origin));

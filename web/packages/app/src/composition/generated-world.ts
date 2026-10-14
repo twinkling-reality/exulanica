@@ -375,9 +375,12 @@ export async function loadGeneratedWorld(
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
   }
+  // Each container came through the world's version, which serves a tile only once its two bakes
+  // agreed, and is held to the digest that route names (`worldTileBytes`): decoded, not baked again.
   const plain = await route.loadGeneratedTile({
     name: first!.name,
     bytes: first!.bytes,
+    proof: 'agreeing-server-bakes',
     manifest: parseTextureSetManifest(library.textureManifest),
     fetchSet: (set) => library.textureSet(set.contentSha256),
     ...(neighbours.length === 0 ? {} : { neighbours }),

@@ -2,7 +2,7 @@ import './front-door.css';
 import captures from 'virtual:front-door-captures';
 import { createScenePreview, scenePreviewPage } from './front-door-preview.ts';
 import { showWorldDetails } from './front-door-details.ts';
-import { capturedPicture, frontDoorAddress, worldAddress } from './front-door-routes.mjs';
+import { capturedPicture, frontDoorAddress, openWorldAddress, worldAddress } from './front-door-routes.mjs';
 import { worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
@@ -30,6 +30,22 @@ export function openFromFrontDoor(entryId: string): Promise<void> {
 export function returnToFrontDoor(entryId: string): void {
   history.replaceState({ ...history.state, [CHOSEN]: entryId }, '', frontDoorAddress(location.origin));
   location.reload();
+}
+
+/**
+ * Keep the world open here in the address. A world opened within this page, as Create a world's Open
+ * world opens one, takes the address Open from the front door gives it, so a reload opens it again;
+ * the front door's own history entry keeps it chosen, and Back to that entry shows the front door.
+ * Listens until `signal` aborts.
+ */
+export function keepWorldInAddress(entryId: string, signal: AbortSignal): void {
+  const address = openWorldAddress(location.href, entryId);
+  if (address !== null) {
+    history.replaceState({ ...history.state, [CHOSEN]: entryId }, '', location.href);
+    history.pushState(null, '', address);
+  }
+  // Back from an address this page pushed stays in this document, which still shows the world.
+  window.addEventListener('popstate', () => { if (openWorldAddress(location.href, entryId) !== null) location.reload(); }, { signal });
 }
 
 /** Rearrange Your worlds into the front door without replacing its actions or availability rules. */

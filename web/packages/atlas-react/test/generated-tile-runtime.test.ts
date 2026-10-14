@@ -182,6 +182,22 @@ describe('loading a baked tile through tess\'s decoder', () => {
     // Four loads of a container whose navigation envelope is now carved, each digesting it whole.
   }, VERIFIED_LOAD_TIMEOUT_MS);
 
+  it('decodes a tile its caller holds by two agreeing server bakes, without baking it again', async () => {
+    const proof = 'agreeing-server-bakes' as const;
+    const served = await loadGeneratedTile({ name: 'tile-conformance', bytes: baked, manifest, fetchSet: noSets, digest: subtle, proof });
+    expect(served.ranges).toEqual(tile.ranges);
+    expect(served.navigation.start).toEqual(tile.navigation.start);
+    // What this read no longer checks: a float of the payload changed in place, which the default
+    // refuses (above), decodes. What holds it instead is the server's two bakes and the route's digest.
+    const at = decodeOwd(baked).header.sections.find((section) => section.name === 'position')!.byte_offset + 1;
+    const changed = new Uint8Array(baked);
+    changed[at] = changed[at]! ^ 1;
+    await expect(loadGeneratedTile({ name: 'changed', bytes: changed, manifest, fetchSet: noSets, digest: subtle, proof })).resolves.toBeDefined();
+    // A layout that does not decode is still refused.
+    await expect(loadGeneratedTile({ name: 'short', bytes: baked.subarray(0, baked.byteLength - 4), manifest, fetchSet: noSets, digest: subtle, proof }))
+      .rejects.toBeInstanceOf(GeneratedTileRefusal);
+  }, VERIFIED_LOAD_TIMEOUT_MS);
+
   it('refuses every tile on a page without crypto.subtle', async () => {
     await expect(loadGeneratedTile({ name: 'x', bytes: baked, manifest, fetchSet: noSets, digest: null }))
       .rejects.toThrow(/no crypto\.subtle/);
@@ -775,6 +791,17 @@ describe('a world of several tiles, drawn', () => {
       neighbours: [{ name: 'the east half', bytes: east }],
     });
   }, 120_000);
+
+  it('reads a neighbour as it reads the tile, decoded where the caller holds both by agreeing server bakes', async () => {
+    const at = decodeOwd(east).header.sections.find((section) => section.name === 'position')!.byte_offset + 1;
+    const changed = new Uint8Array(east);
+    changed[at] = changed[at]! ^ 1;
+    const sources = { name: 'the west half', bytes: west, manifest, fetchSet: noSets, digest: subtle, neighbours: [{ name: 'the east half', bytes: changed }] };
+    // Positive control: baked again on this page, the changed neighbour is refused by name.
+    await expect(loadGeneratedTile(sources)).rejects.toThrow(/^Neighbour the east half refused/);
+    const served = await loadGeneratedTile({ ...sources, proof: 'agreeing-server-bakes' });
+    expect(served.worldTiles).toEqual(world.worldTiles);
+  }, VERIFIED_LOAD_TIMEOUT_MS);
 
   it('draws the neighbour, and counts each tile under its own name rather than adding them up', () => {
     const renderOf = (bytes: Uint8Array): DecodedProjection =>

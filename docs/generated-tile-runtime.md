@@ -233,11 +233,19 @@ Normal map sign: PlayCanvas derives its bitangent toward increasing v and the se
 
 `loadGeneratedTile(sources)` (`tile-runtime.ts`) consumes tess's pure core,
 `@exulanica/loom-tess/core`, the only tess entry shipping code may import (tess's rule in
-`web/.dependency-cruiser.cjs`). It calls `verifyOwd`, which decodes the container and bakes the
-header's records again, requiring every byte to match; there is no second reader and nothing is
+`web/.dependency-cruiser.cjs`). By default it calls `verifyOwd`, which decodes the container and
+bakes the header's records again, requiring every byte to match; the evaluation entry (section 7)
+and every caller that does not say otherwise read tiles this way. A saved world's tiles, read through
+its version (`GET /world/versions/{version_id}/tiles/{tile_id}/bytes`), are held another way
+(`proof: 'agreeing-server-bakes'`): the server serves a tile only once two bakes of it agreed (section
+7), and the page holds the bytes it receives to the SHA-256 the route names in its `ETag`. Such a tile
+is decoded, which checks its layout, and is not baked a third time on the page: that bake was most of
+the wait before a town appeared, about 11 s a tile on the development machine under load. What the page
+then no longer checks itself is that the geometry it decoded is what the tile's records bake to; the
+server's agreeing bakes are what say so. Either way there is no second reader and nothing is
 repaired. The container is tess's `owd/3`. It refuses a page with no `crypto.subtle`, a tile that
-fails verification, a grammar frame other than `city_local` (section 5 has the capsule it also
-reads), and a tile with no `render_batch`, no surface coordinates or no drawn range.
+fails verification or does not decode, a grammar frame other than `city_local` (section 5 has the
+capsule it also reads), and a tile with no `render_batch`, no surface coordinates or no drawn range.
 
 Only `render_batch` is drawn, and only its drawn entries, exactly as stored. A drawn entry is a list
 of surfaces: contiguous runs of its triangles that share no vertex, each with one grammar role, one

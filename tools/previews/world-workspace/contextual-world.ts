@@ -8,7 +8,7 @@ import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { DECIDER_MARKS } from '/src/decider-marks.ts';
 import { DISCOVERY, attentionCandidates, inspectionReach, promptPresentation, layoutDiscovery, markerAt } from './discovery-policy.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
-import { returnToFrontDoor } from './front-door.ts';
+import { keepWorldInAddress, returnToFrontDoor } from './front-door.ts';
 import { keepWorldPicture } from '/src/composition/world-pictures.ts';
 import './entity-sheet.css';
 import './blank-world.css';
@@ -36,6 +36,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const pose = following?.pose || b.controls.state, hold = following?.hold || b.controls.hold;
     try { sessionStorage.setItem(viewKey, JSON.stringify({ yaw: pose.yaw, pitch: pose.pitch, pose: { ...pose }, hold })); } catch {}
   };
+  keepWorldInAddress(entry.entryId, lifetime.signal);
   window.addEventListener('beforeunload', rememberView, { signal: lifetime.signal });
   window.addEventListener('keyup', event => { if (event.code.startsWith('Arrow') || ['KeyW','KeyA','KeyS','KeyD'].includes(event.code)) rememberView(); }, { signal: lifetime.signal });
   selection.closePanels(); objects.close();

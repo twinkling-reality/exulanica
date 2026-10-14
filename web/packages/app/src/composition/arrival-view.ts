@@ -12,10 +12,14 @@
  * and doors, with nothing at eye height dead ahead, and the most open of equally alive views. That
  * choice reads the town's own records and nothing that arrives later: parked vehicles do not enter
  * it, so a town opens the same way every time. A caller may also hand what else stands at eye height
- * (a building, a trunk, a lamp post), and a sight line to the placed things is then clear of those too.
- * Where no spot near is clear (a kerb lined with parked cars), it takes the one whose nearest car in the
- * way is farthest from it, so that car stands smallest in the view. Everything is in the region's plan
- * frame: millimetres east and south.
+ * (a building, a trunk, a lamp post), and a sight line to the placed things is then clear of those too,
+ * with nothing of them dead ahead nearer than the distance a rule states, so a view is never of a wall a
+ * few steps away. Where no spot near is clear (a kerb lined with parked cars), it takes the one whose
+ * nearest car in the way is farthest from it, so that car stands smallest in the view. Where no spot near
+ * the footway sees the placed things at all, they stand inside or close against a building: it steps out
+ * toward and across the street to the nearest spot that sees them, and where none does, it takes the
+ * town's own first view, as for a town with nothing placed. Everything is in the region's plan frame:
+ * millimetres east and south.
  */
 import type { LifeViewRule, OpenViewRule } from '../town-first-view.js';
 
@@ -466,13 +470,15 @@ export function arrivalView(input: {
   const { eastMm, southMm, facing } = input;
   const length = Math.hypot(facing[0], facing[1]) || 1;
   const ahead: [number, number] = [facing[0] / length, facing[1] / length];
-  if (input.targets.length === 0 && input.open !== undefined) {
+  /** The town's own first view, chosen as for a town with nothing placed in it. */
+  const townView = (rule: OpenViewRule): ArrivalView => {
     // A rule that judges by life reads the town's own records alone: what is parked is the traffic's
     // state at the second of opening, read with a limit, and would make two openings differ.
-    const rings = input.open.life === undefined
+    const rings = rule.life === undefined
       ? [...(input.blockers ?? []), ...input.parked.map(footprintRing)] : input.blockers ?? [];
-    return openView(input, ahead, rings, input.open, input.life ?? { seats: [], doors: [] });
-  }
+    return openView(input, ahead, rings, rule, input.life ?? { seats: [], doors: [] });
+  };
+  if (input.targets.length === 0 && input.open !== undefined) return townView(input.open);
   const aim: [number, number] = input.targets.length === 0
     ? [eastMm + ahead[0] * AHEAD_MM, southMm + ahead[1] * AHEAD_MM]
     : [
@@ -482,22 +488,30 @@ export function arrivalView(input: {
   const blocking = (east: number, south: number): PlanFootprint[] =>
     input.parked.filter((footprint) => crosses([east, south], aim, footprint));
   /**
-   * Whether nothing else at eye height stands between a spot and the placed things. With nothing
-   * placed there is no such sight line: the view is the way the entry says, past parked cars alone.
+   * Whether a spot sees the placed things by the town's own records: nothing else at eye height stands
+   * between them and, where the rule states how near something may stand dead ahead (version 2 of the
+   * catalog and later), nothing stands there nearer than that, so the view is never of a wall a few
+   * steps away with the things against it or inside it. With nothing placed there is no such sight
+   * line: the view is the way the entry says, past parked cars alone.
    */
-  const unblocked = (east: number, south: number): boolean => {
+  const sees = (east: number, south: number): boolean => {
     const rings = input.targets.length === 0 ? [] : input.blockers ?? [];
     if (rings.length === 0) return true;
     const reach = Math.hypot(aim[0] - east, aim[1] - south);
     if (reach === 0) return true;
-    return openDistance([east, south], [(aim[0] - east) / reach, (aim[1] - south) / reach], rings, reach) >= reach;
+    const toward: [number, number] = [(aim[0] - east) / reach, (aim[1] - south) / reach];
+    if (openDistance([east, south], toward, rings, reach) < reach) return false;
+    const life = input.open?.life;
+    return life === undefined || nearestInWedge([east, south], toward, life.centreHalf, rings) >= life.centreFloorMm;
   };
-  const clear = (east: number, south: number): boolean => blocking(east, south).length === 0 && unblocked(east, south);
+  const clear = (east: number, south: number): boolean => blocking(east, south).length === 0 && sees(east, south);
   /** How far the nearest car in the way stands from a spot (its middle); infinite with none. */
   const nearestBlock = (east: number, south: number): number =>
     Math.min(...blocking(east, south).map((footprint) => Math.hypot(footprint.eastMm - east, footprint.southMm - south)));
   const served: ArrivalView = { eastMm, southMm, yaw: yawToward(eastMm, southMm, aim[0], aim[1]), moved: false };
   if (clear(eastMm, southMm)) return served;
+  const moved = ([east, south]: readonly [number, number, number]): ArrivalView =>
+    ({ eastMm: east, southMm: south, yaw: yawToward(east, south, aim[0], aim[1]), moved: true });
   // Along the footway (across the way a person faces) first, nearest first, then back from the kerb.
   const across: [number, number] = [-ahead[1], ahead[0]];
   const candidates: [number, number, number][] = [];
@@ -517,19 +531,40 @@ export function arrivalView(input: {
   }
   candidates.sort((a, b) => a[2] - b[2]);
   const standing = candidates.filter(([east, south]) => input.ground(east, south));
-  for (const [east, south] of standing) {
-    if (clear(east, south)) {
-      return { eastMm: east, southMm: south, yaw: yawToward(east, south, aim[0], aim[1]), moved: true };
+  for (const spot of standing) {
+    if (clear(spot[0], spot[1])) return moved(spot);
+  }
+  const seeing = standing.filter(([east, south]) => sees(east, south));
+  if (seeing.length === 0 && !sees(eastMm, southMm)) {
+    // No spot near the footway sees the placed things at all: they stand inside or close against what
+    // the town's records stand at eye height. Out toward and across the street, nearest first, to a
+    // spot that sees them past every parked car; where none does, the town's own first view, so the
+    // first look is always at the town and never at a wall.
+    const out: [number, number, number][] = [];
+    for (let forward = 1; forward <= ARRIVAL_STEPS; forward += 1) {
+      for (let step = 0; step <= ARRIVAL_STEPS; step += 1) {
+        for (const side of step === 0 ? [1] : [1, -1]) {
+          const along = side * step * ARRIVAL_STEP_MM;
+          const outward = forward * ARRIVAL_STEP_MM;
+          out.push([eastMm + across[0] * along + ahead[0] * outward, southMm + across[1] * along + ahead[1] * outward, Math.hypot(along, outward)]);
+        }
+      }
     }
+    out.sort((a, b) => a[2] - b[2]);
+    const spot = out.find(([east, south]) => input.ground(east, south) && clear(east, south));
+    if (spot !== undefined) return moved(spot);
+    if (input.open !== undefined) return townView(input.open);
+    return served;
   }
-  // Nothing clear near: the spot whose nearest car in the way is farthest (the served one included).
-  let best: [number, number, number] = [eastMm, southMm, nearestBlock(eastMm, southMm)];
-  for (const [east, south] of standing) {
+  // Every spot near that sees them has a parked car in the way: the one whose nearest car in the way
+  // is farthest (the served one included where it sees them), so that car stands smallest in the view.
+  let best: [number, number, number] | null = sees(eastMm, southMm) ? [eastMm, southMm, nearestBlock(eastMm, southMm)] : null;
+  for (const [east, south] of seeing) {
     const distance = nearestBlock(east, south);
-    if (distance > best[2] + 500) best = [east, south, distance];
+    if (best === null || distance > best[2] + 500) best = [east, south, distance];
   }
-  if (best[0] === eastMm && best[1] === southMm) return served;
-  return { eastMm: best[0], southMm: best[1], yaw: yawToward(best[0], best[1], aim[0], aim[1]), moved: true };
+  if (best === null || (best[0] === eastMm && best[1] === southMm)) return served;
+  return moved(best);
 }
 
 /**

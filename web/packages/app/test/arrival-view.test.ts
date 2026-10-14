@@ -470,3 +470,40 @@ describe('a seat at the viewer\'s feet', () => {
     expect(looks(tightest.yaw)[0]).toBeGreaterThan(0);
   });
 });
+
+/*
+ * A town with things placed, judged by what its records stand at eye height under a rule that states
+ * how near something may stand dead ahead (10 m here): the same street, where a person may stand
+ * anywhere between the two walls.
+ */
+describe('the first view of a town with things placed, by what its records stand', () => {
+  const street = [opposite, behind];
+  const between = (_east: number, south: number) => south > -16_000 && south < 3_000;
+  const dressed = { eastMm: 0, southMm: 0, facing: [0, -1] as const, parked: [], ground: between, blockers: street, open: LIVELY };
+
+  it('keeps the served spot facing a scene across the street, with room before it', () => {
+    const view = arrivalView({ ...dressed, targets: scene });
+    expect(view).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
+    expect(view.yaw).toBeCloseTo(0, 6);
+  });
+
+  it('steps out across the street from a thing placed against the wall behind, to where no wall is near ahead', () => {
+    const against: [number, number][] = [[0, 2_500]];
+    // Positive control: facing it from the arrival, the wall behind it is 3 m off, dead ahead.
+    expect(nearestInWedge([0, 0], [0, 1], LIFE.centreHalf, street)).toBeCloseTo(3_000, 6);
+    const view = arrivalView({ ...dressed, targets: against });
+    // The nearest spot out toward the street from which that wall is at least 10 m off: 7.5 m out.
+    expect(view).toMatchObject({ eastMm: 0, southMm: -7_500, moved: true });
+    expect(looks(view.yaw)[1]).toBeCloseTo(1, 9);
+    expect(nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), LIFE.centreHalf, street)).toBeGreaterThanOrEqual(LIFE.centreFloorMm);
+  });
+
+  it('takes the town\'s own first view where what is placed stands inside a building', () => {
+    const inside: [number, number][] = [[0, 5_000]];
+    const life = { seats: [[12_000, -1_500]] as [number, number][], doors: [] };
+    const view = arrivalView({ ...dressed, targets: inside, life });
+    expect(view).toEqual(arrivalView({ ...dressed, targets: [], life }));
+    // The town's own view looks along the street, toward its seat, not at the wall.
+    expect(looks(view.yaw)[0]).toBeGreaterThan(0);
+  });
+});

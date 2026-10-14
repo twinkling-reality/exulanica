@@ -7,6 +7,7 @@ import {
   OwdError,
   absoluteSurfaceCoordinates,
   absoluteVertices,
+  decodeOwd,
   verifyOwd,
   type DecodedOwd,
   type DecodedProjection,
@@ -55,9 +56,12 @@ import {
 /**
  * One baked `.owd` tile, drawn.
  *
- * THE CONTAINER IS READ THROUGH TESS'S OWN CODE. `verifyOwd` decodes the layout and then bakes the
- * header's own records again, requiring every byte to match, so what is drawn is exactly what its
- * records say. There is no second reader here and nothing is repaired.
+ * THE CONTAINER IS READ THROUGH TESS'S OWN CODE. By default `verifyOwd` decodes the layout and then
+ * bakes the header's own records again, requiring every byte to match, so what is drawn is exactly
+ * what its records say. A container read through a world's version is held by the server instead: it
+ * is served only once two bakes of it agreed, its caller holds its bytes to the digest the route
+ * names, and it is decoded here and not baked a third time (`proof`). There is no second reader here
+ * and nothing is repaired.
  *
  * WHAT IS DRAWN. Only `render_batch`, and only its drawn entries, each exactly as stored. A drawn
  * entry is made of surfaces (owd/3): contiguous runs of its triangles, sharing no vertex, each with
@@ -154,6 +158,15 @@ export interface GeneratedTileSources {
   readonly renderBudget?: RenderBudget;
   /** The page's `crypto.subtle` by default; null refuses every tile. */
   readonly digest?: TextureSetDigest | null;
+  /**
+   * WHAT HOLDS EACH CONTAINER TO ITS RECORDS. `rebaked-here`, the default: its records are baked
+   * again on this page and every byte must match. `agreeing-server-bakes`: the caller read it through
+   * a world's version, which serves a tile only once two bakes of it agreed, and held its bytes to the
+   * digest that route names; it is decoded, its layout checked, and not baked a third time (a third
+   * bake measured about 11 s a tile on the development machine, 2026-10-14). A layout that does not
+   * decode is refused either way.
+   */
+  readonly proof?: 'rebaked-here' | 'agreeing-server-bakes';
   /**
    * NEIGHBOURING TILES WHOSE GROUND THIS WALK MAY REACH, as whole containers.
    *
@@ -550,9 +563,11 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     throw new GeneratedTileRefusal('This page has no crypto.subtle, so no tile can be checked against its own records.');
   }
   const sha256 = async (bytes: Uint8Array): Promise<string> => hexOf(await digest.digest('SHA-256', bytes));
+  const held = async (bytes: Uint8Array): Promise<DecodedOwd> =>
+    (sources.proof === 'agreeing-server-bakes' ? decodeOwd(bytes) : verifyOwd(bytes, sha256));
   let decoded: DecodedOwd;
   try {
-    decoded = await verifyOwd(sources.bytes, sha256);
+    decoded = await held(sources.bytes);
   } catch (error) {
     if (error instanceof OwdError) throw new GeneratedTileRefusal(`Tile ${sources.name} refused: ${error.message}`);
     throw error;
@@ -578,7 +593,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   for (const source of sources.neighbours ?? []) {
     let near: DecodedOwd;
     try {
-      near = await verifyOwd(source.bytes, sha256);
+      near = await held(source.bytes);
     } catch (error) {
       if (error instanceof OwdError) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: ${error.message}`);
       throw error;

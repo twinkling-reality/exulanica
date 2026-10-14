@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
-import { capturedPicture, frontDoorAddress, isScenePreview, scenePreviewAddress, worldAddress } from './front-door-routes.mjs';
+import { capturedPicture, frontDoorAddress, isScenePreview, openWorldAddress, scenePreviewAddress, worldAddress } from './front-door-routes.mjs';
 import { CAPTURE_CATALOG_PROFILE, capturePictures, capturesModule, checkedCaptureCatalog, scenePreviewWriteGuard } from './front-door-server.mjs';
 
 const origin = 'http://127.0.0.1:19974';
@@ -24,6 +24,14 @@ assert.equal(isScenePreview(frontDoorAddress(origin)), false);
 assert.equal(isScenePreview(origin + '/?entry=x&capture=1'), true);
 assert.equal(isScenePreview(origin + '/?entry=x&livePreview=1'), true);
 assert.equal(isScenePreview(origin + '/?entry=x&capture=0'), false);
+
+// A world opened within the page takes its own address; one the address already names keeps it, with
+// whatever else the address says, and a scene preview's address never changes.
+assert.equal(openWorldAddress(frontDoorAddress(origin), '01a1-shore'), worldAddress('01a1-shore', origin));
+assert.equal(openWorldAddress(origin + '/?entry=other', '01a1-shore'), worldAddress('01a1-shore', origin));
+assert.equal(openWorldAddress(worldAddress('01a1-shore', origin), '01a1-shore'), null);
+assert.equal(openWorldAddress(origin + '/?entry=01a1-shore&measure', '01a1-shore'), null);
+assert.equal(openWorldAddress(scenePreviewAddress('01a1-shore', origin), 'other'), null);
 
 // A capture is shown only while every identity it was taken of still holds.
 const entry = { entryId: 'e', worldId: 'w', authoredVersionId: 'v', authoredStateSha256: 's', styleVersionId: 'a' };
