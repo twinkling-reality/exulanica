@@ -48,7 +48,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   root.innerHTML = `<button class="cw-worlds" type="button" aria-keyshortcuts="Escape"><kbd>Esc</kbd><span>Your worlds</span></button>
     <div class="cw-reticle" aria-label="Centre aim" role="img"><i></i><i></i><i></i><i></i></div><div class="cw-discovery" aria-label="People and things in view"></div>
     <aside class="cw-prompt" hidden aria-label="Available action"><button class="cw-inspect" type="button"><kbd>E</kbd><span>Inspect</span></button></aside>
-    <p class="cw-guidance"><span class="cw-mouse-hint">Drag to look</span><span class="cw-walk-hint">WASD to move · E to inspect</span></p>
+    <p class="cw-guidance"><span class="cw-mouse-hint">Drag to look</span><span class="cw-walk-hint">WASD to move · E to inspect · F to fly</span></p>
     <section class="cw-panel" hidden role="dialog" aria-modal="true" aria-labelledby="cw-panel-title"></section>
     <p class="cw-notice" role="status" hidden></p>`;
   document.body.append(root);
@@ -88,11 +88,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const markerNodes = new Map();
   const measure = document.createElement('canvas').getContext('2d');
   if (measure) measure.font = `500 ${DECIDER_MARKS.nameLeastPx}px "IBM Plex Sans"`;
-  const priorCallbacks = { pick: b.controls.onPointerPick, interact: b.controls.onInteract, summon: b.controls.onSummon, camera: b.controls.onCameraToggle };
+  const priorCallbacks = { pick: b.controls.onPointerPick, interact: b.controls.onInteract, summon: b.controls.onSummon, camera: b.controls.onCameraToggle, fly: b.controls.onFlyChange };
   b.controls.onPointerPick = null;
   b.controls.onInteract = null;
   b.controls.onSummon = null;
   b.controls.onCameraToggle = null;
+  // Flying (F) says its own keys in the walk hint while it lasts.
+  b.controls.onFlyChange = (flying) => {
+    const hint = root.querySelector('.cw-walk-hint');
+    if (hint) hint.textContent = flying ? 'Flying · Space up · C down · Scroll to change speed · F to land' : 'WASD to move · E to inspect · F to fly';
+  };
   b.setControlsEnabled(true); b.setFreeCursorActive(false);
 
   const current = () => state.activeWorldEntry?.worldId === entry.worldId && state.activeWorldEntry?.authoredVersionId === entry.authoredVersionId;
@@ -426,6 +431,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       event.stopImmediatePropagation(); return;
     }
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code)) return;
+    // Flying: F takes off and lands; while flying, Space rises and C descends.
+    if (event.code === 'KeyF' || (b.controls.flying && ['Space', 'KeyC'].includes(event.code))) return;
     if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); void inspect(); }
     else if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) leaveWorld(); }
     else if (event.code === 'Enter' && event.target?.closest?.('.cw-prompt,.cw-worlds')) return;
@@ -506,7 +513,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     entitySheet?.dispose(); entitySheet = null;
     lifetime.abort(); sizeObserver.disconnect(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
     b.controls.onPointerPick = priorCallbacks.pick; b.controls.onInteract = priorCallbacks.interact;
-    b.controls.onSummon = priorCallbacks.summon; b.controls.onCameraToggle = priorCallbacks.camera;
+    b.controls.onSummon = priorCallbacks.summon; b.controls.onCameraToggle = priorCallbacks.camera; b.controls.onFlyChange = priorCallbacks.fly;
     b.setFreeCursorActive(false); b.setControlsEnabled(true);
   };
   try { await refreshInventory(); } catch (error) { notice(error.message); }

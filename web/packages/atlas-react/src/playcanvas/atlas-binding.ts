@@ -429,6 +429,12 @@ export interface PlacementCheck {
   readonly maxErrorMetres: number;
 }
 
+/**
+ * How many times a walk a made world's sprint is: about 7.4 m/s, a fast run. The earlier 2.7 (about
+ * 4.5 m/s) read as a jog across a town's streets; crossing farther is what flying (F) is for.
+ */
+const MADE_WORLD_SPRINT = 4.5;
+
 export class AtlasBinding {
   readonly app: pc.AppBase;
   readonly device: pc.GraphicsDevice;
@@ -1053,7 +1059,7 @@ export class AtlasBinding {
     const controls = new FirstPersonControls(
       options.canvas,
       start.pose,
-      kind.city ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: 2.7, accelTime: .16 } : DEFAULT_CONTROLS,
+      kind.city ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: MADE_WORLD_SPRINT, accelTime: .16 } : DEFAULT_CONTROLS,
       navigationWorld,
       { hold: start.hold },
     );

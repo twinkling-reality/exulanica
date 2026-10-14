@@ -6,7 +6,7 @@ import type {
   SupportState,
   TerrainState,
 } from '@exulanica/atlas-core';
-import { atlasVec3, forwardFromYawPitch, resolveGroundMovement, SupportNavigationError, terrainGroundPose, terrainMillimetres } from '@exulanica/atlas-core';
+import { atlasVec3, forwardFromYawPitch, isNavigationPositionClear, resolveGroundMovement, SupportNavigationError, terrainGroundPose, terrainMillimetres } from '@exulanica/atlas-core';
 
 /**
  * First-person controls: pointer-lock mouse-look plus WASD, and a reticle at fixed screen centre.
@@ -40,6 +40,11 @@ import { atlasVec3, forwardFromYawPitch, resolveGroundMovement, SupportNavigatio
  * reticle's alone.
  *
  * NO JUMP VERB. The space bar is Interact. That is a product decision, not an omission.
+ *
+ * FLYING (F). A person may leave the ground to look around: the camera, never anyone in the world,
+ * moves where it looks, through walls, held within the world's reach and above the ground. While
+ * flying, Space rises and C descends (Space does not interact then; E and Enter still do), Shift
+ * doubles the speed, and the scroll wheel sets it. F again lands on the open ground below.
  */
 
 /** How far a press may move, in CSS pixels, and still be a click rather than a drag to look. */
@@ -66,6 +71,19 @@ export const DEFAULT_CONTROLS: ControlsConfig = Object.freeze({
   eyeHeight: 1.62,
 });
 
+/**
+ * Flying speeds, metres a second. A first flight crosses a garden in a few seconds; the scroll wheel
+ * steps it by a quarter each notch, down to a slow drift for looking closely and up to crossing a
+ * town's kilometres quickly; Shift doubles whatever it is.
+ */
+export const FLY_SPEED = Object.freeze({ start: 12, least: 2, most: 150, step: 1.25, sprint: 2 });
+/** How high flying may go above the world's ground, metres: a town seen whole, not the sky. */
+export const FLY_CEILING_M = 600;
+/** How far above the ground below a flying eye always stays, metres: never under the ground. */
+export const FLY_FLOOR_M = 0.3;
+/** Where landing looks for open ground around the spot below, metres from it, nearest first. */
+const LANDING_RINGS_M = [0, 1, 2, 4, 8, 16] as const;
+
 /** A small epsilon short of straight up and straight down: the user must be able to look at threads. */
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 
@@ -86,8 +104,10 @@ export interface CameraState {
  * and its field, and the eye sits at eye height above it. `altitude` keeps the height a view gave
  * it, as an overview from above does: movement pans across the world at that height and no surface
  * resolves it. A view states its hold when it is set (`setView`); nothing infers one from a height.
+ * `fly` is a person flying (F): the camera moves where it looks, through anything, held within the
+ * world's reach and above its ground.
  */
-export type CameraHold = 'ground' | 'altitude';
+export type CameraHold = 'ground' | 'altitude' | 'fly';
 
 export interface PlanarMovement {
   readonly x: number;
@@ -149,6 +169,11 @@ export class FirstPersonControls {
   private spatial: SpatialClassification | null = null;
   private recoveryReason: GroundMovementResolution['recoveryReason'] = null;
   private disposers: Array<() => void> = [];
+  private vy = 0;
+  /** The flying speed the scroll wheel has set, metres a second; kept for the session. */
+  private flySpeed: number = FLY_SPEED.start;
+  /** Fired when flying starts or stops, however it stops (F, a view set, travel). */
+  onFlyChange: ((flying: boolean) => void) | null = null;
 
   /** Fired when the browser's lock state changes. The application follows; it never drives. */
   onModeChange: ((mode: InputMode) => void) | null = null;
@@ -256,6 +281,7 @@ export class FirstPersonControls {
       if (!this.locked) {
         this.keys.clear();
         this.vx = 0;
+        this.vy = 0;
         this.vz = 0;
         this.intent = Object.freeze({ x: 0, z: 0 });
       }
@@ -323,19 +349,28 @@ export class FirstPersonControls {
         return;
       }
       if (!this.enabled) return;
-      if (e.code === 'KeyC' && !e.repeat) { e.preventDefault(); this.onCameraToggle?.(); return; }
+      if (e.code === 'KeyF' && !e.repeat && !this.conversationActive) { e.preventDefault(); this.toggleFly(); return; }
+      // While flying C descends; on the ground it is the camera toggle, as before.
+      if (e.code === 'KeyC' && !e.repeat && this.cameraHold !== 'fly') { e.preventDefault(); this.onCameraToggle?.(); return; }
       if(['KeyW','KeyA','KeyS','KeyD'].includes(e.code))this.walkAssist='off';
       this.keys.add(e.code);
       if (document.activeElement === this.canvas && (e.code.startsWith('Arrow') || ['KeyW','KeyA','KeyS','KeyD'].includes(e.code))) e.preventDefault();
       if ((this.locked || document.activeElement === this.canvas) && (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter')) {
         e.preventDefault();
-        this.onInteract?.();
+        // Flying, Space rises: it interacts on the ground only.
+        if (!(e.code === 'Space' && this.cameraHold === 'fly')) this.onInteract?.();
       }
       if (e.code === 'KeyX' && !e.repeat) {
         e.preventDefault();
         this.onSummon?.();
       }
     });
+    // Flying, the wheel sets the speed; on the ground it does nothing here.
+    on(canvas, 'wheel', (e: WheelEvent) => {
+      if (this.cameraHold !== 'fly' || !this.enabled || e.deltaY === 0) return;
+      e.preventDefault();
+      this.setFlySpeed(this.flySpeed * (e.deltaY < 0 ? FLY_SPEED.step : 1 / FLY_SPEED.step));
+    }, { passive: false });
     on(document, 'focusin', (event: FocusEvent) => {
       if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable]'))this.walkAssist='off';
       if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, summary, [contenteditable]')) {
@@ -369,6 +404,12 @@ export class FirstPersonControls {
    * its height and pans from there.
    */
   setView(pose: CameraState, hold: CameraHold): void {
+    const wasFlying = this.cameraHold === 'fly';
+    this.setViewHeld(pose, hold);
+    if (wasFlying !== (this.cameraHold === 'fly')) this.onFlyChange?.(this.cameraHold === 'fly');
+  }
+
+  private setViewHeld(pose: CameraState, hold: CameraHold): void {
     const terrainWorld = this.navigationWorld?.terrain === undefined ? null : this.navigationWorld;
     if (terrainWorld !== null && hold === 'ground') {
       if (pose.terrain === undefined) return;
@@ -391,14 +432,15 @@ export class FirstPersonControls {
       } catch (error) { if (!(error instanceof SupportNavigationError)) throw error; return; }
     }
     const { support: _viewSupport, terrain: _viewTerrain, ...visualPose } = pose;
-    Object.assign(this.state, (supported !== undefined || terrainWorld !== null) && hold === 'altitude' ? visualPose : pose);
+    Object.assign(this.state, (supported !== undefined || terrainWorld !== null) && hold !== 'ground' ? visualPose : pose);
     this.vx = 0;
+    this.vy = 0;
     this.vz = 0;
     this.intent = Object.freeze({ x: 0, z: 0 });
     this.cameraHold = hold;
     const world = this.navigationWorld;
     if (world === null) return;
-    if (hold === 'altitude') {
+    if (hold !== 'ground') {
       this.altitudeReach = altitudeReachFrom(world, pose);
       return;
     }
@@ -421,6 +463,10 @@ export class FirstPersonControls {
    * the surface, and the frames after it are walked.
    */
   holdGround(): void {
+    if (this.cameraHold === 'fly') {
+      this.land();
+      return;
+    }
     if (this.navigationWorld?.terrain !== undefined && this.cameraHold === 'altitude') {
       const held = this.lastSafeTerrain;
       const accepted = held === undefined ? null : terrainGroundPose(this.navigationWorld, held.positionMm, held);
@@ -430,6 +476,83 @@ export class FirstPersonControls {
       this.state.terrain = accepted.state;
     }
     this.cameraHold = 'ground';
+  }
+
+  /** Whether the person is flying (F). */
+  get flying(): boolean {
+    return this.cameraHold === 'fly';
+  }
+
+  /** The flying speed the scroll wheel has set, metres a second. */
+  get flyingSpeed(): number {
+    return this.flySpeed;
+  }
+
+  /** Set the flying speed, held within `FLY_SPEED`'s least and most. */
+  setFlySpeed(metresPerSecond: number): void {
+    if (!Number.isFinite(metresPerSecond)) return;
+    this.flySpeed = Math.min(FLY_SPEED.most, Math.max(FLY_SPEED.least, metresPerSecond));
+  }
+
+  /** Take off from where the camera is, or land if flying. */
+  toggleFly(): void {
+    if (this.cameraHold === 'fly') {
+      this.land();
+      return;
+    }
+    this.lastSafe ??= atlasVec3(this.state.x, this.state.y, this.state.z);
+    this.cameraHold = 'fly';
+    if (this.navigationWorld !== null) this.altitudeReach = altitudeReachFrom(this.navigationWorld, this.state);
+    this.walkAssist = 'off';
+    this.vy = 0;
+    this.onFlyChange?.(true);
+  }
+
+  /**
+   * Land from flying: on the open ground below, or the nearest open ground within a few metres of
+   * it, or else back where the person last stood. A world whose ground is an admitted terrain or a
+   * support network lands where the person took off, since a new stand there needs its own contact.
+   */
+  private land(): void {
+    const world = this.navigationWorld;
+    const { yaw, pitch } = this.state;
+    const back = (): void => {
+      const safe = this.lastSafe;
+      if (world?.terrain !== undefined) {
+        this.cameraHold = 'altitude';
+        this.holdGround();
+        return;
+      }
+      if (safe === null || world === null) {
+        this.cameraHold = 'ground';
+        return;
+      }
+      this.setViewHeld({ ...this.state, x: safe.x, y: safe.y, z: safe.z, yaw, pitch }, 'ground');
+    };
+    if (world === null || world.terrain !== undefined || world.support !== undefined) {
+      back();
+    } else {
+      let landed = false;
+      for (const ring of LANDING_RINGS_M) {
+        for (let k = 0; k < (ring === 0 ? 1 : 8) && !landed; k += 1) {
+          const angle = (k * Math.PI) / 4;
+          const x = this.state.x + ring * Math.cos(angle), z = this.state.z + ring * Math.sin(angle);
+          const ground = world.surface.sample(x, z);
+          if (ground == null) continue;
+          const at = atlasVec3(x, ground.height + world.eyeHeight, z);
+          if (!isNavigationPositionClear(world, at)) continue;
+          this.setViewHeld({ ...this.state, x, y: at.y, z, yaw, pitch }, 'ground');
+          this.lastSafe = at;
+          landed = true;
+        }
+        if (landed) break;
+      }
+      if (!landed) back();
+    }
+    this.vx = 0;
+    this.vy = 0;
+    this.vz = 0;
+    this.onFlyChange?.(false);
   }
 
   get movementSpeed(): number {
@@ -525,6 +648,10 @@ export class FirstPersonControls {
       if (this.keys.has('KeyD')) ix += 1;
     }
     if(this.walkAssist!=='off')iz=1;
+    if (this.cameraHold === 'fly') {
+      this.fly(dt, ix, iz);
+      return;
+    }
     const sprint = this.walkAssist==='run' || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
     const speed = this.config.moveSpeed * (sprint ? this.config.sprintMultiplier : 1);
     const intent = cameraRelativeMovement(ix, iz, this.state.yaw);
@@ -576,6 +703,42 @@ export class FirstPersonControls {
     if (this.state.support !== undefined) this.canvas.dataset['navigationSupport'] = JSON.stringify(this.state.support);
     this.spatial = resolution.spatial;
     if (resolution.recovered) this.recoveryReason = resolution.recoveryReason;
+  }
+
+  /** Move a flying camera: along the look, sideways, Space up and C down, through anything. */
+  private fly(dt: number, ix: number, iz: number): void {
+    const steering = !this.conversationActive && (this.locked || document.activeElement === this.canvas);
+    const iy = steering ? (this.keys.has('Space') ? 1 : 0) - (this.keys.has('KeyC') ? 1 : 0) : 0;
+    const sprint = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    const speed = this.flySpeed * (sprint ? FLY_SPEED.sprint : 1);
+    // Forward follows the look, pitch included; sideways stays level; up and down are the world's.
+    const look = forwardFromYawPitch(this.state.yaw + Math.PI, this.state.pitch);
+    const side = cameraRelativeMovement(ix, 0, this.state.yaw);
+    let tx = look.x * iz + side.x, ty = look.y * iz + iy, tz = look.z * iz + side.z;
+    const length = Math.hypot(tx, ty, tz);
+    if (length > 1) { tx /= length; ty /= length; tz /= length; }
+    const k = 1 - Math.exp(-dt / Math.max(this.config.accelTime, 1e-4));
+    this.vx += (tx * speed - this.vx) * k;
+    this.vy += (ty * speed - this.vy) * k;
+    this.vz += (tz * speed - this.vz) * k;
+    this.intent = Object.freeze({ x: tx, z: tz });
+    let x = this.state.x + this.vx * dt, y = this.state.y + this.vy * dt, z = this.state.z + this.vz * dt;
+    const world = this.navigationWorld;
+    if (world !== null) {
+      const dx = x - world.centre.x, dz = z - world.centre.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > this.altitudeReach) {
+        x = world.centre.x + (dx * this.altitudeReach) / distance;
+        z = world.centre.z + (dz * this.altitudeReach) / distance;
+      }
+      let ground: { readonly height: number } | null | undefined = null;
+      try { ground = world.terrain === undefined ? world.surface.sample(x, z) : null; } catch { ground = null; }
+      if (ground != null) y = Math.min(Math.max(y, ground.height + FLY_FLOOR_M), ground.height + FLY_CEILING_M);
+      else y = Math.min(y, (this.lastSafe?.y ?? 0) + FLY_CEILING_M);
+    }
+    this.state.x = x;
+    this.state.y = y;
+    this.state.z = z;
   }
 
   /** The reticle direction. Screen centre, always. */

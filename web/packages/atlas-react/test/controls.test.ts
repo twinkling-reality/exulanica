@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildNavigationWorld, makeScene } from '@exulanica/atlas-core';
+import { atlasVec3, buildNavigationWorld, makeScene, type NavigationWorld } from '@exulanica/atlas-core';
 import {
   cameraRelativeMovement,
   FirstPersonControls,
+  FLY_FLOOR_M,
+  FLY_SPEED,
 } from '../src/playcanvas/controls.js';
 
 describe('camera-relative movement intent', () => {
@@ -365,4 +367,113 @@ describe('explicit movement assistance',()=>{
   input.focus();for(let i=0;i<120;i++)controls.update(1/60);const stopped=controls.state.z;controls.update(1/60);expect(Math.abs(controls.state.z-stopped)).toBeLessThan(.00001);
   controls.setWalkAssist('run');window.dispatchEvent(new Event('blur'));controls.update(1/60);expect(controls.state.z).toBeCloseTo(stopped,4);controls.destroy();
  });
+});
+
+describe('flying (F)', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, writable: true, value: null });
+  });
+
+  /** A flat world with a round wall 3 m ahead of where a person starts (north is -z). */
+  const walled = (): NavigationWorld => ({ ...buildNavigationWorld(makeScene([], 1, 1)), obstacles: [{ id: 'wall', centre: atlasVec3(0, 0, -6), radius: 2 }] });
+  const start = { x: 0, y: 1.62, z: 0, yaw: 0, pitch: 0 };
+  const key = (code: string, type: 'keydown' | 'keyup' = 'keydown', target: EventTarget = window) =>
+    target.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+  const setUp = (world: NavigationWorld | null = walled()) => {
+    const canvas = document.createElement('canvas');
+    document.body.append(canvas);
+    const controls = new FirstPersonControls(canvas, { ...start }, undefined, world);
+    canvas.focus();
+    const changes: boolean[] = [];
+    controls.onFlyChange = (flying) => changes.push(flying);
+    return { canvas, controls, changes };
+  };
+  const run = (controls: FirstPersonControls, seconds: number) => { for (let t = 0; t < seconds; t += 0.05) controls.update(0.05); };
+
+  it('takes off with F, passes through a wall walking stops at, and lands on open ground with F again', () => {
+    const walking = setUp();
+    key('KeyW');
+    run(walking.controls, 2);
+    // Walking stops at the wall's edge.
+    expect(walking.controls.state.z).toBeGreaterThan(-4);
+    walking.controls.destroy();
+    document.body.replaceChildren();
+
+    const { controls, changes } = setUp();
+    key('KeyF');
+    expect(controls.flying).toBe(true);
+    key('KeyW');
+    run(controls, 1);
+    // Flying passes through it.
+    expect(controls.state.z).toBeLessThan(-8);
+    key('KeyW', 'keyup');
+    key('KeyF');
+    expect(controls.flying).toBe(false);
+    expect(controls.hold).toBe('ground');
+    expect(controls.state.y).toBeCloseTo(1.62, 5);
+    expect(changes).toEqual([true, false]);
+    controls.destroy();
+  });
+
+  it('lands beside a wall it is over rather than inside it', () => {
+    const { controls } = setUp();
+    controls.setView({ ...start, z: -6, y: 20 }, 'fly');
+    key('KeyF');
+    expect(controls.hold).toBe('ground');
+    expect(Math.hypot(controls.state.x, controls.state.z + 6)).toBeGreaterThanOrEqual(2);
+    controls.destroy();
+  });
+
+  it('rises with Space and descends with C, without Space interacting or C toggling the camera, and never under the ground', () => {
+    const { controls } = setUp();
+    let interacted = 0, toggled = 0;
+    controls.onInteract = () => { interacted += 1; };
+    controls.onCameraToggle = () => { toggled += 1; };
+    key('KeyF');
+    key('Space');
+    run(controls, 1);
+    const high = controls.state.y;
+    expect(high).toBeGreaterThan(5);
+    key('Space', 'keyup');
+    key('KeyC');
+    run(controls, 5);
+    expect(controls.state.y).toBeCloseTo(FLY_FLOOR_M, 5);
+    expect([interacted, toggled]).toEqual([0, 0]);
+    // On the ground again, Space interacts and C toggles the camera as before.
+    key('KeyC', 'keyup');
+    key('KeyF');
+    key('Space');
+    key('KeyC');
+    expect([interacted, toggled]).toEqual([1, 1]);
+    controls.destroy();
+  });
+
+  it('sets its speed with the scroll wheel, within its least and most, and only while flying', () => {
+    const { canvas, controls } = setUp();
+    const wheel = (deltaY: number) => canvas.dispatchEvent(new WheelEvent('wheel', { deltaY, cancelable: true }));
+    wheel(-100);
+    expect(controls.flyingSpeed).toBe(FLY_SPEED.start);
+    key('KeyF');
+    wheel(-100);
+    expect(controls.flyingSpeed).toBeCloseTo(FLY_SPEED.start * FLY_SPEED.step, 9);
+    for (let n = 0; n < 60; n += 1) wheel(-100);
+    expect(controls.flyingSpeed).toBe(FLY_SPEED.most);
+    for (let n = 0; n < 60; n += 1) wheel(100);
+    expect(controls.flyingSpeed).toBe(FLY_SPEED.least);
+    controls.destroy();
+  });
+
+  it('ignores F typed into a field, and stops flying when a view is set', () => {
+    const { controls, changes } = setUp();
+    const field = document.createElement('input');
+    document.body.append(field);
+    key('KeyF', 'keydown', field);
+    expect(controls.flying).toBe(false);
+    key('KeyF');
+    controls.setView({ ...start, x: 3 }, 'ground');
+    expect(controls.flying).toBe(false);
+    expect(changes).toEqual([true, false]);
+    controls.destroy();
+  });
 });

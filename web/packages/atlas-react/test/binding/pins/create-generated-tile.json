@@ -109,7 +109,7 @@
  "controls": {
   "sensitivity": 0.0022,
   "moveSpeed": 1.65,
-  "sprintMultiplier": 2.7,
+  "sprintMultiplier": 4.5,
   "accelTime": 0.16,
   "eyeHeight": 1.62,
   "enabled": true
