@@ -6,6 +6,12 @@ visitors only while it is open, and a workplace only while one of its workers is
 destination admits only while it has room; and a stay lasts to the end of its shift, the
 destination's own fixed length, or a seeded draw within its activity's range.
 
+Under a routine whose activity catalog states free time (a town's, from its second activity
+catalog), a person with no need pressing is offered free time alone, and the rule draws among it by
+their own weights; under one whose policy states a crowding detour (a town's, from its fourth
+policy), a destination is chosen by its walking cost grown by how full it is. A routine that states
+neither (a district's, and every town made before) offers and orders as it always did.
+
 The functions here read a person, a place, a routine, a seed and the minute, and nothing else: no
 walk, no reservation book, no engine's state shape beyond the person's own fields. A place is
 anything that answers :class:`DayPlace`. The living society
@@ -97,6 +103,19 @@ def day_options(
 ) -> list[OptionRow]:
     """Every activity this inhabitant can act on now, the pressing ones alone when any press.
 
+    When none presses, a routine that states free time offers its free-time activities alone: a
+    person goes out to eat, to shop or to sit down because they are hungry, need provisions or are
+    tired, and otherwise spends free time. Measured on generated towns under the earlier routine,
+    which offered every activity, people ate out with a meal need of about 40 of 1000, some eight
+    meals out a day each.
+
+    A destination a pick chooses among is ordered by whether it is where the person last finished
+    something, then, under a routine whose policy states ``crowding_detour_milli``, by its walking
+    cost grown by that many thousandths per thousandth of how full it is (a place half full counts
+    as half as far again at 1000), and otherwise by how full it is before its cost: ordered by
+    fullness first, everybody choosing in one minute walked across town to whichever place had just
+    opened.
+
     This is the closed answer set, and it is a function of its own so that something other than
     the rule in :func:`rule_pick` can be offered the same rows. A set assembled separately
     for a model would be a second source of truth for what was possible, which is the failure
@@ -122,6 +141,8 @@ def day_options(
     here_spot = loc["spot_id"] if loc["edge"] is None else None
     here_dest = loc["destination_id"] if loc["edge"] is None else None
     last = person["last_completed"] or {}
+    free_time = any(activity.free_time for activity in routine.activities.values())
+    detour = routine.policy.get("crowding_detour_milli")
     pressing = []
     fallback = []
     for key in sorted(routine.activities):
@@ -142,6 +163,8 @@ def day_options(
             value = person["needs"][activity.need]
             urgency = value * preference_weight(seed, routine, activity, person["ordinal"]) // 1000
             is_pressing = value >= need.threshold
+            if not is_pressing and free_time and not activity.free_time:
+                continue
             because = f"{need.label} at {value} of 1000"
             if not is_pressing:
                 because = f"nothing pressing; {because}"
@@ -164,7 +187,7 @@ def day_options(
             targets = [{**t, "shift_day": shift_day} for t in targets]
         if activity.setting == "standing":
             pick = targets[_number(seed, f"stroll:{tick}", person["ordinal"]) % len(targets)]
-        else:
+        elif detour is None:
             pick = min(
                 targets,
                 key=lambda t: (
@@ -175,17 +198,68 @@ def day_options(
                     t["spot_id"] or "",
                 ),
             )
+        else:
+            pick = min(
+                targets,
+                key=lambda t: (
+                    t["destination_id"] == last.get("destination_id"),
+                    t["cost_mm"] * (1000 + t["load_milli"] * detour // 1000) // 1000,
+                    t["cost_mm"],
+                    t["destination_id"] or "",
+                    t["spot_id"] or "",
+                ),
+            )
         row = (urgency, key, activity, pick, because)
         (pressing if is_pressing else fallback).append(row)
     return pressing or fallback
 
 
-def rule_pick(pool: list[OptionRow]) -> tuple[Activity, dict, str] | str:
-    """The rule: the most pressing row, or the reason nothing was possible. Never randomised."""
+def rule_pick(
+    pool: list[OptionRow],
+    *,
+    person: dict | None = None,
+    routine: RoutineModel | None = None,
+    seed: str | None = None,
+    tick: int | None = None,
+) -> tuple[Activity, dict, str] | str:
+    """The rule: the most pressing row, or the reason nothing was possible.
+
+    Free time is the one exception: under a routine that states free time, when no row's need
+    presses (:func:`day_options` then offers free time alone), the rule draws a row in proportion
+    to this person's own weight for it (:func:`preference_weight`), from the seed, the minute and
+    the person, so a draw replays exactly. The top row would send nearly everybody with nothing
+    pressing to the same kind of free time all day, since one need weighs every free-time row
+    alike and only the catalogued weights differ. Without ``person``, ``routine``,
+    ``seed`` and ``tick``, or under a routine that states no free time, the most pressing row is
+    taken as it always was.
+    """
     if not pool:
         return "no_reachable_place_with_room"
+    if (
+        person is not None
+        and routine is not None
+        and seed is not None
+        and tick is not None
+        and any(activity.free_time for activity in routine.activities.values())
+        and not any(_presses(row[2], person, routine) for row in pool)
+    ):
+        rows = sorted(pool, key=lambda row: row[1])
+        weights = [preference_weight(seed, routine, row[2], person["ordinal"]) for row in rows]
+        point = _number(seed, f"free_time:{tick}", person["ordinal"]) % sum(weights)
+        for row, weight in zip(rows, weights, strict=True):
+            if point < weight:
+                _, _, activity, pick, because = row
+                return activity, pick, because
+            point -= weight
     _, _, activity, pick, because = max(pool, key=lambda row: (row[0], row[1]))
     return activity, pick, because
+
+
+def _presses(activity: Activity, person: dict, routine: RoutineModel) -> bool:
+    """Whether this row is offered because it presses: a due shift, or a need at its threshold."""
+    if activity.mode == "shift":
+        return True
+    return person["needs"][activity.need] >= routine.needs[activity.need].threshold
 
 
 def staffed_workplaces(state: dict[str, Any], routine: RoutineModel) -> frozenset[str] | None:

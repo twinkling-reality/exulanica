@@ -197,9 +197,17 @@ def _whole_minutes(played: PlayedRun, minutes: int) -> list:
 def test_a_stopped_hour_whose_stored_records_it_does_not_rebuild_cannot_go_on():
     plan = _town_plan(2 * HOUR_TICKS)
     [_first, (start, played)] = _by_hours(plan)
-    # A stored request the hour does not ask with the same bytes.
-    stored = _whole_minutes(played, 2)
-    stored[0][0]["context"]["options"] = stored[0][0]["context"]["options"][:-1]
+    # A stored request the hour does not ask with the same bytes: one option fewer, on a request
+    # that still offers enough to be asked, with the whole minutes through it stored.
+    asked = sorted({int(request["base_tick"]) for request in played.requests})
+    wide = min(
+        int(request["base_tick"])
+        for request in played.requests
+        if len(request["context"]["options"]) >= 3
+    )
+    stored = _whole_minutes(played, asked.index(wide) + 1)
+    [request, _receipt] = next(pair for pair in stored if len(pair[0]["context"]["options"]) >= 3)
+    request["context"]["options"] = request["context"]["options"][:-1]
     with pytest.raises(ReplayMismatch, match="not the one stored"):
         resume_hour(plan, stored, _Choosing(), start=start)
     # A stored receipt its request does not rebuild to the same bytes.

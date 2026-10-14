@@ -155,6 +155,12 @@ RELEASED_CATALOGS = {
         "90e429b18665e7b1da8bc763bbe3a12ac935a5c07fdd4e8fb7a6627baee047a2"
     ),
     "society-policy.v3.json": "3e085cf79bd3e5a75d5f1f33e5f2ede9c10526ff95d006a6faecd721ffa8ad42",
+    # A town's people spend free time when no need presses and choose a place by its walking
+    # cost grown by how full it is (the town routine's second activity and fourth policy).
+    "society-activity.v2.json": (
+        "d8f0f3314be76e869d067e69672b8f75a0caada55e355b4b076623db2441b79d"
+    ),
+    "society-policy.v4.json": "0874443760e55277949e2bd52058227295b87e4d07a9dd1bc8bd036389a731f6",
     "society-comparison-seeds.v6.json": (
         "012fc1270c313e47628b35148992cc01d9e51de2a11c7021cbea31f22606474d"
     ),

@@ -82,10 +82,11 @@ def test_a_town_made_today_starts_with_its_routine_s_people_housed_by_floor(made
     entry, society = _town(api, "A town of today")
     body = _people(api, entry, society, V5)
     state = body["state"]
-    budget = _stated("society-policy.v3.json", "town_people_default")["value"]
+    today = society_catalogs.TOWN_ROUTINE_VERSIONS
+    policy = f"society-policy.v{today['society-policy']}.json"
+    budget = _stated(policy, "town_people_default")["value"]
     assert len(state["inhabitants"]) == budget == 128
-    assert state["routine"]["catalog_versions"]["society-use-class"] == 3
-    assert state["routine"]["catalog_versions"]["society-policy"] == 3
+    assert state["routine"]["catalog_versions"] == dict(today)
     # Each home houses the people the place its input carries says live there, and they differ:
     # a home with more floor houses more.
     place = _input(api, entry, 1)["living"]["place"]

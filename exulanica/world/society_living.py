@@ -824,7 +824,7 @@ def advance_living_society(
             )
             decision = choices.decide(
                 partial(_question, person, pool, tick, minute, day),
-                partial(_from_options, pool),
+                partial(_from_options, pool, person=person, routine=routine, seed=seed, tick=tick),
             )
             chosen = decision.outcome
             if chosen is WAIT:
@@ -1037,9 +1037,13 @@ def _choose(
     spot_holder: dict,
     visitors: dict,
 ) -> tuple[Activity, dict, str] | str:
-    """The most pressing reachable activity with room, or the reason nothing was possible."""
+    """The rule's reachable activity with room, or the reason nothing was possible."""
     return _from_options(
-        _options(person, place, routine, seed, tick, minute, day, spot_holder, visitors)
+        _options(person, place, routine, seed, tick, minute, day, spot_holder, visitors),
+        person=person,
+        routine=routine,
+        seed=seed,
+        tick=tick,
     )
 
 

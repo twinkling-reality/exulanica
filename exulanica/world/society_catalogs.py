@@ -100,6 +100,7 @@ __all__ = [
     "STATES_AND_ACTS",
     "TOWN_ROUTINE_VERSIONS",
     "TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA",
+    "TOWN_ROUTINE_VERSIONS_BEFORE_FREE_TIME",
     "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
     "ActivityKind",
@@ -156,10 +157,24 @@ SHIFT_CATALOG: Final = "society-shift"
 #: third version, the floor area a dwelling takes, so a town's homes follow the floor its premises
 #: records state (``society-use-class`` v3 over ``society-shift`` v1), and a policy that employs a
 #: share of the town's residents, starts its day early and, from its third version, states how
-#: many people a new town starts with (``society-policy`` v3). A town's receipt pins the versions
-#: it was made under and its input records the versions its living place was built under; its
-#: society reads them from there, so a town made under earlier versions keeps its people.
+#: many people a new town starts with (``society-policy`` v3). From the second activity catalog
+#: and the fourth policy, a person with no need pressing spends free time, drawn by their own
+#: weights, and a destination is chosen by its walking cost grown by how full it is
+#: (:func:`~exulanica.world.society_day.day_options`). A town's receipt pins the versions it was
+#: made under and its input records the versions its living place was built under; its society
+#: reads them from there, so a town made under earlier versions keeps its people and their day.
 TOWN_ROUTINE_VERSIONS: Final = {
+    "society-activity": 2,
+    "society-capacity": 1,
+    "society-need": 1,
+    "society-policy": 4,
+    SHIFT_CATALOG: 1,
+    "society-use-class": 3,
+}
+#: The versions a town was made under before free time and the crowding order: with nothing
+#: pressing, the most urgent of every activity, and a destination emptiest first. Every town made
+#: then pins them, and its people keep that day.
+TOWN_ROUTINE_VERSIONS_BEFORE_FREE_TIME: Final = {
     "society-activity": 1,
     "society-capacity": 1,
     "society-need": 1,
@@ -315,6 +330,9 @@ POLICY_KEYS_BY_VERSION: Final = {
     # The third also states how many people a new town starts with: a chosen budget, spent over
     # its homes (:func:`~exulanica.world.society_city_place.place_from_city_records`).
     3: POLICY_KEYS | {"employment_share_milli", "town_people_default"},
+    # The fourth also states how much farther a destination counts for being full
+    # (:func:`~exulanica.world.society_day.day_options`).
+    4: POLICY_KEYS | {"employment_share_milli", "town_people_default", "crowding_detour_milli"},
 }
 
 
@@ -380,6 +398,25 @@ def _activity_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: only a shift activity takes place at work")
     if values["indoors"] not in (0, 1):
         raise CatalogError(f"{where}: indoors is 0 or 1")
+    if values.get("free_time", 0) == 1 and values["mode"] != "need":
+        raise CatalogError(f"{where}: only an activity that relieves a need is free time")
+
+
+#: What the first version of the activity catalog states of each activity.
+_ACTIVITY_FIELDS: Final = (
+    ("label", text_field),
+    ("mode", _choice(MODES)),
+    ("need", _key),
+    ("relief_milli", _MILLI),
+    ("duration_minimum_ticks", _TICKS),
+    ("duration_maximum_ticks", _TICKS),
+    ("window_start_minute", _MINUTE),
+    ("window_end_minute", _MINUTE),
+    ("setting", _choice(SETTINGS)),
+    ("affordance", _key),
+    ("indoors", integer_field(0, 1)),
+    ("weight_milli", integer_field(1, 10_000)),
+)
 
 
 def _purposeful_bounds(where: str, values: dict[str, FieldValue]) -> None:
@@ -540,21 +577,15 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
     ("society-activity", 1): CatalogSchema(
         "society-activity",
         1,
-        (
-            ("label", text_field),
-            ("mode", _choice(MODES)),
-            ("need", _key),
-            ("relief_milli", _MILLI),
-            ("duration_minimum_ticks", _TICKS),
-            ("duration_maximum_ticks", _TICKS),
-            ("window_start_minute", _MINUTE),
-            ("window_end_minute", _MINUTE),
-            ("setting", _choice(SETTINGS)),
-            ("affordance", _key),
-            ("indoors", integer_field(0, 1)),
-            ("weight_milli", integer_field(1, 10_000)),
-            ("reason", text_field),
-        ),
+        (*_ACTIVITY_FIELDS, ("reason", text_field)),
+        entry_check=_activity_bounds,
+    ),
+    # The second states which activities are free time: what a person may do when no need
+    # presses (:func:`~exulanica.world.society_day.day_options`).
+    ("society-activity", 2): CatalogSchema(
+        "society-activity",
+        2,
+        (*_ACTIVITY_FIELDS, ("free_time", integer_field(0, 1)), ("reason", text_field)),
         entry_check=_activity_bounds,
     ),
     ("society-capacity", 1): CatalogSchema(
@@ -639,7 +670,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             version,
             (("value", integer_field(0, 10**9)), ("reason", text_field)),
         )
-        for version in (1, 2, 3)
+        for version in (1, 2, 3, 4)
     },
     **{
         (PURPOSEFUL_CATALOG, version): CatalogSchema(
@@ -803,6 +834,8 @@ class Activity:
     affordance: str
     indoors: bool
     weight: int
+    #: Whether a person may take it when no need presses (activity catalog version 2 on).
+    free_time: bool = False
 
     def open_at(self, minute: int) -> bool:
         """Whether an activity may start at this minute of the day; windows may wrap midnight."""
@@ -1076,6 +1109,7 @@ def load_routine_model(
             str(v["affordance"]),
             v["indoors"] == 1,
             int(v["weight_milli"]),  # type: ignore[arg-type]
+            free_time=v.get("free_time", 0) == 1,
         )
     if [a for a in activities.values() if a.setting == "standing"] == []:
         raise CatalogError("a routine needs a standing activity, the one that needs no destination")

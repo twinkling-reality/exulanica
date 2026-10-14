@@ -1827,12 +1827,30 @@ kind's own use classes and employment share and is named by its own digest. The
 the overlay.
 
 **Its day is data.** The town's routine (`TOWN_ROUTINE_VERSIONS` in
-`exulanica/world/society_catalogs.py`) reads the living routine's needs, activities and
-capacities with three catalogs of its own under `assets/catalogs/society/`, each entry with its
-reason: `society-use-class` v3, which states each use class's opening hours, the shifts its
-positions work in turn and, for a home, the floor area one dwelling takes; `society-shift` v1,
-the early, day, late and evening shifts; and `society-policy` v3, which employs six in ten
-residents, starts the town's day at 06:00 and states how many people a new town starts with.
+`exulanica/world/society_catalogs.py`) reads the living routine's needs and capacities with
+catalogs of its own under `assets/catalogs/society/`, each entry with its reason:
+`society-activity` v2, the living routine's activities with which of them are free time and a
+visit lasting 15 to 45 minutes; `society-use-class` v3, which states each use class's opening
+hours, the shifts its positions work in turn and, for a home, the floor area one dwelling takes;
+`society-shift` v1, the early, day, late and evening shifts; and `society-policy` v4, which
+employs six in ten residents, starts the town's day at 06:00, states how many people a new town
+starts with and how much farther a destination counts for being full.
+
+**Free time and how full a place is.** A person goes out to eat, to shop or to sit down because
+the need presses: with no need at its threshold, a town's person is offered free time alone, the
+activities its activity catalog marks so (time at home, a walk, a visit), and the rule draws one
+by the person's own weight for each, from the seed, the minute and the person, so the draw replays
+exactly (`day_options` and `rule_pick` in `exulanica/world/society_day.py`). A pressing need or a
+due shift is taken as the most urgent, as before. A destination is chosen by whether the person
+last finished something there, then by its walking cost grown by how full it is (`society-policy`
+v4's `crowding_detour_milli`, 1000: a place half full counts as half as far again), so people go
+to a near place with room before a far empty one. A model the owner chose for a person is asked
+with the same answer set. A town made under the earlier routine (activity v1 and policy v3,
+`TOWN_ROUTINE_VERSIONS_BEFORE_FREE_TIME`) keeps it: there, with nothing pressing, the most urgent
+of every activity is taken and a destination is ordered by how full it is before its cost, which
+on generated towns sent people out to eat with a meal need well below its threshold several times
+a day and sent everyone choosing in one minute to whichever place had just opened
+(`tests/test_society_town_free_time.py`).
 
 **Its homes follow its floor.** A premises of homes holds one dwelling for each
 `dwelling_floor_area_mm2` of the floor its premises record states (`floor_area_mm2`: the storeys

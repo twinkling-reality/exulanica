@@ -482,7 +482,11 @@ def prepare(
                 occupied,
                 visitors,
                 admitting,
-            )
+            ),
+            person=view,
+            routine=routine,
+            seed=seed,
+            tick=state["tick"],
         )
         if isinstance(choice, str):
             result[person["id"]] = {
