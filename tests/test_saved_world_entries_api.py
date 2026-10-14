@@ -651,6 +651,49 @@ def test_starter_rename_and_bound_object_edit_reopen_exactly(objects_api):
     assert reopened["source_snapshot_sha256"] == entry["source_snapshot_sha256"]
 
 
+def _rename(api: ObjectsApi, entry: dict, title: str):
+    return api.client.put(
+        f"/world-entries/{entry['entry_id']}",
+        headers=api.headers,
+        json={
+            "base_revision": entry["revision"],
+            "authored_version_id": entry["authored_version_id"],
+            "expected_authored_state_sha256": entry["authored_state_sha256"],
+            "expected_authored_edit_seq": entry["authored_edit_seq"],
+            "style_version_id": entry["style_version_id"],
+            "title": title,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Work\u200bshop",  # a zero-width space: a format character
+        "Work\u202eshop",  # a right-to-left override: a format character
+        "Workshop\x07",  # a control character
+        "Work\tshop",  # a control character inside the title
+    ],
+)
+def test_a_rename_is_held_to_the_title_rule_a_world_is_created_under(objects_api, title):
+    """A name a world could not be created with is not taken by a rename either: the person's
+    saved title stays as it was and the refusal says why."""
+    entry = _create_starter(objects_api)
+    refused = _rename(objects_api, entry, title)
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "invalid_saved_world_entry"
+    assert "control, surrogate or format" in refused.json()["detail"]
+    reopened = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert (reopened["title"], reopened["revision"]) == (entry["title"], entry["revision"])
+
+
+def test_a_rename_keeps_the_title_trimmed(objects_api):
+    entry = _create_starter(objects_api)
+    renamed = _rename(objects_api, entry, "  Harbour  ")
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["title"] == "Harbour"
+
+
 def test_starter_does_not_replace_a_personal_saved_world(objects_api, repository):
     personal, _version, _style = _create_entry(objects_api, repository)
     response = objects_api.post("/world-entries/starter", {"title": "Replacement"})

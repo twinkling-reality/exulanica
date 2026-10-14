@@ -668,9 +668,8 @@ class SavedWorldEntryRepository:
                 raise StaleSavedWorldEntry(
                     f"entry targets revision {base_revision}; current revision is {row['revision']}"
                 )
-            clean_title = row["title"] if title is None else title.strip()
-            if not 1 <= len(clean_title) <= 200:
-                raise ValueError("title must contain between 1 and 200 characters")
+            # A rename is held to the rule a world is created under.
+            clean_title = row["title"] if title is None else _clean_title(title)
             authored = self._require_versions(
                 row["world_id"],
                 authored_version_id,

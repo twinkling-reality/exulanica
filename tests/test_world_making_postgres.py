@@ -512,6 +512,59 @@ def test_a_workspace_at_its_world_limit_is_told_before_any_model_is_asked(
         assert len(transport.requests) == asked
 
 
+def _made_one_town(client: TestClient, transport: Any) -> int:
+    """Make one small town through the route and answer the tiles it came to, which the day's
+    tile budget now counts."""
+    transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form()), *_plain()])
+    ended = _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
+    assert ended["state"] == "ready", ended
+    return len(_receipt(client, ended["entry"])["tiles"])
+
+
+def test_a_town_draft_on_a_day_with_no_tile_left_is_refused_before_its_drafter_is_asked(
+    drafts, fixed_identities, monkeypatch
+):
+    """Nobody pays for a town that cannot be made today: once the tool chooser picks the town, a
+    day whose tiles are all spent refuses the draft by the budget's own name, with no draft of
+    the town asked for and nothing made."""
+    app, transport = drafts
+    with app() as client:
+        spent = _made_one_town(client, transport)
+        monkeypatch.setenv("EXULANICA_TILES_A_DAY", str(spent))
+        held = _count(client, "world_identity")
+        asked = len(transport.requests)
+        transport.responses.extend([_tool("town", "a quiet town")])
+        ended = _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
+        assert (ended["state"], ended["refusal"]["code"]) == ("refused", "tile_budget_reached")
+        assert "as many towns as it may in one day" in ended["refusal"]["detail"]
+        # The chooser's call alone: the town's drafter, its look and its setting were not asked.
+        assert len(transport.requests) == asked + 1
+        assert len(ended["execution"]["calls"]) == 1
+        assert ended["entry"] is None and ended["made"] == []
+        assert _count(client, "world_identity") == held
+
+
+def test_a_drafted_town_too_large_for_the_tiles_left_today_is_refused_before_its_look_is_chosen(
+    drafts, fixed_identities, monkeypatch
+):
+    """The drafted town's own tiles are asked of the day's budget before its look and setting are
+    chosen, so a refusal the making would give costs no more than the draft that found it."""
+    app, transport = drafts
+    with app() as client:
+        spent = _made_one_town(client, transport)
+        # One tile left today: a town of any preset takes at least two.
+        monkeypatch.setenv("EXULANICA_TILES_A_DAY", str(spent + 1))
+        held = _count(client, "world_identity")
+        asked = len(transport.requests)
+        transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form())])
+        ended = _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
+        assert (ended["state"], ended["refusal"]["code"]) == ("refused", "tile_budget_reached")
+        assert len(transport.requests) == asked + 2
+        assert len(ended["execution"]["calls"]) == 2
+        assert ended["entry"] is None and ended["made"] == []
+        assert _count(client, "world_identity") == held
+
+
 def test_a_database_role_that_cannot_register_a_world_is_told_before_any_model_is_asked(
     drafts, monkeypatch
 ):

@@ -21,9 +21,15 @@ or ``refused`` by name; either way with every call it made.
 A world made this way keeps no kind in the workspace: a site world's receipt carries its whole kind
 document and regenerates from it alone, so nothing is lost, and the workspace's kept kinds are the
 ones a person chose to keep. The job runs under the same holder and budgets as a kind's draft
-(:mod:`exulanica.api.kind_drafts`, the world draft policy). Its state lives in this process: a
-draft still running when the process stops is lost, what it had spent stands, and a world that
-had already been made is among the person's worlds.
+(:mod:`exulanica.api.kind_drafts`, the world draft policy). Its request, progress and outcome are
+kept in the database (migration 0207): a draft whose process stopped while it ran is not asked
+again, and ends ready where its world was already made or refused ``world_draft_interrupted``,
+with what it had spent recorded either way (:mod:`exulanica.api.world_draft_worker`).
+
+A town takes tiles from the workspace's day (the world-count policy's tiles a day), so the town
+tool asks that budget before each paid step that could only end in its refusal: before the town is
+drafted, for the one tile every town takes, and before its look and setting are chosen, for the
+drafted town's own. The making asks it again under the workspace's lock, where the answer holds.
 """
 
 from __future__ import annotations
@@ -66,9 +72,15 @@ from exulanica.world.models import StylePackBinding
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.style_pack_library import style_pack_context, style_pack_library
 from exulanica.world.style_packs import StylePackRefused
+from exulanica.world.world_recipes import town_recipe
 from exulanica.world.world_settings import SettingRefused, bound_setting, setting_parts
 from exulanica.world.world_tools import WorldTool, tool_for_unsure, world_tools
-from exulanica.world.worlds import WorldLimitReached, WorldsReadOnly
+from exulanica.world.worlds import (
+    GENERATED,
+    WorldLimitReached,
+    WorldsReadOnly,
+    refuse_past_limit,
+)
 
 __all__ = [
     "STAGES",
@@ -554,6 +566,25 @@ def _make_place(
     )
 
 
+#: The tiles every town covers at least: whole 128 m tiles, never none.
+_TOWN_TILES_LEAST: Final = 1
+
+
+def _past_the_day(
+    opened: Opener, draft: KindDraft, guest: bool, tiles: int
+) -> dict[str, Any] | None:
+    """The refusal a town of ``tiles`` tiles would meet at its making, asked before a paid step
+    rather than after it: the worlds the workspace may hold, then the tiles its worlds may come to
+    today, as :func:`exulanica.world.worlds.refuse_past_limit` reads them. Unlocked, so an early
+    answer and never a permission: the making asks again under the workspace's lock."""
+    with opened() as connection:
+        try:
+            refuse_past_limit(connection, draft.workspace_id, GENERATED, guest=guest, tiles=tiles)
+        except WorldLimitReached as full:
+            return {"code": full.code, "detail": str(full)}
+    return None
+
+
 def _make_town(
     draft: KindDraft,
     drafts: KindDrafts,
@@ -569,6 +600,10 @@ def _make_town(
     def refused(refusal: Mapping[str, Any]) -> None:
         drafts.finish(draft, state="refused", refusal=dict(refusal), calls=log.calls)
 
+    full = _past_the_day(opened, draft, guest, _TOWN_TILES_LEAST)
+    if full is not None:
+        refused(full)
+        return
     view = specification_view(specification_source.served_document())
     try:
         outcome = draft_world_specification(
@@ -595,6 +630,10 @@ def _make_town(
     value = specification_source.value_refusal(town.preset, town.values)
     if value is not None:
         refused({"code": value.code, "detail": value.detail})
+        return
+    full = _past_the_day(opened, draft, guest, len(town_recipe(town.preset, town.values).tiles))
+    if full is not None:
+        refused(full)
         return
     label = next(
         (
