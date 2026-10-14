@@ -567,12 +567,14 @@ def test_no_inhabitant_name_reaches_the_planner_s_request(world):
 
 
 #: A world whose people include some whose explanations still cite only events recorded under
-#: the first input two minutes after the later object is placed. The society's seed is derived
-#: from the workspace and the world, so these two ids fix its people. In a fresh world that is not
-#: certain: in about 2 percent (8 of 400 seeded worlds, among them workspace
-#: 283d83af-c03f-4e3f-9606-196b7f7cce0f with world 22dc0816-05d3-4191-b5a2-9378f21c40c5) every
-#: person changes what they do in those two minutes. Every explanation then cites an event under
-#: the later input, and no person has only first-input events to withdraw.
+#: the first input two minutes after the later object is placed, and whose latest events hold some
+#: recorded under each input. The society's seed is derived from the workspace and the world, so
+#: these two ids fix its people. In a fresh world neither is certain: in about 2 percent (8 of 400
+#: seeded worlds, among them workspace 283d83af-c03f-4e3f-9606-196b7f7cce0f with world
+#: 22dc0816-05d3-4191-b5a2-9378f21c40c5) every person changes what they do in those two minutes,
+#: so every explanation cites an event under the later input and no person has only first-input
+#: events to withdraw; in some others the latest events hold none recorded under the later input,
+#: which the window test's positive control refuses.
 EXPLAINED_UNDER_THE_FIRST_INPUT = (
     uuid.UUID("7e287936-9f90-42c0-8c2e-0fbf3b302de0"),
     "world:authored:5c6e4337-15ba-4bdd-9772-19d30e7a269f",
@@ -686,6 +688,9 @@ def _later_input(world, client) -> dict[str, Any]:
     return snapshot
 
 
+@pytest.mark.parametrize(
+    ("workspace_id", "saved_world_id"), [EXPLAINED_UNDER_THE_FIRST_INPUT], ids=["pinned-world"]
+)
 def test_a_withdrawn_input_behind_the_latest_events_leaves_out_only_its_events(world):
     """With the full window, the latest events include some recorded under the first input; its
     withdrawal leaves them out and nothing else, so the society still answers."""
