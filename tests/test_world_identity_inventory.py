@@ -114,9 +114,10 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         "the workspace on both union branches, while the separate actor-bound function "
         "returns only the actor's aggregate hourly allowance across workspaces"
     ),
-    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.claim [world_draft_start]": (
-        "the worker claims one due queued or expired-lease running world_draft job in its "
-        "workspace under the workspace lock and row lock; the draft carries its reserved world"
+    "exulanica/world/world_draft_jobs.py::WorldDraftRepository._claimable [world_draft_start]": (
+        "the worker looks for one due queued or expired-lease running world_draft job in its "
+        "workspace, first without a lock (an idle poll takes no workspace lock) and, when one "
+        "is due, again under the workspace lock and row lock; the draft carries its reserved world"
     ),
     "exulanica/world/world_draft_jobs.py::WorldDraftRepository.funding_due [world_draft_start]": (
         "the worker finds its workspace's queued drafts awaiting funding by their deferred "
