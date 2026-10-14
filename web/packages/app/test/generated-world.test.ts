@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
 import { planSight } from '../src/composition/sight.js';
+import { RENDER_BUDGET } from '../src/render-budget.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
 import { worldDidNotOpen } from '../src/ui/startup-state.js';
@@ -149,6 +150,8 @@ describe('a saved generated world of several tiles', () => {
     expect(sources.name).toBe(west);
     expect(sources.bytes).toEqual(bytes[west!]);
     expect(sources.neighbours).toEqual([{ name: east, bytes: bytes[east!] }]);
+    // Its light is drawn within the render budget's caps for a town's tiles.
+    expect(sources.renderBudget).toBe(RENDER_BUDGET);
     // A person opens one step back from the served arrival, which may lie on any of the tiles: it
     // faces south, so a step back from the kerb is a step north, off the line people walk.
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');

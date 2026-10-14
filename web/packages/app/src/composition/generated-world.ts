@@ -338,7 +338,7 @@ export async function loadGeneratedWorld(
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
   const furniture = streetFurnitureOfTown(route, containers);
   rememberTownFurniture(entry.entryId, furniture);
-  const worldLook = await import('../world-look.js');
+  const [worldLook, { RENDER_BUDGET: renderBudget }] = await Promise.all([import('../world-look.js'), import('../render-budget.js')]);
   type Prepared = import('../world-look.js').PreparedWorldLook;
   type Choice = import('../world-look.js').WorldLookChoice;
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
@@ -382,6 +382,7 @@ export async function loadGeneratedWorld(
     fetchSet: (set) => library.textureSet(set.contentSha256),
     ...(neighbours.length === 0 ? {} : { neighbours }),
     ...(prepared === null ? {} : { look: prepared.look }),
+    renderBudget,
   });
   const drawn = dressedIn(plain, prepared);
   const loaded = drawn.tile;

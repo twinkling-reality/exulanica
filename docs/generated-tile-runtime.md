@@ -385,6 +385,39 @@ and colour enhancement together 0.04 to 0.11 ms; temporal anti-aliasing 0.2 to 0
 at once 0.4 to 0.6 ms. Soft (PCSS) shadows take 26 to 27 ms on their own, more than the 16.7 ms a
 frame has at 60 frames a second.
 
+## 6.2 The render budget
+
+A look chooses its sun shadows and contact shadowing for how a world should look; what they cost
+depends on what the scene holds. The render budget catalog
+(`assets/catalogs/world-kinds/render-budget.v1.json`, read by `readRenderBudget` in atlas-core's
+`render-budget.ts`) states, for each scene form (`open_site`, `indoor_site` and `terrain`, which a
+site mount draws, and `town_tiles`, which the tile runtime draws), a cap on the shadow cascades, the
+shadow map size, the shadow distance, and the contact shadowing's samples and resolution fraction.
+Both draw their light through `budgetedLook` (`generated-tile/budgeted-look.ts`), which lowers each
+value above its form's cap to the cap and never raises one; a look within every cap is drawn as the
+same object. The tile runtime budgets only the light: a tile's texture sets are uploaded and batched
+in its look as chosen, and a tile relit in another look keeps its caps. The reader refuses a form it
+does not know, a missing form, an unknown cap, a cap outside the range both look descriptors accept
+and a cap with no reason, by name, so a look lowered to any cap is still a valid look.
+
+Every cap has a class (`ceiling`, `measured` or `chosen`) and a reason. Version 1 sets every cap at
+the looks' own ceiling (four cascades, 4096 texels, 400 m, 64 samples, the full frame), so no look
+draws differently; its reasons cite the measurement a later version would lower a cap from. On a
+drafted garden site (14 October 2026, headless Chrome on Metal, 1280 by 860, three fixed views, the
+median of three interleaved 300-frame samples), two cascades instead of four removed about 200 draws
+a frame at every view with graphics time within the noise, a 2048-texel map or an 80 m distance changed
+graphics time by less than the noise, and contact shadowing was about half of the graphics frame
+while visibly shading a shrub's crown and the shadows under a bench. A cap is lowered only by a new
+catalog version with before and after pictures at fixed views. Contact shadowing's depth pass also
+gives the frame its scene depth, so a version that removes it must first give any material that reads
+the scene depth a depth map of its own.
+
+A town's caps also cite the market town measured in section 6.1, where contact shadowing was 0.7 ms
+and sun shadows 0.6 ms of a 1.7 to 1.8 ms frame. A saved world's tiles (section 7.3) are drawn
+within the `town_tiles` caps; the evaluation entries (sections 7 and 7.1) draw their tile without a
+budget, so they show the look as chosen. Multisampling is not capped: the environment sets it to
+four samples for every look.
+
 ## 7. The evaluation entry
 
 A tile can be named only on the synthetic development preview route:

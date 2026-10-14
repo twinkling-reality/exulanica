@@ -1,6 +1,6 @@
 import { rayTriangle } from '../mesh-picking.js';
 import * as pc from 'playcanvas';
-import type { TextureSetDigest, TextureSetManifest, TextureSetManifestEntry } from '@exulanica/atlas-core';
+import { renderCapsFor, type RenderBudget, type RenderCaps, type TextureSetDigest, type TextureSetManifest, type TextureSetManifestEntry } from '@exulanica/atlas-core';
 import {
   IDENTITY_NOT_STATED,
   MATERIAL_NONE_EXISTS,
@@ -24,6 +24,7 @@ import type {
   GeneratedTileMount,
 } from './binding-contract.js';
 import { applyTileEnvironment } from './environment.js';
+import { budgetedLook } from './budgeted-look.js';
 import { obstructionRings, type ObstructionRings } from './obstruction-rings.js';
 import { composedObstructionRings, type StatingTile } from './walk-world.js';
 import { TILE_LOOK_V1, type TileLook } from './look.js';
@@ -146,6 +147,11 @@ export interface GeneratedTileSources {
   readonly manifest: TextureSetManifest;
   readonly fetchSet: (entry: TextureSetManifestEntry) => Promise<Uint8Array>;
   readonly look?: TileLook;
+  /**
+   * The render budget (`render-budget.ts` in atlas-core): the tile's light is drawn within the caps
+   * of the `town_tiles` form, in this look and in any it is relit in. None draws the look as chosen.
+   */
+  readonly renderBudget?: RenderBudget;
   /** The page's `crypto.subtle` by default; null refuses every tile. */
   readonly digest?: TextureSetDigest | null;
   /**
@@ -634,6 +640,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     .sort((a, b) => a.firstTriangle - b.firstTriangle);
   const vertices = absoluteVertices(render);
   const look = sources.look ?? TILE_LOOK_V1;
+  const caps = sources.renderBudget === undefined ? null : renderCapsFor(sources.renderBudget, 'town_tiles');
   let setBytes = 0;
   for (const set of prepared.values()) if (set.state === 'decoded') setBytes += set.transferredBytes;
 
@@ -679,13 +686,13 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
       return best;
     },
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      return attachTile(host, tile, planned, prepared);
+      return attachTile(host, tile, planned, prepared, caps);
     },
     inLook(next: TileLook): LoadedGeneratedTile {
       const relit: LoadedGeneratedTile = {
         ...tile,
         look: next,
-        attach: (host: GeneratedTileHost): GeneratedTileAttachment => attachTile(host, relit, planned, prepared),
+        attach: (host: GeneratedTileHost): GeneratedTileAttachment => attachTile(host, relit, planned, prepared, caps),
       };
       return relit;
     },
@@ -715,10 +722,12 @@ function attachTile(
   tile: LoadedGeneratedTile,
   tiles: readonly DrawnTile[],
   prepared: ReadonlyMap<string, PreparedTextureSet>,
+  caps: RenderCaps | null,
 ): GeneratedTileAttachment {
   const device = host.app.graphicsDevice;
   const look = tile.look;
-  const environment = applyTileEnvironment(host.app, host.camera, look);
+  // Only the light is budgeted: the uploads and batches below read the look's surface and shading.
+  const environment = applyTileEnvironment(host.app, host.camera, caps === null ? look : budgetedLook(look, caps));
   const uploads = new TileTextureUploads(device, look);
   const roots: pc.Entity[] = [];
   const meshes: pc.Mesh[] = [];

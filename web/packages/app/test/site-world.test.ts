@@ -9,6 +9,7 @@ import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { GROUND_BORDERS } from '../src/ground-borders.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
 import { SITE_INTERIOR } from '../src/site-interior.js';
+import { RENDER_BUDGET } from '../src/render-budget.js';
 import { SITE_SCENERY } from '../src/site-scenery.js';
 import { SURFACE_MATERIALS } from '../src/surface-materials.js';
 import { SURFACE_PATTERNS } from '../src/surface-patterns.js';
@@ -200,6 +201,8 @@ describe('the look a site world is drawn in', () => {
     expect((options as { scenery?: unknown }).scenery).toBe(SITE_SCENERY);
     // And the interior catalog, so an indoor place has its ceiling and light in the pack's look too.
     expect((options as { interior?: unknown }).interior).toBe(SITE_INTERIOR);
+    // And the render budget, so the pack's look is drawn within the caps of the site's form.
+    expect((options as { renderBudget?: unknown }).renderBudget).toBe(RENDER_BUDGET);
     // The dresser reads a leaf by the same materials, patterns each and breaks the borders between grounds.
     expect(dressers.asked.at(-1)).toMatchObject({ materials: SURFACE_MATERIALS, patterns: SURFACE_PATTERNS, borders: GROUND_BORDERS });
     expect(GROUND_BORDERS.byMaterial.get('lake')?.lies).toBe('under');
@@ -254,7 +257,7 @@ describe('the look a site world is drawn in', () => {
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
     expect(world?.look).toEqual({ pack: 'exulanica.cozy-town', source: 'default', drawn: false, reason: 'The style pack list unavailable: HTTP 503' });
     // With no pack the engine's own colours are still read from the catalog, leaf by leaf.
-    expect(mounts.asked.at(-1)).toEqual({ seated: expect.any(Function), servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY, interior: SITE_INTERIOR });
+    expect(mounts.asked.at(-1)).toEqual({ seated: expect.any(Function), servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY, interior: SITE_INTERIOR, renderBudget: RENDER_BUDGET });
   });
 
   it('is the tile look, with no pack read, when the address asks for today\'s look', async () => {

@@ -1,11 +1,12 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type RenderBudget, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
 import type { TileEnvironment } from '../generated-tile/environment.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
 import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
+import { budgetedLook } from '../generated-tile/budgeted-look.js';
 import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type TerrainSiteDrawing, type SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, type DrawnSiteSlots } from './site-primitives.js';
@@ -85,6 +86,17 @@ export interface SiteMountOptions {
    * as before. The ceiling is drawn beside the site's slots and is none of them.
    */
   readonly interior?: SiteInteriorCatalog;
+  /**
+   * The render budget (`render-budget.ts` in atlas-core): the look is drawn within the caps of the
+   * site's scene form, an open site, an indoor site or a terrain. None draws the look as chosen.
+   */
+  readonly renderBudget?: RenderBudget;
+}
+
+/** The look a site of `form` is drawn in: the chosen look within the budget's caps for that form. */
+function lookWithin(options: SiteMountOptions, form: RenderForm): TileLook {
+  const look = options.look ?? TILE_LOOK_V1;
+  return options.renderBudget === undefined ? look : budgetedLook(look, renderCapsFor(options.renderBudget, form));
 }
 
 /**
@@ -108,7 +120,7 @@ export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null 
 /** The mount for a checked site drawing. */
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
   if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
-  const look = options.look ?? TILE_LOOK_V1;
+  const look = lookWithin(options, drawing.extent.enclosure === 'open' ? 'open_site' : 'indoor_site');
   const navigationWorld = siteNavigationWorld(drawing);
   return Object.freeze({
     kindLabel: drawing.kind.label,
@@ -214,7 +226,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
 
 /** Draw the original admitted triangles; scene dressing never supplies navigation authority. */
 function terrainMount(drawing: TerrainSiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
-  const look = options.look ?? TILE_LOOK_V1;
+  const look = lookWithin(options, 'terrain');
   const dressed = drawing.profile === 'exulanica.site-drawing/v4';
   const prepared = options.preparedDressing;
   if (dressed && (prepared === undefined || prepared.dressing !== drawing.dressing)) throw new TypeError('The exact terrain dressing must be prepared before mounting.');
