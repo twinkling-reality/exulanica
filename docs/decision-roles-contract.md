@@ -423,6 +423,19 @@ page says the being is played (`playedByPerson` in
 `played_by_you` and no `chosen_by`, and the thing card's decider as `{kind: person, played_by_you,
 may_change: false, refusal: being_played}`. Replay reads the receipts and needs no player.
 
+A person talks to a being by playing another being and saying a line to it. Out of hearing the turn offers no line to it; the walk to a spot, given its position, brings the played
+being within the say module's hearing reach, where the turn offers a line to it (`say_to`, the being
+named in `being_id`). The person's line is said as theirs and heard by the being it was said to, which
+is due the minute after whatever is under way (`due` in `exulanica/world/roles/person.py`). Where a
+model decides for that being, it is asked with the line quoted among the lines it heard, said to it,
+beside its character and memory ([minds](minds-contract.md#answering-a-person)), and may say
+something back while the person's being stays within reach. Its answer is an ordinary receipt and a
+`said` event with `decider: model`, which the person's being hears; the page reads both lines from
+the events read. Where no model is asked for the being that minute (none chosen, or none the host
+may ask: [the host's decision phase](#the-hosts-decision-phase)), its routine decides, which never
+says anything, and no ask is kept to be spent later. Replay asks neither the person nor the model
+(`tests/test_talk_to_a_being.py`).
+
 ## An outside program deciding
 
 An outside program decides for a subject under a grant: its door (an application component the
