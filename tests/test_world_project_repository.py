@@ -409,3 +409,68 @@ def test_a_living_session_may_close_once_and_never_change_after():
     reopened["living_session"]["opened"]["tick"] = 5
     with pytest.raises(Conflict, match="append-only"):
         append_only({name: opened}, {name: reopened})
+
+
+@pytest.fixture
+def no_git_identity(monkeypatch, tmp_path):
+    """A machine with no git identity, as CI's is: git may not guess one either."""
+    home = tmp_path / "empty-home"
+    home.mkdir()
+    (home / ".gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    for name in ("EMAIL", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME"):
+        monkeypatch.delenv(name, raising=False)
+    return home
+
+
+def test_every_project_commit_has_an_author_without_any_git_identity(no_git_identity, tmp_path):
+    from exulanica.world_package.projects.history import record_application
+
+    project, _ = sample()
+    world, evidence = evidence_from(project)
+    folder = tmp_path / "project"
+    create(folder, world, evidence=[evidence])  # no author given anywhere below
+    local = Project(folder)
+    moved = deepcopy(world)
+    moved["things"][0]["transform"]["x_mm"] = 1000
+    assert local.save(moved)["committed"]
+    assert local.link("learner/world", "main", "exulanica/world")["committed"]
+    record = {
+        "profile": "exulanica.world-project-application/v1",
+        "repository": "learner/world",
+        "pull_request": 1,
+        "merge_commit": "a" * 40,
+        "checkpoint_sha256": "b" * 64,
+        "evidence_sha256": {},
+        "version_id": "00000000-0000-0000-0000-00000000000a",
+        "title": "From learner/world commit " + "a" * 40 + " (pull request #1)",
+    }
+    assert record_application(local, record)["committed"]
+    fork_project(folder, tmp_path / "fork", "project:fork")
+    from exulanica.world_package.projects.repository import DEFAULT_AUTHOR
+
+    authors = git(folder, "log", "--format=%an <%ae>").split("\n")
+    expected = f"{DEFAULT_AUTHOR.name} <{DEFAULT_AUTHOR.email}>"
+    assert [a for a in authors if a] == [expected] * 4
+    assert git(tmp_path / "fork", "log", "-1", "--format=%an <%ae>").strip() == expected
+
+
+def test_a_stated_author_still_signs_and_the_person_s_git_config_is_never_read(
+    tmp_path, monkeypatch
+):
+    home = tmp_path / "home"
+    home.mkdir()
+    # A person's global configuration that would sign commits and name someone else.
+    (home / ".gitconfig").write_text(
+        "[user]\n\tname = Someone Else\n\temail = someone@example.invalid\n"
+        "[commit]\n\tgpgsign = true\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+    project, _ = sample()
+    folder = tmp_path / "project"
+    create(folder, project, author=AUTHOR)
+    assert git(folder, "log", "-1", "--format=%an").strip() == AUTHOR.name
+    create(tmp_path / "default", project)
+    assert git(tmp_path / "default", "log", "-1", "--format=%an").strip() != "Someone Else"

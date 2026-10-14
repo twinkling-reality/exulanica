@@ -18,7 +18,7 @@ import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from exulanica.world_package.projects.checkpoint import (
     MAX_BYTES,
@@ -75,10 +75,18 @@ def check_message(message: str) -> str:
     return message.strip()
 
 
+#: Who a project commit is by when no author is stated. A person's own git configuration is never
+#: read, so a project commits the same on every machine, CI included, and no personal email
+#: enters its history unless the person states one.
+DEFAULT_AUTHOR: Final = Author("Exulanica project", "project@exulanica.invalid")
+
+
 def _environment() -> dict[str, str]:
     environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    # The user's global identity may apply; system configuration and prompts never do.
-    environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0")
+    # Neither the system's nor the person's git configuration applies, and git never prompts.
+    environment.update(
+        GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0"
+    )
     return environment
 
 
@@ -87,7 +95,7 @@ class Project:
 
     def __init__(self, folder: Path, *, author: Author | None = None) -> None:
         self.folder = Path(os.path.abspath(folder))
-        self.author = author
+        self.author = author or DEFAULT_AUTHOR
 
     @property
     def file(self) -> Path:
@@ -107,9 +115,8 @@ class Project:
             "-c",
             "core.autocrlf=false",
         ]
-        if self.author is not None:
-            options += ["-c", f"user.name={self.author.name}"]
-            options += ["-c", f"user.email={self.author.email}"]
+        options += ["-c", f"user.name={self.author.name}"]
+        options += ["-c", f"user.email={self.author.email}"]
         try:
             result = subprocess.run(
                 ["git", *options, *arguments],

@@ -778,7 +778,10 @@ uv run python -m exulanica.world_package.projects fork-project ./my-project --to
 
 `record` commits only when the selected world or its evidence differs from the last commit; an
 unchanged selection makes no commit, however long the world ran. Without `--from` it records the
-folder's edited files. Commit messages are one line without an em dash or attribution trailer;
+folder's edited files. Commits are by `Exulanica project <project@exulanica.invalid>` unless `--author-name` and
+`--author-email` state another author; git runs without the system's or the person's own git
+configuration, so a project commits the same on every machine and no personal email enters its
+history unless stated. Commit messages are one line without an em dash or attribution trailer;
 when none is given, the message is drawn from the plain-word summary. Evidence files are
 append-only: a saved record cannot be changed or removed.
 
