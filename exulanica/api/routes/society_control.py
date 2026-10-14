@@ -93,6 +93,45 @@ class HostPlayback(BaseModel):
     reason: str | None
 
 
+class SessionUnresolved(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    count: int
+    usd: str
+
+
+class SessionUsed(BaseModel):
+    """What a living session has used of each limit: wall seconds since it opened (until it
+    closed), minutes played, model decisions asked, and usd and calls its bounds committed, with
+    what among them may have cost what is not known (``unresolved``)."""
+
+    model_config = ConfigDict(extra="forbid")
+    wall_seconds: int
+    minutes: int
+    decisions: int
+    usd: str
+    calls: int
+    unresolved: SessionUnresolved
+
+
+class LivingSessionNow(BaseModel):
+    """The society's latest living session, open or the last to close, as the control read states
+    it: enough to say how long it has left and why it stopped, with no other read."""
+
+    model_config = ConfigDict(extra="forbid")
+    session_id: str
+    state: Literal["open", "closed"]
+    limits: SessionLimitsBody
+    used: SessionUsed
+    start_tick: int
+    opened_at: str
+    ends_by: str
+    end_tick: int | None
+    closed_at: str | None
+    #: Why it closed, by code: a person stopped or paused it, a limit was reached
+    #: (``SESSION_LIMIT_REASONS``), or playback stopped on an error; null while it is open.
+    closed_reason: str | None
+
+
 class LastBatchExecution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     event_seq: int
@@ -144,6 +183,9 @@ class ControlRead(BaseModel):
     model_minds_code: Literal["spending_cap_reached"] | None
     #: The sentence for ``model_minds_code``, or null.
     model_minds_reason: str | None
+    #: The society's latest living session, or null for one that never had one. Added to this
+    #: profile as an optional field.
+    session: LivingSessionNow | None = None
 
 
 #: What a reader is told when the allowance for open models is spent: the world plays on.
@@ -293,6 +335,12 @@ def repository(
     )
 
 
+def with_session(control: dict, controls: SocietyControlRepository, version_id: uuid.UUID) -> dict:
+    """The control read with the society's latest living session and what it has used. Added here,
+    not in the repository's read, so the worker's minutes read nothing more."""
+    return {**control, "session": controls.session_now(version_id)}
+
+
 def call(operation: Callable[[], Any]) -> Any:
     try:
         return operation()
@@ -329,14 +377,17 @@ def read_control(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    return call(
-        lambda: with_host_playback(
-            repository(connection, session, request, world_id).read(version_id),
-            request,
-            session.workspace_id,
-            connection,
+    def read() -> dict:
+        controls = repository(connection, session, request, world_id)
+        return with_session(
+            with_host_playback(
+                controls.read(version_id), request, session.workspace_id, connection
+            ),
+            controls,
+            version_id,
         )
-    )
+
+    return call(read)
 
 
 @router.put("", response_model=ControlRead)
@@ -354,10 +405,16 @@ def configure_control(
         # owner chose are asked within the guest's grant; anyone else opens one by its route.
         if body.mode == "playing" and holds_as_guest(request):
             fields = body.model_dump(exclude={"mode"})
-            return controls.play_with_session(version_id, actor=session.actor, **fields)
-        return controls.configure(version_id, actor=session.actor, **body.model_dump())
+            done = controls.play_with_session(version_id, actor=session.actor, **fields)
+        else:
+            done = controls.configure(version_id, actor=session.actor, **body.model_dump())
+        return with_session(
+            with_host_playback(done, request, session.workspace_id, connection),
+            controls,
+            version_id,
+        )
 
-    return call(lambda: with_host_playback(configure(), request, session.workspace_id, connection))
+    return call(configure)
 
 
 @router.post("/steps")
@@ -456,9 +513,14 @@ def read_living_session(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    """One living session; 404 ``session_unknown`` where the society has none by that id."""
+    """One living session and what it came to: what it used of each limit, each provider's bound
+    (what it committed, and what is unresolved), its decisions in decision order with their request
+    ids, and the measures of its model decisions overall and per model, from the decisions asked
+    for its minutes alone. 404 ``session_unknown`` where the society has none by that id."""
     return call(
-        lambda: repository(connection, session, request, world_id).session(version_id, session_id)
+        lambda: repository(connection, session, request, world_id).session_read(
+            version_id, session_id, actor=session.actor
+        )
     )
 
 

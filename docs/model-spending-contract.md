@@ -58,7 +58,9 @@ admission:
   inside an open session. A session's bounds are closed once it closes: at once where the worker
   closed it at a limit, and otherwise by the worker's reaper, which closes every bound of a closed
   session still open (`close_closed_session_bounds`). A reservation of unknown cost stays held
-  under the closed bound until an operator reconciles it.
+  under the closed bound until an operator reconciles it. The session's own read states each of
+  its bounds, what it committed and what is unresolved under it, and the control read states
+  their sum as what the session used (`session_bounds`, `exulanica/world/society_sessions.py`).
 - **Providers that bill.** Every level names a provider that bills: one that takes a credential
   (`Manifest.billing_providers`). A provider on this computer, an Ollama server that takes no
   credential and whose every model the manifest prices at 0, bills nothing: no authority, grant,

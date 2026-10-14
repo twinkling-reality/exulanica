@@ -3041,7 +3041,7 @@
      "society"
     ],
     "summary": "Read Living Session",
-    "description": "One living session; 404 ``session_unknown`` where the society has none by that id.",
+    "description": "One living session and what it came to: what it used of each limit, each provider's bound\n(what it committed, and what is unresolved), its decisions in decision order with their request\nids, and the measures of its model decisions overall and per model, from the decisions asked\nfor its minutes alone. 404 ``session_unknown`` where the society has none by that id.",
     "operationId": "read_living_session_world_versions__version_id__society_control_sessions__session_id__get",
     "parameters": [
      {
@@ -29170,6 +29170,16 @@
        }
       ],
       "title": "Model Minds Reason"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LivingSessionNow"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,
@@ -33884,6 +33894,89 @@
      "regions"
     ],
     "title": "LinkSubject"
+   },
+   "LivingSessionNow": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "title": "Session Id"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "open",
+       "closed"
+      ],
+      "title": "State"
+     },
+     "limits": {
+      "$ref": "#/components/schemas/SessionLimitsBody"
+     },
+     "used": {
+      "$ref": "#/components/schemas/SessionUsed"
+     },
+     "start_tick": {
+      "type": "integer",
+      "title": "Start Tick"
+     },
+     "opened_at": {
+      "type": "string",
+      "title": "Opened At"
+     },
+     "ends_by": {
+      "type": "string",
+      "title": "Ends By"
+     },
+     "end_tick": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End Tick"
+     },
+     "closed_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Closed At"
+     },
+     "closed_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Closed Reason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "session_id",
+     "state",
+     "limits",
+     "used",
+     "start_tick",
+     "opened_at",
+     "ends_by",
+     "end_tick",
+     "closed_at",
+     "closed_reason"
+    ],
+    "title": "LivingSessionNow",
+    "description": "The society's latest living session, open or the last to close, as the control read states\nit: enough to say how long it has left and why it stopped, with no other read."
    },
    "LookBody": {
     "properties": {
@@ -43190,6 +43283,64 @@
     ],
     "title": "SessionLimitsBody",
     "description": "What a living session may use before it closes: each figure stated and positive."
+   },
+   "SessionUnresolved": {
+    "properties": {
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     },
+     "usd": {
+      "type": "string",
+      "title": "Usd"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "count",
+     "usd"
+    ],
+    "title": "SessionUnresolved"
+   },
+   "SessionUsed": {
+    "properties": {
+     "wall_seconds": {
+      "type": "integer",
+      "title": "Wall Seconds"
+     },
+     "minutes": {
+      "type": "integer",
+      "title": "Minutes"
+     },
+     "decisions": {
+      "type": "integer",
+      "title": "Decisions"
+     },
+     "usd": {
+      "type": "string",
+      "title": "Usd"
+     },
+     "calls": {
+      "type": "integer",
+      "title": "Calls"
+     },
+     "unresolved": {
+      "$ref": "#/components/schemas/SessionUnresolved"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "wall_seconds",
+     "minutes",
+     "decisions",
+     "usd",
+     "calls",
+     "unresolved"
+    ],
+    "title": "SessionUsed",
+    "description": "What a living session has used of each limit: wall seconds since it opened (until it\nclosed), minutes played, model decisions asked, and usd and calls its bounds committed, with\nwhat among them may have cost what is not known (``unresolved``)."
    },
    "SetObjectBehaviourBody": {
     "properties": {

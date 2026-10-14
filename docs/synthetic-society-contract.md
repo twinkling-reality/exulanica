@@ -1467,9 +1467,8 @@ eight places, stored at the ledger's quantum. They are recorded when the session
 enforced by the playback worker. Before each claimed minute of a society with an open session it
 checks them in this order, and the first that holds closes the session under the claim's lease,
 pauses the society with that reason, and runs no minute: the wall deadline passed
-(`session_deadline`); the session played its minutes (`session_minutes`); its model decisions,
-every receipt of a request asked of a model since its first minute, reached its limit
-(`session_decisions`); a decision of it was refused because its bound or the grant under it had
+(`session_deadline`); the session played its minutes (`session_minutes`); its model decisions
+(below) reached their limit (`session_decisions`); a decision of it was refused because its bound or the grant under it had
 nothing left (`session_spending_limit`); or a call under its bound may have cost what is not known
 (`session_liability_unknown`), which only an operator's reconciliation settles
 (`limit_reached`, `exulanica/world/society_sessions.py`). While a session is open each claim runs
@@ -1502,10 +1501,49 @@ Under the base route, `/sessions`:
 - `POST /sessions/{session_id}/stop` stops the session; a session that already closed is answered
   as it closed. It needs `world.write`.
 - `GET /sessions` lists the society's sessions newest first, and `GET /sessions/{session_id}`
-  reads one, 404 `session_unknown` where the society has none by that id. Both need `world.read`.
+  reads one with what it came to (below), 404 `session_unknown` where the society has none by
+  that id. Both need `world.read`.
 
 Each answer is `exulanica.society-session/v1`: `{session_id, state: "open" | "closed", opened,
 closed}`, the opening and closing receipts' fields with their event sequence numbers.
+
+A session's decisions are the receipts of the requests asked for its minutes: those whose request
+`base_tick` lies from its `start_tick` up to, not including, its `end_tick`, with no end while it
+is open. A request asked for a minute a closed session did not play belongs to the session that
+plays it. Its model decisions are those whose request was asked of a model, not of a person
+playing a being or an outside program. One filter states this in the database
+(`model_decisions`, `exulanica/world/society_sessions.py`); the limit above and the reads below
+count by it.
+
+What a session has used (`used`) is its wall seconds since it opened, until it closed; the minutes
+it played, to the society's current tick while open and to its `end_tick` once closed; its model
+decisions; the `usd` and `calls` its bounds committed (charged, reservations still held
+included); and `unresolved`, the `count` and `usd` of its attempts that may have cost what is not
+known: a reservation of unknown outcome, or one dispatched without a settlement for longer than
+the workspace's spending read allows (`UNRESOLVED_AFTER`). A closed session's figures do not
+change as the world plays on.
+
+The control read (`GET` and `PUT` on the base route) states `session`: the society's latest
+session, open or the last to close, or null for a society that never had one, as `{session_id,
+state, limits, used, start_tick, opened_at, ends_by, end_tick, closed_at, closed_reason}`, the
+last three null while it is open. A page says how long a session has left and why it stopped from
+this read alone. It is attached by the route, so the worker's minutes read nothing more.
+
+`GET /sessions/{session_id}` adds to the session:
+
+- `used`, as above;
+- `bounds`: each provider's bound, by `bound_key` order, with its `provider`, `bound_id`, `state`
+  (`open`, or `closed` once revoked), `ceiling_usd`, `max_calls`, `valid_until`, what it
+  `committed_usd` and `committed_calls`, `in_flight_usd`, `unresolved`, `known_usage_usd` and
+  `reconciled_usd`, amounts at the ledger's eight places;
+- `decisions`: every decision of the session, its latest `decisions_read.maximum` (2,000,
+  `SESSION_DECISIONS_READ`) in decision order, each with its `request_id`, `decision_seq`,
+  `role`, `subject_id`, `decider` (`model`, `person` or `external`), `base_tick` and
+  `consumed_tick` (null until a minute takes it up), for stepping through a being's choices;
+  `decisions_read.counted` says how many it holds;
+- `measures` over its model decisions among those, and `by_model`, the same per model
+  (`{provider, model_id, measures}`), each as the models read measures them
+  (`exulanica/world/decision_measures.py`).
 
 A model is asked for a society's beings only while it has an open session
 ([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)). A society

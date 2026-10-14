@@ -3242,7 +3242,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "get",
     "id": "read_living_session_world_versions__version_id__society_control_sessions__session_id__get",
     "title": "Read Living Session",
-    "description": "One living session; 404 ``session_unknown`` where the society has none by that id.",
+    "description": "One living session and what it came to: what it used of each limit, each provider's bound\n(what it committed, and what is unresolved), its decisions in decision order with their request\nids, and the measures of its model decisions overall and per model, from the decisions asked\nfor its minutes alone. 404 ``session_unknown`` where the society has none by that id.",
     "group": "society",
     "permission": {
       "requires": [

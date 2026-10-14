@@ -12,6 +12,8 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from exulanica.db.session import set_workspace
+from exulanica.world.decision_measures import measures
+from exulanica.world.decision_roles import decision_roles
 from exulanica.world.society import (
     StaleSocietyState,
     UnavailableSocietyInput,
@@ -33,17 +35,21 @@ from exulanica.world.society_controls import (
     utc,
     validate_settings,
 )
+from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import PLAYABLE_ENGINES, society_engine
 from exulanica.world.society_repository import SocietyInputBehind, SocietyRepository
 from exulanica.world.society_sessions import (
     SESSION_CLOSED,
+    SESSION_DECISIONS_READ,
     SESSION_KINDS,
     SESSION_LIMIT_REASONS,
     SESSION_MAXIMA,
     SESSION_OPENED,
     SessionRefused,
     limit_reached,
+    session_bounds,
     session_limits,
+    session_used,
     sessions_from,
 )
 from exulanica.world.world_clock import lead_room
@@ -445,6 +451,101 @@ class SocietyControlRepository:
             if one["session_id"] == str(session_id):
                 return one
         raise SessionRefused("session_unknown", "this society has no such session")
+
+    def session_now(self, version_id: uuid.UUID) -> dict | None:
+        """The society's latest living session as its control read states it, open or the last to
+        close, with what it has used of each limit; None for a society that never had one."""
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            found = sessions_from(self._session_receipts(society["society_id"]))
+            if not found:
+                return None
+            view = found[0]
+            used = session_used(self.connection, self.workspace_id, society, view, self._now())
+            opened, closed = view["opened"], view["closed"]
+            return {
+                "session_id": view["session_id"],
+                "state": view["state"],
+                "limits": opened["limits"],
+                "used": used,
+                "start_tick": opened["start_tick"],
+                "opened_at": opened["opened_at"],
+                "ends_by": opened["ends_by"],
+                "end_tick": None if closed is None else closed["end_tick"],
+                "closed_at": None if closed is None else closed["closed_at"],
+                "closed_reason": None if closed is None else closed["reason"],
+            }
+
+    def session_read(
+        self, version_id: uuid.UUID, session_id: uuid.UUID, *, actor: uuid.UUID
+    ) -> dict:
+        """One living session with what it came to: what it used of each limit, its bounds by
+        provider, its decisions in decision order (each with its request id, for stepping through
+        a being's choices) and the measures of its model decisions overall and per model, from
+        the decisions asked for its minutes alone. Reading the decisions authorizes the society's
+        inputs for ``actor``, as the models read does. Refused ``session_unknown`` where the
+        society has no such session."""
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            view = next(
+                (
+                    one
+                    for one in sessions_from(self._session_receipts(society["society_id"]))
+                    if one["session_id"] == str(session_id)
+                ),
+                None,
+            )
+            if view is None:
+                raise SessionRefused("session_unknown", "this society has no such session")
+            now = self._now()
+            bounds = session_bounds(self.connection, self.workspace_id, view["session_id"], now)
+            used = session_used(self.connection, self.workspace_id, society, view, now, bounds)
+            closed = view["closed"]
+            ticks = (view["opened"]["start_tick"], None if closed is None else closed["end_tick"])
+            reader = self._society(actor)
+            snapshot = reader.snapshot(version_id)
+            decisions = SocietyDecisionRepository(reader)
+            rows = sorted(
+                (
+                    {**row, "role": role.key}
+                    for role in decision_roles()
+                    for row in decisions.role_decisions(
+                        role,
+                        version_id,
+                        latest=SESSION_DECISIONS_READ,
+                        authorized=snapshot,
+                        ticks=ticks,
+                    )
+                ),
+                key=lambda row: row["decision_seq"],
+            )[-SESSION_DECISIONS_READ:]
+            asked = [row for row in rows if row["decider"]["kind"] == "model"]
+            by_model: dict[tuple[str, str], list[dict]] = {}
+            for row in asked:
+                by_model.setdefault((row["provider"], row["model_id"]), []).append(row)
+            return {
+                **view,
+                "used": used,
+                "bounds": bounds,
+                "decisions": [
+                    {
+                        "request_id": row["request_id"],
+                        "decision_seq": row["decision_seq"],
+                        "role": row["role"],
+                        "subject_id": row["subject_id"],
+                        "decider": row["decider"]["kind"],
+                        "base_tick": row["base_tick"],
+                        "consumed_tick": row["consumed_tick"],
+                    }
+                    for row in rows
+                ],
+                "decisions_read": {"counted": len(rows), "maximum": SESSION_DECISIONS_READ},
+                "measures": measures(asked),
+                "by_model": [
+                    {"provider": provider, "model_id": model_id, "measures": measures(group)}
+                    for (provider, model_id), group in sorted(by_model.items())
+                ],
+            }
 
     def open_session(
         self,

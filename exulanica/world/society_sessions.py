@@ -28,7 +28,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from exulanica.models.usage import usd_string
-from exulanica.world.deciders import is_external, is_person_ask
+from exulanica.spending.status import UNRESOLVED_AFTER
 
 #: The profile a session reads as.
 SESSION_PROFILE: Final = "exulanica.society-session/v1"
@@ -149,6 +149,10 @@ def sessions_from(receipts: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     return found[::-1]
 
 
+#: The most decisions a session's read returns and measures, its latest: a read that does not
+#: grow with a long session's people. The read states how many it counted.
+SESSION_DECISIONS_READ: Final = 2000
+
 #: Why a session closes at one of its limits, in the order they are checked before each minute.
 SESSION_LIMIT_REASONS: Final = (
     "session_deadline",
@@ -158,13 +162,22 @@ SESSION_LIMIT_REASONS: Final = (
     "session_liability_unknown",
 )
 
-_RECEIPTS: Final = """
-select d.document as receipt, r.document as request
+#: A session's model decisions: the receipts of the requests asked of a model (a person playing a
+#: being, or an outside program, names its kind in the request, as
+#: :func:`~exulanica.world.deciders.is_person_ask` and :func:`~exulanica.world.deciders.is_external`
+#: read it; a model's names none) for the minutes from ``start`` up to ``end`` (none while open).
+_MODEL_DECISIONS: Final = """
   from world_society_decision d
   join world_society_decision_request r using (workspace_id, society_id, request_id)
- where d.workspace_id = %s and d.society_id = %s
-   and (r.document->>'base_tick')::bigint >= %s
+ where d.workspace_id = %(workspace)s and d.society_id = %(society)s
+   and r.base_tick >= %(start)s and (%(end)s::bigint is null or r.base_tick < %(end)s)
+   and coalesce(r.document->'provider_config'->>'kind', '') not in ('external', 'person')
 """
+_DECISIONS: Final = (
+    "select count(*) as decisions, "
+    "count(*) filter (where d.document->>'reason' = 'spending_limit_reached') as refused"
+    + _MODEL_DECISIONS
+)
 _UNKNOWN: Final = """
 select 1
   from spending_reservation v
@@ -172,28 +185,64 @@ select 1
  where v.workspace_id = %s and v.state = 'unknown' and starts_with(g.bound_key, %s)
  limit 1
 """
+#: Each bound a session's key names, with what it committed and what its reservations hold. A
+#: dispatched attempt older than ``UNRESOLVED_AFTER`` is unresolved, as the workspace's spending
+#: read says it.
+_BOUNDS: Final = """
+select g.grant_id, g.bound_key, g.ceiling_usd, g.max_calls, g.valid_until,
+       gs.committed_usd, gs.committed_calls,
+       exists (select 1 from spending_grant_revocation v
+                where v.workspace_id = g.workspace_id and v.grant_id = g.grant_id) as closed,
+       coalesce(sum(x.reserved_usd) filter (
+         where x.state = 'admitted'
+            or (x.state = 'dispatched' and x.dispatched_at > %(horizon)s)), 0) as in_flight_usd,
+       count(x.reservation_id) filter (
+         where x.state = 'unknown'
+            or (x.state = 'dispatched' and x.dispatched_at <= %(horizon)s)) as unresolved_count,
+       coalesce(sum(case when x.state = 'unknown' then x.settled_usd
+                         when x.state = 'dispatched' and x.dispatched_at <= %(horizon)s
+                         then x.reserved_usd end), 0) as unresolved_usd,
+       coalesce(sum(x.settled_usd) filter (where x.state = 'settled'), 0) as known_usage_usd,
+       coalesce(sum(x.settled_usd) filter (where x.state = 'reconciled'), 0) as reconciled_usd
+  from spending_grant g
+  join spending_grant_state gs on gs.workspace_id = g.workspace_id and gs.grant_id = g.grant_id
+  left join spending_reservation x on x.workspace_id = g.workspace_id and x.bound_id = g.grant_id
+ where g.workspace_id = %(workspace)s and g.parent_grant_id is not null
+   and starts_with(g.bound_key, %(prefix)s)
+ group by g.workspace_id, g.grant_id, g.bound_key, g.ceiling_usd, g.max_calls, g.valid_until,
+          gs.committed_usd, gs.committed_calls
+ order by g.bound_key
+"""
 
 
-def model_receipts(
+def model_decisions(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
     society_id: uuid.UUID,
     start_tick: int,
-) -> list[dict[str, Any]]:
-    """The receipts of the model decisions asked since a session's first minute: every receipt
-    whose request was asked of a model (not a person playing a being, not an outside program) at
-    or after ``start_tick``. Read on a connection scoped to the workspace."""
-    rows = (
+    end_tick: int | None = None,
+) -> dict[str, int]:
+    """How many model decisions a session asked (``decisions``), and how many of them were refused
+    because a spending bound had nothing left (``refused``): the receipts of the requests asked of
+    a model for its minutes, from ``start_tick`` up to ``end_tick`` (none while it is open). A
+    request asked for a minute a closed session did not play belongs to the session that plays
+    it. Counted in the database, so a read polled each second loads no receipt. Read on a
+    connection scoped to the workspace."""
+    row = (
         connection.cursor(row_factory=dict_row)
-        .execute(_RECEIPTS, (workspace_id, society_id, start_tick))
-        .fetchall()
+        .execute(
+            _DECISIONS,
+            {
+                "workspace": workspace_id,
+                "society": society_id,
+                "start": start_tick,
+                "end": end_tick,
+            },
+        )
+        .fetchone()
     )
-    return [
-        row["receipt"]
-        for row in rows
-        if not is_external(row["request"]["provider_config"])
-        and not is_person_ask(row["request"]["provider_config"])
-    ]
+    assert row is not None
+    return {"decisions": int(row["decisions"]), "refused": int(row["refused"])}
 
 
 def decisions_left(
@@ -203,8 +252,85 @@ def decisions_left(
     opened: Mapping[str, Any],
 ) -> int:
     """How many model decisions the open session may still ask for."""
-    used = len(model_receipts(connection, workspace_id, society_id, opened["start_tick"]))
-    return max(0, int(opened["limits"]["decisions"]) - used)
+    used = model_decisions(connection, workspace_id, society_id, opened["start_tick"])
+    return max(0, int(opened["limits"]["decisions"]) - used["decisions"])
+
+
+def session_bounds(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, session_id: str, now: dt.datetime
+) -> list[dict[str, Any]]:
+    """Each provider's bound of a session, by provider: its ceiling and calls, what it committed
+    (charged, holds included), what its reservations hold in flight, unresolved (an attempt that
+    may have cost what is not known, until an operator reconciles it), settled at known usage and
+    reconciled, and whether it is still ``open`` or ``closed``. Amounts are decimal strings at the
+    ledger's eight places. Read on a connection scoped to the workspace."""
+    prefix = f"living-session:{session_id}:"
+    rows = (
+        connection.cursor(row_factory=dict_row)
+        .execute(
+            _BOUNDS,
+            {"workspace": workspace_id, "prefix": prefix, "horizon": now - UNRESOLVED_AFTER},
+        )
+        .fetchall()
+    )
+    return [
+        {
+            "provider": row["bound_key"].removeprefix(prefix),
+            "bound_id": str(row["grant_id"]),
+            "state": "closed" if row["closed"] else "open",
+            "ceiling_usd": usd_string(row["ceiling_usd"]),
+            "max_calls": row["max_calls"],
+            "valid_until": row["valid_until"].isoformat(),
+            "committed_usd": usd_string(row["committed_usd"]),
+            "committed_calls": row["committed_calls"],
+            "in_flight_usd": usd_string(row["in_flight_usd"]),
+            "unresolved": {
+                "count": int(row["unresolved_count"]),
+                "usd": usd_string(row["unresolved_usd"]),
+            },
+            "known_usage_usd": usd_string(row["known_usage_usd"]),
+            "reconciled_usd": usd_string(row["reconciled_usd"]),
+        }
+        for row in rows
+    ]
+
+
+def session_used(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    society: Mapping[str, Any],
+    view: Mapping[str, Any],
+    now: dt.datetime,
+    bounds: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """What a session (``view``, as :func:`sessions_from` reads it) has used of each of its limits:
+    wall seconds since it opened (until it closed), minutes played, model decisions asked, and
+    usd and calls its bounds committed, with what is unresolved among them. An open session's
+    minutes run to ``society``'s current tick; a closed one's to the tick it ended at.
+    ``bounds`` is :func:`session_bounds` where the caller read it already."""
+    opened, closed = view["opened"], view["closed"]
+    since = dt.datetime.fromisoformat(opened["opened_at"])
+    until = now if closed is None else dt.datetime.fromisoformat(closed["closed_at"])
+    end_tick = None if closed is None else closed["end_tick"]
+    if bounds is None:
+        bounds = session_bounds(connection, workspace_id, view["session_id"], now)
+    asked = model_decisions(
+        connection, workspace_id, society["society_id"], opened["start_tick"], end_tick
+    )
+    return {
+        "wall_seconds": max(0, int((until - since).total_seconds())),
+        "minutes": (society["current_tick"] if end_tick is None else end_tick)
+        - opened["start_tick"],
+        "decisions": asked["decisions"],
+        "usd": usd_string(sum((Decimal(one["committed_usd"]) for one in bounds), Decimal(0))),
+        "calls": sum(int(one["committed_calls"]) for one in bounds),
+        "unresolved": {
+            "count": sum(int(one["unresolved"]["count"]) for one in bounds),
+            "usd": usd_string(
+                sum((Decimal(one["unresolved"]["usd"]) for one in bounds), Decimal(0))
+            ),
+        },
+    }
 
 
 def limit_reached(
@@ -226,10 +352,10 @@ def limit_reached(
         return "session_deadline"
     if society["current_tick"] - opened["start_tick"] >= int(limits["minutes"]):
         return "session_minutes"
-    receipts = model_receipts(connection, workspace_id, society["society_id"], opened["start_tick"])
-    if len(receipts) >= int(limits["decisions"]):
+    asked = model_decisions(connection, workspace_id, society["society_id"], opened["start_tick"])
+    if asked["decisions"] >= int(limits["decisions"]):
         return "session_decisions"
-    if any(receipt["reason"] == "spending_limit_reached" for receipt in receipts):
+    if asked["refused"]:
         return "session_spending_limit"
     prefix = f"living-session:{opened['session_id']}:"
     if connection.execute(_UNKNOWN, (workspace_id, prefix)).fetchone() is not None:

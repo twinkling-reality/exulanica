@@ -146,6 +146,7 @@ class SocietyDecisionRepository:
         *,
         latest: int | None = None,
         authorized: Mapping[str, Any] | None = None,
+        ticks: tuple[int, int | None] | None = None,
     ) -> list[dict]:
         """``role``'s decisions this society recorded, in order, with what their minutes did.
 
@@ -154,7 +155,9 @@ class SocietyDecisionRepository:
         chose, and the disposition of the minute that consumed it with that minute's reason, from
         the ``decision_applied`` event it recorded, or ``None`` while none has. The read a
         comparison of models is made from. ``latest`` keeps only that many of the most recent,
-        for a reader that must not grow with the world's age.
+        for a reader that must not grow with the world's age. ``ticks`` (``start``, ``end``) keeps
+        only the decisions asked for the minutes from ``start`` up to ``end`` (none: every one
+        since), as a living session's read takes its own.
 
         Reading the society's snapshot authorizes its inputs. ``authorized`` is the snapshot the
         caller read through this same society in this transaction; when it is this society's,
@@ -167,6 +170,7 @@ class SocietyDecisionRepository:
             or authorized.get("version_id") != version_id
         ):
             self.society.snapshot(version_id)
+        start, end = ticks if ticks else (None, None)
         rows = self.connection.execute(
             "select d.decision_seq,d.document,r.document as request,d.recorded_at,"
             "t.disposition,t.tick,(select e.document->>'reason' from world_society_event e "
@@ -178,8 +182,19 @@ class SocietyDecisionRepository:
             "left join world_society_transition_decision t "
             "using(workspace_id,society_id,decision_seq) "
             "where d.workspace_id=%s and d.society_id=%s and d.document->>'profile'=%s "
+            "and (%s::bigint is null or r.base_tick>=%s) "
+            "and (%s::bigint is null or r.base_tick<%s) "
             "order by d.decision_seq desc limit %s",
-            (row["workspace_id"], row["society_id"], role.receipt_profile, latest),
+            (
+                row["workspace_id"],
+                row["society_id"],
+                role.receipt_profile,
+                start,
+                start,
+                end,
+                end,
+                latest,
+            ),
         ).fetchall()
         decisions = []
         for value in reversed(rows):

@@ -336,7 +336,8 @@ function measuredRate(value: unknown): MeasuredRate {
 
 const amount = (value: unknown): string => (typeof value === 'string' && DECIMAL.test(value) ? value : invalid());
 
-function decisionMeasures(value: unknown): DecisionMeasures {
+/** The server's measures, exactly; the session read parses its own with this same reader. */
+export function decisionMeasures(value: unknown): DecisionMeasures {
   const held = object(value);
   const counts = object(held['counts']);
   const rates = object(held['rates']);
