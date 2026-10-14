@@ -3,7 +3,8 @@
 #contextual-world .bm-pill[aria-pressed="true"] { padding-left:16px; }
 #contextual-world .bm-pill-state { padding-right:10px; margin-right:1px; border-right:1px solid #ffffff38; }
 #contextual-world .bm-pill:hover { border-color:#ffffff65; background-color:rgba(18,24,32,.77); }
-#contextual-world .bm-pill kbd,#contextual-world .bm-action kbd { display:grid; place-items:center; min-width:28px; height:25px; padding:0 6px; border:1px solid #ffffff50; border-radius:7px; font:400 11px/1 "IBM Plex Mono",monospace; background:#ffffff0c; color:#fff; box-shadow:inset 0 1px 0 #ffffff16; }
+/* The chip contextual-world.css draws for Esc Back and Esc Your worlds: one control language. */
+#contextual-world .bm-pill kbd,#contextual-world .bm-action kbd { display:grid; place-items:center; min-width:34px; height:25px; padding:0 5px; border:1px solid #ffffff50; border-radius:7px; font:400 10px/1 "IBM Plex Mono",monospace; background:#ffffff0c; color:#fff; box-shadow:inset 0 1px 0 #ffffff16; }
 #contextual-world .bm-action kbd.bm-glyph { font:400 16px/1 "IBM Plex Sans",sans-serif; }
 #contextual-world .bm-hints { position:absolute; bottom:24px; left:24px; margin:0; padding:4px 0; color:#fff; font-size:11px; text-shadow:0 1px 4px #000,0 0 10px #000b; }
 #contextual-world .bm-tag { left:0; top:0; position:absolute; margin:0; padding:5px 10px; color:#fff; font-size:12px; font-weight:500; background:var(--cw-glass); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid var(--cw-edge); border-radius:8px; pointer-events:none; white-space:nowrap; }
@@ -14,6 +15,11 @@
 #contextual-world .bm-actions { display:flex; flex-wrap:wrap; gap:6px 16px; }
 #contextual-world .bm-action { display:flex; align-items:center; gap:8px; min-height:32px; padding:0; margin:0; border:0; color:#fff; background:transparent; font:400 12px/1 "IBM Plex Sans",sans-serif; cursor:pointer; }
 #contextual-world .bm-action:focus-visible,#contextual-world .bm-pill:focus-visible { outline:2px solid #fff; outline-offset:3px; }
+#contextual-world .bm-changes { position:absolute; top:84px; left:24px; width:300px; max-width:calc(100vw - 32px); max-height:calc(100vh - 168px); overflow:auto; padding:16px 16px 12px; color:var(--cw-text); background:linear-gradient(145deg,#ffffff12,#ffffff02 50%),var(--cw-glass); -webkit-backdrop-filter:blur(20px) saturate(110%); backdrop-filter:blur(20px) saturate(110%); border:1px solid var(--cw-edge); border-radius:16px; box-shadow:inset 0 1px 0 #ffffff1c,0 12px 36px #00000018; pointer-events:auto; animation:cw-reveal .2s ease-out both; }
+#contextual-world .bm-change-list { list-style:none; margin:4px 0 12px; padding:0; }
+#contextual-world .bm-change { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-top:1px solid #ffffff1a; font-size:13px; line-height:1.4; }
+#contextual-world .bm-change:first-child { border-top:0; }
+#contextual-world .bm-when { flex:none; color:var(--cw-muted); font-size:11px; }
 #contextual-world .bm-note { position:absolute; bottom:64px; left:50%; transform:translateX(-50%); max-width:min(420px,calc(100vw - 32px)); margin:0; padding:10px 16px; color:#fff; font-size:13px; background:var(--cw-glass); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border:1px solid var(--cw-edge); border-radius:12px; pointer-events:none; }
 @media(max-width:760px) { #contextual-world .bm-hints { left:16px; right:16px; bottom:16px; } #contextual-world .bm-pill { top:12px; } }
-@media(prefers-reduced-motion:reduce) { #contextual-world .bm-card { animation:none; } }
+@media(prefers-reduced-motion:reduce) { #contextual-world .bm-card,#contextual-world .bm-changes { animation:none; } }

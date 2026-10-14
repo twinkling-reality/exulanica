@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { MAX_YAW, keyAction, moveWords, movedNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { MAX_YAW, changeWords, keyAction, moveWords, movedNote, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
@@ -62,14 +62,26 @@ assert.equal(keyAction(on, key('Backspace')), 'held');
 assert.equal(keyAction(asking, key('Backspace')), 'held');
 assert.equal(keyAction(asking, key('Enter')), 'confirm');
 assert.equal(keyAction(chosen, key('Enter')), null);
-// Cmd+Z or Ctrl+Z undoes; Shift with it, Alt with it or a held key does not.
+// Cmd+Z or Ctrl+Z undoes, with Shift redoes; Alt with it or a held key does neither.
 assert.equal(keyAction(on, key('KeyZ', { metaKey: true })), 'undo');
 assert.equal(keyAction(on, key('KeyZ', { ctrlKey: true })), 'undo');
-assert.equal(keyAction(on, key('KeyZ', { metaKey: true, shiftKey: true })), null);
+assert.equal(keyAction(on, key('KeyZ', { metaKey: true, shiftKey: true })), 'redo');
+assert.equal(keyAction(on, key('KeyZ', { metaKey: true, altKey: true })), null);
 assert.equal(keyAction(on, key('KeyZ', { metaKey: true, repeat: true })), null);
 assert.equal(keyAction(on, key('KeyB', { altKey: true })), null);
 // Walking and inspecting stay the page's.
-for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'KeyE', 'Tab']) assert.equal(keyAction(chosen, key(code)), null, code);
+for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'KeyE']) assert.equal(keyAction(chosen, key(code)), null, code);
+// Tab chooses the next placed thing in view, Shift+Tab the one before; a focused control of build
+// mode, a question or a move keeps Tab the page's.
+assert.equal(keyAction(on, key('Tab')), 'next');
+assert.equal(keyAction(chosen, key('Tab', { shiftKey: true })), 'previous');
+assert.equal(keyAction({ ...chosen, focused: true }, key('Tab')), null);
+assert.equal(keyAction(asking, key('Tab')), null);
+assert.equal(keyAction(off, key('Tab')), null);
+// H shows the changes; Esc closes them before anything else.
+assert.equal(keyAction(on, key('KeyH')), 'changes');
+assert.equal(keyAction({ ...asking, changes: true }, key('Escape')), 'close-changes');
+assert.equal(keyAction(off, key('KeyH')), null);
 // Moving: [ and ] turn what is selected, with Alt for a free turn; Enter keeps only a move the
 // server said may be kept; Esc puts it back; Backspace does nothing while moving.
 const moving = { ...chosen, moving: true, ready: false }, keepable = { ...moving, ready: true };
@@ -91,4 +103,32 @@ assert.equal(keyAction(busy, key('Backspace')), 'held');
 assert.equal(keyAction(busy, key('KeyZ', { metaKey: true })), null);
 assert.equal(keyAction(busy, key('Escape')), 'held');
 assert.equal(keyAction(busy, key('KeyB')), 'toggle');
-console.log('Build words checks passed: names by kind, refusals as sentences, undo notes, move words, snapping, keys per state.');
+// A redo is said by what it did again, read from the documents.
+const at = (x, removed = false) => ({ kind: { kind: 'well', version: 2 }, removed, transform: { x_mm: x, z_mm: 0, yaw_microradians: 0 } });
+assert.equal(redoneNote({ before: at(0), after: at(0, true) }), 'Removed the well again.');
+assert.equal(redoneNote({ before: null, after: at(0) }), 'Placed the well again.');
+assert.equal(redoneNote({ before: at(0), after: at(2000) }), 'Moved the well again.');
+assert.equal(redoneNote({}), 'Did the change again.');
+assert.equal(redoRefusalWords('invalid_object_state', ''), 'Nothing left to do again.');
+// The changes list: each edit in words, an undo by what it took back, a redo by what it did again.
+const log = [
+  { edit_id: 'a', kind: 'add_thing', thing_id: 'well:1', undone_edit_id: null },
+  { edit_id: 'b', kind: 'move_thing', thing_id: 'well:1', undone_edit_id: null },
+  { edit_id: 'c', kind: 'undo', thing_id: 'well:1', undone_edit_id: 'b' },
+  { edit_id: 'd', kind: 'undo', thing_id: 'well:1', undone_edit_id: 'c' },
+  { edit_id: 'e', kind: 'remove_thing', thing_id: 'gone:1', undone_edit_id: null },
+  { edit_id: 'f', kind: 'move_object', thing_id: null, undone_edit_id: null },
+  { edit_id: 'g', kind: 'set_look', thing_id: null, undone_edit_id: null },
+];
+const name = (id) => (id === 'well:1' ? 'well' : null);
+assert.deepEqual(log.map(edit => changeWords(edit, log, name)), [
+  'Placed the well', 'Moved the well', 'Took back: moved the well', 'Moved the well again',
+  'Removed a thing', 'Moved an object', 'Changed the world',
+]);
+for (const edit of log) assert.doesNotMatch(changeWords(edit, log, name), /_|well:1|gone:1/u);
+// When, in plain words.
+const now = Date.parse('2026-10-14T16:30:00Z');
+assert.equal(whenWords('2026-10-14T16:29:40Z', now), 'just now');
+assert.equal(whenWords('2026-10-14T16:26:00Z', now), '4 min ago');
+assert.equal(whenWords('not a time', now), '');
+console.log('Build words checks passed: names by kind, refusals as sentences, undo notes, move words, snapping, redo, the changes list, keys per state.');

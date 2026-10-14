@@ -4,16 +4,19 @@
 // it (half metres and 15 degree steps, Alt for free); the server says whether it may stand there
 // while it moves and when it is let go, and Enter keeps the move, Esc puts it back. Backspace asks
 // the server what removing it would do and Enter does it, and Cmd+Z takes back the world's newest
-// change. Every write goes through the app's own edit path
+// change, and Cmd+Shift+Z does the last change taken back again. Tab and Shift+Tab choose the
+// next or previous placed thing in view, so selecting needs no pointer; H lists the world's changes. Every write goes through the app's own edit path
 // (`send`, main.ts's sendPlanned), which advances the saved world and redraws what changed; every
 // write is asked of the server first as a preview, and only the server's answer is shown.
 // What a key does in each state, and every sentence, is build-words.mjs.
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
-import { keepLine, keyAction, moveWords, movedNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { changeWords, keepLine, keyAction, moveWords, movedNote, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
 import './build-mode.css';
 
 /** How long a note of what was done stays, in milliseconds. */
 const NOTE_MS = 5000;
+/** How many of the world's newest changes the list shows. */
+const CHANGES_SHOWN = 8;
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
 const ASK_AFTER_MS = 180;
 
@@ -34,7 +37,9 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const tag = node('p', '', 'bm-tag'); tag.hidden = true; tag.setAttribute('aria-hidden', 'true');
   const card = node('section', '', 'bm-card'); card.hidden = true; card.setAttribute('role', 'region');
   const note = node('p', '', 'bm-note'); note.hidden = true; note.setAttribute('role', 'status');
-  root.append(pill, hints, tag, card, note);
+  const changes = node('section', '', 'bm-changes'); changes.hidden = true;
+  changes.setAttribute('role', 'region'); changes.setAttribute('aria-label', 'Changes');
+  root.append(pill, hints, tag, card, note, changes);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
   /**
@@ -44,13 +49,16 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    */
   let moving = null, asked = 0, askTimer = 0;
   let records = new Map(), pointer = null, lastPick = 0, noteTimer = 0;
+  /** The version's edit log and every thing it ever placed (removed ones too), for the changes list. */
+  let edits = [], everyThing = new Map(), changesOpen = false;
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
   const point = b.camera.getPosition().clone(), footPoint = point.clone();
   let wasInspecting = false;
 
   const things = () => b.__workspaceThings?.() ?? null;
-  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, moving: moving !== null, ready: moving?.verdict.state === 'ready', busy });
+  const focused = () => [pill, card, changes].some(element => element.contains(document.activeElement));
+  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, moving: moving !== null, ready: moving?.verdict.state === 'ready', busy, changes: changesOpen, focused: focused() });
 
   function say(words) {
     clearTimeout(noteTimer);
@@ -67,6 +75,57 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const version = await read(versionPath + worldQuery);
     if (version.version_id !== entry.authoredVersionId || version.world_id !== entry.worldId) throw Error('This world changed. Reload it before building.');
     records = new Map((version.things || []).filter(thing => !thing.removed).map(thing => [thing.thing_id, thing]));
+    everyThing = new Map((version.things || []).map(thing => [thing.thing_id, thing]));
+    edits = Array.isArray(version.edits) ? version.edits : [];
+    if (changesOpen) renderChanges();
+  }
+
+  /** The world's newest changes in words, newest first. */
+  function renderChanges() {
+    changes.replaceChildren(node('h2', 'Changes', 'bm-title'));
+    const shown = edits.slice(-CHANGES_SHOWN).reverse();
+    if (!shown.length) changes.append(node('p', 'Nothing has been changed yet.', 'bm-line'));
+    else {
+      const list = node('ol', '', 'bm-change-list');
+      const now = Date.now();
+      for (const edit of shown) {
+        const item = node('li', '', 'bm-change');
+        const named = (thingId) => { const thing = everyThing.get(thingId); return thing ? thingName(thing) : null; };
+        item.append(node('span', changeWords(edit, edits, named)), node('span', whenWords(edit.recorded_at, now), 'bm-when'));
+        list.append(item);
+      }
+      changes.append(list);
+    }
+    const actions = node('div', '', 'bm-actions');
+    actions.append(chip('Esc', 'Close', closeChanges));
+    changes.append(actions);
+  }
+  function toggleChanges() {
+    changesOpen = !changesOpen; changes.hidden = !changesOpen;
+    if (changesOpen) { renderChanges(); void refreshRecords().catch(() => {}); }
+    render();
+  }
+  function closeChanges() { changesOpen = false; changes.hidden = true; render(); canvas.focus({ preventScroll: true }); }
+
+  /** The placed things in view now, nearest first: what Tab chooses among. */
+  function inView() {
+    const layer = things()?.layer;
+    if (!layer) return [];
+    const eye = b.camera.getPosition(), seen = [];
+    for (const { placedId } of layer.drawn) {
+      const figure = layer.figureOf(placedId);
+      if (!records.has(placedId) || !figure || !figure.root.enabled) continue;
+      const screen = b.camera.camera.worldToScreen(figure.markAnchor(point));
+      if (screen.z <= 0 || screen.x < 0 || screen.x > innerWidth || screen.y < 0 || screen.y > innerHeight) continue;
+      seen.push({ placedId, distance: eye.distance(figure.root.getPosition()) });
+    }
+    return seen.sort((a, c) => a.distance - c.distance || (a.placedId < c.placedId ? -1 : 1)).map(item => item.placedId);
+  }
+  function cycle(step) {
+    const ids = inView();
+    if (!ids.length) { say('No placed things in view. Walk closer to one.'); return; }
+    const at = selected === null ? -1 : ids.indexOf(selected);
+    select(ids[at === -1 ? (step > 0 ? 0 : ids.length - 1) : (at + step + ids.length) % ids.length]);
   }
 
   /** The placed thing a screen point meets first, or null: a person or an object in front hides it. */
@@ -90,10 +149,11 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     // While building, Esc is build mode's (put back, close, then done): the way out of the world
     // and its Esc show again once building is done.
     if (worlds) worlds.hidden = on;
-    hints.textContent = selected === null ? 'Drag to look · Click to select · ⌘Z to undo'
-      : moving !== null ? 'Drag it to move · [ ] to turn · Alt for free' : 'Drag it to move · [ ] to turn · ⌘Z to undo';
+    hints.textContent = selected === null ? 'Click or Tab to select · ⌘Z to undo · H for changes'
+      : moving !== null ? 'Drag it to move · [ ] to turn · Alt for free' : 'Drag it to move · [ ] to turn · Tab for the next';
     card.replaceChildren();
-    card.hidden = !on || selected === null || inspecting();
+    // The changes list and the card each close on Esc: one at a time, so Esc means one thing.
+    card.hidden = !on || selected === null || inspecting() || changesOpen;
     if (card.hidden) return;
     const name = nameOf(selected) || 'thing';
     const title = node('h2', titled(name), 'bm-title'); title.id = 'bm-title';
@@ -143,6 +203,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
   function leave() {
     dropMove();
+    if (changesOpen) { changesOpen = false; changes.hidden = true; }
     on = false; hovered = null; tag.hidden = true;
     if (selected !== null) things()?.layer.setPicked(null);
     selected = null; confirming = null; failure = '';
@@ -258,6 +319,23 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     try { await refreshRecords(); } catch {}
   }
 
+  async function redo() {
+    if (busy) return;
+    busy = true; render();
+    try {
+      const asked = base();
+      const preview = (await post('things.redo.preview', '/things/redo/preview', { base_state_sha256: asked })).body;
+      if (preview.availability !== 'ready') { say(redoRefusalWords(preview.blocked_reason, preview.blocked_detail)); return; }
+      await post('things.redo', '/things/redo', { base_state_sha256: asked, saved_entry: savedEntry() });
+      say(redoneNote(preview.would_change));
+    } catch (error) { say(problem(error)); }
+    finally {
+      busy = false;
+      try { await refreshRecords(); } catch {}
+      if (selected !== null && !records.has(selected)) deselect(); else render();
+    }
+  }
+
   async function undo() {
     if (busy) return;
     busy = true; render();
@@ -298,6 +376,11 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       else if (action === 'turn-right') turn(-15 * (event.altKey ? 1 / 15 : 1), event.altKey);
       else if (action === 'put-back') putBack();
       else if (action === 'keep') void keepMove();
+      else if (action === 'redo') void redo();
+      else if (action === 'next') cycle(1);
+      else if (action === 'previous') cycle(-1);
+      else if (action === 'changes') toggleChanges();
+      else if (action === 'close-changes') closeChanges();
       return true;
     },
     /**
@@ -382,7 +465,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       canvas.style.cursor = '';
       guidance.hidden = false;
       if (worlds) worlds.hidden = false;
-      pill.remove(); hints.remove(); tag.remove(); card.remove(); note.remove();
+      pill.remove(); hints.remove(); tag.remove(); card.remove(); note.remove(); changes.remove();
     },
   };
 }

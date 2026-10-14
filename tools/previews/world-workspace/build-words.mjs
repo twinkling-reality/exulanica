@@ -58,6 +58,63 @@ export function undoneNote(change) {
   return 'Undid the last change.';
 }
 
+/**
+ * What a redo did, from its preview's `would_change`: the thing's document as it stands and as the
+ * redo leaves it. Read from the documents, since a redo is the undo of an undo.
+ */
+export function redoneNote(change) {
+  const before = change?.before ?? null, after = change?.after ?? null;
+  const name = thingName(after ?? before);
+  if (before !== null && after !== null && !before.removed && after.removed) return `Removed the ${name} again.`;
+  if ((before === null || before.removed) && after !== null && !after.removed) return `Placed the ${name} again.`;
+  const a = before?.transform, b = after?.transform;
+  if (a && b && (a.x_mm !== b.x_mm || a.z_mm !== b.z_mm || a.yaw_microradians !== b.yaw_microradians)) return `Moved the ${name} again.`;
+  return 'Did the change again.';
+}
+
+/** The redo preview's refusal when nothing is left to do again. */
+export function redoRefusalWords(code, detail) {
+  return code === 'invalid_object_state' ? 'Nothing left to do again.' : refusalWords(code, detail);
+}
+
+/**
+ * One line of the world's changes, from its edit log: what the edit did, by its kind and the
+ * thing it names (`nameOf(thingId)`, a name or null), an undo by what it took back, and a redo
+ * (an undo of an undo) by what it did again.
+ */
+export function changeWords(edit, edits, nameOf) {
+  const byId = new Map(edits.map(each => [each.edit_id, each]));
+  const plain = (one) => {
+    const name = one.thing_id ? nameOf(one.thing_id) : null;
+    const thing = name ? `the ${name}` : 'a thing';
+    if (one.kind === 'add_thing') return `Placed ${thing}`;
+    if (one.kind === 'move_thing') return `Moved ${thing}`;
+    if (one.kind === 'remove_thing') return `Removed ${thing}`;
+    if (/_object$/.test(one.kind)) return one.kind.startsWith('add') ? 'Placed an object' : one.kind.startsWith('move') ? 'Moved an object' : one.kind.startsWith('remove') ? 'Removed an object' : 'Changed an object';
+    return 'Changed the world';
+  };
+  if (edit.kind !== 'undo') return plain(edit);
+  const undone = byId.get(edit.undone_edit_id);
+  if (!undone) return 'Took back a change';
+  if (undone.kind === 'undo') {
+    const again = byId.get(undone.undone_edit_id);
+    return again ? `${plain(again)} again` : 'Did a change again';
+  }
+  const words = plain(undone);
+  return `Took back: ${words.charAt(0).toLowerCase()}${words.slice(1)}`;
+}
+
+/** How long ago a change was, from its recorded time: "just now", "4 min ago", else the hour. */
+export function whenWords(recordedAt, now) {
+  const at = Date.parse(recordedAt);
+  if (!Number.isFinite(at)) return '';
+  const minutes = Math.floor((now - at) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const time = new Date(at);
+  return `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+}
+
 /** The undo preview's refusal when nothing is left to take back. */
 export function undoRefusalWords(code, detail) {
   return code === 'invalid_object_state' ? 'Nothing left to undo.' : refusalWords(code, detail);
@@ -119,12 +176,14 @@ export function snapped(mm, free) {
  * Esc puts a question away, puts a moved thing back, lets go of what is selected, then leaves build
  * mode; Backspace or Delete asks to remove what is selected; `[` and `]` turn it, Alt for a free
  * turn; Enter answers yes to a question or keeps a move the server said may be kept; Cmd+Z or
- * Ctrl+Z takes back the world's newest change. While a request is on its way only B acts: nothing
+ * Ctrl+Z takes back the world's newest change, with Shift does the last one taken back again; Tab
+ * and Shift+Tab choose the next or previous placed thing in view; H shows the world's changes, and
+ * Esc closes them first. While a request is on its way only B acts: nothing
  * is sent twice, and Esc does not seem to call back a change already sent.
  */
 export function keyAction(state, event) {
   const command = event.metaKey || event.ctrlKey;
-  if (command) return state.on && event.code === 'KeyZ' && !event.shiftKey && !event.altKey && !state.busy && !event.repeat ? 'undo' : null;
+  if (command) return state.on && event.code === 'KeyZ' && !event.altKey && !state.busy && !event.repeat ? (event.shiftKey ? 'redo' : 'undo') : null;
   // By the key's place, and by its character where a keyboard reports no place.
   const turn = event.code === 'BracketLeft' || (!event.code && event.key === '[') ? 'turn-left'
     : event.code === 'BracketRight' || (!event.code && event.key === ']') ? 'turn-right' : null;
@@ -132,7 +191,11 @@ export function keyAction(state, event) {
   if (event.code === 'KeyB') return event.repeat ? 'held' : 'toggle';
   if (!state.on) return null;
   if (state.busy) return turn !== null || ['Escape', 'Backspace', 'Delete', 'Enter'].includes(event.code) ? 'held' : null;
-  if (event.code === 'Escape') return state.confirming ? 'cancel' : state.moving ? 'put-back' : state.selected ? 'deselect' : 'leave';
+  if (event.code === 'Escape') return state.changes ? 'close-changes' : state.confirming ? 'cancel' : state.moving ? 'put-back' : state.selected ? 'deselect' : 'leave';
+  if (event.code === 'KeyH') return event.repeat ? 'held' : 'changes';
+  // Tab chooses the next placed thing in view, Shift+Tab the one before, unless a control of
+  // build mode has the focus, where Tab moves the focus as anywhere else.
+  if (event.code === 'Tab') return state.focused || state.confirming || state.moving ? null : event.shiftKey ? 'previous' : 'next';
   if (['Backspace', 'Delete'].includes(event.code)) return state.selected && !state.confirming && !state.moving ? 'remove' : 'held';
   if (turn !== null) return state.selected && !state.confirming ? turn : 'held';
   if (event.code === 'Enter') return state.confirming ? 'confirm' : state.moving ? (state.ready ? 'keep' : 'held') : null;
