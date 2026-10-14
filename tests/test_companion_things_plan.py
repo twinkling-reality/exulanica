@@ -19,9 +19,17 @@ from exulanica.selection import action_plan as plan
 from exulanica.selection import action_things as things
 from exulanica.selection.action_plan import WorldEditOperation as Op
 from exulanica.world.authored_delta import delta_sha256
-from exulanica.world.objects import Transform
+from exulanica.world.objects import ObjectOrigin, Transform
+from exulanica.world.placed_things import UNSCALED_MILLI, PlacedThing, named_kind
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_things import initial_things_society
+from exulanica.world.thing_landing import (
+    BlockedPart,
+    LandingGround,
+    footprint_half_extents,
+    landing_refusal,
+    rests_on_plane,
+)
 
 import living_square_support as square
 import things_society_support as support
@@ -138,6 +146,89 @@ def test_with_nowhere_near_free_nothing_is_laid_out():
     ]
     assert things.lay_out(BEING, anchor=WELL, spot=None, viewer=VIEWER, taken=crowd) is None
     assert things.lay_out(BEING, anchor=None, spot=(0, -3_500), viewer=VIEWER, taken=crowd) is None
+
+
+# -- where the world's ground takes a thing -------------------------------------------------------
+
+#: A pond 6 m square about the pointed spot, as a site states its water: what the add and move
+#: routes refuse a thing in (exulanica/world/thing_landing.py).
+POND = BlockedPart(
+    "water", "duck pond", ((-3_000, -6_500), (3_000, -6_500), (3_000, -500), (-3_000, -500))
+)
+GROUND = LandingGround("region-a", None, rests_on_plane(0), (POND,))
+
+
+def _well(thing_id: str = "companion:well:1") -> PlacedThing:
+    return PlacedThing(
+        thing_id=thing_id,
+        kind=named_kind("well", 2),
+        region_id="region-a",
+        transform=Transform(0, 0, 0, 0, UNSCALED_MILLI),
+        origin=ObjectOrigin("authored", "fictional"),
+    )
+
+
+def test_a_spot_the_ground_refuses_sends_a_thing_onto_the_nearest_ring_it_may_stand_on():
+    refused = {(0, -3_500)}
+    assert things.lay_out(
+        BEING,
+        anchor=None,
+        spot=(0, -3_500),
+        viewer=VIEWER,
+        taken=[],
+        fits=lambda p: p not in refused,
+    ) == (0, -6_000)
+
+
+def test_beside_something_a_side_the_ground_refuses_is_passed_for_the_next():
+    toward = (0, -3_500 + 1_858)
+    assert things.lay_out(
+        BEING, anchor=WELL, spot=None, viewer=VIEWER, taken=[WELL], fits=lambda p: p != toward
+    ) == (-1_858, -3_500)
+
+
+def test_a_well_asked_for_in_the_pond_is_laid_out_on_dry_ground_the_route_takes():
+    fits = things.landing_fits(GROUND, [], thing=_well(), y_mm=0, yaw_at=lambda point: 0)
+    assert fits is not None and not fits((0, -3_500))
+    point = things.lay_out(
+        (800, 800), anchor=None, spot=(0, -3_500), viewer=VIEWER, taken=[], fits=fits
+    )
+    assert point is not None
+    standing = dataclasses.replace(
+        _well(), transform=Transform(point[0], 0, point[1], 0, UNSCALED_MILLI)
+    )
+    assert landing_refusal(GROUND, standing, footprint_half_extents(standing), ()) is None
+
+
+def test_a_moved_thing_does_not_block_itself_but_another_placed_well_does():
+    moving = dataclasses.replace(
+        _well("well-1"), transform=Transform(9_000, 0, 9_000, 0, UNSCALED_MILLI)
+    )
+    other = dataclasses.replace(
+        _well("well-2"), transform=Transform(9_000, 0, -9_000, 0, UNSCALED_MILLI)
+    )
+    ground = LandingGround("region-a", None, rests_on_plane(0), ())
+    fits = things.landing_fits(
+        ground, [moving, other], thing=moving, y_mm=0, yaw_at=lambda point: 0
+    )
+    assert fits is not None
+    assert fits((9_000, 9_000))
+    assert not fits((9_000, -9_000))
+
+
+def test_a_ground_not_read_or_another_region_s_checks_nothing():
+    assert things.landing_fits(None, [], thing=_well(), y_mm=0, yaw_at=lambda point: 0) is None
+    elsewhere = LandingGround("region-b", None, rests_on_plane(0), (POND,))
+    assert things.landing_fits(elsewhere, [], thing=_well(), y_mm=0, yaw_at=lambda point: 0) is None
+
+
+def test_with_no_spot_near_the_ground_takes_nothing_is_laid_out():
+    assert (
+        things.lay_out(
+            BEING, anchor=None, spot=(0, -3_500), viewer=VIEWER, taken=[], fits=lambda point: False
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize(

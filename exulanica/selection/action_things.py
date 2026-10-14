@@ -39,7 +39,7 @@ from __future__ import annotations
 import hashlib
 import math
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Final
@@ -61,6 +61,12 @@ from exulanica.world.placed_things import (
 from exulanica.world.society_actions import HANDS_ABILITIES, ActionIntent, build_action_request
 from exulanica.world.society_input_policy import TARGET_PLACE_FIELD
 from exulanica.world.society_things import THING_NAMESPACE
+from exulanica.world.thing_landing import (
+    LandingGround,
+    blocking_things,
+    footprint_half_extents,
+    landing_refusal,
+)
 from exulanica.world.thing_library import shipped_looks
 
 __all__ = [
@@ -81,6 +87,7 @@ __all__ = [
     "direct_body",
     "facing_yaw",
     "holder",
+    "landing_fits",
     "lay_out",
     "minted_thing_id",
     "offered_kinds",
@@ -604,6 +611,7 @@ def lay_out(
     spot: tuple[int, int] | None,
     viewer: tuple[int, int] | None,
     taken: Sequence[Footprint],
+    fits: Callable[[tuple[int, int]], bool] | None = None,
 ) -> tuple[int, int] | None:
     """Where a thing of ``half_mm`` stands, region-local, or None when nowhere near is free.
 
@@ -611,10 +619,15 @@ def lay_out(
     it, its own size, the thing's and :data:`CLEARANCE_MM` apart, and a millimetre more. Else at
     the pointed ``spot``, or when that is taken on the rings about it (:data:`RINGS_MM`), ahead
     first along the line the person looks, then to either side. A place is free when the thing's
-    circle, with the clearance, meets nothing ``taken`` and keeps the person's own room.
+    circle, with the clearance, meets nothing ``taken`` and keeps the person's own room, and,
+    with ``fits``, when the world's ground takes the thing there (:func:`landing_fits`).
     Deterministic: whole millimetres.
     """
     radius = Footprint(0, 0, half_mm).radius_mm
+
+    def free(point: tuple[int, int]) -> bool:
+        return _clear(point, radius, taken, viewer) and (fits is None or fits(point))
+
     if anchor is not None:
         toward = (
             (0.0, 1.0)
@@ -626,12 +639,12 @@ def lay_out(
         for turn in SIDE_TURNS:
             dx, dz = _turned(toward, turn)
             point = (round(anchor.x_mm + dx * distance), round(anchor.z_mm + dz * distance))
-            if _clear(point, radius, taken, viewer):
+            if free(point):
                 return point
         return None
     if spot is None:
         return None
-    if _clear(spot, radius, taken, viewer):
+    if free(spot):
         return spot
     ahead = (
         (0.0, -1.0)
@@ -642,9 +655,39 @@ def lay_out(
         for turn in RING_TURNS:
             dx, dz = _turned(ahead, turn)
             point = (round(spot[0] + dx * ring), round(spot[1] + dz * ring))
-            if _clear(point, radius, taken, viewer):
+            if free(point):
                 return point
     return None
+
+
+def landing_fits(
+    landing: LandingGround | None,
+    others: Sequence[PlacedThing],
+    *,
+    thing: PlacedThing,
+    y_mm: int,
+    yaw_at: Callable[[tuple[int, int]], int],
+) -> Callable[[tuple[int, int]], bool] | None:
+    """Whether ``thing`` would stand at a point, at ``y_mm`` and turned as ``yaw_at`` turns it
+    there, by the rule ``POST .../things`` and its move hold it to
+    (:func:`~exulanica.world.thing_landing.landing_refusal`): ``others`` are the version's placed
+    things, the thing itself among them for a move. None where the world's ground is not read
+    (``landing`` None) or is another region's, as the routes then place and move unchecked."""
+    if landing is None or landing.region_id != thing.region_id:
+        return None
+    blocking = blocking_things(others, thing.thing_id)
+
+    def fits(point: tuple[int, int]) -> bool:
+        placed = PlacedThing(
+            thing_id=thing.thing_id,
+            kind=thing.kind,
+            region_id=thing.region_id,
+            transform=Transform(point[0], y_mm, point[1], yaw_at(point), UNSCALED_MILLI),
+            origin=thing.origin,
+        )
+        return landing_refusal(landing, placed, footprint_half_extents(placed), blocking) is None
+
+    return fits
 
 
 def facing_yaw(point: tuple[int, int], viewer: tuple[int, int] | None, otherwise: int) -> int:

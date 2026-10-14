@@ -105,6 +105,7 @@ from exulanica.world.composition_preview import (
 )
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.errors import InvalidObjectData
+from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.minds_budget import MindsBudgetRefused, budget_figures
 from exulanica.world.models import StyleVersion
 from exulanica.world.object_edit_preview import (
@@ -114,13 +115,16 @@ from exulanica.world.object_edit_preview import (
     read_only_snapshot,
 )
 from exulanica.world.object_repository import WorldObjectRepository
-from exulanica.world.objects import Transform, validate_transform
+from exulanica.world.objects import ObjectOrigin, Transform, validate_transform
+from exulanica.world.placed_things import UNSCALED_MILLI, PlacedThing, ThingKindReference
 from exulanica.world.repository import AUTHORED_DESIGN_BASIS, EVIDENCE_BASIS
 from exulanica.world.society_authored_ground import read_authored_ground
 from exulanica.world.society_controls import SPEEDS
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_presence import AWAY, HERE
 from exulanica.world.society_presence import refusal as presence_refusal
+from exulanica.world.thing_landing import LandingGround
+from exulanica.world.thing_landing_source import prepare_landing_in_region
 from exulanica.world.thing_looks import look_choices
 from exulanica.world.traffic_signal_repository import TrafficSignalRepository
 
@@ -600,6 +604,12 @@ class _World:
     #: of the whole sentence plans (None where it is no shape, and a budget is asked about).
     said_fixed: tuple[str, ...] = ()
     said_shape: str | None = None
+    #: The ground a thing added or moved is held to, by region, as the things routes hold it
+    #: (:mod:`exulanica.world.thing_landing`); a region missing here, or None, is not checked (a
+    #: world the rule cannot read, or a site whose place is still being made). With the version's
+    #: placed things, which block one another.
+    landings: Mapping[str, LandingGround | None] = field(default_factory=dict)
+    placed_things: tuple[PlacedThing, ...] = ()
 
     def descriptor(self, operation: str) -> Mapping[str, Any] | None:
         return self.descriptors.get(operation)
@@ -650,6 +660,19 @@ def read_world(
                 else str(context.placement["region_id"])
             ),
         )
+    # Where a step may stand a thing, as its route will judge it: the society's region and the one
+    # the person points into. Prepared after the snapshot, as the routes prepare it before theirs.
+    landings: dict[str, LandingGround | None] = {}
+    for region in {
+        str(held[0]["region_id"]) if held is not None else None,
+        None if context.placement is None else str(context.placement["region_id"]),
+    } - {None}:
+        try:
+            landings[str(region)] = prepare_landing_in_region(
+                repository, context.version_id, str(region)
+            )
+        except KindWorkWaiting:
+            landings[str(region)] = None
     assets = tuple(
         _Choice(label=row.asset_key, value=row.asset_key, title=row.title, detail=row.summary)
         for row in placeable
@@ -722,6 +745,8 @@ def read_world(
         placed=placed,
         beings=beings,
         places=places,
+        landings=landings,
+        placed_things=tuple(version.things),
     )
 
 
@@ -2670,17 +2695,33 @@ def _prepared_thing_edit_step(
                     if person.get("placed_id") == thing_id
                 }
                 taken += [b.footprint for b in read.society.beings if b.id not in placed_as]
+            y_mm = read.elevation_mm if read.elevation_mm is not None else y_now
+            current = next((t for t in world.placed_things if t.thing_id == thing_id), None)
+            # Where the move's route will let it stand, as that route judges it.
+            fits = (
+                None
+                if current is None
+                else action_things.landing_fits(
+                    world.landings.get(region_id),
+                    world.placed_things,
+                    thing=current,
+                    y_mm=y_mm,
+                    yaw_at=lambda point: action_things.facing_yaw(
+                        point, viewer, otherwise=int(transform["yaw_microradians"])
+                    ),
+                )
+            )
             point = action_things.lay_out(
                 footprint.half_mm,
                 anchor=None,
                 spot=(int(transform["x_mm"]), int(transform["z_mm"])),
                 viewer=viewer,
                 taken=taken,
+                fits=fits,
             )
             if point is None:
                 code = "no_free_place_near"
             else:
-                y_mm = read.elevation_mm if read.elevation_mm is not None else y_now
                 yaw = action_things.facing_yaw(
                     point, viewer, otherwise=int(transform["yaw_microradians"])
                 )
@@ -3196,11 +3237,6 @@ def _thing_placement(
     taken = [footprint for _id, footprint in read.taken]
     if read.society is not None:
         taken += [being.footprint for being in read.society.beings]
-    point = action_things.lay_out(
-        kind.half_mm, anchor=anchor, spot=spot, viewer=viewer, taken=taken
-    )
-    if point is None:
-        return None, "no_free_place_near"
     y_mm = (
         read.elevation_mm
         if read.elevation_mm is not None
@@ -3210,15 +3246,31 @@ def _thing_placement(
         if spot_transform is None
         else int(spot_transform["y_mm"])
     )
-    yaw = action_things.facing_yaw(
-        point,
-        viewer,
-        otherwise=0 if spot_transform is None else int(spot_transform["yaw_microradians"]),
-    )
+    otherwise = 0 if spot_transform is None else int(spot_transform["yaw_microradians"])
     thing_id = action.thing_id or action_things.minted_thing_id(
         world.version_id, world.state_sha256, index, kind.key
     )
     origin_role = str(context.origin_role)
+    # Where the add's route will let it stand, as that route judges it.
+    fits = action_things.landing_fits(
+        world.landings.get(region),
+        world.placed_things,
+        thing=PlacedThing(
+            thing_id=thing_id,
+            kind=ThingKindReference(kind.key, kind.version, kind.sha256),
+            region_id=region,
+            transform=Transform(0, y_mm, 0, 0, UNSCALED_MILLI),
+            origin=ObjectOrigin("authored", origin_role),
+        ),
+        y_mm=y_mm,
+        yaw_at=lambda point: action_things.facing_yaw(point, viewer, otherwise=otherwise),
+    )
+    point = action_things.lay_out(
+        kind.half_mm, anchor=anchor, spot=spot, viewer=viewer, taken=taken, fits=fits
+    )
+    if point is None:
+        return None, "no_free_place_near"
+    yaw = action_things.facing_yaw(point, viewer, otherwise=otherwise)
     transform = action_things.thing_transform(point, y_mm, yaw)
     refused = action_things.placement_refusal(
         thing_id=thing_id,

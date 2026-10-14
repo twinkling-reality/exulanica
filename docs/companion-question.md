@@ -824,7 +824,12 @@ object (`place_object`), so a request for a bench takes the measured object path
 is laid out without the model ([action_things.py](../exulanica/selection/action_things.py)):
 beside what is named, on its side toward the person first, then its right, its left and behind it,
 the two sizes and a clearance apart; otherwise at the pointed spot, or on rings about it when that
-is taken; at the society ground's elevation, turned to face the person. The route has no preview,
+is taken; at the society ground's elevation, turned to face the person. A place counts as free
+only where the world's ground takes the thing, by the rule the route holds a placing to
+([objects contract](world-objects-contract.md#14-placed-things)): not in water, inside a building
+or wall, on another placed object, past the world's edge or off the ground; the ground is read
+once for the plan, and a site whose place is still being made is laid out as before and left to
+the route. The route has no preview,
 so its own pure checks run in process before a step is offered, and a step they refuse is
 `blocked` with the route's code (`invalid_object_state`, `thing_limit_reached`,
 `invalid_thing_placement`), or with `no_free_place_near` or `anchor_not_here`; the route stays the
@@ -982,8 +987,9 @@ the thing it was placed as), is typed `move_thing` or `remove_thing` and sent to
 an object to the objects'. A kind of thing named, or a place a placed thing provides, stands for the
 placed thing of that kind or at that place; several that fit are asked about. One of the world's own
 people, or a visitor, is no placed thing, and a removal naming one names nothing. A thing is moved to where the person points, in its own region,
-laid out as a thing added there is (the pointed spot, or the nearest free place on rings about it;
-the ground's elevation; turned to face the person); moving a thing beside something named is not
+laid out as a thing added there is (the pointed spot, or the nearest free place on rings about it
+that the world's ground takes, as the move's route holds it; the ground's elevation; turned to
+face the person); moving a thing beside something named is not
 offered. The routes have no preview, so their own checks run in process: a thing that does not
 stand in the version is `blocked` with `invalid_object_state`, a spot in another region or one no
 pose can state with `invalid_thing_placement`, and a spot with nowhere free near it with

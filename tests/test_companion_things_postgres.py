@@ -28,6 +28,7 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.action_plan import ACTION_PROMPT_VERSION, DIRECT, MAX_STEPS, THING_PLACE
 from exulanica.world.society_actions import ACTION_REFUSALS
+from exulanica.world.starter import AUTHORED_GROUND_V1_MODULE_VERSION
 from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
@@ -146,39 +147,39 @@ def _counts(world) -> dict[str, int]:
     }
 
 
-def _base_body(client, world, **extra) -> dict:
+def _base_body(client, world, spot=SPOT, **extra) -> dict:
     version = _version(client, world)
     return {
         "version_id": str(world["binding"].version_id),
         "base_state_sha256": version["state_sha256"],
         "origin_role": "fictional",
         "context": {
-            "placement": {"region_id": world["binding"].region_id, "transform": SPOT},
+            "placement": {"region_id": world["binding"].region_id, "transform": spot},
             "viewer": {**VIEWER, "region_id": world["binding"].region_id},
         },
         **extra,
     }
 
 
-def _ask(client, world, utterance: str):
+def _ask(client, world, utterance: str, spot=SPOT):
     scope, _, _ = routes(world)
     asked = client.post(
         "/selection/actions",
         headers=OWNER,
         params=scope,
-        json={**_base_body(client, world), "utterance": utterance},
+        json={**_base_body(client, world, spot), "utterance": utterance},
     )
     assert asked.status_code == 200, asked.text
     return asked.json()
 
 
-def _prepare(client, world, actions):
+def _prepare(client, world, actions, spot=SPOT):
     scope, _, _ = routes(world)
     prepared = client.post(
         "/selection/actions/prepare",
         headers=OWNER,
         params=scope,
-        json={**_base_body(client, world), "actions": actions},
+        json={**_base_body(client, world, spot), "actions": actions},
     )
     assert prepared.status_code == 200, prepared.text
     return prepared.json()
@@ -296,6 +297,52 @@ def test_add_a_knight_by_the_well_is_the_add_thing_request_beside_the_well(compa
     [receipt] = read["steps"][0]["receipts"]
     assert (receipt["kind"], receipt["thing_id"]) == ("add_thing", body["thing_id"])
     assert read["steps"][0]["matches_preview"] is None
+
+
+def test_a_well_asked_for_past_the_edge_stands_where_the_add_s_route_takes_it(companion):
+    """Pointing just past a bounded ground's east edge (12 m from its middle), the step stands
+    the well on the nearest ring the ground takes, and the add's route places it there; on an
+    endless ground the pointed spot is taken as it is."""
+    world, client, transport = companion
+    transport.responses[:] = [
+        _reply({"kind": "world_edit"}),
+        _reply({"steps": [{"operation": "place_thing", "options": ["well"]}]}),
+    ]
+    past_the_edge = {**SPOT, "x_mm": 12_500}
+    plan = _ask(client, world, "add a well", past_the_edge)
+    assert plan["outcome"] == "plan", _why(plan)
+    [step] = plan["steps"]
+    assert step["state"] == "prepared", step
+    pose = step["body"]["pose"]
+    bounded = world["ground_module_version"] == AUTHORED_GROUND_V1_MODULE_VERSION
+    if bounded:
+        assert (pose["x_mm"], pose["z_mm"]) != (12_500, 500)
+        assert pose["x_mm"] < 12_000
+    else:
+        assert (pose["x_mm"], pose["z_mm"]) == (12_500, 500)
+    sent = _send(client, step)
+    assert sent.status_code == 201, sent.text
+
+
+def test_a_well_moved_past_the_edge_stands_where_the_move_s_route_takes_it(companion):
+    """A move pointed past a bounded ground's edge is laid out on the ground, as the move's
+    route takes it; on an endless ground the pointed spot is taken as it is."""
+    world, client, _transport = companion
+    _place(client, world, "well", "well", 2, -4_000, 2_000)
+    past_the_edge = {**SPOT, "x_mm": 12_500}
+    prepared = _prepare(
+        client, world, [{"operation": "move_thing", "thing_id": "well"}], past_the_edge
+    )
+    [step] = prepared["steps"]
+    assert step["state"] == "prepared", step
+    pose = step["body"]["pose"]
+    if world["ground_module_version"] == AUTHORED_GROUND_V1_MODULE_VERSION:
+        assert (pose["x_mm"], pose["z_mm"]) != (12_500, 500)
+        assert pose["x_mm"] < 12_000
+    else:
+        assert (pose["x_mm"], pose["z_mm"]) == (12_500, 500)
+    sent = _send(client, step)
+    assert sent.status_code == 200, sent.text
 
 
 def test_the_film_s_six_things_are_placed_once_their_origin_is_answered(companion):
