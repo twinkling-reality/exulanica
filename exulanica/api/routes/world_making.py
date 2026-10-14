@@ -447,8 +447,9 @@ def start_world_draft(
     ``GET /worlds/drafts`` before anything is typed. 409 ``kind_draft_busy`` while a draft runs in
     this workspace, with its ``draft_id`` when the caller started it as a world's draft; 429
     ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many drafts this
-    hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when the server
-    runs as many drafts as it may. The three figures are the world draft policy's
+    hour as one person may. A server already running as many drafts as it may still answers 202:
+    the draft waits queued until its worker has a slot, and ends refused ``kind_draft_capacity``
+    only where no thread could be started for it. The three figures are the world draft policy's
     budgets. A body over 131,072 bytes, including quote metadata, is refused 413 before it is read.
     Saved names are replaced in the words before the job starts.
     """

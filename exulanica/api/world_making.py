@@ -408,8 +408,9 @@ def make_world(
     with every call it made either way.
 
     ``opened`` opens a connection scoped to the draft's workspace that may write; none is held
-    while a model runs. ``fixed_world_id`` fixes the world's identity instead of drawing one, so a
-    test makes the same world every run."""
+    while a model runs. ``fixed_world_id`` fixes the world's identity instead of drawing one: the
+    world draft job passes its draft's own, so a draft taken up again after a restart finds the
+    world it made, and a test makes the same world every run."""
     log = CallLog()
 
     def refused(refusal: Mapping[str, Any]) -> None:

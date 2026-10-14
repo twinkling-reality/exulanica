@@ -450,8 +450,9 @@ class SavedWorldEntryRepository:
         identity, so every workspace's copy of an arrival world is the same town, and its tiles,
         once baked, are every copy's at once. Identities are keyed by workspace, so the same one in
         two workspaces names two worlds. A fixed identity is tried alone: when none of its seed
-        candidates generate, the world is refused rather than given another identity. No route
-        passes one.
+        candidates generate, the world is refused rather than given another identity. The world
+        draft job passes its draft's own (``world:generated:<draft id>``), so a draft taken up
+        again after a restart finds the world it made; no route takes one from a caller.
 
         The world is generated for a fresh identity before the transaction, so no lock is held
         while it runs; everything it writes is written together or not at all. When none of the
@@ -535,7 +536,8 @@ class SavedWorldEntryRepository:
         ``compose`` makes one identity's world (by default here, in this process); the API hands
         the kind worker's, so no generation runs on a request's thread. ``fixed_world_id`` fixes
         the identity instead of drawing one, as :meth:`create_generated` takes it: a fixed identity
-        is tried alone, and the same identity gives the same world. No route passes one.
+        is tried alone, and the same identity gives the same world. The world draft job passes its
+        draft's own; no route takes one from a caller.
         """
         from exulanica.world.composers.site_plan import compose_kind
         from exulanica.world.generated_worlds import create_kind_world_authorities
