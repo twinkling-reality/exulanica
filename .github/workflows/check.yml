@@ -96,7 +96,7 @@ jobs:
             docker run --detach --name "postgres-$worker" --publish "127.0.0.1:$port:5432" \
               --env POSTGRES_PASSWORD=postgres --env POSTGRES_HOST_AUTH_METHOD=trust \
               pgvector/pgvector:0.8.6-pg18@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a -c fsync=off -c full_page_writes=off \
-              -c max_locks_per_transaction=256
+              -c max_locks_per_transaction=256 -c log_lock_waits=on
             urls+=("postgresql://postgres@localhost:$port/exulanica_spine_test")
           done
           for worker in $(seq 0 $((WORKERS - 1))); do
@@ -132,6 +132,17 @@ jobs:
       # fails when this step stops checking that file or could let the job pass without checking it.
       - name: skips
         run: uv run python scripts/run_backend_suite.py --check-skips "$RUNNER_TEMP/backend-suite.xml"
+      # A deadlock or a lock wait names its other session only in the server's own log, which the
+      # job does not keep. log_lock_waits (above) writes every wait longer than deadlock_timeout,
+      # and this step prints each worker's server log when the job has failed, and only then.
+      - name: the PostgreSQL servers' logs, when the job failed
+        if: failure()
+        run: |
+          for worker in $(seq 0 $((WORKERS - 1))); do
+            echo "::group::postgres-$worker"
+            docker logs "postgres-$worker" 2>&1 | tail -n 400
+            echo "::endgroup::"
+          done
 
   web:
     runs-on: ubuntu-latest
