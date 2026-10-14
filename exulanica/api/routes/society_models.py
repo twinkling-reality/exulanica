@@ -37,6 +37,7 @@ from exulanica.door.outside import outside_deciders
 from exulanica.models.manifest import Manifest, load_manifest
 from exulanica.models.usage import usd_string
 from exulanica.world.deciders import is_played
+from exulanica.world.decision_measures import by_being, measures, nearest_rank
 from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
@@ -129,14 +130,6 @@ def _society(
     )
 
 
-def _nearest_rank(values: list[int], share: int) -> int | None:
-    """The value at ``share`` percent of ``values`` by nearest rank, or None for none."""
-    if not values:
-        return None
-    ordered = sorted(values)
-    return ordered[max(0, -(-share * len(ordered) // 100) - 1)]
-
-
 def _not_acted_on(decision: dict[str, Any]) -> str | None:
     """Why a settled decision was not acted on: the receipt's reason when the model was not
     followed, and the routine decided; or the minute's when it was followed and could not be
@@ -178,14 +171,17 @@ def _by_model(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     )
                 ),
                 "latency_ms": {
-                    "p50": _nearest_rank(latencies, 50),
-                    "p95": _nearest_rank(latencies, 95),
+                    "p50": nearest_rank(latencies, 50),
+                    "p95": nearest_rank(latencies, 95),
                     "longest": max(latencies) if latencies else None,
                 },
                 "cost_usd": usd_string(
                     sum((Decimal(row["cost_usd"]) for row in asked), Decimal(0))
                 ),
                 "cost_known": all(row["cost_known"] for row in asked),
+                # Counts, rates with their sample, timeouts, repetition, latency and cost basis,
+                # added to the profile as an optional field (decision_measures).
+                "measures": measures(rows),
             }
         )
     return summaries
@@ -400,6 +396,12 @@ def society_models_view(
         "by_model": [
             {**summary, "name": manifest.model_name(summary["model_id"])}
             for summary in _by_model(asked_models)
+        ],
+        # The same measures for each being under each model, added as an optional field: what a
+        # page says of how a being is doing is read here, never recomputed.
+        "by_being": [
+            {**entry, "name": manifest.model_name(entry["model_id"])}
+            for entry in by_being(asked_models)
         ],
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
         # Every subject an outside program decides for now under a grant that stands, the world's

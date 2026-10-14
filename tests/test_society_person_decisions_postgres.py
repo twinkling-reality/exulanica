@@ -402,6 +402,16 @@ def test_a_chosen_person_is_asked_and_the_minute_applies_the_choice_and_replays_
     not_acted = [e for e in applied if e["document"]["disposition"] != "applied"]
     assert summary["not_acted_on"] == dict(Counter(e["document"]["reason"] for e in not_acted))
     assert summary["latency_ms"]["p50"] is not None and summary["cost_known"] is True
+    # The same read says what the decisions came to (decision_measures), per model and per being
+    # under it: counts agree with the summary, each rate states its sample, and cost says how it
+    # was found.
+    found = summary["measures"]
+    assert found["counts"]["answered"] == len(receipts) and found["counts"]["refused"] == 0
+    assert found["rates"]["acceptance"]["numerator"] == len(receipts)
+    assert found["cost"] == {**found["cost"], "basis": "computed", "unknown_calls": 0}
+    beings = read.json()["by_being"]
+    assert {entry["subject_id"] for entry in beings} == {r["subject_id"] for r in receipts}
+    assert sum(entry["measures"]["counts"]["decisions"] for entry in beings) == len(receipts)
     latest = {entry["subject_id"]: entry for entry in read.json()["latest"]}
     assert {event["document"]["subject_id"] for event in moved} <= set(latest)
     # Replay regenerates the same history from what was stored, and asks no model: the only

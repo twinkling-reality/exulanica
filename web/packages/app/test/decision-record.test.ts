@@ -3,7 +3,8 @@
 // cost. Records here are written by hand in the decision route's and the events route's shapes.
 import { describe, expect, it } from 'vitest';
 import {
-  decisionChange, explainDecisionRecord, knownDecisions, parseDecisionEvents, type DecisionEvent,
+  VERDICT_ORDER, choiceAccount, choiceTimeline, decisionChange, explainDecisionRecord, knownDecisions,
+  parseDecisionEvents, rewind, type DecisionEvent,
 } from '../src/composition/decision-record.js';
 import type { PersonDecision, SocietyDecisionDetail } from '../src/society-models-api.js';
 
@@ -88,7 +89,7 @@ describe('a recorded decision, explained', () => {
     ]);
     expect(view.told).toContain('Tiredness 800 of 1000; its routine rests from 700.');
     expect(view.told).toContain('A walker; 9 m away; resting; cannot hear it.');
-    expect(view).toMatchObject({ servedModel: MODEL, responseTime: '2.40 s', tokens: '400 in, 120 out.', cost: '$0.00005000, as reported for the call.' });
+    expect(view).toMatchObject({ servedModel: MODEL, responseTime: '2.40 s', tokens: '400 in, 120 out.', cost: '$0.00005000, computed from the reported tokens at the listed price.' });
     expect(allWords(view)).not.toMatch(INNER_LIFE);
   });
 
@@ -163,5 +164,106 @@ describe('the events a record reads', () => {
       { requestId: 'later', minute: 10, words: 'Minute 10, applied: “wait here a minute”' },
       { requestId: 'go', minute: 4, words: 'Minute 4, applied: “resting, 60 m away (1)”' },
     ]);
+  });
+});
+
+/** A record as the route serves it: request and receipt digests, and the receipt's decision order. */
+const stored = (id: string, label: string | null, seq: number, extra: { status?: string; reason?: string; line?: string } = {}): SocietyDecisionDetail => {
+  const base = answered(id, label, extra.status, extra.reason);
+  const decision = base.decision!;
+  const proposal = decision['proposal'] as Record<string, unknown> | null;
+  return {
+    ...base,
+    request: { ...base.request, document_sha256: `request-${id}` },
+    decision: {
+      ...decision, decision_seq: seq, document_sha256: `receipt-${id}`,
+      proposal: proposal === null || extra.line === undefined ? proposal : { ...proposal, line: extra.line },
+    },
+  };
+};
+const closed = (tick: number, id: string, seq: number, disposition = 'applied', reason = 'validated_choice', chose: string | null = null): unknown => ({
+  event_id: `event-${id}`, tick, event_kind: 'decision_applied', subject_id: BEING,
+  document: { order: 5, request_id: id, decision_seq: seq, disposition, reason, chose, motion_path_mm: [[0, 0]] },
+});
+
+describe('a choice told in four parts with one verdict', () => {
+  it('labels what was observed and what was reported, and points each part at its stored record', () => {
+    const events = page([...[closed(4, 'go', 1, 'applied', 'validated_choice', 'resting, 60 m away (1)')],
+      event(4, 'route_progressed', { motion_path_mm: [[0, 0], [30000, 0]] }, 1)]);
+    const account = choiceAccount(stored('go', 'resting, 60 m away (1)', 1, { line: 'Off to rest.' }), null, events);
+    expect(account.parts.map((part) => [part.part, part.provenance])).toEqual([
+      ['saw', 'observed'], ['answered', 'reported'], ['checked', 'observed'], ['did', 'observed'],
+    ]);
+    expect(account.parts[0].records).toEqual([{ kind: 'request', id: 'go', sha256: 'request-go' }]);
+    expect(account.parts[1].lines).toEqual(['It answered “resting, 60 m away (1)”.', 'It proposed to say: “Off to rest.”']);
+    expect(account.parts[2].records).toEqual([{ kind: 'receipt', id: 'go', sha256: 'receipt-go' }]);
+    expect(account.parts[3].records[0]).toEqual({ kind: 'event', id: 'event-go', sha256: null });
+    expect(account.verdict).toEqual({ kind: 'applied', reason: 'validated_choice', words: 'Applied in minute 4.' });
+    expect(account.decisionSeq).toBe(1);
+    expect(account.inferred).toEqual([]);
+  });
+
+  it('gives the first verdict that holds, in a fixed order, naming the reason', () => {
+    expect(VERDICT_ORDER).toEqual(['awaiting_answer', 'refused', 'no_answer', 'stale', 'not_applied', 'pending', 'applied']);
+    const verdict = (detail: SocietyDecisionDetail, events: readonly DecisionEvent[] = []) => choiceAccount(detail, null, events).verdict;
+    expect(verdict({ ...stored('a', null, 1), status: 'in_progress', decision: null }).kind).toBe('awaiting_answer');
+    expect(verdict(stored('a', null, 1, { status: 'rejected', reason: 'answer_not_offered' }))).toEqual({
+      kind: 'refused', reason: 'answer_not_offered', words: 'Refused: it did not answer with one of the things they could do.',
+    });
+    // A timeout is nobody's decision; the routine is named only once a minute has run without it.
+    expect(verdict(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' })).words)
+      .toBe('No usable answer: it did not answer in time. No minute has taken it up yet.');
+    expect(verdict(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' }), page([closed(4, 'a', 1, 'unavailable', 'model_timed_out')])).words)
+      .toBe('No usable answer: it did not answer in time. Its routine acted in minute 4.');
+    expect(verdict(stored('a', 'wait here a minute', 1), page([closed(4, 'a', 1, 'stale', 'decision_context_changed')])).kind).toBe('stale');
+    expect(verdict(stored('a', 'wait here a minute', 1), page([closed(4, 'a', 1, 'rejected', 'place_taken_this_minute')]))).toEqual({
+      kind: 'not_applied', reason: 'place_taken_this_minute', words: 'Accepted but not applied in minute 4: someone else took that place first.',
+    });
+    expect(verdict(stored('a', 'wait here a minute', 1)).kind).toBe('pending');
+    // A missing answer is observed, never reported.
+    expect(choiceAccount(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' }), null, []).parts[1].provenance).toBe('observed');
+  });
+
+  it('infers repetition and a walk with no movement only by named rules, against the previous record', () => {
+    const events = page([
+      closed(4, 'one', 1, 'applied', 'validated_choice', 'stand a while nearby'),
+      closed(8, 'two', 2, 'applied', 'validated_choice', 'stand a while nearby'),
+    ]);
+    const one = stored('one', 'stand a while nearby', 1, { line: 'Hello.' });
+    const two = stored('two', 'stand a while nearby', 2, { line: 'Hello.' });
+    const account = choiceAccount(two, null, events, one);
+    expect(account.inferred.map((item) => [item.rule, item.provenance])).toEqual([
+      ['repeat-choice.v1', 'inferred'], ['repeat-line.v1', 'inferred'],
+    ]);
+    expect(account.inferred[0]!.records).toEqual([
+      { kind: 'receipt', id: 'one', sha256: 'receipt-one' }, { kind: 'receipt', id: 'two', sha256: 'receipt-two' },
+    ]);
+    // A line proposed but never applied was never said, so it is not a repeat.
+    const notSaid = page([closed(4, 'one', 1, 'rejected', 'no_room_to_stand'), closed(8, 'two', 2)]);
+    expect(choiceAccount(two, null, notSaid, one).inferred.map((item) => item.rule)).toEqual(['repeat-choice.v1']);
+    // An applied walk with no recorded movement before the next applied decision.
+    const still = page([closed(4, 'go', 1), closed(9, 'next', 2)]);
+    expect(choiceAccount(stored('go', 'resting, 60 m away (1)', 1), null, still).inferred.map((item) => item.rule))
+      .toEqual(['applied-go-without-movement.v1']);
+    const parts = choiceAccount(two, null, events, one);
+    const said = [parts.verdict.words, ...parts.parts.flatMap((part) => part.lines), ...parts.inferred.map((item) => item.words)].join(' ');
+    expect(said).not.toMatch(INNER_LIFE);
+  });
+});
+
+describe('rewinding a being\'s choices', () => {
+  it('steps through them oldest first by decision order, ending with one no minute has taken up', () => {
+    const events = page([
+      closed(9, 'second', 2, 'applied', 'validated_choice', 'stand a while nearby'),
+      closed(4, 'first', 1, 'applied', 'validated_choice', 'resting, 60 m away (1)'),
+      { ...closed(6, 'elsewhere', 3) as object, subject_id: 'someone-else' },
+    ]);
+    const timeline = choiceTimeline(BEING, latest({ requestId: 'third', decisionSeq: 4, baseTick: 12 }), events);
+    expect(timeline.map((entry) => [entry.requestId, entry.decisionSeq, entry.minute, entry.takenUp])).toEqual([
+      ['first', 1, 4, true], ['second', 2, 9, true], ['third', 4, 12, false],
+    ]);
+    expect(rewind(timeline, 'second')).toEqual({ index: 1, total: 3, previous: timeline[0], next: timeline[2] });
+    expect(rewind(timeline, 'first')!.previous).toBeNull();
+    expect(rewind(timeline, 'missing')).toBeNull();
   });
 });

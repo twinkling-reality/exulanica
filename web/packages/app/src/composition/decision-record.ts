@@ -18,6 +18,8 @@ import { ACTION_LABELS, ACTIVITY_LABELS } from '../society-activity-words.js';
 
 /** One event of the society's history, as much of it as a record reads. */
 export interface DecisionEvent {
+  /** The event's own id, which a part of a choice's account points at; null where none is served. */
+  readonly eventId: string | null;
   readonly tick: number;
   readonly order: number;
   /** The event's kind: `decision_applied`, `route_progressed`, `action_completed`, `blocked`... */
@@ -27,6 +29,8 @@ export interface DecisionEvent {
   readonly reason: string | null;
   /** For a `decision_applied` event: the request it closed, and what its minute did with it. */
   readonly requestId: string | null;
+  /** For a `decision_applied` event: the society-wide order of the decision it closed. */
+  readonly decisionSeq: number | null;
   readonly disposition: string | null;
   /** For a `decision_applied` event: the offered option's words it chose, or null. */
   readonly chose: string | null;
@@ -74,6 +78,7 @@ export function parseDecisionEvents(value: unknown): DecisionEventsPage {
     const kind = words(row?.['event_kind']);
     if (row === null || document === null || tick === null || kind === null) continue;
     events.push({
+      eventId: words(row['event_id']),
       tick,
       order: whole(document['order']) ?? 0,
       kind,
@@ -81,6 +86,7 @@ export function parseDecisionEvents(value: unknown): DecisionEventsPage {
       outcome: words(document['outcome']),
       reason: words(document['reason']),
       requestId: words(document['request_id']),
+      decisionSeq: whole(document['decision_seq']),
       disposition: words(document['disposition']),
       chose: words(document['chose']),
       path: items(document['motion_path_mm']).flatMap((one) => {
@@ -317,7 +323,10 @@ function appliedWords(
 function costWords(provider: Held | null): string {
   if (provider === null) return 'No model call is recorded.';
   const usd = words(provider['cost_usd']);
-  if (provider['cost_known'] === true) return usd === null ? 'Recorded as known, with no amount.' : `$${usd}, as reported for the call.`;
+  // Known means computed from the tokens the provider reported, at the listed price: not a bill.
+  if (provider['cost_known'] === true) {
+    return usd === null ? 'Recorded as known, with no amount.' : `$${usd}, computed from the reported tokens at the listed price.`;
+  }
   return usd === null
     ? 'Not known.'
     : `Not known. The ledger charged its reservation of $${usd}, the most the call can have cost.`;
@@ -451,4 +460,205 @@ export function knownDecisions(
     });
   }
   return [...known.values()].sort((a, b) => b.minute - a.minute);
+}
+
+/** Where a part of a choice's account comes from (the user's Salidium classes). */
+export type Provenance = 'observed' | 'reported' | 'inferred';
+
+/** A stored record a part was read from: open it by its id; its digest where the record states one. */
+export interface RecordPointer {
+  readonly kind: 'request' | 'receipt' | 'event';
+  readonly id: string;
+  readonly sha256: string | null;
+}
+
+/** One of a choice's four parts, in its fixed order: what it saw, answered, how that was checked, what it did. */
+export interface ChoicePart {
+  readonly part: 'saw' | 'answered' | 'checked' | 'did';
+  readonly provenance: Provenance;
+  readonly lines: readonly string[];
+  readonly records: readonly RecordPointer[];
+}
+
+/** Something the records imply but do not state, by a named rule. */
+export interface ChoiceInference {
+  readonly rule: 'repeat-choice.v1' | 'repeat-line.v1' | 'applied-go-without-movement.v1';
+  readonly provenance: 'inferred';
+  readonly words: string;
+  readonly records: readonly RecordPointer[];
+}
+
+/**
+ * The checks a choice's verdict is the first match of, in this order: no answer recorded yet; the
+ * engine refused the answer; no usable answer; the world had moved on (stale); accepted but not
+ * applied; accepted and not yet taken up; applied.
+ */
+export const VERDICT_ORDER = ['awaiting_answer', 'refused', 'no_answer', 'stale', 'not_applied', 'pending', 'applied'] as const;
+export type ChoiceVerdict = typeof VERDICT_ORDER[number];
+
+export interface ChoiceAccount {
+  readonly requestId: string;
+  readonly subjectId: string | null;
+  readonly decisionSeq: number | null;
+  /** One verdict: the first of `VERDICT_ORDER` that holds, with its reason code where it has one. */
+  readonly verdict: { readonly kind: ChoiceVerdict; readonly reason: string | null; readonly words: string };
+  readonly parts: readonly [ChoicePart, ChoicePart, ChoicePart, ChoicePart];
+  readonly inferred: readonly ChoiceInference[];
+}
+
+const receiptPointer = (requestId: string, receipt: Held): RecordPointer =>
+  ({ kind: 'receipt', id: requestId, sha256: words(receipt['document_sha256']) });
+
+/** The minute a request was taken up in, and what that minute did, from its event or the latest read. */
+function consumption(requestId: string, latest: PersonDecision | null, events: readonly DecisionEvent[] | null) {
+  const event = events?.find((one) => one.kind === 'decision_applied' && one.requestId === requestId) ?? null;
+  const summary = latest !== null && latest.requestId === requestId ? latest : null;
+  return {
+    event,
+    tick: event?.tick ?? summary?.consumedTick ?? null,
+    disposition: event?.disposition ?? summary?.disposition ?? null,
+    reason: event !== null ? event.reason : summary?.dispositionReason ?? null,
+  };
+}
+
+function verdictOf(
+  receipt: Held | null, consumed: ReturnType<typeof consumption>,
+): ChoiceAccount['verdict'] {
+  const reason = words(receipt?.['reason']);
+  if (receipt === null) return { kind: 'awaiting_answer', reason: null, words: 'No answer is recorded yet.' };
+  if (receipt['status'] === 'rejected') return { kind: 'refused', reason, words: sentence(`Refused: ${why(reason)}`) };
+  if (receipt['status'] !== 'accepted') {
+    return {
+      kind: 'no_answer', reason,
+      words: sentence(`No usable answer: ${why(reason)}`) + (consumed.tick === null
+        ? ' No minute has taken it up yet.'
+        : ` Its routine acted in minute ${consumed.tick}.`),
+    };
+  }
+  if (consumed.disposition === 'stale') {
+    return { kind: 'stale', reason: consumed.reason, words: `Not applied: the world had moved on before minute ${consumed.tick} could act on it. Its routine acted instead.` };
+  }
+  if (consumed.disposition === 'rejected' || consumed.disposition === 'superseded') {
+    return { kind: 'not_applied', reason: consumed.reason, words: sentence(`Accepted but not applied in minute ${consumed.tick}: ${why(consumed.reason)}`) };
+  }
+  if (consumed.disposition === null) return { kind: 'pending', reason: null, words: 'Accepted; no minute has acted on it yet.' };
+  return { kind: 'applied', reason: consumed.reason, words: `Applied in minute ${consumed.tick}.` };
+}
+
+/** What a stored answer chose and proposed to say. */
+function answerOf(detail: SocietyDecisionDetail | null): { readonly chose: string | null; readonly line: string | null } {
+  const proposal = held(held(detail?.decision)?.['proposal']);
+  return { chose: words(proposal?.['label']), line: words(proposal?.['line']) };
+}
+
+/**
+ * One choice told in four parts, each saying where it comes from and pointing at the stored record
+ * it was read from, one verdict, and what the records imply by a named rule. `previous` is the
+ * being's previous decision record, for the repetition rules; null where there is none or it is
+ * not read. Explanations come from `explainDecisionRecord`; nothing here is called thinking.
+ */
+export function choiceAccount(
+  detail: SocietyDecisionDetail,
+  latest: PersonDecision | null,
+  events: readonly DecisionEvent[] | null,
+  previous: SocietyDecisionDetail | null = null,
+): ChoiceAccount {
+  const view = explainDecisionRecord(detail, latest, events);
+  const request = detail.request;
+  const receipt = detail.decision;
+  const requestId = view.requestId;
+  const consumed = consumption(requestId, latest, events);
+  const requestRecord: RecordPointer = { kind: 'request', id: requestId, sha256: words(request['document_sha256']) };
+  const receiptRecords = receipt === null ? [] : [receiptPointer(requestId, receipt)];
+  const own = (events ?? []).filter((one) => one.subjectId === view.subjectId && view.appliedAt !== null
+    && one.tick >= view.appliedAt && (one.kind === 'route_progressed' || one.kind === 'action_completed'));
+  const eventRecords = [consumed.event, ...own].flatMap((one): RecordPointer[] =>
+    one === null || one.eventId === null ? [] : [{ kind: 'event', id: one.eventId, sha256: null }]);
+  const unanswered = receipt === null || receipt['status'] === 'unavailable';
+  const saw: ChoicePart = {
+    part: 'saw', provenance: 'observed',
+    lines: [...view.told, ...view.options.map((option) => `Offered: ${option.label}`)],
+    records: [requestRecord],
+  };
+  const answer: ChoicePart = {
+    part: 'answered',
+    // A missing answer is observed by the host; an answer's words are the model's own report.
+    provenance: unanswered ? 'observed' : 'reported',
+    lines: receipt === null ? ['No answer is recorded yet.']
+      : receipt['status'] === 'unavailable' ? [view.answer]
+        : [view.chosen === null ? 'It named no offered option.' : `It answered “${view.chosen}”.`,
+          ...(view.line === null ? [] : [`It proposed to say: “${view.line}”`])],
+    records: receiptRecords,
+  };
+  const checked: ChoicePart = { part: 'checked', provenance: 'observed', lines: [view.answer], records: receiptRecords };
+  const did: ChoicePart = { part: 'did', provenance: 'observed', lines: [view.applied, ...view.changed], records: eventRecords };
+
+  const inferred: ChoiceInference[] = [];
+  const before = answerOf(previous);
+  const previousId = words(previous?.request['request_id']);
+  const previousRecords = previous?.decision == null || previousId === null ? [] : [receiptPointer(previousId, previous.decision)];
+  if (receipt?.['status'] === 'accepted' && view.chosen !== null && before.chose === view.chosen && previous?.decision?.['status'] === 'accepted') {
+    inferred.push({ rule: 'repeat-choice.v1', provenance: 'inferred', words: `The same answer as its previous choice: “${view.chosen}”.`, records: [...previousRecords, ...receiptRecords] });
+  }
+  const previousApplied = previousId !== null && consumption(previousId, latest, events).disposition === 'applied';
+  if (view.appliedAt !== null && view.line !== null && previousApplied && before.line === view.line) {
+    inferred.push({ rule: 'repeat-line.v1', provenance: 'inferred', words: `It said the same line as at its previous choice: “${view.line}”`, records: [...previousRecords, ...receiptRecords] });
+  }
+  const option = held(held(receipt?.['proposal'])?.['option']);
+  if (view.appliedAt !== null && view.subjectId !== null && events !== null && words(option?.['action']) === 'go'
+    && events.some((one) => one.tick <= view.appliedAt!)
+    && decisionChange(events, view.subjectId, requestId, view.appliedAt).walked.length === 0) {
+    inferred.push({ rule: 'applied-go-without-movement.v1', provenance: 'inferred', words: 'A walk was applied, but no movement is recorded for it before its next applied decision.', records: [...receiptRecords, ...eventRecords] });
+  }
+  return {
+    requestId,
+    subjectId: view.subjectId,
+    decisionSeq: whole(receipt?.['decision_seq']),
+    verdict: verdictOf(receipt, consumed),
+    parts: [saw, answer, checked, did],
+    inferred,
+  };
+}
+
+/** One of a being's choices in rewind order. */
+export interface TimelineEntry {
+  readonly requestId: string;
+  /** The society-wide decision order, or null where the read does not state it. */
+  readonly decisionSeq: number | null;
+  /** The minute it was taken up in, or, for one no minute has, the minute it was asked at. */
+  readonly minute: number;
+  readonly takenUp: boolean;
+  readonly chose: string | null;
+}
+
+/**
+ * A being's choices this read knows of, oldest first, for stepping back and forth one choice at a
+ * time: each one a minute's decision event closed, then the latest where no minute has taken it up.
+ * Stepping reads stored records only; no model is asked.
+ */
+export function choiceTimeline(
+  subjectId: string, latest: PersonDecision | null, events: readonly DecisionEvent[],
+): readonly TimelineEntry[] {
+  const entries = new Map<string, TimelineEntry>();
+  for (const event of events) {
+    if (event.kind !== 'decision_applied' || event.subjectId !== subjectId || event.requestId === null) continue;
+    entries.set(event.requestId, { requestId: event.requestId, decisionSeq: event.decisionSeq, minute: event.tick, takenUp: true, chose: event.chose });
+  }
+  if (latest !== null && latest.subjectId === subjectId && latest.requestId !== undefined && !entries.has(latest.requestId)) {
+    entries.set(latest.requestId, {
+      requestId: latest.requestId, decisionSeq: latest.decisionSeq,
+      minute: latest.consumedTick ?? latest.baseTick, takenUp: latest.consumedTick !== null, chose: latest.chose,
+    });
+  }
+  return [...entries.values()].sort((a, b) =>
+    (a.decisionSeq ?? Number.MAX_SAFE_INTEGER) - (b.decisionSeq ?? Number.MAX_SAFE_INTEGER) || a.minute - b.minute);
+}
+
+/** Where one choice sits in a timeline, and its neighbours; null where the timeline does not hold it. */
+export function rewind(
+  timeline: readonly TimelineEntry[], requestId: string,
+): { readonly index: number; readonly total: number; readonly previous: TimelineEntry | null; readonly next: TimelineEntry | null } | null {
+  const index = timeline.findIndex((entry) => entry.requestId === requestId);
+  if (index < 0) return null;
+  return { index, total: timeline.length, previous: timeline[index - 1] ?? null, next: timeline[index + 1] ?? null };
 }

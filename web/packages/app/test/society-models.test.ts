@@ -57,6 +57,37 @@ function pick(root: HTMLElement, value: string): void {
 }
 
 describe('reading who decides', () => {
+  it('reads what decisions came to as the server measured it, null rates kept null, and an older read without it', () => {
+    const rate = (numerator: number, denominator: number, value: number | null) => ({ numerator, denominator, minimum: 5, value });
+    const measured = {
+      counts: { decisions: 5, answered: 4, refused: 0, unavailable: 1, timeouts: 1, stale: 0, applied: 3, not_applied: 1, pending: 0 },
+      rates: { acceptance: rate(4, 4, null), applied: rate(3, 4, null), repeated_choice: rate(1, 3, null), repeated_line: rate(0, 0, null) },
+      timeouts: { longest_streak: 1, current_streak: 0 },
+      repetition: { longest_choice_run: 2, longest_line_run: 0 },
+      latency_ms: { n: 4, minimum: 5, p50: null, p95: null, longest: null },
+      cost: { usd: '0.00042000', basis: 'bounded', unknown_calls: 1, calls: 5 },
+    };
+    const summary = read().by_model[0]!;
+    const view = parseSocietyModels(read({
+      by_model: [{ ...summary, measures: measured }],
+      by_being: [{ subject_id: 'ada', provider: 'nebius_token_factory', model_id: MODEL, name: 'Nemotron 3 Nano 30B', measures: measured }],
+    }));
+    const found = view.byModel[0]!.measures!;
+    // Too few to say stays null, never 0; a count is still a count.
+    expect(found.rates.acceptance).toEqual({ numerator: 4, denominator: 4, minimum: 5, value: null });
+    expect(found.counts.notApplied).toBe(1);
+    expect(found.latencyMs.p50).toBeNull();
+    expect(found.cost).toEqual({ usd: '0.00042000', basis: 'bounded', unknownCalls: 1, calls: 5 });
+    expect(view.byBeing).toEqual([expect.objectContaining({ subjectId: 'ada', name: 'Nemotron 3 Nano 30B', measures: found })]);
+    // A server that predates the measures reads as before.
+    const older = parseSocietyModels(read());
+    expect(older.byModel[0]!.measures).toBeUndefined();
+    expect(older.byBeing).toBeUndefined();
+    // A cost basis this page does not know, or a rate that is not a number, is refused.
+    expect(() => parseSocietyModels(read({ by_model: [{ ...summary, measures: { ...measured, cost: { ...measured.cost, basis: 'billed' } } }] }))).toThrow();
+    expect(() => parseSocietyModels(read({ by_model: [{ ...summary, measures: { ...measured, rates: { ...measured.rates, applied: rate(3, 4, 0 / 0) } } }] }))).toThrow();
+  });
+
   it('retains the exact request link and leaves older summaries without an invented link', () => {
     expect(parseSocietyModels(read()).latest[0]).not.toHaveProperty('requestId');
     const latest = { ...read().latest[0], request_id: 'request-1' };

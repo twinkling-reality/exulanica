@@ -222,6 +222,11 @@ class SocietyDecisionRepository:
                     "disposition": value["disposition"],
                     "disposition_reason": value["disposition_reason"],
                     "chose": None if receipt["proposal"] is None else receipt["proposal"]["label"],
+                    # The line it proposed to say, for what a model's decisions came to
+                    # (:mod:`~exulanica.world.decision_measures`).
+                    "line": None
+                    if receipt["proposal"] is None
+                    else receipt["proposal"].get("line"),
                     "asked_model": provider is not None and not played,
                     "answers_asked": call.get("answers_asked"),
                     "latency_ms": call.get("latency_ms"),

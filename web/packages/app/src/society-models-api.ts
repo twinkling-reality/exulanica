@@ -121,6 +121,61 @@ export function parseSocietyDecisionDetail(value: unknown, requestId: string): S
   };
 }
 
+/**
+ * A rate with what it is made of. `value` is null below `minimum`, never 0: too few to say.
+ */
+export interface MeasuredRate {
+  readonly numerator: number;
+  readonly denominator: number;
+  readonly minimum: number;
+  readonly value: number | null;
+}
+
+/**
+ * What a model's decisions came to, as the server measures them (`exulanica/world/decision_measures.py`),
+ * its one authority: read, never recomputed here. No measure is combined into a score.
+ */
+export interface DecisionMeasures {
+  readonly counts: {
+    readonly decisions: number;
+    readonly answered: number;
+    readonly refused: number;
+    readonly unavailable: number;
+    readonly timeouts: number;
+    readonly stale: number;
+    readonly applied: number;
+    readonly notApplied: number;
+    readonly pending: number;
+  };
+  readonly rates: {
+    readonly acceptance: MeasuredRate;
+    readonly applied: MeasuredRate;
+    readonly repeatedChoice: MeasuredRate;
+    readonly repeatedLine: MeasuredRate;
+  };
+  readonly timeouts: { readonly longestStreak: number; readonly currentStreak: number };
+  readonly repetition: { readonly longestChoiceRun: number; readonly longestLineRun: number };
+  /** Percentiles are null below `minimum` timed calls. */
+  readonly latencyMs: {
+    readonly n: number;
+    readonly minimum: number;
+    readonly p50: number | null;
+    readonly p95: number | null;
+    readonly longest: number | null;
+  };
+  /**
+   * `computed` from reported tokens at the listed price, or `bounded` where some call's cost is
+   * unknown and its reservation stands in. Never a provider's bill.
+   */
+  readonly cost: { readonly usd: string; readonly basis: 'computed' | 'bounded'; readonly unknownCalls: number; readonly calls: number };
+}
+
+/** One being's measures under one model. */
+export interface BeingDecisionMeasures extends NamedModelRef {
+  readonly subjectId: string;
+  readonly measures: DecisionMeasures;
+}
+
 /** What one model's decisions came to: the numbers a comparison of models reads. */
 export interface ModelDecisionSummary extends NamedModelRef {
   readonly decisions: number;
@@ -136,6 +191,8 @@ export interface ModelDecisionSummary extends NamedModelRef {
   readonly latencyP95Ms: number | null;
   readonly costUsd: string;
   readonly costKnown: boolean;
+  /** Absent from a server that predates the measures. */
+  readonly measures?: DecisionMeasures;
 }
 
 /**
@@ -193,6 +250,8 @@ export interface SocietyModels {
   readonly outside?: readonly OutsideDecider[];
   /** Each gate's traveller mind; empty or absent where no gate names one. */
   readonly travellers?: readonly TravellerChoice[];
+  /** Each being's measures under each model; absent from a server that predates them. */
+  readonly byBeing?: readonly BeingDecisionMeasures[];
 }
 
 const invalid = (): never => { throw new Error('Invalid society models response'); };
@@ -251,6 +310,62 @@ function outsideDecider(value: unknown): OutsideDecider {
   };
   // Present only where the server says it, so a read that predates the field reads as before.
   return latest === undefined ? base : { ...base, latest };
+}
+
+function measuredRate(value: unknown): MeasuredRate {
+  const held = object(value);
+  const ratio = held['value'];
+  return {
+    numerator: count(held['numerator']),
+    denominator: count(held['denominator']),
+    minimum: count(held['minimum']),
+    value: ratio === null ? null : typeof ratio === 'number' && Number.isFinite(ratio) ? ratio : invalid(),
+  };
+}
+
+function decisionMeasures(value: unknown): DecisionMeasures {
+  const held = object(value);
+  const counts = object(held['counts']);
+  const rates = object(held['rates']);
+  const timeouts = object(held['timeouts']);
+  const repetition = object(held['repetition']);
+  const latency = object(held['latency_ms']);
+  const cost = object(held['cost']);
+  const basis = cost['basis'] === 'computed' || cost['basis'] === 'bounded' ? cost['basis'] : invalid();
+  return {
+    counts: {
+      decisions: count(counts['decisions']),
+      answered: count(counts['answered']),
+      refused: count(counts['refused']),
+      unavailable: count(counts['unavailable']),
+      timeouts: count(counts['timeouts']),
+      stale: count(counts['stale']),
+      applied: count(counts['applied']),
+      notApplied: count(counts['not_applied']),
+      pending: count(counts['pending']),
+    },
+    rates: {
+      acceptance: measuredRate(rates['acceptance']),
+      applied: measuredRate(rates['applied']),
+      repeatedChoice: measuredRate(rates['repeated_choice']),
+      repeatedLine: measuredRate(rates['repeated_line']),
+    },
+    timeouts: { longestStreak: count(timeouts['longest_streak']), currentStreak: count(timeouts['current_streak']) },
+    repetition: { longestChoiceRun: count(repetition['longest_choice_run']), longestLineRun: count(repetition['longest_line_run']) },
+    latencyMs: {
+      n: count(latency['n']),
+      minimum: count(latency['minimum']),
+      p50: maybe(latency['p50'], count),
+      p95: maybe(latency['p95'], count),
+      longest: maybe(latency['longest'], count),
+    },
+    cost: {
+      usd: typeof cost['usd'] === 'string' && DECIMAL.test(cost['usd']) ? cost['usd'] : invalid(),
+      basis,
+      unknownCalls: count(cost['unknown_calls']),
+      calls: count(cost['calls']),
+    },
+  };
 }
 
 const SOURCES: readonly ChoiceSource[] = ['choice', 'choice_over_bound', 'travellers', 'travellers_over_bound'];
@@ -331,6 +446,8 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         latencyP95Ms: maybe(latency['p95'], count),
         costUsd: text(held['cost_usd']),
         costKnown: flag(held['cost_known']),
+        // Added to the profile as an optional field: absent from an older server.
+        ...(held['measures'] === undefined ? {} : { measures: decisionMeasures(held['measures']) }),
       };
     }),
     decisionsCounted: count(window['counted']),
@@ -345,6 +462,12 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         deciderKind: text(object(held['decider'])['kind']),
         model: maybe(held['model'], modelRef),
       };
+    }),
+    ...(row['by_being'] === undefined ? {} : {
+      byBeing: list(row['by_being']).map((entry): BeingDecisionMeasures => {
+        const held = object(entry);
+        return { ...modelRef(held), subjectId: text(held['subject_id']), measures: decisionMeasures(held['measures']) };
+      }),
     }),
   });
 }
