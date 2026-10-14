@@ -27,6 +27,7 @@ from exulanica.door.crossings import Visits
 
 import test_society_authored_world_postgres as helpers
 import test_society_hands_postgres as hands
+from living_session_support import open_for_saved_world
 from society_seed_support import choose_society_seed
 from test_door_crossing_rules_postgres import _crossings
 from test_door_crossings_postgres import _arrive, _grant, _world
@@ -150,6 +151,7 @@ def test_a_traveller_its_player_calls_home_takes_the_world_s_sword_to_its_game(
         )
         cursor = _hello_cursor(bridge, channel)
         visitor = _arrive(bridge, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+        open_for_saved_world(client.app.state.services, world)
         host, _manifest, _model_id = _host(door, hands._Hands())
         for _ in range(20):
             society = _minute(door, host, world, society)
@@ -203,6 +205,7 @@ def test_a_traveller_its_owner_sends_away_leaves_the_world_s_sword_behind(
         )
         cursor = _hello_cursor(bridge, channel)
         visitor = _arrive(bridge, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+        open_for_saved_world(client.app.state.services, world)
         host, _manifest, _model_id = _host(door, hands._Hands())
         for _ in range(20):
             society = _minute(door, host, world, society)

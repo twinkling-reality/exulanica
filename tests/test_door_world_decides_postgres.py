@@ -41,6 +41,7 @@ from psycopg.conninfo import make_conninfo
 import door_support
 import test_society_authored_world_postgres as helpers
 import test_society_person_decisions_postgres as decisions
+from living_session_support import open_for_saved_world
 from test_door_crossing_rules_postgres import _crossings, _expire
 from test_door_crossings_postgres import (
     _arrive,
@@ -192,6 +193,7 @@ def test_a_world_grant_s_visitor_is_decided_for_by_its_mind_and_never_asked_thro
     assert documents[thing_id]["decided_by"] == "world"
     assert "decided_by" not in documents[programs]
 
+    open_for_saved_world(client.app.state.services, world)
     host, _manifest, model_id = _host(door, _Knight())
     for _ in range(6):
         society = _minute(door, host, world, society)
