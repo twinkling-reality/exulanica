@@ -42,15 +42,10 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, drafted_kind
+from exulanica.api.world_draft_offer import calls_at_most as counted_calls
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
-from exulanica.selection import (
-    kind_drafting,
-    look_choosing,
-    setting_choosing,
-    tool_choosing,
-    world_drafting,
-)
+from exulanica.models.manifest import load_manifest
 from exulanica.selection.calls import CallLog
 from exulanica.selection.look_choosing import LookOption, choose_look
 from exulanica.selection.setting_choosing import SettingAxis, SettingOption, choose_setting
@@ -118,22 +113,17 @@ _FAILED: Final = {
 }
 
 
-def calls_at_most() -> int:
-    """The most times one draft of a world asks a model: the chooser's call and its repair, then
-    the attempts of whichever listed tool's drafter makes the most. Counted from the steps' own
-    bounds, so the figure a person is shown before sending is the one the job is held to. A
-    model withdrawn mid-call may be asked again through its fallback, which the spending
-    allowance bounds and this figure does not count."""
-    drafting = {
-        "kind": kind_drafting.DRAFT_ATTEMPTS,
-        "specification": world_drafting.DRAFT_ATTEMPTS,
-    }
-    return (
-        tool_choosing.ATTEMPTS
-        + max(drafting[tool.drafter] for tool in world_tools())
-        + look_choosing.ATTEMPTS
-        + setting_choosing.ATTEMPTS
-    )
+def calls_at_most(client: ModelClient | None) -> int:
+    """The most times one draft of a world asks a model, counted as its operation sheet counts
+    them (:func:`exulanica.api.world_draft_offer.calls_at_most`): every schema repair of every
+    step along the longer tool's path, each step's request sent to every model of its chain as
+    often as ``client`` tries one. With no client, each model is counted once, as the server's own
+    client (one attempt a model) asks it. So the figure a person is shown before sending is the
+    same whether or not the server could read prices, and never less than the job may do."""
+    if client is None:
+        manifest = load_manifest()
+        return counted_calls(manifest, lambda role: len(manifest[role].chain))
+    return counted_calls(client.manifest, client.maximum_wire_attempts)
 
 
 Span = tuple[int, int]

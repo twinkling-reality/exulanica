@@ -5,7 +5,12 @@ from dataclasses import replace
 from decimal import Decimal
 
 import pytest
-from exulanica.api.world_draft_offer import WorldDraftOfferRefused, operation_sheet, stages
+from exulanica.api.world_draft_offer import (
+    WorldDraftOfferRefused,
+    calls_at_most,
+    operation_sheet,
+    stages,
+)
 from exulanica.models.manifest import load_manifest
 from exulanica.models.provider_catalog import ProviderPrice
 
@@ -54,6 +59,24 @@ def test_full_operation_includes_actual_repairs_fallbacks_and_alternative_tool_p
             != manifest.spec(rate["model_id"]).input_usd_per_mtok
         )
         assert rate["rate_response_sha256"] == "f" * 64
+
+
+@pytest.mark.parametrize("attempts", [1, 3])
+def test_the_most_calls_without_prices_are_the_sheet_s_own(attempts):
+    """A person is told the same most calls whether or not the server could read prices: every
+    schema repair, every wire attempt and every fallback, counted as the sheet counts them."""
+    manifest, prices, at, _ = inputs()
+
+    def wire(role):
+        return len(manifest[role].chain) * attempts
+
+    sheet = operation_sheet(manifest, prices, at, wire, now=NOW)
+    assert calls_at_most(manifest, wire) == sheet["calls_at_most"]
+    # Fallbacks count: where a role holds one, the figure is more than the schema attempts along
+    # the longest path, which is all the offer used to count when it could read no prices.
+    assert any(len(manifest[role].chain) > 1 for path in stages().values() for role, _ in path)
+    longest = max(sum(repairs for _, repairs in path) for path in stages().values())
+    assert calls_at_most(manifest, wire) > longest
 
 
 @pytest.mark.parametrize("change", ["missing", "stale", "future", "nan", "context"])

@@ -763,7 +763,7 @@
   "offered": false,
   "code": "kind_draft_busy",
   "detail": "A draft is already running in this workspace.",
-  "calls_at_most": 9,
+  "calls_at_most": 16,
   "starts": {
    "an_hour": 12,
    "left": 11,

@@ -53,6 +53,22 @@ def stages() -> dict[str, tuple[tuple[Role, int], ...]]:
     }
 
 
+def calls_at_most(manifest: Manifest, maximum_wire_attempts: Callable[[Role], int]) -> int:
+    """The most dispatches one draft can make, counted as :func:`operation_sheet` counts them and
+    with no prices needed: each stage's schema attempts times its wire attempts (every fallback and
+    retry), summed along each tool's path for each provider, the larger path for each provider,
+    then the providers summed."""
+    most: dict[str, int] = {}
+    for path in stages().values():
+        along: dict[str, int] = {}
+        for role, repairs in path:
+            provider = manifest[role].provider
+            along[provider] = along.get(provider, 0) + repairs * maximum_wire_attempts(role)
+        for provider, calls in along.items():
+            most[provider] = max(most.get(provider, 0), calls)
+    return sum(most.values())
+
+
 def operation_sheet(
     manifest: Manifest,
     prices: Mapping[tuple[str, str], ProviderPrice],

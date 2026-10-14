@@ -44,7 +44,7 @@ from exulanica.world.world_settings import setting_parts
 from exulanica.world.worlds import WorldsReadOnly
 from fastapi.testclient import TestClient
 
-from model_fakes import chat_body
+from model_fakes import FakeTransport, chat_body
 from spending_support import bench as bench
 from test_companion_saved_names import named as saved_named  # noqa: F401
 from test_kind_drafts_postgres import NEIGHBOUR_TOKEN, NO_MODEL_TOKEN, OTHER_TOKEN, TOKEN, _farm
@@ -475,6 +475,32 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         assert spent["code"] in {code["code"] for code in spent["refusals"]}
         again = _start(client, FARM_WORDS)
         assert (again.status_code, again.json()["code"]) == (429, "kind_draft_limit")
+
+
+def test_a_refused_offer_says_the_same_most_calls_as_the_offered_one(drafts):
+    """The most calls a draft can make is said the same way whether the offer is open or refused,
+    so a page never tells one person "up to 9 times" and another "up to 16" for the same draft."""
+    app, transport = drafts
+    with app() as client:
+        offered = _offer(client)
+        assert offered["offered"] is True
+        expected = offered["operation"]["calls_at_most"]
+        assert offered["calls_at_most"] == expected
+        for token in (NO_MODEL_TOKEN, OTHER_TOKEN):
+            refused = _offer(client, token)
+            assert refused["offered"] is False and refused["operation"] is None
+            assert refused["calls_at_most"] == expected, refused["code"]
+    assert transport.requests == []
+
+
+def test_with_no_model_on_the_server_the_most_calls_are_as_its_own_client_would_make():
+    """With no client, each model of a role's chain is counted once, as the server's own client
+    (one attempt a model) asks it."""
+    server_client = ModelClient(
+        api_key={provider: "test-not-a-key" for provider in load_manifest().providers},
+        transport=FakeTransport(),
+    )
+    assert world_making.calls_at_most(None) == world_making.calls_at_most(server_client)
 
 
 def test_a_server_that_takes_no_kind_from_a_person_drafts_no_world_and_says_so(drafts):

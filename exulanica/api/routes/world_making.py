@@ -665,7 +665,9 @@ def read_world_draft_offer(
         offered=code is None,
         code=code,
         detail=None if detail is None else sayable(detail),
-        calls_at_most=calls_at_most() if quote is None else quote["calls_at_most"],
+        calls_at_most=(
+            calls_at_most(services.model_client) if quote is None else quote["calls_at_most"]
+        ),
         operation=quote,
         starts=DraftStartsView(
             an_hour=allowance.starts_an_hour,
