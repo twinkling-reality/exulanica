@@ -100,9 +100,7 @@ from exulanica.api.instance_settings import (
 from exulanica.api.instance_settings import (
     SOCIETY_SETTING_REFUSALS as SOCIETY_SETTING_REFUSALS,
 )
-from exulanica.api.kind_draft_worker import KindDraftWorker
 from exulanica.api.kind_drafts import KindDrafts
-from exulanica.api.reference_pictures import reference_picture_source
 from exulanica.api.service_refusals import ServiceRefusals
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
@@ -119,6 +117,7 @@ from exulanica.api.society_opening import (
     SocietyOpening,
 )
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
+from exulanica.api.worker_factories import WorkerFactories
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.account_workspaces import PacedWorkspaces
 from exulanica.db.session import DATABASE_URL_ENV, Database
@@ -150,10 +149,8 @@ from exulanica.references.settings import (
     reads_pictures_here,
     reference_workspaces,
 )
-from exulanica.references.worker import ReferenceWorker
 from exulanica.selection import creature_drafts
 from exulanica.selection.creature_drafts import (
-    CreatureDraftWorker,
     creature_workspaces,
     plays_creatures_here,
 )
@@ -173,7 +170,6 @@ from exulanica.store.configured import ContentStores, content_stores
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.material_recipes import MaterialRuntime
-from exulanica.world.model_probe_worker import ModelProbeWorker
 from exulanica.world.society import world_society_seed
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
@@ -189,7 +185,6 @@ from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
-    from exulanica.api.world_draft_worker import WorldDraftWorker
 
 __all__ = [
     "DATA_DIR_ENV",
@@ -272,7 +267,7 @@ class _RuntimeAccounts:
 
 
 @dataclass(frozen=True, slots=True)
-class Services(ServiceRefusals):
+class Services(ServiceRefusals, WorkerFactories):
     """Everything a request might need, and a note about what is not configured."""
 
     database: Database
@@ -812,150 +807,6 @@ class Services(ServiceRefusals):
             and workspace_id in self.model_probe_workspaces
             and self.model_client is not None
             and self.spending is not None
-        )
-
-    def build_kind_draft_worker(self) -> KindDraftWorker:
-        """Native kind jobs remain readable without a provider; overdue work is scrubbed."""
-        return KindDraftWorker(
-            self.database,
-            client=self.model_client if self.kinds_from_people else None,
-            spending=self.spending,
-            holder=self.kind_drafts,
-            policy_for=lambda workspace: self.request_policy(
-                workspace,
-                lambda: self.readonly_database.session(workspace),
-                released_places=no_place_released,
-            ),
-            workspaces=lambda: (
-                (frozenset() if self.tokens is None else self.tokens.workspaces)
-                | self.watched_workspaces()
-            ),
-        )
-
-    def build_world_draft_worker(self) -> WorldDraftWorker | None:
-        """The native world maker under durable job and spending authority."""
-        if not self.kinds_from_people or self.model_client is None or self.spending is None:
-            return None
-        from exulanica.api.world_draft_worker import WorldDraftWorker
-
-        return WorldDraftWorker(
-            self.database,
-            client=self.model_client,
-            spending=self.spending,
-            holder=self.kind_drafts,
-            store=self.store,
-            policy_for=lambda workspace: self.request_policy(
-                workspace,
-                lambda: self.readonly_database.session(workspace),
-                released_places=no_place_released,
-            ),
-            workspaces=lambda: (
-                (frozenset() if self.tokens is None else self.tokens.workspaces)
-                | self.watched_workspaces()
-            ),
-        )
-
-    def build_model_probe_worker(self) -> ModelProbeWorker | None:
-        if (
-            not self.runs_model_probe_worker
-            or not self.model_probe_workspaces
-            or self.model_client is None
-            or self.spending is None
-        ):
-            return None
-
-        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
-            return self.request_policy(
-                workspace_id,
-                lambda: self.readonly_database.session(workspace_id),
-                released_places=no_place_released,
-            )
-
-        return ModelProbeWorker(
-            self.database,
-            client=self.model_client,
-            spending=self.spending,
-            policy_for=policy_for,
-            workspaces=lambda: self.model_probe_workspaces,
-        )
-
-    def build_creature_worker(self) -> CreatureDraftWorker | None:
-        """What drafts the creatures of the listed workspaces, or None where this process has no
-        model client, no looks namespace or no such workspace. Each draft's requests carry the
-        workspace's rules, with no place's name released: a creature is not a use a place-name
-        right offers."""
-        if (
-            self.model_client is None
-            or self.content_stores is None
-            or not self.creature_workspaces
-            or not self.runs_creature_worker
-        ):
-            return None
-        readonly = self.readonly_database
-        looks = self.content_stores.looks
-        workspaces = self.creature_workspaces
-
-        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
-            return self.request_policy(
-                workspace_id,
-                lambda: readonly.session(workspace_id),
-                released_places=no_place_released,
-            )
-
-        from exulanica.api.reference_pictures import creature_picture_notes_authority
-
-        return CreatureDraftWorker(
-            self.database,
-            client=self.model_client,
-            policy_for=policy_for,
-            looks_for=looks.for_workspace,
-            workspaces=lambda: workspaces,
-            picture_notes_authority=creature_picture_notes_authority(
-                manifest=self.model_client.manifest,
-                offered_to=self.pictures_offered_to,
-            ),
-        )
-
-    def build_reference_worker(self) -> ReferenceWorker | None:
-        """What plays the reference jobs of the workspaces that may ask for web notes, or None
-        where this process has no model client, no durable spending, no such workspace or no
-        source configuration. Each job's requests carry the workspace's rules, with no place's
-        name released: a search is not a use a place-name right offers."""
-        if (
-            self.model_client is None
-            or self.spending is None
-            or not self.reference_workspaces
-            or self.reference_adapter_for is None
-            or not self.references_offered_here()
-        ):
-            return None
-        database = self.database
-        readonly = self.readonly_database
-        workspaces = self.reference_workspaces
-
-        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
-            # Saved names and rights are read on the read-only database, as a person's decisions
-            # read them.
-            return self.request_policy(
-                workspace_id,
-                lambda: readonly.session(workspace_id),
-                released_places=no_place_released,
-            )
-
-        return ReferenceWorker(
-            database,
-            client=self.model_client,
-            policy_for=policy_for,
-            spending=self.spending,
-            adapter_for=self.reference_adapter_for,
-            workspaces=lambda: workspaces,
-            # A person's own pictures are read only where pictures are turned on, from the
-            # read-only database as the request policy reads rights.
-            picture_source=(
-                reference_picture_source(readonly.session, self.store)
-                if self.picture_reading_here()
-                else None
-            ),
         )
 
     def model_host_refusal(
