@@ -294,17 +294,37 @@ class CountingVisionModel:
         )
 
 
-@pytest.fixture
-def workspace_id() -> uuid.UUID:
-    return uuid.uuid4()
+#: The namespace a test's own ids are drawn in. Any fixed value would do; changing it moves every
+#: test to another workspace and another world.
+_TEST_IDS = uuid.UUID("fc151cd9-e994-495a-a287-7961ccd4d42b")
+
+
+def node_uuid(request: pytest.FixtureRequest, what: str) -> uuid.UUID:
+    """An id of ``what`` that belongs to the requesting test.
+
+    Derived from the test's node id, which pytest states relative to the repository root, so it is
+    the same on every run, in every part and on every worker, and no two tests share it.
+    """
+    return uuid.uuid5(_TEST_IDS, f"{what}:{request.node.nodeid}")
 
 
 @pytest.fixture
-def saved_world_id() -> str:
-    """The id of ``saved_world``'s world: a fresh one, unless a test pins it (with
-    ``workspace_id``, which together name the world's society seed) by parametrizing both
-    directly."""
-    return f"world:authored:{uuid.uuid4()}"
+def workspace_id(request: pytest.FixtureRequest) -> uuid.UUID:
+    """This test's workspace (see :func:`node_uuid`).
+
+    A world's society seed is derived from its workspace and its id
+    (:func:`exulanica.world.society.world_society_seed`), so a random workspace gave a test other
+    people on every run, and a test that held for most of them failed for a few.
+    """
+    return node_uuid(request, "workspace")
+
+
+@pytest.fixture
+def saved_world_id(request: pytest.FixtureRequest) -> str:
+    """The id of ``saved_world``'s world: this test's own (see :func:`node_uuid`), unless a test
+    pins it (with ``workspace_id``, which together name the world's society seed) by
+    parametrizing both directly."""
+    return f"world:authored:{node_uuid(request, 'world')}"
 
 
 # ---------------------------------------------------------------------------------------
