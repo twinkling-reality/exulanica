@@ -1596,11 +1596,14 @@ together, so a version that does not belong to the named world reads as an unava
 rather than reaching another world's society.
 
 `GET /world/versions/{id}/society?places=true` adds `places` to a society with inputs: the input
-sequence and digest the current state consumed, its availability and reason, the walkable area and
-clearance, the targets an inhabitant can be directed to, and each object activity the input names
-as `authored_affordance_unreachable`. They are copied from that one authorised input; an input a
-later edit queued is not described until a step consumes it. Without the parameter the read is
-unchanged.
+sequence and digest the current state consumed, the authored edit that input was composed from
+(`authored_state`: the version's `edit_seq` and `delta_sha256`, null for an input that states
+none), its availability and reason, the walkable area and clearance, the targets an inhabitant can
+be directed to, and each object activity the input names as `authored_affordance_unreachable`. They
+are copied from that one authorised input; an input a later edit queued is not described until a
+step consumes it, so `authored_state` names the newest edit the current state has taken in, and a
+reader comparing it with the version's edit log knows which placed things the state has not seen
+since. Without the parameter the read is unchanged.
 
 The application supplies `society_initial_input(connection, session, version_id, place_id, region_id,
 engine)`, where `engine` is the engine the society is created with and says how a town's walking

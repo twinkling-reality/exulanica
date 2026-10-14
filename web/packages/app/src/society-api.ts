@@ -151,6 +151,12 @@ export interface SocietyWalkableArea {
 export interface SocietyPlaces {
   readonly inputSeq: number;
   readonly inputSha256: string;
+  /**
+   * The version's edit the consumed input was composed from (`authored_state.edit_seq`): the newest
+   * authored edit the current state has taken in. Null where the input states none; absent from a
+   * server that does not serve it.
+   */
+  readonly authoredEditSeq?: number | null;
   readonly available: boolean;
   readonly unavailableReason: string | null;
   readonly walkableArea: SocietyWalkableArea | null;
@@ -344,9 +350,18 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
       ...(destination['indoors'] === undefined ? {} : { indoors: destination['indoors'] }),
     })] as const;
   }));
+  const authored = places['authored_state'];
+  let authoredEditSeq: number | null | undefined;
+  if (authored === null) authoredEditSeq = null;
+  else if (authored !== undefined) {
+    const held = record(authored);
+    if (!integer(held['edit_seq']) || !digest(held['delta_sha256'])) throw new Error('Invalid society authored state');
+    authoredEditSeq = held['edit_seq'] as number;
+  }
   return Object.freeze({
     inputSeq: places['input_seq'] as number,
     inputSha256: places['input_sha256'] as string,
+    ...(authoredEditSeq === undefined ? {} : { authoredEditSeq }),
     available: places['availability'] === 'available',
     unavailableReason: places['unavailable_reason'] as string | null,
     walkableArea,
@@ -400,6 +415,16 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
   });
 }
 
+/**
+ * The state as drawn, with the authored edit its consumed input took in where the read's places
+ * state one (`authored_edit_seq`), so the drawing knows which of the version's edits this minute
+ * has not taken in yet. The read's, never the engine's: the state itself is unchanged.
+ */
+function withAuthoredEdit(state: OwnedSocietyState, places: SocietyPlaces | null): OwnedSocietyState {
+  const seq = places?.authoredEditSeq;
+  return typeof seq === 'number' ? Object.freeze({ ...state, authored_edit_seq: seq }) : state;
+}
+
 export function parseSociety(value: unknown): SocietySnapshot {
   const row = record(value);
   const state = record(row['state']);
@@ -422,7 +447,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
       societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
       ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
       populationSize: row['population_size'] as number, currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-      state: livingPresentation(row, state, places), places, presence: EVERYONE_HERE,
+      state: withAuthoredEdit(livingPresentation(row, state, places), places), places, presence: EVERYONE_HERE,
     });
   }
   const inhabitants = state['inhabitants'];
@@ -490,11 +515,12 @@ export function parseSociety(value: unknown): SocietySnapshot {
       row['input_seq'] !== state['input_seq'] || !digest(state['input_sha256']) ||
       row['input_sha256'] !== state['input_sha256'])) throw new Error('Invalid society branch or input');
   const walkBudgetsMm = walkBudgetsOf(row, ids);
+  const places = v2 ? placesOf(row) : null;
   return Object.freeze({
     societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
     ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
     populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-    state: state as unknown as OwnedSocietyState, places: v2 ? placesOf(row) : null, presence,
+    state: withAuthoredEdit(state as unknown as OwnedSocietyState, places), places, presence,
     ...(walkBudgetsMm === null ? {} : { walkBudgetsMm }),
   });
 }

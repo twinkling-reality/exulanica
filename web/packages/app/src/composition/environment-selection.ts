@@ -2770,7 +2770,7 @@ export function mountEnvironmentSelection(
       for (const thing of placed) {
         if (thing.gone === true && thing.kind.source === 'workspace') documentLabels.set(kindKey({ source: 'workspace', sha256: thing.kind.sha256 }), null);
       }
-      await things.setPlaced(placed);
+      await things.setPlaced(placed, current?.edits);
       if (deps.env.canvas) deps.env.canvas.dataset['thingsDrawn'] = String(things.layer.drawn.length);
       if (deps.env.canvas) deps.env.canvas.dataset['thingsMissed'] = String(things.misses.length);
     } catch (error) {

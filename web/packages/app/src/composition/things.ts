@@ -30,7 +30,7 @@ import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
 import { tokenBlock } from '../ui/system/token-values.js';
 import type { ThingLookChoice } from '../thing-looks-api.js';
-import type { PlacedThing } from '../world-objects-api.js';
+import type { PlacedThing, VersionEdit } from '../world-objects-api.js';
 
 export const THING_PICK_EVENT = 'exulanica:thing-pick';
 
@@ -77,8 +77,12 @@ export interface ThingsDependencies {
 }
 
 export interface MountedThings {
-  /** Stand the version's placed things; resolves when every one is drawn or named a miss. */
-  setPlaced(things: readonly PlacedThing[]): Promise<void>;
+  /**
+   * Stand the version's placed things; resolves when every one is drawn or named a miss. `edits`
+   * is the version's edit log, from which each thing's newest edit is read, so a society's minute
+   * that has not taken that edit in does not draw it as it was.
+   */
+  setPlaced(things: readonly PlacedThing[], edits?: readonly VersionEdit[]): Promise<void>;
   /** The nearest drawn thing a world ray meets, and how far along it. */
   pick(origin: readonly [number, number, number], direction: readonly [number, number, number]): { readonly pick: ThingPick; readonly distance: number } | null;
   /** Raise the pick event for `pick`, or for nothing with null. */
@@ -162,7 +166,7 @@ export function visitorsOf(state: OwnedSocietyState): ReadonlySet<string> {
   return new Set(state.inhabitants.filter((person) => person.came_by === 'crossed').map((person) => person.id));
 }
 
-export function placedThingRecord(thing: PlacedThing): PlacedThingRecord {
+export function placedThingRecord(thing: PlacedThing, editSeq?: number): PlacedThingRecord {
   return {
     thingId: thing.thingId,
     kind: thing.kind,
@@ -176,7 +180,18 @@ export function placedThingRecord(thing: PlacedThing): PlacedThingRecord {
     },
     removed: thing.removed,
     ...(thing.support === undefined ? {} : { support: thing.support }),
+    ...(editSeq === undefined ? {} : { editSeq }),
   };
+}
+
+/** Each thing's newest edit in a version's edit log, by placed id. */
+export function newestThingEdits(edits: readonly VersionEdit[]): ReadonlyMap<string, number> {
+  const newest = new Map<string, number>();
+  for (const edit of edits) {
+    if (edit.thingId == null) continue;
+    newest.set(edit.thingId, Math.max(newest.get(edit.thingId) ?? 0, edit.editSeq));
+  }
+  return newest;
 }
 
 export async function mountThings(deps: ThingsDependencies): Promise<MountedThings> {
@@ -215,7 +230,7 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
   /** The being the viewer plays, as last handed to the layer. */
   let played: string | null = null;
   return {
-    async setPlaced(things) {
+    async setPlaced(things, edits) {
       if (destroyed) return;
       placedYaw = new Map(things.map((thing) => [thing.thingId, thing.transform.yawMicroradians]));
       // A thing whose workspace kind is gone (its creature erased) is drawn nowhere, and what the
@@ -223,7 +238,8 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
       for (const thing of things) {
         if (thing.gone === true && thing.kind.source === 'workspace') void library.forgetHeldKind(thing.kind.sha256);
       }
-      await layer.setPlaced(things.filter((thing) => !thing.gone).map(placedThingRecord));
+      const newest = edits === undefined ? null : newestThingEdits(edits);
+      await layer.setPlaced(things.filter((thing) => !thing.gone).map((thing) => placedThingRecord(thing, newest?.get(thing.thingId))));
     },
     setSociety(state) {
       if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures, deps.walkEnded ?? (() => true), deps.leaving ?? (() => false));

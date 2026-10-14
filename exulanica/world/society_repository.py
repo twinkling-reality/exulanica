@@ -138,8 +138,11 @@ def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
 
     Read from the one input the state names, already authorized with it, and copied rather than
     derived: the targets an inhabitant can be directed to, each object activity the input says no
-    inhabitant can reach, and the area the society walks. A queued input that no step has consumed
-    yet is not described here, because nothing in the society has acted on it.
+    inhabitant can reach, the area the society walks, and the authored edit the input was composed
+    from (``authored_state``: the version's edit and digest; null for an input that states none),
+    so a reader knows which of the version's edits the current state has taken in. A queued input
+    that no step has consumed yet is not described here, because nothing in the society has acted
+    on it.
     """
     navigation = document["navigation"]
     living = document.get("living")
@@ -148,6 +151,14 @@ def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
     return {
         "input_seq": document["input_seq"],
         "input_sha256": document["document_sha256"],
+        "authored_state": (
+            None
+            if document.get("authored_state") is None
+            else {
+                "edit_seq": document["authored_state"]["edit_seq"],
+                "delta_sha256": document["authored_state"]["delta_sha256"],
+            }
+        ),
         "availability": document["availability"],
         "unavailable_reason": document["unavailable_reason"],
         "walkable_area": navigation.get("walkable_area"),

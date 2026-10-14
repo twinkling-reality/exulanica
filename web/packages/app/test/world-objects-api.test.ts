@@ -244,6 +244,18 @@ describe('the published version body, as the fixture publishes it', () => {
     expect(second!.pointMapInstanceId).toBeNull();
   });
 
+  it('reads which placed thing an edit named, none where it named none, and nothing where it was not served', () => {
+    const value = clone(FIXTURE) as { edits: Record<string, unknown>[] };
+    value.edits[0]!['thing_id'] = 'well:by-the-walk';
+    value.edits[1]!['thing_id'] = null;
+    const [first, second, third] = parseVersion(value).edits;
+    expect(first!.thingId).toBe('well:by-the-walk');
+    expect(second!.thingId).toBeNull();
+    expect(third!.thingId).toBeUndefined();
+    value.edits[0]!['thing_id'] = 7;
+    expect(() => parseVersion(value)).toThrow();
+  });
+
   it('leaves the next undoable edit computable: the newest no undo already names', () => {
     const version = parseVersion(FIXTURE);
     const undone = new Set(version.edits.flatMap((e) => (e.undoneEditId === null ? [] : [e.undoneEditId])));

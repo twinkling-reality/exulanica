@@ -203,6 +203,8 @@ export interface VersionEdit {
   readonly elementId: string | null;
   readonly environmentInstanceId?: string | null;
   readonly pointMapInstanceId?: string | null;
+  /** The placed thing the edit names, where it names one; absent from a server that does not serve it. */
+  readonly thingId?: string | null;
   readonly undoneEditId: string | null;
   readonly baseStateSha256: string;
   readonly resultStateSha256: string;
@@ -1062,6 +1064,7 @@ function parseEdit(value: unknown): VersionEdit {
     pointMapInstanceId: optionalText(
       row['point_map_instance_id'], 'version edit point map instance',
     ),
+    ...(row['thing_id'] === undefined ? {} : { thingId: optionalText(row['thing_id'], 'version edit thing') }),
     undoneEditId: optionalText(row['undone_edit_id'], 'version edit undone id'),
     baseStateSha256: digest(row['base_state_sha256'], 'version edit base hash'),
     resultStateSha256: digest(row['result_state_sha256'], 'version edit result hash'),

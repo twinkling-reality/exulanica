@@ -194,6 +194,12 @@ export interface OwnedSocietyState {
   readonly things?: readonly SocietyThingSnapshot[];
   /** v7: the ability modules its first input recorded, such as `exulanica-ability/hands/v1`. */
   readonly modules?: readonly string[];
+  /**
+   * The newest authored edit this state has taken in, as the society read's places state it (the
+   * consumed input's `authored_state.edit_seq`), not a field of the engine's state; absent where
+   * the read states none. A thing edited after it is drawn as its version puts it.
+   */
+  readonly authored_edit_seq?: number;
 }
 
 export type CrowdDetail = 'near' | 'far';

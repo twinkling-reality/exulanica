@@ -13,9 +13,11 @@
  * and its reason is kept by name in `misses`, never stood in for.
  *
  * A thing an edit moved, placed or brought back stands where its version now puts it, not where the
- * society's minute last saw it, while the minutes drawn still show it as it was before the edit: a
- * paused world shows an edit at once, and a minute that took the edit in (it lists the thing at its
- * new place, in a hand, or anywhere else it has gone since) draws it again. An editor may draw a
+ * society's minute last saw it, while the minute drawn has not taken that edit in: where the society
+ * read states the newest edit its minute took in (`authored_edit_seq`) and the record its newest
+ * edit (`editSeq`), by those, also after a reload; otherwise while the minutes drawn still show it
+ * as it was before an edit made on this page. A paused world shows an edit at once, and a minute
+ * that took the edit in draws it again. An editor may draw a
  * see-through copy of a placed thing where it would go (`setGhost`), tinted where the world refused
  * that spot.
  *
@@ -85,6 +87,8 @@ export interface PlacedThingRecord {
   };
   readonly removed: boolean;
   readonly support?: PlacedThingSupportReference;
+  /** The version's newest edit naming this thing, where the version's edit log was read. */
+  readonly editSeq?: number;
 }
 
 /**
@@ -218,6 +222,8 @@ export class ThingLayer {
    * newest edit in.
    */
   private readonly edited = new Map<string, Array<readonly [number, number]>>();
+  /** The newest authored edit the society's minute drawn has taken in, where its read states it. */
+  private societyEdit: number | null = null;
   /** Whether the version's things were stood once: later new ones are an edit's. */
   private placedOnce = false;
   /** Play this one: the being played, ringed where its feet are drawn, and where its next walk goes. */
@@ -555,6 +561,7 @@ export class ThingLayer {
     leaving: (subjectId: string) => boolean = () => false,
   ): void {
     this.settleEdits(state);
+    this.societyEdit = state?.things === undefined ? null : state.authored_edit_seq ?? null;
     if (state?.things === undefined) {
       this.society = null;
       this.shown.clear();
@@ -606,6 +613,16 @@ export class ThingLayer {
       if (at != null && !current && replaced.some(([east, south]) => at[0] === east && at[1] === south)) continue;
       this.edited.delete(id);
     }
+  }
+
+  /** Whether the thing's newest edit is one the society's minute drawn has not taken in, by the read's word. */
+  private unseen(entry: Entry): boolean {
+    return this.societyEdit !== null && entry.record.editSeq !== undefined && entry.record.editSeq > this.societyEdit;
+  }
+
+  /** Whether an edit is drawn as its version says rather than as the society's minute has it. */
+  private editedNow(entry: Entry): boolean {
+    return this.edited.has(entry.record.thingId) || this.unseen(entry);
   }
 
   /** Where the drawing stands a thing now (east and south, millimetres): the society's place, else its version's. */
@@ -679,7 +696,7 @@ export class ThingLayer {
       const society = this.society;
       // An object an edit moved, placed or brought back stands as its version says until a later
       // minute lists it; a being is the crowd's to draw.
-      const edited = society !== null && this.edited.has(entry.record.thingId) && !society.beings.has(entry.record.thingId);
+      const edited = society !== null && this.editedNow(entry) && !society.beings.has(entry.record.thingId);
       const thing = society === null || edited ? undefined : this.shown.get(entry.record.thingId);
       const holder = thing?.held_by == null || thing.socket == null ? null : { subjectId: thing.held_by, socket: thing.socket };
       const holderFigure = holder === null ? null : society?.figures?.figureOf(holder.subjectId) ?? null;
@@ -758,7 +775,8 @@ export class ThingLayer {
     }
     const t = entry.record.transform;
     // Where a society runs, an object stands at the state's plan point, turned by the state's yaw.
-    const thing = this.society === null || entry.record.support !== undefined || this.edited.has(entry.record.thingId)
+    const thing = this.society === null || entry.record.support !== undefined
+      || (this.editedNow(entry) && !this.society.beings.has(entry.record.thingId))
       ? undefined : this.shown.get(entry.record.thingId);
     // A society's thing stands its height above the ground under it: on land, the land's.
     const ground = thing?.position_mm == null ? undefined : this.options.society?.()?.groundHeightAt;

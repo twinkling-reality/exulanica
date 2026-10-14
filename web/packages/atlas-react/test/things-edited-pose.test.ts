@@ -167,6 +167,43 @@ describe('an edit made while the minute stands still is drawn at once', () => {
   });
 });
 
+describe('a fresh page, where the society read states the edit its minute took in', () => {
+  const stated = (tick: number, things: readonly SocietyThingSnapshot[], edit: number): OwnedSocietyState =>
+    ({ ...minute(tick, things), authored_edit_seq: edit });
+
+  it('draws a thing whose newest edit the minute has not taken in as its version says, until it has', async () => {
+    const { served, layer } = setup();
+    await layer.setPlaced([{ ...well(served, 6000), editSeq: 5 }]);
+    await until(() => layer.figureOf('well') !== null, 'the well\'s figure');
+    layer.setSociety(stated(9, [listed(2000)], 4), null);
+    step(layer);
+    expect(eastOf(layer)).toBeCloseTo(6, 6);
+    layer.setSociety(stated(10, [listed(6000)], 5), null);
+    layer.setSociety(stated(11, [listed(5000)], 5), null);
+    step(layer);
+    expect(eastOf(layer)).toBeCloseTo(5, 6);
+  });
+
+  it('draws a thing as the society has it where the minute took its newest edit in', async () => {
+    const { served, layer } = setup();
+    await layer.setPlaced([{ ...well(served, 6000), editSeq: 4 }]);
+    await until(() => layer.figureOf('well') !== null, 'the well\'s figure');
+    layer.setSociety(stated(9, [listed(2000)], 4), null);
+    step(layer);
+    expect(eastOf(layer)).toBeCloseTo(2, 6);
+  });
+
+  it('draws a thing placed after the minute even though the minute does not list it', async () => {
+    const { served, layer } = setup();
+    await layer.setPlaced([{ ...well(served, 6000), editSeq: 7 }]);
+    await until(() => layer.figureOf('well') !== null, 'the well\'s figure');
+    layer.setSociety(stated(9, [], 6), null);
+    step(layer);
+    expect(layer.figureOf('well')!.root.enabled).toBe(true);
+    expect(eastOf(layer)).toBeCloseTo(6, 6);
+  });
+});
+
 describe('an editor\'s see-through copy of a placed thing', () => {
   it('stands apart from the thing, is never picked, and goes when asked', async () => {
     const { layer, region } = await drawnWell();

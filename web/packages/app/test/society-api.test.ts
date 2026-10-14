@@ -308,6 +308,39 @@ describe('what a town\'s place calls a premises, on a society of things\' input'
   });
 });
 
+describe('the authored edit a society\'s minute took in', () => {
+  const read = (authored?: unknown) => parseSociety({
+    society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'p', population_size: 2,
+    current_tick: 9, state_sha256: '9'.repeat(64), input_seq: 3, input_sha256: 'b'.repeat(64),
+    state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick: 9, input_seq: 3,
+      input_sha256: 'b'.repeat(64), inhabitants: [] },
+    places: {
+      input_seq: 3, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
+      walkable_area: null, clearance_mm: 450, targets: [], unavailable_affordances: [],
+      ...(authored === undefined ? {} : { authored_state: authored }),
+    },
+  });
+
+  it('carries the edit the consumed input was composed from to the state the drawing reads', () => {
+    const parsed = read({ edit_seq: 14, delta_sha256: 'd'.repeat(64) });
+    expect(parsed.places?.authoredEditSeq).toBe(14);
+    expect(parsed.state.authored_edit_seq).toBe(14);
+  });
+
+  it('carries nothing from a read that states none, or from an older server', () => {
+    expect(read(null).places?.authoredEditSeq).toBeNull();
+    expect(read(null).state.authored_edit_seq).toBeUndefined();
+    expect(read().places?.authoredEditSeq).toBeUndefined();
+    expect(read().state.authored_edit_seq).toBeUndefined();
+  });
+
+  it('refuses an authored edit that is not one', () => {
+    for (const bad of [{ edit_seq: -1, delta_sha256: 'd'.repeat(64) }, { edit_seq: 2, delta_sha256: 'short' }, 'edit 2']) {
+      expect(() => read(bad)).toThrow(/Invalid society/);
+    }
+  });
+});
+
 describe('the walk budgets a society of things is served beside its state', () => {
   const being = {
     id: 'creature', synthetic: true, position_mm: [1000, 2000], motion_path_mm: [[1000, 2000]], display_name: 'Creature',
