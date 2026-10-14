@@ -42,6 +42,7 @@ from exulanica.world.society_model_decisions import model_goal_policies
 from exulanica.world.society_planner import advance_purposeful_society
 
 import test_society_stay_requests_api as stays
+from living_session_support import open_for_saved_world
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_society_saved_world_api import OWNER, routes
 
@@ -216,6 +217,7 @@ def test_the_host_stores_and_the_minute_applies_exactly_what_the_person_role_bui
             manifest=manifest,
             contract=contract,
         )
+    open_for_saved_world(services, world)
     host = _host(world, services, manifest, _Scripted())
     # The same answers, asked in memory of the same model through a client of its own.
     asking = _client(manifest, _Scripted()).with_policy(RecordingPolicy())

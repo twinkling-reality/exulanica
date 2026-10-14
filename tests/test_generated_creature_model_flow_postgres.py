@@ -32,6 +32,7 @@ from exulanica.world.model_probe_worker import ModelProbeWorker
 from exulanica.world.thing_store import ThingStore
 from scripts.things.author_surfaces import assemble_authored
 
+from living_session_support import LIMITS
 from model_fakes import chat_body
 from personal_world_support import OWNER_TOKEN, STRANGER_TOKEN
 from spending_support import WorkspacePolicy, spending_client
@@ -102,8 +103,21 @@ def _configured(api, control_path, mode):
 
 
 def _minute(api, worker, society, control, workspace):
+    """One minute as a living session plays it: opened (which plays the society) and paused (which
+    closes it). A model is asked only inside a session."""
     before = api.get(society).json()
-    _configured(api, control, "playing")
+    read = api.get(control).json()
+    opened = api.post(
+        control.replace("/control?", "/control/sessions?"),
+        {
+            "request_id": str(uuid.uuid4()),
+            "base_revision": read["revision"],
+            "base_tick": read["current_tick"],
+            "base_state_sha256": read["state_sha256"],
+            "limits": LIMITS,
+        },
+    )
+    assert opened.status_code == 201, opened.text
     until = time.monotonic() + 10
     while (result := worker.run_once(workspace)) is None:
         assert time.monotonic() < until, "the configured playback minute never became due"

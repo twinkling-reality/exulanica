@@ -38,12 +38,14 @@ on the society route that commits a world to a model: the choice of the model th
 person (``POST .../society/models``). That recorded choice is the authorization for the spend it
 causes, so the door's grant route asks for it too when a grant names the mind a gate's travellers
 get (``POST /door/grants`` with a ``traveller``), checked by the route because the body decides it.
-The host's playback asks the chosen model for a listed workspace whoever plays the world,
-so a token holding ``world.write`` without ``model.invoke`` may start spending by playing a world
-whose owner chose a model (``PUT .../society/control``), always within the world's budget for
-its minds in any hour (the decision contract's two figures until a person sets another, lower or
-higher: ``POST .../models/{role_key}/budget``) and the share of the process's budget it keeps for
-other work.
+The host's playback asks a chosen model only while the world has an open living session, and
+opening one takes ``model.invoke`` beside ``world.write`` (``POST .../society/control/sessions``):
+it commits the world to asking within the session's limits. Playing a world
+(``PUT .../society/control``) with ``world.write`` alone asks no model, except that a guest's Play
+opens a session for the guest, held to the guest's own grant. Every ask stays within the world's
+budget for its minds in any hour (the decision contract's two figures until a person sets another,
+lower or higher: ``POST .../models/{role_key}/budget``) and the share of the process's budget it
+keeps for other work.
 ``tiles.materialise`` meters a route against :mod:`exulanica.api.quotas` by being declared on it,
 and declaring it is the only way a route is metered. Three routes hold it: the two ``/tiles``
 reads, which serve bytes an offline bake already made, and ``POST /world-generation/worlds``,

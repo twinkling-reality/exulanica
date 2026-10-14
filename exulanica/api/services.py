@@ -600,7 +600,8 @@ class Services:
 
     def decision_host(self) -> DecisionHost | None:
         """What asks the models a society's owner chose before a minute, for every role its engine
-        hosts, or None without a society runtime.
+        hosts, or None without a society runtime. A model is asked only for a society with an open
+        living session, each ask under the session's own bound where spending is durable.
 
         The workspaces this host's environment lists are asked for, and, where
         :attr:`discovers_model_workspaces`, the ones account discovery watches; any other workspace
@@ -620,6 +621,7 @@ class Services:
             external=None if self.door is None else self.door.asker(),
             discovered=self.watched_workspaces if self.discovers_model_workspaces else None,
             spending_refusals=self.spending_refusals if self.spending is not None else None,
+            spending=self.spending,
             binding_source=self.workspace_execution_source
             if self.admits_workspace_models
             else None,

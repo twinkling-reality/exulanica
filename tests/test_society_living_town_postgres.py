@@ -21,6 +21,7 @@ from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.world_recipes import CANDIDATES_MAXIMUM
 
 import test_world_objects_api as object_helpers
+from living_session_support import open_living_session
 from society_living_fixtures import grid_input
 from test_society_made_world import _place
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -460,6 +461,14 @@ def test_the_decision_host_asks_a_chosen_model_for_a_town_person(made):
             manifest=manifest,
             contract=decision_contract(),
         )
+    open_living_session(
+        services.database,
+        services.society_runtime,
+        workspace,
+        entry["world_id"],
+        version_id,
+        api.actor,
+    )
     transport = _Chooser()
     host = DecisionHost(
         database=services.database,

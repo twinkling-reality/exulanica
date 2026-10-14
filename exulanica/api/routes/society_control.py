@@ -12,7 +12,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
-from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.dependencies import CurrentSession, ScopedConnection, holds_as_guest
 from exulanica.api.society_control_worker import HOST_PLAYBACK_REFUSALS, host_playback_refusal
 from exulanica.api.world_scope import WorldId
 from exulanica.selection.validation import Session
@@ -348,16 +348,16 @@ def configure_control(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    return call(
-        lambda: with_host_playback(
-            repository(connection, session, request, world_id).configure(
-                version_id, actor=session.actor, **body.model_dump()
-            ),
-            request,
-            session.workspace_id,
-            connection,
-        )
-    )
+    def configure() -> dict:
+        controls = repository(connection, session, request, world_id)
+        # A guest's Play opens a living session where none is open, so the models the world's
+        # owner chose are asked within the guest's grant; anyone else opens one by its route.
+        if body.mode == "playing" and holds_as_guest(request):
+            fields = body.model_dump(exclude={"mode"})
+            return controls.play_with_session(version_id, actor=session.actor, **fields)
+        return controls.configure(version_id, actor=session.actor, **body.model_dump())
+
+    return call(lambda: with_host_playback(configure(), request, session.workspace_id, connection))
 
 
 @router.post("/steps")

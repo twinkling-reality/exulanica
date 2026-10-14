@@ -48,7 +48,14 @@ admission:
   cancelled (`exulanica/api/comparison_spending.py`,
   [comparisons](society-experiments.md#running-a-comparison)). A start whose bound or calls the
   grant has not left room for is refused before anything is written; it is never given a smaller
-  bound. Whole-world drafts also open provider bounds under their accepted operation sheet.
+  bound. Whole-world drafts also open provider bounds under their accepted operation sheet. An open
+  [living session](synthetic-society-contract.md#living-sessions) opens one for each provider its
+  host asks, the first time it asks it, keyed `living-session:<session id>:<provider>` and found
+  again by that key every minute after. Its ceiling, calls and validity are each the lower of the
+  session's own limit and what the grant has left, so it never asks the authority for more than the
+  grant holds; a provider whose grant is not live, or has nothing left, is refused before anything
+  is sent (`exulanica/api/session_spending.py`). The host asks a society's chosen models only
+  inside an open session.
 - **Providers that bill.** Every level names a provider that bills: one that takes a credential
   (`Manifest.billing_providers`). A provider on this computer, an Ollama server that takes no
   credential and whose every model the manifest prices at 0, bills nothing: no authority, grant,
@@ -164,9 +171,11 @@ The reference worker and the creature-draft worker admit inside `spending_reques
 job id (`exulanica/references/worker.py`, `exulanica/selection/creature_drafts.py`). An attempt
 with no enclosing key is admitted under a fresh `auto:` key from `next_request_key` in
 `exulanica/models/spending.py`. A request those two workers replay after a crash is the same
-attempts. A request with no enclosing key can be sent, and billed, twice. The API, the decision
-host, and comparisons do not pass a request key
-([section 12](#12-what-this-does-not-provide)).
+attempts. The decision host asks every model inside `spending_request_key("decision:<request id>")`,
+set in the thread that asks, so a decision request asked again after a crash is admitted as the same
+attempts and one that may already have been sent is refused, not sent again; its receipt records no
+answer (`spending_unavailable`). A request with no enclosing key can be sent, and billed, twice. The
+API and comparisons do not pass a request key ([section 12](#12-what-this-does-not-provide)).
 
 | An attempt with the key is | Asking again |
 | --- | --- |
@@ -402,9 +411,9 @@ taken effect, so asking again would repeat the step.
   under the same key starts it at zero, still inside its grant and authority, which are carried. A
   restore that lost no ledger step needs no reconciliation, so a bound closed after its backup is
   open again unless a sealed restore checkpoint carried the closure; what it committed is accurate.
-- OPEN. Deduplicating a replayed request is delivered for the reference worker and the
-  creature-draft worker, each keyed by job id. No committed API, decision-host, or comparison
-  path passes `spending_request_key`. A request those paths replay after a crash is admitted as
+- OPEN. Deduplicating a replayed request is delivered for the reference worker, the
+  creature-draft worker, each keyed by job id, and the decision host, keyed by decision request
+  (section 4). No committed API or comparison path passes `spending_request_key`. A request those paths replay after a crash is admitted as
   new attempts, within the allowance, and may be sent and billed again (section 4). Comparisons,
   which open durable bounds (section 2), pass no request key either: a takeover's replayed ask
   is admitted as a new attempt, within the comparison's bound.

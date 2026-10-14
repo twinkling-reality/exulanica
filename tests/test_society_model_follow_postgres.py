@@ -23,6 +23,7 @@ from exulanica.world.society_planner import held_nodes, input_graph, open_ground
 from exulanica.world.thing_store import ThingStore
 
 from creature_support import form_of
+from living_session_support import open_living_session
 from test_site_society_of_things_postgres import FARM, V7, _input, _place, _site, _step
 from test_society_made_kinds import BY
 from test_society_made_world import made as made
@@ -111,6 +112,14 @@ def test_generated_model_pursuit_survives_unasked_minutes_and_cold_replay(
         },
     )
     assert chosen.status_code == 200, chosen.text
+    open_living_session(
+        services.database,
+        services.society_runtime,
+        workspace,
+        entry["world_id"],
+        uuid.UUID(str(version)),
+        api.actor,
+    )
     host = _host({"workspace": workspace}, client, services, manifest)
 
     def minute(before):

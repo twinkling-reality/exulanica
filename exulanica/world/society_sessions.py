@@ -83,6 +83,7 @@ def session_limits(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 _OPENED_FIELDS: Final = (
     "request_id",
+    "reason",
     "opened_by",
     "limits",
     "start_tick",
@@ -106,7 +107,7 @@ def _view(opened: Mapping[str, Any], closed: Mapping[str, Any] | None) -> dict[s
         "state": "open" if closed is None else "closed",
         "opened": {
             "event_seq": opened["event_seq"],
-            **{key: opened[key] for key in _OPENED_FIELDS},
+            **{key: opened.get(key) for key in _OPENED_FIELDS},
         },
         "closed": None
         if closed is None

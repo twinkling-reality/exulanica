@@ -723,7 +723,15 @@ workspaces its environment lists (`EXULANICA_SOCIETY_CONTROL_WORKSPACES`) and, w
 durable and account discovery is on, for the account workspaces it plays, each ask admitted against
 the workspace's own grant ([deployment](deployment.md#515-society-playback)). A workspace the
 worker plays through discovery under process spending is asked nothing (`models_not_run_here`).
-In order:
+
+A model is asked only while the society has an open
+[living session](synthetic-society-contract.md#living-sessions). Without one, every being a model
+was chosen for decides by its routine and nothing is reserved for it; beings people play and outside
+programs under a door grant are answered as before. Inside one, where spending is durable, every
+attempt is admitted under the session's own bound of its provider
+(`exulanica/api/session_spending.py`), and every ask is made under its request's key,
+`decision:<request_id>`, so a request asked again after a crash cannot send a call twice: the
+authority's duplicate refusal records no answer (`spending_unavailable`). In order:
 
 1. **Close what an earlier host left open.** A request reserved in the last four minutes with no
    receipt, left by a host that stopped between reserving and recording, is closed as

@@ -1261,11 +1261,13 @@ role (`EXULANICA_SOCIETY_CONTROL_WORKER`); `docs/deployment.md` lists the settin
 refusals. With `EXULANICA_PLAYBACK_WORKER=process` the API starts none, and
 `exulanica-playback-worker` plays those workspaces in a process of its own. Account-wide discovery is off by default and refuses startup without configured
 accounts and the reviewed current-input runtime. The worker asks a model only in the decision
-phase before a minute of a purposeful society whose owner chose one for someone, and only for a
-workspace its environment lists or, where discovery is on and spending is durable, one discovery
-watches: an owner's, or a guest's while the guest is there and holds a playing place
-([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)). Each ask is
-admitted against that workspace's own grant.
+phase before a minute of a purposeful society whose owner chose one for someone, only while that
+society has an open [living session](#living-sessions), and only for a workspace its environment
+lists or, where discovery is on and spending is durable, one discovery watches: an owner's, or a
+guest's while the guest is there and holds a playing place
+([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)). A society
+playing without a session is played by its people's routines. Each ask of a session is admitted
+under the session's own bound of its provider, within that workspace's own grant.
 
 The authenticated base route is `/world/versions/{version_id}/society/control`:
 
@@ -1489,6 +1491,18 @@ Under the base route, `/sessions`:
 
 Each answer is `exulanica.society-session/v1`: `{session_id, state: "open" | "closed", opened,
 closed}`, the opening and closing receipts' fields with their event sequence numbers.
+
+A model is asked for a society's beings only while it has an open session
+([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)). A society
+playing without one, as every listed or discovered workspace's world did before sessions, is
+played by its people's routines; beings people play and outside programs under a door grant are
+asked as before, since neither is a model the host pays for. The opening receipt records why it
+opened (`reason`): `opened_by_person` through the route, `guest_pressed_play` when a guest's Play
+(`PUT` with `playing`, from a guest's browser session) found the society paused with no session
+open. A guest's session is opened by the guest's own actor, at the society's current tick and
+digest, with limits at `SESSION_MAXIMA`; what it may spend is held to the guest's grant, as every
+session's bound is held to its grant
+([model spending](model-spending-contract.md#2-authorities-grants-and-bounds)).
 
 ### Server integration and HTTP
 

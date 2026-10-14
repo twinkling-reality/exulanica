@@ -70,6 +70,7 @@ from exulanica.world.society_repository import SocietyRepository
 from psycopg.types.json import Jsonb
 
 import test_society_stay_requests_api as stays
+from living_session_support import open_for_saved_world
 from model_fakes import FakeTransport, as_hosted_deployment, chat_body, hosted_only
 from test_society_saved_world_api import OWNER, TOKEN, routes
 from tests_support_api import EVERY_PERMISSION
@@ -173,9 +174,14 @@ def _claim(world, snapshot) -> ControlClaim:
     )
 
 
-def _choose(services, world, people, model, *, manifest, key=None) -> dict[str, Any]:
+def _choose(
+    services, world, people, model, *, manifest, key=None, open_session=True
+) -> dict[str, Any]:
+    """Choose ``model`` for ``people``, and open a living session where none is open: the host
+    asks a chosen model only inside one. A test of sessions themselves opens its own
+    (``open_session=False``)."""
     with services.database.session(world["workspace"]) as connection:
-        return SocietyModelChoiceRepository(
+        chosen = SocietyModelChoiceRepository(
             connection, world["workspace"], world_id=world["binding"].world_id
         ).record_choice(
             world["binding"].version_id,
@@ -187,6 +193,9 @@ def _choose(services, world, people, model, *, manifest, key=None) -> dict[str, 
             manifest=manifest,
             contract=decision_contract(),
         )
+    if open_session:
+        open_for_saved_world(services, world)
+    return chosen
 
 
 def _requests(services, world, snapshot) -> int:

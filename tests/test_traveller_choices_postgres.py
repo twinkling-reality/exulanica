@@ -38,6 +38,7 @@ import test_society_person_decisions_postgres as decisions
 import test_society_stay_requests_api as stays
 import test_society_things_postgres as things_api
 import things_society_support as things_support
+from living_session_support import open_for_saved_world
 from test_society_lines_postgres import _Speaker
 from test_society_saved_world_api import OWNER, routes
 
@@ -161,6 +162,7 @@ def test_a_gate_s_travellers_get_the_mind_its_owner_named(app):
         )
     # The host asks the gate's model for the visitor the world decides for, and asks nobody for
     # the one its program decides for (no door here).
+    open_for_saved_world(services, world)
     transport = _Speaker()
     host = decisions._host(world, decisions._client(manifest, transport), services, manifest)
     for _ in range(10):

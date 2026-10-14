@@ -22,6 +22,7 @@ reachable from a route.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import logging
 import threading
 import time
@@ -37,6 +38,7 @@ from typing import Any, Final, TypeVar
 import psycopg
 
 from exulanica.api.external_asking import REFUSALS_BEFORE_ASKING, ExternalAsker
+from exulanica.api.session_spending import SessionGate
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
 from exulanica.epistemics.saved_names import SavedName, recognised_spans, saved_names
@@ -56,10 +58,11 @@ from exulanica.models.errors import (
 from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy, NoHostedRequestPolicy
-from exulanica.models.spending import SpendingRefused
+from exulanica.models.spending import SpendingRefused, spending_request_key
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
+from exulanica.spending import DurableSpending
 from exulanica.spending.status import SpendingRefusals
 from exulanica.things.lines import LineRefused, check_line
 from exulanica.world.deciders import arrival_deciders, check_external_config, is_played
@@ -73,6 +76,7 @@ from exulanica.world.decision_roles import (
 from exulanica.world.minds_budget import MindsBudget, MindsBudgetRepository, default_budget
 from exulanica.world.role_decisions import check_role_result, names_its_listener
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
+from exulanica.world.society_control_repository import open_session_receipt
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_model_choice_repository import (
@@ -161,8 +165,8 @@ def _failure_reason(exc: BaseException) -> str:
         # admit; the failed call remains unavailable and its attempt evidence stays recorded.
         return exc.reason if exc.reason in GENERIC_REASONS else "model_call_failed"
     if isinstance(exc, SpendingRefused):
-        # The durable authority's own reason. The host asks under no request key, so an
-        # idempotency refusal cannot reach here; it would still be named for what it is not.
+        # The durable authority's own reason. An idempotency refusal (a request asked again whose
+        # attempt may already have been sent) is not one a receipt names: it records no answer.
         return exc.reason if exc.reason in GENERIC_REASONS else "spending_unavailable"
     if isinstance(exc, BudgetShareExceeded):
         return "process_share_spent"
@@ -631,6 +635,25 @@ class OutsideAsk:
         return min(now + self.deadline_ms / 1000, self.latest)
 
 
+def _keyed(answer: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    """``answer`` with every attempt admitted under its request's own key
+    (``decision:<request_id>``), so the same request asked again after a crash is admitted as the
+    same attempts, and the authority refuses an attempt that may already have been sent rather
+    than sending it twice. The key is set in the thread that asks, because a worker thread does not
+    inherit it. A request that names no id (none a role stores) is admitted under fresh keys."""
+
+    @functools.wraps(answer)
+    def keyed(client: ModelClient, asked: RoleAsk, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        request_id = asked.request.get("request_id")
+        if not isinstance(request_id, str):
+            return answer(client, asked, *args, **kwargs)
+        with spending_request_key(f"decision:{request_id}"):
+            return answer(client, asked, *args, **kwargs)
+
+    return keyed
+
+
+@_keyed
 def ask(
     client: ModelClient,
     asked: RoleAsk,
@@ -894,6 +917,10 @@ class DecisionHost:
     binding_source: (
         Callable[[uuid.UUID, str, frozenset[str]], tuple[ModelClient, Manifest, str] | None] | None
     ) = None
+    #: The durable spending authority, where the host spends durably: each open living session's
+    #: asks are then admitted under the session's own bounds
+    #: (:mod:`exulanica.api.session_spending`).
+    spending: DurableSpending | None = None
 
     def before_minute(self, claim: ControlClaim, lease_ends: float) -> bool:
         """Ask every chosen subject at a choice point; True when the coming minute runs alone.
@@ -954,6 +981,10 @@ class DecisionHost:
             row = society._row(claim.version_id)
             if row is None:
                 return False
+            # A model is asked only inside an open living session: without one, every being a
+            # model was chosen for decides by its routine. Beings people play and outside programs
+            # are not models the host pays for, and are asked as before.
+            session_open = open_session_receipt(connection, claim.workspace_id, row["society_id"])
             chosen_roles = []
             choice_repository = SocietyModelChoiceRepository(
                 connection, claim.workspace_id, world_id=claim.world_id
@@ -964,7 +995,11 @@ class DecisionHost:
                 terms = role.terms(row["engine_version"])
                 contract = role.contract(terms.versions)
                 choices = choice_repository.deciding(claim.version_id, role, contract)
-                chosen = {subject: c for subject, c in choices.items() if c["model"]}
+                chosen = (
+                    {subject: c for subject, c in choices.items() if c["model"]}
+                    if session_open is not None
+                    else {}
+                )
                 # A being a person plays is answered from what its person posted, never asked.
                 played = {subject: c for subject, c in choices.items() if is_played(c["decider"])}
                 outside = {
@@ -1046,6 +1081,16 @@ class DecisionHost:
                 if client is None or not planned
                 else client.with_policy(self.policy_for(claim.workspace_id))
             )
+            if asking is not None and self.spending is not None and session_open is not None:
+                # Every attempt under the open session's own bound of its provider.
+                asking = asking.with_spending(
+                    SessionGate(
+                        self.spending,
+                        claim.workspace_id,
+                        session_open,
+                        lambda: self.database.session(claim.workspace_id),
+                    )
+                )
             # Outside programs' requests are reserved first, each door's statement waited for no
             # later than its role's asks may end, so no door's time is taken from a model's ask
             # window, which is set after its own reservation below.

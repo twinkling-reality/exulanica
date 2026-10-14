@@ -38,6 +38,7 @@ from exulanica.world.society_repository import SocietyInputBehind, SocietyReposi
 from exulanica.world.society_sessions import (
     SESSION_CLOSED,
     SESSION_KINDS,
+    SESSION_MAXIMA,
     SESSION_OPENED,
     SessionRefused,
     session_limits,
@@ -86,6 +87,37 @@ class _RoundInputs:
         with inputs_ahead(connection, [document for _, document in once.values()]):
             for actor, document in once.values():
                 authorizer(actor, document)
+
+
+def _verified_receipt(row: dict) -> dict:
+    """A stored playback receipt, its digest checked against the row and its own contents."""
+    doc = row["document"]
+    digest = society_state_sha256({k: v for k, v in doc.items() if k != "document_sha256"})
+    if digest != row["document_sha256"] or digest != doc["document_sha256"]:
+        raise ValueError("control receipt digest mismatch")
+    return doc
+
+
+def open_session_receipt(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, society_id: uuid.UUID
+) -> dict | None:
+    """The society's open living session's opening receipt, or None while none is open: its newest
+    session receipt, where that one opened a session. Read on a connection scoped to the
+    workspace; the host reads it before each minute to know whether it may ask a model."""
+    row = (
+        connection.cursor(row_factory=dict_row)
+        .execute(
+            "select document,document_sha256 from world_society_control_event "
+            "where workspace_id=%s and society_id=%s and document->>'kind' in (%s,%s) "
+            "order by event_seq desc limit 1",
+            (workspace_id, society_id, *SESSION_KINDS),
+        )
+        .fetchone()
+    )
+    if row is None:
+        return None
+    doc = _verified_receipt(row)
+    return doc if doc["kind"] == SESSION_OPENED else None
 
 
 def _refuse_untold(_version_id: uuid.UUID) -> None:
@@ -225,14 +257,7 @@ class SocietyControlRepository:
         )
         return document
 
-    @staticmethod
-    def _verified(row: dict) -> dict:
-        """A stored receipt, its digest checked against the row and its own contents."""
-        doc = row["document"]
-        digest = society_state_sha256({k: v for k, v in doc.items() if k != "document_sha256"})
-        if digest != row["document_sha256"] or digest != doc["document_sha256"]:
-            raise ValueError("control receipt digest mismatch")
-        return doc
+    _verified = staticmethod(_verified_receipt)
 
     def _session_receipts(self, society_id: uuid.UUID) -> list[dict]:
         """The society's session receipts, oldest first, each digest checked."""
@@ -246,16 +271,7 @@ class SocietyControlRepository:
 
     def _open_session(self, society_id: uuid.UUID) -> dict | None:
         """The society's open session's opening receipt, or None while none is open."""
-        row = self.connection.execute(
-            "select document,document_sha256 from world_society_control_event "
-            "where workspace_id=%s and society_id=%s and document->>'kind' in (%s,%s) "
-            "order by event_seq desc limit 1",
-            (self.workspace_id, society_id, *SESSION_KINDS),
-        ).fetchone()
-        if row is None:
-            return None
-        doc = self._verified(row)
-        return doc if doc["kind"] == SESSION_OPENED else None
+        return open_session_receipt(self.connection, self.workspace_id, society_id)
 
     def _close_session(
         self, society: dict, opened: dict, *, reason: str, closed_by: uuid.UUID | None
@@ -415,6 +431,7 @@ class SocietyControlRepository:
         limits: dict,
         speed: int = 1,
         base_clock_revision: int | None = None,
+        reason: str = "opened_by_person",
     ) -> dict:
         """Open a living session on a paused society and play it, in one transaction.
 
@@ -423,7 +440,9 @@ class SocietyControlRepository:
         since; with other limits it is refused ``session_request_reused``. While a session is open
         another is refused ``session_already_open``, and a society playing without one is refused
         ``society_not_paused``. Opening writes a ``configured`` receipt (playing) and then a
-        ``session_opened`` one.
+        ``session_opened`` one, which records ``reason``: ``opened_by_person`` for a session
+        opened by its route, ``guest_pressed_play`` for one a guest's Play opened
+        (:meth:`play_with_session`).
         """
         stated = session_limits(limits)
         with self.connection.transaction():
@@ -465,6 +484,7 @@ class SocietyControlRepository:
                 {
                     "session_id": str(session_id),
                     "request_id": str(request_id),
+                    "reason": reason,
                     "opened_by": str(actor),
                     "limits": stated,
                     "start_tick": base_tick,
@@ -474,6 +494,55 @@ class SocietyControlRepository:
                 },
             )
             return self.session(version_id, session_id)
+
+    def play_with_session(
+        self,
+        version_id: uuid.UUID,
+        *,
+        actor: uuid.UUID,
+        base_revision: int,
+        speed: int,
+        base_clock_revision: int | None = None,
+    ) -> dict:
+        """Play the society, opening a living session for it where none is open: what a guest's
+        Play does, so the models its owner chose are asked within the guest's grant.
+
+        A paused society gets a session at its current tick and digest, limited by
+        ``SESSION_MAXIMA`` (the grant's own figures bound what it may spend, as every session's
+        bound is held to its grant), opened by ``actor`` for ``guest_pressed_play``. The same Play
+        sent again opens the same session. A society already playing, or one with a session open,
+        is configured as Play configures it. Answers the control.
+        """
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            control = self._control(society["society_id"])
+            playing = control is not None and control["mode"] == "playing"
+            if playing or self._open_session(society["society_id"]) is not None:
+                return self.configure(
+                    version_id,
+                    actor=actor,
+                    base_revision=base_revision,
+                    mode="playing",
+                    speed=speed,
+                    base_clock_revision=base_clock_revision,
+                )
+            if base_revision != (0 if control is None else control["revision"]):
+                raise StaleSocietyState("playback controls changed; reload before saving")
+            self.open_session(
+                version_id,
+                actor=actor,
+                request_id=uuid.uuid5(
+                    society["society_id"], f"guest_pressed_play:{base_revision}:{actor}"
+                ),
+                base_revision=base_revision,
+                base_tick=society["current_tick"],
+                base_state_sha256=society["state_sha256"],
+                limits={**SESSION_MAXIMA, "usd": str(SESSION_MAXIMA["usd"])},
+                speed=speed,
+                base_clock_revision=base_clock_revision,
+                reason="guest_pressed_play",
+            )
+            return self.read(version_id)
 
     def stop_session(
         self, version_id: uuid.UUID, *, actor: uuid.UUID, session_id: uuid.UUID

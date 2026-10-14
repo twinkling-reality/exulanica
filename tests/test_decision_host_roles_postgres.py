@@ -31,6 +31,7 @@ from exulanica.world.society_model_choice_repository import SocietyModelChoiceRe
 import test_society_person_decisions_postgres as person_decisions
 import test_society_stay_requests_api as stays
 from decision_role_support import person_entry, person_like, registry_in_use, write_registry
+from living_session_support import open_for_saved_world
 
 saved_world = stays.saved_world
 app = stays.app
@@ -69,6 +70,7 @@ def _choose(services, world, role: DecisionRole, people, model, *, manifest) -> 
             manifest=manifest,
             contract=role.contract(),
         )
+    open_for_saved_world(services, world)
 
 
 def _receipts(services, world, snapshot) -> list[dict[str, Any]]:

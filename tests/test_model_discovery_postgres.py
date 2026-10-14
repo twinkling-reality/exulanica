@@ -12,6 +12,7 @@ from exulanica.world.workspace_models import WorkspaceModelRepository
 
 import test_society_person_decisions_postgres as decisions
 import test_society_stay_requests_api as stays
+from living_session_support import open_for_saved_world
 from test_society_saved_world_api import TOKEN
 
 saved_world = stays.saved_world
@@ -203,6 +204,7 @@ def test_shipped_model_reaches_an_inhabitant_receipt_and_exact_replay(app):
         },
     )
     assert chosen.status_code == 200, chosen.text
+    open_for_saved_world(services, world)
     transport = Choosing()
     host = decisions._host(world, decisions._client(manifest, transport), services, manifest)
     host = replace(host, manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest())

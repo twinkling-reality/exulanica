@@ -24,6 +24,7 @@ import test_society_person_decisions_postgres as decisions
 import test_society_stay_requests_api as stays
 import test_society_things_postgres as things_api
 import things_society_support as things_support
+from living_session_support import open_for_saved_world
 from society_seed_support import choose_society_seed
 from test_society_saved_world_api import OWNER, routes
 from test_traveller_choices_postgres import _an_hour_from_now, _repository
@@ -79,6 +80,7 @@ def test_a_traveller_called_home_by_its_player_carries_the_world_s_sword_out(app
                 contract=decision_contract(),
                 ends_at=_an_hour_from_now(),
             )
+        open_for_saved_world(services, world)
         transport = hands._Hands()
         host = decisions._host(world, decisions._client(manifest, transport), services, manifest)
         for _ in range(20):

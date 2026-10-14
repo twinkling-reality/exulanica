@@ -23,6 +23,7 @@ from exulanica.world.model_probe_worker import ModelProbeWorker
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
 from exulanica.world.workspace_models import WorkspaceModelRepository
 
+from living_session_support import open_living_session
 from model_fakes import chat_body
 from personal_world_support import STRANGER_TOKEN
 from spending_support import WorkspacePolicy, spending_client
@@ -170,6 +171,14 @@ def test_verified_candidate_owner_choice_records_its_source_decision_application
         },
     )
     assert selected.status_code == 200, selected.text
+    open_living_session(
+        services.database,
+        services.society_runtime,
+        workspace,
+        entry["world_id"],
+        uuid.UUID(entry["authored_version_id"]),
+        api.actor,
+    )
     transport.runtime = True
     host = services.decision_host()
     assert host
