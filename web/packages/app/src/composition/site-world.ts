@@ -26,9 +26,15 @@ import type { TerrainOccupancyProof } from '@exulanica/atlas-core';
  * and why it was not drawn. While the site is open it can be redrawn in another pack at once
  * (`./world-look-redraw.ts`): its drawing, already read and checked, is mounted again in the new
  * pack's light and dressing on the same host, so the person stays where they stand.
+ *
+ * A site made on land (`exulanica.site-drawing/v5`) names its land's chunks and backdrop by digest;
+ * each is read through the world's version (`GET .../land/chunks/{x}/{y}`, `.../land/backdrop`) and
+ * held to the digest its drawing names (`readSiteLand`) before the site is mounted, and the same
+ * land serves every look it is redrawn in. Land that cannot be read, or is not the land named, is
+ * not drawn and is not stood in for: the site is not drawn, and the page says so.
  */
 
-import type { GeneratedSiteMount, SiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
+import type { GeneratedSiteMount, SiteDrawing, SiteLand, StructuredSiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
 import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
@@ -131,7 +137,39 @@ export async function loadSiteWorld(
         || terrain.contactSha256 !== drawing.terrain.sha256 || terrain.arrivalMm.some((v, i) => v !== drawing.arrival.positionMm[i])
         || terrain.arrivalFacingMm.some((v, i) => v !== drawing.arrival.facingMm[i])) throw new Error("This world's terrain drawing differs from its saved entry.");
   } else if (entry.generatedSite == null) throw new Error("This world's drawing is not its declared terrain.");
-  return siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry);
+  const land = isTerrainSiteDrawing(drawing) || drawing.land === undefined ? null : await loadSiteLand(access, entry, drawing);
+  return siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry, land);
+}
+
+/**
+ * The land a site on land names, read through its world's version: every chunk and the backdrop,
+ * each held to the digest its route names and to the one the drawing names.
+ */
+async function loadSiteLand(access: Credentials, entry: SavedWorldEntry, drawing: StructuredSiteDrawing): Promise<SiteLand> {
+  const [{ readSiteLand }, { sha256Hex }] = await Promise.all([
+    import('@exulanica/atlas-react/generated-site'),
+    import('@exulanica/atlas-react/playcanvas'),
+  ]);
+  const section = drawing.land!;
+  const query = new URLSearchParams({ world_id: entry.worldId });
+  const version = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`;
+  let bytes = 0;
+  const read = async (path: string, sha256: string): Promise<unknown> => {
+    const response = await fetch(`${version}/${path}?${query.toString()}`, {
+      headers: { ...accessHeaders(access), Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    if (!response.ok) throw new Error(`This world's land could not be read: HTTP ${response.status}.`);
+    if (response.headers.get('ETag')?.replaceAll('"', '') !== sha256) throw new Error("This world's land arrived as a document its drawing does not name.");
+    const text = await response.text();
+    bytes += new TextEncoder().encode(text).byteLength;
+    return JSON.parse(text);
+  };
+  const [chunks, backdrop] = await Promise.all([
+    Promise.all(section.chunks.map(async ({ chunk: [x, y], sha256 }) => [`${x},${y}`, await read(`land/chunks/${x}/${y}`, sha256)] as const)),
+    read('land/backdrop', section.backdropSha256),
+  ]);
+  return readSiteLand(drawing, new Map(chunks), backdrop, sha256Hex, bytes);
 }
 
 /**
@@ -146,6 +184,7 @@ async function siteInLook(
   bound: WorldStylePackBinding | null,
   entry: SavedWorldEntry,
   currentEntry?: () => SavedWorldEntry | null,
+  land: SiteLand | null = null,
 ): Promise<SiteWorld> {
   const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
@@ -164,6 +203,8 @@ async function siteInLook(
   const terrainLease = await readTerrainOccupancy(access, entry, drawing, currentEntry);
   const terrainOccupancy = terrainLease.read;
   const terrainOptions = isTerrainSiteDrawing(drawing) ? {terrainOccupancy, dressingReadiness, ...(preparedDressing === undefined ? {} : {preparedDressing})} : {};
+  // A site on land is mounted on its land in every look it is drawn in.
+  const landOptions = land === null ? {} : { land };
   const measure = new URLSearchParams(search).has('measure') ? { measure: true } : {};
   const seated = (seats: Parameters<typeof rememberSiteSeats>[2]): (() => void) => rememberSiteSeats(entry.entryId, entry.authoredVersionId!, seats);
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
@@ -175,7 +216,7 @@ async function siteInLook(
   };
   /** The mount in a resolved choice's pack, or in the tile look for none. Throws when the pack cannot be read. */
   const mounted = async (choice: WorldLookChoice): Promise<GeneratedSiteMount> => {
-    if (choice.packId === null) return siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
+    if (choice.packId === null) return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
     const [library, { packSiteDresser }, { prepareTextureSet }, { parseTextureSetManifest, resolveSurfaceLookRole }] = await Promise.all([
       import('../texture-library.js').then((module) => module.committedTextureLibrary()),
       import('@exulanica/atlas-react/style-pack'),
@@ -193,7 +234,7 @@ async function siteInLook(
       await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256)),
     ] as const)));
     const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish });
-    return siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
+    return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
   };
   let choice = worldLook.worldLookChoice(search, bound);
   let mount: GeneratedSiteMount;
@@ -203,7 +244,7 @@ async function siteInLook(
     mount = await mounted(choice);
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
-    mount = siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
+    mount = siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
   }
   return {
     mount: leasedMount(mount, terrainLease),
@@ -249,7 +290,11 @@ export async function openSiteWorld(
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     if (world === null) return null;
     // Every box the drawing draws across the eye height a person walks it at.
-    if (!isTerrainSiteDrawing(world.mount.drawing)) standing(siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000));
+    if (!isTerrainSiteDrawing(world.mount.drawing)) {
+      standing(world.mount.land === undefined
+        ? siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000)
+        : siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000, world.mount.land.groundMm));
+    }
     const stated = (look: WorldLookState): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(world.look);
     return switchableSite(world, stated, env.shell);

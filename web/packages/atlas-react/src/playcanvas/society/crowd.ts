@@ -72,11 +72,13 @@ import { pickReach } from './types.js';
  * the path recorded for the tick has been walked, so a person asked to rest walks there and then
  * sits. How an activity is drawn is the character catalog's decision.
  *
- * Everyone walks on the ground plane. A recorded point is a plan point and the height each
- * walker is drawn at is 0, which is the ground a tile bake draws; a person who states the height
- * of the surface they stand on is refused rather than drawn under it. When a place's stated
- * heights are wired through to a person, that refusal is what says the ground-plane zeros here
- * and in the far figures must be read from the person instead of written.
+ * Everyone walks on the ground. A recorded point is a plan point and the height each walker is
+ * drawn at is the ground's under them: 0, the ground a tile bake draws, or, for a site on land, the
+ * land's height under the point they are drawn at this frame (`CrowdOptions.ground`), read anew as
+ * they walk, so a walk over a crest goes over it. A person who states the height of the surface
+ * they stand on is refused rather than drawn under it. When a place's stated heights are wired
+ * through to a person, that refusal is what says the ground here and in the far figures must be
+ * read from the person instead.
  *
  * A person using a placed object is drawn as its kind says, from the seating layout handed with
  * the snapshot (`./seating.ts`): once their recorded path is walked, and while their state names
@@ -108,7 +110,15 @@ export interface CrowdOptions {
   readonly factory?: CrowdRenderableFactory;
   /** Frames between poses for the full character at this nearness rank (0 is nearest). */
   readonly poseInterval?: PoseInterval;
+  /**
+   * The ground's height under a point of the crowd's frame (east, south, metres) for a site on
+   * land; none stands everyone on the plane at 0. It is asked on every frame and must not allocate.
+   */
+  readonly ground?: CrowdGround;
 }
+
+/** The ground's height under a point of the crowd's frame, east and south in metres. */
+export type CrowdGround = (east: number, south: number) => number;
 
 export type PoseInterval = (rank: number) => number;
 
@@ -432,6 +442,7 @@ export class SocietyCrowd {
     readonly layout: SeatingLayout | null;
   } | null = null;
   private stopAwaiting: (() => void) | null = null;
+  private readonly ground: CrowdGround | null;
 
   constructor(
     private readonly device: pc.GraphicsDevice,
@@ -443,7 +454,13 @@ export class SocietyCrowd {
     this.nearRadius = options.nearRadius ?? 60;
     this.farRadius = options.farRadius ?? 700;
     this.poseInterval = options.poseInterval ?? POSE_INTERVAL;
+    this.ground = options.ground ?? null;
     this.far = new FarFigures(device, root);
+  }
+
+  /** The ground's height under a point of this crowd's frame: 0 with no ground. */
+  private groundUnder(east: number, south: number): number {
+    return this.ground === null ? 0 : this.ground(east, south);
   }
 
   /** Accept one canonical snapshot and start presenting its recorded motion. */
@@ -632,7 +649,7 @@ export class SocietyCrowd {
         seatBlend: jumped ? 0 : previous?.seatBlend ?? 0,
         onSeat: jumped ? false : previous?.onSeat ?? false,
         aside: jumped ? NO_STEP : previous?.aside ?? NO_STEP,
-        drawn: jumped || previous === undefined ? [position[0], 0, position[1]] : previous.drawn,
+        drawn: jumped || previous === undefined ? [position[0], this.groundUnder(position[0], position[1]), position[1]] : previous.drawn,
         figure: this.figures?.figureFor(person) ?? null,
       };
       walkers.set(person.id, walker);
@@ -1125,7 +1142,8 @@ export class SocietyCrowd {
     const settle = walker.settle;
     if (settle === null) {
       const stepping = this.stepAside(walker, dt, reduced);
-      walker.drawn = [walker.position[0] + walker.aside[0], 0, walker.position[1] + walker.aside[1]];
+      const east = walker.position[0] + walker.aside[0], south = walker.position[1] + walker.aside[1];
+      walker.drawn = [east, this.groundUnder(east, south), south];
       walker.seatBlend = 0;
       walker.onSeat = false;
       if (walker.arrived) this.turn(walker, this.facingOf(walker));
@@ -1160,7 +1178,9 @@ export class SocietyCrowd {
       ? Math.min(1, Math.max(0, (settle.progress - settle.toFront) / settle.ontoSeat))
       : (settle.progress >= end ? 1 : 0);
     const [x, z] = sampleMotionPath(settle.path, end > 0 ? settle.progress / end : 1);
-    walker.drawn = [x, settle.lift * onto, z];
+    // Lowered from the ground under them onto the seat, whose height is stated in the same frame.
+    const under = this.groundUnder(x, z);
+    walker.drawn = [x, this.ground === null ? settle.lift * onto : under + (settle.lift - under) * onto, z];
     walker.seatBlend = onto;
     walker.onSeat = staying && settle.progress >= settle.toFront;
     if (settle.progress > settle.toFront || walker.onSeat) {
@@ -1262,7 +1282,8 @@ export class SocietyCrowd {
       yaw: walker.facing,
       activity: this.drawnActivity(walker),
       ...(seated ? { seated } : {}),
-      ...(walker.drawn[1] !== 0 ? { groundY: 0 } : {}),
+      // Lifted above the ground under them, onto a seat: the feet are dropped back to it.
+      ...(walker.drawn[1] !== this.groundUnder(walker.drawn[0], walker.drawn[2]) ? { groundY: this.groundUnder(walker.drawn[0], walker.drawn[2]) } : {}),
       // The crowd turns its people itself: no step is drawn for a turn, so their stride is the ground's alone.
       pivot: true,
     };
@@ -1346,7 +1367,7 @@ export class SocietyCrowd {
         this.walkers.set(id, {
           ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? 0,
           rate: null, gateStep: true, startsAtMs: nowMs, arrived: false,
-          position: gate, drawn: [gate[0], 0, gate[1]],
+          position: gate, drawn: [gate[0], this.groundUnder(gate[0], gate[1]), gate[1]],
         });
         this.entering.delete(id);
         this.fresh.add(id);
@@ -1412,7 +1433,7 @@ export class SocietyCrowd {
       // the distance walked since the last pose, so a longer gap costs update rate, not stride.
       const interval = id === this.selectedId ? 1 : Math.max(1, Math.floor(this.poseInterval(slot.rank)));
       // Someone above the ground has their feet planted afresh on every frame the clip moves them.
-      const due = discontinuity || !renderable.follow || interval === 1 || position[1] !== 0 ||
+      const due = discontinuity || !renderable.follow || interval === 1 || position[1] !== this.groundUnder(position[0], position[2]) ||
         (this.frame + slot.rank) % interval === 0;
       if (due) {
         renderable.pose({ ...this.poseOf(walker), deltaSeconds: slot.pendingSeconds, reducedMotion: reduced, discontinuity });

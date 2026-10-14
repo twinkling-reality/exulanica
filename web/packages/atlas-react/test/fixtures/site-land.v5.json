@@ -1,0 +1,255 @@
+{
+ "profile": "exulanica.site-drawing/v5",
+ "world_id": "world:generated:land-fixture",
+ "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+ "kind": {
+  "kind": "fixture_yard",
+  "version": 1,
+  "label": "Yard on a slope"
+ },
+ "extent": {
+  "widthMm": 20000,
+  "depthMm": 16000,
+  "enclosure": "open"
+ },
+ "arrival": {
+  "positionMm": [
+   10000,
+   0,
+   6500
+  ],
+  "facingMm": [
+   0,
+   1
+  ]
+ },
+ "slots": [
+  {
+   "identity": "yard:ground",
+   "part": "yard",
+   "label": "yard:ground",
+   "lookRole": "ground.tilled_soil",
+   "positionMm": [
+    10000,
+    8000,
+    6820
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    20000,
+    16000,
+    0
+   ],
+   "front": "+y",
+   "fit": "surface",
+   "primitive": "plane",
+   "drape": true
+  },
+  {
+   "identity": "zone:west",
+   "part": "zone",
+   "label": "zone:west",
+   "lookRole": "ground.paving",
+   "positionMm": [
+    4000,
+    8000,
+    6326
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    8000,
+    16000,
+    0
+   ],
+   "front": "+y",
+   "fit": "surface",
+   "primitive": "plane",
+   "drape": true
+  },
+  {
+   "identity": "path:main",
+   "part": "path",
+   "label": "path:main",
+   "lookRole": "path.gravel",
+   "positionMm": [
+    9000,
+    8000,
+    6832
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    2000,
+    16000,
+    0
+   ],
+   "front": "+y",
+   "fit": "surface",
+   "primitive": "plane",
+   "drape": true
+  },
+  {
+   "identity": "fence:wall:0",
+   "part": "fence",
+   "label": "fence:wall:0",
+   "lookRole": "boundary.fence_wood",
+   "positionMm": [
+    10000,
+    15900,
+    7136
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    20000,
+    100,
+    1200
+   ],
+   "front": "+y",
+   "fit": "contain",
+   "primitive": "box",
+   "drape": true
+  },
+  {
+   "identity": "bench",
+   "part": "bench",
+   "label": "bench",
+   "lookRole": "fixture.bench",
+   "positionMm": [
+    4000,
+    12000,
+    6480
+   ],
+   "yawQuarterTurns": 2,
+   "boxMm": [
+    1800,
+    500,
+    450
+   ],
+   "front": "+y",
+   "fit": "contain",
+   "primitive": "box"
+  },
+  {
+   "identity": "shed",
+   "part": "shed",
+   "label": "shed",
+   "lookRole": "structure.default",
+   "positionMm": [
+    14000,
+    9000,
+    6860
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    4000,
+    3000,
+    2400
+   ],
+   "front": "+y",
+   "fit": "contain",
+   "primitive": "none"
+  },
+  {
+   "identity": "shed:roof",
+   "part": "shed",
+   "label": "shed:roof",
+   "lookRole": "roof.clay",
+   "positionMm": [
+    14000,
+    9000,
+    9260
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    4000,
+    3000,
+    1050
+   ],
+   "front": "+y",
+   "fit": "contain",
+   "primitive": "gable"
+  },
+  {
+   "identity": "pond",
+   "part": "pond",
+   "label": "pond",
+   "lookRole": "water.pond",
+   "positionMm": [
+    17000,
+    2500,
+    6500
+   ],
+   "yawQuarterTurns": 0,
+   "boxMm": [
+    3000,
+    3000,
+    0
+   ],
+   "front": "+y",
+   "fit": "surface",
+   "primitive": "plane"
+  }
+ ],
+ "walk": {
+  "floorMm": [
+   0,
+   0,
+   20000,
+   16000
+  ],
+  "blockersMm": [],
+  "keepOutMm": [
+   [
+    15500,
+    1000,
+    18500,
+    4000
+   ]
+  ]
+ },
+ "seats": [
+  {
+   "identity": "bench",
+   "seatHeightMm": 450
+  }
+ ],
+ "land": {
+  "land_sha256": "deea5e48cbde6540b7f7726f125cff5264b2ee3ba88ebe3bfbdedc3f29a89309",
+  "chunk_mm": 128000,
+  "chunks": [
+   {
+    "chunk": [
+     -1,
+     0
+    ],
+    "sha256": "1d5b5a235a652b22929078f50f308909ecd5da4956023695b43cd1e0975d5271"
+   },
+   {
+    "chunk": [
+     0,
+     0
+    ],
+    "sha256": "2f89dd1c1a0d0a9f1c205b7c1e8f9e652b9138d2aa75abd01e3df41bc29d853f"
+   }
+  ],
+  "backdrop_sha256": "f529a5e9c8674c192e92061689083cf3bbd5a3c1f093472e3656b4b279df426b",
+  "water": [
+   {
+    "id": "sea",
+    "kind": "sea",
+    "level_mm": 0,
+    "side": "south"
+   },
+   {
+    "id": "pond 0",
+    "kind": "pond",
+    "level_mm": 6500,
+    "rect_mm": [
+     15500,
+     1000,
+     18500,
+     4000
+    ]
+   }
+  ]
+ }
+}

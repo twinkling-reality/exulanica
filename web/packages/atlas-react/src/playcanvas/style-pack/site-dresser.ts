@@ -128,6 +128,7 @@ function pieceSlot(slot: SiteSlot): PieceSlot {
     positionMm: slot.positionMm,
     front: FRONTS[slot.yawQuarterTurns]!,
     boxMm: slot.boxMm,
+    ...(slot.drape === true ? { drape: true as const } : {}),
   };
 }
 
@@ -151,7 +152,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const material = materialOfLeaf(catalog, slot.family, slot.leaf);
     return material === null ? null : patterns.byMaterial.get(material.key) ?? null;
   };
-  return (host, drawn, drawing: StructuredSiteDrawing, scenery = null, environment) => {
+  return (host, drawn, drawing: StructuredSiteDrawing, scenery = null, environment, land) => {
     const device = host.app.graphicsDevice;
     const textures = new SiteTextures(device, dressing.look ?? TILE_LOOK_V1, dressing.textures);
     const water = new WaterRipples(host.app, host.camera);
@@ -275,7 +276,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       // Bound retained contact copies across the whole site; oversized seats remain unavailable.
       maximumVertices: 100_000,
       triangles: (identity, positions, normals) => seatTriangles.set(identity, seatGeometry(positions, normals)),
-    });
+    }, land?.groundM);
     const standing = new Set(modules.map((slot) => slot.identity));
     for (const identity of placed.undressed) standing.delete(identity);
     for (const identity of standing) {
@@ -329,7 +330,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (catalog !== null && borders !== null && bordersRun(device)) {
       const drawnPlanes = new Map<string, { readonly instance: pc.MeshInstance; readonly shape: pc.Entity; readonly plane: GroundPlane }>();
       for (const slot of drawing.slots) {
-        if (slot.primitive !== 'plane' || texturedSlots.has(slot.identity) || slot.supportSurfaceId !== undefined) continue;
+        // A plane laid on land is a mesh that bends with it: it is not grown, and keeps its ruled edge.
+        if (slot.primitive !== 'plane' || texturedSlots.has(slot.identity) || slot.supportSurfaceId !== undefined || slot.drape === true) continue;
         const shape = drawn.entities.get(slot.identity)?.findByName(`${slot.identity}:shape`) as pc.Entity | null | undefined;
         const instance = shape?.render?.meshInstances[0];
         if (shape == null || instance === undefined) continue;
@@ -384,7 +386,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         const standingTrees = scenery.pieces.map((piece): PieceSlot => ({
           identity: `site-scenery:${piece.identity}`,
           lookRole: SCENERY_TREE_ROLE,
-          positionMm: [piece.xMm, piece.yMm, 0],
+          positionMm: [piece.xMm, piece.yMm, scenery.groundMm === null ? 0 : scenery.groundMm(piece.xMm, piece.yMm)],
           front: FRONTS[piece.quarterTurns]!,
           boxMm: [piece.widthMm, piece.widthMm, piece.heightMm],
         }));

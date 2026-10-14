@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import type { IslandId } from '@exulanica/atlas-core';
 import { AuthoredRegionSociety } from './authored-society.js';
+import type { CrowdGround } from './crowd.js';
 
 /**
  * A saved world's people, hung from one island of a world made from photographs.
@@ -56,21 +57,26 @@ export function generatedRegionName(regionId: string): string {
  * so the region's origin is that root's origin and the society's root sits there, at `floorMm`
  * above it. The society states plan positions only, so the page stands its people on one plane:
  * the height of the surface where a person arrives, which the world's entry states, and a person
- * elsewhere may stand a few centimetres above or below the footway beneath them. Null when the
- * binding already holds a society somewhere else, which it never replaces.
+ * elsewhere may stand a few centimetres above or below the footway beneath them.
+ *
+ * A site on land hands its land's height (`ground`, under a point of the region's frame): the
+ * region then sits at the land's datum, the frame its drawing, its seats and its things state
+ * their heights in, and each person stands on the land under them, so `floorMm` is not a floor.
+ * Null when the binding already holds a society somewhere else, which it never replaces.
  */
 export function hostGeneratedSociety(
   host: GeneratedSocietyHost,
   regionId: string,
   floorMm: number,
+  ground?: CrowdGround,
 ): AuthoredRegionSociety | null {
   const name = generatedRegionName(regionId);
   const held = host.authoredSociety;
   if (held !== null) return held.root.parent?.name === name ? held : null;
   const region = new pc.Entity(name);
-  region.setLocalPosition(0, floorMm / 1000, 0);
+  region.setLocalPosition(0, ground === undefined ? floorMm / 1000 : 0, 0);
   host.environmentRoot.addChild(region);
-  const society = new AuthoredRegionSociety(host.device, region);
+  const society = ground === undefined ? new AuthoredRegionSociety(host.device, region) : new AuthoredRegionSociety(host.device, region, { ground });
   host.authoredSociety = society;
   return society;
 }

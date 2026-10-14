@@ -37,7 +37,9 @@ export interface Sight {
  * or above it. A slot's position is its base's centre in site millimetres (x east, y north), its
  * box is its width along its front, its depth and its height, and it is turned by quarter turns;
  * what is drawn as a plane, a ridge or nothing (ground, a roof, a door, a structure's own outline)
- * is no box and is left out. No family or kind of slot is named here.
+ * is no box and is left out. No family or kind of slot is named here. On land, a box's bottom is
+ * read above the land under its base's centre (`groundMm`, millimetres under a site point), the
+ * height a person's eye stands above the land they stand on.
  */
 export function siteSightRings(
   drawing: { readonly slots: readonly {
@@ -45,10 +47,12 @@ export function siteSightRings(
     readonly boxMm: readonly [number, number, number]; readonly yawQuarterTurns: number;
   }[] },
   heightMm: number,
+  groundMm?: (eastMm: number, northMm: number) => number,
 ): SightBlocker[] {
   const rings: SightBlocker[] = [];
   for (const slot of drawing.slots) {
-    const [x, y, base] = slot.positionMm;
+    const [x, y, stated] = slot.positionMm;
+    const base = groundMm === undefined ? stated : stated - groundMm(x, y);
     const [width, depth, height] = slot.boxMm;
     if (slot.primitive !== 'box' || base > heightMm || base + height < heightMm) continue;
     // A quarter turn lays the width along north and south.

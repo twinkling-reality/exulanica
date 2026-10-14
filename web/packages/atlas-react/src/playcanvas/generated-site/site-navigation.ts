@@ -13,6 +13,7 @@ import {
 } from '@exulanica/atlas-core';
 import type { CameraState } from '../controls.js';
 import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type SiteRectMm } from './site-drawing.js';
+import type { SiteLand } from './site-land.js';
 
 /**
  * Where a person walks in a site world, from its canonical walk or explicit support network.
@@ -72,8 +73,30 @@ export function siteSurface(drawing: StructuredSiteDrawing): NavigationSurface {
   });
 }
 
+/** How far apart the land is read either side of a point for its slope, metres: half a cell. */
+const LAND_SLOPE_STEP_M = 0.5;
+
+/**
+ * The floor of a site on land: the graded land wherever the site states its floor, its height
+ * and its slope read from the land, and none off it, so walking off the site's edge recovers a
+ * person as on level ground.
+ */
+export function siteLandSurface(drawing: StructuredSiteDrawing, land: SiteLand): NavigationSurface {
+  const floor = drawing.walk.floorMm;
+  const h = LAND_SLOPE_STEP_M;
+  return Object.freeze({
+    sample: (east: number, south: number): SurfaceSample | null => {
+      if (!onRect(floor, east, south)) return null;
+      const dx = (land.groundM(east + h, south) - land.groundM(east - h, south)) / (2 * h);
+      const dz = (land.groundM(east, south + h) - land.groundM(east, south - h)) / (2 * h);
+      const length = Math.hypot(dx, 1, dz);
+      return Object.freeze({ height: land.groundM(east, south), normal: Object.freeze({ x: -dx / length, y: 1 / length, z: -dz / length }) });
+    },
+  });
+}
+
 /** The navigation world a person exploring a site walks in. */
-export function siteNavigationWorld(drawing: SiteDrawing, occupancy: TerrainOccupancyProof | (() => TerrainOccupancyProof) = {status: 'unavailable'}): NavigationWorld {
+export function siteNavigationWorld(drawing: SiteDrawing, occupancy: TerrainOccupancyProof | (() => TerrainOccupancyProof) = {status: 'unavailable'}, land?: SiteLand): NavigationWorld {
   if (isTerrainSiteDrawing(drawing)) {
     const {east, south} = drawing.boundsMm;
     const reach = Math.hypot(east[1] - east[0], south[1] - south[0]) / 2000;
@@ -107,7 +130,7 @@ export function siteNavigationWorld(drawing: SiteDrawing, occupancy: TerrainOccu
   }
   return Object.freeze({
     ...(support === undefined ? {} : { support }),
-    surface: support === undefined ? siteSurface(drawing) : Object.freeze({ sample: (east: number, south: number) => {
+    surface: support === undefined ? (land === undefined ? siteSurface(drawing) : siteLandSurface(drawing, land)) : Object.freeze({ sample: (east: number, south: number) => {
       try { return Object.freeze({ height: support.at(support.entry, [east * MILLIMETRES, south * MILLIMETRES]) / MILLIMETRES, normal: LEVEL.normal }); }
       catch (error) { if (!(error instanceof SupportNavigationError)) throw error; return null; }
     } }),

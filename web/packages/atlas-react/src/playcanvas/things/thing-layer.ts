@@ -133,6 +133,11 @@ export interface DrawnSociety {
   readonly root: pc.Entity;
   /** Where a person's feet are drawn now, in world space, into `out`; false when not drawn outdoors. */
   groundOf(id: string, out: pc.Vec3): boolean;
+  /**
+   * The land's height under a point of the society's own frame (east, south, metres) for a site on
+   * land; none where its ground is the root's own plane.
+   */
+  readonly groundHeightAt?: ((east: number, south: number) => number) | undefined;
 }
 
 /** A point of the society's own frame, millimetres, as the state and a person's walk name one. */
@@ -348,7 +353,9 @@ export class ThingLayer {
       this.destinationAt.parent?.removeChild(this.destinationAt);
       root.addChild(this.destinationAt);
     }
-    this.destinationAt.setLocalPosition(this.destination!.xMm / 1000, 0, this.destination!.zMm / 1000);
+    const ground = this.options.society?.()?.groundHeightAt;
+    const east = this.destination!.xMm / 1000, south = this.destination!.zMm / 1000;
+    this.destinationAt.setLocalPosition(east, ground === undefined ? 0 : ground(east, south), south);
     this.destinationRing.place(this.destinationAt, DESTINATION_RING_RADIUS);
   }
 
@@ -603,10 +610,14 @@ export class ThingLayer {
     const t = entry.record.transform;
     // Where a society runs, an object stands at the state's plan point, turned by the state's yaw.
     const thing = this.society === null || entry.record.support !== undefined ? undefined : this.shown.get(entry.record.thingId);
+    // A society's thing stands its height above the ground under it: on land, the land's.
+    const ground = thing?.position_mm == null ? undefined : this.options.society?.()?.groundHeightAt;
     figure.pose({
       position: thing?.position_mm == null
         ? [t.xMm / 1000, t.yMm / 1000, t.zMm / 1000]
-        : [thing.position_mm[0] / 1000, (thing.height_mm ?? 0) / 1000, thing.position_mm[1] / 1000],
+        : ground === undefined
+          ? [thing.position_mm[0] / 1000, (thing.height_mm ?? 0) / 1000, thing.position_mm[1] / 1000]
+          : [thing.position_mm[0] / 1000, ground(thing.position_mm[0] / 1000, thing.position_mm[1] / 1000) + (thing.height_mm ?? 0) / 1000, thing.position_mm[1] / 1000],
       facing: facingOfYaw(thing?.yaw_microradians ?? t.yawMicroradians),
       deltaSeconds: dt,
       ...(reducedMotion ? { reducedMotion: true } : {}),

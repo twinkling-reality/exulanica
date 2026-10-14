@@ -2694,7 +2694,12 @@ export function mountEnvironmentSelection(
     const generated = entry.generatedGround ?? entry.generatedSite ?? null;
     if (generated != null) {
       const { regionId, arrivalMm } = generated;
-      return binding?.generatedTile == null || hostGeneratedSociety(binding, regionId, arrivalMm[1]) === null
+      // A site on land stands its people on its land, its region at the land's datum.
+      const drawn = binding?.worldKind?.ground;
+      const land = entry.generatedSite != null && drawn?.form === 'generated-site' ? drawn.site.land : undefined;
+      return binding?.generatedTile == null || (land === undefined
+        ? hostGeneratedSociety(binding, regionId, arrivalMm[1])
+        : hostGeneratedSociety(binding, regionId, arrivalMm[1], land.groundM)) === null
         ? null : regionId;
     }
     if (entry.declaredFloor == null || binding === undefined) return null;

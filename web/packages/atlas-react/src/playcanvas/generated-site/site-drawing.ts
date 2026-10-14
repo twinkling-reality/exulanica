@@ -1,5 +1,5 @@
 import {readTerrainDressing, type TerrainDressing} from './terrain-dressing.js';
-import { readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type SupportNavigation } from '@exulanica/atlas-core';
+import { LAND_CHUNK_MM, readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type LandWater, type SupportNavigation } from '@exulanica/atlas-core';
 import { sha256Hex, canonicalJson } from '../character/digest.js';
 /**
  * The drawing a site world's records make, in its level-floor or explicit-support profile.
@@ -19,6 +19,12 @@ export const SITE_DRAWING_SUPPORT_PROFILE = 'exulanica.site-drawing/v2';
 
 export const SITE_DRAWING_TERRAIN_PROFILE = 'exulanica.site-drawing/v3';
 export const SITE_DRAWING_DRESSED_TERRAIN_PROFILE = 'exulanica.site-drawing/v4';
+/**
+ * A site laid out on stated land (`docs/landform-contract.md`, sites on land): the version 1 slots,
+ * each standing at the graded land's height under it, some marked `drape`, and a `land` section
+ * naming the land's chunks and backdrop by digest, which the page reads before it draws the site.
+ */
+export const SITE_DRAWING_LAND_PROFILE = 'exulanica.site-drawing/v5';
 
 export type SiteFit = 'contain' | 'fill' | 'tile' | 'surface';
 export type SitePrimitive = 'box' | 'plane' | 'gable' | 'none';
@@ -48,13 +54,29 @@ export interface SiteSlot {
   readonly fit: SiteFit;
   readonly primitive: SitePrimitive;
   readonly uvFrame?: SiteUvFrame;
+  /**
+   * A slot of a site on land that follows the land: each point of it stands as far above the land
+   * under it as its base stands above the land under its base's centre. Stated only on land.
+   */
+  readonly drape?: true;
+}
+
+/** What a site on land states of its land: each chunk's place and digest, the backdrop's and the water's. */
+export interface SiteLandSection {
+  readonly landSha256: string;
+  readonly chunkMm: number;
+  readonly chunks: readonly { readonly chunk: readonly [x: number, y: number]; readonly sha256: string }[];
+  readonly backdropSha256: string;
+  readonly water: readonly LandWater[];
 }
 
 export type SiteRectMm = readonly [x0: number, y0: number, x1: number, y1: number];
 
 export interface StructuredSiteDrawing {
-  readonly profile?: typeof SITE_DRAWING_PROFILE | typeof SITE_DRAWING_SUPPORT_PROFILE;
+  readonly profile?: typeof SITE_DRAWING_PROFILE | typeof SITE_DRAWING_SUPPORT_PROFILE | typeof SITE_DRAWING_LAND_PROFILE;
   readonly support?: SupportNavigation;
+  /** The land a site on land stands on, by digest; none for a site on level ground. */
+  readonly land?: SiteLandSection;
   readonly worldId: string;
   readonly receiptSha256: string;
   readonly kind: { readonly kind: string; readonly version: number; readonly label: string };
@@ -136,8 +158,10 @@ const FITS: readonly SiteFit[] = ['contain', 'fill', 'tile', 'surface'];
 const PRIMITIVES: readonly SitePrimitive[] = ['box', 'plane', 'gable', 'none'];
 const LOOK = /^([a-z]+)\.([a-z][a-z0-9_]{0,47})$/u;
 
-function slot(value: unknown, index: number): SiteSlot {
+function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
   const row = object(value, `slot ${index}`);
+  const drape = row['drape'];
+  if (drape !== undefined && (drape !== true || !onLand)) fail(`The site drawing's slot ${index} drapes only on land, and only as true.`);
   const look = text(row['lookRole'], `slot ${index} look role`);
   const parts = LOOK.exec(look);
   if (parts === null) fail(`The site drawing's slot ${index} names no look role family.leaf.`);
@@ -174,6 +198,47 @@ function slot(value: unknown, index: number): SiteSlot {
           vAxisMm: triple(frame['vAxisMm'], `slot ${index} uv v axis`),
         }),
       }),
+    ...(drape === true ? { drape: true as const } : {}),
+  });
+}
+
+/** Two whole numbers, as far from the site as its land reaches. */
+function point(value: unknown, what: string): readonly [number, number] {
+  if (!Array.isArray(value) || value.length !== 2) fail(`The site drawing's ${what} is not two figures.`);
+  return Object.freeze([integer(value[0], what), integer(value[1], what)] as const);
+}
+
+const WATER_FIELDS: Readonly<Record<string, string>> = {
+  sea: 'id kind level_mm side', lake: 'id kind level_mm centre_mm radius_mm', pond: 'id kind level_mm rect_mm',
+};
+
+/** The land section of a site on land: its chunks and backdrop by digest, and its water. */
+function landSection(value: unknown): SiteLandSection {
+  const row = closed(value, 'land_sha256 chunk_mm chunks backdrop_sha256 water', 'land');
+  if (row['chunk_mm'] !== LAND_CHUNK_MM) fail(`The site drawing's land chunks are not ${LAND_CHUNK_MM} mm.`);
+  const chunks = row['chunks'], water = row['water'];
+  if (!Array.isArray(chunks) || chunks.length === 0 || !Array.isArray(water)) fail("The site drawing's land states no chunks or no water list.");
+  const read = chunks.map((one, index) => {
+    const chunk = closed(one, 'chunk sha256', `land chunk ${index}`);
+    return Object.freeze({ chunk: pair(chunk['chunk'], `land chunk ${index} place`), sha256: digest(chunk['sha256'], `land chunk ${index} digest`) });
+  });
+  if (new Set(read.map((one) => one.chunk.join(','))).size !== read.length) fail("The site drawing's land states a chunk twice.");
+  return Object.freeze({
+    landSha256: digest(row['land_sha256'], 'land digest'),
+    chunkMm: LAND_CHUNK_MM,
+    chunks: Object.freeze(read),
+    backdropSha256: digest(row['backdrop_sha256'], 'backdrop digest'),
+    water: Object.freeze(water.map((one, index): LandWater => {
+      const kind = object(one, `land water ${index}`)['kind'];
+      const fields = typeof kind === 'string' ? WATER_FIELDS[kind] : undefined;
+      if (fields === undefined) fail(`The site drawing's land water ${index} is not sea, lake or pond.`);
+      const body = closed(one, fields, `land water ${index}`);
+      const id = text(body['id'], `land water ${index} id`), levelMm = integer(body['level_mm'], `land water ${index} level`);
+      if (kind === 'sea') return Object.freeze({ id, kind, levelMm, side: text(body['side'], `land water ${index} side`) });
+      if (kind === 'lake') return Object.freeze({ id, kind, levelMm, centreMm: point(body['centre_mm'], `land water ${index} centre`), radiusMm: integer(body['radius_mm'], `land water ${index} radius`) });
+      const [x0, y0, x1, y1] = rect(body['rect_mm'], `land water ${index} rectangle`);
+      return Object.freeze({ id, kind: 'pond' as const, levelMm, rectMm: Object.freeze([x0, y0, x1, y1] as const) });
+    })),
   });
 }
 
@@ -181,7 +246,9 @@ function slot(value: unknown, index: number): SiteSlot {
 export function parseSiteDrawing(value: unknown): SiteDrawing {
   const body = object(value, 'document');
   if ((body['profile'] === SITE_DRAWING_TERRAIN_PROFILE || body['profile'] === SITE_DRAWING_DRESSED_TERRAIN_PROFILE)) return parseTerrainDrawing(body);
-  if (body['profile'] !== SITE_DRAWING_PROFILE && body['profile'] !== SITE_DRAWING_SUPPORT_PROFILE) fail(`The site drawing is not ${SITE_DRAWING_PROFILE} or ${SITE_DRAWING_SUPPORT_PROFILE}.`);
+  const profile = body['profile'];
+  if (profile !== SITE_DRAWING_PROFILE && profile !== SITE_DRAWING_SUPPORT_PROFILE && profile !== SITE_DRAWING_LAND_PROFILE) fail(`The site drawing is not ${SITE_DRAWING_PROFILE}, ${SITE_DRAWING_SUPPORT_PROFILE} or ${SITE_DRAWING_LAND_PROFILE}.`);
+  const onLand = profile === SITE_DRAWING_LAND_PROFILE;
   const kind = object(body['kind'], 'kind');
   const extent = object(body['extent'], 'extent');
   const enclosure = extent['enclosure'];
@@ -212,7 +279,8 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
     if (!/^[0-9a-f]{64}$/.test(text(supportRaw['place_sha256'], 'support place digest'))
         || binding[text(supportRaw['entry_node_id'], 'support entry node')] !== entrySurface) fail('The site support entry/place binding is invalid.');
   }
-  const read = slots.map(slot);
+  const read = slots.map((one, index) => slot(one, index, onLand));
+  const land = onLand ? landSection(body['land']) : undefined;
   // Network supports are canonical walking geometry. Draw their exact top planes in the same dresser.
   if (support !== undefined) for (const surface of support.document.surfaces) {
     if (surface.surface_id === support.entry.surfaceId) continue;
@@ -226,8 +294,9 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
   const identities = new Set(read.map((one) => one.identity));
   if (identities.size !== read.length) fail('Two slots of the site drawing share an identity.');
   return Object.freeze({
-    profile: body['profile'],
+    profile,
     ...(support === undefined ? {} : { support }),
+    ...(land === undefined ? {} : { land }),
     worldId: text(body['world_id'], 'world'),
     receiptSha256: text(body['receipt_sha256'], 'receipt'),
     kind: Object.freeze({

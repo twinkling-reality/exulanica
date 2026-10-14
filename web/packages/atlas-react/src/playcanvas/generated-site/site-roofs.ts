@@ -213,7 +213,8 @@ export function shapeRoofs(drawing: StructuredSiteDrawing, materials: SurfaceMat
     const input: RoofInput = {
       widthM: widthMm / 1000,
       depthM: depthMm / 1000,
-      wallM: roof.positionMm[2] / 1000,
+      // From the building's own base, which on land stands on its terrace and not at the datum.
+      wallM: (roof.positionMm[2] - (structure?.positionMm[2] ?? 0)) / 1000,
       served: { pitched: roof.primitive === 'gable', riseM: roof.boxMm[2] / 1000, ridge: turned ? 'z' : 'x' },
       doorAxis: structure === undefined || doors.length === 0 ? null : structure.yawQuarterTurns % 2 === 0 ? 'z' : 'x',
       doors,

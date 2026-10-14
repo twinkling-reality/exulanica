@@ -21,6 +21,7 @@ import {
   generatedRegionName,
   placementPoseBeforeVisitor,
   yawMicroradiansOf,
+  type WorldGround,
 } from '@exulanica/atlas-react/playcanvas';
 import { ApiError } from '@exulanica/graph-client';
 import { draftEnded, type CreatureDraft, type CreatureDraftsClient, type CreatureOffer } from '../creature-drafts-api.js';
@@ -120,15 +121,29 @@ export function fartherAhead(placement: CreaturePlacement, extraMm: number): Cre
  * thing, facing the way they face, in the one region that world's people live in. That region's
  * frame is the city's, raised to the height where a person arrives (`hostGeneratedSociety`), so a
  * point in it is the person's atlas position less that height, on the plane its people stand on.
- * Null unless that region is the one drawn here (`drawnRegion`, the entity its people and things
- * hang from), so a creature is never placed where this page would not show it.
+ * A site on land (`ground`, the world's drawn ground, a site with land) hangs that region at the
+ * land's datum, and the creature stands on the land there. Null unless that region is the one drawn
+ * here (`drawnRegion`, the entity its people and things hang from), so a creature is never placed
+ * where this page would not show it.
  */
 export function placementInGeneratedRegion(
   generated: { readonly regionId: string; readonly arrivalMm: readonly number[] } | null | undefined,
   drawnRegion: string | null | undefined,
   pose: CameraPose | undefined,
+  ground?: WorldGround,
 ): CreaturePlacement | null {
   if (generated == null || pose === undefined || drawnRegion !== generatedRegionName(generated.regionId)) return null;
+  const land = ground?.form === 'generated-site' ? ground.site.land : undefined;
+  if (land !== undefined) {
+    const there = placementPoseBeforeVisitor({ position: atlasVec3(0, 0, 0), yaw: 0, scale: 1 }, pose, DEFAULT_PLACEMENT_DISTANCE_MM);
+    return {
+      region_id: generated.regionId,
+      transform: {
+        x_mm: there.xMm, y_mm: Math.round(land.groundM(there.xMm / 1000, there.zMm / 1000) * 1000),
+        z_mm: there.zMm, yaw_microradians: there.yawMicroradians,
+      },
+    };
+  }
   const ahead = placementPoseBeforeVisitor(
     { position: atlasVec3(0, (generated.arrivalMm[1] ?? 0) / 1000, 0), yaw: 0, scale: 1 },
     pose,
@@ -161,9 +176,10 @@ export function planPlacement(
   generated: { readonly regionId: string; readonly arrivalMm: readonly number[] } | null | undefined,
   drawnRegion: string | null | undefined,
   pose: CameraPose | undefined,
+  ground?: WorldGround,
 ): PlanPlacement | null {
   if (panel !== null) return panel;
-  const ahead = placementInGeneratedRegion(generated, drawnRegion, pose);
+  const ahead = ground === undefined ? placementInGeneratedRegion(generated, drawnRegion, pose) : placementInGeneratedRegion(generated, drawnRegion, pose, ground);
   if (ahead === null) return null;
   return { region_id: ahead.region_id, transform: { ...ahead.transform, scale_milli: 1000 } };
 }

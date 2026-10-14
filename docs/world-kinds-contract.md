@@ -347,7 +347,9 @@ marked `drape` (each point of a draped slot as far above the land under it as it
 the land under its base's centre), the arrival at its height, and a `land` section naming the
 land's digest, each chunk's place and digest, the backdrop's digest and the water over the land.
 The chunks and the backdrop are served by those digests. Every earlier version is unchanged. The
-application does not yet read version 5.
+application reads version 5: it holds each chunk and the backdrop to the digest the drawing names,
+lays each draped slot on the land, draws the land in place of the site's base ground and the
+look's ground beyond, out to the backdrop's horizon, and stands the site's people and things on it.
 
 A style pack dresses a slot by its look role and never changes it. Nothing in the drawing decides a
 look.

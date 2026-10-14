@@ -3,7 +3,7 @@ import { FlightFlock } from '../flight/flock.js';
 import type { FlightKindLook, FlightWindow } from '../flight/types.js';
 import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { createObjectContainerAsset } from '../scene-objects.js';
-import { SocietyCrowd, type CrowdCounts, type CrowdFigures, type CrowdSeatingMiss } from './crowd.js';
+import { SocietyCrowd, type CrowdCounts, type CrowdFigures, type CrowdGround, type CrowdSeatingMiss } from './crowd.js';
 import type { SeatingLayout } from './seating.js';
 import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
 
@@ -67,6 +67,46 @@ export function visitorRayOnRootGround(
   return { xMm: mm(from.x + t * along.x), zMm: mm(from.z + t * along.z) };
 }
 
+/**
+ * How far apart a ray is tried against land before the crossing is narrowed, and how far it
+ * reaches, metres. A click on open ground names a walk on the site's floor, which lies within a few
+ * hundred metres of anyone looking at it, and the ray is walked on every pointer move while a being
+ * is played, so it is walked no further than that: at most 800 samples of the land.
+ */
+const LAND_RAY_STEP_M = 0.5;
+export const LAND_RAY_REACH_M = 400;
+
+/**
+ * Where a ray of the visitor's world comes down to the land under `root` (`ground`, its height
+ * under a point of that frame), as a point of that frame in whole millimetres; null where the ray
+ * starts under the land or meets none within its reach. The ray is walked in half metres and the
+ * crossing narrowed, so it meets the first hill in its way.
+ */
+export function visitorRayOnRootLand(
+  root: pc.GraphNode,
+  renderOrigin: { readonly x: number; readonly y: number; readonly z: number },
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+  ground: CrowdGround,
+): { readonly xMm: number; readonly zMm: number } | null {
+  const fromWorld = new pc.Mat4();
+  const from = visitorPointInRoot(root, renderOrigin, origin, fromWorld);
+  const along = fromWorld.transformVector(new pc.Vec3(direction[0], direction[1], direction[2]), new pc.Vec3()).normalize();
+  const above = (t: number): number => from.y + t * along.y - ground(from.x + t * along.x, from.z + t * along.z);
+  if (!(above(0) > 0)) return null;
+  for (let t = LAND_RAY_STEP_M; t <= LAND_RAY_REACH_M; t += LAND_RAY_STEP_M) {
+    if (above(t) > 0) continue;
+    let low = t - LAND_RAY_STEP_M, high = t;
+    for (let k = 0; k < 24; k += 1) {
+      const middle = (low + high) / 2;
+      if (above(middle) > 0) low = middle; else high = middle;
+    }
+    const mm = (metres: number): number => Math.round(metres * 1000) + 0;
+    return { xMm: mm(from.x + high * along.x), zMm: mm(from.z + high * along.z) };
+  }
+  return null;
+}
+
 export class AuthoredRegionSociety {
   readonly root: pc.Entity;
   private readonly crowd: SocietyCrowd;
@@ -82,10 +122,18 @@ export class AuthoredRegionSociety {
   private readonly local = new pc.Vec3();
   private nearbySignature = '';
 
-  constructor(device: pc.GraphicsDevice, regionRoot: pc.Entity) {
+  /**
+   * The land's height under a point of this society's frame (east, south, metres), for a site on
+   * land: what its people stand on, what a click on open ground meets and what its things stand
+   * on. None on level ground, where everyone stands on the root's own plane.
+   */
+  readonly groundHeightAt: CrowdGround | undefined;
+
+  constructor(device: pc.GraphicsDevice, regionRoot: pc.Entity, options: { readonly ground?: CrowdGround } = {}) {
     this.root = new pc.Entity('authored-region-society');
     regionRoot.addChild(this.root);
-    this.crowd = new SocietyCrowd(device, this.root);
+    this.groundHeightAt = options.ground;
+    this.crowd = options.ground === undefined ? new SocietyCrowd(device, this.root) : new SocietyCrowd(device, this.root, { ground: options.ground });
   }
 
   /**
@@ -382,7 +430,9 @@ export class AuthoredRegionSociety {
     origin: readonly [number, number, number],
     direction: readonly [number, number, number],
   ): { readonly xMm: number; readonly zMm: number } | null {
-    return visitorRayOnRootGround(this.root, this.renderOrigin, origin, direction);
+    return this.groundHeightAt === undefined
+      ? visitorRayOnRootGround(this.root, this.renderOrigin, origin, direction)
+      : visitorRayOnRootLand(this.root, this.renderOrigin, origin, direction, this.groundHeightAt);
   }
 
   destroy(): void {

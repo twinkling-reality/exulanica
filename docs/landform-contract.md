@@ -1,12 +1,12 @@
 # Landform
 
-Status: **IMPLEMENTED BOUNDARY: DATA, READERS AND SITE WORLDS ON LAND; NOT YET DRAWN**. A world's
-land can be stated as data, realized, graded and read back in Python and in the browser, and a site
-world can be made on land through its route: graded, regenerated from its receipt, its people's
-places standing on the land, its drawing and its land served. The application does not yet draw
-land, and no product page or drafter asks for it, so every world anyone has made stands on level
-ground, as the [world kinds contract](world-kinds-contract.md) and the
-[city grammar](grammar-package.md) state.
+Status: **IMPLEMENTED BOUNDARY: DATA, READERS AND SITE WORLDS ON LAND, DRAWN; NOT YET ASKED FOR**.
+A world's land can be stated as data, realized, graded and read back in Python and in the browser,
+and a site world can be made on land through its route: graded, regenerated from its receipt, its
+people's places standing on the land, its drawing and its land served. The application draws such
+a site on its land, to the horizon, and stands its people and things on it. No product page or
+drafter asks for land, so every world anyone has made stands on level ground, as the
+[world kinds contract](world-kinds-contract.md) and the [city grammar](grammar-package.md) state.
 
 This document owns the land document (`exulanica.landform/v1`), the landform catalogs, the pure
 function that realizes a land, the grading a layout applies to it, and the chunk and backdrop
@@ -214,8 +214,10 @@ level. A world made without land is the level world it always was, byte for byte
 
 ## Limits
 
-- The application draws no land: a site made on land is served its land and the page does not yet
-  read it. No product page or drafter asks for land. Towns are laid out on level ground.
+- No product page or drafter asks for land. Towns are laid out on level ground.
+- The application draws a site's land with no shadow from it: hills cast none. A pick is not
+  hidden by a hill. Faces steeper than about 35 degrees are drawn in the surface catalog's stone
+  colour, not a style pack's surface.
 - Positions in a society stay two integers and plan distance stays the walking cost; walking uphill
   takes no longer.
 - One heightfield per chunk: no overhangs, arches or passages under terraces.

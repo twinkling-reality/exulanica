@@ -51,6 +51,8 @@ export interface DrawnScenery {
   /** Holds `SCENERY_TREES` or `SCENERY_STONES`, whichever is drawn. */
   readonly root: pc.Entity;
   readonly triangles: number;
+  /** The land's height under a site point, millimetres, for scenery on land; null on level ground. */
+  readonly groundMm: ((eastMm: number, northMm: number) => number) | null;
   destroy(): void;
 }
 
@@ -103,11 +105,13 @@ class Gathered {
 
 /**
  * Draw scenery as plain shapes under a new root, in the renderer's frame (east, up, south; a site's
- * y is north). `materials` names the colours; with none, the engine's own.
+ * y is north). `materials` names the colours; with none, the engine's own. On land, `groundMm`
+ * stands each piece on the land under it; with none, every piece stands at the site's level.
  */
 export function drawSiteScenery(
   device: pc.GraphicsDevice, drawn: { readonly scenery: SiteScenery; readonly pieces: readonly SceneryPiece[] },
   materials: SurfaceMaterials | null,
+  groundMm?: (eastMm: number, northMm: number) => number,
 ): DrawnScenery {
   const { scenery, pieces } = drawn;
   const root = new pc.Entity('site-scenery');
@@ -151,9 +155,10 @@ export function drawSiteScenery(
     for (const piece of pieces) {
       const x = piece.xMm / 1000, z = -piece.yMm / 1000, tall = piece.heightMm / 1000, wide = piece.widthMm / 1000;
       const trunk = tall * TRUNK_HEIGHT, crown = tall * (1 - CROWN_FROM);
+      const ground = groundMm === undefined ? 0 : groundMm(piece.xMm, piece.yMm) / 1000;
       // Both unit shapes stand about their own middle.
-      trunks.add(post, [tall * TRUNK_HALF_WIDTH, trunk, tall * TRUNK_HALF_WIDTH], piece.quarterTurns, [x, trunk / 2, z]);
-      crowns.add(cone, [wide / 2, crown, wide / 2], piece.quarterTurns, [x, tall * CROWN_FROM + crown / 2, z]);
+      trunks.add(post, [tall * TRUNK_HALF_WIDTH, trunk, tall * TRUNK_HALF_WIDTH], piece.quarterTurns, [x, ground + trunk / 2, z]);
+      crowns.add(cone, [wide / 2, crown, wide / 2], piece.quarterTurns, [x, ground + tall * CROWN_FROM + crown / 2, z]);
     }
     shaped(SCENERY_TREES, [
       [trunks, material('trunk', colourOf(TRUNK_MATERIAL, PLAIN_RGB.trunk))],
@@ -167,12 +172,13 @@ export function drawSiteScenery(
       const tall = piece.heightMm / 1000 / (1 - STONE_SUNK), wide = piece.widthMm / 1000;
       // Every other stone is narrower one way, so no two read as the same ball.
       const narrow = piece.quarterTurns % 2 === 0 ? 0.7 : 1;
-      stones.add(ball, [wide, tall, wide * narrow], piece.quarterTurns, [piece.xMm / 1000, tall * (0.5 - STONE_SUNK), -piece.yMm / 1000]);
+      const ground = groundMm === undefined ? 0 : groundMm(piece.xMm, piece.yMm) / 1000;
+      stones.add(ball, [wide, tall, wide * narrow], piece.quarterTurns, [piece.xMm / 1000, ground + tall * (0.5 - STONE_SUNK), -piece.yMm / 1000]);
     }
     shaped(SCENERY_STONES, [[stones, material('stone', colourOf(STONE_MATERIAL, PLAIN_RGB.stone))]]);
   }
   return {
-    pieces, stands: scenery.stands, material: scenery.key, root, triangles,
+    pieces, stands: scenery.stands, material: scenery.key, root, triangles, groundMm: groundMm ?? null,
     destroy(): void {
       root.destroy();
       for (const mesh of meshes) mesh.destroy();

@@ -9,7 +9,8 @@ import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
 import { budgetedLook } from '../generated-tile/budgeted-look.js';
 import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type TerrainSiteDrawing, type SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
-import { drawSiteSlots, type DrawnSiteSlots } from './site-primitives.js';
+import { drawSiteSlots, slotColour, type DrawnSiteSlots } from './site-primitives.js';
+import { drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
 import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
 import { measureSite } from './site-measurements.js';
@@ -41,6 +42,8 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
   /** The kind the world was made from, in its own words, which the About panel says. */
   readonly kindLabel: string;
   readonly drawing: SiteDrawing;
+  /** A site on land's land, which its society, its things and its sight stand on; none on level ground. */
+  readonly land?: SiteLand;
 }
 
 /**
@@ -49,7 +52,7 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
 export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void };
-export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment) => SiteUndress;
+export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment, land?: SiteLand) => SiteUndress;
 
 export interface SiteMountOptions {
   readonly preparedDressing?: PreparedDressing;
@@ -91,6 +94,12 @@ export interface SiteMountOptions {
    * site's scene form, an open site, an indoor site or a terrain. None draws the look as chosen.
    */
   readonly renderBudget?: RenderBudget;
+  /**
+   * The land a site on land stands on, read and held to the digests its drawing names
+   * (`readSiteLand`). A drawing that states land is not mounted without it; a drawing on level
+   * ground takes none.
+   */
+  readonly land?: SiteLand;
 }
 
 /**
@@ -113,23 +122,31 @@ export const SITE_BEYOND_DROP_M = 0.018;
 
 /**
  * The slot a site's base ground is drawn by: the ground plane its drawing lays over its whole
- * extent, at the level of the site's origin. Null where the drawing lays none.
+ * extent, at the level of the site's origin, or on land draped over it. Null where the drawing
+ * lays none.
  */
 export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null {
   const { widthMm, depthMm } = drawing.extent;
   return drawing.slots.find((slot) => slot.family === 'ground' && slot.primitive === 'plane'
     && slot.boxMm[0] === widthMm && slot.boxMm[1] === depthMm
-    && slot.positionMm[0] * 2 === widthMm && slot.positionMm[1] * 2 === depthMm && slot.positionMm[2] === 0) ?? null;
+    && slot.positionMm[0] * 2 === widthMm && slot.positionMm[1] * 2 === depthMm && (slot.positionMm[2] === 0 || slot.drape === true)) ?? null;
 }
+
+/** The base ground's colour for a site on land with none, the engine's own ground colour. */
+const LAND_GROUND_RGB = [0.47, 0.56, 0.33] as const;
 
 /** The mount for a checked site drawing. */
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
   if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
   const { look, caps } = drawnWithin(options, drawing.extent.enclosure === 'open' ? 'open_site' : 'indoor_site');
-  const navigationWorld = siteNavigationWorld(drawing);
+  // A site on land is drawn on the land its drawing names, or not at all.
+  const land = drawing.land === undefined ? null : options.land ?? null;
+  if (drawing.land !== undefined && (land === null || land.section !== drawing.land)) throw new TypeError("A site on land is mounted with the land its drawing names.");
+  const navigationWorld = land === null ? siteNavigationWorld(drawing) : siteNavigationWorld(drawing, undefined, land);
   return Object.freeze({
     kindLabel: drawing.kind.label,
     drawing,
+    ...(land === null ? {} : { land }),
     navigationWorld,
     start: siteStart(drawing, navigationWorld),
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
@@ -138,15 +155,53 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials, options.roofForms ?? null);
       host.environmentRoot.addChild(slots.root);
       const base = drawing.extent.enclosure === 'open' ? baseGroundSlot(drawing) : null;
+      // On land: the slots that follow it laid on it, and the land itself in place of the base
+      // ground and of the look's flat plane beyond, out to the backdrop's horizon.
+      const draped = land === null ? null : drapeSiteSlots(host.app.graphicsDevice, drawing, slots, land);
+      const landBase = land === null ? null : baseGroundSlot(drawing);
+      const landBaseShape = landBase === null ? null : (slots.entities.get(landBase.identity)?.findByName(`${landBase.identity}:shape`) as pc.Entity | null);
+      const landPlain = land !== null && landBaseShape?.render?.meshInstances[0] === undefined
+        ? new pc.StandardMaterial() : null;
+      if (landPlain !== null) {
+        landPlain.name = 'site-land:ground';
+        landPlain.diffuse = new pc.Color(...LAND_GROUND_RGB);
+        landPlain.update();
+      }
+      const stone = materials?.materials.find((one) => one.key === 'stone')?.swatch.srgb8;
+      const drawnLand = land === null ? null : drawSiteLand(host.app.graphicsDevice, land,
+        landBaseShape?.render?.meshInstances[0]?.material ?? landPlain!,
+        landBase === null ? LAND_GROUND_RGB : slotColour(landBase, drawing.extent.enclosure, materials),
+        stone === undefined ? undefined : [stone[0] / 255, stone[1] / 255, stone[2] / 255]);
+      if (drawnLand !== null) {
+        host.environmentRoot.addChild(drawnLand.root);
+        // The land is the base ground: the slot is kept for what dresses it, and not drawn.
+        const baseEntity = landBase === null ? undefined : slots.entities.get(landBase.identity);
+        if (baseEntity !== undefined) baseEntity.enabled = false;
+        if (environment.ground !== null) environment.ground.enabled = false;
+        const camera = host.camera.camera;
+        if (camera != null) camera.farClip = Math.max(camera.farClip, drawnLand.reachM);
+      }
       // What stands beyond the place: scenery, beside the site's slots in the same frame and none of
       // them, so nothing that reads or outlines the slots meets it. The dresser is handed it to
       // shade, or to stand its own trees in.
       // It stands on the ground beyond: a look that draws no ground beyond the place draws none.
-      const standing = options.scenery === undefined || materials === null || environment.ground === null
+      const stated = options.scenery === undefined || materials === null || environment.ground === null
         ? null : sceneryOf(drawing, base, options.scenery, materials);
-      const scenery = standing === null || standing.pieces.length === 0 ? null : drawSiteScenery(host.app.graphicsDevice, standing, materials);
+      // On land, scenery stands on the land where it is dry, never in the sea, a lake or a pond.
+      const standing = stated === null || land === null ? stated
+        : { ...stated, pieces: stated.pieces.filter((piece) => land.dryAt(piece.xMm, piece.yMm)) };
+      const scenery = standing === null || standing.pieces.length === 0 ? null
+        : land === null ? drawSiteScenery(host.app.graphicsDevice, standing, materials)
+          : drawSiteScenery(host.app.graphicsDevice, standing, materials, land.groundMm);
       if (scenery !== null) host.environmentRoot.addChild(scenery.root);
-      const undress = options.dress?.(host, slots, drawing, scenery, environment) ?? null;
+      const undress = (land === null ? options.dress?.(host, slots, drawing, scenery, environment)
+        : options.dress?.(host, slots, drawing, scenery, environment, land)) ?? null;
+      // The near land wears the base ground as it is dressed, a pack's texture with its own scale.
+      const dressedBase = landBaseShape?.render?.meshInstances[0]?.material ?? null;
+      if (drawnLand !== null && dressedBase !== null) {
+        drawnLand.wear(dressedBase);
+        for (const instance of drawnLand.ground) undress?.dressBeyond?.(instance, landBase!);
+      }
       const withdrawSeats = options.seated === undefined ? undefined : options.seated(drawnSiteSeats(drawing, slots, undress?.seatTriangles));
       // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn
       // in once dressed, and the look's sun turned into the light under it.
@@ -163,7 +218,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       const beyond = environment.ground?.render?.meshInstances[0] ?? null;
       const baseShape = base === null ? null : (slots.entities.get(base.identity)?.findByName(`${base.identity}:shape`) as pc.Entity | null);
       const worn = baseShape?.render?.meshInstances[0]?.material ?? null;
-      const edged = beyond !== null && worn !== null && environment.ground !== null;
+      const edged = land === null && beyond !== null && worn !== null && environment.ground !== null;
       if (edged) {
         beyond.material = worn;
         // A texture needs the beyond plane’s physical UVs, rather than its unit primitive UVs.
@@ -178,6 +233,10 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       // What stands beyond, said on the canvas: what, how many, and beyond which ground.
       if (scenery !== null && canvas?.dataset !== undefined) {
         canvas.dataset['siteScenery'] = JSON.stringify({ stands: scenery.stands, beyond: scenery.material, pieces: scenery.pieces.length });
+      }
+      // The land, said on the canvas: its chunks, the slots laid on it and what it draws.
+      if (drawnLand !== null && canvas?.dataset !== undefined) {
+        canvas.dataset['siteLand'] = JSON.stringify({ land: land!.section.landSha256, chunks: land!.chunks.length, draped: draped!.draped, draws: drawnLand.draws, triangles: drawnLand.triangles });
       }
       const said = options.dress === undefined && materials !== null && canvas?.dataset !== undefined;
       if (said) {
@@ -195,9 +254,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         animating: undress?.animating ?? false,
         metrics: Object.freeze({
           tileName: `site:${drawing.worldId}`,
-          triangles: slots.triangles,
-          drawBatches: slots.drawn,
-          transferredBytes: options.servedBytes + (undress?.textureMetrics?.transferredBytes ?? 0),
+          triangles: slots.triangles + (drawnLand?.triangles ?? 0),
+          drawBatches: slots.drawn + (drawnLand?.draws ?? 0),
+          transferredBytes: options.servedBytes + (land?.servedBytes ?? 0) + (undress?.textureMetrics?.transferredBytes ?? 0),
           decodedTextureBytes: undress?.textureMetrics?.decodedTextureBytes ?? 0,
           unavailableSurfaces: undress?.textureMetrics?.unavailableSurfaces ?? 0,
           neighbours: Object.freeze([]),
@@ -217,11 +276,17 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
           }
           if (scenery !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteScenery'];
           if (ceiling !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCeiling'];
+          if (drawnLand !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteLand'];
           // The ceiling goes before the dressing is undone: it wears a material the dressing made.
           ceiling?.destroy();
           undress?.();
+          // The slots get their own shapes back before they go, and the land's meshes after them.
+          draped?.undrape();
           scenery?.destroy();
           slots.destroy();
+          draped?.destroy();
+          drawnLand?.destroy();
+          landPlain?.destroy();
           environment.dispose();
         },
       };

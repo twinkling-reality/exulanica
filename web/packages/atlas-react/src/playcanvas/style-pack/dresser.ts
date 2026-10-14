@@ -34,6 +34,11 @@ export interface PieceSlot {
   readonly front: readonly [number, number];
   /** Width along the front, depth, height. */
   readonly boxMm: readonly [number, number, number];
+  /**
+   * A slot of a site on land that follows the land: each point of its piece stands as far above
+   * the land under it as the slot's base stands above the land under its base's centre.
+   */
+  readonly drape?: true;
 }
 
 export interface SlotDressing {
@@ -84,6 +89,8 @@ export function dressSlots(
   shading: RenderShading,
   /** Opt-in copy of a selected slot's exact baked triangles, in the parent's frame. */
   capture?: { readonly identities: ReadonlySet<string>; readonly maximumVertices: number; readonly triangles: (identity: string, positions: readonly number[], normals: readonly number[]) => void },
+  /** The land's height under a point of the parent's frame (east, south, metres), for draped slots; none on level ground. */
+  ground?: (east: number, south: number) => number,
 ): SlotDressing {
   const batches = new Map<string, SwatchBatch>();
   const undressed: string[] = [];
@@ -115,6 +122,9 @@ export function dressSlots(
     // right of a viewer facing the front.
     const [frontEast, frontNorth] = slot.front;
     const [east, north, up] = slot.positionMm.map((value) => value / 1000) as [number, number, number];
+    // A draped slot's piece rises and falls with the land under each of its points.
+    const under = ground === undefined || slot.drape !== true ? 0 : ground(east, -north);
+    const lift = ground === undefined || slot.drape !== true ? null : (x: number, z: number): number => ground(x, z) - under;
     // Renderer metres: east, up, south.
     const toRenderer = (x: number, y: number, z: number, out: number[], offset: boolean): void => {
       const e = -x * frontNorth + z * frontEast;
@@ -133,7 +143,7 @@ export function dressSlots(
           batches.set(group.swatch, batch);
         }
         const from = batch.positions.length;
-        bake(group, axes, shift, toRenderer, batch, local, normal);
+        bake(group, axes, shift, toRenderer, batch, local, normal, lift);
         if (captured !== null && !captureRefused) {
           const count = (batch.positions.length - from) / 3;
           if (capturedVertices + count > captureLimit) {
@@ -203,6 +213,7 @@ function bake(
   batch: SwatchBatch,
   local: number[],
   normal: number[],
+  lift: ((x: number, z: number) => number) | null,
 ): void {
   const { positions, normals, indices } = group;
   for (let t = 0; t < indices.length; t += 3) {
@@ -226,6 +237,7 @@ function bake(
       local[1] = placeAxis(axes[1]!, positions[v * 3 + 1]!);
       local[2] = placeAxis(axes[2]!, positions[v * 3 + 2]!);
       toRenderer(local[0]!, local[1]!, local[2]!, normal, true);
+      if (lift !== null) normal[1] = normal[1]! + lift(normal[0]!, normal[2]!);
       batch.positions.push(normal[0]!, normal[1]!, normal[2]!);
       // A normal under a stretch turns by the inverse of the draw-out on each axis.
       const nx = normals[v * 3]! / fx;

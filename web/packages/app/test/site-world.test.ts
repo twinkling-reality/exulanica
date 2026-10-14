@@ -6,6 +6,7 @@ import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
 import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
+import { siteSightRings } from '../src/composition/sight.js';
 import { GROUND_BORDERS } from '../src/ground-borders.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
 import { SITE_INTERIOR } from '../src/site-interior.js';
@@ -328,5 +329,96 @@ describe('redrawing an open site in another pack', () => {
     expect(stated).toEqual([{ pack: 'exulanica.toon-town', source: 'redraw', drawn: true, reason: null }]);
     attachment.dispose();
     expect(log.at(-1)).toBe('take down exulanica.toon-town');
+  });
+});
+
+/**
+ * A site made on land (`exulanica.site-drawing/v5`): the synthetic yard on a slope the atlas-react
+ * tests read (`fixtures/site-land.v5.json`), its two chunks and backdrop rebuilt from the same
+ * formula, each served by the digest its drawing names.
+ */
+const LAND_DRAWING = canonical(JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-land.v5.json', 'utf8')));
+const landEntry = { ...entry, worldId: 'world:generated:land-fixture' } as unknown as SavedWorldEntry;
+const lattice = (east: number, north: number): number => 6000 + (40 * north) / 1000 + (east >= 8000 ? 500 : 0);
+function landChunk(chunkX: number, chunkY: number): string {
+  const height = [];
+  for (let j = 0; j < 129; j += 1) for (let i = 0; i < 129; i += 1) height.push(lattice(chunkX * 128_000 + i * 1000, chunkY * 128_000 + j * 1000));
+  return canonical({ profile: 'exulanica.landform-chunk/v1', chunk: [chunkX, chunkY], cell_mm: 1000, samples_per_side: 129, height_mm: height });
+}
+function landBackdrop(): string {
+  const xs = [-400_000, -128_000, 0, 128_000, 400_000], ys = [-400_000, 0, 128_000, 400_000];
+  return canonical({
+    profile: 'exulanica.landform-backdrop/v1', near_mm: [-128_000, 0, 128_000, 128_000], x_mm: xs, y_mm: ys,
+    height_mm: ys.flatMap((y) => xs.map((x) => (y < 0 ? -20_000 : y > 128_000 ? 150_000 : lattice(x, y)))),
+    water: [{ id: 'sea', kind: 'sea', level_mm: 0, side: 'south' }],
+  });
+}
+
+/** A host serving the yard on a slope and its land; `tampered` serves that path's document changed. */
+function landHost(tampered: string | null = null) {
+  const level = host(200, LAND_DRAWING);
+  const documents = new Map([['land/chunks/-1/0', landChunk(-1, 0)], ['land/chunks/0/0', landChunk(0, 0)], ['land/backdrop', landBackdrop()]]);
+  const fetched = vi.fn(async (input: string): Promise<Response> => {
+    const at = /^\/world\/versions\/version\/(land\/[^?]+)\?world_id=world%3Agenerated%3Aland-fixture$/.exec(input.slice(access.baseUrl.length));
+    if (at === null) return level.fetched(input);
+    level.asked.push(input.slice(access.baseUrl.length));
+    const body = documents.get(at[1]!);
+    if (body === undefined) return refused(404, 'land_chunk_unavailable');
+    const etag = `"${sha256(new TextEncoder().encode(body))}"`;
+    return new Response(at[1] === tampered ? body.replace('6000', '6001') : body, { status: 200, headers: { ETag: etag } });
+  });
+  return { fetched, asked: level.asked };
+}
+
+describe('a site made on land', () => {
+  it('reads every chunk and the backdrop its drawing names, by digest, and mounts the site on them in every look', async () => {
+    const { fetched, asked } = landHost();
+    vi.stubGlobal('fetch', fetched);
+    const world = (await loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null))!;
+    const land = world.mount.land!;
+    expect(land.chunks.map((chunk) => [chunk.chunkX, chunk.chunkY])).toEqual([[-1, 0], [0, 0]]);
+    expect(land.groundMm(4000, 8000)).toBe(6320);
+    expect((mounts.asked.at(-1) as { land?: unknown }).land).toBe(land);
+    expect(asked.filter((path) => path.includes('/land/')).sort()).toEqual([
+      '/world/versions/version/land/backdrop?world_id=world%3Agenerated%3Aland-fixture',
+      '/world/versions/version/land/chunks/-1/0?world_id=world%3Agenerated%3Aland-fixture',
+      '/world/versions/version/land/chunks/0/0?world_id=world%3Agenerated%3Aland-fixture',
+    ]);
+    // Redrawn in another look on the same land, read once.
+    const before = asked.length;
+    const again = await world.relook({ packId: null, source: 'address' } as unknown as WorldLookChoice);
+    expect(again.mount.land).toBe(land);
+    expect(asked.slice(before).some((path) => path.includes('/land/'))).toBe(false);
+  });
+
+  it.each(['land/chunks/0/0', 'land/backdrop'])('is not drawn when %s is not the document its drawing names', async (path) => {
+    vi.stubGlobal('fetch', landHost(path).fetched);
+    await expect(loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null)).rejects.toThrow('is the document its digest names');
+  });
+
+  it('is not drawn when its land cannot be read', async () => {
+    const { fetched } = landHost();
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => (input.includes('/land/backdrop') ? refused(404, 'land_unavailable') : fetched(input))));
+    await expect(loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null)).rejects.toThrow("land could not be read: HTTP 404");
+  });
+
+  it('puts what stands across the eye in a sight line above the land it stands on', async () => {
+    vi.stubGlobal('fetch', landHost().fetched);
+    const world = (await loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null))!;
+    const drawing = world.mount.drawing as Parameters<typeof siteSightRings>[0];
+    // The fence stands 1.2 m on land 7 m up: across a 1.1 m eye above the land, under it above the datum.
+    expect(siteSightRings(drawing, 1100, world.mount.land!.groundMm)).toHaveLength(1);
+    expect(siteSightRings(drawing, 1100)).toHaveLength(0);
+  });
+});
+
+describe('a site on level ground', () => {
+  it('asks for no land and mounts with none', async () => {
+    const { fetched, asked } = host();
+    vi.stubGlobal('fetch', fetched);
+    const world = (await loadSiteWorld(access, entry, () => {}, async () => {}, '', null))!;
+    expect(world.mount.land).toBeUndefined();
+    expect('land' in mounts.asked.at(-1)!).toBe(false);
+    expect(asked.some((path) => path.includes('/land/'))).toBe(false);
   });
 });
