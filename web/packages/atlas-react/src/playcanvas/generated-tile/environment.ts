@@ -1,7 +1,8 @@
 import * as pc from 'playcanvas';
 import type { RenderCaps } from '@exulanica/atlas-core';
 import { isRenderLook, sunDirection, type RenderLook, type Rgb, type TileLook, type TileLookV1 } from './look.js';
-import { cubeFaceDirection, renderSkyFaces } from './sky.js';
+import { cubeFaceDirection, renderSkyFaces, sunDiscRadiance } from './sky.js';
+import { installSunDisc, setSunDisc } from './sun-disc.js';
 import { ShadowDetail } from './shadow-detail.js';
 import { installAerialHaze, setAerialHaze } from './aerial-haze.js';
 
@@ -161,10 +162,11 @@ function tileSkyLight(device: pc.GraphicsDevice, look: TileLookV1): SkyLight {
  * Resident bytes count the drawn sky and the two light textures at half-float RGBA, the lighting
  * source with its mip chain.
  */
-function renderSkyLight(device: pc.GraphicsDevice, look: RenderLook): SkyLight {
+/** `disc` false bakes the sky without the sun's disc, which `sun-disc.ts` then draws. */
+function renderSkyLight(device: pc.GraphicsDevice, look: RenderLook, disc: boolean): SkyLight {
   const size = look.sky.faceTexels;
   const source = look.environment.sourceSize;
-  const sky = halfFloatCubemap(device, 'generated-tile-sky', size, renderSkyFaces(look, size, false));
+  const sky = halfFloatCubemap(device, 'generated-tile-sky', size, renderSkyFaces(look, size, false, disc));
   const probe = halfFloatCubemap(device, 'generated-tile-sky-light', source, renderSkyFaces(look, source, true));
   const lighting = pc.EnvLighting.generateLightingSource(probe, { size: source * 2 });
   const atlas = pc.EnvLighting.generateAtlas(lighting, { size: look.environment.atlasSize });
@@ -251,7 +253,10 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
   component.farClip = Math.max(component.farClip, reach);
 
   const device = app.graphicsDevice;
-  const { sky, lighting, atlas, residentBytes: probeBytes } = isRenderLook(look) ? renderSkyLight(device, look) : tileSkyLight(device, look);
+  // A render look's sun disc is drawn by the sky's shader where it can be, so it is a smooth circle
+  // rather than a few texels of the baked faces (`sun-disc.ts`).
+  const discDrawn = isRenderLook(look) && installSunDisc(device);
+  const { sky, lighting, atlas, residentBytes: probeBytes } = isRenderLook(look) ? renderSkyLight(device, look, !discDrawn) : tileSkyLight(device, look);
   scene.envAtlas = atlas;
   scene.skybox = sky;
   scene.skyboxIntensity = look.environment.intensity;
@@ -277,6 +282,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
   // A directional light shines down its local -Y axis.
   sun.setRotation(new pc.Quat().setFromDirections(new pc.Vec3(0, -1, 0), new pc.Vec3(dx, dy, dz)));
   app.root.addChild(sun);
+  if (discDrawn) setSunDisc(device, [-dx, -dy, -dz], sunDiscRadiance(look as RenderLook));
   // Small casters keep their shadows near the eye and leave the coarse far cascades (`shadow-detail.ts`).
   const shadowDetail = new ShadowDetail(app);
   // A render look's haze, when it states one, is drawn in place of its fog (`aerial-haze.ts`).
@@ -367,6 +373,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
       scene.exposure = saved.exposure;
       scene.ambientLight = saved.ambient;
       if (hazeDrawn) setAerialHaze(device, null, look.sky.horizon, look.sun.colour, [0, 1, 0]);
+      if (discDrawn) setSunDisc(device, null, [0, 0, 0]);
       scene.fog.type = saved.fogType;
       scene.fog.start = saved.fogStart;
       scene.fog.end = saved.fogEnd;

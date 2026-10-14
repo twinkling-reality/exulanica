@@ -114,8 +114,25 @@ export function analyticSkyRadiance(model: RenderSkyModel, toSun: readonly [numb
   return out;
 }
 
-/** Linear radiance of the render look's sky toward `direction` (any length; +Y up). */
-export function renderSkyRadiance(look: RenderLook, direction: readonly [number, number, number], forLighting = false): Rgb {
+/** The cosine of the sun disc's angular radius: the disc is every direction within it of the sun. */
+export const SUN_DISC_COS = 0.9996;
+
+/** The share of the sky the look's clouds cover toward a unit `dir`, 0 to 0.95. */
+function cloudAlpha(clouds: NonNullable<RenderLook['sky']['clouds']>, dir: readonly [number, number, number]): number {
+  const up = dir[1];
+  if (up <= 0.02) return 0;
+  // Cloud points are projected onto a flat layer above, so clouds shrink toward the horizon.
+  const reach = (clouds.scale * 2.2) / (up + 0.08);
+  const density = cloudNoise(dir[0] * reach + 13.7, dir[2] * reach - 4.1, clouds.seed);
+  const cover = Math.max(0, Math.min(1, (density - (1 - clouds.cover)) * 4.5));
+  return cover * Math.min(1, (up - 0.02) * 8) * 0.95;
+}
+
+/**
+ * Linear radiance of the render look's sky toward `direction` (any length; +Y up). With `disc`
+ * false the sun's disc is left out, for a sky whose disc is drawn by its shader (`sun-disc.ts`).
+ */
+export function renderSkyRadiance(look: RenderLook, direction: readonly [number, number, number], forLighting = false, disc = true): Rgb {
   const length = Math.hypot(direction[0], direction[1], direction[2]);
   const dir = [direction[0] / length, direction[1] / length, direction[2] / length] as const;
   const sky = look.sky;
@@ -137,21 +154,17 @@ export function renderSkyRadiance(look: RenderLook, direction: readonly [number,
   }
   const facing = Math.max(0, linearDot(dir, toSun));
   const glow = sky.sunGlow * (Math.pow(facing, 8) * 0.6 + Math.pow(facing, 64) * 1.5);
-  const disc = forLighting || facing <= 0.9996 ? 0 : sky.sunDisc;
+  const sunDisc = forLighting || !disc || facing <= SUN_DISC_COS ? 0 : sky.sunDisc;
   const sun = look.sun.colour;
-  colour = [colour[0] + sun[0] * (glow + disc), colour[1] + sun[1] * (glow + disc), colour[2] + sun[2] * (glow + disc)];
+  colour = [colour[0] + sun[0] * (glow + sunDisc), colour[1] + sun[1] * (glow + sunDisc), colour[2] + sun[2] * (glow + sunDisc)];
   const clouds = sky.clouds;
   if (clouds !== null && up > 0.02) {
-    // Cloud points are projected onto a flat layer above, so clouds shrink toward the horizon.
     const reach = (clouds.scale * 2.2) / (up + 0.08);
     const px = dir[0] * reach;
     const pz = dir[2] * reach;
-    const density = cloudNoise(px + 13.7, pz - 4.1, clouds.seed);
-    const cover = Math.max(0, Math.min(1, (density - (1 - clouds.cover)) * 4.5));
-    const fade = Math.min(1, (up - 0.02) * 8);
     const lit = 0.55 + 0.45 * Math.min(1, facing * 1.4 + cloudNoise(px * 1.7 + 3.1, pz * 1.7 + 9.2, clouds.seed + 7) * 0.5);
     const cloud = mix(clouds.shade, clouds.colour, lit);
-    const alpha = cover * fade * 0.95;
+    const alpha = cloudAlpha(clouds, dir);
     colour = [
       colour[0] * (1 - alpha) + cloud[0] * alpha * 1.15,
       colour[1] * (1 - alpha) + cloud[1] * alpha * 1.15,
@@ -173,8 +186,31 @@ export function cubeFaceDirection(face: number, u: number, v: number): readonly 
   }
 }
 
+/**
+ * The linear radiance of the sun's disc as the baked sky would draw it, behind whatever cloud the
+ * sky draws in front of the sun: for a shader that draws the disc itself (`sun-disc.ts`).
+ */
+export function sunDiscRadiance(look: RenderLook): Rgb {
+  const travel = sunDirection(look);
+  const toSun = [-travel[0], -travel[1], -travel[2]] as const;
+  const clear = look.sky.clouds === null ? 1 : 1 - cloudAlpha(look.sky.clouds, toSun);
+  const k = look.sky.sunDisc * look.sky.intensity * clear;
+  const sun = look.sun.colour;
+  return [sun[0] * k, sun[1] * k, sun[2] * k];
+}
+
+/**
+ * The world direction a cubemap texel shows. The engine's sky and image light read a cubemap with
+ * x negated (`dir.x *= -1.0` in its skybox chunk, and the same in its image light), so a texel at
+ * cube direction (x, y, z) is seen toward world (-x, y, z).
+ */
+export function cubeTexelWorldDirection(face: number, u: number, v: number): readonly [number, number, number] {
+  const d = cubeFaceDirection(face, u, v);
+  return [-d[0], d[1], d[2]];
+}
+
 /** The sky's six cubemap faces, `size` texels square, as linear RGBA floats sampled at texel centres. */
-export function renderSkyFaces(look: RenderLook, size: number, forLighting = false): Float32Array[] {
+export function renderSkyFaces(look: RenderLook, size: number, forLighting = false, disc = true): Float32Array[] {
   const faces: Float32Array[] = [];
   for (let face = 0; face < 6; face += 1) {
     const texels = new Float32Array(size * size * 4);
@@ -182,7 +218,7 @@ export function renderSkyFaces(look: RenderLook, size: number, forLighting = fal
       for (let column = 0; column < size; column += 1) {
         const u = ((column + 0.5) / size) * 2 - 1;
         const v = ((row + 0.5) / size) * 2 - 1;
-        const radiance = renderSkyRadiance(look, cubeFaceDirection(face, u, v), forLighting);
+        const radiance = renderSkyRadiance(look, cubeTexelWorldDirection(face, u, v), forLighting, disc);
         const at = (row * size + column) * 4;
         texels[at] = radiance[0];
         texels[at + 1] = radiance[1];
