@@ -1,0 +1,155 @@
+{
+ "schema_version": 1,
+ "catalog_id": "exulanica.landform-surface",
+ "catalog_version": 1,
+ "noise": {
+  "broad_mm": 180000,
+  "fine_mm": 40000,
+  "fine_share_permille": 300,
+  "jitter_permille": 180,
+  "reason": "Authored: every threshold is moved by world-space noise at two scales, so the bands never read as contour lines."
+ },
+ "entries": [
+  {
+   "key": "sand",
+   "words": "sand where the land meets the sea",
+   "applies": [
+    "near",
+    "backdrop"
+   ],
+   "srgb8": [
+    176,
+    164,
+    130
+   ],
+   "slope_permille": null,
+   "height_mm": [
+    -10000000,
+    -10000000,
+    1500,
+    3500
+   ],
+   "needs_sea": true,
+   "reason": "Authored: a beach reads as sand only within a few metres of the sea's level; linear albedo about 0.4, as dry sand is.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "wooded",
+   "words": "the darker band of wooded slopes on far hills",
+   "applies": [
+    "backdrop"
+   ],
+   "srgb8": [
+    62,
+    84,
+    48
+   ],
+   "slope_permille": [
+    120,
+    320
+   ],
+   "height_mm": [
+    12000,
+    40000,
+    160000,
+    230000
+   ],
+   "needs_sea": false,
+   "reason": "Authored: woods on far hills are much darker than open ground (linear albedo about 0.07), and that darker band is what layers far ridges one behind another under haze.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "planted",
+   "words": "planting and scrub on banks too steep for a lawn",
+   "applies": [
+    "near"
+   ],
+   "srgb8": [
+    88,
+    110,
+    60
+   ],
+   "slope_permille": [
+    420,
+    640
+   ],
+   "height_mm": null,
+   "needs_sea": false,
+   "reason": "Authored: a bank steeper than about 23 degrees is planted or overgrown rather than mown, a darker green than the lawn above it.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rock",
+   "words": "bare rock on faces too steep to hold soil",
+   "applies": [
+    "near",
+    "backdrop"
+   ],
+   "srgb8": [
+    138,
+    132,
+    122
+   ],
+   "slope_permille": [
+    760,
+    1080
+   ],
+   "height_mm": null,
+   "needs_sea": false,
+   "reason": "Authored: soil does not hold beyond about 37 to 47 degrees, so steep faces are rock; linear albedo about 0.23, as weathered stone is.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "scree",
+   "words": "pale scree and bare ground high on the mountains",
+   "applies": [
+    "backdrop"
+   ],
+   "srgb8": [
+    150,
+    146,
+    138
+   ],
+   "slope_permille": null,
+   "height_mm": [
+    240000,
+    330000,
+    10000000,
+    10000000
+   ],
+   "needs_sea": false,
+   "reason": "Authored: above the woods, high slopes are scree and bare ground, paler than the rock below and the cue that a ridge is a mountain.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  }
+ ]
+}

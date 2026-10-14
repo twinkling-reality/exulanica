@@ -13,7 +13,7 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { canonicalJson, chunkHeightMm, readLandChunk, readRoofForms, readSurfaceMaterials, type SceneryPiece } from '@exulanica/atlas-core';
+import { canonicalJson, chunkHeightMm, readLandChunk, readLandSurfaces, readRoofForms, readSurfaceMaterials, type SceneryPiece } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
@@ -30,6 +30,8 @@ import {
   type StructuredSiteDrawing,
 } from '../src/playcanvas/generated-site/index.js';
 import type { TileLook } from '../src/playcanvas/generated-tile/look.js';
+import { withLandSurfaces } from '../src/playcanvas/generated-site/land-slope.js';
+import { withFinish } from '../src/playcanvas/style-pack/ground-finish.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 const FIXTURE = JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-land.v5.json', 'utf8')) as Record<string, unknown>;
@@ -41,6 +43,7 @@ const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy
 };
 const edgedLook = (): TileLook => renderLookOfPreset(COZY.light.presets[COZY.light.default_preset]!, COZY.shading, COZY.edge);
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+const SURFACES = readLandSurfaces(readFileSync('../assets/catalogs/landform/landform-surface.v1.json', 'utf8'));
 
 /** The fixture's land at a lattice point, millimetres above the datum. */
 const lattice = (east: number, north: number): number => 6000 + (40 * north) / 1000 + (east >= 8000 ? 500 : 0);
@@ -304,4 +307,63 @@ it('rebuilds the fixture\'s land documents to the digests the fixture names', ()
   const land = (FIXTURE['land'] as { chunks: { chunk: number[]; sha256: string }[]; backdrop_sha256: string });
   for (const { chunk: [x, y], sha256: named } of land.chunks) expect(sha256(new TextEncoder().encode(canonicalJson(chunkDocument(x!, y!))))).toBe(named);
   expect(sha256(new TextEncoder().encode(canonicalJson(backdropDocument())))).toBe(land.backdrop_sha256);
+});
+
+describe("a site on land in the land's own surfaces", () => {
+  const drawing = parseStructuredSiteDrawing(served());
+
+  it('wraps the colour function, the finish included, and lays the near bands over it once', () => {
+    const plain = 'uniform vec3 material_diffuse;\nvoid getAlbedo() {\n    dAlbedo = material_diffuse.rgb;\n}\n';
+    const wrapped = withLandSurfaces(plain, SURFACES, true)!;
+    expect(wrapped.split('void getAlbedo() {')).toHaveLength(2);
+    expect(wrapped).toContain('void exuLandBase() {');
+    for (const key of ['sand', 'planted', 'rock']) expect(wrapped).toContain(`// ${key}`);
+    // Far bands are the backdrop's, and sand needs a sea.
+    expect(wrapped).not.toContain('// wooded');
+    expect(withLandSurfaces(plain, SURFACES, false)).not.toContain('// sand');
+    // The slope is the land's own surface's, never a normal map's.
+    expect(wrapped).toContain('dVertexNormalW');
+    expect(wrapped).not.toContain('dNormalW');
+    // Over the ground finish: both colour functions kept, the finish's called inside the land's.
+    const finished = withLandSurfaces(withFinish(plain, 'ground'), SURFACES, true)!;
+    expect(finished).toContain('void exuFinishBase() {');
+    expect(finished).toContain('void exuLandBase() {');
+    expect(finished.split('void getAlbedo() {')).toHaveLength(2);
+    // The chain: the land's colour calls the finish's (renamed to the land's base), which calls the pack's.
+    expect(finished.indexOf('void exuLandBase() {')).toBeLessThan(finished.indexOf('exuFinishBase();'));
+    expect(finished.slice(finished.indexOf('void getAlbedo() {'))).toContain('exuLandBase();');
+    // Once only, and never into a chunk with no one colour function.
+    expect(withLandSurfaces(wrapped, SURFACES, true)).toBe(wrapped);
+    expect(withLandSurfaces('void main() {}', SURFACES, true)).toBeNull();
+  });
+
+  it('wears a copy of the base ground with the bands over it on the one mesh of each chunk, and the backdrop in its woods', () => {
+    const land = landOf(drawing);
+    const { app, camera, environmentRoot } = nullApp();
+    const attachment = siteMount(drawing, { servedBytes: 1, land, landSurfaces: SURFACES, materials: MATERIALS }).attach({ app, camera, environmentRoot });
+    const chunk = (environmentRoot.findByName('site-land:chunk:0:0') as pc.Entity).render!.meshInstances;
+    expect(chunk).toHaveLength(1);
+    const base = (environmentRoot.findByName('yard:ground:shape') as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial;
+    const worn = chunk[0]!.material as pc.StandardMaterial;
+    expect(worn).not.toBe(base);
+    expect(worn.name).toBe(`site-land:surfaces:${base.name}`);
+    expect(worn.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS')).toContain('// exulanica: land surfaces');
+    // The base ground keeps its own colour function: the bands are the land's alone.
+    expect(base.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS') ?? '').not.toContain('exuLandBase');
+    // The same copy on every chunk: one material, made once.
+    expect((environmentRoot.findByName('site-land:chunk:-1:0') as pc.Entity).render!.meshInstances[0]!.material).toBe(worn);
+    // The backdrop's slopes north of the near land stand 40 to 150 m up: wooded, darker than its ground.
+    const block = (environmentRoot.findByName('site-land:backdrop') as pc.Entity).render!.meshInstances;
+    const greens: number[] = [];
+    for (const one of block) {
+      const colours: number[] = [];
+      one.mesh.getColors(colours);
+      for (let k = 1; k < colours.length; k += 4) greens.push(colours[k]!);
+    }
+    const wooded = SURFACES.bands.find((one) => one.key === 'wooded')!.linear[1];
+    expect(greens.some((g) => Math.abs(g - wooded) < 0.005)).toBe(true);
+    expect(Math.max(...greens)).toBeGreaterThan(wooded + 0.05);
+    attachment.dispose();
+    expect(environmentRoot.findByName('site-land')).toBeNull();
+  });
 });

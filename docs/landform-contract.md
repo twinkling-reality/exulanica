@@ -25,6 +25,7 @@ documents a reader receives. The exact contact predicates a chunk is read with b
 - [Water](#water)
 - [Grading](#grading)
 - [Readers in the browser](#readers-in-the-browser)
+- [The land's look](#the-lands-look)
 - [Sites on land](#sites-on-land)
 - [Refusals](#refusals)
 - [Limits](#limits)
@@ -170,6 +171,21 @@ samples under the near land sunk below it. `tests/fixtures/landform/conformance.
 chunk, a backdrop and exact heights at points; the Python realizer is held to the file, and the
 browser readers are held to the same heights, exact through the heightfield and within float
 precision through `groundHeightMm`.
+
+## The land's look
+
+What the land wears where it is not the site's own ground is land data:
+[`landform-surface.v1.json`](../assets/catalogs/landform/landform-surface.v1.json) states bands,
+each with a colour and a reason, worn by slope and height above the sea: sand by the sea, planting
+on banks too steep to mow and rock on faces too steep to hold soil on the near land; on the
+backdrop, sand, a darker wooded band on hillsides, rock and pale scree high up, over the site's
+ground colour. Every threshold is moved by noise in the world's metres at two scales, so a band's
+edge wanders and never follows the land's one-metre grid. On the near land the bands are laid over
+the base ground as it is dressed (a pack's swatch, pattern or texture, and the ground finish),
+wrapping its colour function rather than replacing it (`generated-site/land-slope.ts`), with the
+slope read from the land's own surface; on a WebGPU device the near land wears its ground alone.
+The backdrop is coloured by vertex with the same rule (`landBackdropColour`). Far ranges read as
+mountains only through the look's haze, which a world wears from its style pack.
 
 ## Sites on land
 

@@ -219,3 +219,107 @@ export function backdropMeshData(backdrop: LandBackdrop, options: { readonly sin
   }
   return out;
 }
+
+export const LAND_SURFACE_CATALOG_ID = 'exulanica.landform-surface';
+
+/** One band of the land's look: a colour worn where the land's slope and height above the sea fall. */
+export interface LandSurfaceBand {
+  readonly key: string;
+  /** Whether the band is worn on the near land a person walks, the backdrop, or both. */
+  readonly near: boolean;
+  readonly backdrop: boolean;
+  /** Linear RGB, from the band's sRGB. */
+  readonly linear: readonly [number, number, number];
+  /** Where the band comes in by slope, rise per run in per mille: from nothing to whole. Null for any slope. */
+  readonly slopePermille: readonly [number, number] | null;
+  /** By height above the sea, millimetres: comes in, whole from, whole to, gone by. Null for any height. */
+  readonly heightMm: readonly [number, number, number, number] | null;
+  /** Worn only where the land states a sea. */
+  readonly needsSea: boolean;
+}
+
+export interface LandSurfaces {
+  readonly bands: readonly LandSurfaceBand[];
+  /** World-space noise moving every threshold: wavelengths in metres, the fine one's share, and how far it moves a threshold, as a share. */
+  readonly noise: { readonly broadM: number; readonly fineM: number; readonly fineShare: number; readonly jitter: number };
+}
+
+const srgbToLinear = (byte: number): number => {
+  const c = byte / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+};
+
+/** Read the land's look (`assets/catalogs/landform/landform-surface.v1.json`), or refuse it by name. */
+export function readLandSurfaces(text: string): LandSurfaces {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { throw new LandformError('land surfaces', 'is JSON'); }
+  const row = fields(raw, 'schema_version catalog_id catalog_version noise entries', 'land surfaces');
+  require(row['catalog_id'] === LAND_SURFACE_CATALOG_ID && row['schema_version'] === 1 && row['catalog_version'] === 1, 'land surfaces', `is ${LAND_SURFACE_CATALOG_ID} version 1`);
+  const noise = fields(row['noise'], 'broad_mm fine_mm fine_share_permille jitter_permille reason', 'land surfaces.noise');
+  require(Array.isArray(row['entries']) && row['entries'].length > 0, 'land surfaces.entries', 'is a list of bands');
+  const keys = new Set<string>();
+  const bands = (row['entries'] as unknown[]).map((one, i): LandSurfaceBand => {
+    const where = `land surfaces.entries[${i}]`;
+    const band = fields(one, 'key words applies srgb8 slope_permille height_mm needs_sea reason licence', where);
+    require(typeof band['key'] === 'string' && /^[a-z][a-z0-9_]{0,39}$/.test(band['key']) && !keys.has(band['key']), `${where}.key`, 'is a new key');
+    keys.add(band['key']);
+    const applies = band['applies'];
+    require(Array.isArray(applies) && applies.length > 0 && applies.every((a) => a === 'near' || a === 'backdrop'), `${where}.applies`, 'names near or backdrop');
+    const [r, g, b] = integers(band['srgb8'], 3, 0, 255, `${where}.srgb8`);
+    const slope = band['slope_permille'] === null ? null : integers(band['slope_permille'], 2, 0, 20_000, `${where}.slope_permille`);
+    if (slope !== null) require(slope[0]! < slope[1]!, `${where}.slope_permille`, 'rises');
+    const far = 100_000_000;
+    const height = band['height_mm'] === null ? null : integers(band['height_mm'], 4, -far, far, `${where}.height_mm`);
+    if (height !== null) require(height.every((v, k) => k === 0 || v >= height[k - 1]!), `${where}.height_mm`, 'does not fall');
+    require(typeof band['needs_sea'] === 'boolean', `${where}.needs_sea`, 'is true or false');
+    return Object.freeze({
+      key: band['key'] as string, near: (applies as string[]).includes('near'), backdrop: (applies as string[]).includes('backdrop'),
+      linear: [srgbToLinear(r!), srgbToLinear(g!), srgbToLinear(b!)] as const,
+      slopePermille: slope === null ? null : [slope[0]!, slope[1]!] as const,
+      heightMm: height === null ? null : [height[0]!, height[1]!, height[2]!, height[3]!] as const,
+      needsSea: band['needs_sea'] as boolean,
+    });
+  });
+  return Object.freeze({
+    bands: Object.freeze(bands),
+    noise: Object.freeze({
+      broadM: integer(noise['broad_mm'], 1000, 10_000_000, 'land surfaces.noise.broad_mm') / 1000,
+      fineM: integer(noise['fine_mm'], 1000, 10_000_000, 'land surfaces.noise.fine_mm') / 1000,
+      fineShare: integer(noise['fine_share_permille'], 0, 1000, 'land surfaces.noise.fine_share_permille') / 1000,
+      jitter: integer(noise['jitter_permille'], 0, 900, 'land surfaces.noise.jitter_permille') / 1000,
+    }),
+  });
+}
+
+const ramp = (low: number, high: number, value: number): number => {
+  const t = Math.min(1, Math.max(0, (value - low) / (high - low)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * How much of a band is worn at a point: by its slope (rise per run, per mille) and its height
+ * above the sea (millimetres), each threshold moved by `shift` (-1 to 1, the surfaces' noise at the
+ * point) times the noise's jitter. The shader on the near land states the same rule.
+ */
+export function landBandWeight(band: LandSurfaceBand, jitter: number, slopePermille: number, heightMm: number, shift: number): number {
+  const moved = 1 + jitter * shift;
+  const bySlope = band.slopePermille === null ? 1 : ramp(band.slopePermille[0] * moved, band.slopePermille[1] * moved, slopePermille);
+  if (band.heightMm === null) return bySlope;
+  const [comeIn, wholeFrom, wholeTo, goneBy] = band.heightMm.map((v) => v * moved) as unknown as [number, number, number, number];
+  const rising = wholeFrom > comeIn ? ramp(comeIn, wholeFrom, heightMm) : heightMm >= comeIn ? 1 : 0;
+  const falling = goneBy > wholeTo ? 1 - ramp(wholeTo, goneBy, heightMm) : heightMm <= wholeTo ? 1 : 0;
+  return bySlope * rising * falling;
+}
+
+/** The land's colour at a point of the backdrop, linear RGB: its open ground, then each band over it in order. */
+export function landBackdropColour(
+  surfaces: LandSurfaces, ground: readonly [number, number, number], slopePermille: number, heightMm: number, shift: number, sea: boolean,
+): [number, number, number] {
+  const out: [number, number, number] = [ground[0], ground[1], ground[2]];
+  for (const band of surfaces.bands) {
+    if (!band.backdrop || (band.needsSea && !sea)) continue;
+    const w = landBandWeight(band, surfaces.noise.jitter, slopePermille, heightMm, shift);
+    for (let c = 0; c < 3; c += 1) out[c] = out[c]! + (band.linear[c]! - out[c]!) * w;
+  }
+  return out;
+}

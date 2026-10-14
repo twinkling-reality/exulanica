@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { pointContact, readHeightfieldGeometry } from '../src/heightfield-geometry.js';
 import {
-  LAND_CHUNK_MM, LandformError, NearLand, backdropMeshData, chunkHeightMm, landChunkGeometry, landChunkLocal,
-  readLandBackdrop, readLandChunk,
+  LAND_CHUNK_MM, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandWeight, landChunkGeometry,
+  landChunkLocal, readLandBackdrop, readLandChunk, readLandSurfaces,
 } from '../src/landform.js';
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -85,5 +85,65 @@ describe('the backdrop', () => {
     expect(() => readLandBackdrop(reversed, digest)).toThrow(LandformError);
     const sea = { ...fixture.backdrop, water: [{ id: 'sea', kind: 'sea', level_mm: 0, side: 'south' }] };
     expect(readLandBackdrop(sea, digest).water).toEqual([{ id: 'sea', kind: 'sea', levelMm: 0, side: 'south' }]);
+  });
+});
+
+describe("the land's own surfaces", () => {
+  // Relative to web/, where the suite runs: the catalog a deployment ships.
+  const text = readFileSync('../assets/catalogs/landform/landform-surface.v1.json', 'utf8');
+  const surfaces = readLandSurfaces(text);
+  const band = (key: string) => surfaces.bands.find((one) => one.key === key)!;
+
+  it('reads the shipped catalog: its bands, where each is worn, and its noise', () => {
+    expect(surfaces.bands.map((one) => one.key)).toEqual(['sand', 'wooded', 'planted', 'rock', 'scree']);
+    expect(band('planted')).toMatchObject({ near: true, backdrop: false });
+    expect(band('wooded')).toMatchObject({ near: false, backdrop: true });
+    expect(band('sand').needsSea).toBe(true);
+    // Linear albedos a lit scene reads as plausible ground: woods darkest, scree palest of the land.
+    const luminance = (key: string) => 0.2126 * band(key).linear[0] + 0.7152 * band(key).linear[1] + 0.0722 * band(key).linear[2];
+    expect(luminance('wooded')).toBeLessThan(0.1);
+    expect(luminance('rock')).toBeGreaterThan(0.18);
+    expect(luminance('rock')).toBeLessThan(0.3);
+    expect(surfaces.noise.jitter).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['another catalog', (d: Record<string, unknown>) => { d['catalog_id'] = 'exulanica.other'; }, 'is exulanica.landform-surface'],
+    ['a key twice', (d: Record<string, unknown>) => { (d['entries'] as { key: string }[])[1]!.key = 'sand'; }, 'is a new key'],
+    ['a slope that falls', (d: Record<string, unknown>) => { (d['entries'] as { slope_permille: number[] }[])[3]!.slope_permille = [900, 800]; }, 'rises'],
+    ['a band worn nowhere', (d: Record<string, unknown>) => { (d['entries'] as { applies: string[] }[])[0]!.applies = []; }, 'names near or backdrop'],
+  ])('refuses %s by name', (_name, change, words) => {
+    const document = JSON.parse(text) as Record<string, unknown>;
+    change(document);
+    expect(() => readLandSurfaces(JSON.stringify(document))).toThrow(words);
+  });
+
+  it('wears rock only on steep faces, sand only by a sea, scree only high up', () => {
+    const { jitter } = surfaces.noise;
+    expect(landBandWeight(band('rock'), jitter, 200, 10_000, 0)).toBe(0);
+    expect(landBandWeight(band('rock'), jitter, 1500, 10_000, 0)).toBe(1);
+    const halfway = landBandWeight(band('rock'), jitter, 920, 10_000, 0);
+    expect(halfway).toBeGreaterThan(0);
+    expect(halfway).toBeLessThan(1);
+    // The noise moves the threshold: the same slope is more rock or less where it shifts.
+    expect(landBandWeight(band('rock'), jitter, 920, 10_000, -1)).toBeGreaterThan(halfway);
+    expect(landBandWeight(band('rock'), jitter, 920, 10_000, 1)).toBeLessThan(halfway);
+    expect(landBandWeight(band('sand'), jitter, 50, 800, 0)).toBe(1);
+    expect(landBandWeight(band('sand'), jitter, 50, 9_000, 0)).toBe(0);
+    expect(landBandWeight(band('scree'), jitter, 300, 400_000, 0)).toBe(1);
+    expect(landBandWeight(band('scree'), jitter, 300, 50_000, 0)).toBe(0);
+  });
+
+  it('colours the backdrop by the bands over its ground: sand by the sea, darker woods on hillsides, its ground elsewhere', () => {
+    const ground = [0.15, 0.22, 0.07] as const;
+    const close = (actual: readonly number[], expected: readonly number[]) => actual.forEach((v, k) => expect(v).toBeCloseTo(expected[k]!, 6));
+    expect(landBackdropColour(surfaces, ground, 30, 20_000, 0, true)).toEqual([...ground]);
+    close(landBackdropColour(surfaces, ground, 30, 800, 0, true), band('sand').linear);
+    expect(landBackdropColour(surfaces, ground, 30, 800, 0, false)).toEqual([...ground]);
+    const wooded = landBackdropColour(surfaces, ground, 400, 90_000, 0, true);
+    close(wooded, band('wooded').linear);
+    expect(wooded[1]!).toBeLessThan(ground[1]);
+    // Near-land bands are not the backdrop's: planting is worn on the near land alone.
+    expect(landBackdropColour(surfaces, ground, 550, 5_000, 0, true)).toEqual([...ground]);
   });
 });

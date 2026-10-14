@@ -749,6 +749,7 @@ export type { TerrainState, TerrainNavigation, TerrainGroundPose, TerrainOccupan
 
 export {
   LAND_BACKDROP_PROFILE, LAND_CELL_MM, LAND_CHUNK_MM, LAND_CHUNK_PROFILE, LAND_NEAR_BOUND_MM, LAND_SAMPLES_PER_SIDE,
-  LandformError, NearLand, backdropMeshData, chunkHeightMm, landChunkGeometry, landChunkLocal, readLandBackdrop, readLandChunk,
+  LAND_SURFACE_CATALOG_ID, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandWeight, landChunkGeometry, landChunkLocal,
+  readLandBackdrop, readLandChunk, readLandSurfaces,
 } from './landform.js';
-export type { BackdropBlock, LandBackdrop, LandChunk, LandWater } from './landform.js';
+export type { BackdropBlock, LandBackdrop, LandChunk, LandSurfaceBand, LandSurfaces, LandWater } from './landform.js';

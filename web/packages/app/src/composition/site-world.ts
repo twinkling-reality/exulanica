@@ -204,7 +204,7 @@ async function siteInLook(
   const terrainOccupancy = terrainLease.read;
   const terrainOptions = isTerrainSiteDrawing(drawing) ? {terrainOccupancy, dressingReadiness, ...(preparedDressing === undefined ? {} : {preparedDressing})} : {};
   // A site on land is mounted on its land in every look it is drawn in.
-  const landOptions = land === null ? {} : { land };
+  const landOptions = land === null ? {} : { land, landSurfaces: (await import('../land-surfaces.js')).LAND_SURFACES };
   const measure = new URLSearchParams(search).has('measure') ? { measure: true } : {};
   const seated = (seats: Parameters<typeof rememberSiteSeats>[2]): (() => void) => rememberSiteSeats(entry.entryId, entry.authoredVersionId!, seats);
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */

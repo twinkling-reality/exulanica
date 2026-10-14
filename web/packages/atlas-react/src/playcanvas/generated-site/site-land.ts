@@ -1,9 +1,10 @@
 import * as pc from 'playcanvas';
 import {
-  LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, readLandBackdrop, readLandChunk,
-  type HeightfieldDigest, type LandBackdrop, type LandChunk, type LandWater,
+  LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, landBackdropColour, readLandBackdrop, readLandChunk,
+  type HeightfieldDigest, type LandBackdrop, type LandChunk, type LandSurfaces, type LandWater,
 } from '@exulanica/atlas-core';
 import { buildSurfaceMesh } from '../generated-tile/surface-mesh.js';
+import { landSurfaceMaterial } from './land-slope.js';
 import type { SiteLandSection, SiteSlot, StructuredSiteDrawing } from './site-drawing.js';
 import type { DrawnSiteSlots } from './site-primitives.js';
 
@@ -23,13 +24,6 @@ import type { DrawnSiteSlots } from './site-primitives.js';
  * takes a ground function is handed none.
  */
 
-/** A surface no gentler than this (the cosine of its slope, about 35 degrees) is drawn as a bank's face. */
-const STEEP_NORMAL_Y = 0.82;
-/** The colour a bank's face is drawn in where no catalog names stone: the scenery's plain stone. */
-const PLAIN_STONE: readonly [number, number, number] = [0.58, 0.57, 0.54];
-/** Sand by the sea, sRGB, on backdrop land within this height of the water. */
-const SAND: readonly [number, number, number] = [0.76, 0.7, 0.55];
-const SAND_REACH_MM = 1500;
 /** Plain water where the drawing's own water material is not handed over. */
 const PLAIN_WATER: readonly [number, number, number] = [0.24, 0.42, 0.55];
 /** Scenery stands only on land at least this far above the sea's level. */
@@ -263,8 +257,13 @@ export interface DrawnSiteLand {
   readonly draws: number;
   /** How far from the site's origin the backdrop reaches, metres: where the far plane must stand. */
   readonly reachM: number;
-  /** Wear the site's base ground on the near land. */
+  /**
+   * Wear the site's base ground on the near land, as it is dressed, and the land's own surfaces
+   * over it (`land-slope.ts`). After a pack's texture is set on the near land (which replaces what
+   * it wears), `surfaces` lays the land's surfaces over that too.
+   */
   wear(material: pc.Material): void;
+  surfaces(): void;
   destroy(): void;
 }
 
@@ -282,36 +281,29 @@ function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMateri
   return material;
 }
 
-/** Triangles of a shared grid with only the vertices they use, so each mesh holds its own. */
-function compact(positions: readonly number[], normals: readonly number[], surfaceMm: readonly number[], indices: readonly number[]) {
-  const renumbered = new Map<number, number>();
-  const out = { positions: [] as number[], normals: [] as number[], surfaceMm: [] as number[], indices: [] as number[] };
-  for (const index of indices) {
-    let at = renumbered.get(index);
-    if (at === undefined) {
-      at = renumbered.size;
-      renumbered.set(index, at);
-      out.positions.push(positions[index * 3]!, positions[index * 3 + 1]!, positions[index * 3 + 2]!);
-      out.normals.push(normals[index * 3]!, normals[index * 3 + 1]!, normals[index * 3 + 2]!);
-      out.surfaceMm.push(surfaceMm[index * 2]!, surfaceMm[index * 2 + 1]!);
-    }
-    out.indices.push(at);
-  }
-  return out;
+/** Value noise in the world's metres, 0 to 1: the backdrop's own, as the near land's shader states it. */
+function valueNoise(x: number, z: number): number {
+  const hash = (a: number, b: number): number => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const i = Math.floor(x), j = Math.floor(z), tx = x - i, tz = z - j;
+  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
+  const a = hash(i, j) + (hash(i + 1, j) - hash(i, j)) * sx;
+  const b = hash(i, j + 1) + (hash(i + 1, j + 1) - hash(i, j + 1)) * sx;
+  return a + (b - a) * sz;
 }
 
 /**
  * Draw a site's land under a new root: each near chunk as one mesh in `groundMaterial` (the site's
- * base ground as drawn), its faces steeper than a bank's in `stoneRgb` beside it, the backdrop in
- * blocks a renderer can cull, coloured by the ground, sand by the sea and stone on its slopes, and
- * the sea and lakes at their levels. Nothing here casts a shadow; the near land receives them.
+ * base ground as drawn) with the land's own surfaces laid over it, the backdrop in blocks a
+ * renderer can cull, coloured by the same surfaces over `groundRgb`, and the sea and lakes at their
+ * levels. With no `surfaces` the land wears its ground alone. Nothing here casts a shadow; the near
+ * land receives them.
  */
 export function drawSiteLand(
   device: pc.GraphicsDevice,
   land: SiteLand,
   groundMaterial: pc.Material,
   groundRgb: Rgb,
-  stoneRgb: Rgb = PLAIN_STONE,
+  surfaces: LandSurfaces | null = null,
 ): DrawnSiteLand {
   const root = new pc.Entity('site-land');
   const meshes: pc.Mesh[] = [];
@@ -319,8 +311,21 @@ export function drawSiteLand(
   const ground: pc.MeshInstance[] = [];
   let triangles = 0;
   let draws = 0;
-  const stone = plainMaterial('site-land:stone', stoneRgb, 0.15);
-  made.push(stone);
+  const sea = land.section.water.some((body) => body.kind === 'sea');
+  // Each material the near land wears, with the land's surfaces over it, made once.
+  const surfaced = new Map<pc.Material, pc.Material>();
+  const worn = new Set<pc.Material>();
+  const overlaid = (material: pc.Material): pc.Material => {
+    if (surfaces === null || worn.has(material)) return material;
+    let copy = surfaced.get(material);
+    if (copy === undefined) {
+      const fresh = landSurfaceMaterial(device, material, surfaces, sea);
+      copy = fresh ?? material;
+      if (fresh !== null) { made.push(fresh); worn.add(fresh); }
+      surfaced.set(material, copy);
+    }
+    return copy;
+  };
   const add = (name: string, instances: readonly pc.MeshInstance[], receive: boolean): void => {
     const entity = new pc.Entity(name);
     entity.addComponent('render', { meshInstances: [...instances], castShadows: false, receiveShadows: receive });
@@ -340,33 +345,16 @@ export function drawSiteLand(
       all.push(sw, se, ne, sw, ne, nw);
     }
     const normals = pc.calculateNormals(positions, all);
-    const gentle: number[] = [], steep: number[] = [];
-    for (let t = 0; t < all.length; t += 3) {
-      const [a, b, c] = [all[t]!, all[t + 1]!, all[t + 2]!];
-      const ux = positions[b * 3]! - positions[a * 3]!, uy = positions[b * 3 + 1]! - positions[a * 3 + 1]!, uz = positions[b * 3 + 2]! - positions[a * 3 + 2]!;
-      const vx = positions[c * 3]! - positions[a * 3]!, vy = positions[c * 3 + 1]! - positions[a * 3 + 1]!, vz = positions[c * 3 + 2]! - positions[a * 3 + 2]!;
-      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      (Math.abs(ny) / Math.hypot(nx, ny, nz) < STEEP_NORMAL_Y ? steep : gentle).push(a, b, c);
-    }
-    const uv = (s: number, t: number): readonly [number, number] => [s / 1000, t / 1000];
-    const instances: pc.MeshInstance[] = [];
-    if (gentle.length > 0) {
-      const flat = buildSurfaceMesh(device, compact(positions, normals, surfaceMm, gentle), uv);
-      meshes.push(flat);
-      const near = new pc.MeshInstance(flat, groundMaterial);
-      ground.push(near);
-      instances.push(near);
-    }
-    if (steep.length > 0) {
-      const banks = buildSurfaceMesh(device, compact(positions, normals, surfaceMm, steep), uv);
-      meshes.push(banks);
-      instances.push(new pc.MeshInstance(banks, stone));
-    }
+    const mesh = buildSurfaceMesh(device, { positions, normals, surfaceMm, indices: all }, (s, t) => [s / 1000, t / 1000]);
+    meshes.push(mesh);
+    const near = new pc.MeshInstance(mesh, overlaid(groundMaterial));
+    ground.push(near);
     triangles += all.length / 3;
-    add(`site-land:chunk:${chunk.chunkX}:${chunk.chunkY}`, instances, true);
+    add(`site-land:chunk:${chunk.chunkX}:${chunk.chunkY}`, [near], true);
   }
-  // The backdrop: coloured by vertex, linear, since it is drawn only and never dressed.
-  const sea = land.section.water.find((body) => body.kind === 'sea') ?? null;
+  // The backdrop: coloured by vertex, linear, by the land's surfaces over its ground, since it is
+  // drawn only and never dressed.
+  const groundLinear = [linear(groundRgb[0]), linear(groundRgb[1]), linear(groundRgb[2])] as const;
   const far = new pc.StandardMaterial();
   far.name = 'site-land:backdrop';
   far.diffuse = new pc.Color(1, 1, 1);
@@ -383,10 +371,14 @@ export function drawSiteLand(
     const normals = pc.calculateNormals(positions, indices);
     const colours: number[] = [];
     for (let v = 0; v < positions.length; v += 3) {
-      reach = Math.max(reach, Math.hypot(positions[v]!, positions[v + 2]!));
-      const heightMm = positions[v + 1]! * 1000;
-      const rgb = sea !== null && heightMm < sea.levelMm + SAND_REACH_MM ? SAND : normals[v + 1]! < STEEP_NORMAL_Y ? stoneRgb : groundRgb;
-      colours.push(linear(rgb[0]), linear(rgb[1]), linear(rgb[2]), 1);
+      const x = positions[v]!, z = positions[v + 2]!;
+      reach = Math.max(reach, Math.hypot(x, z));
+      if (surfaces === null) { colours.push(...groundLinear, 1); continue; }
+      const up = Math.min(1, Math.max(0.02, Math.abs(normals[v + 1]!)));
+      const slopePermille = Math.sqrt(Math.max(0, 1 - up * up)) / up * 1000;
+      const { broadM, fineM, fineShare } = surfaces.noise;
+      const shift = (2 * valueNoise(x / broadM, z / broadM) - 1) * (1 - fineShare) + (2 * valueNoise(x / fineM + 17, z / fineM + 3) - 1) * fineShare;
+      colours.push(...landBackdropColour(surfaces, groundLinear, slopePermille, positions[v + 1]! * 1000, shift, sea), 1);
     }
     const mesh = new pc.Mesh(device);
     mesh.setPositions(positions);
@@ -402,7 +394,6 @@ export function drawSiteLand(
   // The sea and the lakes, level at their own heights, wide enough to meet the backdrop's edge.
   const water = plainMaterial('site-land:water', PLAIN_WATER, 0.85);
   made.push(water);
-  const surfaces: pc.MeshInstance[] = [];
   for (const body of land.section.water) {
     if (body.kind === 'pond') continue;
     const [x, z, half] = body.kind === 'sea' ? [0, 0, reach] : [body.centreMm[0] / 1000, -body.centreMm[1] / 1000, body.radiusMm / 1000];
@@ -413,7 +404,6 @@ export function drawSiteLand(
     entity.setLocalPosition(x, body.levelMm / 1000, z);
     entity.addComponent('render', { meshInstances: [surface], castShadows: false, receiveShadows: true });
     root.addChild(entity);
-    surfaces.push(surface);
     draws += 1;
     triangles += mesh.primitive[0]!.count / 3;
   }
@@ -425,7 +415,10 @@ export function drawSiteLand(
     draws,
     reachM: reach * FAR_MARGIN,
     wear(material: pc.Material): void {
-      for (const instance of ground) instance.material = material;
+      for (const instance of ground) instance.material = overlaid(material);
+    },
+    surfaces(): void {
+      for (const instance of ground) instance.material = overlaid(instance.material);
     },
     destroy(): void {
       if (destroyed) return;

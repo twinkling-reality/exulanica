@@ -1,5 +1,5 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
@@ -100,6 +100,11 @@ export interface SiteMountOptions {
    * ground takes none.
    */
   readonly land?: SiteLand;
+  /**
+   * The land's own surfaces (`assets/catalogs/landform/landform-surface.v1.json`): sand, planting,
+   * rock and the far hills' bands laid over the ground. None draws the land in its ground alone.
+   */
+  readonly landSurfaces?: LandSurfaces;
 }
 
 /**
@@ -167,11 +172,10 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         landPlain.diffuse = new pc.Color(...LAND_GROUND_RGB);
         landPlain.update();
       }
-      const stone = materials?.materials.find((one) => one.key === 'stone')?.swatch.srgb8;
       const drawnLand = land === null ? null : drawSiteLand(host.app.graphicsDevice, land,
         landBaseShape?.render?.meshInstances[0]?.material ?? landPlain!,
         landBase === null ? LAND_GROUND_RGB : slotColour(landBase, drawing.extent.enclosure, materials),
-        stone === undefined ? undefined : [stone[0] / 255, stone[1] / 255, stone[2] / 255]);
+        options.landSurfaces ?? null);
       if (drawnLand !== null) {
         host.environmentRoot.addChild(drawnLand.root);
         // The land is the base ground: the slot is kept for what dresses it, and not drawn.
@@ -201,6 +205,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       if (drawnLand !== null && dressedBase !== null) {
         drawnLand.wear(dressedBase);
         for (const instance of drawnLand.ground) undress?.dressBeyond?.(instance, landBase!);
+        // A pack's texture replaces what the land wears: the land's surfaces go over it again.
+        drawnLand.surfaces();
       }
       const withdrawSeats = options.seated === undefined ? undefined : options.seated(drawnSiteSeats(drawing, slots, undress?.seatTriangles));
       // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn

@@ -8,6 +8,7 @@ import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWo
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { siteSightRings } from '../src/composition/sight.js';
 import { GROUND_BORDERS } from '../src/ground-borders.js';
+import { LAND_SURFACES } from '../src/land-surfaces.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
 import { SITE_INTERIOR } from '../src/site-interior.js';
 import { RENDER_BUDGET } from '../src/render-budget.js';
@@ -379,6 +380,9 @@ describe('a site made on land', () => {
     expect(land.chunks.map((chunk) => [chunk.chunkX, chunk.chunkY])).toEqual([[-1, 0], [0, 0]]);
     expect(land.groundMm(4000, 8000)).toBe(6320);
     expect((mounts.asked.at(-1) as { land?: unknown }).land).toBe(land);
+    // And the land's own surfaces, so its sand, planting, rock and far woods are drawn.
+    expect((mounts.asked.at(-1) as { landSurfaces?: unknown }).landSurfaces).toBe(LAND_SURFACES);
+    expect(LAND_SURFACES.bands.map((band) => band.key)).toContain('rock');
     expect(asked.filter((path) => path.includes('/land/')).sort()).toEqual([
       '/world/versions/version/land/backdrop?world_id=world%3Agenerated%3Aland-fixture',
       '/world/versions/version/land/chunks/-1/0?world_id=world%3Agenerated%3Aland-fixture',
@@ -419,6 +423,7 @@ describe('a site on level ground', () => {
     const world = (await loadSiteWorld(access, entry, () => {}, async () => {}, '', null))!;
     expect(world.mount.land).toBeUndefined();
     expect('land' in mounts.asked.at(-1)!).toBe(false);
+    expect('landSurfaces' in mounts.asked.at(-1)!).toBe(false);
     expect(asked.some((path) => path.includes('/land/'))).toBe(false);
   });
 });
