@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import { isRenderLook, sunDirection, type RenderLook, type Rgb, type TileLook, type TileLookV1 } from './look.js';
 import { cubeFaceDirection, renderSkyFaces } from './sky.js';
+import { ShadowDetail } from './shadow-detail.js';
 
 /**
  * The light a generated street stands in, built from one {@link TileLook}.
@@ -265,6 +266,8 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
   // A directional light shines down its local -Y axis.
   sun.setRotation(new pc.Quat().setFromDirections(new pc.Vec3(0, -1, 0), new pc.Vec3(dx, dy, dz)));
   app.root.addChild(sun);
+  // Small casters keep their shadows near the eye and leave the coarse far cascades (`shadow-detail.ts`).
+  const shadowDetail = new ShadowDetail(app);
 
   // A render look's ground beyond the tiles: a plane round the world's origin, below every
   // carriageway, so a world never stands on its tiles in a void.
@@ -353,6 +356,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
       component.toneMapping = saved.toneMapping;
       component.farClip = saved.farClip;
       for (const light of saved.lights) light.enabled = true;
+      shadowDetail.dispose();
     },
   };
 }
