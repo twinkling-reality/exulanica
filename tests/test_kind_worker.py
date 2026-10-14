@@ -295,6 +295,47 @@ def test_the_jobs_answer_a_check_a_world_and_its_drawing_as_plain_data() -> None
     assert set(worker_module._records) == {f"w:{made.receipt_sha256}"}
 
 
+LAND = {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 8000,
+    "features": [{"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 30}],
+}
+
+
+def test_a_world_on_land_is_drawn_with_its_chunks_and_backdrop_and_a_refused_land_is_answered():
+    farm = json.loads((FIXTURES / "fixture-farm.json").read_text(encoding="utf-8"))
+    world_id = "world:generated:worker-land"
+    composed = compose_job("w", farm, {"width_mm": 96_000, "barns": 1}, world_id, None, LAND)
+    assert composed["status"] == "done"
+    made = composed["composed"]
+    assert made.receipt["composer"] == {"key": "site-plan", "version": 5}
+    drawing = json.loads(composed["body"])
+    assert drawing["profile"] == "exulanica.site-drawing/v5"
+    land = composed["land"]
+    assert {f"{c['chunk'][0]},{c['chunk'][1]}" for c in drawing["land"]["chunks"]} == set(
+        land["chunks"]
+    )
+    assert land["backdrop"]["sha256"] == drawing["land"]["backdrop_sha256"]
+    # The drawing job, from the receipt alone, makes the same drawing and land.
+    worker_module._records.clear()
+    drawn = drawing_job("w", world_id, dict(made.receipt), made.receipt_sha256)
+    assert (drawn["body"], drawn["sha256"], drawn["land"]) == (
+        composed["body"],
+        composed["sha256"],
+        composed["land"],
+    )
+    # A land the catalog refuses is answered by name, never as unavailable work.
+    refused = compose_job(
+        "w", farm, {"width_mm": 96_000, "barns": 1}, world_id, None, {**LAND, "ground_mm": -1}
+    )
+    assert refused == {
+        "status": "land_refused",
+        "code": "landform_invalid",
+        "detail": "land states -1, outside 0 to 40000",
+        "path": "ground_mm",
+    }
+
+
 def test_a_worker_process_that_dies_answers_unavailable_and_the_next_job_starts_a_new_one():
     # The real spawned process the server uses: its job is a long sleep, and it is killed while the
     # request waits.

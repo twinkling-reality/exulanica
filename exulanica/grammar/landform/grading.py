@@ -79,12 +79,14 @@ class Corridor:
 
 @dataclass(frozen=True, slots=True)
 class Pad:
-    """Level ground for a building, a seat or a plaza: a stated level, or its door's height."""
+    """Level ground for a building, a seat, a plaza or a whole yard: a stated level, or its door's
+    height. A pad that holds water lets a pond be carved into it (a yard's own pond)."""
 
     id: str
     rect_mm: tuple[int, int, int, int]
     level_mm: int | None = None
     door_mm: tuple[int, int] | None = None
+    water_allowed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,8 +160,12 @@ class _Work:
         self.owner[index] = owner
 
 
-def _pad(work: _Work, pad: Pad, level: int) -> int:
+def _pad(work: _Work, pad: Pad, level: int, *, keep_fixed: bool = False) -> int:
+    """Set a pad's cells level. Set after the corridors (``keep_fixed``), it keeps every cell a
+    corridor has already fixed, so a yard meeting its path never moves the path."""
     for index in work.cells(pad.rect_mm):
+        if keep_fixed and work.locked[index]:
+            continue
         work.fix(index, level, pad.id)
     return level
 
@@ -294,7 +300,7 @@ def _reach(x: int, y: int, ellipse: tuple[int, int, int, int]) -> int:
     return integer_sqrt(u * u + v * v)
 
 
-def _pond(work: _Work, basin: Basin) -> WaterBody:
+def _pond(work: _Work, basin: Basin, pads: Sequence[Pad] = ()) -> WaterBody:
     ellipse = _ellipse(basin.rect_mm)
     cx, cy, a, b = ellipse
     short = min(a, b)
@@ -308,7 +314,8 @@ def _pond(work: _Work, basin: Basin) -> WaterBody:
             inside.append((index, reach))
         elif reach < rim_out:
             rim.append(work.h[index])
-    locked = [i for i, _ in inside if work.locked[i]]
+    holding = {pad.id for pad in pads if pad.water_allowed}
+    locked = [i for i, _ in inside if work.locked[i] and work.owner[i] not in holding]
     if locked:
         x, y = work.place(locked[0])
         raise LandformRefused(
@@ -420,7 +427,7 @@ def grade_land(near: NearLand, plan: GradingPlan, water: Sequence[WaterBody] = (
             x0, y0, x1, y1 = pad.rect_mm
             middle = ((x0 + x1) // 2 // CELL_MM * CELL_MM, (y0 + y1) // 2 // CELL_MM * CELL_MM)
             level = work.h[work.cell(*middle)]
-        levels[pad.id] = _pad(work, pad, level)
+        levels[pad.id] = _pad(work, pad, level, keep_fixed=True)
     walls = _banks(work, plan.bank_grade_permille)
     cut = fill = 0
     for index, (graded, natural) in enumerate(zip(work.h, near.heights, strict=True)):
@@ -433,7 +440,7 @@ def grade_land(near: NearLand, plan: GradingPlan, water: Sequence[WaterBody] = (
                 f"at ({x}, {y}); the bound is {plan.cut_fill_most_mm} mm",
                 code="landform_cut_too_deep",
             )
-    ponds = [_pond(work, basin) for basin in plan.basins]
+    ponds = [_pond(work, basin, plan.pads) for basin in plan.basins]
     bodies = [*water, *ponds]
     _water_holds(work, bodies)
     _reachable(work, plan, bodies, walls)

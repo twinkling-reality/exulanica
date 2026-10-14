@@ -7,7 +7,8 @@ module is its second producer from generated records, beside the city's
 (:mod:`exulanica.grammar.grammars.site`) and what a world's kind says each part is for
 (:class:`SiteSociety`, carried in the world's receipt), and publishes:
 
-* **Nodes**, all on the level ground every site stands on (height 0): stations every
+* **Nodes**, on the level ground every site stands on (height 0), or, for a site on land, each at
+  the height of the graded land under it (the ``ground`` a caller passes): stations every
   ``footway_station_spacing_mm`` (the routine policy's) along each path; a lattice over each zone
   people may walk into, at that spacing outdoors and at :data:`INDOOR_LATTICE_MM` inside; a node at
   each zone's gate, in front of each structure's door, at each area's access point and in front of
@@ -15,8 +16,10 @@ module is its second producer from generated records, beside the city's
   site has their home.
 * **Edges** between nodes whose straight way is clear of everything a walker keeps clear of, by
   the walking capsule's radius: structures, areas, blocking fixtures, closed zones and walls (a
-  wall's gates and doors are gaps in it). Paths and yards are ``footway``; the way to a door is
-  ``premises_access``; to a fixture, ``furniture_access``.
+  wall's gates and doors are gaps in it). On land, no walking edge climbs more than one kerb step
+  (:data:`~exulanica.world.society_place.STEP_LIMIT_MM`): a join that would is not made. Paths
+  and yards are ``footway``; the way to a door is ``premises_access``; to a fixture,
+  ``furniture_access``.
 * **Destinations**: each structure with a home, workplace or shop role at its door, indoors, its
   capacities from its use class (a home's residents from the sleepers of the beds in its rooms
   where it has any); each area with a workplace role at its access point; each fixture with a seat
@@ -33,7 +36,7 @@ Pure: no connection and no store.
 from __future__ import annotations
 
 import functools
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from itertools import pairwise
@@ -53,7 +56,13 @@ from exulanica.grammar.grammars.site.records import (
 )
 from exulanica.grammar.records import canonical_record
 from exulanica.world.society_catalogs import RoutineModel
-from exulanica.world.society_place import PLACE_PROFILE_V2, ceil_distance, seal_place
+from exulanica.world.society_place import (
+    PLACE_PROFILE_V2,
+    STEP_LIMIT_MM,
+    STEPPED_KINDS,
+    ceil_distance,
+    seal_place,
+)
 
 if TYPE_CHECKING:
     from exulanica.world.society_city_place import CityObstructions
@@ -294,11 +303,20 @@ class _Cells:
 
 
 class _Graph:
-    def __init__(self, blocked: Sequence[_Box], node_limit: int | None = None) -> None:
+    def __init__(
+        self,
+        blocked: Sequence[_Box],
+        node_limit: int | None = None,
+        ground: Callable[[int, int], int] | None = None,
+    ) -> None:
         self.blocked = _Cells([box.inflated(CAPSULE_RADIUS_MM) for box in blocked])
         self.nodes: dict[str, Point] = {}
         self.edges: dict[tuple[str, str], dict[str, Any]] = {}
         self.node_limit = node_limit
+        self.ground = ground
+
+    def height(self, point: Point) -> int:
+        return 0 if self.ground is None else self.ground(point[0], point[1])
 
     def free(self, point: Point) -> bool:
         return not any(box.contains(point) for box in self.blocked.holding(point))
@@ -323,6 +341,12 @@ class _Graph:
             return True
         pa, pb = self.nodes[a], self.nodes[b]
         if pa == pb or not self.clear(pa, pb):
+            return False
+        if (
+            self.ground is not None
+            and kind not in STEPPED_KINDS
+            and abs(self.height(pa) - self.height(pb)) > STEP_LIMIT_MM
+        ):
             return False
         self.edges[pair] = {
             "edge_id": f"{pair[0]}|{pair[1]}",
@@ -545,11 +569,15 @@ def place_from_site_records(
     routine: RoutineModel,
     input_seq: int = 1,
     node_limit: int | None = None,
+    ground: Callable[[int, int], int] | None = None,
 ) -> dict[str, Any]:
     """Derive the place a site's records and its society's uses support, sealed by its digest.
 
     With ``node_limit``, building stops with :class:`GraphOverBudget` as soon as the walking graph
-    would hold more places than that, rather than after the whole graph is built."""
+    would hold more places than that, rather than after the whole graph is built. With ``ground``
+    (a site on land), every node and spot stands at the height it gives in millimetres above the
+    land's datum, and no walking edge climbs more than one kerb step; without it the place is the
+    level site's, byte for byte."""
     extent = next(r for r in records if isinstance(r, SiteExtentRecord))
     paths = [r for r in records if isinstance(r, SitePathRecord)]
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
@@ -565,7 +593,7 @@ def place_from_site_records(
     # which only adds places to stand and ways round, at twice it outdoors.
     corridor_step = station if extent.enclosure == "open" else INDOOR_LATTICE_MM
     lattice = 2 * station if extent.enclosure == "open" else INDOOR_LATTICE_MM
-    graph = _Graph(_blocked(records), node_limit)
+    graph = _Graph(_blocked(records), node_limit, ground)
     walkable: list[str] = []
     spots: dict[str, dict[str, Any]] = {}
     destinations: list[dict[str, Any]] = []
@@ -815,7 +843,7 @@ def place_from_site_records(
                 "spot_id": spot_id,
                 "node_id": node,
                 "position_mm": [point[0], point[1]],
-                "support_z_mm": 0,
+                "support_z_mm": graph.height(point),
                 "destination_ids": [f"fixture:{fixture.identity}"],
             }
             made.append(spot_id)
@@ -878,7 +906,7 @@ def place_from_site_records(
             "spot_id": name,
             "node_id": name,
             "position_mm": [point[0], point[1]],
-            "support_z_mm": 0,
+            "support_z_mm": graph.height(point),
             "destination_ids": [],
         }
         take(point)
@@ -906,7 +934,11 @@ def place_from_site_records(
             "axis_order": ["x", "y"],
             "horizontal_unit": "millimetre",
             "vertical_unit": "millimetre",
-            "datum": "site_local z, the level ground every site stands on",
+            "datum": (
+                "site_local z, the level ground every site stands on"
+                if ground is None
+                else "site_local z, above the land's datum, the sea's level"
+            ),
         },
         "routine_sha256": routine.sha256,
         "clearance_mm": paths_half,
@@ -914,7 +946,7 @@ def place_from_site_records(
             {
                 "node_id": name,
                 "position_mm": [point[0], point[1]],
-                "support_z_mm": 0,
+                "support_z_mm": graph.height(point),
                 "street_id": None,
             }
             for name, point in sorted(graph.nodes.items())

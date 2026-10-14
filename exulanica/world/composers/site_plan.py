@@ -47,6 +47,7 @@ from exulanica.grammar.grammars.site import (
 from exulanica.grammar.grammars.site.layout import LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import plan_sha256
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SitePathRecord
+from exulanica.grammar.landform import LandformRefused, read_land_document
 from exulanica.world.composers import (
     RECEIPT_PROFILE,
     ComposedWorld,
@@ -64,6 +65,7 @@ from exulanica.world.kinds.document import (
 )
 from exulanica.world.kinds.routine import kind_overlay, overlay_routine
 from exulanica.world.kinds.samples import SiteWorld, compose_site, layout_budget
+from exulanica.world.site_land import SiteLand, site_land_of
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_site_place import (
     CAPSULE_RADIUS_MM,
@@ -80,12 +82,14 @@ __all__ = [
     "COMPOSER_VERSIONS",
     "DESTINATION_ID",
     "ELEMENT_ID",
+    "LAND_COMPOSER_VERSION",
     "REGION_ID",
     "SITE_MODULE",
     "compose",
     "compose_kind",
     "receipt_digest_of",
     "receipt_kind",
+    "receipt_land",
     "receipt_routine",
     "records",
     "society_place",
@@ -94,7 +98,9 @@ __all__ = [
 ]
 
 COMPOSER_KEY: Final = "site-plan"
-COMPOSER_VERSIONS: Final = (1, 2, *TERRAIN_COMPOSER_VERSIONS)
+#: The composer version of a site laid out on land: its receipt carries the land document.
+LAND_COMPOSER_VERSION: Final = 5
+COMPOSER_VERSIONS: Final = (1, 2, *TERRAIN_COMPOSER_VERSIONS, LAND_COMPOSER_VERSION)
 REGION_ID: Final = "region:generated"
 DESTINATION_ID: Final = "destination:region:generated"
 ELEMENT_ID: Final = "element:site"
@@ -139,6 +145,7 @@ def _candidate(
     extent: SiteExtentRecord,
     *,
     composer_version: int = 1,
+    up_mm: int = 0,
 ) -> SpatialCandidate:
     east, north = arrival["position_mm"]
     return _site_candidate(
@@ -146,7 +153,7 @@ def _candidate(
         kind.version,
         world_id,
         digest,
-        (east, 0, -north),
+        (east, up_mm, -north),
         extent.width_mm,
         extent.depth_mm,
         composer_version=composer_version,
@@ -316,10 +323,16 @@ def compose_kind(
     base_routine: RoutineModel | None = None,
     place_id: str | None = None,
     support: Mapping[str, Any] | None = None,
+    land: Mapping[str, Any] | None = None,
 ) -> ComposedWorld:
     """The world ``kind`` makes with ``values`` for ``world_id``: its receipt, its structural
     candidate and its records, and with ``place_id`` the place its society walks there, the one its
-    checks built (:func:`society_place` makes the same from the receipt). Refused as
+    checks built (:func:`society_place` makes the same from the receipt). With ``land`` (an
+    ``exulanica.landform/v1`` document) the site is laid out on that land as composer version
+    :data:`LAND_COMPOSER_VERSION`: its receipt carries the land document and its digest, its
+    candidates are graded (:mod:`exulanica.world.site_land`) and a person arrives at the land's
+    height; the document is refused as :class:`~exulanica.grammar.landform.LandformRefused`, and
+    land with a support declaration is not served. Refused as
     :func:`~exulanica.world.kinds.samples.compose_site` refuses
     (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate named)."""
     if base_routine is None:
@@ -328,7 +341,16 @@ def compose_kind(
         base_routine = town_routine()
     overlay = kind_overlay(kind)
     routine = overlay_routine(base_routine, overlay)
-    world = compose_site(kind, values, world_id, routine=routine)
+    document = None
+    if land is not None:
+        if support is not None:
+            raise LandformRefused(
+                "a site is laid out on land or on a support declaration, not both",
+                path="land",
+                code="landform_not_served",
+            )
+        document = read_land_document(land)
+    world = compose_site(kind, values, world_id, routine=routine, land=document)
     arrival = _arrival(world)
     receipt = {
         "profile": RECEIPT_PROFILE,
@@ -359,6 +381,14 @@ def compose_kind(
     }
     supported_place = world.place
     composer_version = 1
+    up_mm = 0
+    if document is not None:
+        receipt["land"] = document.canonical()
+        receipt["land_sha256"] = document.sha256
+        receipt["composer"]["version"] = LAND_COMPOSER_VERSION
+        composer_version = LAND_COMPOSER_VERSION
+        graded = site_land_of(receipt, world.records, routine.policy["footway_station_spacing_mm"])
+        up_mm = graded.height_at(*arrival["position_mm"])
     if support is not None:
         from exulanica.world.site_drawing import _site_drawing_v1
         from exulanica.world.support_site import BASE_SURFACE, attach_site_support
@@ -394,6 +424,7 @@ def compose_kind(
             arrival,
             next(r for r in world.records if isinstance(r, SiteExtentRecord)),
             composer_version=composer_version,
+            up_mm=up_mm,
         ),
         records=world.records,
         place=None if place_id is None else _placed_at(supported_place, place_id),
@@ -461,6 +492,8 @@ def _check_current(receipt: Mapping[str, Any]) -> None:
         raise InvalidStructuralData(
             "generated_world_support_changed: composer/support binding mismatch"
         )
+    if (composer["version"] == LAND_COMPOSER_VERSION) != ("land" in receipt):
+        raise InvalidStructuralData("generated_world_land_changed: composer/land binding mismatch")
     grammar = receipt["grammar"]
     if (grammar["grammar_id"], grammar["grammar_version"]) != (
         SITE_GRAMMAR_ID,
@@ -555,7 +588,22 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
     generated = site_records(generation)
     if receipt["composer"]["version"] == 2:
         receipt_support(receipt, generated)
+    if receipt["composer"]["version"] == LAND_COMPOSER_VERSION:
+        receipt_land(receipt, generated)
     return generated
+
+
+def receipt_land(receipt: Mapping[str, Any], generated: tuple[object, ...]) -> SiteLand:
+    """The graded land a version 5 receipt states for its regenerated records, or refused by name
+    when its land no longer reads or no longer takes its layout."""
+    try:
+        return site_land_of(
+            receipt, generated, receipt_routine(receipt).policy["footway_station_spacing_mm"]
+        )
+    except LandformRefused as exc:
+        raise InvalidStructuralData(
+            f"generated_world_land_changed: its land no longer takes its layout: {exc.detail}"
+        ) from exc
 
 
 def society_place(
@@ -569,12 +617,16 @@ def society_place(
         raise InvalidStructuralData("terrain_society_projection_unavailable")
     if receipt["composer"]["version"] == 2:
         return _placed_at(receipt_support(receipt, generated).projection.place(), place_id)
+    ground = None
+    if receipt["composer"]["version"] == LAND_COMPOSER_VERSION:
+        ground = receipt_land(receipt, generated).height_at
     return place_from_site_records(
         place_id=place_id,
         records=generated,
         society=SiteSociety.read(receipt["society"]),
         routine=receipt_routine(receipt),
         node_limit=load_kind_catalogs().bound("walking_nodes")[1],
+        ground=ground,
     )
 
 

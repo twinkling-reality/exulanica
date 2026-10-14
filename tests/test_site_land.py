@@ -1,0 +1,313 @@
+"""A site world laid out on land: terraces at their gates, paths within a kerb step per station,
+ponds in their basins, the drawing standing on the graded land, and every land-less world as it
+was."""
+
+from __future__ import annotations
+
+import copy
+import json
+import uuid
+from itertools import pairwise
+from pathlib import Path
+
+import pytest
+from exulanica.grammar.grammars.site.records import (
+    SiteAreaRecord,
+    SiteExtentRecord,
+    SitePathRecord,
+    SiteWallRecord,
+    SiteZoneRecord,
+)
+from exulanica.grammar.landform import CHUNK_PROFILE, LandformRefused, read_land_chunk
+from exulanica.world.composers import site_plan
+from exulanica.world.kinds import samples
+from exulanica.world.kinds.document import read_kind
+from exulanica.world.site_drawing import LAND_DRAWING_PROFILE, site_drawing, site_drawing_sha256
+from exulanica.world.site_land import path_grade_permille, site_land_of
+from exulanica.world.society_engines import CREATES
+from exulanica.world.society_living import LivingPlace, initial_living_society
+from exulanica.world.society_place import STEP_LIMIT_MM
+
+FIXTURES = Path(__file__).parent / "fixtures" / "world-kinds"
+TILT = {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 8000,
+    "features": [
+        {"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 30},
+        {"id": "swell", "kind": "undulation", "amplitude_mm": 700, "wavelength_mm": 40000},
+        {"id": "hill", "kind": "rise", "side": "north", "distance_mm": 30000, "height_mm": 20000},
+        {"id": "sea", "kind": "shore", "side": "south", "distance_mm": 60000},
+        {"id": "skyline", "kind": "range", "side": "north", "distance_mm": 2000000,
+         "band_mm": 800000, "height_mm": 300000},
+    ],
+}  # fmt: skip
+
+
+def kind(name: str):  # type: ignore[no-untyped-def]
+    return read_kind(json.loads((FIXTURES / f"fixture-{name}.json").read_text(encoding="utf-8")))
+
+
+def made(name: str, land: dict | None = TILT, world_id: str = "world:generated:land", **more):  # type: ignore[no-untyped-def]
+    found = kind(name)
+    return site_plan.compose_kind(
+        found, found.values(found.presets[0][0]), world_id, place_id="place:land", land=land, **more
+    )
+
+
+def drawn(world):  # type: ignore[no-untyped-def]
+    return site_drawing(
+        world_id=world.receipt["world_id"],
+        receipt=world.receipt,
+        receipt_sha256=world.receipt_sha256,
+        records=world.records,
+    )
+
+
+@pytest.mark.parametrize("name", ["site", "farm", "cafe"])
+def test_a_world_made_without_land_is_the_level_world_it_always_was(name: str) -> None:
+    found = kind(name)
+    values = found.values(found.presets[0][0])
+    level = site_plan.compose_kind(found, values, "world:generated:level", place_id="place:land")
+    asked = made(name, land=None, world_id="world:generated:level")
+    assert asked.receipt == level.receipt and asked.receipt_sha256 == level.receipt_sha256
+    assert level.receipt["composer"]["version"] == 1
+    assert "land" not in level.receipt and "land_sha256" not in level.receipt
+    drawing = drawn(level)
+    assert drawing["profile"] == "exulanica.site-drawing/v1" and "land" not in drawing
+    assert not any("drape" in slot for slot in drawing["slots"])
+    assert drawing["arrival"]["positionMm"][2] == 0
+    assert {node["support_z_mm"] for node in level.place["nodes"]} == {0}
+    assert level.place["frame"]["datum"] == "site_local z, the level ground every site stands on"
+    assert asked.place == level.place
+
+
+@pytest.mark.parametrize("name", ["site", "farm", "cafe"])
+def test_a_site_on_land_is_composer_five_and_regenerates_from_its_receipt(name: str) -> None:
+    world = made(name)
+    receipt = world.receipt
+    assert receipt["composer"] == {"key": "site-plan", "version": 5}
+    assert receipt["land_sha256"] == site_land_of(receipt, world.records, 4000).land.sha256
+    regenerated = site_plan.records(receipt)
+    assert regenerated == world.records
+    assert site_plan.society_place("place:land", receipt, regenerated) == world.place
+    first, second = drawn(world), drawn(world)
+    assert first["profile"] == LAND_DRAWING_PROFILE
+    assert site_drawing_sha256(first) == site_drawing_sha256(second)
+    level = made(name, land=None)
+    assert level.receipt["output_digest"] == receipt["output_digest"], "same layout, other ground"
+
+
+def test_every_zone_is_a_level_terrace_and_every_walking_edge_stays_within_a_step() -> None:
+    world = made("farm")
+    graded = site_land_of(world.receipt, world.records, 4000)
+    near = graded.graded.near
+    # A zone's cells under a pond, or shared with its path (the path keeps its grade), excepted.
+    kept = [body.rect_mm for body in graded.water if body.kind == "pond"] + [
+        (p.min_x_mm, p.min_y_mm, p.max_x_mm, p.max_y_mm)
+        for p in world.records
+        if isinstance(p, SitePathRecord)
+    ]
+    zones = [r for r in world.records if isinstance(r, SiteZoneRecord)]
+    for zone in zones:
+        # A row two zones share belongs to the one graded first.
+        others = [(z.min_x_mm, z.min_y_mm, z.max_x_mm, z.max_y_mm) for z in zones if z is not zone]
+        heights = {
+            near.at(x, y)
+            for x in range(-(-zone.min_x_mm // 1000) * 1000, zone.max_x_mm + 1, 1000)
+            for y in range(-(-zone.min_y_mm // 1000) * 1000, zone.max_y_mm + 1, 1000)
+            if not any(r[0] <= x <= r[2] and r[1] <= y <= r[3] for r in kept + others)
+        }
+        assert len(heights) == 1, (zone.zone_key, sorted(heights))
+    levels = {graded.height_at(*n["position_mm"]) for n in world.place["nodes"]}
+    assert max(levels) - min(levels) > 500, "the terraces stand at different heights"
+    heights = {n["node_id"]: n["support_z_mm"] for n in world.place["nodes"]}
+    for edge in world.place["edges"]:
+        if edge["kind"] in ("crossing", "premises_access"):
+            continue
+        assert abs(heights[edge["from_node_id"]] - heights[edge["to_node_id"]]) <= STEP_LIMIT_MM
+    assert world.place["frame"]["datum"] == "site_local z, above the land's datum, the sea's level"
+
+
+def test_a_path_climbs_no_more_than_one_step_over_its_longest_station() -> None:
+    world = made("site")
+    graded = site_land_of(world.receipt, world.records, 4000)
+    for path in (r for r in world.records if isinstance(r, SitePathRecord)):
+        grade = path_grade_permille(path, 4000)
+        assert grade * 4000 // 1000 <= STEP_LIMIT_MM
+        along_y = (path.max_y_mm - path.min_y_mm) >= (path.max_x_mm - path.min_x_mm)
+        middle = (
+            (
+                (path.min_x_mm + path.max_x_mm) // 2
+                if along_y
+                else (path.min_y_mm + path.max_y_mm) // 2
+            )
+            // 1000
+            * 1000
+        )
+        stations = range(-(-(path.min_y_mm if along_y else path.min_x_mm) // 1000) * 1000,
+                         (path.max_y_mm if along_y else path.max_x_mm) + 1, 1000)  # fmt: skip
+        profile = [
+            graded.graded.near.at(*((middle, s) if along_y else (s, middle))) for s in stations
+        ]
+        assert max(abs(b - a) for a, b in pairwise(profile)) <= grade
+
+
+def test_the_drawing_stands_on_the_land_and_names_it_by_digest() -> None:
+    world = made("farm")
+    drawing = drawn(world)
+    graded = site_land_of(world.receipt, world.records, 4000)
+    land = drawing["land"]
+    assert land["land_sha256"] == world.receipt["land_sha256"]
+    assert [c["sha256"] for c in land["chunks"]] == [c.sha256 for c in graded.chunks()]
+    assert land["backdrop_sha256"] == graded.backdrop.sha256
+    documents = graded.documents()
+    for chunk in land["chunks"]:
+        key = f"{chunk['chunk'][0]},{chunk['chunk'][1]}"
+        body = json.loads(documents["chunks"][key]["body"])
+        assert body["profile"] == CHUNK_PROFILE
+        assert read_land_chunk(body, chunk["sha256"]).chunk_x == chunk["chunk"][0]
+    east, north, up = drawing["arrival"]["positionMm"]
+    assert up == graded.height_at(east, north) > 0
+    level = drawn(made("farm", land=None))
+    for on_land, flat in zip(drawing["slots"], level["slots"], strict=True):
+        assert on_land["identity"] == flat["identity"] and on_land["boxMm"] == flat["boxMm"]
+        x, y, z = flat["positionMm"]
+        if on_land["lookRole"].startswith("water."):
+            continue
+        assert on_land["positionMm"] == [x, y, graded.height_at(x, y) + z]
+    draped = {s["identity"] for s in drawing["slots"] if s.get("drape")}
+    assert draped == _ground_and_boundaries(world, drawing)
+
+
+def _ground_and_boundaries(world, drawing) -> set[str]:  # type: ignore[no-untyped-def]
+    """The slots a land drawing drapes: the site's ground, its zones, paths and dry areas, and every
+    piece of a wall that belongs to no building."""
+    covering = {
+        r.identity
+        for r in world.records
+        if isinstance(r, SiteZoneRecord | SitePathRecord)
+        or (isinstance(r, SiteAreaRecord) and "water" not in r.roles)
+    }
+    walls = {r.identity for r in world.records if isinstance(r, SiteWallRecord)}
+    extent = next(r for r in world.records if isinstance(r, SiteExtentRecord))
+    return {
+        s["identity"]
+        for s in drawing["slots"]
+        if s["identity"] in covering | {f"{extent.identity}:ground"}
+        or (s["identity"].partition(":")[0] in walls and "structure" not in s)
+    }
+
+
+def _leaves_level(graded, slot) -> int:  # type: ignore[no-untyped-def]
+    """How far the land under a slot's footprint corners leaves the land under its base's centre."""
+    x, y, _ = slot["positionMm"]
+    width, depth, _ = slot["boxMm"]
+    if slot["yawQuarterTurns"] % 2:
+        width, depth = depth, width
+    centre = graded.height_at(x, y)
+    return max(
+        abs(graded.height_at(x + dx * width // 2, y + dy * depth // 2) - centre)
+        for dx in (-1, 1)
+        for dy in (-1, 1)
+    )
+
+
+@pytest.mark.parametrize("name", ["site", "farm", "cafe"])
+@pytest.mark.parametrize("grade", [30, 60])
+def test_what_the_land_leaves_level_is_draped_and_the_rest_stands_level(
+    name: str, grade: int
+) -> None:
+    """A terrace is level only inside its edges, where it meets sloping paths and terraces at other
+    levels: a zone's corners, and a fence along its edge, leave its level, so they are drawn on the
+    land. A building, its rooms and walls, and a fixture stand where the land is level."""
+    land = copy.deepcopy(TILT)
+    land["features"][0]["grade_permille"] = grade
+    world = made(name, land=land)
+    drawing = drawn(world)
+    graded = site_land_of(world.receipt, world.records, 4000)
+    draped = [s for s in drawing["slots"] if s.get("drape")]
+    assert {s["identity"] for s in draped} == _ground_and_boundaries(world, drawing)
+    assert max(_leaves_level(graded, s) for s in draped) > 300, "the land leaves a terrace's level"
+    for slot in drawing["slots"]:
+        if slot.get("drape") or slot["lookRole"].startswith("water."):
+            continue
+        assert _leaves_level(graded, slot) <= 50, (slot["identity"], slot["lookRole"])
+
+
+def test_a_pond_stands_in_its_basin_at_its_level() -> None:
+    world = made("farm")  # the farm's pond corner holds a pond
+    graded = site_land_of(world.receipt, world.records, 4000)
+    ponds = [body for body in graded.water if body.kind == "pond"]
+    assert ponds
+    drawing = drawn(world)
+    for pond in ponds:
+        x0, y0, x1, y1 = pond.rect_mm
+        floor = min(
+            h for x, y, h in graded.graded.near.samples() if x0 <= x <= x1 and y0 <= y <= y1
+        )
+        assert floor < pond.level_mm - 1000
+        water = [s for s in drawing["slots"] if s["lookRole"].startswith("water.")]
+        assert any(s["positionMm"][2] == pond.level_mm for s in water)
+
+
+def test_a_land_document_the_catalog_refuses_is_refused_before_any_layout() -> None:
+    bad = copy.deepcopy(TILT)
+    bad["features"][2]["height_mm"] = 700000
+    with pytest.raises(LandformRefused) as caught:
+        made("site", land=bad)
+    assert caught.value.code == "landform_invalid" and caught.value.path == "features[2].height_mm"
+
+
+def test_land_with_a_support_declaration_is_not_served() -> None:
+    with pytest.raises(LandformRefused) as caught:
+        made("farm", support={"profile": "anything"})
+    assert caught.value.code == "landform_not_served"
+
+
+def test_a_layout_the_land_cannot_take_is_refused_and_the_next_candidate_is_tried(
+    monkeypatch,
+) -> None:
+    real = samples.site_land
+    calls: list[int] = []
+
+    def first_refused(*args, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append(1)
+        if len(calls) == 1:
+            raise LandformRefused(
+                "the path to zone 1 would cut 9000 mm", code="landform_cut_too_deep"
+            )
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(samples, "site_land", first_refused)
+    world = made("site")
+    assert world.receipt["candidate"] == 1
+    [refused] = world.receipt["refused_candidates"]
+    assert refused["candidate"] == 0 and refused["code"] == "kind_generation_refused"
+    assert "its land cannot take this layout" in refused["refusal"] and "9000" in refused["refusal"]
+
+
+def test_people_live_on_terraces_and_every_one_walks_to_work() -> None:
+    """DAY's rule: homes and workplaces on different terraces, joined by a graded path, and the
+    living society is made (no inhabitant cut off from its workplace)."""
+    steep = copy.deepcopy(TILT)
+    steep["features"][0]["grade_permille"] = 60  # steeper than a path: the track cuts and fills
+    world = made("farm", land=steep)
+    routine = site_plan.receipt_routine(world.receipt)
+    place = LivingPlace(world.place, routine)
+    heights = {n["node_id"]: n["support_z_mm"] for n in world.place["nodes"]}
+    destinations = world.place["destinations"]
+    homes = {d["node_id"] for d in destinations if d["resident_capacity"]}
+    work = {d["node_id"] for d in destinations if d["staff_capacity"]}
+    assert homes and work
+    levels = {heights[n] for n in homes | work}
+    assert max(levels) - min(levels) > 500, "homes and work stand on different terraces"
+    state = initial_living_society(
+        uuid.UUID("00000000-0000-4000-8000-00000000a001"),
+        "c" * 64,
+        place,
+        routine,
+        branch_id="branch",
+        profile=CREATES["town"],
+    )
+    workers = [p for p in state["inhabitants"] if p.get("work")]
+    assert workers, "someone on the farm works"

@@ -252,6 +252,7 @@ def _drawn(
 ) -> dict[str, Any]:
     """The drawing as the bytes a response carries (written as the API writes JSON, here rather
     than on the request's thread) and its digest."""
+    from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION, receipt_land
     from exulanica.world.site_drawing import site_drawing, site_drawing_sha256
 
     drawing = site_drawing(
@@ -260,7 +261,12 @@ def _drawn(
     body = json.dumps(
         drawing, ensure_ascii=False, allow_nan=False, indent=None, separators=(",", ":")
     ).encode("utf-8")
-    return {"body": body, "sha256": site_drawing_sha256(drawing)}
+    drawn: dict[str, Any] = {"body": body, "sha256": site_drawing_sha256(drawing)}
+    if receipt["composer"]["version"] == LAND_COMPOSER_VERSION:
+        # A site on land keeps its chunks and backdrop with its drawing: the land routes serve
+        # them by the digests the drawing names.
+        drawn["land"] = receipt_land(receipt, records).documents()
+    return drawn
 
 
 def site_ground_place_id() -> str:
@@ -352,9 +358,11 @@ def compose_job(
     values: dict[str, int],
     world_id: str,
     support: dict[str, Any] | None = None,
+    land: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose the world the kind makes with ``values`` for ``world_id`` and draw it, with the
     place its society walks (the one its checks built), or say why not."""
+    from exulanica.grammar.landform import LandformRefused
     from exulanica.world.composers.site_plan import compose_kind
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
@@ -364,8 +372,15 @@ def compose_job(
     place_id = site_ground_place_id()
     try:
         composed = compose_kind(
-            read_kind(document), values, world_id, place_id=place_id, support=support
+            read_kind(document), values, world_id, place_id=place_id, support=support, land=land
         )
+    except LandformRefused as refused:
+        return {
+            "status": "land_refused",
+            "code": refused.code,
+            "detail": refused.detail,
+            "path": refused.path,
+        }
     except SupportRefused as refused:
         return {
             "status": "support_refused",
@@ -681,12 +696,28 @@ class WorkerComposer:
     generation runs on a request's thread or a draft's, and then keeps :attr:`drawn` and
     :attr:`placed` with :meth:`keep`."""
 
-    def __init__(self, workspace: Any, *, support: Mapping[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        workspace: Any,
+        *,
+        support: Mapping[str, Any] | None = None,
+        land: Mapping[str, Any] | None = None,
+    ) -> None:
         self.workspace = str(workspace)
         self._worker = kind_worker()
         self._epoch = self._worker.epoch
         self._support = None if support is None else copy.deepcopy(dict(support))
         self._support_key = ""
+        self._land = None if land is None else copy.deepcopy(dict(land))
+        self._land_key = ""
+        if self._land is not None:
+            from exulanica.canonical import sha256_of_canonical
+            from exulanica.grammar.landform import LandformRefused
+
+            try:
+                self._land_key = f":land:{sha256_of_canonical(self._land).hex()}"
+            except (TypeError, ValueError) as exc:
+                raise LandformRefused("land is canonical integer JSON", path="land") from exc
         if self._support is not None:
             from exulanica.canonical import sha256_of_canonical
             from exulanica.world.support_surfaces import SupportRefused
@@ -700,12 +731,13 @@ class WorkerComposer:
         self.placed: tuple[str, dict[str, Any]] | None = None
 
     def __call__(self, kind: Any, values: Mapping[str, int], world_id: str) -> Any:
+        from exulanica.grammar.landform import LandformRefused
         from exulanica.world.kinds.samples import SiteRefused
         from exulanica.world.support_surfaces import SupportRefused
 
         outcome = self._worker.run(
             f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
-            f"{json.dumps(dict(values), sort_keys=True)}" + self._support_key,
+            f"{json.dumps(dict(values), sort_keys=True)}" + self._support_key + self._land_key,
             COMPOSE_SECONDS,
             compose_job,
             self.workspace,
@@ -713,20 +745,23 @@ class WorkerComposer:
             dict(values),
             world_id,
             self._support,
+            *(() if self._land is None else (self._land,)),
             workspace=self.workspace,
         )
         if outcome.status != "done" or outcome.value is None:
             raise KindWorkWaiting(outcome.status, kept=False, reason=outcome.reason)
         answer = outcome.value
+        if answer["status"] == "land_refused":
+            raise LandformRefused(answer["detail"], path=answer["path"], code=answer["code"])
         if answer["status"] == "support_refused":
             raise SupportRefused(answer["where"], answer["detail"])
         if answer["status"] == "refused":
             raise SiteRefused(answer["code"], answer["refusals"])
         composed = answer["composed"]
-        self.drawn = (
-            drawing_key(self.workspace, composed.receipt_sha256),
-            {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
-        )
+        drawn = {"status": "done", "body": answer["body"], "sha256": answer["sha256"]}
+        if "land" in answer:
+            drawn["land"] = answer["land"]
+        self.drawn = (drawing_key(self.workspace, composed.receipt_sha256), drawn)
         self.placed = (
             place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),
             answer["placed"],
@@ -772,10 +807,10 @@ class TerrainWorkerComposer:
         if answer["status"] == "terrain_refused":
             raise TerrainAuthoringRefused(answer["detail"])
         composed = answer["composed"]
-        self.drawn = (
-            drawing_key(self.workspace, composed.receipt_sha256),
-            {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
-        )
+        drawn = {"status": "done", "body": answer["body"], "sha256": answer["sha256"]}
+        if "land" in answer:
+            drawn["land"] = answer["land"]
+        self.drawn = (drawing_key(self.workspace, composed.receipt_sha256), drawn)
         self.placed = (
             place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),
             answer["placed"],

@@ -1,9 +1,12 @@
 # Landform
 
-Status: **IMPLEMENTED BOUNDARY: DATA AND READERS ONLY**. A world's land can be stated as data,
-realized, graded and read back in Python and in the browser. No world states land and nothing draws
-it: every world stands on level ground, as the [world kinds contract](world-kinds-contract.md) and
-the [city grammar](grammar-package.md) state.
+Status: **IMPLEMENTED BOUNDARY: DATA, READERS AND SITE WORLDS ON LAND; NOT YET DRAWN**. A world's
+land can be stated as data, realized, graded and read back in Python and in the browser, and a site
+world can be made on land through its route: graded, regenerated from its receipt, its people's
+places standing on the land, its drawing and its land served. The application does not yet draw
+land, and no product page or drafter asks for it, so every world anyone has made stands on level
+ground, as the [world kinds contract](world-kinds-contract.md) and the
+[city grammar](grammar-package.md) state.
 
 This document owns the land document (`exulanica.landform/v1`), the landform catalogs, the pure
 function that realizes a land, the grading a layout applies to it, and the chunk and backdrop
@@ -22,6 +25,7 @@ documents a reader receives. The exact contact predicates a chunk is read with b
 - [Water](#water)
 - [Grading](#grading)
 - [Readers in the browser](#readers-in-the-browser)
+- [Sites on land](#sites-on-land)
 - [Refusals](#refusals)
 - [Limits](#limits)
 
@@ -159,6 +163,39 @@ chunk, a backdrop and exact heights at points; the Python realizer is held to th
 browser readers are held to the same heights, exact through the heightfield and within float
 precision through `groundHeightMm`.
 
+## Sites on land
+
+`POST /worlds/kinds/{kind}/worlds` takes an optional `land` (`exulanica.landform/v1`) for any kind
+but the town; land with a support declaration is not served. The site grammar lays the site out
+exactly as on level ground, then, per layout candidate, the layout grades the land
+([`site_land.py`](../exulanica/world/site_land.py)) so that everything the site's society walks
+stays within the place contract's one kerb step per edge (180 mm), with no new edge kind and no
+change to walking cost:
+
+- every **zone** is a level terrace at the height of its path where the zone's gate meets it;
+- every **path** is graded no steeper than one step over its longest station spacing (the place
+  lays a station every `footway_station_spacing_mm` or a little more), less a 2 mm rounding
+  margin; a path ending within a lattice cell of the site's edge is graded to the edge;
+- every **water area** is a pond carved into its zone's terrace, its level the rim less the
+  catalog's freeboard;
+- the place's nodes and spots stand at the graded land's height, its frame's datum the sea's
+  level, and a join that would climb more than the step is not made.
+
+A candidate whose layout the land cannot take is refused with the grading's sentence and the next
+candidate tried; the kind's needs are checked on the graded place. The land is realized with a seed
+from the world's identity and the land's digest, so it is the same land whichever layout is kept.
+
+The receipt names composer `site-plan` version 5 and carries the canonical land document and its
+digest; the records, plan and output digest are the level layout's. The drawing is
+`exulanica.site-drawing/v5` ([world kinds contract](world-kinds-contract.md#the-drawing)); the chunks
+and the backdrop are made with the drawing in the kind worker and served by the digests it names,
+`GET /world/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}` and `.../land/backdrop` (world
+read). In the drawing the site's ground, zones, paths, dry areas and boundary walls follow the land
+(`drape`: each point as far above the land under it as the slot's base stands above the land under
+its base's centre), since a terrace is level only inside its edges, where it meets sloping paths and
+terraces at other levels; a building and its rooms stand level on their terrace, and water at its
+level. A world made without land is the level world it always was, byte for byte.
+
 ## Refusals
 
 | Code | When |
@@ -173,12 +210,12 @@ precision through `groundHeightMm`.
 | `landform_water_spills` | Water would stand above the ground beside it |
 | `landform_unreachable` | A door cannot be reached from the entry |
 | `landform_digest_mismatch` | A chunk is not the one its digest names |
+| `landform_not_served` | Land asked of the town, or with a support declaration |
 
 ## Limits
 
-- No world states land, no composer reads a land document and nothing draws land; the site and
-  city grammars still lay out level ground. A world's land, its drawing, people standing on it and
-  its society's places are later work, each a visible change.
+- The application draws no land: a site made on land is served its land and the page does not yet
+  read it. No product page or drafter asks for land. Towns are laid out on level ground.
 - Positions in a society stay two integers and plan distance stays the walking cost; walking uphill
   takes no longer.
 - One heightfield per chunk: no overhangs, arches or passages under terraces.

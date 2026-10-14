@@ -340,6 +340,15 @@ and recovery. It does not select a floor from overlapping meshes. Reopening star
 entry. [Canonical support and connectivity](world-composition-contract.md#canonical-support-and-connectivity)
 owns the geometry, state rules and outstanding inhabitant, elevated-object and transit limits.
 
+A site made on land (composer version 5, [landform contract](landform-contract.md#sites-on-land))
+serves `exulanica.site-drawing/v5`: the version 1 slots, each standing at the graded land's height
+under it, a pond's water at its level, the site's ground, zones, paths, dry areas and boundary walls
+marked `drape` (each point of a draped slot as far above the land under it as its base stands above
+the land under its base's centre), the arrival at its height, and a `land` section naming the
+land's digest, each chunk's place and digest, the backdrop's digest and the water over the land.
+The chunks and the backdrop are served by those digests. Every earlier version is unchanged. The
+application does not yet read version 5.
+
 A style pack dresses a slot by its look role and never changes it. Nothing in the drawing decides a
 look.
 
@@ -386,10 +395,14 @@ stages.
 | `POST /worlds/kinds` | world write | Keeps a creator's kind (origin `uploaded`, at most 65,536 bytes; a body over 131,072 bytes is refused 413 before it is read) once both stages pass; 422 names the refusal and writes nothing; 409 `kind_version_exists` or `kind_cap_reached`, asked before any sample world is built; 503 when the worker cannot answer in time |
 | `POST /worlds/kinds/{kind}/worlds` | world write | Makes a world of a kind with a preset, values and a title, and saves its entry; the latest version unless one is named; a body over 16,384 bytes is refused 413 before it is read; 503 when the worker cannot answer in time |
 | `GET /world/versions/{version_id}/site` | world read | The drawing, served only to the world whose snapshot names its receipt, with its digest as the entity tag; made in the kind worker and kept, 503 with a `Retry-After` while it cannot be |
+| `GET /world/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}` | world read | One chunk of a site's graded land (`exulanica.landform-chunk/v1`), with its digest as the entity tag, made and kept with the drawing; 404 `land_unavailable` for a level world, 404 `land_chunk_unavailable` for a chunk the land does not hold |
+| `GET /world/versions/{version_id}/land/backdrop` | world read | The site's land drawn to the horizon (`exulanica.landform-backdrop/v1`), with its digest as the entity tag; 404 `land_unavailable` for a level world |
 
 Making a world answers 404 for an unknown kind or preset, 422 for a value the kind does not offer
-(naming the key, the value and the range) or an empty title, 409 with every refusal when no
-candidate makes a world people can live in, 409 when the workspace holds as many generated worlds
+(naming the key, the value and the range) or an empty title, 422 for a `land` document the landform
+catalog refuses (naming its `path`) and 422 `landform_not_served` for land asked of the town or with
+a support declaration, 409 with every refusal when no candidate makes a world people can live in
+(on land, when no candidate's layout the land can take), 409 when the workspace holds as many generated worlds
 as the count policy allows, and 403 `worlds_read_only` when the deployment's database role cannot
 register a world. Nothing is written when any is refused. A stranger is told a world does not
 exist, as for every world route. The browser offers no upload: keeping a kind is the API path a
@@ -636,7 +649,8 @@ town's receipt or digest depends on the adapter.
   (thatch steep and overhanging, a canvas roof a tent's, an earth roof a slab with a parapet); the
   walls under it are not: every structure but a tent is a box of walls, and a tall thing standing
   near a tent's side shows through its canvas.
-- Beyond an open site its ground runs out to the pack's reach, flat, with the setting it wears.
+- Beyond an open site its ground runs out to the pack's reach, flat, with the setting it wears,
+  unless the site is made on land ([landform contract](landform-contract.md#sites-on-land)).
   A sea setting changes that ground beyond the site; it supplies no water area inside it, shore
   layout or boats. Settings supply no individual trees.
 - Native kind drafts keep their identity, requester, input, bounded execution metadata and outcome

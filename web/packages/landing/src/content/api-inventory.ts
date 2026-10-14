@@ -23624,7 +23624,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "post",
     "id": "create_kind_world_worlds_kinds__kind__worlds_post",
     "title": "Make a world of a kind and save it as yours.",
-    "description": "Make a world of ``kind`` with a preset and values, for a new identity, and save its entry.\n\nThe town is made as ``POST /worlds/generated`` makes it, from its preset through the same gate\nand composer, so it is the same world. Every other kind is made by the site grammar from the\nkind the workspace holds or the product ships (the latest version unless one is named). An\nunknown kind or preset answers 404; a value the kind does not offer 422, naming the key, the\nvalue and the range; a title empty once trimmed 422; a kind none of whose candidates makes a\nworld people can live in, for any identity drawn, 409 with every refusal; a workspace already\nholding as many generated worlds as the count policy allows 409; a deployment whose database\nrole cannot register a world 403 ``worlds_read_only``. Nothing is written when any is refused.\n\nA world's receipt carries its kind's whole document, so a world of a kind the workspace keeps\ncopies a person's document once more. A server whose deployment has not turned kinds from\npeople on (``EXULANICA_KINDS_FROM_PEOPLE``) makes worlds of shipped kinds and the town only,\nand answers 403 ``kinds_from_people_not_offered`` for a kind the workspace keeps.",
+    "description": "Make a world of ``kind`` with a preset and values, for a new identity, and save its entry.\n\nThe town is made as ``POST /worlds/generated`` makes it, from its preset through the same gate\nand composer, so it is the same world. Every other kind is made by the site grammar from the\nkind the workspace holds or the product ships (the latest version unless one is named). An\nunknown kind or preset answers 404; a value the kind does not offer 422, naming the key, the\nvalue and the range; a title empty once trimmed 422; a land document the landform catalog\nrefuses 422, naming its path (``landform_*``), and land asked of the town or with a support\ndeclaration 422 ``landform_not_served``; a kind none of whose candidates makes a world people\ncan live in, for any identity drawn (on land: none whose layout the land can take), 409 with\nevery refusal; a workspace already\nholding as many generated worlds as the count policy allows 409; a deployment whose database\nrole cannot register a world 403 ``worlds_read_only``. Nothing is written when any is refused.\n\nA world's receipt carries its kind's whole document, so a world of a kind the workspace keeps\ncopies a person's document once more. A server whose deployment has not turned kinds from\npeople on (``EXULANICA_KINDS_FROM_PEOPLE``) makes worlds of shipped kinds and the town only,\nand answers 403 ``kinds_from_people_not_offered`` for a kind the workspace keeps.",
     "group": "world",
     "permission": {
       "requires": [
@@ -23700,6 +23700,174 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "id": "read_site_drawing_world_versions__version_id__site_get",
     "title": "A site world's drawing, for the world whose snapshot names its receipt.",
     "description": "Serve the version's exact drawing after worker/cache and final current-source checks.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}",
+    "method": "get",
+    "id": "read_site_land_chunk_world_versions__version_id__land_chunks__chunk_x___chunk_y__get",
+    "title": "One 128 m chunk of a site world's land, by its place on the city's tile grid.",
+    "description": "Serve one chunk of a site world's graded land (``exulanica.landform-chunk/v1``), held to the\ndigest its drawing (``exulanica.site-drawing/v5``) names. A level world answers 404\n``land_unavailable``; a chunk the land does not hold 404 ``land_chunk_unavailable``.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "chunk_x",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Chunk X"
+        }
+      },
+      {
+        "name": "chunk_y",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Chunk Y"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/land/backdrop",
+    "method": "get",
+    "id": "read_site_land_backdrop_world_versions__version_id__land_backdrop_get",
+    "title": "A site world's land drawn to the horizon, never walked.",
+    "description": "Serve a site world's backdrop (``exulanica.landform-backdrop/v1``), held to the digest its\ndrawing names. A level world answers 404 ``land_unavailable``.",
     "group": "world",
     "permission": {
       "requires": [

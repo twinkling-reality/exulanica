@@ -35,9 +35,11 @@ from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars.site import generate_site, site_records
 from exulanica.grammar.grammars.site.layout import LayoutBudget, LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import SitePlan, plan_sha256
+from exulanica.grammar.landform import LandDocument, LandformRefused
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused
 from exulanica.world.kinds.routine import kind_routine
+from exulanica.world.site_land import land_seed, site_land
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_place import validate_place
 from exulanica.world.society_site_place import (
@@ -212,11 +214,17 @@ def compose_site(
     routine: RoutineModel | None = None,
     candidates: int | None = None,
     budget: LayoutBudget | None = None,
+    land: LandDocument | None = None,
 ) -> SiteWorld:
     """The world ``kind`` makes with ``values`` for ``world_id``: the first seed candidate whose
     site is laid out within ``budget`` (by default each candidate within the bounds catalog's
     ``layout_trials``) and meets every need; :class:`SiteRefused` with every candidate's sentence
-    when none does."""
+    when none does.
+
+    With ``land``, each candidate's layout grades the land (:mod:`exulanica.world.site_land`) and
+    its place stands on the graded land; a layout the land cannot take is refused with the
+    grading's sentence and the next candidate tried, and the kind's needs are checked on the
+    graded place. Without it, nothing here differs from a level site."""
     bounds = load_kind_catalogs().bounds
     tries = bounds["candidates"][0] if candidates is None else candidates
     budget = layout_budget() if budget is None else budget
@@ -260,6 +268,25 @@ def compose_site(
             )
             continue
         records = site_records(generation)
+        ground = None
+        if land is not None:
+            try:
+                graded = site_land(
+                    land,
+                    records,
+                    land_seed(world_id, land.sha256),
+                    routine.policy["footway_station_spacing_mm"],
+                )
+            except LandformRefused as exc:
+                refused.append(
+                    {
+                        "candidate": candidate,
+                        "code": "kind_generation_refused",
+                        "refusal": f"its land cannot take this layout: {exc.detail}"[:500],
+                    }
+                )
+                continue
+            ground = graded.height_at
         try:
             # The graph's budget is held while it is built, so an oversized site stops early.
             place = place_from_site_records(
@@ -268,6 +295,7 @@ def compose_site(
                 society=society,
                 routine=routine,
                 node_limit=bounds["walking_nodes"][1],
+                ground=ground,
             )
         except GraphOverBudget as exc:
             refused.append(

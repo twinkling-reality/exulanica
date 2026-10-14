@@ -270,6 +270,9 @@ class CreateKindWorldBody(BaseModel):
     values: Annotated[dict[str, Any] | None, Field(max_length=64)] = None
     #: Explicit bounded support authoring; absent retains the historical composer/drawing.
     support: dict[str, Any] | None = None
+    #: The land the site is laid out on (``exulanica.landform/v1``); absent makes the level site
+    #: every earlier world is, byte for byte.
+    land: dict[str, Any] | None = None
 
 
 def _echo(value: object) -> object:
@@ -910,8 +913,11 @@ def create_kind_world(
     and composer, so it is the same world. Every other kind is made by the site grammar from the
     kind the workspace holds or the product ships (the latest version unless one is named). An
     unknown kind or preset answers 404; a value the kind does not offer 422, naming the key, the
-    value and the range; a title empty once trimmed 422; a kind none of whose candidates makes a
-    world people can live in, for any identity drawn, 409 with every refusal; a workspace already
+    value and the range; a title empty once trimmed 422; a land document the landform catalog
+    refuses 422, naming its path (``landform_*``), and land asked of the town or with a support
+    declaration 422 ``landform_not_served``; a kind none of whose candidates makes a world people
+    can live in, for any identity drawn (on land: none whose layout the land can take), 409 with
+    every refusal; a workspace already
     holding as many generated worlds as the count policy allows 409; a deployment whose database
     role cannot register a world 403 ``worlds_read_only``. Nothing is written when any is refused.
 
@@ -921,6 +927,7 @@ def create_kind_world(
     and answers 403 ``kinds_from_people_not_offered`` for a kind the workspace keeps.
     """
     try:
+        from exulanica.grammar.landform import LandformRefused
         from exulanica.world.support_surfaces import SupportRefused
 
         require_world_registration(connection)
@@ -935,6 +942,13 @@ def create_kind_world(
             if body.support is not None:
                 return _problem(
                     422, "support_network_invalid", "Support authoring is served for site worlds."
+                )
+            if body.land is not None:
+                return _problem(
+                    422,
+                    "landform_not_served",
+                    "Land is served for site worlds; a town is laid out on level ground.",
+                    path="land",
                 )
             created = entries.create_generated(
                 title=body.title,
@@ -957,7 +971,7 @@ def create_kind_world(
                 return _problem(404, "unknown_world_kind", f"no world kind is named {kind!r}")
             used_kind = found
             values = found.values(body.preset, body.values)
-            composer = WorkerComposer(session.workspace_id, support=body.support)
+            composer = WorkerComposer(session.workspace_id, support=body.support, land=body.land)
             created = entries.create_from_kind(
                 title=body.title,
                 kind=found,
@@ -993,6 +1007,8 @@ def create_kind_world(
         return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
     except SupportRefused as exc:
         return _problem(422, exc.code, exc.detail, where=exc.where)
+    except LandformRefused as exc:
+        return _problem(422, exc.code, exc.detail, path=exc.path)
     except TileBudgetReached as exc:
         return _problem(409, exc.code, str(exc), returns_at=exc.returns_at.isoformat())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
@@ -1094,3 +1110,98 @@ def read_site_drawing(
         media_type="application/json",
         headers={**_HEADERS, "ETag": f'"{answer["sha256"]}"'},
     )
+
+
+def _site_land_document(
+    version_id: uuid.UUID,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    pick: str,
+) -> Response:
+    """Serve one of a site world's land documents (``pick`` is ``backdrop`` or ``x,y`` for a
+    chunk), made with its drawing in the kind worker and kept beside it, by the digest the drawing
+    names."""
+    from exulanica.api.world_edit import object_problem
+    from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION
+    from exulanica.world.object_repository import WorldObjectRepository
+
+    try:
+        require_world(connection, session.workspace_id, world_id)
+        repository = WorldObjectRepository(connection, session.workspace_id, world_id=world_id)
+        snapshot_id = repository.edit_base_row(version_id)["source_snapshot_id"]
+        if not states_site(connection, session.workspace_id, world_id, snapshot_id):
+            return _problem(404, "unknown_reference", "this world is not made from a world kind")
+        digest, receipt = generation_receipt(
+            connection, session.workspace_id, world_id, snapshot_id
+        )
+        if receipt["composer"] != {"key": "site-plan", "version": LAND_COMPOSER_VERSION}:
+            return _problem(404, "land_unavailable", "this world stands on level ground")
+        worker = kind_worker()
+        outcome = worker.run(
+            drawing_key(str(session.workspace_id), digest),
+            DRAWING_SECONDS,
+            drawing_job,
+            str(session.workspace_id),
+            world_id,
+            dict(receipt),
+            digest,
+            workspace=str(session.workspace_id),
+            kept=worker.drawings,
+        )
+        if outcome.status != "done" or outcome.value is None:
+            return _waiting(outcome, kept=True)
+        answer = outcome.value
+        if answer["status"] == "refused":
+            return _problem(409, "generated_world_unreadable", answer["detail"])
+        land = answer["land"]
+        found = land["backdrop"] if pick == "backdrop" else land["chunks"].get(pick)
+        if found is None:
+            return _problem(404, "land_chunk_unavailable", f"this world's land has no chunk {pick}")
+    except KindWorkWaiting as exc:
+        return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
+    except InvalidStructuralData as exc:
+        return _problem(409, "generated_world_unreadable", str(exc))
+    except Exception as exc:
+        problem = object_problem(exc)
+        if problem is None:
+            raise
+        return problem
+    return Response(
+        content=found["body"].encode("utf-8"),
+        media_type="application/json",
+        headers={**_HEADERS, "ETag": f'"{found["sha256"]}"'},
+    )
+
+
+@site_router.get(
+    "/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}",
+    summary="One 128 m chunk of a site world's land, by its place on the city's tile grid.",
+)
+def read_site_land_chunk(
+    version_id: uuid.UUID,
+    chunk_x: Annotated[int, Path(ge=-4096, le=4096)],
+    chunk_y: Annotated[int, Path(ge=-4096, le=4096)],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve one chunk of a site world's graded land (``exulanica.landform-chunk/v1``), held to the
+    digest its drawing (``exulanica.site-drawing/v5``) names. A level world answers 404
+    ``land_unavailable``; a chunk the land does not hold 404 ``land_chunk_unavailable``."""
+    return _site_land_document(version_id, connection, session, world_id, f"{chunk_x},{chunk_y}")
+
+
+@site_router.get(
+    "/versions/{version_id}/land/backdrop",
+    summary="A site world's land drawn to the horizon, never walked.",
+)
+def read_site_land_backdrop(
+    version_id: uuid.UUID,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve a site world's backdrop (``exulanica.landform-backdrop/v1``), held to the digest its
+    drawing names. A level world answers 404 ``land_unavailable``."""
+    return _site_land_document(version_id, connection, session, world_id, "backdrop")

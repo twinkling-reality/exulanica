@@ -24,6 +24,18 @@ millimetres from the site's south-west corner; the region's east is x and its so
 A slot's identity is its record's subject identity, or that identity with the piece it names
 (``:wall:2``, ``:lintel:0``, ``:roof``, ``:door:0``), so a pack's variant chosen by identity is the
 same on every load. Nothing here decides a look; a pack never changes a slot.
+
+A site laid out on land (composer version 5) serves ``exulanica.site-drawing/v5``: the same slots,
+each standing at the graded land's height under it (its zone's terrace, or its path), a pond's
+water at its level, the site's ground, its zones, its paths, its dry areas and its boundaries'
+walls marked ``drape`` (each point of a draped slot stands as far above the land under it as its
+base does under its base's centre: a terrace is level only inside its edges, where it meets sloping
+paths and terraces at other levels, so a flat plane or a level fence would leave the land there; a
+building and its rooms stand level on their terrace), the arrival at its height, and ``land``: the
+land's digest, each 128 m chunk's place and digest, the backdrop's digest and the water over the
+land. The chunks and the backdrop themselves are served by digest
+(:mod:`exulanica.world.site_land`).
+Every earlier version is unchanged.
 """
 
 from __future__ import annotations
@@ -45,9 +57,19 @@ from exulanica.grammar.grammars.site.records import (
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
 
-__all__ = ["DRAWING_PROFILE", "LAYER_MM", "site_drawing", "site_drawing_sha256"]
+__all__ = [
+    "DRAWING_PROFILE",
+    "LAND_DRAWING_PROFILE",
+    "LAYER_MM",
+    "site_drawing",
+    "site_drawing_sha256",
+]
 
 DRAWING_PROFILE: Final = "exulanica.site-drawing/v1"
+#: The composer version whose drawing stands on land (``site_plan.LAND_COMPOSER_VERSION``), and
+#: the drawing it serves.
+LAND_DRAWING_COMPOSER_VERSION: Final = 5
+LAND_DRAWING_PROFILE: Final = "exulanica.site-drawing/v5"
 #: How far above the ground each kind of surface lies, so planes never share a height.
 LAYER_MM: Final = {"ground": 0, "zone": 6, "path": 12, "area": 18, "floor": 24}
 #: A flat roof's slab, and a gable's rise per millimetre of its span (seven twentieths, a pitch
@@ -450,4 +472,47 @@ def site_drawing(
 
         drawing["profile"] = "exulanica.site-drawing/v2"
         drawing["support"] = receipt_support(receipt, tuple(records)).adapter_document()
+    if receipt["composer"]["version"] == LAND_DRAWING_COMPOSER_VERSION:
+        _on_land(drawing, receipt, records)
     return drawing
+
+
+def _on_land(
+    drawing: dict[str, Any], receipt: Mapping[str, Any], records: Sequence[object]
+) -> None:
+    """Stand a version 1 drawing on its graded land, as ``exulanica.site-drawing/v5``."""
+    from exulanica.world.composers.site_plan import receipt_land
+
+    land = receipt_land(receipt, tuple(records))
+    extent = next(r for r in records if isinstance(r, SiteExtentRecord))
+    draped = {f"{extent.identity}:ground"} | {
+        r.identity
+        for r in records
+        if isinstance(r, SiteZoneRecord | SitePathRecord)
+        or (isinstance(r, SiteAreaRecord) and "water" not in r.roles)
+    }
+    # A boundary's wall runs along a terrace's edge, where the land leaves the terrace's level; a
+    # building's walls stand level on its terrace.
+    boundaries = {r.identity for r in records if isinstance(r, SiteWallRecord)}
+    levels = {tuple(body.rect_mm): body.level_mm for body in land.water if body.kind == "pond"}
+    ponds = {
+        r.identity: levels[(r.min_x_mm, r.min_y_mm, r.max_x_mm, r.max_y_mm)]
+        for r in records
+        if isinstance(r, SiteAreaRecord)
+        and (r.min_x_mm, r.min_y_mm, r.max_x_mm, r.max_y_mm) in levels
+    }
+    for slot in drawing["slots"]:
+        x, y, z = slot["positionMm"]
+        if slot["identity"] in ponds:
+            slot["positionMm"] = [x, y, ponds[slot["identity"]]]
+            continue
+        record_identity = str(slot["identity"]).partition(":")[0]
+        if slot["identity"] in draped or (
+            record_identity in boundaries and "structure" not in slot
+        ):
+            slot["drape"] = True
+        slot["positionMm"] = [x, y, land.height_at(x, y) + z]
+    east, north = receipt["arrival"]["position_mm"]
+    drawing["arrival"]["positionMm"] = [east, north, land.height_at(east, north)]
+    drawing["profile"] = LAND_DRAWING_PROFILE
+    drawing["land"] = land.drawing_section()
