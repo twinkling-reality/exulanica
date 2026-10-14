@@ -713,10 +713,10 @@
    "value": "coast_grade_permille",
    "minimum": 100,
    "maximum": 2000,
-   "default": 600,
+   "default": 350,
    "required": 0,
    "words": [],
-   "reason": "Authored: how fast the land may rise behind the beach; high land meets the sea as a slope, never a wall.",
+   "reason": "Authored: how fast the land may rise behind the beach; high land meets the sea as a slope, never a wall. The default is 350 per mille (about 19 degrees), since where the water's edge wanders the slope behind it steepens: at 600 a level coast reached 41 degrees. Changed inside version 1 only because no world was yet made on land through a product path; from the next change these catalogs change only by new versions.",
    "licence": {
     "spdx": "Apache-2.0",
     "verdict": "SHIP",
@@ -946,6 +946,24 @@
    "required": 0,
    "words": [],
    "reason": "Authored: how far the benches take to fade into the natural slope at the band's ends.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_riser_share_permille",
+   "feature": "terraces",
+   "value": "riser_share_permille",
+   "minimum": 100,
+   "maximum": 1000,
+   "default": 800,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how much of each tier's natural rise its bank takes, the rest being a level bench, so a bank is no steeper than the slope beneath divided by this share and on gentle land the steps are grassed banks, not walls. Added inside version 1 only because no world was yet made on land through a product path.",
    "licence": {
     "spdx": "Apache-2.0",
     "verdict": "SHIP",

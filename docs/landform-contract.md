@@ -82,9 +82,9 @@ carries a reason and a licence (`exulanica/grammar/landform/catalog.py`):
 | `valley` | A long hollow with a flat floor |
 | `undulation` | Small seeded unevenness everywhere |
 | `range` | Mountains or hills on the horizon, drawn only |
-| `shore` | The land falling to a beach and a sea floor below the datum |
+| `shore` | The land falling to a beach and a sea floor below the datum, rising behind the beach no faster than its coast grade |
 | `basin` | A bowl; filled, a lake whose level is its rim less a freeboard |
-| `terraces` | Level benches stepping up a slope, fading at their ends |
+| `terraces` | Level benches stepping up a slope, each joined to the next by a bank, fading at their ends |
 
 ## Realizing a land
 
@@ -95,6 +95,14 @@ smoothsteps, integer square roots. Additive features sum; then shaping features 
 order, terraces, shores, basins, so a basin's level is set by the rim it ends with. Each recipe is
 bounded to the land it was written for and fades out beyond it. Noise is sampled on the world's
 own axes, so a grid of samples computes its interpolation weights once per row and column.
+
+Within each tier of natural rise a terrace holds the lower part level, a bench, and the upper part
+(`riser_share_permille` of the tier, 800 by default) is a bank climbing the whole tier, so a bank is
+no steeper than the slope beneath divided by its share: on gentle land the steps are grassed
+banks, on steep land they are as steep as the land demands. Behind a beach the land rises away from
+the water at most at the coast grade (350 per mille by default); where the waterline wanders that
+slope steepens, and a level coast with the defaults rises no steeper than 600 per mille. Both are
+functions of each point alone, so the near land and the backdrop agree wherever they meet.
 
 ## Near land in chunks
 

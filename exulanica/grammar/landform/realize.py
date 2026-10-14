@@ -2,8 +2,9 @@
 
 ``H(x, y)`` is the land's height in millimetres above the datum (the sea's level) at a point east
 and north of the world's south-west corner. Features apply in a fixed order: the additive ones sum
-(tilt, rise, valley, undulation, range), then the shaping ones carve or hold the result, terraces,
-then shores, then basins last, so a basin's water is set by the rim it ends with. Each recipe is
+(tilt, rise, valley, undulation, range), then the shaping ones carve or hold the result, terraces
+(level benches joined by banks), then shores, then basins last, so a basin's water is set by the rim
+it ends with. Each recipe is
 bounded to the land it was written for and fades out beyond it, so no periodic term ever repeats
 across a far slope.
 
@@ -263,17 +264,23 @@ _ADDITIVE: Final = {
 def _terraces(
     frame: WorldFrame, land: LandDocument, f: LandFeature, grid: _Grid, h: list[int]
 ) -> None:
+    """Steps cut into a slope: within each tier of natural rise the lower part is held level, a
+    bench, and the upper part (``riser_share_permille`` of the tier) is a bank climbing the whole
+    tier, so a bank is no steeper than the slope beneath divided by its share. A function of each
+    point's own height: the backdrop and the near land agree wherever they meet."""
     v, c = f.values, frame.centre
     side = str(v["side"])
     start = frame.half_along(side) + int(v["distance_mm"])
     depth, half, fade = int(v["depth_mm"]), int(v["width_mm"]) // 2, int(v["fade_mm"])
     tier, base, offset = int(v["tier_height_mm"]), land.ground_mm, int(v["offset_mm"])
+    bench = tier - tier * int(v["riser_share_permille"]) // 1000
     for k, (x, y) in enumerate(grid.points):
         u = _along(side, x, y, c) - start
         w = abs(_across(side, x, y, c) - offset)
         if u < -fade or u > depth + fade or w > half + fade or h[k] <= base:
             continue
-        held = base + (h[k] - base) // tier * tier
+        step, part = divmod(h[k] - base, tier)
+        held = base + step * tier + max(0, part - bench) * tier // (tier - bench)
         weight = ONE
         for edge in (u + fade, depth + fade - u, half + fade - w):
             if edge < 2 * fade:

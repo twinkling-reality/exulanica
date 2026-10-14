@@ -108,7 +108,7 @@ def test_a_known_land_realizes_to_known_bytes():
     assert chunk.sha256 == GOLDEN_CHUNK_SHA256
 
 
-GOLDEN_CHUNK_SHA256 = "33c3c9525978d096e139c0ea3eaeb7cf571896f16652eded02af0319cac096a8"
+GOLDEN_CHUNK_SHA256 = "5cf71d21437d3c8fc152e6c821767f45f6f0544e99440e227c16b447a4a7fd22"
 
 
 def test_neighbouring_chunks_share_their_edge_samples():
@@ -205,6 +205,67 @@ def test_a_shore_ends_the_land_in_a_beach_and_a_sea_floor_below_the_datum():
     assert profile[-1] == 9000
     [sea] = water_bodies(shore, FRAME)
     assert sea.kind == "sea" and sea.level_mm == 0
+
+
+def _steepest_permille(near) -> int:
+    """The steepest rise from a sample to its east or north neighbour, per mille."""
+    rows = [near.heights[j * near.nx : (j + 1) * near.nx] for j in range(near.ny)]
+    return max(
+        max(abs(b - a) for row in rows for a, b in pairwise(row)),
+        max(abs(b - a) for low, high in pairwise(rows) for a, b in zip(low, high, strict=True)),
+    )
+
+
+def test_a_shore_with_its_defaults_meets_the_land_as_a_slope_where_its_edge_wanders():
+    """The waterline wanders, and the coast's slope behind the beach follows it: where the line
+    bends the land must still rise no steeper than a person could walk up, never a scarp."""
+    shore = read_land_document(
+        {
+            "profile": PROFILE,
+            "ground_mm": 9000,
+            "features": [{"id": "sea", "kind": "shore", "side": "south", "distance_mm": 50_000}],
+        }
+    )
+    near = realize_region(shore, FRAME, -128_000, -128_000, 256_000, 0)
+    assert min(near.heights) < 0 and max(near.heights) == 9000
+    assert _steepest_permille(near) <= 600
+
+
+def test_terraces_are_level_benches_joined_by_banks_not_walls():
+    """On an even slope each step is a level bench and a bank: the bank takes its catalogued share
+    of the tier's rise, so it is no steeper than the slope beneath divided by that share."""
+    slope = read_land_document(
+        {
+            "profile": PROFILE,
+            "ground_mm": 4000,
+            "features": [
+                {"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 100},
+                {
+                    "id": "steps",
+                    "kind": "terraces",
+                    "side": "north",
+                    "distance_mm": 10_000,
+                    "depth_mm": 80_000,
+                    "width_mm": 100_000,
+                    "fade_mm": 5_000,
+                    "tier_height_mm": 2500,
+                },
+            ],
+        }
+    )
+    share = slope.features[1].values["riser_share_permille"]
+    canonical = slope.canonical()
+    natural = read_land_document({**canonical, "features": canonical["features"][:1]})
+    # Up the band's middle, clear of its fading edges: a column running up the slope.
+    ys = [70_000 + 10_000 + 15_000 + k * 1000 for k in range(41)]
+    column = [height_at(slope, FRAME, 40_000, y) for y in ys]
+    beneath = [height_at(natural, FRAME, 40_000, y) for y in ys]
+    rises = [b - a for a, b in pairwise(column)]
+    steepest = max(b - a for a, b in pairwise(beneath))
+    assert max(rises) <= steepest * 1000 // share + 2, (steepest, rises)
+    # A bench is the tier's level part, several metres deep on a gentle slope.
+    assert any(rises[k : k + 4] == [0, 0, 0, 0] for k in range(len(rises))), rises
+    assert min(rises) >= 0, "a terrace never steps down a slope that rises"
 
 
 def test_a_filled_basin_holds_its_water_at_its_rim_less_the_freeboard():
