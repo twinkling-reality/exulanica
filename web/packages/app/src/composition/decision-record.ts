@@ -140,6 +140,12 @@ export interface DecisionChange {
   readonly lines: readonly string[];
   /** Metres walked along the recorded path, by minute; empty where it did not move. */
   readonly walked: readonly { readonly minute: number; readonly metres: number }[];
+  /**
+   * The being's own events the lines were read from: the applied minute until its next applied
+   * decision, in order. What a choice's Did part points at, so its sentences and its records share
+   * one bound.
+   */
+  readonly window: readonly DecisionEvent[];
 }
 
 
@@ -216,7 +222,7 @@ export function decisionChange(
     }
   }
   if (nextDecision !== undefined && start !== null) lines.push(`Its next applied decision was in minute ${nextDecision.tick}.`);
-  return { lines: dedupe(lines), walked };
+  return { lines: dedupe(lines), walked, window };
 }
 
 const dedupe = (lines: readonly string[]): string[] => [...new Set(lines)];
@@ -570,8 +576,10 @@ export function choiceAccount(
   const consumed = consumption(requestId, latest, events);
   const requestRecord: RecordPointer = { kind: 'request', id: requestId, sha256: words(request['document_sha256']) };
   const receiptRecords = receipt === null ? [] : [receiptPointer(requestId, receipt)];
-  const own = (events ?? []).filter((one) => one.subjectId === view.subjectId && view.appliedAt !== null
-    && one.tick >= view.appliedAt && (one.kind === 'route_progressed' || one.kind === 'action_completed'));
+  // The movement and actions the Did sentences were read from, bounded as they are by decisionChange.
+  const own = view.appliedAt === null || view.subjectId === null || events === null ? []
+    : decisionChange(events, view.subjectId, requestId, view.appliedAt).window
+      .filter((one) => one.kind === 'route_progressed' || one.kind === 'action_completed');
   const eventRecords = [consumed.event, ...own].flatMap((one): RecordPointer[] =>
     one === null || one.eventId === null ? [] : [{ kind: 'event', id: one.eventId, sha256: null }]);
   const unanswered = receipt === null || receipt['status'] === 'unavailable';

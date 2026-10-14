@@ -6,6 +6,7 @@ import { mountEntitySheet } from './entity-sheet.ts';
 import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { DECIDER_MARKS } from '/src/decider-marks.ts';
 import { DISCOVERY, attentionCandidates, inspectionReach, promptPresentation, layoutDiscovery, markerAt } from './discovery-policy.mjs';
+import { createReadBackoff } from './read-backoff.mjs';
 import './entity-sheet.css';
 import './blank-world.css';
 import './contextual-world.css';
@@ -61,6 +62,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   let dragging = null, overPrompt = false, serial = 0, lastPick = 0, frameId = 0;
   const activityLabels = new Map([...Object.entries(ACTION_LABELS), ...ACTIVITY_LABELS]);
   const offers = new Map(), offerReads = new Map(), offerSerials = new Map();
+  // Automatic reads of a subject whose read failed wait longer each time (read-backoff.mjs).
+  const readBackoff = createReadBackoff();
   let entitySheet = null, targetReachable = false;
   let following = null;
   let visibleMarkers = [], lastDiscovery = -Infinity, pointerIntent = false;
@@ -115,6 +118,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (offerSerials.get(row.key) === sequence && !lifetime.signal.aborted) offers.set(row.key, { offer, at: performance.now() });
       return offer;
     })();
+    request.then(() => readBackoff.succeeded(row.key), () => readBackoff.failed(row.key, performance.now()));
     offerReads.set(row.key, request);
     try { return await request; } finally { if (offerReads.get(row.key) === request) offerReads.delete(row.key); }
   }
@@ -245,7 +249,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       marker.root.dataset.distance = item.distance.toFixed(1);
       marker.root.setAttribute('aria-label', 'Focus ' + item.label);
       if (marker.name.textContent !== item.label) marker.name.textContent = item.label; marker.name.hidden = item.key !== focused?.key || !item.named || !panel.hidden;
-      if (!offers.has(item.key) && !offerReads.has(item.key)) void entityOffer(item.row).catch(() => {});
+      if (!offers.has(item.key) && !offerReads.has(item.key) && readBackoff.ready(item.key, performance.now())) void entityOffer(item.row).catch(() => {});
     }
   }
   function targetAt(at) {
@@ -270,7 +274,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       $('.cw-inspect').setAttribute('aria-label', 'Inspect ' + row.label);
       if (changed) {
         lastDiscovery = -Infinity;
-        void entityOffer(row).catch(() => {});
+        if (readBackoff.ready(row.key, performance.now())) void entityOffer(row).catch(() => {});
       }
     }
   }

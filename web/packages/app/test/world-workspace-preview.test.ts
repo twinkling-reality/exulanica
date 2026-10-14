@@ -98,7 +98,7 @@ describe('the world workspace preview\'s edits to this app', () => {
 
 describe('the world workspace preview\'s own checks', () => {
   // Each script asserts at its top level; importing it runs it, and a failed assertion fails here.
-  it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-explanation.mjs'])('%s passes', async (script) => {
+  it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-explanation.mjs', 'verify-read-backoff.mjs'])('%s passes', async (script) => {
     await expect(preview(script)).resolves.toBeDefined();
   });
 });

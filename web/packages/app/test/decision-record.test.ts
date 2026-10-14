@@ -251,6 +251,20 @@ describe('a choice told in four parts with one verdict', () => {
   });
 });
 
+describe('what a choice\'s Did part points at', () => {
+  it('stops at the next applied decision, as its sentences do', () => {
+    const move = (tick: number, id: string): unknown => ({ ...event(tick, 'route_progressed', { motion_path_mm: [[0, 0], [5000, 0]] }, 1) as object, event_id: id });
+    const events = page([
+      closed(4, 'first', 1, 'applied', 'validated_choice', 'resting, 60 m away (1)'), move(4, 'walk-4'), move(5, 'walk-5'),
+      closed(13, 'second', 2, 'applied', 'validated_choice', 'wait here a minute'), move(18, 'walk-18'),
+    ]);
+    const did = choiceAccount(stored('first', 'resting, 60 m away (1)', 1), null, events).parts[3];
+    expect(did.lines).toContain('Its next applied decision was in minute 13.');
+    // Its own closing event and the walks before minute 13; never a later choice's events.
+    expect(did.records.map((record) => record.id)).toEqual(['event-first', 'walk-4', 'walk-5']);
+  });
+});
+
 describe('rewinding a being\'s choices', () => {
   it('steps through them oldest first by decision order, ending with one no minute has taken up', () => {
     const events = page([

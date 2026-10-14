@@ -65,7 +65,7 @@ describe('reading who decides', () => {
       timeouts: { longest_streak: 1, current_streak: 0 },
       repetition: { longest_choice_run: 2, longest_line_run: 0 },
       latency_ms: { n: 4, minimum: 5, p50: null, p95: null, longest: null },
-      cost: { usd: '0.00042000', basis: 'bounded', unknown_calls: 1, calls: 5 },
+      cost: { usd: '0.00042000', known_usd: '0.00030000', reserved_usd: '0.00012000', basis: 'bounded', unknown_calls: 1, calls: 5 },
     };
     const summary = read().by_model[0]!;
     const view = parseSocietyModels(read({
@@ -77,7 +77,7 @@ describe('reading who decides', () => {
     expect(found.rates.acceptance).toEqual({ numerator: 4, denominator: 4, minimum: 5, value: null });
     expect(found.counts.notApplied).toBe(1);
     expect(found.latencyMs.p50).toBeNull();
-    expect(found.cost).toEqual({ usd: '0.00042000', basis: 'bounded', unknownCalls: 1, calls: 5 });
+    expect(found.cost).toEqual({ usd: '0.00042000', knownUsd: '0.00030000', reservedUsd: '0.00012000', basis: 'bounded', unknownCalls: 1, calls: 5 });
     expect(view.byBeing).toEqual([expect.objectContaining({ subjectId: 'ada', name: 'Nemotron 3 Nano 30B', measures: found })]);
     // A server that predates the measures reads as before.
     const older = parseSocietyModels(read());

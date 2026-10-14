@@ -63,8 +63,14 @@ def test_counts_keep_refused_unavailable_stale_and_pending_apart() -> None:
         "stale": 1,
         "applied": 1,
         "not_applied": 1,
-        "pending": 2,
+        # Only the accepted answer no minute has taken up waits; the unanswered ask is a timeout.
+        "pending": 1,
     }
+    counts = found["counts"]
+    assert counts["decisions"] == counts["answered"] + counts["refused"] + counts["unavailable"]
+    assert counts["answered"] == (
+        counts["applied"] + counts["not_applied"] + counts["stale"] + counts["pending"]
+    )
     # Unavailable is not counted against acceptance: five judged answers, four accepted.
     assert found["rates"]["acceptance"] == {
         "numerator": 4,
@@ -160,6 +166,8 @@ def test_latency_is_null_below_its_minimum_and_cost_says_computed_or_bounded() -
     }
     assert found["cost"] == {
         "usd": "0.00040000",
+        "known_usd": "0.00040000",
+        "reserved_usd": "0.00000000",
         "basis": "computed",
         "unknown_calls": 0,
         "calls": 4,
@@ -169,6 +177,12 @@ def test_latency_is_null_below_its_minimum_and_cost_says_computed_or_bounded() -
     assert (found["latency_ms"]["p50"], found["latency_ms"]["longest"]) == (1003, 19000)
     assert found["cost"]["basis"] == "bounded"
     assert found["cost"]["unknown_calls"] == 1
+    # The reservation is kept apart from what reported tokens priced, and the two make the total.
+    assert (found["cost"]["known_usd"], found["cost"]["reserved_usd"], found["cost"]["usd"]) == (
+        "0.00040000",
+        "0.00050000",
+        "0.00090000",
+    )
     # A decision no model was asked for (a person played the being) costs and times nothing.
     played = measures([_row("a", 1, asked_model=False, latency_ms=None)])
     assert played["cost"]["calls"] == 0

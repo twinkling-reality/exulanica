@@ -109,6 +109,8 @@ def measures(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     asked = [row for row in rows if row["asked_model"]]
     latencies = [row["latency_ms"] for row in asked if row["latency_ms"] is not None]
     enough = len(latencies) >= LATENCY_MINIMUM
+    known = sum((Decimal(row["cost_usd"]) for row in asked if row["cost_known"]), Decimal(0))
+    reserved = sum((Decimal(row["cost_usd"]) for row in asked if not row["cost_known"]), Decimal(0))
     unknown = sum(1 for row in asked if not row["cost_known"])
     return {
         "counts": {
@@ -122,7 +124,9 @@ def measures(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "not_applied": sum(
                 1 for row in answered if row["disposition"] in ("rejected", "superseded")
             ),
-            "pending": sum(1 for row in rows if row["disposition"] is None),
+            # An answer no minute has taken up yet. An ask left without an answer is counted under
+            # unavailable (and timeouts), never as waiting, whether or not a minute took it up.
+            "pending": sum(1 for row in answered if row["disposition"] is None),
         },
         "rates": {
             # Answers the engine could judge; an unavailable call is counted apart, not as refused.
@@ -141,7 +145,10 @@ def measures(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "longest": max(latencies) if enough else None,
         },
         "cost": {
-            "usd": usd_string(sum((Decimal(row["cost_usd"]) for row in asked), Decimal(0))),
+            "usd": usd_string(known + reserved),
+            # The two parts of usd: computed from reported tokens, and charged as reservations.
+            "known_usd": usd_string(known),
+            "reserved_usd": usd_string(reserved),
             # Computed from the provider's reported tokens at the manifest's listed price; bounded
             # where a call's tokens were not reported and its reservation, the most it can have
             # cost, was charged instead. Never a provider's bill.

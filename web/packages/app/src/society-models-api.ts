@@ -145,6 +145,7 @@ export interface DecisionMeasures {
     readonly stale: number;
     readonly applied: number;
     readonly notApplied: number;
+    /** Answers no minute has taken up yet; an ask left without an answer is never counted here. */
     readonly pending: number;
   };
   readonly rates: {
@@ -167,7 +168,17 @@ export interface DecisionMeasures {
    * `computed` from reported tokens at the listed price, or `bounded` where some call's cost is
    * unknown and its reservation stands in. Never a provider's bill.
    */
-  readonly cost: { readonly usd: string; readonly basis: 'computed' | 'bounded'; readonly unknownCalls: number; readonly calls: number };
+  readonly cost: {
+    /** `knownUsd` plus `reservedUsd`. */
+    readonly usd: string;
+    /** Computed from the provider's reported tokens at the listed price. */
+    readonly knownUsd: string;
+    /** Charged as reservations for calls whose tokens were not reported: the most they can have cost. */
+    readonly reservedUsd: string;
+    readonly basis: 'computed' | 'bounded';
+    readonly unknownCalls: number;
+    readonly calls: number;
+  };
 }
 
 /** One being's measures under one model. */
@@ -323,6 +334,8 @@ function measuredRate(value: unknown): MeasuredRate {
   };
 }
 
+const amount = (value: unknown): string => (typeof value === 'string' && DECIMAL.test(value) ? value : invalid());
+
 function decisionMeasures(value: unknown): DecisionMeasures {
   const held = object(value);
   const counts = object(held['counts']);
@@ -360,7 +373,9 @@ function decisionMeasures(value: unknown): DecisionMeasures {
       longest: maybe(latency['longest'], count),
     },
     cost: {
-      usd: typeof cost['usd'] === 'string' && DECIMAL.test(cost['usd']) ? cost['usd'] : invalid(),
+      usd: amount(cost['usd']),
+      knownUsd: amount(cost['known_usd']),
+      reservedUsd: amount(cost['reserved_usd']),
       basis,
       unknownCalls: count(cost['unknown_calls']),
       calls: count(cost['calls']),
