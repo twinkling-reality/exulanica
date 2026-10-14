@@ -783,9 +783,8 @@ append-only: a saved record cannot be changed or removed.
 
 Every comparison reports world changes and evidence apart, in plain words, with the raw field
 diff underneath: "moved the knight 2 m east", "assigned a model to the knight", "recorded 3 more
-decision records from session S". `history` returns the read model a history panel uses: pending
-world changes and pending evidence, the session files with record counts, digests and warnings,
-and checkpoints newest first with their summaries. `reopen` validates the last commit offline,
+decision records from session S". `history` returns the read a history panel uses, described
+below. `reopen` validates the last commit offline,
 reports missing, corrupt and unsupported dependencies, uncommitted edits, and a labelled warning
 for a session file of another project or one made under assignments no longer current. It
 installs nothing and reports `installed: false`. A fork is a new folder and project identity
@@ -799,6 +798,32 @@ dependencies against `--dependencies` and `--expected-source`, `fork` writes a f
 and documents over 2 MiB. No command applies checkpoint edits to live state. A future live
 importer must repeat authorization, source validity, identity mapping, dependency and
 optimistic-concurrency checks through existing world writers.
+
+### History read
+
+`history FOLDER [--limit N] [--publication]` returns one document of profile
+`exulanica.world-project-history/v1`. From the folder's git history, exactly: the project and
+its fork lineage, the link, the head, pending world changes and pending evidence, and the
+checkpoints newest first. Each checkpoint has its commit, time and message; its kind (`checkpoint`
+for world, evidence or dependency files, `link`, or `application`); its world changes and evidence
+changes in the summaries' words against the commit before; the session files it holds with record
+counts, records added, digests and warnings; and `applied_as`, the world versions it became.
+`more` is true when `--limit` left older checkpoints out.
+
+Which merge became which version comes from records the folder commits itself: after `apply`
+succeeds, or finds the merge already applied, it commits `applications/<merge commit>.json`
+(profile `exulanica.world-project-application/v1`: repository, pull request, merge commit, the
+applied checkpoint and evidence digests, version identity and title). A record is shown on the
+newest content checkpoint holding exactly that content; records not matched to a listed
+checkpoint are named. Merges applied from another folder are not known here, and the read says
+its source is this folder's records; no world credentials are read. Records are never published.
+
+Publication is `not read` unless `--publication` is given. Then one GitHub read (the linked
+branch's files and its newest pull request into the base) either succeeds whole or the command
+fails; the read reports the branch head, the newest local checkpoint whose world and evidence
+files equal the branch's (the same match the publisher uses), whether the branch matches local
+history at all, and the pull request's number, link, state and merge commit. Each checkpoint is
+then marked published or not; without the read, `published` is null.
 
 ### Capture and automatic tracking
 

@@ -12,12 +12,14 @@ from pathlib import Path
 
 from exulanica.world_package.projects.apply import apply as apply_merge
 from exulanica.world_package.projects.apply import review as review_apply
+from exulanica.world_package.projects.apply import title_for
 from exulanica.world_package.projects.capture import Capture, WorldReader, capture, read_token
 from exulanica.world_package.projects.checkpoint import (
     MAX_BYTES,
     Conflict,
     ProjectError,
     changes,
+    checkpoint_digest,
     decode,
     evidence_digest,
     fork,
@@ -34,7 +36,9 @@ from exulanica.world_package.projects.github import (
     RollingPullRequests,
     Target,
     read_merged,
+    read_publication,
 )
+from exulanica.world_package.projects.history import history_read, record_application
 from exulanica.world_package.projects.link import resolve
 from exulanica.world_package.projects.repository import (
     Author,
@@ -99,6 +103,11 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--project-id", required=True)
         if name == "history":
             command.add_argument("--limit", type=int, default=50)
+            command.add_argument(
+                "--publication",
+                action="store_true",
+                help="also read the linked branch and pull request on GitHub (read only)",
+            )
         if name == "watch":
             _world_arguments(command)
             command.add_argument("--poll-seconds", type=float, default=15.0)
@@ -259,7 +268,13 @@ def project_command(args: argparse.Namespace) -> dict[str, object]:
     if args.command == "reopen":
         return project.reopen()
     if args.command == "history":
-        return project.timeline(args.limit)
+        publication = None
+        if args.publication:
+            linked = resolve(args.folder, None, None, None)
+            publication = read_publication(
+                BranchTarget(linked["repository"], linked["base"], linked["branch"])
+            )
+        return history_read(project, limit=args.limit, publication=publication)
     if args.command == "fork-project":
         return fork_project(args.folder, args.destination, args.project_id, author=_author(args))
     # watch: a session per run, recorded locally only.
@@ -376,6 +391,26 @@ def main(argv: list[str] | None = None) -> int:
                         reviewed_sha256=args.review_sha256,
                         allow_world_write=args.allow_world_write,
                     )
+                    version = result.get("version_id")
+                    if result.get("mode") == "already applied":
+                        version = review_apply(client, merged, linked["base"])["target_version"]
+                    if version is not None:
+                        result["recorded"] = record_application(
+                            Project(args.folder),
+                            {
+                                "profile": "exulanica.world-project-application/v1",
+                                "repository": merged.repository,
+                                "pull_request": merged.number,
+                                "merge_commit": merged.merge_commit,
+                                "checkpoint_sha256": checkpoint_digest(merged.world),
+                                "evidence_sha256": {
+                                    name: evidence_digest(session)
+                                    for name, session in sorted(merged.sessions.items())
+                                },
+                                "version_id": version,
+                                "title": title_for(merged),
+                            },
+                        )
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command in ("review-branch", "publish-branch"):

@@ -165,6 +165,17 @@ class Project:
             result[name] = evidence_document(decode(data))
         return result
 
+    def published_files(self, revision: str) -> dict[str, bytes]:
+        """The files publication sends for a commit: the world and its evidence, as bytes."""
+        files = {PROJECT_FILE: pretty(self.at(revision))}
+        files.update(
+            {
+                f"{EVIDENCE_DIR}/{name}": pretty_evidence(session)
+                for name, session in self.sessions_at(revision).items()
+            }
+        )
+        return files
+
     def working(self) -> dict[str, Any]:
         """The checkpoint as edited in the folder, which may be ahead of the last commit."""
         if self.file.is_symlink() or not self.file.is_file():
@@ -544,3 +555,30 @@ def accumulate(saved: Sessions, captured: Any) -> list[dict[str, Any]]:
             }
         )
     return result
+
+
+def published_part(files: dict[str, bytes]) -> dict[str, bytes]:
+    """The project files among a branch's files; anything else on the branch is not ours."""
+    return {
+        path: data
+        for path, data in files.items()
+        if path == PROJECT_FILE or path.startswith(f"{EVIDENCE_DIR}/")
+    }
+
+
+def published_through(
+    project: Project, remote: dict[str, bytes]
+) -> tuple[list[dict[str, str]], int | None]:
+    """Local history oldest first, and the index of the newest commit the remote files equal.
+
+    -1 when the remote holds no project files (nothing published yet); None when the remote
+    matches no local commit (someone else changed the branch).
+    """
+    published = published_part(remote)
+    history = list(reversed(project.history()))
+    if not published:
+        return history, -1
+    for index in range(len(history) - 1, -1, -1):
+        if project.published_files(history[index]["commit"]) == published:
+            return history, index
+    return history, None

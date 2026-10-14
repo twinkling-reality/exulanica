@@ -28,9 +28,13 @@ from exulanica.world_package.projects.checkpoint import (
     evidence_digest,
     evidence_document,
     pretty,
-    pretty_evidence,
 )
-from exulanica.world_package.projects.repository import append_only, check_message
+from exulanica.world_package.projects.repository import (
+    append_only,
+    check_message,
+    published_part,
+    published_through,
+)
 from exulanica.world_package.projects.summary import evidence_summary, summarize
 
 PROJECT_PATH = "world-project.json"
@@ -487,17 +491,6 @@ class RollingPullRequests:
         """What publication would do, bound to what the remote holds now. Writes nothing."""
         return self._prepare(target, project, message)[0]
 
-    @staticmethod
-    def _snapshot(project: Any, revision: str) -> dict[str, bytes]:
-        files = {PROJECT_PATH: pretty(project.at(revision))}
-        files.update(
-            {
-                f"{EVIDENCE_PATH}/{name}": pretty_evidence(session)
-                for name, session in project.sessions_at(revision).items()
-            }
-        )
-        return files
-
     def _steps(
         self, project: Any, current: dict[str, bytes], message: str | None
     ) -> list[tuple[str, dict[str, bytes]]]:
@@ -507,25 +500,15 @@ class RollingPullRequests:
         checkpoints after it are replayed in order. A branch matching no local checkpoint, or a
         long backlog, is published as one commit of the last saved state.
         """
-        published = {
-            path: data
-            for path, data in current.items()
-            if path == PROJECT_PATH or path.startswith(f"{EVIDENCE_PATH}/")
-        }
-        history = list(reversed(project.history()))
-        start: int | None = -1 if not published else None
-        for index in range(len(history) - 1, -1, -1):
-            if start is not None:
-                break
-            if self._snapshot(project, history[index]["commit"]) == published:
-                start = index
+        published = published_part(current)
+        history, start = published_through(project, current)
         pending = [] if start is None else history[start + 1 :]
         if start is None or len(pending) > MAX_REPLAYED:
             text = message or history[-1]["message"]
             pending = [{"commit": history[-1]["commit"], "message": text}]
         steps, state = [], dict(published)
         for entry in pending:
-            files = self._snapshot(project, entry["commit"])
+            files = project.published_files(entry["commit"])
             changed = {path: data for path, data in files.items() if state.get(path) != data}
             if changed:
                 steps.append((check_message(entry["message"]), changed))
@@ -539,7 +522,7 @@ class RollingPullRequests:
             check_message(message)
         world = project.at("HEAD")
         sessions = project.sessions_at("HEAD")
-        local = self._snapshot(project, "HEAD")
+        local = project.published_files("HEAD")
         remote = self.read(target)
         if not remote.writable_owned:
             raise ProjectError("publication requires a writable repository owned by the CLI user")
@@ -896,3 +879,66 @@ def read_merged(
         world=world,
         sessions=_sessions(files),
     )
+
+
+# Reading what a project's branch holds and its pull request's state, for the history read.
+
+_PUBLICATION_QUERY = (
+    """query($owner:String!, $name:String!, $ref:String!, $branch:String!) {
+  repository(owner:$owner, name:$name) {
+    nameWithOwner
+    ref(qualifiedName:$ref) { name target { ... on Commit { oid """
+    + _FILES
+    + """ } } }
+    pullRequests(headRefName:$branch, last:5) {
+      nodes { number url state merged baseRefName mergeCommit { oid } }
+    }
+  }
+}"""
+)
+
+
+def read_publication(
+    target: BranchTarget,
+    request: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """The project branch's files and the newest pull request from it into the base. Read only."""
+    owner, name = target.repository.split("/")
+    data = (request or gh_graphql)(
+        _PUBLICATION_QUERY,
+        {
+            "owner": owner,
+            "name": name,
+            "ref": f"refs/heads/{target.branch}",
+            "branch": target.branch,
+        },
+    )
+    try:
+        repo = data["repository"]
+        if repo is None or repo["nameWithOwner"].lower() != target.repository.lower():
+            raise ProjectError("repository missing or redirected; select the exact destination")
+        ref = repo["ref"]
+        head = None if ref is None else ref["target"]["oid"]
+        if head is not None and re.fullmatch(r"[0-9a-f]{40}", head) is None:
+            raise ProjectError("GitHub did not return a commit identity")
+        files = {} if ref is None else _files(ref["target"])
+        requests = [
+            {
+                "number": node["number"],
+                "url": node["url"],
+                "state": node["state"],
+                "merged": node["merged"],
+                "merge_commit": None if node["mergeCommit"] is None else node["mergeCommit"]["oid"],
+            }
+            for node in repo["pullRequests"]["nodes"]
+            if node["baseRefName"] == target.base
+        ]
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ProjectError("GitHub returned incomplete branch metadata") from exc
+    return {
+        "repository": repo["nameWithOwner"],
+        "branch": target.branch,
+        "branch_head": head,
+        "files": files,
+        "pull_request": max(requests, key=lambda pr: pr["number"]) if requests else None,
+    }
