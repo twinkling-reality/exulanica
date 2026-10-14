@@ -435,13 +435,13 @@ def capture(
         ):
             # The session's list holds every decision asked in its minutes (its total), the
             # unanswered ones too. Each record is still read in full below: the list carries no
-            # source record digest, options, choice, latency, tokens or cost.
+            # source record digest, options, choice, latency, tokens or cost. Its decider is the
+            # word the read serves (model, person or external), not a decider object.
             coverage = "all"
             asked = [
                 (entry["request_id"], entry["subject_id"])
                 for entry in session["decisions"]
-                if (entry.get("decider") or {}).get("kind") == "model"
-                and entry["subject_id"] in latest
+                if entry.get("decider") == "model" and entry["subject_id"] in latest
             ]
         else:
             asked = [(event["document"]["request_id"], event["subject_id"]) for event in events]

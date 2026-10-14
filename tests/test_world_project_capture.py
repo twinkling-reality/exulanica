@@ -410,15 +410,19 @@ def with_session(world, *, counted=7, maximum=2000, total=None, reason="session_
     world.records["early"] = record("early", world.knight, 2, "wait here a minute")
     # Asked of a model for a being the capture did not select.
     world.records["bench"]["request"]["provider_config"] = {"provider": "synthetic"}
+    # Each entry as the session read serves it (synthetic-society-contract.md, the session read's
+    # `decisions`): the decider is a word, and how its ask ended is beside it.
     listed = [
         {
             "request_id": rid,
             "decision_seq": n,
             "role": "society_decision",
             "subject_id": world.knight if rid != "bench" else world.bench,
-            "decider": {"kind": "model", "provider": "synthetic", "model_id": "synthetic-model"},
+            "decider": "model",
             "base_tick": tick,
             "consumed_tick": None if rid == "r9" else tick + 1,
+            "status": "unavailable" if rid == "r9" else "accepted",
+            "reason": "model_timed_out" if rid == "r9" else "validated_choice",
         }
         for n, (rid, tick) in enumerate(
             [("early", 2), ("r1", 4), ("r2", 5), ("r3", 6), ("r9", 7), ("bench", 4)], start=1
