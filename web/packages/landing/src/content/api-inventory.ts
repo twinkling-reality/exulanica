@@ -2155,7 +2155,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "get",
     "id": "society_events_world_versions__version_id__society_events_get",
     "title": "Society Events",
-    "description": "",
+    "description": "The society's events, newest first, a page at a time (``before`` reads on). Naming a window\nof minutes (``from_tick``, ``to_tick``, inclusive) reads it oldest first instead, a page at a\ntime (``after`` reads on), so a page can show what was said in the minutes it draws, in order;\n``kinds`` keeps those kinds alone (``said`` for lines). A window that ends before it begins,\n``before`` with a window, ``after`` without one or a malformed kind is refused\n``invalid_events_window``.",
     "group": "society",
     "permission": {
       "requires": [
@@ -2212,6 +2212,81 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
             }
           ],
           "title": "Before"
+        }
+      },
+      {
+        "name": "after",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After"
+        }
+      },
+      {
+        "name": "kinds",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 16
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Kinds"
+        }
+      },
+      {
+        "name": "from_tick",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "From Tick"
+        }
+      },
+      {
+        "name": "to_tick",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "To Tick"
         }
       },
       {

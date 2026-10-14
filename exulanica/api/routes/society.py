@@ -39,6 +39,7 @@ from exulanica.world.society_engines import (
 from exulanica.world.society_erasure import SocietyErasureRefused, erase_society
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import (
+    EVENT_KINDS_READ_MAXIMUM,
     EVENTS_READ_MAXIMUM,
     SocietyRepository,
 )
@@ -339,10 +340,29 @@ def society_events(
     world_id: WorldId,
     limit: Annotated[int, Query(ge=1, le=EVENTS_READ_MAXIMUM)] = EVENTS_READ_MAXIMUM,
     before: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    after: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    kinds: Annotated[
+        list[str] | None, Query(min_length=1, max_length=EVENT_KINDS_READ_MAXIMUM)
+    ] = None,
+    from_tick: Annotated[int | None, Query(ge=0, le=2**31 - 1)] = None,
+    to_tick: Annotated[int | None, Query(ge=0, le=2**31 - 1)] = None,
 ) -> Any:
+    """The society's events, newest first, a page at a time (``before`` reads on). Naming a window
+    of minutes (``from_tick``, ``to_tick``, inclusive) reads it oldest first instead, a page at a
+    time (``after`` reads on), so a page can show what was said in the minutes it draws, in order;
+    ``kinds`` keeps those kinds alone (``said`` for lines). A window that ends before it begins,
+    ``before`` with a window, ``after`` without one or a malformed kind is refused
+    ``invalid_events_window``."""
+
     def page() -> dict[str, Any]:
         events, following = _repository(connection, session, request, world_id).events_page(
-            version_id, limit=limit, before=before
+            version_id,
+            limit=limit,
+            before=before,
+            after=after,
+            kinds=kinds,
+            from_tick=from_tick,
+            to_tick=to_tick,
         )
         return {"events": served_events(events), "next": following}
 

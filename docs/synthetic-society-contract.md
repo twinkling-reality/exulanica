@@ -1092,6 +1092,16 @@ This is deterministic replay with immutable input/event/transition history and c
 not a claim that events alone reconstruct all state. Losing required input bytes prevents exact
 replay and must be reported.
 
+The events read (`GET .../society/events`) pages back from the newest with `before`. Naming a
+window of minutes (`from_tick`, `to_tick`, inclusive, either end open) reads those minutes oldest
+first instead, in minute, then the order the minute gave its events, then id, and reads on with
+`after`; `kinds` keeps only the events of the kinds named (`said` for what was said), with or
+without a window. So a page that joins late, scrubs or replays a stretch shows each minute's lines
+in the order they were said, from the stored events alone, asking no model. A window that ends
+before it begins, `before` with a window, `after` without one, a cursor outside the window or a
+malformed kind is refused `invalid_events_window`. How long a line stays readable is presentation
+(`assets/catalogs/thing-presentation/decider-marks.v2.json`), not part of the record.
+
 A read of the society, its events or its playback, and a step, load and validate only the inputs
 they show or consume (`SocietyRepository._inputs`): the input the state consumed, any queued after
 it, and those the events on the page name, each held to its own row's sequence and digest, after a

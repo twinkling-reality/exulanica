@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import ExitStack
 from typing import Any
 
@@ -102,6 +103,19 @@ class InvalidEventCursor(ValueError):
     """A cursor that names no event of this society, or is not one this repository wrote."""
 
     code = "invalid_event_cursor"
+
+
+class InvalidEventsWindow(InvalidEventCursor):
+    """An events read whose window or kinds cannot be read: a window that ends before it begins,
+    ``before`` with a window or ``after`` without one, a cursor outside the window, or a kind that
+    is not an event kind's shape. Answered as an invalid cursor is, under its own code."""
+
+    code = "invalid_events_window"
+
+
+#: The most event kinds one read may name.
+EVENT_KINDS_READ_MAXIMUM = 16
+_EVENT_KIND = re.compile(r"[a-z][a-z_]{0,47}")
 
 
 def event_cursor(event: dict[str, Any]) -> str:
@@ -1283,27 +1297,67 @@ class SocietyRepository:
         return self.events_page(version_id, limit=limit)[0]
 
     def events_page(
-        self, version_id: uuid.UUID, *, limit: int = EVENTS_READ_MAXIMUM, before: str | None = None
+        self,
+        version_id: uuid.UUID,
+        *,
+        limit: int = EVENTS_READ_MAXIMUM,
+        before: str | None = None,
+        after: str | None = None,
+        kinds: Sequence[str] | None = None,
+        from_tick: int | None = None,
+        to_tick: int | None = None,
     ) -> tuple[tuple[dict[str, Any], ...], str | None]:
-        """A page of the society's events, newest first, and the cursor that reads on from it.
+        """A page of the society's events, and the cursor that reads on from it.
 
-        The order is the one every events read has: tick, newest first, then the order the
-        engine gave events within a tick, then id. ``before`` is a cursor a previous page gave
+        Without a window the page is newest first: tick, newest first, then the order the engine
+        gave events within a tick, then id. ``before`` is a cursor a previous page gave
         (:func:`event_cursor`); the page holds the events after it in that order. The cursor that
-        comes back is None when no older event is left. The inputs of the events a page shows are
-        authorized before it is answered, as the first page's are.
+        comes back is None when no older event is left.
+
+        With a window (``from_tick``, ``to_tick`` or both, inclusive; an open end is the first or
+        the latest minute) the page holds the window's events oldest first, in minute, then order,
+        then id, so a page can show the lines of the minutes it draws in the order they were said.
+        ``after`` is the cursor a previous page of the same window gave; the cursor that comes back
+        is None when the window holds no later event. ``kinds`` keeps the events of those kinds
+        alone, with or without a window. The inputs of the events a page shows are authorized
+        before it is answered, as the first page's are.
         """
+        windowed = from_tick is not None or to_tick is not None
+        if windowed and before is not None:
+            raise InvalidEventsWindow("a window reads oldest first: continue it with after")
+        if after is not None and not windowed:
+            raise InvalidEventsWindow("after continues a window: name from_tick or to_tick")
+        if from_tick is not None and to_tick is not None and to_tick < from_tick:
+            raise InvalidEventsWindow("a window ends no earlier than it begins")
+        if kinds is not None and (
+            not kinds
+            or len(kinds) > EVENT_KINDS_READ_MAXIMUM
+            or any(not isinstance(k, str) or _EVENT_KIND.fullmatch(k) is None for k in kinds)
+        ):
+            raise InvalidEventsWindow(
+                f"kinds names 1 to {EVENT_KINDS_READ_MAXIMUM} event kinds, each a lowercase key"
+            )
         self.snapshot(version_id)  # Current authorization applies to event materialization too.
         row = self._row(version_id)
         bound = max(1, min(limit, EVENTS_READ_MAXIMUM))
-        after = ""
+        clauses = ""
         values: dict[str, Any] = {
             "workspace": self.workspace_id,
             "society": row["society_id"],
             "rows": bound + 1,
         }
-        if before is not None:
-            tick, order, event_id = _cursor_parts(before)
+        if kinds is not None:
+            clauses += " and event_kind = any(%(kinds)s)"
+            values["kinds"] = sorted(set(kinds))
+        if from_tick is not None:
+            clauses += " and tick>=%(from_tick)s"
+            values["from_tick"] = from_tick
+        if to_tick is not None:
+            clauses += " and tick<=%(to_tick)s"
+            values["to_tick"] = to_tick
+        cursor = before if before is not None else after
+        if cursor is not None:
+            tick, order, event_id = _cursor_parts(cursor)
             named = self.connection.execute(
                 "select 1 from world_society_event where workspace_id=%s and society_id=%s "
                 "and event_id=%s and tick=%s "
@@ -1312,9 +1366,15 @@ class SocietyRepository:
             ).fetchone()
             if named is None:
                 raise InvalidEventCursor("the cursor names no event of this society")
+            if windowed and not (
+                (from_tick is None or tick >= from_tick) and (to_tick is None or tick <= to_tick)
+            ):
+                raise InvalidEventsWindow("the cursor names an event outside the window")
             values |= {"tick": tick, "order": order, "event": event_id}
-            after = (
-                " and (tick<%(tick)s or (tick=%(tick)s and ("
+            # Within a minute both directions read order, then id, ascending; the minutes run
+            # newest first without a window and oldest first with one.
+            clauses += (
+                f" and (tick{'>' if windowed else '<'}%(tick)s or (tick=%(tick)s and ("
                 "(%(order)s::integer is not null and ((document->>'order')::integer>%(order)s "
                 "or document->>'order' is null or ((document->>'order')::integer=%(order)s "
                 "and event_id>%(event)s))) "
@@ -1326,8 +1386,9 @@ class SocietyRepository:
             "event_id,tick,event_kind,subject_id,object_id,place_id,document,document_sha256,"
             "recorded_at from world_society_event "
             "where workspace_id=%(workspace)s and society_id=%(society)s"
-            + after
-            + " order by tick desc, (document->>'order')::integer nulls last,event_id "
+            + clauses
+            + f" order by tick {'asc' if windowed else 'desc'}, "
+            "(document->>'order')::integer nulls last,event_id "
             "limit %(rows)s",
             values,
         ).fetchall()
