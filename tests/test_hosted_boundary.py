@@ -32,6 +32,7 @@ import dataclasses
 import json
 import sys
 import time
+import tomllib
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -254,6 +255,28 @@ def test_every_hosted_call_in_the_product_is_a_registered_path():
     registered = set(HOSTED_CALL_PATHS.values())
     assert not found - registered, f"hosted calls no path names: {sorted(found - registered)}"
     assert not registered - found, f"paths that send nothing: {sorted(registered - found)}"
+
+
+#: The import contract that holds every registered call site away from a workspace's style packs.
+_STYLE_PACK_CONTRACT = "No hosted model call site reaches a workspace's own style packs"
+
+
+def test_the_style_pack_contract_holds_every_module_that_sends():
+    """A module with a registered call site is a source of the style-pack import contract.
+
+    The contract holds only the modules it names, so a call site added in a module it does not name
+    could reach a creator's own style pack text with every import check passing.
+    """
+    pyproject = tomllib.loads((_PACKAGE.parent / "pyproject.toml").read_text(encoding="utf-8"))
+    contracts = pyproject["tool"]["importlinter"]["contracts"]
+    (contract,) = [entry for entry in contracts if entry["name"] == _STYLE_PACK_CONTRACT]
+    held = set(contract["source_modules"])
+    sending = {module for module, _ in HOSTED_CALL_PATHS.values()}
+    # Positive control: both lists were read, so an empty difference means something.
+    assert held and sending
+    assert not sending - held, (
+        f"modules that send and the contract does not hold: {sorted(sending - held)}"
+    )
 
 
 def test_benchmark_inputs_is_never_attached_by_the_product():

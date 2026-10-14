@@ -758,7 +758,8 @@ forbidden_modules = [
 # (docs/style-pack-contract.md section 11). Every module that holds a registered hosted call site
 # (tests/test_hosted_boundary.py HOSTED_CALL_PATHS) is held away from the modules that keep, admit,
 # check or serve a workspace's style packs, indirect imports counted, so a prompt cannot reach that
-# text without this contract changing first.
+# text without this contract changing first. tests/test_hosted_boundary.py fails while a module of
+# a registered call site is missing here.
 name = "No hosted model call site reaches a workspace's own style packs"
 type = "forbidden"
 source_modules = [
@@ -771,10 +772,14 @@ source_modules = [
     "exulanica.selection.creature_drafting",
     "exulanica.selection.embeddings",
     "exulanica.selection.environment_proposal",
+    "exulanica.selection.kind_drafting",
+    "exulanica.selection.look_choosing",
     "exulanica.selection.planner",
     "exulanica.selection.proposal",
     "exulanica.selection.question",
+    "exulanica.selection.setting_choosing",
     "exulanica.selection.society_question",
+    "exulanica.selection.tool_choosing",
     "exulanica.selection.world_drafting",
 ]
 forbidden_modules = [
