@@ -147,7 +147,7 @@ async function siteInLook(
   entry: SavedWorldEntry,
   currentEntry?: () => SavedWorldEntry | null,
 ): Promise<SiteWorld> {
-  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }] = await Promise.all([
+  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('../world-look.js'),
     import('../surface-materials.js'),
@@ -157,6 +157,7 @@ async function siteInLook(
     import('../site-interior.js'),
     import('../ground-borders.js'),
     import('../render-budget.js'),
+    import('../surface-finish.js'),
   ]);
   const preparedDressing = drawing.profile === 'exulanica.site-drawing/v4' ? await import('./terrain-dressing.js').then(module => module.loadTerrainDressing(access, drawing.dressing)) : undefined;
   const dressingReadiness = createDressingReadiness();
@@ -191,7 +192,7 @@ async function siteInLook(
     const textures = new Map(await Promise.all([...setIds].map(async setId => [setId,
       await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256)),
     ] as const)));
-    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders });
+    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish });
     return siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
   };
   let choice = worldLook.worldLookChoice(search, bound);

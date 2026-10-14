@@ -21,6 +21,8 @@ import { baseGroundSlot, ceilingRests, parseStructuredSiteDrawing, sceneryOf, si
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
 import { fetchPackPieces, packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
+import { readSurfaceFinish } from '../src/playcanvas/style-pack/ground-finish.js';
+import type { StylePackManifest } from '@exulanica/atlas-core';
 
 // Relative to web/, where the suite runs.
 const CASES = JSON.parse(readFileSync('../assets/style-packs/manifest-cases.v1.json', 'utf8'));
@@ -823,6 +825,44 @@ describe('the borders between a made place\'s grounds', () => {
     expect(takenBack!.stated).toEqual([false, false, false, false, false]);
     expect(takenBack!.scales).toEqual([[40, 30], [19, 30], [30, 2], [19, 30], [14, 26]]);
     for (const name of takenBack!.materials) expect(name).toMatch(/^generated-site-colour:/);
+  });
+
+  it('gives a water finished by its depth no surface finish, and every other water and ground the finish', async () => {
+    const pack = sitePack();
+    const pieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
+    const finish = readSurfaceFinish(JSON.parse(readFileSync('../assets/catalogs/world-kinds/surface-finish.v1.json', 'utf8')));
+    const cases = (JSON.parse(readFileSync('../assets/style-packs/manifest-cases.v1.json', 'utf8')) as { cases: { name: string; manifest: StylePackManifest }[] }).cases;
+    const watered = cases.find((one) => one.name === 'a preset with haze and a pack with a water finish')!.manifest;
+    const deepLook = renderLookOfPreset(watered.light!.presets[watered.light!.default_preset]!, watered.shading!, watered.edge, 1, watered.water);
+    expect(deepLook.water).not.toBeNull();
+    const chunksOf = (look: typeof deepLook | undefined) => {
+      const dresser = packSiteDresser({ pack, families, pieces, shading: PBR, materials: MATERIALS, finish, ...(look === undefined ? {} : { look }) });
+      let seen: { lake: string; lakeOpacity: boolean; ground: string } | null = null;
+      siteMount(camp(), {
+        servedBytes: 1,
+        dress: (host, drawn, dressing) => {
+          const undress = dresser(host, drawn, dressing);
+          const material = (identity: string) => (drawn.root.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial;
+          seen = {
+            lake: colourChunk(material('lake')) ?? '',
+            lakeOpacity: material('lake').getShaderChunks(pc.SHADERLANGUAGE_GLSL).has('opacityPS'),
+            ground: colourChunk(material('clearing')) ?? '',
+          };
+          return undress;
+        },
+      }).attach(nullApp()).dispose();
+      return seen!;
+    };
+    // The look's water finish owns the lake's colour; the grounds still wear the surface finish.
+    const deep = chunksOf(deepLook);
+    expect(deep.lakeOpacity).toBe(true);
+    expect(deep.lake).not.toContain('exuFinishWaterTone');
+    expect(deep.ground).toContain('exuFinishGround');
+    // Positive control: with no water finish in the look, the lake wears the surface finish.
+    const plain = chunksOf(undefined);
+    expect(plain.lakeOpacity).toBe(false);
+    expect(plain.lake).toContain('exuFinishWaterTone');
+    expect(plain.ground).toContain('exuFinishGround');
   });
 
   it('sets the working into a copy where a ground wears a material that is not the dressing\'s own, and puts the ground back in it', async () => {

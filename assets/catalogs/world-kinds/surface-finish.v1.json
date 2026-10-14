@@ -1,0 +1,111 @@
+{
+  "profile": "exulanica.surface-finish/v1",
+  "note": "The finish a made place's grounds, paths and water are drawn with over the colours its style pack gives them. Every value is presentation: no recorded position, ground, water, contact, path or pick is changed by it, and a page that reads none of it draws every surface in its pack's flat colour. Each value is a chosen default with its reason, set by eye against the Canopy garden at three fixed views and measured there; not a measured physical property or a safety bound. A later version is another file beside this one.",
+  "entries": [
+    {
+      "key": "ground_variation_share",
+      "value": 0.22,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How far a ground's tone wanders above and below its pack colour across the ground, as a share of that colour. One flat tone to the horizon reads as a painted floor; real grass and paving vary by a tenth or so in brightness over a few metres. Kept small so the pack's colour stays the colour a person chose."
+    },
+    {
+      "key": "ground_broad_m",
+      "value": 9,
+      "unit": "metre",
+      "class": "chosen_default",
+      "reason": "The size of the broad wander in a ground's tone: patches about a house wide, which a person standing sees as uneven ground rather than as a texture."
+    },
+    {
+      "key": "ground_fine_m",
+      "value": 1.8,
+      "unit": "metre",
+      "class": "chosen_default",
+      "reason": "The size of the finer wander laid over the broad one, about a stride or two, so near ground is not smooth either. Not smaller than this: finer than a metre it flickers at the distances a site is watched from."
+    },
+    {
+      "key": "ground_warmth_share",
+      "value": 0.09,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How far a ground leans warmer in some patches and cooler in others, as a share of each colour channel: drier and lusher ground differ in hue as well as brightness. Small, so no ground changes its colour name."
+    },
+    {
+      "key": "wet_band_m",
+      "value": 2.2,
+      "unit": "metre",
+      "class": "chosen_default",
+      "reason": "How far from a water's edge the ground beside it is drawn wet and darker, fading to dry. Ground at a pond's edge is darker for about an arm's length to a couple of metres; this keeps the water from sitting on the ground like a sheet of colour."
+    },
+    {
+      "key": "wet_darkening_share",
+      "value": 0.42,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How much darker ground is at the water's very edge, as a share of its colour. Wet soil and stone are about a third darker than dry."
+    },
+    {
+      "key": "water_deep_m",
+      "value": 4,
+      "unit": "metre",
+      "class": "chosen_default",
+      "reason": "How far in from its edge water reaches its deepest colour. A pond is shallow at its rim and darker towards its middle; a few metres reads as a garden pond, not a lake."
+    },
+    {
+      "key": "water_shallow_lift_share",
+      "value": 0.45,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How much lighter water is drawn at its very edge than its pack colour, where the bed shows through shallow water."
+    },
+    {
+      "key": "water_deep_darkening_share",
+      "value": 0.45,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How much darker water is drawn at its deepest than its pack colour."
+    },
+    {
+      "key": "water_ripple_share",
+      "value": 0.14,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How far light drifting over water brightens and darkens it, as a share of its colour. Moving water must read as moving at a glance from standing height; more than about a tenth reads as a pattern rather than as light on water."
+    },
+    {
+      "key": "water_ripple_m",
+      "value": 1.4,
+      "unit": "metre",
+      "class": "chosen_default",
+      "reason": "The size of the drifting light on water: a little under two metres, small beside a pond and large enough not to shimmer at a distance."
+    },
+    {
+      "key": "water_ripple_speed_m_per_second",
+      "value": 0.35,
+      "unit": "metre_per_second",
+      "class": "chosen_default",
+      "reason": "How fast the light drifts over water: an easy breeze over a still pond, slow enough to read as calm."
+    },
+    {
+      "key": "water_sheen_share",
+      "value": 0.5,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How much brighter water is drawn seen at a low angle than looking down into it, as water reflects more of the sky the lower it is seen. Applied as a brightening of the water's own colour, so it works in every shading model a pack may choose."
+    },
+    {
+      "key": "reflection_strength_share",
+      "value": 0,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "How much of the real reflection of the world in level water is added to its light; 0 makes no reflection camera at all. Off in this version, by measurement: on the Canopy garden at three fixed views (headless Chrome, Metal, 1280x860, 14 October 2026) the reflection camera took the draws of a frame from 495, 738 and 697 to 907, 1,339 and 1,217, past the finish's budget of no more draws than before. It stays available, at a strength a later version states, once a world's draws leave room for it."
+    },
+    {
+      "key": "reflection_size_px",
+      "value": 512,
+      "unit": "pixel",
+      "class": "chosen_default",
+      "reason": "The size, square, of the texture the reflection is drawn into when one is drawn: a pond is a small part of a view and its reflection is broken by the water's light, so a quarter of a full view's width is enough."
+    }
+  ]
+}

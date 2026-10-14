@@ -11,6 +11,8 @@ import { attachTileInk } from '../generated-tile/ink.js';
 import type { RenderShading } from '../generated-tile/look.js';
 import { applyShading } from '../generated-tile/shading.js';
 import { applyBorder, bordersRun, clearPlaneBorder, setPlaneBorder } from './border-material.js';
+import { applyGroundFinish, applyWaterFinish, finishRuns, setFinishWaters, waterRectOf, type SurfaceFinish, type WaterRect } from './ground-finish.js';
+import { PlanarReflection } from './planar-reflection.js';
 import { dressSlots, type PieceSlot } from './dresser.js';
 import { applyPattern } from './pattern-material.js';
 import { uploadPackPieces, type FetchedPieces } from './pieces.js';
@@ -74,6 +76,12 @@ export interface SitePackDressing {
    * rectangle as before.
    */
   readonly borders?: GroundBorders;
+  /**
+   * The finish a site's grounds, paths and water are drawn with over their colours (`ground-finish.ts`):
+   * a varied tone, wet ground near water, water lighter at its edge and darker in its middle with
+   * drifting light, and a real reflection where it states a strength. None draws them flat as before.
+   */
+  readonly finish?: SurfaceFinish;
   /** Told what one site's dressing drew, each time a site is dressed. */
   readonly told?: (summary: SiteDressingSummary) => void;
 }
@@ -123,6 +131,13 @@ function pieceSlot(slot: SiteSlot): PieceSlot {
   };
 }
 
+/**
+ * How far apart in height a site's waters may lie and still be reflected as one level, in metres:
+ * the drawing lays its planes 6 mm apart, so waters drawn at one level differ by a few layers at
+ * most; waters further apart than this are not one mirror, and none is reflected.
+ */
+const LEVEL_TOLERANCE_M = 0.05;
+
 /** The dresser that draws any site in `dressing`'s pack. */
 export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
   const pack = dressing.pack;
@@ -139,9 +154,26 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
   return (host, drawn, drawing: StructuredSiteDrawing, scenery = null, environment) => {
     const device = host.app.graphicsDevice;
     const textures = new SiteTextures(device, dressing.look ?? TILE_LOOK_V1, dressing.textures);
-    const water = new WaterRipples(host.app);
+    const water = new WaterRipples(host.app, host.camera);
     // A look's water finish, when it states one; otherwise water keeps its ripples alone.
     const waterFinish = dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.water ?? null : null;
+    // The surface finish, on the device it is written for; the materials it was set into, by kind.
+    const finish = dressing.finish !== undefined && finishRuns(device) ? dressing.finish : null;
+    const finishedGrounds = new Set<pc.StandardMaterial>();
+    const finishedWaters = new Set<pc.StandardMaterial>();
+    /** `byDepth`: the look's water finish owns this water's colour, so the surface finish leaves it. */
+    const finished = (slot: SiteSlot, material: pc.StandardMaterial, byDepth: boolean): void => {
+      if (finish === null) return;
+      if (slot.family === 'water') {
+        if (byDepth) return;
+        applyWaterFinish(device, material, finish);
+        water.animate(material);
+        finishedWaters.add(material);
+      } else if (slot.family === 'ground' || slot.family === 'path') {
+        applyGroundFinish(device, material, finish);
+        finishedGrounds.add(material);
+      }
+    };
     const texturedSlots = new Set<string>();
     const made: pc.StandardMaterial[] = [];
     const replaced: (readonly [pc.MeshInstance, pc.Material])[] = [];
@@ -197,8 +229,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         let material = surfaceMaterials.get(resolved.role);
         if (material === undefined) {
           material = swatchMaterial(resolved.material.swatch, null, shading, `style-pack:material:${resolved.role}`);
-          if (slot.family === 'water' && shading.model === 'pbr') water.add(material, waterFinish);
+          const byDepth = slot.family === 'water' && shading.model === 'pbr' && water.add(material, waterFinish);
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
+          finished(slot, material, byDepth);
           made.push(material);
           surfaceMaterials.set(resolved.role, material);
         }
@@ -220,8 +253,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         let material = surfaceMaterials.get(key);
         if (material === undefined) {
           material = swatchMaterial(resolved.swatch, resolved.up, shading, `style-pack:surface:${key}`);
-          if (slot.family === 'water' && shading.model === 'pbr') water.add(material, waterFinish);
+          const byDepth = slot.family === 'water' && shading.model === 'pbr' && water.add(material, waterFinish);
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
+          finished(slot, material, byDepth);
           made.push(material);
           surfaceMaterials.set(key, material);
         }
@@ -258,6 +292,31 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     for (const slot of leftAsDrawn) {
       wear(drawn.entities.get(slot.identity)!, slot.identity, shaded);
       undressed += 1;
+    }
+
+    // Where the site's waters are, from the engine's bounds of their planes as drawn (before any border
+    // grows them), for the wet ground beside them and their own shallow edges; and the reflection in
+    // them, where the finish states one and every water lies at one level.
+    let reflection: PlanarReflection | null = null;
+    if (finish !== null && (finishedGrounds.size > 0 || finishedWaters.size > 0)) {
+      const waterRects: WaterRect[] = [];
+      const levels: number[] = [];
+      for (const slot of drawing.slots) {
+        if (slot.family !== 'water' || slot.primitive !== 'plane') continue;
+        const instance = (drawn.entities.get(slot.identity)?.findByName(`${slot.identity}:shape`) as pc.Entity | null | undefined)?.render?.meshInstances[0];
+        if (instance === undefined) continue;
+        waterRects.push(waterRectOf(instance));
+        levels.push(instance.aabb.center.y);
+      }
+      for (const material of [...finishedGrounds, ...finishedWaters]) {
+        setFinishWaters(material, waterRects);
+        material.update();
+      }
+      const level = levels.length === 0 ? null : levels.reduce((sum, one) => sum + one, 0) / levels.length;
+      if (finish.reflectionStrength > 0 && finishedWaters.size > 0 && level !== null && levels.every((one) => Math.abs(one - level) <= LEVEL_TOLERANCE_M)) {
+        reflection = new PlanarReflection(host.app, host.camera, level, finish.reflectionSizePx, finish.reflectionStrength);
+        for (const material of finishedWaters) reflection.add(material);
+      }
     }
 
     // The borders between the site's grounds: each ground plane is given what lies over it and its
@@ -356,6 +415,10 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (sceneryPieces !== null && canvas?.dataset !== undefined) canvas.dataset['siteSceneryPieces'] = String(sceneryPieces.placed);
     // How many grounds are drawn with a broken border.
     if (bordered.length > 0 && canvas?.dataset !== undefined) canvas.dataset['siteBorders'] = String(bordered.length);
+    // How many of the site's materials wear the surface finish, and whether its water reflects.
+    if (finish !== null && canvas?.dataset !== undefined) {
+      canvas.dataset['siteFinish'] = JSON.stringify({ grounds: finishedGrounds.size, waters: finishedWaters.size, reflection: reflection !== null });
+    }
     dressing.told?.({
       surfaces,
       materials,
@@ -381,6 +444,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       }
       if (sceneryPieces !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteSceneryPieces'];
       if (bordered.length > 0 && canvas?.dataset !== undefined) delete canvas.dataset['siteBorders'];
+      if (finish !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFinish'];
+      reflection?.dispose();
       // Every bordered ground is its full rectangle again, with nothing stated on it.
       for (const [instance, shape, x, z] of bordered.splice(0)) {
         clearPlaneBorder(instance);

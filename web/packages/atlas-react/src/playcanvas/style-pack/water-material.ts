@@ -46,31 +46,59 @@ void getOpacity() {
 const DEPTH_WATER_EMISSIVE = 'void getEmission() { dEmission = exuWaterBody; }';
 const DEPTH_WATER_DIFFUSE = 'void getAlbedo() { dAlbedo = vec3(0.0); }';
 
-/** Cosmetic surface ripples in metre coordinates. The basin and its keep-out remain world data. */
+/**
+ * Cosmetic surface ripples in metre coordinates. The basin and its keep-out remain world data.
+ *
+ * It keeps the time of every water it moves: a pbr water's ripples bend its normal and, when the
+ * look states a water finish, its colour comes from its depth (`add`); a water given the surface
+ * finish (`ground-finish.ts`) drifts its light in any shading model and is told where the eye is,
+ * for its sheen at a low angle (`animate`).
+ */
 export class WaterRipples {
   readonly #materials = new Set<pc.StandardMaterial>();
+  readonly #finished = new Set<pc.StandardMaterial>();
   #time = 0;
   #disposed = false;
   readonly #tick = (dt: number): void => {
     this.#time = (this.#time + Math.min(dt, 0.1)) % 3600;
     for (const material of this.#materials) material.setParameter('exuWaterTime', this.#time);
+    if (this.#finished.size === 0) return;
+    const at = this.eye?.getPosition() ?? null;
+    for (const material of this.#finished) {
+      // Its own name: a pbr water's ripple chunk declares exuWaterTime in the same shader.
+      material.setParameter('exuFinishTime', this.#time);
+      if (at !== null) material.setParameter('exuFinishEye', [at.x, at.y, at.z]);
+    }
   };
 
-  constructor(private readonly app: pc.AppBase) {}
+  constructor(private readonly app: pc.AppBase, private readonly eye: pc.Entity | null = null) {}
   get animating(): boolean { return this.#materials.size > 0; }
 
-  /**
-   * Ripple a water material, and when a look states a water finish, finish it by depth as well.
-   * The finish needs the camera frame's scene depth map.
-   */
-  add(material: pc.StandardMaterial, finish: RenderWater | null = null): void {
+  /** Keep the time and the eye of a water given the surface finish, whatever its shading. */
+  animate(material: pc.StandardMaterial): void {
+    if (this.#finished.has(material)) return;
+    this.#start(material);
+    this.#finished.add(material);
+  }
+
+  #start(material: pc.StandardMaterial): void {
     if (this.#materials.has(material)) return;
     if (this.#materials.size === 0) this.app.on('update', this.#tick);
     this.#materials.add(material);
     material.setParameter('exuWaterTime', 0);
+  }
+
+  /**
+   * Ripple a water material, and when a look states a water finish, finish it by depth as well.
+   * The finish needs the camera frame's scene depth map. Returns whether the water is finished by
+   * depth, which then owns its colour: the surface finish leaves such a water as it is.
+   */
+  add(material: pc.StandardMaterial, finish: RenderWater | null = null): boolean {
+    const finished = finish !== null && !this.app.graphicsDevice.isWebGPU;
+    if (this.#materials.has(material) && !this.#finished.has(material)) return finished;
+    this.#start(material);
     material.shaderChunksVersion = '2.8';
     // With a finish the clock is declared in either chunk, guarded; without one the chunk is as it was.
-    const finished = finish !== null && !this.app.graphicsDevice.isWebGPU;
     material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set('normalMapPS', `
 ${finished ? WATER_TIME_GLSL : 'uniform float exuWaterTime;'}
 void getNormal() {
@@ -103,6 +131,7 @@ fn getNormal() {
       material.setParameter('exuWaterFinish', new Float32Array([finish.depthScaleM, finish.foamWidthM, 0, 0]));
     }
     material.update();
+    return finished;
   }
 
   dispose(): void {
@@ -110,5 +139,6 @@ fn getNormal() {
     this.#disposed = true;
     this.app.off('update', this.#tick);
     this.#materials.clear();
+    this.#finished.clear();
   }
 }
