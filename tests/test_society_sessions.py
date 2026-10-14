@@ -7,13 +7,22 @@ sessions from receipts, with receipts written by hand in their stored shape.
 
 from __future__ import annotations
 
+import ast
+import inspect
 import uuid
 
+import exulanica.world.society_control_repository as repository_module
+import exulanica.world.society_sessions as sessions_module
 import pytest
 from exulanica.world.society_sessions import (
+    SESSION_CLOSE_REASONS,
+    SESSION_CLOSED_WORDS,
+    SESSION_LIMIT_REASONS,
     SESSION_MAXIMA,
     SESSION_PROFILE,
+    UNWORDED_CLOSE,
     SessionRefused,
+    closed_words,
     session_limits,
     sessions_from,
 )
@@ -101,3 +110,83 @@ def test_a_history_that_closes_what_it_never_opened_or_opens_twice_is_refused() 
     ):
         with pytest.raises(ValueError):
             sessions_from(broken)
+
+
+#: The repository's ways to close a session, and which argument of each names the reason.
+_CLOSERS = {"_close_session": "reason", "_pause_for_session": 2, "_pause_error": 1}
+
+
+def _closing_reasons(source: str) -> list[ast.expr]:
+    """Every expression the source passes as a session's closing reason."""
+    found: list[ast.expr] = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        name = getattr(node.func, "attr", getattr(node.func, "id", None))
+        where = _CLOSERS.get(name)
+        if isinstance(where, int) and len(node.args) > where:
+            found.append(node.args[where])
+        found += [
+            keyword.value
+            for keyword in node.keywords
+            if keyword.arg == "closing_reason" or (where == "reason" and keyword.arg == "reason")
+        ]
+    found += [
+        default
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.FunctionDef)
+        for argument, default in zip(node.args.kwonlyargs, node.args.kw_defaults, strict=True)
+        if argument.arg == "closing_reason" and default is not None
+    ]
+    return found
+
+
+def test_every_reason_a_session_closes_with_has_words_and_a_new_one_cannot_go_unworded() -> None:
+    # One wording, for exactly the reasons a session closes with, each a plain sentence.
+    assert set(SESSION_CLOSED_WORDS) == set(SESSION_CLOSE_REASONS)
+    assert len(SESSION_CLOSE_REASONS) == len(set(SESSION_CLOSE_REASONS))
+    for code, words in SESSION_CLOSED_WORDS.items():
+        assert words.endswith(".") and "_" not in words and code not in words
+    assert closed_words("session_minutes") == SESSION_CLOSED_WORDS["session_minutes"]
+    assert closed_words("a_reason_nobody_worded") == UNWORDED_CLOSE
+    # The repository names every closing reason it writes by a name this module words, never by a
+    # bare string a test could not see; the reasons it passes on unnamed are its own parameters.
+    reasons = _closing_reasons(inspect.getsource(repository_module))
+    assert len(reasons) >= 6, "the reading finds the repository's closing calls"
+    for reason in reasons:
+        assert not isinstance(reason, ast.Constant), ast.unparse(reason)
+        if isinstance(reason, ast.Name) and reason.id.isupper():
+            assert getattr(sessions_module, reason.id) in SESSION_CLOSED_WORDS, reason.id
+        else:
+            assert isinstance(reason, ast.Name) and reason.id in {"reason", "closing_reason"}, (
+                ast.unparse(reason)
+            )
+    # A limit closes a session by the reason the limit check answers: one of the limit reasons.
+    returned = {
+        node.value.value
+        for node in ast.walk(ast.parse(inspect.getsource(sessions_module.limit_reached)))
+        if isinstance(node, ast.Return)
+        and isinstance(node.value, ast.Constant)
+        and node.value.value is not None
+    }
+    assert returned == set(SESSION_LIMIT_REASONS)
+
+
+def test_a_closed_session_reads_with_its_reason_in_words() -> None:
+    session = str(uuid.uuid4())
+    opened = {"kind": "session_opened", "event_seq": 1, "session_id": session, "limits": LIMITS}
+    closed = {
+        "kind": "session_closed",
+        "event_seq": 2,
+        "session_id": session,
+        "reason": "session_minutes",
+        "closed_by": None,
+        "end_tick": 3,
+        "end_state_sha256": "a" * 64,
+        "closed_at": "2026-10-14T00:00:00+00:00",
+    }
+    [read] = sessions_from([opened, closed])
+    assert read["closed"]["words"] == SESSION_CLOSED_WORDS["session_minutes"]
+    [unworded] = sessions_from([opened, {**closed, "reason": "a_reason_nobody_worded"}])
+    assert unworded["closed"]["reason"] == "a_reason_nobody_worded"
+    assert unworded["closed"]["words"] == UNWORDED_CLOSE

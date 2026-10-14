@@ -1505,7 +1505,17 @@ Under the base route, `/sessions`:
   that id. Both need `world.read`.
 
 Each answer is `exulanica.society-session/v1`: `{session_id, state: "open" | "closed", opened,
-closed}`, the opening and closing receipts' fields with their event sequence numbers.
+closed}`, the opening and closing receipts' fields with their event sequence numbers; `closed`
+also states `words`, why it closed in a sentence.
+
+Why a session closed is stored as a code, and said in words from one table,
+`SESSION_CLOSED_WORDS` (`exulanica/world/society_sessions.py`), which every reader takes them
+from: the page through the reads below, and a project's pull request by importing it. It words
+every reason in `SESSION_CLOSE_REASONS`: the two a person causes, the five limits, and the three
+error pauses. The repository closes a session only by those named reasons, and a test holds that
+each has words. A close is how a session's spending stops, so it is never refused: a reason
+without words still closes the session, read as "The session ended." (`UNWORDED_CLOSE`), and the
+missing words are logged.
 
 A session's decisions are the receipts of the requests asked for its minutes: those whose request
 `base_tick` lies from its `start_tick` up to, not including, its `end_tick`, with no end while it
@@ -1525,8 +1535,8 @@ change as the world plays on.
 
 The control read (`GET` and `PUT` on the base route) states `session`: the society's latest
 session, open or the last to close, or null for a society that never had one, as `{session_id,
-state, limits, used, start_tick, opened_at, ends_by, end_tick, closed_at, closed_reason}`, the
-last three null while it is open. A page says how long a session has left and why it stopped from
+state, limits, used, start_tick, opened_at, ends_by, end_tick, closed_at, closed_reason,
+closed_reason_words}`, the last four null while it is open. A page says how long a session has left and why it stopped from
 this read alone. It is attached by the route, so the worker's minutes read nothing more.
 
 `GET /sessions/{session_id}` adds to the session:
@@ -1538,9 +1548,12 @@ this read alone. It is attached by the route, so the worker's minutes read nothi
   `reconciled_usd`, amounts at the ledger's eight places;
 - `decisions`: every decision of the session, its latest `decisions_read.maximum` (2,000,
   `SESSION_DECISIONS_READ`) in decision order, each with its `request_id`, `decision_seq`,
-  `role`, `subject_id`, `decider` (`model`, `person` or `external`), `base_tick` and
-  `consumed_tick` (null until a minute takes it up), for stepping through a being's choices;
-  `decisions_read.counted` says how many it holds;
+  `role`, `subject_id`, `decider` (`model`, `person` or `external`), `base_tick`,
+  `consumed_tick` (null until a minute takes it up), and how its ask ended, its receipt's
+  `status` and `reason` (an unavailable model or a timeout shows here), for stepping through a
+  being's choices; `decisions_read.counted` says how many it holds and `decisions_read.total`
+  how many the session has of every decider, so the list is every decision exactly when the two
+  are equal;
 - `measures` over its model decisions among those, and `by_model`, the same per model
   (`{provider, model_id, measures}`), each as the models read measures them
   (`exulanica/world/decision_measures.py`).

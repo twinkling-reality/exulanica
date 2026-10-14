@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -39,14 +40,23 @@ from exulanica.world.society_decision_repository import SocietyDecisionRepositor
 from exulanica.world.society_engines import PLAYABLE_ENGINES, society_engine
 from exulanica.world.society_repository import SocietyInputBehind, SocietyRepository
 from exulanica.world.society_sessions import (
+    INVALID_SOCIETY_STATE,
+    LEASE_RECOVERY_LIMIT,
+    PAUSED_BY_PERSON,
     SESSION_CLOSED,
+    SESSION_CLOSED_WORDS,
+    SESSION_DEADLINE,
     SESSION_DECISIONS_READ,
     SESSION_KINDS,
     SESSION_LIMIT_REASONS,
     SESSION_MAXIMA,
     SESSION_OPENED,
+    SOURCE_UNAVAILABLE,
+    STOPPED_BY_PERSON,
     SessionRefused,
+    closed_words,
     limit_reached,
+    model_decisions,
     session_bounds,
     session_limits,
     session_used,
@@ -54,6 +64,8 @@ from exulanica.world.society_sessions import (
 )
 from exulanica.world.world_clock import lead_room
 from exulanica.world.world_clock_repository import ClockLeadExhausted, WorldClockRepository
+
+_LOG = logging.getLogger(__name__)
 
 #: Profiles an explicitly enabled playback worker may advance.
 #: The engines the playback worker may play, from the engine table.
@@ -309,7 +321,12 @@ class SocietyControlRepository:
     def _close_session(
         self, society: dict, opened: dict, *, reason: str, closed_by: uuid.UUID | None
     ) -> dict:
-        """Close the open session: where the society stands now, why, and who (None: the system)."""
+        """Close the open session: where the society stands now, why, and who (None: the system).
+
+        A close is how a session's spending stops, so it is never refused: a reason without words
+        (``SESSION_CLOSED_WORDS``) still closes the session, and the missing words are logged."""
+        if reason not in SESSION_CLOSED_WORDS:
+            _LOG.warning("A living session closed for a reason with no words: %s", reason)
         now = self._society()._row(society["version_id"])
         return self._event(
             society,
@@ -474,6 +491,7 @@ class SocietyControlRepository:
                 "end_tick": None if closed is None else closed["end_tick"],
                 "closed_at": None if closed is None else closed["closed_at"],
                 "closed_reason": None if closed is None else closed["reason"],
+                "closed_reason_words": None if closed is None else closed_words(closed["reason"]),
             }
 
     def session_read(
@@ -536,10 +554,22 @@ class SocietyControlRepository:
                         "decider": row["decider"]["kind"],
                         "base_tick": row["base_tick"],
                         "consumed_tick": row["consumed_tick"],
+                        # How its ask ended, so a timeout or an unavailable model shows without
+                        # reading each receipt.
+                        "status": row["status"],
+                        "reason": row["reason"],
                     }
                     for row in rows
                 ],
-                "decisions_read": {"counted": len(rows), "maximum": SESSION_DECISIONS_READ},
+                # Every decision of the session (``total``), of which the latest ``maximum`` are
+                # held (``counted``): the list is complete exactly when the two are equal.
+                "decisions_read": {
+                    "counted": len(rows),
+                    "maximum": SESSION_DECISIONS_READ,
+                    "total": model_decisions(
+                        self.connection, self.workspace_id, society["society_id"], *ticks
+                    )["total"],
+                },
                 "measures": measures(asked),
                 "by_model": [
                     {"provider": provider, "model_id": model_id, "measures": measures(group)}
@@ -722,7 +752,7 @@ class SocietyControlRepository:
             opened = self._open_session(society["society_id"])
             if opened is None or self._now() < dt.datetime.fromisoformat(opened["ends_by"]):
                 return False
-            self._pause_for_session(society, opened, "session_deadline")
+            self._pause_for_session(society, opened, SESSION_DEADLINE)
             return True
 
     def stop_session(
@@ -745,7 +775,7 @@ class SocietyControlRepository:
                 base_revision=control["revision"],
                 mode="paused",
                 speed=control["speed"],
-                closing_reason="stopped_by_person",
+                closing_reason=STOPPED_BY_PERSON,
             )
             return self.session(version_id, session_id)
 
@@ -758,7 +788,7 @@ class SocietyControlRepository:
         mode: str,
         speed: int,
         base_clock_revision: int | None = None,
-        closing_reason: str = "paused_by_person",
+        closing_reason: str = PAUSED_BY_PERSON,
     ) -> dict:
         """Play or pause the society, at a speed. Pausing closes its open living session, by
         ``closing_reason``, in the same transaction."""
@@ -922,7 +952,7 @@ class SocietyControlRepository:
             if row["claim_attempts"] >= MAX_CLAIM_ATTEMPTS:
                 scoped._pause_error(
                     society,
-                    "lease_recovery_limit",
+                    LEASE_RECOVERY_LIMIT,
                     "lease_recovery_exhausted",
                     {"abandoned_claim_id": str(row["lease_token"])},
                 )
@@ -1096,9 +1126,9 @@ class SocietyControlRepository:
             except (UnavailableSocietyInput, ValueError) as exc:
                 self._check_lease(control, claim)
                 reason = (
-                    "source_unavailable"
+                    SOURCE_UNAVAILABLE
                     if isinstance(exc, UnavailableSocietyInput)
-                    else "invalid_society_state"
+                    else INVALID_SOCIETY_STATE
                 )
                 receipt = self._pause_error(
                     society,

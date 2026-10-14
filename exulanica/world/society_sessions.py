@@ -18,6 +18,7 @@ The limits are stored when a session opens and enforced by the playback worker
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import re
 import uuid
 from collections.abc import Mapping, Sequence
@@ -29,6 +30,8 @@ from psycopg.rows import dict_row
 
 from exulanica.models.usage import usd_string
 from exulanica.spending.status import UNRESOLVED_AFTER
+
+_LOG = logging.getLogger(__name__)
 
 #: The profile a session reads as.
 SESSION_PROFILE: Final = "exulanica.society-session/v1"
@@ -117,7 +120,12 @@ def _view(opened: Mapping[str, Any], closed: Mapping[str, Any] | None) -> dict[s
         },
         "closed": None
         if closed is None
-        else {"event_seq": closed["event_seq"], **{key: closed[key] for key in _CLOSED_FIELDS}},
+        else {
+            "event_seq": closed["event_seq"],
+            **{key: closed[key] for key in _CLOSED_FIELDS},
+            # Why it closed, in the one wording a page and a pull request read.
+            "words": closed_words(closed["reason"]),
+        },
     }
 
 
@@ -161,22 +169,71 @@ SESSION_LIMIT_REASONS: Final = (
     "session_spending_limit",
     "session_liability_unknown",
 )
+#: The limit the worker's reaper closes a session by, where no claim found it past its deadline.
+SESSION_DEADLINE: Final = SESSION_LIMIT_REASONS[0]
+#: A person ended the session: stopped it, or paused the world it played.
+STOPPED_BY_PERSON: Final = "stopped_by_person"
+PAUSED_BY_PERSON: Final = "paused_by_person"
+#: The pauses the system makes for an error, each closing the open session by its own reason:
+#: claims kept being lost, the world's source could not be read, or its state could not be used.
+LEASE_RECOVERY_LIMIT: Final = "lease_recovery_limit"
+SOURCE_UNAVAILABLE: Final = "source_unavailable"
+INVALID_SOCIETY_STATE: Final = "invalid_society_state"
+#: Every reason a session is closed with.
+SESSION_CLOSE_REASONS: Final = (
+    STOPPED_BY_PERSON,
+    PAUSED_BY_PERSON,
+    *SESSION_LIMIT_REASONS,
+    LEASE_RECOVERY_LIMIT,
+    SOURCE_UNAVAILABLE,
+    INVALID_SOCIETY_STATE,
+)
 
-#: A session's model decisions: the receipts of the requests asked of a model (a person playing a
-#: being, or an outside program, names its kind in the request, as
-#: :func:`~exulanica.world.deciders.is_person_ask` and :func:`~exulanica.world.deciders.is_external`
-#: read it; a model's names none) for the minutes from ``start`` up to ``end`` (none while open).
-_MODEL_DECISIONS: Final = """
+#: Why a session closed, in words, by its reason: the one wording a page and a project's pull
+#: request read. Every reason in ``SESSION_CLOSE_REASONS`` has its words here, which a test holds.
+SESSION_CLOSED_WORDS: Final[Mapping[str, str]] = {
+    "stopped_by_person": "Someone stopped the session.",
+    "paused_by_person": "Someone paused the world, which ended the session.",
+    "session_deadline": "The session reached its time limit.",
+    "session_minutes": "The session played all the minutes it was given.",
+    "session_decisions": "The session used all the model decisions it was given.",
+    "session_spending_limit": "The session's spending allowance ran out.",
+    "session_liability_unknown": (
+        "A model call's cost is not known yet, so the session stopped until it is settled."
+    ),
+    "lease_recovery_limit": "Playback stopped after it was interrupted too many times.",
+    "source_unavailable": "Playback stopped because the world's source could not be read.",
+    "invalid_society_state": "Playback stopped because the world's state could not be used.",
+}
+#: Said of a reason without words of its own. A session is never left open for want of words: it
+#: closes, and the missing words are logged when it does.
+UNWORDED_CLOSE: Final = "The session ended."
+
+
+def closed_words(reason: str) -> str:
+    """The words for why a session closed, or ``UNWORDED_CLOSE`` for a reason that has none."""
+    return SESSION_CLOSED_WORDS.get(reason, UNWORDED_CLOSE)
+
+
+#: A session's decisions: the receipts of the requests asked for its minutes, from ``start`` up to
+#: ``end`` (none while open).
+_SESSION_DECISIONS: Final = """
   from world_society_decision d
   join world_society_decision_request r using (workspace_id, society_id, request_id)
  where d.workspace_id = %(workspace)s and d.society_id = %(society)s
    and r.base_tick >= %(start)s and (%(end)s::bigint is null or r.base_tick < %(end)s)
-   and coalesce(r.document->'provider_config'->>'kind', '') not in ('external', 'person')
 """
+#: Of those, a model decision: a request asked of a model (a person playing a being, or an outside
+#: program, names its kind in the request, as :func:`~exulanica.world.deciders.is_person_ask` and
+#: :func:`~exulanica.world.deciders.is_external` read it; a model's names none).
+_ASKED_A_MODEL: Final = (
+    "coalesce(r.document->'provider_config'->>'kind', '') not in ('external', 'person')"
+)
 _DECISIONS: Final = (
-    "select count(*) as decisions, "
-    "count(*) filter (where d.document->>'reason' = 'spending_limit_reached') as refused"
-    + _MODEL_DECISIONS
+    f"select count(*) filter (where {_ASKED_A_MODEL}) as decisions, "
+    f"count(*) filter (where {_ASKED_A_MODEL} "
+    "and d.document->>'reason' = 'spending_limit_reached') as refused, "
+    "count(*) as total" + _SESSION_DECISIONS
 )
 _UNKNOWN: Final = """
 select 1
@@ -222,12 +279,12 @@ def model_decisions(
     start_tick: int,
     end_tick: int | None = None,
 ) -> dict[str, int]:
-    """How many model decisions a session asked (``decisions``), and how many of them were refused
-    because a spending bound had nothing left (``refused``): the receipts of the requests asked of
-    a model for its minutes, from ``start_tick`` up to ``end_tick`` (none while it is open). A
-    request asked for a minute a closed session did not play belongs to the session that plays
-    it. Counted in the database, so a read polled each second loads no receipt. Read on a
-    connection scoped to the workspace."""
+    """How many model decisions a session asked (``decisions``), how many of them were refused
+    because a spending bound had nothing left (``refused``), and how many decisions it holds of
+    every decider (``total``): the receipts of the requests asked for its minutes, from
+    ``start_tick`` up to ``end_tick`` (none while it is open). A request asked for a minute a
+    closed session did not play belongs to the session that plays it. Counted in the database, so
+    a read polled each second loads no receipt. Read on a connection scoped to the workspace."""
     row = (
         connection.cursor(row_factory=dict_row)
         .execute(
@@ -242,7 +299,7 @@ def model_decisions(
         .fetchone()
     )
     assert row is not None
-    return {"decisions": int(row["decisions"]), "refused": int(row["refused"])}
+    return {key: int(row[key]) for key in ("decisions", "refused", "total")}
 
 
 def decisions_left(

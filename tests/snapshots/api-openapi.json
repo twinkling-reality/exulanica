@@ -34225,6 +34225,17 @@
        }
       ],
       "title": "Closed Reason"
+     },
+     "closed_reason_words": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Closed Reason Words"
      }
     },
     "additionalProperties": false,

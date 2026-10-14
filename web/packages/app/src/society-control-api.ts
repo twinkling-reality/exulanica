@@ -104,6 +104,8 @@ export interface LivingSessionNow {
   readonly endTick: number | null;
   readonly closedAt: string | null;
   readonly closedReason: string | null;
+  /** Why it closed, in the server's one wording (`SESSION_CLOSED_WORDS`); null while open. */
+  readonly closedReasonWords: string | null;
 }
 
 /** One provider's spending bound of a session, as the ledger holds it. Amounts are decimal strings. */
@@ -131,6 +133,9 @@ export interface SessionDecision {
   readonly decider: 'model' | 'person' | 'external';
   readonly baseTick: number;
   readonly consumedTick: number | null;
+  /** How its ask ended: the receipt's status and reason, so a timeout shows without another read. */
+  readonly status: string;
+  readonly reason: string;
 }
 
 /** A living session and what it came to, from the decisions asked for its own minutes alone. */
@@ -138,7 +143,8 @@ export interface LivingSessionRead extends LivingSessionNow {
   readonly bounds: readonly SessionBound[];
   /** In decision order: its latest `decisionsRead.maximum` at most. */
   readonly decisions: readonly SessionDecision[];
-  readonly decisionsRead: { readonly counted: number; readonly maximum: number };
+  /** `total` is every decision of the session: the list is complete exactly when `counted` equals it. */
+  readonly decisionsRead: { readonly counted: number; readonly maximum: number; readonly total: number };
   /** Over its model decisions among `decisions`, as the models read measures them. */
   readonly measures: DecisionMeasures;
   readonly byModel: readonly { readonly provider: string; readonly modelId: string; readonly measures: DecisionMeasures }[];
@@ -186,8 +192,9 @@ function livingSessionNow(value: unknown): LivingSessionNow {
     startTick: count(held['start_tick']), openedAt: word(held['opened_at']), endsBy: word(held['ends_by']),
     endTick: either(held['end_tick'], count), closedAt: either(held['closed_at'], word),
     closedReason: either(held['closed_reason'], word),
+    closedReasonWords: either(held['closed_reason_words'], word),
   };
-  const closing = [now.endTick, now.closedAt, now.closedReason];
+  const closing = [now.endTick, now.closedAt, now.closedReason, now.closedReasonWords];
   if (now.state === 'open' ? closing.some((one) => one !== null) : closing.some((one) => one === null)) invalid();
   return now;
 }
@@ -212,6 +219,7 @@ function sessionDecision(value: unknown): SessionDecision {
     requestId: word(held['request_id']), decisionSeq: count(held['decision_seq']), role: word(held['role']),
     subjectId: word(held['subject_id']), decider, baseTick: count(held['base_tick']),
     consumedTick: either(held['consumed_tick'], count),
+    status: word(held['status']), reason: word(held['reason']),
   };
 }
 
@@ -231,6 +239,7 @@ export function parseLivingSession(value: unknown, sessionId: string): LivingSes
     start_tick: opened['start_tick'], opened_at: opened['opened_at'], ends_by: opened['ends_by'],
     end_tick: closed === null ? null : closed['end_tick'], closed_at: closed === null ? null : closed['closed_at'],
     closed_reason: closed === null ? null : closed['reason'],
+    closed_reason_words: closed === null ? null : closed['words'],
   });
   const read = object(row['decisions_read']);
   const decisions = list(row['decisions']).map(sessionDecision);
@@ -239,7 +248,7 @@ export function parseLivingSession(value: unknown, sessionId: string): LivingSes
     ...now,
     bounds: list(row['bounds']).map(bound),
     decisions,
-    decisionsRead: { counted: count(read['counted']), maximum: count(read['maximum']) },
+    decisionsRead: { counted: count(read['counted']), maximum: count(read['maximum']), total: count(read['total']) },
     measures: decisionMeasures(row['measures']),
     byModel: list(row['by_model']).map((entry) => {
       const held = object(entry);

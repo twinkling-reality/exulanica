@@ -130,6 +130,9 @@ class LivingSessionNow(BaseModel):
     #: Why it closed, by code: a person stopped or paused it, a limit was reached
     #: (``SESSION_LIMIT_REASONS``), or playback stopped on an error; null while it is open.
     closed_reason: str | None
+    #: Why it closed, in words (``SESSION_CLOSED_WORDS``), or null while it is open. Added to this
+    #: profile as an optional field.
+    closed_reason_words: str | None = None
 
 
 class LastBatchExecution(BaseModel):

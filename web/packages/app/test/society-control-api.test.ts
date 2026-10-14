@@ -41,15 +41,19 @@ describe('society playback client', () => {
       limits: { wallSeconds: 3600, minutes: 60, decisions: 10, usd: '1.00000000', calls: 100 },
       used: { wallSeconds: 12, minutes: 2, decisions: 3, usd: '0.00120000', calls: 3, unresolved: { count: 1, usd: '0.00040000' } },
       startTick: 4, openedAt: '2026-10-14T01:00:00+00:00', endsBy: '2026-10-14T02:00:00+00:00',
-      endTick: null, closedAt: null, closedReason: null,
+      endTick: null, closedAt: null, closedReason: null, closedReasonWords: null,
     });
     const closed = parseSocietyControl({ ...control, session: { ...openSession, ...closing } }, version);
-    expect(closed.livingSession).toMatchObject({ state: 'closed', endTick: 7, closedReason: 'session_decisions' });
+    expect(closed.livingSession).toMatchObject({
+      state: 'closed', endTick: 7, closedReason: 'session_decisions', closedReasonWords: closing.closed_reason_words,
+    });
     expect(parseSocietyControl({ ...control, session: null }, version).livingSession).toBeNull();
     expect('livingSession' in parseSocietyControl(control, version)).toBe(false);
     for (const wrong of [
       { ...openSession, end_tick: 7 },
       { ...openSession, ...closing, closed_reason: null },
+      { ...openSession, ...closing, closed_reason_words: null },
+      { ...openSession, closed_reason_words: 'An open session has no reason.' },
       { ...openSession, used: { ...openSession.used, usd: '0.0012' } },
       { ...openSession, state: 'ended' },
     ]) {
@@ -66,14 +70,16 @@ describe('society playback client', () => {
     });
     const read = await client.readSession(version, 'session-1');
     expect(String(fetcher.mock.calls[0]![0])).toContain('/world/versions/version/society/control/sessions/session-1?');
-    expect(read).toMatchObject({ state: 'closed', closedReason: 'session_decisions', endTick: 7 });
-    expect(read.decisions.map((one) => [one.requestId, one.decider, one.consumedTick])).toEqual([
-      ['request-1', 'model', 5], ['request-2', 'person', null],
+    expect(read).toMatchObject({
+      state: 'closed', closedReason: 'session_decisions', closedReasonWords: closing.closed_reason_words, endTick: 7,
+    });
+    expect(read.decisions.map((one) => [one.requestId, one.decider, one.consumedTick, one.status, one.reason])).toEqual([
+      ['request-1', 'model', 5, 'accepted', 'validated_choice'], ['request-2', 'person', null, 'accepted', 'validated_choice'],
     ]);
     expect(read.bounds[0]).toMatchObject({ provider: 'nebius', state: 'closed', committedCalls: 3, unresolved: { count: 1, usd: '0.00040000' } });
     expect(read.measures.counts.decisions).toBe(1);
     expect(read.byModel.map((one) => one.modelId)).toEqual(['open/model']);
-    expect(read.decisionsRead).toEqual({ counted: 2, maximum: 2000 });
+    expect(read.decisionsRead).toEqual({ counted: 2, maximum: 2000, total: 2 });
     expect(() => parseLivingSession(sessionRead, 'session-2')).toThrow('playback response');
     expect(() => parseLivingSession({ ...sessionRead, decisions: [...sessionRead.decisions].reverse() }, 'session-1'))
       .toThrow('playback response');
@@ -85,9 +91,12 @@ const used = { wall_seconds: 12, minutes: 2, decisions: 3, usd: '0.00120000', ca
 const openSession = {
   session_id: 'session-1', state: 'open', limits, used, start_tick: 4,
   opened_at: '2026-10-14T01:00:00+00:00', ends_by: '2026-10-14T02:00:00+00:00',
-  end_tick: null, closed_at: null, closed_reason: null,
+  end_tick: null, closed_at: null, closed_reason: null, closed_reason_words: null,
 };
-const closing = { state: 'closed', end_tick: 7, closed_at: '2026-10-14T01:05:00+00:00', closed_reason: 'session_decisions' };
+const closing = {
+  state: 'closed', end_tick: 7, closed_at: '2026-10-14T01:05:00+00:00', closed_reason: 'session_decisions',
+  closed_reason_words: 'The session used all the model decisions it was given.',
+};
 const rate = { numerator: 0, denominator: 0, minimum: 5, value: null };
 const measures = {
   counts: { decisions: 1, answered: 1, refused: 0, unavailable: 0, timeouts: 0, stale: 0, applied: 1, not_applied: 0, pending: 0 },
@@ -105,7 +114,7 @@ const sessionRead = {
   },
   closed: {
     event_seq: 9, reason: 'session_decisions', closed_by: null, end_tick: 7,
-    end_state_sha256: 'b'.repeat(64), closed_at: closing.closed_at,
+    end_state_sha256: 'b'.repeat(64), closed_at: closing.closed_at, words: closing.closed_reason_words,
   },
   used,
   bounds: [{
@@ -115,10 +124,10 @@ const sessionRead = {
     known_usage_usd: '0.00080000', reconciled_usd: '0.00000000',
   }],
   decisions: [
-    { request_id: 'request-1', decision_seq: 1, role: 'people', subject_id: 'ada', decider: 'model', base_tick: 4, consumed_tick: 5 },
-    { request_id: 'request-2', decision_seq: 2, role: 'people', subject_id: 'bo', decider: 'person', base_tick: 6, consumed_tick: null },
+    { request_id: 'request-1', decision_seq: 1, role: 'people', subject_id: 'ada', decider: 'model', base_tick: 4, consumed_tick: 5, status: 'accepted', reason: 'validated_choice' },
+    { request_id: 'request-2', decision_seq: 2, role: 'people', subject_id: 'bo', decider: 'person', base_tick: 6, consumed_tick: null, status: 'accepted', reason: 'validated_choice' },
   ],
-  decisions_read: { counted: 2, maximum: 2000 },
+  decisions_read: { counted: 2, maximum: 2000, total: 2 },
   measures,
   by_model: [{ provider: 'nebius', model_id: 'open/model', measures }],
 };

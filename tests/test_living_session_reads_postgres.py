@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import time
 from decimal import Decimal
 
@@ -25,8 +26,11 @@ from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import TransportError
 from exulanica.models.transport import HttpResponse
+from exulanica.selection.validation import Session
 from exulanica.spending.status import read_spending_refusals
+from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import LEASE_SECONDS
+from exulanica.world.society_sessions import SESSION_CLOSED_WORDS, UNWORDED_CLOSE
 
 import test_outside_deciders_postgres as outside
 import test_society_person_decisions_postgres as person_decisions
@@ -105,7 +109,7 @@ def _model_requests(services, world, snapshot) -> list[str]:
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_the_control_and_session_reads_state_each_session_s_own_decisions(app):
+def test_the_control_and_session_reads_state_each_session_s_own_decisions(app, monkeypatch):
     world, client = app
     services = person_decisions._services(client)
     manifest, model_id = person_decisions._offered()
@@ -147,8 +151,12 @@ def test_the_control_and_session_reads_state_each_session_s_own_decisions(app):
     )
     assert ended["used"]["decisions"] == 2
     assert ended["used"]["minutes"] == ended["end_tick"] - ended["start_tick"] > 0
+    # Why it closed, in the one wording both reads serve.
+    words = SESSION_CLOSED_WORDS["session_decisions"]
+    assert ended["closed_reason_words"] == words
     read_first = _read(client, world, first["session_id"])
     assert read_first["used"] == ended["used"]
+    assert read_first["closed"]["words"] == words
 
     second = _session(client, world, limits={**LIMITS, "decisions": 3})
     # A minute's people may be asked together: two of them may be due at once.
@@ -158,6 +166,15 @@ def test_the_control_and_session_reads_state_each_session_s_own_decisions(app):
     # What a closed session used stays as it closed, whatever plays after it.
     assert read_first["used"] == ended["used"]
     assert _control(client, world)["session"]["session_id"] == second["session_id"]
+
+    # Holding fewer than the session asked, the read says so: its total stays every decision.
+    monkeypatch.setattr("exulanica.world.society_control_repository.SESSION_DECISIONS_READ", 1)
+    capped = _read(client, world, second["session_id"])
+    assert capped["decisions_read"] == {"counted": 1, "maximum": 1, "total": 3}
+    assert [one["request_id"] for one in capped["decisions"]] == [
+        one["request_id"] for one in read_second["decisions"]
+    ][-1:]
+    monkeypatch.undo()
 
     asked = _model_requests(services, world, snapshot)
     assert len(asked) == len(transport.requests) == 5
@@ -174,7 +191,15 @@ def test_the_control_and_session_reads_state_each_session_s_own_decisions(app):
         assert [one["decision_seq"] for one in read["decisions"]] == sorted(
             one["decision_seq"] for one in read["decisions"]
         )
-        assert read["decisions_read"] == {"counted": len(read["decisions"]), "maximum": 2000}
+        # The whole session is held: every decision, each with how its ask ended.
+        assert read["decisions_read"] == {
+            "counted": len(read["decisions"]),
+            "maximum": 2000,
+            "total": len(read["decisions"]),
+        }
+        assert {(one["status"], one["reason"]) for one in read["decisions"]} == {
+            ("accepted", "validated_choice")
+        }
         assert read["measures"]["counts"]["decisions"] == read["used"]["decisions"]
         # Every ask was answered, so every decision is a call the measures cost.
         assert read["measures"]["counts"]["unavailable"] == 0
@@ -216,6 +241,8 @@ def test_a_person_s_answer_is_a_session_decision_but_not_a_model_decision(app):
     assert [(one["subject_id"], one["decider"]) for one in read["decisions"]] == [
         (knight, "person")
     ]
+    # Counted among every decision of the session, never among its model decisions.
+    assert read["decisions_read"]["total"] == 1
     assert read["used"]["decisions"] == 0
     assert read["measures"]["counts"]["decisions"] == 0 and read["by_model"] == []
     assert _control(client, world)["session"]["used"]["decisions"] == 0
@@ -234,6 +261,49 @@ def test_a_person_s_answer_is_a_session_decision_but_not_a_model_decision(app):
         opened["session_id"],
         "closed",
         "paused_by_person",
+    )
+    assert closed["closed_reason_words"] == SESSION_CLOSED_WORDS["paused_by_person"]
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_reason_without_words_still_closes_the_session_and_says_so_plainly(app, caplog):
+    """A close is how a session's spending stops, so it is never refused for want of words: the
+    session closes by the reason it was given, both reads say so plainly, and the missing words
+    are logged."""
+    world, client = app
+    services = person_decisions._services(client)
+    stays._inhabited(world, client)
+    opened = _session(client, world)
+    binding, workspace, actor = world["binding"], world["workspace"], world["session"].actor
+    caplog.set_level(logging.WARNING, logger="exulanica.world.society_control_repository")
+    with services.database.session(workspace) as connection:
+        controls = SocietyControlRepository(
+            connection,
+            workspace,
+            world_id=binding.world_id,
+            input_authorizer=lambda who, document: services.society_runtime.authorize(
+                connection, Session(workspace_id=workspace, actor=who), document
+            ),
+        )
+        read = controls.read(binding.version_id)
+        controls.configure(
+            binding.version_id,
+            actor=actor,
+            base_revision=read["revision"],
+            mode="paused",
+            speed=read["speed"],
+            closing_reason="a_reason_nobody_worded",
+        )
+    now = _control(client, world)["session"]
+    assert (now["session_id"], now["state"], now["closed_reason"]) == (
+        opened["session_id"],
+        "closed",
+        "a_reason_nobody_worded",
+    )
+    assert now["closed_reason_words"] == UNWORDED_CLOSE
+    assert _read(client, world, opened["session_id"])["closed"]["words"] == UNWORDED_CLOSE
+    assert any(
+        "no words: a_reason_nobody_worded" in record.getMessage() for record in caplog.records
     )
 
 
