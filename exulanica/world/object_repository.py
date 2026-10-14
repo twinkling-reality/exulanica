@@ -2503,10 +2503,26 @@ class WorldObjectRepository:
         *,
         base_state_sha256: str,
         actor: uuid.UUID,
+        landing: LandingGround | None,
     ) -> AlternateVersion:
+        """Place a thing in a region of the version. ``landing`` is the world's ground the placing
+        is held to, as a move is
+        (:func:`~exulanica.world.thing_landing_source.prepare_landing_in_region`), or None where it
+        is not checked; every caller states which."""
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
             thing = self._validated_thing_placement(row, placement)
+            if landing is not None:
+                if landing.region_id != thing.region_id:
+                    raise ValueError("a landing prepared for another region than the placing's")
+                refusal = landing_refusal(
+                    landing,
+                    thing,
+                    footprint_half_extents(thing),
+                    blocking_things(self._things(version_id), thing.thing_id),
+                )
+                if refusal is not None:
+                    raise refusal
             edit_id = uuid.uuid4()
             self._insert_thing(version_id, thing, (edit_id, edit_id))
             self._append_edit(

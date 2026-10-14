@@ -1039,9 +1039,10 @@ holds at most 256 placed things, removed ones included, since its delta keeps th
 refused as `409 thing_limit_reached`, and undoing a placement makes room again. What a placed
 thing is never changes after it is placed: the table's trigger refuses a change to its kind or
 origin, and a move keeps its region. An unbound move changes its pose; a freeform move of a
-support-bound thing also clears its support affinity. A move is held to the world's ground as the
-world's society reads it (`exulanica/world/thing_landing.py`), so where a thing may be moved and
-what the world's people can reach never disagree: inside the walkable area where the world's own
+support-bound thing also clears its support affinity. A move, and a placing of a shipped kind, is
+held to the world's ground as the world's society reads it (`exulanica/world/thing_landing.py`), so
+where a thing may be put and what the world's people can reach never disagree: inside the walkable
+area where the world's own
 ground states one, resting on the ground by the society's own rule (the ground plane, or the
 nearest walking line of a world that states its walking surfaces), and with its kind's box, turned
 with it, overlapping nothing people cannot walk through: a site's structures, water and other
@@ -1050,11 +1051,14 @@ and the version's other placed objects whose kinds block walking. A being is hel
 Touching a face is not overlapping. A refusal is `422` with one code per kind,
 `thing_landing_outside`, `thing_landing_off_ground` or `thing_landing_blocked`, a `where` naming
 what refused it (the part's kind and words, or the height above the ground) and a sentence a person
-reads as `detail`; nothing is written. The world's ground is prepared before the move's
-transaction, through the kind worker's place cache for a site world, so a move asked while that
-place is being made is answered `503` with `Retry-After` and writes nothing. A world whose ground
-the rule cannot read, such as one made from terrain, which has no society projection, is moved as
-before; the move's preview says it was not checked. Placing a thing is not yet held to the ground.
+reads as `detail`; nothing is written. The world's ground is prepared before the edit's
+transaction, through the kind worker's place cache for a site world, so a move or a placing asked
+while that place is being made is answered `503` with `Retry-After` and writes nothing. A world
+whose ground the rule cannot read, such as one made from terrain, which has no society projection,
+is edited as before; the move's preview says it was not checked. A thing of a kind its workspace
+keeps (a creature made from words, below) is placed where its maker stands it, unchecked, and held
+to the ground when it is moved. Things a scene places by its arrangement, and a thing placed on a
+support (below, under its own clearance rules), are not held to this rule.
 `add_thing`, `move_thing`
 and `remove_thing` append to the version's edit log under the same compare-and-swap as every edit,
 naming the thing in the log's `thing_id`, and undo restores the stored document; an undone addition

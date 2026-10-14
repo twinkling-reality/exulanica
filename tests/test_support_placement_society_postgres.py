@@ -5,10 +5,20 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import uuid
 from pathlib import Path
 
 import pytest
+from exulanica.api.world_edit import (
+    BaseStateBody,
+    bound_edit,
+    object_problem_code,
+    writing_repository,
+)
+from exulanica.selection.validation import Session
 from exulanica.things.kinds import shipped_thing_kinds
+from exulanica.world.objects import ObjectOrigin, Transform
+from exulanica.world.placed_things import UNSCALED_MILLI, ThingPlacement, named_kind
 from exulanica.world.society_engines import CREATES_HOLDING_THINGS
 from exulanica.world.society_input_policy import OFF_GROUND
 
@@ -38,6 +48,82 @@ def latest_input(api, entry):
         ).fetchone()["document"]
 
 
+#: A lantern stood where the supported bench is, on its deck's height.
+LANTERN_POSE = {"x_mm": 55000, "y_mm": 150, "z_mm": -8000, "yaw_microradians": 0}
+
+
+def stood_unchecked(api, entry, base_state_sha256):
+    """The lantern stood on the supported bench by a writer the ground's rule does not hold, a
+    scene's arrangement (``exulanica/api/scene_dressing.py``), through the same society observer
+    every authored edit reaches: the version it wrote, or the code its refusal answers with."""
+    services = api.client.app.state.services
+    observer = api.client.app.state.society_authored_edit
+    session = Session(workspace_id=api.repository.workspace_id, actor=api.actor)
+    with api.database.session(api.repository.workspace_id) as connection:
+        repository = writing_repository(connection, session, services, observer, entry["world_id"])
+        version_id = uuid.UUID(entry["authored_version_id"])
+        placement = ThingPlacement(
+            thing_id="thing:collision",
+            kind=named_kind("lantern", 1),
+            region_id="region:generated",
+            transform=Transform(
+                LANTERN_POSE["x_mm"], LANTERN_POSE["y_mm"], LANTERN_POSE["z_mm"], 0, UNSCALED_MILLI
+            ),
+            origin=ObjectOrigin("authored", "fictional"),
+        )
+        try:
+            return bound_edit(
+                repository,
+                version_id,
+                BaseStateBody(base_state_sha256=base_state_sha256),
+                lambda: repository.add_thing(
+                    version_id,
+                    placement,
+                    base_state_sha256=base_state_sha256,
+                    actor=api.actor,
+                    landing=None,
+                ),
+            ), None
+        except Exception as exc:
+            answer = object_problem_code(exc)
+            if answer is None:
+                raise
+            return None, answer[1]
+
+
+def test_a_person_s_lantern_on_the_supported_bench_is_refused_by_the_ground_first(made):
+    api = made
+    entry, prefix, scope, drawing, initial = supported_world(api)
+    placed = api.post(prefix + "/things/on-support" + scope, request_body(entry, drawing, initial))
+    assert placed.status_code == 201, placed.text
+    assert CREATES_HOLDING_THINGS is not None
+    created = api.post(
+        prefix + "/society" + scope,
+        {"region_id": "region:generated", "profile": CREATES_HOLDING_THINGS.engine},
+    )
+    assert created.status_code in (200, 201), created.text
+    first = latest_input(api, entry)
+    base = api.get(prefix + scope).json()
+
+    asked = api.post(
+        prefix + "/things" + scope,
+        {
+            "base_state_sha256": base["state_sha256"],
+            "thing_id": "thing:collision",
+            "kind": shipped_thing_kinds()[("lantern", 1)].reference(),
+            "region_id": "region:generated",
+            "pose": LANTERN_POSE,
+            "origin_role": "fictional",
+        },
+    )
+
+    assert asked.status_code == 422, asked.text
+    assert asked.json()["code"] == "thing_landing_blocked"
+    assert asked.json()["where"]["part"] == "thing"
+    assert api.get(prefix + scope).json() == base
+    assert latest_input(api, entry) == first
+
+
 def test_bounded_projection_records_actual_unsupported_offer_and_observer_checks_overlap(made):
     api = made
     entry, prefix, scope, drawing, initial = supported_world(api)
@@ -62,26 +148,16 @@ def test_bounded_projection_records_actual_unsupported_offer_and_observer_checks
         for ref in first["dependency_refs"]
     )
     base = api.get(prefix + scope).json()
-    # Ordinary authoring stays its existing operation. The observer must either refuse and
-    # roll it back, or persist an explicitly unavailable input; it may not hide the collision.
-    collision = api.post(
-        prefix + "/things" + scope,
-        {
-            "base_state_sha256": base["state_sha256"],
-            "thing_id": "thing:collision",
-            "kind": shipped_thing_kinds()[("lantern", 1)].reference(),
-            "region_id": "region:generated",
-            "pose": {"x_mm": 55000, "y_mm": 150, "z_mm": -8000, "yaw_microradians": 0},
-            "origin_role": "fictional",
-        },
-    )
-    if collision.status_code == 424:
+    # A person's placing there is refused by the ground's rule first (the test above); a writer
+    # that rule does not hold still reaches the observer, which must either refuse and roll it
+    # back, or persist an explicitly unavailable input; it may not hide the collision.
+    written, refused = stood_unchecked(api, entry, base["state_sha256"])
+    if refused is not None:
         overlap_input = latest_input(api, entry)
-        assert collision.json()["code"] == "unavailable_society_input"
+        assert refused == "unavailable_society_input"
         assert api.get(prefix + scope).json() == base
         assert latest_input(api, entry) == first
     else:
-        assert collision.status_code == 201, collision.text
         after = latest_input(api, entry)
         overlap_input = after
         assert after["availability"] == "unavailable"
@@ -91,7 +167,7 @@ def test_bounded_projection_records_actual_unsupported_offer_and_observer_checks
             == "unavailable"
         )
         undone = api.post(
-            prefix + "/things/undo" + scope, {"base_state_sha256": collision.json()["state_sha256"]}
+            prefix + "/things/undo" + scope, {"base_state_sha256": written.state_sha256}
         )
         assert undone.status_code == 200, undone.text
         assert latest_input(api, entry)["availability"] == "available"
@@ -105,8 +181,8 @@ def test_bounded_projection_records_actual_unsupported_offer_and_observer_checks
                     "origin": "actual isolated API observer; no model/browser claim",
                     "entry": entry,
                     "first_input": first,
-                    "overlap_status": collision.status_code,
-                    "overlap_response": collision.json(),
+                    "overlap_refused": refused,
+                    "overlap_state_sha256": None if written is None else written.state_sha256,
                     "overlap_input": overlap_input,
                     "final_input": latest_input(api, entry),
                     "replay": replay.json(),

@@ -1,9 +1,11 @@
-"""A world's ground as a move of a placed thing reads it, prepared before the move's transaction.
+"""A world's ground as a move or a placing of a thing reads it, prepared before the edit's
+transaction.
 
-:func:`prepare_landing` reads the version's source the way its society does
-(:func:`~exulanica.world.society_authored_ground.read_authored_ground`), and returns the
-:class:`~exulanica.world.thing_landing.LandingGround` a move is held to, or None for a world whose
-ground the rule cannot read, which is moved as before and said to be unchecked:
+:func:`prepare_landing` (a move, by the thing's own region) and :func:`prepare_landing_in_region`
+(a placing, by the region it names) read the version's source the way its society does
+(:func:`~exulanica.world.society_authored_ground.read_authored_ground`), and return the
+:class:`~exulanica.world.thing_landing.LandingGround` the edit is held to, or None for a world whose
+ground the rule cannot read, which is edited as before and said to be unchecked:
 
 * a ground walked on a lattice (a starter, a world made from photographs): the plane at its
   elevation, edged where the world's own ground states its area;
@@ -15,7 +17,7 @@ ground the rule cannot read, which is moved as before and said to be unchecked:
   surfaces its society walks and their blocked parts.
 
 Every figure is turned into the region's frame (east and south), the frame a placed thing's pose
-is in. The version's other placed objects are read inside the move's own transaction
+is in. The version's other placed objects are read inside the edit's own transaction
 (:func:`~exulanica.world.thing_landing.blocking_things`), so they cannot have moved since.
 """
 
@@ -43,7 +45,7 @@ from exulanica.world.thing_landing import BlockedPart, LandingGround, rests_on_p
 if TYPE_CHECKING:
     from exulanica.world.object_repository import WorldObjectRepository
 
-__all__ = ["prepare_landing"]
+__all__ = ["prepare_landing", "prepare_landing_in_region"]
 
 
 def prepare_landing(
@@ -54,11 +56,21 @@ def prepare_landing(
     ``KindWorkWaiting`` while a site's place is being made. An unknown thing is left to the move,
     which checks its base before it looks the thing up: a stale base is answered as stale
     whatever the id."""
-    row = repository.edit_base_row(version_id)
+    repository.edit_base_row(version_id)
     try:
         thing = repository.placed_thing(version_id, thing_id)
     except UnknownWorldResource:
         return None
+    return prepare_landing_in_region(repository, version_id, thing.region_id)
+
+
+def prepare_landing_in_region(
+    repository: WorldObjectRepository, version_id: uuid.UUID, region_id: str
+) -> LandingGround | None:
+    """The ground a thing placed in ``region_id`` of ``version_id`` is held to, or None where it is
+    not checked. Raises as :func:`prepare_landing` does. A region the version's source does not
+    hold is left to the placing, which refuses it after checking its base."""
+    row = repository.edit_base_row(version_id)
     connection = repository.connection
     try:
         ground = read_authored_ground(
@@ -66,7 +78,7 @@ def prepare_landing(
             repository.workspace_id,
             repository.world_id,
             row["source_snapshot_id"],
-            region_id=thing.region_id,
+            region_id=region_id,
         )
     except InvalidStructuralData:
         return None

@@ -96,6 +96,7 @@ def test_0167_reads_stored_choices_as_shipped_and_indexes_said_events_by_speaker
                     ),
                     base_state_sha256=version.state_sha256,
                     actor=actor,
+                    landing=None,
                 )
                 # An owner's choice as the code before 0167 wrote one.
                 connection.execute(

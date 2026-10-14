@@ -85,7 +85,11 @@ def test_the_deployed_writer_places_moves_removes_and_undoes_a_thing(
             is False
         )
         placed = runtime.add_thing(
-            version.version_id, _placement(), base_state_sha256=empty, actor=uuid.uuid4()
+            version.version_id,
+            _placement(),
+            base_state_sha256=empty,
+            actor=uuid.uuid4(),
+            landing=None,
         )
         [thing] = placed.things
         assert thing.kind.sha256 == placeable_kind().sha256
@@ -120,7 +124,11 @@ def test_the_deployed_writer_places_moves_removes_and_undoes_a_thing(
         ).fetchone()
         assert retained == {"removed": True, "addition_undone": True}
         again = runtime.add_thing(
-            version.version_id, _placement(), base_state_sha256=empty, actor=uuid.uuid4()
+            version.version_id,
+            _placement(),
+            base_state_sha256=empty,
+            actor=uuid.uuid4(),
+            landing=None,
         )
         assert [thing.thing_id for thing in again.things] == ["thing:placed"]
         assert again.state_sha256 == placed.state_sha256
@@ -136,6 +144,7 @@ def test_what_a_placed_thing_is_never_changes_after_it_is_placed(world, reposito
         _placement("thing:fixed"),
         base_state_sha256=version.state_sha256,
         actor=uuid.uuid4(),
+        landing=None,
     )
     repository.connection.commit()
     provision_runtime_role(repository.connection)
@@ -169,6 +178,7 @@ def test_a_thing_s_id_is_its_author_s_within_their_own_workspace(world, reposito
         _placement("thing:shared"),
         base_state_sha256=version.state_sha256,
         actor=uuid.uuid4(),
+        landing=None,
     )
     repository.connection.commit()
     provision_runtime_role(repository.connection)
@@ -197,6 +207,7 @@ def test_a_branch_keeps_its_parent_s_things_and_a_carry_plans_to_carry_them(worl
         _placement("thing:carried"),
         base_state_sha256=version.state_sha256,
         actor=uuid.uuid4(),
+        landing=None,
     )
     branched = objects.branch_version(
         parent_version_id=version.version_id, title="Branch", created_by=uuid.uuid4()

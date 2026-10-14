@@ -433,6 +433,7 @@ def test_undo_reverses_each_thing_kind(world, kind):
             placement,
             base_state_sha256=version.state_sha256,
             actor=uuid.uuid4(),
+            landing=None,
         )
     before_edit = version
     if kind == "add_thing":
@@ -441,6 +442,7 @@ def test_undo_reverses_each_thing_kind(world, kind):
             placement,
             base_state_sha256=version.state_sha256,
             actor=uuid.uuid4(),
+            landing=None,
         )
     elif kind == "move_thing":
         after_edit = worlds.move_thing(

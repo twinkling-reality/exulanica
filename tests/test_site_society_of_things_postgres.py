@@ -1,8 +1,9 @@
 """A world made from a world kind lives as a society of things, as a deployment stores it.
 
 A farm with a creature placed on it: the farm's own people are villagers with homes and jobs made
-from the site's own place, the creature is a being among them and acts, a being placed inside a
-barn is refused a place to stand, the creature leaves the minute after its kind is erased, and the
+from the site's own place, the creature is a being among them and acts, a well inside a barn is
+refused when placed and, standing there all the same, offers nobody a place to stand, the creature
+leaves the minute after its kind is erased, and the
 stored minutes replay. Each world is made under a fixed identity, so it is the same site on every
 run, and where a thing is placed is read from that site's own records.
 """
@@ -25,6 +26,9 @@ from exulanica.world import saved_entries
 from exulanica.world.composers import composer_module
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.kinds.worker import JobOutcome, Kept, kind_worker
+from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.objects import ObjectOrigin, Transform
+from exulanica.world.placed_things import UNSCALED_MILLI, ThingPlacement, named_kind
 from exulanica.world.society_engines import CREATES, CREATES_HOLDING_THINGS
 from exulanica.world.thing_store import ThingStore
 
@@ -87,10 +91,10 @@ def _keep_creature(api, tmp_path):
     return creature
 
 
-def _place(api, entry: dict, thing_id: str, kind: dict, x_mm: int, z_mm: int) -> None:
+def _post_thing(api, entry: dict, thing_id: str, kind: dict, x_mm: int, z_mm: int):
     root = f"/world/versions/{entry['authored_version_id']}?world_id={entry['world_id']}"
     base = api.get(root).json()["state_sha256"]
-    placed = api.post(
+    return api.post(
         f"/world/versions/{entry['authored_version_id']}/things?world_id={entry['world_id']}",
         {
             "base_state_sha256": base,
@@ -101,7 +105,34 @@ def _place(api, entry: dict, thing_id: str, kind: dict, x_mm: int, z_mm: int) ->
             "origin_role": "fictional",
         },
     )
+
+
+def _place(api, entry: dict, thing_id: str, kind: dict, x_mm: int, z_mm: int) -> None:
+    placed = _post_thing(api, entry, thing_id, kind, x_mm, z_mm)
     assert placed.status_code == 201, placed.text
+
+
+def _place_unchecked(api, entry: dict, thing_id: str, kind: dict, x_mm: int, z_mm: int) -> None:
+    """A thing stood where the world's ground does not take it, as a writer not held to the
+    ground's rule may still stand one (a scene placed by its arrangement)."""
+    with api.database.session(api.repository.workspace_id) as connection:
+        objects = WorldObjectRepository(
+            connection, api.repository.workspace_id, world_id=entry["world_id"]
+        )
+        version = objects.version(uuid.UUID(entry["authored_version_id"]))
+        objects.add_thing(
+            version.version_id,
+            ThingPlacement(
+                thing_id=thing_id,
+                kind=named_kind(kind["kind"], kind["version"]),
+                region_id="region:generated",
+                transform=Transform(x_mm, 0, z_mm, 0, UNSCALED_MILLI),
+                origin=ObjectOrigin("authored", "fictional"),
+            ),
+            base_state_sha256=version.state_sha256,
+            actor=api.actor,
+            landing=None,
+        )
 
 
 def _input(api, entry: dict, seq: int) -> dict:
@@ -201,7 +232,11 @@ def test_a_well_inside_a_barn_offers_nobody_a_place_and_one_in_the_open_does(mad
     inside = ((barn.min_x_mm + barn.max_x_mm) // 2, -((barn.min_y_mm + barn.max_y_mm) // 2))
     east, _height, south = entry["generated_site"]["arrival_mm"]
     well = {"kind": "well", "version": 2}
-    _place(api, entry, "well-indoors", well, *inside)
+    # A person's placing there is refused, as the world's ground does not take it; a thing that
+    # stands there all the same is somewhere nobody is sent.
+    asked = _post_thing(api, entry, "well-indoors", well, *inside)
+    assert (asked.status_code, asked.json()["code"]) == (422, "thing_landing_blocked"), asked.text
+    _place_unchecked(api, entry, "well-indoors", well, *inside)
     _place(api, entry, "well-outdoors", well, east + 3_000, south)
     created = api.post(society, {"region_id": "region:generated", "profile": V7})
     assert created.status_code in (200, 201), created.text

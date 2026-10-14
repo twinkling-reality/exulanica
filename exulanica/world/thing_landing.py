@@ -1,9 +1,9 @@
-"""Where a placed thing may stand when it is moved, by the world's own reading of its ground.
+"""Where a thing may stand when it is moved or placed, by the world's own reading of its ground.
 
-A move used to be held only to its record: a well could be moved into a pond, inside a barn's walls,
-past the edge of the world or a metre into the air, and the move was stored. This is the rule that
-refuses those, read from the same figures the world's society reads, so where a thing may be moved
-and what the world's people can reach never disagree:
+A move or a placing used to be held only to its record: a well could be put into a pond, inside a
+barn's walls, past the edge of the world or a metre into the air, and the edit was stored. This is
+the rule that refuses those, read from the same figures the world's society reads, so where a thing
+may be put and what the world's people can reach never disagree:
 
 * **The world's edge**: the society's walkable area (:class:`WalkableArea`), when the world's own
   ground states it. An endless ground, or an area the society only declared, has no edge here.

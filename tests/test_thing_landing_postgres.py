@@ -1,4 +1,5 @@
-"""A placed thing is moved only where the world's ground takes it, and its preview says so first.
+"""A placed thing is moved or placed only where the world's ground takes it, and a move's preview
+says so first.
 
 On a farm made from the fixture kind under a fixed identity, with a duck pond and a barn read from
 the farm's own records, through the routes as a deployment serves them:
@@ -13,7 +14,10 @@ the farm's own records, through the routes as a deployment serves them:
     the removal; the undo preview on the things' path names the move it would undo;
 *   while the kind worker is still making the farm's place, a move is answered 503 with
     Retry-After and writes nothing, and asked again once the place is made, it is moved; after the
-    worker lost the place, a move is made in one ask.
+    worker lost the place, a move is made in one ask;
+*   a well placed in the pond, inside the barn, past the edge or in the air is refused as a move
+    there is, and nothing is written; a creature made from words (a kind its workspace keeps) is
+    placed where its maker puts it, unchecked.
 """
 
 from __future__ import annotations
@@ -30,7 +34,9 @@ from exulanica.world import saved_entries
 from exulanica.world.composers import composer_module
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.kinds.worker import JobOutcome, Kept, kind_worker
+from exulanica.world.thing_store import ThingStore
 
+from test_society_made_kinds import canary_creature
 from test_society_made_world import made as imported_made  # noqa: F401
 
 pytestmark = pytest.mark.postgres
@@ -364,3 +370,91 @@ def test_another_world_s_version_is_answered_as_the_move_answers_it(made):
             {"base_state_sha256": version["state_sha256"], "pose": _pose(*_open_ground(entry))},
         )
         assert answer.status_code == 404, answer.text
+
+
+def _place(api, entry: dict, thing_id: str, kind: dict, pose: dict):
+    return api.post(
+        _root(entry) + "/things" + _scope(entry),
+        {
+            "base_state_sha256": _version(api, entry)["state_sha256"],
+            "thing_id": thing_id,
+            "kind": kind,
+            "region_id": "region:generated",
+            "pose": pose,
+            "origin_role": "fictional",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["into the duck pond", "inside the barn", "past the farm's edge", "a metre into the air"],
+)
+def test_a_well_placed_where_the_farm_does_not_take_it_is_refused_and_nothing_is_written(
+    made, case
+):
+    api = made
+    entry, records = _farm(api)
+    before = _version(api, entry)
+    pose, expected = _refused_cases(entry, records)[case]
+
+    placed = _place(api, entry, "well", WELL, pose)
+
+    assert placed.status_code == 422, placed.text
+    problem = placed.json()
+    assert problem["code"] == expected["code"]
+    for key, value in expected["where"].items():
+        assert problem["where"][key] == value, problem
+    assert problem["detail"] and "_" not in problem["detail"]
+    assert _version(api, entry) == before
+
+
+def test_a_well_placed_on_a_well_already_there_is_refused_by_its_name(made):
+    api = made
+    entry, _records = _farm(api)
+    first = _placed_well(api, entry)
+
+    placed = _place(api, entry, "second-well", WELL, _pose(*_open_ground(entry)))
+
+    assert placed.status_code == 422, placed.text
+    assert placed.json()["code"] == "thing_landing_blocked"
+    assert placed.json()["where"]["part"] == "thing"
+    assert _version(api, entry) == first
+
+
+def test_a_creature_made_from_words_is_placed_where_its_maker_puts_it_unchecked(made):
+    """The creature maker stands what it made in front of the person, wherever that is; a kind its
+    workspace keeps is not held to the ground's rule when placed."""
+    api = made
+    entry, records = _farm(api)
+    creature = canary_creature("crocodile", hands=True)
+    with api.database.session(api.repository.workspace_id) as session:
+        ThingStore(session, api.repository.workspace_id, api.store).keep_creature(
+            creature, created_by=api.actor
+        )
+
+    placed = _place(
+        api,
+        entry,
+        "creature:0000aaaa",
+        {"source": "workspace", "sha256": creature.kind.sha256},
+        _pose(*_pond(records)),
+    )
+
+    assert placed.status_code == 201, placed.text
+
+
+def test_a_placing_while_the_place_is_being_made_asks_to_come_back_and_writes_nothing(
+    made, monkeypatch
+):
+    api = made
+    entry, _records = _farm(api)
+    before = _version(api, entry)
+    with monkeypatch.context() as busy:
+        _place_runs(busy, lambda *_args, **_kwargs: JobOutcome("busy"))
+        placed = _place(api, entry, "well", WELL, _pose(*_open_ground(entry)))
+        assert placed.status_code == 503, placed.text
+        assert placed.headers["Retry-After"] == "2"
+        assert _version(api, entry) == before
+    placed = _place(api, entry, "well", WELL, _pose(*_open_ground(entry)))
+    assert placed.status_code == 201, placed.text

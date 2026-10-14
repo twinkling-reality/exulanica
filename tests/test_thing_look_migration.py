@@ -113,6 +113,7 @@ def test_0156_keys_stored_placed_things_to_the_registry_they_already_name(monkey
                     ),
                     base_state_sha256=version.state_sha256,
                     actor=actor,
+                    landing=None,
                 )
                 assert [thing.thing_id for thing in placed.things] == ["well"]
             admin.execute("drop view thing_erasure")

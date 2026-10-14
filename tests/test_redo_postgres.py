@@ -241,6 +241,7 @@ def _place(worlds: WorldObjectRepository, version, thing_id: str = "thing:pinned
         ),
         base_state_sha256=version.state_sha256,
         actor=_actor(),
+        landing=None,
     )
 
 

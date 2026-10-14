@@ -4,9 +4,11 @@ look each thing of a version wears.
 A placed thing names a shipped thing kind by key, version and digest, or a kind its workspace keeps
 (a creature drafted from a person's words) by the digest of the kind's document alone, and stands
 in a region of the version's source snapshot at its kind's own size
-(:mod:`exulanica.world.placed_things`). A thing whose workspace kind is gone (no longer held, or
-erased after it was placed) is moved nowhere (410 ``thing_kind_erased``) and is removed as any
-thing is. Every edit names the version state it was made against and runs in
+(:mod:`exulanica.world.placed_things`). A thing of a shipped kind is placed and moved only where
+the world's ground takes it (:mod:`exulanica.world.thing_landing`); a made creature is placed where
+its maker stands it, and held to the ground when it is moved. A thing whose workspace kind is gone
+(no longer held, or erased after it was placed) is moved nowhere (410 ``thing_kind_erased``) and is
+removed as any thing is. Every edit names the version state it was made against and runs in
 :func:`exulanica.api.world_edit.commit_edit`, like every other authored edit, and answers with the
 whole version. ``GET .../thing-looks`` answers the latest look chosen for each thing of the
 version (:mod:`exulanica.world.thing_looks`), never cached.
@@ -23,6 +25,7 @@ input names something no longer available, as the society read does.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Path, Request, Response
@@ -49,7 +52,6 @@ from exulanica.world.object_edit_preview import (
     preview_thing_removal,
     preview_undo,
 )
-from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
 from exulanica.world.placed_things import (
     UNSCALED_MILLI,
@@ -59,7 +61,7 @@ from exulanica.world.placed_things import (
 )
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.thing_landing import LandingGround
-from exulanica.world.thing_landing_source import prepare_landing
+from exulanica.world.thing_landing_source import prepare_landing, prepare_landing_in_region
 from exulanica.world.thing_looks import ThingLookRefused, look_choices
 
 router = APIRouter(prefix="/world", tags=["world"])
@@ -123,13 +125,11 @@ class MoveThingPreviewBody(ThingEditPreviewBody):
     pose: ThingPoseBody
 
 
-def _landing(
-    repository: WorldObjectRepository, version_id: uuid.UUID, thing_id: str
-) -> LandingGround | Response | None:
-    """The ground a move of the thing is held to, prepared before any transaction, or the problem
+def _landing(prepare: Callable[[], LandingGround | None]) -> LandingGround | Response | None:
+    """The ground a move or a placing is held to, prepared before any transaction, or the problem
     that stopped it (503 with Retry-After while a site's place is being made)."""
     try:
-        return prepare_landing(repository, version_id, thing_id)
+        return prepare()
     except Exception as exc:
         problem = object_problem(exc)
         if problem is None:
@@ -150,6 +150,16 @@ def add_thing(
     session: CurrentSession,
     request: Request,
 ) -> Response | AlternateVersionView:
+    # A creature made from words (a kind its workspace keeps) is placed where its maker stands it,
+    # unchecked; a thing of a shipped kind is held to the ground as a move of it is.
+    landing = (
+        None
+        if isinstance(body.kind, WorkspaceKindBody)
+        else _landing(lambda: prepare_landing_in_region(repository, version_id, body.region_id))
+    )
+    if isinstance(landing, Response):
+        return landing
+
     def place() -> AlternateVersion:
         placement = ThingPlacement(
             thing_id=body.thing_id,
@@ -163,7 +173,11 @@ def add_thing(
             origin=ObjectOrigin("authored", body.origin_role),
         )
         return repository.add_thing(
-            version_id, placement, base_state_sha256=body.base_state_sha256, actor=session.actor
+            version_id,
+            placement,
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
+            landing=landing,
         )
 
     return commit_edit(request, repository, version_id, body, place)
@@ -182,7 +196,7 @@ def move_thing(
     session: CurrentSession,
     request: Request,
 ) -> Response | AlternateVersionView:
-    landing = _landing(repository, version_id, thing_id)
+    landing = _landing(lambda: prepare_landing(repository, version_id, thing_id))
     if isinstance(landing, Response):
         return landing
     return commit_edit(
@@ -214,7 +228,7 @@ def move_thing_preview(
 ) -> Response | dict[str, object]:
     # The write-scoped connection, read only, as the object previews use it, and the same ground
     # the write is held to, so the verdict is the one the move then answers.
-    landing = _landing(repository, version_id, thing_id)
+    landing = _landing(lambda: prepare_landing(repository, version_id, thing_id))
     if isinstance(landing, Response):
         return landing
     return preview_thing_move(

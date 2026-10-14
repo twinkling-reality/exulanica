@@ -201,8 +201,10 @@ def dress_saved_world(
                 repository,
                 version_id,
                 edit,
+                # A scene's things stand where its arrangement puts them, not yet held to the
+                # ground's rule as a person's placing is.
                 lambda placement=placement, base=version.state_sha256: repository.add_thing(
-                    version_id, placement, base_state_sha256=base, actor=session.actor
+                    version_id, placement, base_state_sha256=base, actor=session.actor, landing=None
                 ),
             )
         except Exception as exc:
