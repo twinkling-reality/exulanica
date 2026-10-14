@@ -82,9 +82,20 @@ def test_processes_racing_one_small_limit_never_admit_past_it(bench, tmp_path, w
         "race-api": ("api", first),
         "race-worker": ("worker", second),
     }
+    # Each makes its first attempt before any races on, so a process that starts late under load
+    # still races rather than finding the limit spent by the other three.
+    marks = [str(tmp_path / f"{name}.first") for name in names]
     launched = [
-        _launch(tmp_path, bench, name, witnessed=witnessed, mode=mode, workspace=str(workspace))
-        for name, (mode, workspace) in names.items()
+        _launch(
+            tmp_path,
+            bench,
+            name,
+            witnessed=witnessed,
+            mode=mode,
+            workspace=str(workspace),
+            together={"mark": mark, "marks": marks},
+        )
+        for (name, (mode, workspace)), mark in zip(names.items(), marks, strict=True)
     ]
     deadline = time.monotonic() + 120
     while not all(result.with_suffix(".ready").exists() for _process, result in launched):

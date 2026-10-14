@@ -15,6 +15,9 @@ after dispatch, after the request is sent, after the reply is received and befor
 after it is settled, or after the witness is written and before the admission commits.
 Every request is sent to a scripted transport that appends one line per request to ``sends``,
 and answers without a usage report, so each attempt keeps its whole reservation.
+
+``together`` (``{"mark", "marks"}``) holds the race back after each process's first attempt until
+every racing process has made its own, so all of them race even when one starts late under load.
 """
 
 from __future__ import annotations
@@ -239,6 +242,40 @@ def _ask(config: dict[str, Any]) -> Any:
     raise AssertionError(mode)
 
 
+def _attempt(ask: Any, key: str | None, result: dict[str, Any], *, once: bool) -> bool:
+    """One call, recorded in ``result``; whether this process asks again."""
+    try:
+        if key:
+            with spending_request_key(key):
+                ask()
+        else:
+            ask()
+        result["sent"] += 1
+    except SpendingRefused as refused:
+        result["refused"][refused.reason] = result["refused"].get(refused.reason, 0) + 1
+        if refused.reason in ("spending_limit_reached",) or key:
+            result["last_refusal"] = {"reason": refused.reason, "detail": refused.detail}
+            return False
+    except Exception as exc:  # recorded, never hidden: the parent asserts there are none
+        result["errors"].append(f"{type(exc).__name__}: {exc}"[:300])
+        return False
+    return not (key or once)
+
+
+def _together(together: dict[str, Any], result: dict[str, Any]) -> bool:
+    """Mark this process's first attempt made, and wait until every racing process has marked
+    its own: a process that starts late under load still races, rather than finding the limit
+    already spent by the others. Whether the wait ended with every mark."""
+    Path(together["mark"]).write_text("first")
+    deadline = time.monotonic() + float(together.get("seconds", 120))
+    while not all(Path(mark).exists() for mark in together["marks"]):
+        if time.monotonic() >= deadline:
+            result["errors"].append("the other processes never made their first attempt")
+            return False
+        time.sleep(0.01)
+    return True
+
+
 def main(path: str) -> int:
     config = json.loads(Path(path).read_text())
     ask = _ask(config)
@@ -246,27 +283,17 @@ def main(path: str) -> int:
     go = Path(config["go"])
     while not go.exists():
         time.sleep(0.01)
-    deadline = time.monotonic() + float(config.get("seconds", 30))
     result: dict[str, Any] = {"pid": os.getpid(), "sent": 0, "refused": {}, "errors": []}
     key = config.get("request_key")
-    while time.monotonic() < deadline:
-        try:
-            if key:
-                with spending_request_key(key):
-                    ask()
-            else:
-                ask()
-            result["sent"] += 1
-        except SpendingRefused as refused:
-            result["refused"][refused.reason] = result["refused"].get(refused.reason, 0) + 1
-            if refused.reason in ("spending_limit_reached",) or key:
-                result["last_refusal"] = {"reason": refused.reason, "detail": refused.detail}
-                break
-        except Exception as exc:  # recorded, never hidden: the parent asserts there are none
-            result["errors"].append(f"{type(exc).__name__}: {exc}"[:300])
-            break
-        if key or config.get("once"):
-            break
+    once = bool(config.get("once"))
+    going = True
+    together = config.get("together")
+    if together:
+        going = _attempt(ask, key, result, once=once)
+        going = _together(together, result) and going
+    deadline = time.monotonic() + float(config.get("seconds", 30))
+    while going and time.monotonic() < deadline:
+        going = _attempt(ask, key, result, once=once)
     Path(config["result"]).write_text(json.dumps(result))
     return 0
 
