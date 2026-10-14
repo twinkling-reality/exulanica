@@ -3,6 +3,7 @@
 import datetime as dt
 import uuid
 
+import psycopg
 import pytest
 from exulanica.db.roles import provision_runtime_role
 from exulanica.world.world_draft_contract import DEFINITION_PROFILE
@@ -148,3 +149,79 @@ def test_concurrent_actor_admission_across_workspaces_keeps_one_durable_start(dr
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(attempt, range(4)))
     assert results.count("accepted") == 1
+
+
+#: A deletion written while another transaction holds its workspace's lock (migration 0137).
+BUSY = "workspace in use; retry the deletion"
+
+
+def write_deletion(connection, workspace, actor):
+    """A capture's deletion, as one statement on its own connection: the tombstone migration
+    0137 refuses at once, 40001, while another transaction holds the workspace's lock."""
+    connection.execute(
+        "insert into tombstone (workspace_id, scope, capture_id, requested_by, reason) "
+        "values (%s, 'capture', %s, %s, 'world draft claim fixture')",
+        (workspace, uuid.uuid4(), actor),
+    )
+
+
+def test_an_idle_claim_takes_no_workspace_lock_so_a_deletion_is_not_refused_for_it(draft_db):
+    """The worker polls every workspace it watches twice a second. A poll that finds nothing to
+    claim is an observation, not a mutation: it holds no workspace lock, so a deletion written
+    while it is open is not refused "workspace in use", as the kind draft queue already holds."""
+    workspace, actor = uuid.uuid4(), uuid.uuid4()
+    with draft_db.session(workspace) as polling, draft_db.session(workspace) as deleting:
+        with polling.transaction():
+            assert WorldDraftRepository(polling, workspace).claim() is None
+            # The poll's transaction is still open: a lock it took would still be held.
+            write_deletion(deleting, workspace, actor)
+        assert (
+            deleting.execute(
+                "select count(*) as n from tombstone where workspace_id=%s", (workspace,)
+            ).fetchone()["n"]
+            == 1
+        )
+
+
+def test_a_claim_with_work_still_takes_the_workspace_lock_before_the_job(draft_db):
+    """The control: a claim that finds a job takes the workspace's lock first, as every writer
+    does, so a deletion meeting it is refused and sent again rather than racing the claim."""
+    workspace, actor = uuid.uuid4(), uuid.uuid4()
+    with draft_db.session(workspace) as polling, draft_db.session(workspace) as deleting:
+        repo = WorldDraftRepository(polling, workspace)
+        ident = submit(repo, actor, uuid.uuid4())
+        for provider in {p["provider"] for p in definition()["quote"]["providers"]}:
+            repo.attach_bound(actor, ident, provider, uuid.uuid4())
+        repo.enqueue(actor, ident)
+        with polling.transaction():
+            claimed = repo.claim()
+            assert claimed is not None and claimed.draft_id == ident
+            with pytest.raises(psycopg.errors.SerializationFailure, match=BUSY):
+                write_deletion(deleting, workspace, actor)
+        write_deletion(deleting, workspace, actor)
+
+
+def test_two_claims_racing_for_one_job_give_it_to_exactly_one(draft_db):
+    """Two workers claim the same workspace at once: the job goes to one of them, and the other
+    finds nothing to claim."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    workspace, actor = uuid.uuid4(), uuid.uuid4()
+    with draft_db.session(workspace) as connection:
+        repo = WorldDraftRepository(connection, workspace)
+        ident = submit(repo, actor, uuid.uuid4())
+        for provider in {p["provider"] for p in definition()["quote"]["providers"]}:
+            repo.attach_bound(actor, ident, provider, uuid.uuid4())
+        repo.enqueue(actor, ident)
+    start = Barrier(2)
+
+    def claim(_):
+        with draft_db.session(workspace) as connection:
+            start.wait(timeout=10)
+            return WorldDraftRepository(connection, workspace).claim()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claims = list(pool.map(claim, range(2)))
+    won = [one for one in claims if one is not None]
+    assert len(won) == 1 and won[0].draft_id == ident

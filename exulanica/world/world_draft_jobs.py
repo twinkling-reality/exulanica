@@ -234,20 +234,29 @@ class WorldDraftRepository:
             (self.workspace_id,),
         ).fetchall()
 
+    def _claimable(self, *, lock: bool = False) -> dict | None:
+        return self.connection.execute(
+            "select s.*,r.document,i.description,j.attempts "
+            "from world_draft_start s join world_draft_request r using(workspace_id,draft_id) "
+            "join world_draft_input i using(workspace_id,draft_id) "
+            "join job j on j.job_id=s.job_id "
+            "where s.workspace_id=%s and j.kind='world_draft' and "
+            "((j.state='queued' and j.run_after<=now()) or "
+            "(j.state='running' and j.lease_expires_at<now())) "
+            "order by s.started_at " + ("for update of j skip locked " if lock else "") + "limit 1",
+            (self.workspace_id,),
+        ).fetchone()
+
     def claim(self) -> ClaimedDraft | None:
         with self.connection.transaction():
+            # An idle poll is an observation, not a workspace mutation: it takes no workspace
+            # lock, so a deletion written meanwhile is not refused "workspace in use" (migration
+            # 0137), as the kind draft queue holds. A positive observation is only a hint:
+            # preserve workspace-before-job lock order and reread under that fence.
+            if self._claimable() is None:
+                return None
             self._live()
-            row = self.connection.execute(
-                "select s.*,r.document,i.description,j.attempts "
-                "from world_draft_start s join world_draft_request r using(workspace_id,draft_id) "
-                "join world_draft_input i using(workspace_id,draft_id) "
-                "join job j on j.job_id=s.job_id "
-                "where s.workspace_id=%s and j.kind='world_draft' and "
-                "((j.state='queued' and j.run_after<=now()) or "
-                "(j.state='running' and j.lease_expires_at<now())) "
-                "order by s.started_at for update of j skip locked limit 1",
-                (self.workspace_id,),
-            ).fetchone()
+            row = self._claimable(lock=True)
             if row is None:
                 return None
             token = uuid.uuid4()
