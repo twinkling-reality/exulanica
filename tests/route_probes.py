@@ -782,9 +782,12 @@ ROUTE_PROBES: Final[dict[tuple[str, str], dict[str, Any]]] = derive_probes(
 )
 
 #: Path parameters that are not identifiers, with the value the sweep sends. Each route checks these
-#: against a closed set before anything else, so an identifier there would be refused as malformed
-#: and the sweep would be asking the validator about the session rather than the route.
+#: against a closed set before anything else (a site's land chunk is a whole-number place on the
+#: tile grid, bounded by its path type), so an identifier there would be refused as malformed and
+#: the sweep would be asking the validator about the session rather than the route.
 _NON_IDENTIFIER_PARAMETERS: Final[Mapping[str, str]] = {
+    "chunk_x": "0",
+    "chunk_y": "0",
     "kind": "source",
     "role_key": decision_roles().deciding_for("person").key,
     "subject_kind": "avatar",
