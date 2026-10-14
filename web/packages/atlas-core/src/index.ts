@@ -746,3 +746,9 @@ export type { HeightfieldContact, HeightfieldContactDocument, HeightfieldContact
 
 export { terrainGroundPose, terrainMillimetres } from './navigation.js';
 export type { TerrainState, TerrainNavigation, TerrainGroundPose, TerrainOccupancyProof, VerifiedTerrainOccupancy } from './navigation.js';
+
+export {
+  LAND_BACKDROP_PROFILE, LAND_CELL_MM, LAND_CHUNK_MM, LAND_CHUNK_PROFILE, LAND_NEAR_BOUND_MM, LAND_SAMPLES_PER_SIDE,
+  LandformError, NearLand, backdropMeshData, chunkHeightMm, landChunkGeometry, landChunkLocal, readLandBackdrop, readLandChunk,
+} from './landform.js';
+export type { BackdropBlock, LandBackdrop, LandChunk, LandWater } from './landform.js';

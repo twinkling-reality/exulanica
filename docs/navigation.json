@@ -67,6 +67,7 @@
       "documents": [
         {"path": "grammar-package.md", "role": "contract", "owns": "Generator contract, seeds, city stages and the catalog envelope every data catalog uses"},
         {"path": "world-kinds-contract.md", "role": "contract", "owns": "World kinds as data: the kind document and its checks, the site grammar, a site world's people, receipt and drawing, and the kind routes"},
+        {"path": "landform-contract.md", "role": "contract", "owns": "A world's land as data: the landform document and catalogs, the integer realizer, near land chunks, the backdrop, water bodies, grading and their browser readers; nothing draws land yet"},
         {"path": "generated-corridor-street.md", "role": "reference", "owns": "Generated corridor structure and reproduction"},
         {"path": "generated-tile-runtime.md", "role": "contract", "owns": "Generated-tile loading, rendering and navigation in the development preview"},
         {"path": "representation-decisions.md", "role": "reference", "owns": "Generated-world representation decisions, supports and limits"},

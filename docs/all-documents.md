@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**112 documents** in the public catalog.
+**113 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -98,6 +98,7 @@ Generation vocabulary, world kinds and the site grammar, generated streets and t
 | --- | --- | --- |
 | [The generator system: `exulanica.grammar`](grammar-package.md) | contract | Generator contract, seeds, city stages and the catalog envelope every data catalog uses |
 | [World kinds](world-kinds-contract.md) | contract | World kinds as data: the kind document and its checks, the site grammar, a site world's people, receipt and drawing, and the kind routes |
+| [Landform](landform-contract.md) | contract | A world's land as data: the landform document and catalogs, the integer realizer, near land chunks, the backdrop, water bodies, grading and their browser readers; nothing draws land yet |
 | [The generated corridor: one street, from a seed](generated-corridor-street.md) | reference | Generated corridor structure and reproduction |
 | [Generated tile runtime](generated-tile-runtime.md) | contract | Generated-tile loading, rendering and navigation in the development preview |
 | [Generated-world representation decisions](representation-decisions.md) | reference | Generated-world representation decisions, supports and limits |
