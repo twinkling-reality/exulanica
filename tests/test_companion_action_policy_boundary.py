@@ -22,6 +22,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 #: The modules that plan world actions, read their outcome, and serve both.
 _ACTION_SOURCES = (
     _ROOT / "exulanica" / "selection" / "action_plan.py",
+    _ROOT / "exulanica" / "selection" / "action_vocabulary.py",
     _ROOT / "exulanica" / "selection" / "action_outcome.py",
     _ROOT / "exulanica" / "api" / "routes" / "selection_actions.py",
 )

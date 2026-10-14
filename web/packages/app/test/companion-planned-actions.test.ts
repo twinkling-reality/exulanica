@@ -23,6 +23,7 @@ const fixture = (name: string): unknown =>
 const plan = (name: string): ActionPlan => parseActionPlan(fixture(name));
 const responses = (name: string): unknown[] => (fixture(name) as { body: unknown }[]).map((row) => row.body);
 const planner = readFileSync(`${repository}/exulanica/selection/action_plan.py`, 'utf8');
+const vocabulary = readFileSync(`${repository}/exulanica/selection/action_vocabulary.py`, 'utf8');
 const routes = readFileSync(`${repository}/exulanica/api/routes/selection_actions.py`, 'utf8');
 const workspacePlanner = readFileSync(`${repository}/exulanica/selection/world_draft_plan.py`, 'utf8');
 const workspaceOperation = workspacePlanner.match(/^OPERATION = "([^"]+)"$/m)![1]!;
@@ -30,9 +31,9 @@ const workspaceProfile = workspacePlanner.match(/^PROFILE = "([^"]+)"$/m)![1]!;
 const workspaceWords = [...workspacePlanner.matchAll(/action=\{"operation": "([a-z_]+)"\}/g)].map((m) => m[1]!);
 
 function enumValues(name: string): string[] {
-  const start = planner.indexOf(`class ${name}(StrEnum):`);
-  const end = planner.indexOf('\n\n\n', start);
-  return [...planner.slice(start, end).matchAll(/^\s+[A-Z_]+ = "([a-z_]+)"$/gm)].map((m) => m[1]!);
+  const start = vocabulary.indexOf(`class ${name}(StrEnum):`);
+  const end = vocabulary.indexOf('\n\n\n', start);
+  return [...vocabulary.slice(start, end).matchAll(/^\s+[A-Z_]+ = "([a-z_]+)"$/gm)].map((m) => m[1]!);
 }
 
 describe('the planner’s vocabulary on the registry', () => {

@@ -223,9 +223,9 @@ describe('what the sheet says of a budget before the yes', () => {
     );
     expect(budgetQuestionWords('budget_period', {})).toBe(PLAN_CLARIFY_WORDS['budget_period']);
     expect(PLAN_CLARIFY_WORDS['budget_period']).toContain('I will not work an hour’s figure out of another span');
-    const planner = read('exulanica/selection/action_plan.py');
+    const vocabulary = read('exulanica/selection/action_vocabulary.py');
     for (const code of ['budget_required', 'budget_ambiguous', 'budget_period']) {
-      expect(planner).toContain(`"${code}"`);
+      expect(vocabulary).toContain(`"${code}"`);
       expect(PLAN_CLARIFY_WORDS[code], code).toBeTruthy();
     }
   });
@@ -248,7 +248,7 @@ describe('a living town taking its newcomers in, as a planned step', () => {
     const [step] = plan('take-in-plan').steps;
     expect(PLAN_ACTIONS['take_in']).toBe('people.take-in');
     expect(actionSpec('people.take-in').operation).toBe(TAKE_IN);
-    expect(read('exulanica/selection/action_plan.py')).toContain('TAKE_IN: Final = f"POST {_VERSION}/society/take-in"');
+    expect(read('exulanica/selection/action_vocabulary.py')).toContain('TAKE_IN: Final = f"POST {_VERSION}/society/take-in"');
     const built = plannedRequest(step!, []);
     if ('refused' in built) throw new Error(JSON.stringify(built.refused));
     expect(built.request.path).toBe('/world/versions/00000000-0000-0000-0000-000000000007/society/take-in');
@@ -259,8 +259,8 @@ describe('a living town taking its newcomers in, as a planned step', () => {
 
   it('has words for every loss and every thing kept that the planner states', () => {
     const [step] = plan('take-in-plan').steps;
-    const planner = read('exulanica/selection/action_plan.py');
-    const codes = (name: string): string[] => [...planner.slice(planner.indexOf(`${name}: Final = (`)).split(')')[0]!.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]!);
+    const vocabulary = read('exulanica/selection/action_vocabulary.py');
+    const codes = (name: string): string[] => [...vocabulary.slice(vocabulary.indexOf(`${name}: Final = (`)).split(')')[0]!.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]!);
     expect(step!.erases).toEqual({ undo: false, loses: codes('TAKE_IN_LOSES'), keeps: codes('TAKE_IN_KEEPS') });
     expect(step!.erases!.loses.length).toBe(7);
     expect(erasesWords(step!.erases!, 12)).toEqual([

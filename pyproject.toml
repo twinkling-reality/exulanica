@@ -1019,6 +1019,7 @@ type = "forbidden"
 source_modules = [
   "exulanica.selection.action_outcome",
   "exulanica.selection.action_plan",
+  "exulanica.selection.action_vocabulary",
   "exulanica.selection.environment_proposal",
   "exulanica.selection.proposal",
 ]

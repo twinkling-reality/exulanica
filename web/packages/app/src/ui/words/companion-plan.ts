@@ -1,7 +1,7 @@
 /**
  * What the Companion says about a plan it prepared: the sheet's words, a refusal by its code and a
  * clarification by its code (`ACTION_REFUSALS` and `CLARIFICATIONS` in
- * `exulanica/selection/action_plan.py`). Two sentences for a refusal, what happened and what to do
+ * `exulanica/selection/action_vocabulary.py`). Two sentences for a refusal, what happened and what to do
  * next (interface-system.md 5). Codes stay in the technical record; a code without words here
  * gets the general pair.
  */

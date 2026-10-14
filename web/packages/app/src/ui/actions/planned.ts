@@ -2,7 +2,7 @@
  * A Companion plan's steps, read as registry actions.
  *
  * Each step names a typed action (`place_object`, `advance` ...) from the planner's vocabulary
- * (`exulanica/selection/action_plan.py`). That word picks the registry entry, so a step and the
+ * (`exulanica/selection/action_vocabulary.py`). That word picks the registry entry, so a step and the
  * rail button or panel control for the same action share their words, icon, availability and
  * refusal words. The registry also picks the route: the request goes to the entry's own operation,
  * never to a route the plan names. The plan supplies only what fills that route: its path values,
