@@ -84,7 +84,8 @@ def workspace_status(
     providers: Iterable[str] | None = None,
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:
-    """The workspace's spending document: one entry per provider the manifest names."""
+    """The workspace's spending document: one entry per provider that bills
+    (``Manifest.billing_providers``); a provider on this computer bills nothing and has none."""
     with database.session(workspace_id) as connection:
         return read_workspace_status(connection, workspace_id, providers=providers, now=now)
 
@@ -112,7 +113,7 @@ def _entries(
     """One entry per provider. Without ``held`` the workspace's reservations are not read, and
     what they hold (in flight, unresolved, known usage, reconciled) is stated as nothing: what is
     left, and every state, comes from the grants alone."""
-    names = sorted(load_manifest().providers) if providers is None else sorted(providers)
+    names = sorted(load_manifest().billing_providers()) if providers is None else sorted(providers)
     row = connection.execute("select statement_timestamp() as t").fetchone()
     assert row is not None
     instant = now or row["t"]
@@ -340,7 +341,7 @@ class SpendingRefusals:
 def read_spending_refusals(
     connection: psycopg.Connection, workspace_id: uuid.UUID, *, witness_configured: bool
 ) -> SpendingRefusals:
-    """:func:`admission_refusal` for every provider the manifest names, read on ``connection``,
+    """:func:`admission_refusal` for every provider that bills, read on ``connection``,
     scoped to the workspace, from its grants alone: admission compares what is committed with
     each ceiling, so what its reservations hold is not read."""
     entries = _entries(connection, workspace_id, None, None, held=False)

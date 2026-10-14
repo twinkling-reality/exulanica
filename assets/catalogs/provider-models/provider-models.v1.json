@@ -503,6 +503,21 @@
       "source": "https://tokenfactory.nebius.com/api/public/models_info",
       "read_on": "2026-10-10",
       "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "ollama_local|exulanica-qwen3-4b-instruct-2507-nothink",
+      "provider": "ollama_local",
+      "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "tools"
+      ],
+      "licence_stated": "apache-2.0",
+      "licence_url": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/cdbee75f17c01a7cc42f958dc650907174af0554/LICENSE",
+      "source": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/cdbee75f17c01a7cc42f958dc650907174af0554/README.md",
+      "read_on": "2026-10-13",
+      "reason": "A model the shipped manifest declares on this computer: an Ollama alias of the library model qwen3:4b-instruct, which is Qwen/Qwen3-4B-Instruct-2507 quantized. Its use cases are the capabilities the Ollama server states for the alias (completion, read as text, and tools); its licence is the upstream README front matter at the revision the source names, which the library model's licence layer agrees with (docs/license-matrix.md section 3.7)."
     }
   ],
   "licence_classes": [
@@ -705,6 +720,14 @@
       "verdict": "CONDITIONAL",
       "matrix": "docs/license-matrix.md",
       "row": "`NousResearch/Hermes-4-405B`"
+    },
+    {
+      "provider": "ollama_local",
+      "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`exulanica-qwen3-4b-instruct-2507-nothink`"
     }
   ]
 }

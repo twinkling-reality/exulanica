@@ -1,0 +1,5854 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "calls": [
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 2827,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 132,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 182,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 129,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 191,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 151,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 754,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 684,
+        "line": "Hail, villager. I am the knight. I come in service of the path.",
+        "line_characters": 63,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 701,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 54,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 701,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek to understand this place.",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 752,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 720,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 774,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 694,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 674,
+        "line": "Greetings, villager. I\u2019ve just arrived. Is there a place where I might rest or find what I need?",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 753,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 691,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand the world we share.",
+        "line_characters": 104,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 787,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 751,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 789,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 726,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 749,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 691,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 770,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 664,
+        "line": "Hail, villager. I am the knight. I come in peace, and I seek to know the way forward.",
+        "line_characters": 85,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 773,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 694,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 623,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 46,
+            "prompt_tokens": 788,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 562,
+        "line": "Greetings, villager. I am the knight. I come in peace.",
+        "line_characters": 54,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 792,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 567,
+        "line": "Good morning, villager. The gate is open. You may pass if you wish.",
+        "line_characters": 67,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 615,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 806,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 367,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 806,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 215,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 326,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 216,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 326,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 216,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1052,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 750,
+        "line": "Hail, villagers! I am the knight, and I stand here to protect and serve. I see you all, and I am ready to assist.",
+        "line_characters": 113,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1092,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 793,
+        "line": "Hail, villagers. I am the knight, and I stand here with purpose. I will protect this place, and I will listen to your needs.",
+        "line_characters": 124,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1090,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 782,
+        "line": "Hail, villagers. I am the knight, and I stand at the gate. I will protect this place, and I will listen to your needs.",
+        "line_characters": 118,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1048,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 791,
+        "line": "Hail, villagers! I am the knight, and I stand here to protect this land. I see you all, and I am ready to serve.",
+        "line_characters": 112,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1089,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 751,
+        "line": "Hail, villagers. I am the knight, and I stand here with purpose. I will protect this place, and I will listen to your needs.",
+        "line_characters": 124,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1091,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 651,
+        "line": "Hail, villagers. I am the knight, and I stand guard at the gate. I will protect this place, and I will answer your calls.",
+        "line_characters": 121,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 1049,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 736,
+        "line": "Greetings, villager. I am the knight. I come to protect this place.",
+        "line_characters": 67,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 31,
+            "prompt_tokens": 1102,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "by a tree, 2 m away",
+        "chose_kind": "target",
+        "latency_ms": 529,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 31,
+            "prompt_tokens": 1104,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "by a tree, 2 m away",
+        "chose_kind": "target",
+        "latency_ms": 538,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 1042,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 737,
+        "line": "Greetings, villager. I am the knight. I come to protect this place.",
+        "line_characters": 67,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 1082,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 723,
+        "line": "Hail, villager. I am the knight. What brings you here?",
+        "line_characters": 54,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 51,
+            "prompt_tokens": 1085,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 687,
+        "line": "Hear me, all of you. I am the knight, and I stand here to protect this place.",
+        "line_characters": 77,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 65,
+            "prompt_tokens": 1077,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 826,
+        "line": "Hail, fellow citizen. I am a knight, and I have just arrived. What is the state of the village?",
+        "line_characters": 95,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 64,
+            "prompt_tokens": 1117,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 808,
+        "line": "Greetings, villager. I am a knight, and I have just arrived. What is the state of the village?",
+        "line_characters": 94,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 1122,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 739,
+        "line": "Hail, villager. I am the knight. What brings you here?",
+        "line_characters": 54,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 64,
+            "prompt_tokens": 1077,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 785,
+        "line": "Hail, fellow citizen. I am the knight, and I stand at the gate. What news do you bring?",
+        "line_characters": 87,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 3948,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 4418,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 3944,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4415,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 3877,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4410,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 754,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 5924,
+        "line": "Hail, villager. I am the knight. I come in service of the path.",
+        "line_characters": 63,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 6190,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 54,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2876,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek to understand this place.",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 752,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3476,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 774,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2858,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3042,
+        "line": "Greetings, villager. I\u2019ve just arrived. Is there a place where I might rest or find what I need?",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 753,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3420,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand the world we share.",
+        "line_characters": 104,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 787,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2324,
+        "line": "Greetings, villager. I\u2019ve just arrived, and I hope to serve you well.",
+        "line_characters": 69,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 789,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3260,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 749,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3030,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 770,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2805,
+        "line": "Hail, villager. I am the knight. I come in peace, and I seek to know the way forward.",
+        "line_characters": 85,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 773,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2991,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2730,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 788,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2333,
+        "line": "Greetings, villager. The gate stands open, and I have just arrived. Is there a path forward you might show me?",
+        "line_characters": 110,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 792,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2037,
+        "line": "Good morning, villager. The gate is open. You may pass if you wish.",
+        "line_characters": 67,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1924,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 1248,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 1257,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1255,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1242,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1251,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1240,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 754,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3160,
+        "line": "Hail, villager. I am the knight. I come in service of the path.",
+        "line_characters": 63,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3466,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 54,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3006,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek to understand this place.",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 752,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3598,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 774,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3041,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3070,
+        "line": "Greetings, villager. I\u2019ve just arrived. Is there a place where I might rest or find what I need?",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 753,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3571,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand the world we share.",
+        "line_characters": 104,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 787,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2705,
+        "line": "Greetings, villager. I\u2019ve just arrived, and I hope to serve you well.",
+        "line_characters": 69,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 789,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3035,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 749,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2801,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 770,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2688,
+        "line": "Hail, villager. I am the knight. I come in peace, and I seek to know the way forward.",
+        "line_characters": 85,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 773,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2697,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2511,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 788,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2546,
+        "line": "Greetings, villager. The gate stands open, and I have just arrived. Is there a path forward you might show me?",
+        "line_characters": 110,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 792,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1903,
+        "line": "Good morning, villager. The gate is open. You may pass if you wish.",
+        "line_characters": 67,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2056,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 2872,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 141,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 199,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 142,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 201,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 152,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 754,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 588,
+        "line": "Hail, villager. I am the knight. I come in service of the path.",
+        "line_characters": 63,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 626,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 54,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 635,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek to understand this place.",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 752,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 712,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 774,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 690,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 758,
+        "line": "Greetings, villager. I\u2019ve just arrived. Is there a place where I might rest or find what I need?",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 753,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 733,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand the world we share.",
+        "line_characters": 104,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 787,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 774,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 789,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 778,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 749,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 757,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 770,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 736,
+        "line": "Hail, villager. I am the knight. I come in peace, and I seek to know the way forward.",
+        "line_characters": 85,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 773,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 786,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 708,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 46,
+            "prompt_tokens": 788,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 646,
+        "line": "Greetings, villager. I am the knight. I come in peace.",
+        "line_characters": 54,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 792,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 682,
+        "line": "Good morning, villager. The gate is open. You may pass if you wish.",
+        "line_characters": 67,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 716,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 806,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 419,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 806,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 255,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 377,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 265,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 376,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 22,
+            "prompt_tokens": 802,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 244,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1052,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 845,
+        "line": "Hail, villagers! I am the knight, and I stand here to protect and serve. I see you all, and I am ready to assist.",
+        "line_characters": 113,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1092,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 879,
+        "line": "Hail, villagers. I am the knight, and I stand here with purpose. I will protect this place, and I will listen to your needs.",
+        "line_characters": 124,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1090,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 862,
+        "line": "Hail, villagers. I am the knight, and I stand at the gate. I will protect this place, and I will listen to your needs.",
+        "line_characters": 118,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1048,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 867,
+        "line": "Hail, villagers! I am the knight, and I stand here to protect this land. I see you all, and I am ready to serve.",
+        "line_characters": 112,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1089,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 875,
+        "line": "Hail, villagers. I am the knight, and I stand here with purpose. I will protect this place, and I will listen to your needs.",
+        "line_characters": 124,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 60,
+            "prompt_tokens": 1091,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 748,
+        "line": "Hail, villagers. I am the knight, and I stand guard at the gate. I will protect this place, and I will answer your calls.",
+        "line_characters": 121,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 1049,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 825,
+        "line": "Greetings, villager. I am the knight. I come to protect this place.",
+        "line_characters": 67,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 31,
+            "prompt_tokens": 1102,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "by a tree, 2 m away",
+        "chose_kind": "target",
+        "latency_ms": 575,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 31,
+            "prompt_tokens": 1104,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "by a tree, 2 m away",
+        "chose_kind": "target",
+        "latency_ms": 565,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 1042,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 829,
+        "line": "Greetings, villager. I am the knight. I come to protect this place.",
+        "line_characters": 67,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 1082,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 832,
+        "line": "Hail, villager. I am the knight. What brings you here?",
+        "line_characters": 54,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 51,
+            "prompt_tokens": 1085,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 778,
+        "line": "Hear me, all of you. I am the knight, and I stand here to protect this place.",
+        "line_characters": 77,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 65,
+            "prompt_tokens": 1077,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 921,
+        "line": "Hail, fellow citizen. I am a knight, and I have just arrived. What is the state of the village?",
+        "line_characters": 95,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 64,
+            "prompt_tokens": 1117,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 956,
+        "line": "Greetings, villager. I am a knight, and I have just arrived. What is the state of the village?",
+        "line_characters": 94,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 1122,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 871,
+        "line": "Hail, villager. I am the knight. What brings you here?",
+        "line_characters": 54,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 64,
+            "prompt_tokens": 1077,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 920,
+        "line": "Hail, fellow citizen. I am the knight, and I stand at the gate. What news do you bring?",
+        "line_characters": 87,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 4781,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 4800,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4791,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4767,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4596,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4759,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 754,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 6366,
+        "line": "Hail, villager. I am the knight. I come in service of the path.",
+        "line_characters": 63,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 6651,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 54,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2580,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek to understand this place.",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 752,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3405,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 774,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2861,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2856,
+        "line": "Greetings, villager. I\u2019ve just arrived. Is there a place where I might rest or find what I need?",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 753,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2926,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand the world we share.",
+        "line_characters": 104,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 787,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2349,
+        "line": "Greetings, villager. I\u2019ve just arrived, and I hope to serve you well.",
+        "line_characters": 69,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 789,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3070,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 749,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2844,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 770,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2571,
+        "line": "Hail, villager. I am the knight. I come in peace, and I seek to know the way forward.",
+        "line_characters": 85,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 773,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2672,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2194,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 788,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2243,
+        "line": "Greetings, villager. The gate stands open, and I have just arrived. Is there a path forward you might show me?",
+        "line_characters": 110,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 792,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2032,
+        "line": "Good morning, villager. The gate is open. You may pass if you wish.",
+        "line_characters": 67,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1718,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 1119,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 570,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "wait here a minute",
+        "chose_kind": "wait",
+        "latency_ms": 1132,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1133,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1122,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1126,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 568,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 1112,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 754,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2780,
+        "line": "Hail, villager. I am the knight. I come in service of the path.",
+        "line_characters": 63,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3082,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 54,
+            "prompt_tokens": 775,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2735,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek to understand this place.",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 752,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3277,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 774,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2757,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2751,
+        "line": "Greetings, villager. I\u2019ve just arrived. Is there a place where I might rest or find what I need?",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 753,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3225,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand the world we share.",
+        "line_characters": 104,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 787,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2432,
+        "line": "Greetings, villager. I\u2019ve just arrived, and I hope to serve you well.",
+        "line_characters": 69,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 789,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2943,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 59,
+            "prompt_tokens": 749,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2692,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to know what is needed of me here.",
+        "line_characters": 105,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 56,
+            "prompt_tokens": 770,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2504,
+        "line": "Hail, villager. I am the knight. I come in peace, and I seek to know the way forward.",
+        "line_characters": 85,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 62,
+            "prompt_tokens": 773,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2483,
+        "line": "Greetings, villager. I am the knight. I have just arrived, and I see you are waiting. Is there a need for me to assist?",
+        "line_characters": 119,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2292,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 57,
+            "prompt_tokens": 788,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2350,
+        "line": "Greetings, villager. The gate stands open, and I have just arrived. Is there a path forward you might show me?",
+        "line_characters": 110,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 49,
+            "prompt_tokens": 792,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1765,
+        "line": "Good morning, villager. The gate is open. You may pass if you wish.",
+        "line_characters": 67,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 767,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1909,
+        "line": "Greetings, villager. I am the knight. I come in peace, and I seek only to understand this place.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-qwen3-4b-instruct-2507-nothink",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 4870,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 225,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 19,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 395,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 19,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 317,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 303,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 239,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 842,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 44,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 922,
+        "line": "Hear ye, villagers! I am the knight, here to serve and protect. What brings you to this gathering?",
+        "line_characters": 98,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 993,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. What brings you to this gathering?",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1049,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1022,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 978,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 965,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1189,
+        "line": "Hear ye, all who dwell near the tree! I am the armoured knight, here to serve and protect. Let us proceed with the day's tasks.",
+        "line_characters": 127,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 43,
+            "prompt_tokens": 779,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1031,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this quiet glen?",
+        "line_characters": 87,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 44,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1038,
+        "line": "Hear ye, villagers! I am here to serve and protect. Let us begin our day with purpose and vigor.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 991,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1002,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. What brings you to this gathering?",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 44,
+            "prompt_tokens": 755,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1040,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with purpose and vigor.",
+        "line_characters": 101,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 777,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 993,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 781,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1081,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 755,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1088,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 28,
+            "prompt_tokens": 798,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "resting on a bench, 14 m away",
+        "chose_kind": "target",
+        "latency_ms": 824,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 28,
+            "prompt_tokens": 798,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "resting on a bench, 14 m away",
+        "chose_kind": "target",
+        "latency_ms": 526,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 28,
+            "prompt_tokens": 798,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 839,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 28,
+            "prompt_tokens": 798,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 618,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 28,
+            "prompt_tokens": 798,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "resting on a bench, 10 m away",
+        "chose_kind": "target",
+        "latency_ms": 888,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 28,
+            "prompt_tokens": 798,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "resting on a bench, 10 m away",
+        "chose_kind": "target",
+        "latency_ms": 678,
+        "line": null,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 51,
+            "prompt_tokens": 1033,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1634,
+        "line": "Hear ye, fellow travelers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 93,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1073,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1674,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with courage and unity.",
+        "line_characters": 101,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1076,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1679,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with courage and honor.",
+        "line_characters": 101,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1033,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1588,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with courage and unity.",
+        "line_characters": 101,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 1073,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1612,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1076,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1385,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with courage and unity.",
+        "line_characters": 101,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 46,
+            "prompt_tokens": 1033,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1391,
+        "line": "Hear ye, all! I am the knight, here to serve and protect.",
+        "line_characters": 57,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 1090,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1465,
+        "line": "Hear ye, all! I am here to serve and protect. Let us proceed with our day.",
+        "line_characters": 74,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1093,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1643,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with courage and unity.",
+        "line_characters": 101,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 50,
+            "prompt_tokens": 1033,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1442,
+        "line": "Hear ye, all! I am here to serve and protect. Let us proceed with our tasks.",
+        "line_characters": 76,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1073,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1572,
+        "line": "Hear ye, all! I am the knight, here to serve and protect. Let us proceed with our day.",
+        "line_characters": 86,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 1076,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1445,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with courage and unity.",
+        "line_characters": 101,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 1064,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1692,
+        "line": "Hail, good villager! I am here to serve and protect.",
+        "line_characters": 52,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 52,
+            "prompt_tokens": 1104,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1547,
+        "line": "Greetings, ari! How may I assist you today?",
+        "line_characters": 43,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 51,
+            "prompt_tokens": 1109,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 1629,
+        "line": "Hear ye, ye villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 89,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 55,
+            "prompt_tokens": 1064,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 1582,
+        "line": "Hail, good villager! I am here to serve and protect.",
+        "line_characters": 52,
+        "mechanism": "tool_call",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "one_at_a_time",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 8441,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 7475,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 19,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 9274,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 19,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 9339,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 7919,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 8356,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 11085,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 11179,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4933,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. What brings you to this gathering?",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4618,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4876,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4870,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 46,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 5127,
+        "line": "Hear ye, villagers! I have arrived, weary but ready to serve. Let us begin the day with purpose and vigor.",
+        "line_characters": 106,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 5817,
+        "line": "Hear ye, all who dwell near the tree! I am the armoured knight, here to serve and protect. Let us proceed with the day's tasks.",
+        "line_characters": 127,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 43,
+            "prompt_tokens": 779,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4937,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this quiet glen?",
+        "line_characters": 87,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4764,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4231,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4185,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. What brings you to this gathering?",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 44,
+            "prompt_tokens": 755,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 3710,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with purpose and vigor.",
+        "line_characters": 101,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 777,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3571,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 781,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2862,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 755,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2291,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_cold",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 1,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 2192,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 2,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 2175,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 19,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 3,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 3587,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 19,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 4,
+        "chose": "resting on a bench, 8 m away",
+        "chose_kind": "target",
+        "latency_ms": 3526,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 5,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 2226,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 13,
+            "prompt_tokens": 558,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 6,
+        "chose": "stand a while nearby",
+        "chose_kind": "stand",
+        "latency_ms": 2214,
+        "line": null,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": false
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 7,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 5380,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 8,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 5366,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 9,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4539,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. What brings you to this gathering?",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 10,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4528,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 11,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4528,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 12,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4521,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 13,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4524,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 53,
+            "prompt_tokens": 776,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 14,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 5501,
+        "line": "Hear ye, all who dwell near the tree! I am the armoured knight, here to serve and protect. Let us proceed with the day's tasks.",
+        "line_characters": 127,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 43,
+            "prompt_tokens": 779,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 15,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4668,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this quiet glen?",
+        "line_characters": 87,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 44,
+            "prompt_tokens": 739,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 16,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4736,
+        "line": "Hear ye, villagers! I am here to serve and protect. Let us begin our day with purpose and vigor.",
+        "line_characters": 96,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 761,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 17,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4238,
+        "line": "Hear ye, villagers! I am here to serve and protect. What brings you to this gathering?",
+        "line_characters": 86,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 41,
+            "prompt_tokens": 764,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 18,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4234,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. What brings you to this gathering?",
+        "line_characters": 91,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 44,
+            "prompt_tokens": 755,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 19,
+        "chose": "say something to everyone near you",
+        "chose_kind": "say_all",
+        "latency_ms": 4404,
+        "line": "Hear ye, villagers! I have arrived to serve and protect. Let us begin the day with purpose and vigor.",
+        "line_characters": 101,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 777,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 20,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 4273,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 781,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 21,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 3234,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      },
+      {
+        "attempts": [
+          {
+            "completion_tokens": 42,
+            "prompt_tokens": 755,
+            "usd": "0E-8"
+          }
+        ],
+        "case": 22,
+        "chose": "say something to ari ash 1 (a villager), 2 m away",
+        "chose_kind": "say_to",
+        "latency_ms": 2458,
+        "line": "Greetings, traveler! How may I assist you today?",
+        "line_characters": 48,
+        "mechanism": "json_schema",
+        "model_id": "exulanica-granite-4.1-8b",
+        "outcome": "offered_label_with_line",
+        "phase": "eight_warm",
+        "served_model_id": "exulanica-granite-4.1-8b",
+        "takes_line": true
+      }
+    ],
+    "chosen": {
+      "chosen": "exulanica-qwen3-4b-instruct-2507-nothink",
+      "eligible": [
+        "exulanica-qwen3-4b-instruct-2507-nothink",
+        "exulanica-qwen3-4b-instruct-2507",
+        "exulanica-granite-4.1-8b"
+      ]
+    },
+    "manifest_sha256": "5f9ae23d474cf34baca276ecc6eb1d4b6d5be2ae60a5af145e0f64f9a4a12b24",
+    "memory": {
+      "exulanica-granite-4.1-8b": [
+        {
+          "context_length": 16384,
+          "name": "exulanica-granite-4.1-8b:latest",
+          "size": 27551313427,
+          "size_vram": 27551313427
+        }
+      ],
+      "exulanica-qwen3-4b-instruct-2507": [
+        {
+          "context_length": 16384,
+          "name": "exulanica-qwen3-4b-instruct-2507:latest",
+          "size": 22735497461,
+          "size_vram": 22735497461
+        }
+      ],
+      "exulanica-qwen3-4b-instruct-2507-nothink": [
+        {
+          "context_length": 16384,
+          "name": "exulanica-qwen3-4b-instruct-2507-nothink:latest",
+          "size": 22735497461,
+          "size_vram": 22735497461
+        }
+      ]
+    },
+    "preregistration": ".exulanica/laptop-probe/preregistration.json",
+    "preregistration_record_sha256": "993b43972ad967808cdcc004f0bae5b75133859e51810ffa649f7f7fe129fa3f",
+    "repeated": {
+      "exulanica-granite-4.1-8b": {
+        "compared": 22,
+        "same_label": 22
+      },
+      "exulanica-qwen3-4b-instruct-2507": {
+        "compared": 22,
+        "same_label": 22
+      },
+      "exulanica-qwen3-4b-instruct-2507-nothink": {
+        "compared": 22,
+        "same_label": 22
+      }
+    },
+    "script_as_run": ".exulanica/laptop-probe/measure_laptop_mind_probe-as-run.py.txt",
+    "script_sha256": "f780f97c91a5eb84bb18a8a6089f3dd4dd38031429133964ed09bfc7294a1504",
+    "served": {
+      "candidates": {
+        "exulanica-granite-4.1-8b": {
+          "capabilities": [
+            "completion",
+            "tools"
+          ],
+          "details": {
+            "context_length": 131072,
+            "embedding_length": 4096,
+            "families": [
+              "granite"
+            ],
+            "family": "granite",
+            "format": "gguf",
+            "parameter_size": "8.8B",
+            "parent_model": "granite4.1:8b",
+            "quantization_level": "Q4_K_M"
+          },
+          "digest": "1307327b3fa25f983e194524074217a8a440e0bf21dc0fc4c87c0648f15af625",
+          "from_digest": "444af1c4b2fedd6b54041aca558e7300b0b3d5c0468c44619126240323ba2852",
+          "parameters": "num_ctx                        16384",
+          "recipe": {
+            "from": "granite4.1:8b",
+            "parameters": {
+              "num_ctx": 16384
+            }
+          }
+        },
+        "exulanica-qwen3-4b-instruct-2507": {
+          "capabilities": [
+            "tools",
+            "thinking",
+            "completion"
+          ],
+          "details": {
+            "context_length": 262144,
+            "embedding_length": 2560,
+            "families": [
+              "qwen3"
+            ],
+            "family": "qwen3",
+            "format": "gguf",
+            "parameter_size": "4.0B",
+            "parent_model": "qwen3:4b-instruct",
+            "quantization_level": "Q4_K_M"
+          },
+          "digest": "8b939f12b0f9fcea23fc6b3d4b387e76fd2314f66a755119a4b8246c4991f445",
+          "from_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+          "parameters": "num_ctx                        16384\nrepeat_penalty                 1\nstop                           \"<|im_start|>\"\nstop                           \"<|im_end|>\"\ntemperature                    0.7\ntop_k                          20\ntop_p                          0.8",
+          "recipe": {
+            "from": "qwen3:4b-instruct",
+            "parameters": {
+              "num_ctx": 16384
+            }
+          }
+        },
+        "exulanica-qwen3-4b-instruct-2507-nothink": {
+          "capabilities": [
+            "completion",
+            "tools"
+          ],
+          "details": {
+            "context_length": 262144,
+            "embedding_length": 2560,
+            "families": [
+              "qwen3"
+            ],
+            "family": "qwen3",
+            "format": "gguf",
+            "parameter_size": "4.0B",
+            "parent_model": "qwen3:4b-instruct",
+            "quantization_level": "Q4_K_M"
+          },
+          "digest": "a8aa49bc70ee2d052c659a0b211c64924803447256f988081e1a4675d20d7e3a",
+          "from_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+          "parameters": "num_ctx                        16384\nrepeat_penalty                 1\nstop                           \"<|im_start|>\"\nstop                           \"<|im_end|>\"\ntemperature                    0.7\ntop_k                          20\ntop_p                          0.8",
+          "recipe": {
+            "from": "qwen3:4b-instruct",
+            "parameters": {
+              "num_ctx": 16384
+            },
+            "parser": "qwen3-vl-instruct",
+            "renderer": "qwen3-vl-instruct"
+          }
+        }
+      },
+      "version": "0.34.4"
+    },
+    "spent_usd": "0E-8",
+    "stopped": null,
+    "timing": {
+      "exulanica-granite-4.1-8b": {
+        "json_schema": {
+          "eight_cold": {
+            "asks": 22,
+            "completion_tokens_longest": 53,
+            "completion_tokens_median": 41,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 8441,
+            "longest_ms": 11179,
+            "p50_ms": 4933,
+            "p95_ms": 11085
+          },
+          "eight_warm": {
+            "asks": 22,
+            "completion_tokens_longest": 53,
+            "completion_tokens_median": 41,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 2192,
+            "longest_ms": 5501,
+            "p50_ms": 4273,
+            "p95_ms": 5380
+          },
+          "one_at_a_time": {
+            "asks": 22,
+            "completion_tokens_longest": 53,
+            "completion_tokens_median": 41,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 4870,
+            "longest_ms": 4870,
+            "p50_ms": 993,
+            "p95_ms": 1189
+          }
+        },
+        "tool_call": {
+          "one_at_a_time": {
+            "asks": 22,
+            "completion_tokens_longest": 55,
+            "completion_tokens_median": 51,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 824,
+            "longest_ms": 1692,
+            "p50_ms": 1465,
+            "p95_ms": 1679
+          }
+        }
+      },
+      "exulanica-qwen3-4b-instruct-2507": {
+        "json_schema": {
+          "eight_cold": {
+            "asks": 22,
+            "completion_tokens_longest": 62,
+            "completion_tokens_median": 55,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 3948,
+            "longest_ms": 6190,
+            "p50_ms": 3042,
+            "p95_ms": 5924
+          },
+          "eight_warm": {
+            "asks": 22,
+            "completion_tokens_longest": 62,
+            "completion_tokens_median": 55,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 1248,
+            "longest_ms": 3598,
+            "p50_ms": 2688,
+            "p95_ms": 3571
+          },
+          "one_at_a_time": {
+            "asks": 22,
+            "completion_tokens_longest": 62,
+            "completion_tokens_median": 55,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 2827,
+            "longest_ms": 2827,
+            "p50_ms": 674,
+            "p95_ms": 751
+          }
+        },
+        "tool_call": {
+          "one_at_a_time": {
+            "asks": 22,
+            "completion_tokens_longest": 65,
+            "completion_tokens_median": 56,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 367,
+            "longest_ms": 826,
+            "p50_ms": 723,
+            "p95_ms": 808
+          }
+        }
+      },
+      "exulanica-qwen3-4b-instruct-2507-nothink": {
+        "json_schema": {
+          "eight_cold": {
+            "asks": 22,
+            "completion_tokens_longest": 62,
+            "completion_tokens_median": 55,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 4781,
+            "longest_ms": 6651,
+            "p50_ms": 2861,
+            "p95_ms": 6366
+          },
+          "eight_warm": {
+            "asks": 22,
+            "completion_tokens_longest": 62,
+            "completion_tokens_median": 55,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 1119,
+            "longest_ms": 3277,
+            "p50_ms": 2432,
+            "p95_ms": 3225
+          },
+          "one_at_a_time": {
+            "asks": 22,
+            "completion_tokens_longest": 62,
+            "completion_tokens_median": 55,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 2872,
+            "longest_ms": 2872,
+            "p50_ms": 690,
+            "p95_ms": 786
+          }
+        },
+        "tool_call": {
+          "one_at_a_time": {
+            "asks": 22,
+            "completion_tokens_longest": 65,
+            "completion_tokens_median": 56,
+            "deadline_ms": 20000,
+            "ended_by_deadline": 0,
+            "exact": 22,
+            "first_ms": 419,
+            "longest_ms": 956,
+            "p50_ms": 825,
+            "p95_ms": 921
+          }
+        }
+      }
+    },
+    "tree": {
+      "files_sha256": {
+        "exulanica/api/services.py": "d26ec2f2506626b8433739e44c77b8117815df48908882d073a1a51b88a5697e",
+        "exulanica/models/chain.py": "0661b6f23ce424f03b75ff56132095096ab9a3faad7f234ae53f3e35b325ac45",
+        "exulanica/models/client.py": "71013adf54ed3440655854603a3bad4200a56ef55e5159f7e1d4237d3e13f004",
+        "exulanica/models/manifest.py": "830c76c1ef6d58e8ce749a02c5791234bb029e6f64ac3641eac548196afb96cd",
+        "exulanica/models/models.manifest.json": "5f9ae23d474cf34baca276ecc6eb1d4b6d5be2ae60a5af145e0f64f9a4a12b24",
+        "exulanica/models/preflight.py": "e3b6d7e20980c9bc722d4bbb94684cdbc6faa493c056fc5b21acadcf5d05e01f",
+        "scripts/measure_laptop_mind_probe.py": "f780f97c91a5eb84bb18a8a6089f3dd4dd38031429133964ed09bfc7294a1504",
+        "tests/test_egress_allowlist.py": "ef0ff335d0fc5983bea09e123178b1c483dcb2965f74d4bbc039251cc7a50981",
+        "tests/test_models_manifest.py": "fcc06d2397d095a82babd8ee4e58974e3256b354388cba1bcef4a06d0b0fbef0"
+      },
+      "head": "6d691c6e857b13ef1a461799c8802e89b9097eb3"
+    },
+    "verdicts": {
+      "exulanica-granite-4.1-8b": {
+        "json_schema": {
+          "answers_lines": true,
+          "line_asked": 16,
+          "line_exact": 16,
+          "plain_asked": 6,
+          "plain_named_a_label": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "answers_lines": true,
+          "line_asked": 16,
+          "line_exact": 16,
+          "plain_asked": 6,
+          "plain_named_a_label": 6,
+          "verified": true
+        }
+      },
+      "exulanica-qwen3-4b-instruct-2507": {
+        "json_schema": {
+          "answers_lines": true,
+          "line_asked": 16,
+          "line_exact": 16,
+          "plain_asked": 6,
+          "plain_named_a_label": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "answers_lines": true,
+          "line_asked": 16,
+          "line_exact": 16,
+          "plain_asked": 6,
+          "plain_named_a_label": 6,
+          "verified": true
+        }
+      },
+      "exulanica-qwen3-4b-instruct-2507-nothink": {
+        "json_schema": {
+          "answers_lines": true,
+          "line_asked": 16,
+          "line_exact": 16,
+          "plain_asked": 6,
+          "plain_named_a_label": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "answers_lines": true,
+          "line_asked": 16,
+          "line_exact": 16,
+          "plain_asked": 6,
+          "plain_named_a_label": 6,
+          "verified": true
+        }
+      }
+    }
+  },
+  "record_sha256": "afece9f2cea8fe72c6139f12e3c70865ba8827485d54147372740b09700af713"
+}

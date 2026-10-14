@@ -58,7 +58,7 @@ from exulanica.world.society_planner import (
 from exulanica.world.society_presence import change_presence, presence_request
 
 import living_square_support as square
-from model_fakes import FakeTransport, RecordingPolicy, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body, hosted_only
 
 SEED = square.DEVELOPMENT_SEEDS[0]
 PROBE_RECORD = "docs/evaluation/2026-09-25-society-person-models-probe.json"
@@ -660,10 +660,13 @@ def test_a_refusal_is_decided_on_money_spent_never_on_calls_under_way():
     host neither refuses for it nor lets a refusal come and go with it: once spending leaves too
     little, the refusal holds until the process restarts."""
     from exulanica.api.decision_host import host_refusal, smallest_ask_usd
-    from exulanica.models.manifest import Role, load_manifest
+    from exulanica.models.manifest import MANIFEST_PATH, Role, parse_manifest
     from exulanica.models.usage import CallUsage
 
-    manifest = load_manifest()
+    # Every model offered a hosted one with a price: a free ask always fits (``hosted_only``).
+    manifest = parse_manifest(
+        hosted_only(json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal))
+    )
     contract = decision_contract()
     smallest = smallest_ask_usd(
         person_role(), BudgetGuard(ceiling_usd=Decimal(1), max_calls=10), manifest, contract

@@ -349,9 +349,11 @@ def guest_entry(
 def _grant_guest(
     request: Request, workspace_id: uuid.UUID, *, providers: list[str] | None = None
 ) -> list[dict[str, str]]:
-    """The workspace's allowance from every provider with a guest policy. A refusal, or a failure
-    of any kind, leaves the workspace without one on that provider and is answered by provider and
-    code (a failure by its class alone, never its text); the entry stands."""
+    """The workspace's allowance from every provider with a guest policy, of the providers that
+    bill (``Manifest.billing_providers``): a provider on this computer bills nothing and asks no
+    allowance. A refusal, or a failure of any kind, leaves the workspace without one on that
+    provider and is answered by provider and code (a failure by its class alone, never its text);
+    the entry stands."""
     from exulanica.models.manifest import load_manifest
 
     spending = getattr(request.app.state.services, "spending", None)
@@ -360,7 +362,7 @@ def _grant_guest(
     problems: list[dict[str, str]] = []
     if providers is None:
         try:
-            providers = list(load_manifest().providers)
+            providers = list(load_manifest().billing_providers())
         except Exception as exc:
             _LOG.warning("the model manifest could not be read: %s", type(exc).__qualname__)
             return [{"provider": "*", "code": "allowance_failed"}]

@@ -36,7 +36,7 @@ from exulanica.world.society_hands import approach_mm
 import test_society_person_decisions_postgres as decisions
 import test_society_stay_requests_api as stays
 import test_society_things_postgres as things_api
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, as_hosted_deployment, chat_body
 from society_seed_support import choose_society_seed
 from test_society_saved_world_api import OWNER, routes
 
@@ -283,7 +283,8 @@ def test_the_models_reads_judge_the_budget_by_the_terms_a_society_of_things_asks
     model_client = ModelClient(
         api_key="test-key-not-real",
         manifest=manifest,
-        transport=_Hands(),
+        # A hosted deployment's client, which refuses the free model on this computer.
+        transport=as_hosted_deployment(_Hands()),
         budget=BudgetGuard(ceiling_usd=ceiling, max_calls=100),
     )
     client.app.state.services = dataclasses.replace(

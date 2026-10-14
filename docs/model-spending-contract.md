@@ -49,6 +49,13 @@ admission:
   [comparisons](society-experiments.md#running-a-comparison)). A start whose bound or calls the
   grant has not left room for is refused before anything is written; it is never given a smaller
   bound. Whole-world drafts also open provider bounds under their accepted operation sheet.
+- **Providers that bill.** Every level names a provider that bills: one that takes a credential
+  (`Manifest.billing_providers`). A provider on this computer, an Ollama server that takes no
+  credential and whose every model the manifest prices at 0, bills nothing: no authority, grant,
+  bound, guest allowance or spending read names it, and an attempt to it asks the authority
+  nothing, while the process's fuse still reserves and counts it
+  ([a model on this computer](model-and-service-selection.md#a-model-on-this-computer)).
+  VERIFIED (`tests/test_laptop_models.py`).
 
 A whole-world draft (`GET /worlds/drafts`) quotes fresh provider rates separately from its
 operation ceiling. The ceiling covers full admitted input contexts, actual output limits,

@@ -295,6 +295,17 @@ class EgressAllowlist:
             return False
         return True
 
+    def declares(self, url: str) -> bool:
+        """Whether this list declares ``url``'s origin, read in the list's own spelling, logging
+        nothing. For a component asking whether an optional destination is configured, such as a
+        model server on this computer a deployment may not run: an undeclared one there is a
+        setting, not an attempt to leave, and is never logged as the alert a refusal is."""
+        try:
+            (origin,) = parse_egress_allowlist([declared_origin(url)]).origins
+        except ValueError:
+            return False
+        return origin in self.origins
+
     def _refuse(self, described: str, why: str) -> NoReturn:
         message = (
             f"egress to {described} was refused before any connection: {why}. Declared origins: "

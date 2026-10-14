@@ -66,7 +66,8 @@ def _api_client(responses=()) -> tuple[ModelClient, FakeTransport]:
 
 
 def test_the_api_builds_its_client_with_the_defaults_the_bound_is_read_from():
-    """``build_services`` calls ``ModelClient()`` with no arguments: no set timeout, one try."""
+    """``build_services`` calls ``ModelClient()`` with no arguments but which providers it may
+    ask (``local_only``, for a deployment with no credential): no set timeout, one try."""
     source = inspect.getsource(services_module.build_services)
     calls = [
         node
@@ -74,7 +75,10 @@ def test_the_api_builds_its_client_with_the_defaults_the_bound_is_read_from():
         if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "ModelClient"
     ]
     assert calls, "build_services builds no ModelClient, so the bound reads the wrong client"
-    assert all(not call.args and not call.keywords for call in calls)
+    assert all(
+        not call.args and {keyword.arg for keyword in call.keywords} <= {"local_only"}
+        for call in calls
+    )
 
 
 def test_the_page_waits_the_answer_bound_and_its_read_allowance_and_no_longer():

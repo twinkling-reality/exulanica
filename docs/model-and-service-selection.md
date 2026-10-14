@@ -172,8 +172,10 @@ provider under `providers` names its OpenAI-compatible endpoint, the environment
 credential is read from and the catalog the preflight checks its models against; every model names
 its provider and says in plain words what it is. A role's chain stays on one provider, and each
 provider's egress origin is derived from its endpoint rather than written twice
-([security floor](security-floor.md#3-egress-allowlist)). Nebius Token Factory is the one provider
-declared.
+([security floor](security-floor.md#3-egress-allowlist)). Two providers are declared: Nebius Token
+Factory, which serves every role the manifest binds, and an Ollama server on the computer that
+serves the app (`ollama_local`), which serves only models a world chooses
+([below](#a-model-on-this-computer)).
 
 A role whose model a world chooses has no entry in the manifest. The decision role registry
 declares each such role as data
@@ -228,6 +230,64 @@ included. Super answers by a strict schema, lines included, but by a forced call
 choices that take no line: it writes a line where the action it chose says none. A contract asks
 a model by the first mechanism of its order for every choice, and the person's contract ranks a
 forced call first, so Super's entry names the schema alone.
+
+#### A model on this computer
+
+A being's decisions can be made by an open model running on the machine that serves the app, at no
+cost per call and with nothing sent elsewhere. The provider `ollama_local` is an Ollama server at
+`http://localhost:11434/v1`. It takes no credential: its `api_key_env` is null, which the manifest
+accepts only for a provider whose every URL reaches `localhost`, and its requests carry no
+`Authorization` header. Its models cost nothing and serve no role the manifest binds. Each states
+a `recipe`, as data: the server, the Ollama library model it is created from, the parameters it
+is created with (`num_ctx`, which must equal its context window), the server's own chat renderer
+and parser where named, and the server settings it was measured under.
+[`laptop_model_recipe.py`](../scripts/laptop_model_recipe.py) writes the Modelfile from it and
+prints the `ollama create` command and the server settings; it downloads nothing, so the library
+model must already be on the computer. Created from the shipped recipe, the alias has the digest
+the probe served. A test holds the recipe's context to the largest request the decision contract
+sends (`tests/test_laptop_models.py`).
+
+A deployment reaches the server only when its egress allowlist names `http://localhost:11434`;
+otherwise the model is listed and refused as `provider_not_admitted`, and its people are decided
+for by their routine. A deployment with no model credential whose allowlist names the server asks
+models on this computer and nothing else: it builds a client with `local_only=True`, which reads
+no credential, from the environment or a `.env` file, and refuses every hosted provider as
+`provider_credential_absent` (`Services.choice_client`). Every other model-dependent feature of
+such a deployment still finds no model client and says so, and a junction signal is decided by
+its routine there. The preflight reports a model on this computer as a warning, never a failure,
+when the allowlist does not admit its server, the server does not answer, or the server does not
+serve the model. Its asks cost nothing: while the allowlist admits its server, the process's
+budget refuses the host only by its call limit, and where it is not admitted the host is refused as
+before once no billed ask fits. It bills nothing, so no spending read, grant or guest allowance
+names it ([spending contract](model-spending-contract.md#2-authorities-grants-and-bounds)), a
+role whose every billed allowance is spent reads as spent (`offered_providers` names billed
+providers only), and the durable authority admits no attempt to it: the process's budget alone
+reserves and counts each one. No recorded run asks it under durable spending.
+
+Three recipes of the two Apache-2.0 models on disk were probed on this computer by both
+mechanisms, on the same six plain and sixteen line choices as the Super and Ultra probe, first one
+ask at a time and then eight at once, cold and warm
+([pre-registration](evaluation/2026-10-13-laptop-mind-probe-preregistration.json),
+[record](evaluation/2026-10-13-laptop-mind-probe.json)). Every recipe answered all 22 choices
+exactly, by a schema and by a call, and gave the same label to every choice when asked again. The
+server does not honour `tool_choice`, so a call is never forced by name; the pre-registration
+admits the schema alone. By the pre-registered rule, the most exact answers and then the lowest
+95th percentile with eight asks at once, the manifest offers Qwen3 4B Instruct 2507 under the
+recipe that names the server's own Qwen chat renderer and parser. Under the library model's own
+chat format, Ollama 0.34.4 reads the weights' embedded template as one that thinks, and an
+underspecified prompt then wrote about 360 tokens of free text before a schema's answer.
+
+| Recipe | One at a time p50 / p95 | Eight at once, warm p50 / p95 / longest | Eight at once, cold longest | Median completion tokens | Memory held |
+| --- | --- | --- | --- | --- | --- |
+| Qwen3 4B Instruct 2507, server renderer (offered) | 690 / 786 ms | 2,432 / 3,225 / 3,277 ms | 6,651 ms | 55 | 22.7 GB |
+| Qwen3 4B Instruct 2507, library format | 674 / 751 ms | 2,688 / 3,571 / 3,598 ms | 6,190 ms | 55 | 22.7 GB |
+| Granite 4.1 8B | 993 / 1,189 ms | 4,273 / 5,380 / 5,501 ms | 11,179 ms | 41 | 27.6 GB |
+
+Measured on one Apple M5 Max with 64 GB, Q4_K_M weights, eight requests at once with a 16,384
+token context each; no ask came near the 20 s deadline, and the first ask after a load took
+2.8 s to 4.9 s. Most of the memory is the eight contexts' cache, not the weights (2.5 GB for
+Qwen3 4B). Not measured: a computer with less memory, fewer or shorter contexts, and whether a
+choice or a line is apt; the probe judges only the answer's shape.
 
 The [measurement](evaluation/2026-09-25-society-person-models.json) gave each model the eight
 people of the small square for 60 simulated minutes, on one fixed development seed

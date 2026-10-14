@@ -36,12 +36,31 @@ def _catalog_entry(model_id: str, *, use_cases, price_in="0.06", price_out="0.24
     }
 
 
+def _tag_entry(model_id: str, *, use_cases) -> dict:
+    """An Ollama tag list's entry for ``model_id``, its capabilities those its use cases read as."""
+    capabilities = {"text": "completion", "image": "vision"}
+    return {
+        "name": f"{model_id}:latest",
+        "digest": "0" * 64,
+        "capabilities": [capabilities.get(use_case, use_case) for use_case in use_cases],
+    }
+
+
 def live_catalogs_for(manifest):
-    """Synthetic catalogs, one per provider, in which every manifest identifier resolves and fits
-    its role."""
-    catalogs: dict[str, list] = {provider: [] for provider in manifest.providers}
+    """Synthetic catalogs, one per provider in its own format, in which every manifest identifier
+    resolves and fits its role: a list of flavors for a hosted provider, a tag list for a provider
+    on this computer."""
+    catalogs: dict[str, list | dict] = {
+        provider: {"models": []} if manifest.provider(provider).on_this_computer else []
+        for provider in manifest.providers
+    }
     for model_id in sorted(manifest.referenced_model_ids()):
         spec = manifest.spec(model_id)
+        if manifest.provider(spec.provider).on_this_computer:
+            catalogs[spec.provider]["models"].append(
+                _tag_entry(model_id, use_cases=spec.catalog_use_cases)
+            )
+            continue
         catalogs[spec.provider].append(
             _catalog_entry(
                 model_id,
@@ -54,9 +73,11 @@ def live_catalogs_for(manifest):
 
 
 def _without(catalogs, model_id):
-    """The same catalogs with ``model_id`` withdrawn from whichever provider lists it."""
+    """The same catalogs with ``model_id`` withdrawn from whichever hosted provider lists it."""
     return {
         provider: [e for e in entries if e["flavors"][0]["model_id"] != model_id]
+        if isinstance(entries, list)
+        else entries
         for provider, entries in catalogs.items()
     }
 
@@ -65,6 +86,7 @@ def _entry(catalogs, model_id):
     return next(
         entry
         for entries in catalogs.values()
+        if isinstance(entries, list)
         for entry in entries
         if entry["flavors"][0]["model_id"] == model_id
     )
@@ -188,7 +210,11 @@ def test_no_module_reads_a_credential_from_a_variable_it_spells(manifest):
     """Every caller takes a provider's credential variable from the manifest's ``api_key_env``
     (``Manifest.credential_variables``); a module that spells one reads a credential the
     manifest no longer names once the provider moves."""
-    variables = {provider.api_key_env for provider in manifest.providers.values()}
+    variables = {
+        provider.api_key_env
+        for provider in manifest.providers.values()
+        if provider.api_key_env is not None
+    }
     offenders = [
         f"{candidate}:{line}"
         for candidate in sorted((REPOSITORY / "exulanica").rglob("*.py"))

@@ -23,7 +23,7 @@ import httpx
 import pytest
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.chain import ModelChain
-from exulanica.models.client import ModelClient
+from exulanica.models.client import PROVIDER_NOT_ADMITTED, ModelClient
 from exulanica.models.egress import (
     EGRESS_ALLOWLIST_ENV,
     EgressAllowlist,
@@ -382,7 +382,10 @@ def test_the_model_client_checks_its_endpoint_at_construction(monkeypatch, socke
         ModelClient(api_key="test-key-not-real")
     monkeypatch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps(model_origins()))
     client = ModelClient(api_key="test-key-not-real")
-    assert dict(client.refusals) == {}
+    # A provider on this computer the list does not declare is refused by name, never required.
+    local = {p.provider_id for p in manifest.providers.values() if p.on_this_computer}
+    assert local, "the positive control: the manifest declares a provider on this computer"
+    assert dict(client.refusals) == dict.fromkeys(local, PROVIDER_NOT_ADMITTED)
     # Construction opened nothing.
     assert sockets == []
 

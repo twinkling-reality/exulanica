@@ -22,6 +22,13 @@ Each model is checked against the catalog of the provider serving it, read by th
 declared ``catalog_format``. Every model a role reaches is checked, and so is every model offered
 to a role a world chooses, because a world may have chosen it.
 
+**A provider on this computer is reported, never failed.** A model server beside the application
+(``Provider.on_this_computer``, such as Ollama) is not part of every deployment: its models are
+only ever chosen, and a choice its server cannot answer is decided by the being's routine. So a
+deployment whose allowlist does not admit it, whose server does not answer, or whose catalog
+supplied here leaves it out passes with a warning naming each of its models as unavailable, and a
+model missing from its catalog is a warning too. Every hosted provider is held exactly as before.
+
 The deployment runs it as ``exulanica-preflight``, the console script
 (``exulanica/orchestration/catalog_preflight.py``), which gives :func:`main` the roles the
 decision role registry declares, so each model a role is offered is also held to the use cases
@@ -42,6 +49,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica.models.egress import (
+    EgressAllowlist,
+    EgressConfigurationError,
+    load_egress_allowlist,
+)
 from exulanica.models.errors import PreflightError, TransportError
 from exulanica.models.manifest import (
     CatalogFormat,
@@ -60,10 +72,19 @@ __all__ = [
     "catalog_flavors",
     "fetch_catalog",
     "main",
+    "ollama_tags",
     "run_preflight",
 ]
 
 _TIMEOUT: Final = 60.0
+#: How long a server on this computer may take to list its models before it counts as not
+#: answering: a local list is read from disk, so a long wait means the server is not there.
+_LOCAL_TIMEOUT: Final = 5.0
+#: The use case each capability an Ollama server states of a model stands for, in the words the
+#: hosted catalogs and the decision role registry use. Any other capability keeps its own name
+#: (``tools``, ``thinking``), which no hosted use case means: a template that accepts tools is not
+#: a verified function call, and a template that accepts thinking is not a reasoning model.
+_OLLAMA_CAPABILITIES: Final = {"completion": "text", "vision": "image"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,16 +177,85 @@ def fetch_catalog(url: str, *, transport: Transport | None = None) -> list[dict[
     return body
 
 
-def catalog_entries(
-    provider: Provider, catalog: Sequence[Mapping[str, Any]]
-) -> dict[str, dict[str, Any]]:
+def ollama_tags(document: Any) -> dict[str, dict[str, Any]]:
+    """Map callable identifier to its entry in an Ollama server's ``/api/tags`` document.
+
+    A model's ``name`` is ``<model>:<tag>``; the manifest names a model without a tag (an
+    identifier may not hold a colon, ``exulanica.models.handoff``), which the server reads as
+    ``latest``, so only a ``latest`` tag is read as the bare identifier and any other keeps its
+    tag and matches nothing. Its capabilities are read as use cases by ``_OLLAMA_CAPABILITIES``.
+    The document states no price.
+    """
+    models = document.get("models") if isinstance(document, Mapping) else None
+    if not isinstance(models, list):
+        raise PreflightError("an Ollama tag list is an object whose models are a list")
+    found: dict[str, dict[str, Any]] = {}
+    for model in models:
+        name = model.get("name") if isinstance(model, Mapping) else None
+        if not isinstance(name, str) or not name:
+            continue
+        model_id = name.removesuffix(":latest")
+        capabilities = model.get("capabilities") or ()
+        found[model_id] = {
+            "model_id": model_id,
+            "digest": model.get("digest"),
+            "use_cases": [
+                _OLLAMA_CAPABILITIES.get(str(capability), str(capability))
+                for capability in capabilities
+            ],
+        }
+    return found
+
+
+def catalog_entries(provider: Provider, catalog: Any) -> dict[str, dict[str, Any]]:
     """A provider's catalog as callable identifier to entry, read by its declared format."""
     if provider.catalog_format is CatalogFormat.MODEL_FLAVORS:
         return catalog_flavors(catalog)
+    if provider.catalog_format is CatalogFormat.OLLAMA_TAGS:
+        return ollama_tags(catalog)
     raise PreflightError(
         f"provider {provider.provider_id} declares catalog format {provider.catalog_format!r}, "
         "which the preflight has no reader for"
     )
+
+
+def _admitted_here(provider: Provider, transport: Transport | None) -> bool:
+    """Whether this deployment's egress allowlist admits ``provider``'s endpoint and catalog: the
+    transport's own allowlist where it carries one, else the environment's, and never where no
+    allowlist is declared. A test double carrying none reaches no network and answers for itself.
+    """
+    egress: EgressAllowlist | None = getattr(transport, "egress", None)
+    if egress is None and transport is not None:
+        return True
+    if egress is None:
+        try:
+            egress = load_egress_allowlist()
+        except EgressConfigurationError:
+            return False
+    return egress.declares(provider.base_url) and egress.declares(provider.catalog_url)
+
+
+def _local_catalog(provider: Provider, transport: Transport | None) -> tuple[Any, str | None]:
+    """A provider on this computer's catalog, or None with why it was not read."""
+    if not _admitted_here(provider, transport):
+        return None, (
+            "this deployment's egress allowlist does not admit it, so its models are offered "
+            "and refused as not admitted"
+        )
+    transport = transport or HttpxTransport()
+    try:
+        response = transport.get_json(
+            provider.catalog_url, headers={"Accept": "application/json"}, timeout=_LOCAL_TIMEOUT
+        )
+        if not response.ok:
+            raise TransportError(f"HTTP {response.status_code}")
+        document = response.json_body()
+        catalog_entries(provider, document)
+    except TransportError as exc:
+        return None, f"its server did not answer ({str(exc)[:120]})"
+    except PreflightError as exc:
+        return None, f"what answered at its address is not its catalog ({str(exc)[:120]})"
+    return document, None
 
 
 def _roles_using(
@@ -211,11 +301,13 @@ def run_preflight(
     """Run all three checks. Fetches each provider's catalog unless ``catalogs`` supplies them.
 
     ``catalogs`` maps a provider key to that provider's catalog document. When it is given, it
-    must hold every provider a checked model is served by: a provider it leaves out is refused by
-    name rather than skipped. ``chosen`` holds the roles a world may choose a model for, from the
-    decision role registry above this package: each reaches the models the manifest offers it,
-    which then also need its use cases. Every model verified to answer a choice is checked
-    whether or not a role is given.
+    must hold every hosted provider a checked model is served by: a hosted provider it leaves out
+    is refused by name rather than skipped. A provider on this computer it leaves out, or one this
+    deployment does not admit or whose server does not answer, is reported as a warning naming
+    each of its models (see the module's note). ``chosen`` holds the roles a world may choose a
+    model for, from the decision role registry above this package: each reaches the models the
+    manifest offers it, which then also need its use cases. Every model verified to answer a
+    choice is checked whether or not a role is given.
     """
     manifest = manifest or load_manifest()
     referenced = sorted(manifest.referenced_model_ids())
@@ -223,12 +315,23 @@ def run_preflight(
     # against its own provider's entry only.
     live: dict[tuple[str, str], dict[str, Any]] = {}
     size = 0
+    issues: list[PreflightIssue] = []
+    #: Each provider on this computer whose catalog was not read, with why.
+    unread: dict[str, str] = {}
     for provider_id in sorted({manifest.spec(model_id).provider for model_id in referenced}):
         provider = manifest.provider(provider_id)
-        if catalogs is None:
-            catalog = fetch_catalog(provider.catalog_url, transport=transport)
-        elif provider_id in catalogs:
+        if catalogs is not None and provider_id in catalogs:
             catalog = catalogs[provider_id]
+        elif provider.on_this_computer:
+            if catalogs is not None:
+                unread[provider_id] = "no catalog was supplied for it"
+                continue
+            catalog, why = _local_catalog(provider, transport)
+            if why is not None:
+                unread[provider_id] = why
+                continue
+        elif catalogs is None:
+            catalog = fetch_catalog(provider.catalog_url, transport=transport)
         else:
             raise PreflightError(
                 f"no catalog was supplied for provider {provider_id}, which serves a checked model"
@@ -237,11 +340,25 @@ def run_preflight(
         size += len(entries)
         live.update({(provider_id, model_id): entry for model_id, entry in entries.items()})
 
-    issues: list[PreflightIssue] = []
-
     for model_id in referenced:
         roles = _roles_using(manifest, model_id, chosen)
         spec = manifest.spec(model_id)
+        local = manifest.provider(spec.provider).on_this_computer
+        if spec.provider in unread:
+            issues.append(
+                PreflightIssue(
+                    kind="unavailable_on_this_computer",
+                    model_id=model_id,
+                    roles=roles,
+                    detail=(
+                        f"{spec.provider} runs on this computer and was not checked: "
+                        f"{unread[spec.provider]}. A being whose owner chose this model is "
+                        "decided for by its routine."
+                    ),
+                    fatal=False,
+                )
+            )
+            continue
         flavor = live.get((spec.provider, model_id))
         if flavor is None:
             issues.append(
@@ -250,10 +367,15 @@ def run_preflight(
                     model_id=model_id,
                     roles=roles,
                     detail=(
-                        f"not present in {spec.provider}'s flavors[].model_id. It has been "
+                        f"not served by {spec.provider} on this computer: create it from the "
+                        "manifest's recipe, or a being whose owner chose it is decided for by its "
+                        "routine."
+                        if local
+                        else f"not present in {spec.provider}'s flavors[].model_id. It has been "
                         "withdrawn, or the identifier is misspelled. Check casing before assuming "
                         "a deprecation."
                     ),
+                    fatal=not local,
                 )
             )
             continue
@@ -271,6 +393,7 @@ def run_preflight(
                             f"role needs use_cases {sorted(required)}, catalog "
                             f"now declares {sorted(declared)}; missing {missing}"
                         ),
+                        fatal=not local,
                     )
                 )
 

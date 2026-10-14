@@ -190,6 +190,17 @@ updated 2026-05-05, made part of the terms by their section 3.8) and the Privacy
 | AUP 4 | End users who use the service through the customer's application must be bound by terms at least as restrictive as the AUP, monitored, and violations reported | A lookup feature offered to people needs such product terms first |
 | Terms 17.8 | Tavily may audit use; the customer keeps accurate records of it | Requests sent are recorded |
 
+### 3.5 A model run on this computer, not over an API
+
+A model the manifest's provider `ollama_local` serves runs on the machine that serves the app, from
+weights the person's own Ollama server keeps. **Exulanica downloads, stores and redistributes no
+weight for it**: the manifest names the Ollama library model its alias is created from, with that
+model's digests, and the request is an HTTP call to `http://localhost:11434/v1`.
+
+| Model identifier | Role | License recorded here | Source of that reading | Status |
+| --- | --- | --- | --- | --- |
+| `exulanica-qwen3-4b-instruct-2507-nothink`, an Ollama alias of `Qwen/Qwen3-4B-Instruct-2507` | offered for a being's decisions, run on this computer | Apache-2.0 | The upstream README front matter at revision `cdbee75f17c01a7cc42f958dc650907174af0554`, read on 2026-10-13; the Ollama library model's licence layer is the Apache License 2.0 text ([license matrix](docs/license-matrix.md) section 3.7) | **VERIFIED against the card frontmatter** |
+
 ---
 
 ## 4. Python dependencies

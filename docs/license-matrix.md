@@ -347,6 +347,19 @@ corpus.
 | NVIDIA NeMo Agent Toolkit 1.9.0 (`nvidia-nat`, `nvidia-nat-mcp`, `nvidia-nat-langchain[openai]`) | **Apache-2.0** | n/a | Yes | <https://github.com/NVIDIA/NeMo-Agent-Toolkit/blob/v1.9.0/LICENSE.md> | SHIP, outside the product: an example's framework (`bridges/agents/examples/nemo-agent-toolkit.yml`), installed by whoever runs it; licence read 2026-10-06; its tree includes `certifi` and `orjson` under MPL-2.0, used unmodified |
 | ETH3D high-resolution multi-view benchmark, `pipes` training scene | Data: CC-BY-NC-SA-4.0 | n/a | No, separately licensed evaluation input | <https://www.eth3d.net/> | **USE-ONLY, VERIFIED 2026-09-04.** Official data page states CC BY-NC-SA 4.0. Fixed archive and license-document digests are in `exulanica/evaluation/benchmarks/eth3d-pipes-v1.json`. Never vendor the source images into the Apache-2.0 tree |
 
+### 3.7 Models run on this computer
+
+A model the manifest's provider on this computer serves (`ollama_local`) runs on the machine that
+serves the app, from weights the person's own Ollama server keeps. The repository ships and
+downloads no weight: it names the Ollama library model the alias is created from, with its digests.
+Section 6's self-hosting rule applies: only CC-BY-4.0, OpenMDW-1.1, Apache-2.0, MIT or
+public-domain weights. NVIDIA Nemotron Nano's SHIP verdict covers API calls only, so it is not run
+here.
+
+| Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| `exulanica-qwen3-4b-instruct-2507-nothink`, the Ollama alias of `Qwen/Qwen3-4B-Instruct-2507` | n/a, weights only | **Apache-2.0**: the upstream README front matter (`license: apache-2.0`, `license_link` to the repository's LICENSE) at revision `cdbee75f17c01a7cc42f958dc650907174af0554`, README SHA-256 `8e3dd0c3b5b11897cc71092ccfe517bb7a9783479baa3665aad73c8d1a2041cd`, read on 2026-10-13; the Ollama library model `qwen3:4b-instruct` (manifest SHA-256 `0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0`, Q4_K_M weights layer `85e4a5b7b8ef0e48af0e8658f5aaab9c2324c76c1641493f4d1e25fce54b18b9`) carries a licence layer (`d18a5cc71b84bc4af394a31116bd3932b42241de70c77d2b76d69a314ec8aa12`) that is the Apache License 2.0 text, and the weights' own metadata names `apache-2.0` and "Qwen3 4B Instruct 2507". That the quantized file is a faithful conversion of the upstream checkpoint rests on the library's statement and the file's metadata; no conversion was reproduced | **Yes** | <https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/cdbee75f17c01a7cc42f958dc650907174af0554/README.md> | **SHIP.** Run on this computer only, never vendored or redistributed by this repository; a model a world may choose for a being's decisions |
+
 ---
 
 ## 4. The license traps most likely to be hit by accident
@@ -481,7 +494,9 @@ redistribution clauses and false of the guardrail, revocation and amendment clau
 The self-hosted stack satisfies this. The manifest's local models are SAM 2.1 Hiera Tiny, Grounding
 DINO Tiny and OWLv2 Base Patch16 Ensemble (all Apache-2.0) and MoGe-2 ViT-L (MIT), each pinned with
 the license read from its frontmatter; scene training uses gsplat (Apache-2.0); the generated
-appearance models are in section 12. No face detection or face embedding model is part of it.
+appearance models are in section 12; the model a being may be given on this computer, Qwen3 4B
+Instruct 2507 (Apache-2.0), is in section 3.7. No face detection or face embedding model is part
+of it.
 
 ---
 

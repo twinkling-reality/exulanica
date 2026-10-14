@@ -34,7 +34,10 @@ this walks it. Three policies live here and nowhere else, each because of someth
     credential is found, before it is sent, and dispatched (the durable record that it may now
     leave) before the request is handed to the transport. What came back settles it; a failure
     proven never to have left releases it; any other failure after dispatch leaves its whole
-    reservation held, because the provider may bill what nobody received.
+    reservation held, because the provider may bill what nobody received. An attempt to a
+    provider on this computer, which takes no credential and bills nothing
+    (``Manifest.billing_providers``), asks the authority nothing: only the process's guard
+    reserves and counts it.
 
 Split out of the client because these are decisions about the network, and the client's own job
 is what a request means and whether a reply may be believed. A change to the retry policy should
@@ -191,6 +194,12 @@ class ModelChain:
         """Read current provider rates through the same credential and guarded transport."""
         from exulanica.models.provider_catalog import prices
 
+        if not self._manifest.provider(provider).takes_credential:
+            raise ProviderRefused(
+                f"provider {provider} runs on this computer and states no prices to read",
+                provider=provider,
+                reason="provider_states_no_prices",
+            )
         known = {
             spec.model_id: (spec.input_usd_per_mtok, spec.output_usd_per_mtok)
             for spec in self._manifest.models.values()
@@ -225,8 +234,12 @@ class ModelChain:
 
     def _headers(self, spec: ModelSpec) -> dict[str, str]:
         key = self._api_keys.get(spec.provider)
+        provider = self._manifest.provider(spec.provider)
+        if not provider.takes_credential:
+            # A provider on this computer is sent no credential, of this process or any other.
+            return {"Content-Type": "application/json", "Accept": "application/json"}
         if key is None:
-            variable = self._manifest.provider(spec.provider).api_key_env
+            variable = provider.api_key_env
             raise ProviderRefused(
                 f"no credential for provider {spec.provider}: {variable} is not set, so nothing "
                 f"is sent to {spec.model_id}",
@@ -427,7 +440,11 @@ class ModelChain:
                     )
                 cut = left < timeout
                 wait = min(timeout, left)
-            if self._spending is None and self._spending_required:
+            # A provider on this computer bills nothing, so no durable authority is asked to
+            # admit an attempt to it: it has no allowance to spend, and the process's budget still
+            # reserves and counts the attempt below.
+            billed = self._manifest.provider(spec.provider).takes_credential
+            if billed and self._spending is None and self._spending_required:
                 raise SpendingRefused(
                     "spending_scope_missing",
                     message=(
@@ -452,7 +469,7 @@ class ModelChain:
             ticket: SpendingTicket | None = None
             try:
                 headers = self._headers(spec)
-                if self._spending is not None:
+                if billed and self._spending is not None:
                     ticket = self._admitted(
                         spec,
                         role,

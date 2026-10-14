@@ -395,7 +395,13 @@ def test_a_provider_the_allowlist_does_not_declare_is_refused_by_name_and_sends_
     bound = sorted({manifest.provider(b.provider).origin for b in manifest.roles.values()})
     transport = _AllowlistedTransport(bound)
     client = _client(manifest, transport)
-    assert dict(client.refusals) == {SECOND: PROVIDER_NOT_ADMITTED}
+    # A provider on this computer the list does not declare is refused by name too.
+    local = {
+        p.provider_id: PROVIDER_NOT_ADMITTED
+        for p in manifest.providers.values()
+        if p.on_this_computer
+    }
+    assert dict(client.refusals) == {SECOND: PROVIDER_NOT_ADMITTED, **local}
     with pytest.raises(ProviderRefused) as refused:
         client.choose(
             CHOSEN,
@@ -410,7 +416,7 @@ def test_a_provider_the_allowlist_does_not_declare_is_refused_by_name_and_sends_
     assert transport.requests == []
     # The positive control: declared, the same provider is reached.
     admitted = _client(manifest, _AllowlistedTransport([*bound, "https://second.example.com"]))
-    assert dict(admitted.refusals) == {}
+    assert dict(admitted.refusals) == local
 
 
 def test_a_provider_whose_credential_is_not_set_is_refused_by_name(monkeypatch):
@@ -418,7 +424,8 @@ def test_a_provider_whose_credential_is_not_set_is_refused_by_name(monkeypatch):
     _with_second_provider(document)
     manifest = parse_manifest(document)
     for provider in manifest.providers.values():
-        monkeypatch.delenv(provider.api_key_env, raising=False)
+        if provider.takes_credential:
+            monkeypatch.delenv(provider.api_key_env, raising=False)
     bound = manifest.provider(manifest[Role.REASONING_CHEAP].provider)
     monkeypatch.setenv(bound.api_key_env, "test-key-not-real")
     monkeypatch.chdir("/")

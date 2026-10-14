@@ -46,7 +46,7 @@ from exulanica.api.decision_host import ask_bound_usd
 from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
 from exulanica.grammar.errors import CatalogError
 from exulanica.models.budget import BudgetGuard
-from exulanica.models.manifest import Manifest
+from exulanica.models.manifest import Manifest, load_manifest
 from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import USD_QUANTUM
 from exulanica.world.decision_roles import DecisionContract, DecisionRole
@@ -610,9 +610,13 @@ def spending_plan_refusal(refused: SpendingRefused) -> dict[str, Any]:
 
 
 def asked_providers(body: Mapping[str, Any]) -> tuple[str, ...]:
-    """Every provider a comparison ``body`` asks, each once and sorted: each model arm's, and, in a
-    comparison of people, in every arm the provider of the model an owner chose for somebody
-    outside the group. A comparison of a town's signals names nobody outside its arms."""
+    """Every provider a comparison ``body`` asks that bills, each once and sorted: each model
+    arm's, and, in a comparison of people, in every arm the provider of the model an owner chose
+    for somebody outside the group. A comparison of a town's signals names nobody outside its arms.
+    A provider on this computer bills nothing, so no allowance is read and no bound is opened for
+    it (``Manifest.billing_providers``)."""
+    manifest = load_manifest()
+    free = set(manifest.providers) - set(manifest.billing_providers())
     return tuple(
         sorted(
             {
@@ -620,6 +624,7 @@ def asked_providers(body: Mapping[str, Any]) -> tuple[str, ...]:
                 for held in [*body["arms"].values(), *body.get("others", ())]
                 if held.get("provider_config") is not None
             }
+            - free
         )
     )
 

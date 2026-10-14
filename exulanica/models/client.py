@@ -37,7 +37,11 @@ Everything here exists because of something that was measured, not assumed:
     question. Any other provider the allowlist does not declare, or whose credential is not set,
     is refused by name at every call to it (:attr:`ModelClient.refusals`), never skipped. The
     transport checks every call again; see :mod:`exulanica.models.egress` for what that does and
-    does not cover.
+    does not cover. A provider on this computer takes no credential and is sent none. A client
+    built with ``local_only=True``, for a deployment with no model credential that asks only
+    models a world chose on this computer, serves no manifest-bound role: it refuses every
+    provider that takes a credential by name (``provider_credential_absent``) without reading
+    one, from the environment or a ``.env`` file, so nothing it sends can be billed.
 *   **A world's choice of model is asked one way only.** :meth:`ModelClient.choose` asks the
     model a world chose for a chosen role to pick one option of a
     :class:`~exulanica.models.choice.ChoiceRequest`, by a mechanism the model's manifest entry
@@ -221,6 +225,7 @@ class ModelClient:
         policy: HostedRequestPolicy | None = None,
         clock: Callable[[], float] = time.monotonic,
         spending: SpendingSource | None = None,
+        local_only: bool = False,
     ) -> None:
         # No policy means nothing is sent: every sending method refuses by name until one is
         # attached, here or with `with_policy` where the workspace is known.
@@ -244,10 +249,25 @@ class ModelClient:
         # when it built its own client. A provider serving a role the manifest binds must be
         # declared; any other is refused by name at each call, never quietly left out.
         egress = getattr(network, "egress", None)
-        bound = {binding.provider for binding in self._manifest.roles.values()}
+        # A client asking only providers on this computer serves no bound role, so a bound role's
+        # provider is one more provider it refuses, and it never reads a credential: every
+        # provider that takes one is refused before anything could be read for it, from the
+        # environment or a .env file.
+        bound = (
+            set() if local_only else {binding.provider for binding in self._manifest.roles.values()}
+        )
         self._refusals: dict[str, str] = {}
         for provider in sorted(self._manifest.providers.values(), key=lambda p: p.provider_id):
+            if local_only and provider.takes_credential:
+                self._refusals[provider.provider_id] = PROVIDER_CREDENTIAL_ABSENT
+                continue
             if egress is None:
+                continue
+            if provider.on_this_computer:
+                # A server on this computer is optional: one the list leaves out is a setting,
+                # refused by name and never logged as the alert an attempt to leave is.
+                if not egress.declares(provider.base_url):
+                    self._refusals[provider.provider_id] = PROVIDER_NOT_ADMITTED
                 continue
             try:
                 egress.require(provider.base_url)
@@ -263,15 +283,17 @@ class ModelClient:
         # Each credential is read here and handed to the chain, which is the only thing that
         # needs them. None is kept on this object: a client that does not hold a key cannot leak
         # one through a repr, a traceback or a cache entry. ``api_key`` is one key only for a
-        # manifest with one provider; with several, it names each provider's key, so no provider
-        # is ever sent another's.
-        if isinstance(api_key, str) and len(self._manifest.providers) > 1:
+        # manifest with one provider that takes a key; with several, it names each provider's
+        # key, so no provider is ever sent another's. A provider on this computer takes none, is
+        # given none and is never counted here.
+        keyed = [p for p in self._manifest.providers.values() if p.takes_credential]
+        if isinstance(api_key, str) and len(keyed) > 1:
             raise ValueError(
                 "a manifest with several providers is given each provider's key by provider, "
                 "never one key for all of them"
             )
         keys: dict[str, str] = {}
-        for provider in self._manifest.providers.values():
+        for provider in keyed:
             if provider.provider_id in self._refusals:
                 continue
             given = api_key.get(provider.provider_id) if isinstance(api_key, Mapping) else api_key

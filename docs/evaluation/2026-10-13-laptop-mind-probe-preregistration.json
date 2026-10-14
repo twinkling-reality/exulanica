@@ -1,0 +1,266 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "asked": [
+      "phase one_at_a_time: for each candidate, every model unloaded first, then each case once by each mechanism, one call at a time, through ModelClient.choose with the role's messages and choice for the case, the host's token bound for the model (answer_tokens) and the contract's deadline (20000 ms); the line held to check_line at the request's bound",
+      "phase eight_cold: every model unloaded, then every case once by json_schema, 8 asks in flight at once",
+      "phase eight_warm: the same again with the model loaded, 8 at once",
+      "the client built with local_only=True over a transport whose egress allowlist names http://localhost:11434 alone; no credential is read and every price is zero"
+    ],
+    "candidates": {
+      "exulanica-granite-4.1-8b": {
+        "entry": {
+          "catalog_license": "apache-2.0",
+          "catalog_type": "text2text",
+          "catalog_use_cases": [
+            "text"
+          ],
+          "context_window_tokens": 16384,
+          "default_max_tokens": 512,
+          "description": "Granite 4.1 8B, an open model from IBM that runs on this computer and answers without reasoning first.",
+          "emits_inline_reasoning": false,
+          "input_usd_per_mtok": 0,
+          "min_max_tokens": 256,
+          "output_usd_per_mtok": 0,
+          "provider": "ollama_local",
+          "region_informational": "this computer",
+          "supports_json_schema": true
+        },
+        "recipe": {
+          "from": "granite4.1:8b",
+          "parameters": {
+            "num_ctx": 16384
+          }
+        }
+      },
+      "exulanica-qwen3-4b-instruct-2507": {
+        "entry": {
+          "catalog_license": "apache-2.0",
+          "catalog_type": "text2text",
+          "catalog_use_cases": [
+            "text"
+          ],
+          "context_window_tokens": 16384,
+          "default_max_tokens": 512,
+          "description": "Qwen3 4B Instruct, an open model from the Qwen team that runs on this computer and answers without reasoning first.",
+          "emits_inline_reasoning": false,
+          "input_usd_per_mtok": 0,
+          "min_max_tokens": 256,
+          "output_usd_per_mtok": 0,
+          "provider": "ollama_local",
+          "region_informational": "this computer",
+          "supports_json_schema": true
+        },
+        "recipe": {
+          "from": "qwen3:4b-instruct",
+          "parameters": {
+            "num_ctx": 16384
+          }
+        }
+      },
+      "exulanica-qwen3-4b-instruct-2507-nothink": {
+        "entry": {
+          "catalog_license": "apache-2.0",
+          "catalog_type": "text2text",
+          "catalog_use_cases": [
+            "text"
+          ],
+          "context_window_tokens": 16384,
+          "default_max_tokens": 512,
+          "description": "Qwen3 4B Instruct, an open model from the Qwen team that runs on this computer and answers without reasoning first.",
+          "emits_inline_reasoning": false,
+          "input_usd_per_mtok": 0,
+          "min_max_tokens": 256,
+          "output_usd_per_mtok": 0,
+          "provider": "ollama_local",
+          "region_informational": "this computer",
+          "supports_json_schema": true
+        },
+        "recipe": {
+          "from": "qwen3:4b-instruct",
+          "parameters": {
+            "num_ctx": 16384
+          },
+          "parser": "qwen3-vl-instruct",
+          "renderer": "qwen3-vl-instruct"
+        }
+      }
+    },
+    "cases": [
+      {
+        "context_sha256": "6944b6dea70d225c870ec3d171abf93b0ad8d18d1a908af3c39c45639cd19beb",
+        "options": 8,
+        "takes_line": false
+      },
+      {
+        "context_sha256": "6944b6dea70d225c870ec3d171abf93b0ad8d18d1a908af3c39c45639cd19beb",
+        "options": 8,
+        "takes_line": false
+      },
+      {
+        "context_sha256": "5ec6cd95eec73518aed91d112f73b0679c087f1f03c39f8b6eb22284709f3006",
+        "options": 8,
+        "takes_line": false
+      },
+      {
+        "context_sha256": "5ec6cd95eec73518aed91d112f73b0679c087f1f03c39f8b6eb22284709f3006",
+        "options": 8,
+        "takes_line": false
+      },
+      {
+        "context_sha256": "2977c7b09365477a1071515c53dab7e4ba3f8090987c0224fa6a26c0f0154422",
+        "options": 8,
+        "takes_line": false
+      },
+      {
+        "context_sha256": "2977c7b09365477a1071515c53dab7e4ba3f8090987c0224fa6a26c0f0154422",
+        "options": 8,
+        "takes_line": false
+      },
+      {
+        "context_sha256": "0216a6eb63322bb282f95616c00357b4d2fede3f6a0f15c5650b75072e34a167",
+        "options": 11,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "cca7a1905ba17558eb126ebee0f10cca9c5a949ebfc0df3a2ba3b5b4b587dcf1",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "bfcb43ac28f005b0a05070c571c0002140f691f9409484b65282620e40059f0b",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "700ecda7e1051ab44ce6254f3aafb7e66b0a1cbfe9edcad83fdee23530143a7b",
+        "options": 11,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "c96acdfdb710378bb47adefd69d5333149b2efec2cf62fb1a402f165b5707afa",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "d8e0679aaa90b0508ba5dd835bacc02f757f1d4299fc408b7d33a35ff305653c",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "44112017f9fc2a91291535a15c69659e39e0af70266cd8a66b8ad5c964bd3356",
+        "options": 11,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "d7e651a81d4249914b6d6899c7cd3d8437b7d559672fdd7f7190c4d66346f1be",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "12de55cbfa946a733b4912d6e0daa28245b9658453a1315b209af7687e792eb1",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "b1e5a89dc13a17477b437bdec3756261cbcd034850195e5714ea0301d733a9ee",
+        "options": 11,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "9b8d47f95bff5429ea12e9c0e6de77070918c7cbffd324b731f2ddf57f06598d",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "fe4cae3caef34a7f1827c1c6ae64cbd928289c6e8dba6ad7feb37880b5678657",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "f487d65ec473fc77d6d96fab375dac0b4498730a5a163b5d7e420298a1de1ce8",
+        "options": 12,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "94a5ce7ed29504bce002f8f86f1548b562fbfcca555e1ef2d71c33929e1b1af3",
+        "options": 13,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "dfa1794f54c416e1cd7cdc149eaa566133d5c9602d32ca8e1bc2ce432787a8dd",
+        "options": 13,
+        "takes_line": true
+      },
+      {
+        "context_sha256": "a33cc6a012d2055ef3820444132435d7b60636b8081d033aa845ab1d5ecdfbde",
+        "options": 12,
+        "takes_line": true
+      }
+    ],
+    "choice_rule": "A candidate is eligible when its json_schema verdict is verified and answers lines, and no ask of it in phase eight_warm was ended by the 20000 ms deadline. The chosen model is the eligible candidate with the most exact answers by json_schema in phase one_at_a_time (plain cases naming an offered label and line cases answered exactly), ties broken by the lower 95th percentile ask time in phase eight_warm. With none eligible, no model on this computer is offered.",
+    "contexts_artifact": ".exulanica/laptop-probe/contexts.json",
+    "contexts_sha256": "394678a7a1c55a7c7862456f89d748c842680553aae3633ba799da34f83e58d0",
+    "contract": {
+      "catalog_versions": {
+        "society-decision-action": 8,
+        "society-decision-policy": 8
+      },
+      "sha256": "73be53c8e48b77d7a7e65ab3454065841444eb83e6ee608083b01080e694c0ea"
+    },
+    "files_sha256": {
+      "exulanica/models/chain.py": "0661b6f23ce424f03b75ff56132095096ab9a3faad7f234ae53f3e35b325ac45",
+      "exulanica/models/client.py": "71013adf54ed3440655854603a3bad4200a56ef55e5159f7e1d4237d3e13f004",
+      "exulanica/models/models.manifest.json": "5f9ae23d474cf34baca276ecc6eb1d4b6d5be2ae60a5af145e0f64f9a4a12b24",
+      "scripts/measure_laptop_mind_probe.py": "f780f97c91a5eb84bb18a8a6089f3dd4dd38031429133964ed09bfc7294a1504",
+      "scripts/measure_society_mind_probe.py": "4eed7faabcbd23a9b630602963399113cb79afc2436bc546e902ae2e99c73223",
+      "scripts/measure_society_person_models.py": "02b38912f38ca181a93fd84f0140d6cff13500bc3bf4fbdfad16a3e7a7ab683c",
+      "tests/things_society_support.py": "29146df571103e28db6ad7c494ce2b8a904f55869005b91ef802c5221c15422b"
+    },
+    "manifest_sha256": "5f9ae23d474cf34baca276ecc6eb1d4b6d5be2ae60a5af145e0f64f9a4a12b24",
+    "max_calls": 400,
+    "measured": [
+      "per call: phase, model, mechanism, case, outcome (the hosted probe's outcomes), the label's kind, the line's length, completion and prompt tokens, time",
+      "per candidate and phase: ask time at the 50th and 95th percentiles and the longest, the share of asks the deadline ended, the median completion tokens",
+      "per candidate: the memory the loaded model holds (/api/ps size_vram), the server's version, the alias's and its source's digests and quantization",
+      "per candidate: whether phase eight_warm chose the label phase one_at_a_time chose for each case by json_schema (the same ask asked again)"
+    ],
+    "mechanisms": [
+      "json_schema",
+      "tool_call"
+    ],
+    "not_covered": [
+      "22 synthetic requests of one square: whether a choice or a line is apt, kind or in character is not judged; only its shape is.",
+      "Times are this computer's, with whatever else it was running; another computer answers at its own speed.",
+      "Agreement with a hosted model's answers is not measured here: the requests a hosted model answered in a person's world are that person's data."
+    ],
+    "prompt_version": "society-person-choice/v7",
+    "provider": "ollama_local",
+    "question": "Can each candidate on this computer be a being's mind: by each mechanism the client asks with, does it answer a society of things' person's choice as the host asks it, naming an offered label, with a line of at most the request's bound exactly where the label says something, within the host's token bound and the contract's deadline; and how long does it take here, one ask at a time and eight at once?",
+    "record": ".exulanica/laptop-probe/record.json",
+    "server": "http://localhost:11434",
+    "stop_rule": "The probe stops after 3 failed calls in a row (timed out, failed in transport or a model error), writing what it asked and why it stopped. A model and mechanism asked one at a time stops after 2 refusals of the request by the server, the rest of its cases recorded as not asked.",
+    "tree": {
+      "files_sha256": {
+        "exulanica/api/services.py": "d26ec2f2506626b8433739e44c77b8117815df48908882d073a1a51b88a5697e",
+        "exulanica/models/chain.py": "0661b6f23ce424f03b75ff56132095096ab9a3faad7f234ae53f3e35b325ac45",
+        "exulanica/models/client.py": "71013adf54ed3440655854603a3bad4200a56ef55e5159f7e1d4237d3e13f004",
+        "exulanica/models/manifest.py": "830c76c1ef6d58e8ce749a02c5791234bb029e6f64ac3641eac548196afb96cd",
+        "exulanica/models/models.manifest.json": "5f9ae23d474cf34baca276ecc6eb1d4b6d5be2ae60a5af145e0f64f9a4a12b24",
+        "exulanica/models/preflight.py": "e3b6d7e20980c9bc722d4bbb94684cdbc6faa493c056fc5b21acadcf5d05e01f",
+        "scripts/measure_laptop_mind_probe.py": "f780f97c91a5eb84bb18a8a6089f3dd4dd38031429133964ed09bfc7294a1504",
+        "tests/test_egress_allowlist.py": "ef0ff335d0fc5983bea09e123178b1c483dcb2965f74d4bbc039251cc7a50981",
+        "tests/test_models_manifest.py": "fcc06d2397d095a82babd8ee4e58974e3256b354388cba1bcef4a06d0b0fbef0"
+      },
+      "head": "6d691c6e857b13ef1a461799c8802e89b9097eb3"
+    },
+    "verdict_rule": {
+      "answers": "at least 5 of the 6 plain cases' answers name an offered label",
+      "answers_lines": "at least 14 of the 16 line cases' answers name an offered label with a line exactly where it says something, within the rule",
+      "manifest": "a json_schema verdict that answers joins the model's answering, naming the published record; tool_call joins no model's answering whatever its counts, because the server does not honour tool_choice, so the call is not forced as the client's mechanism names it; a model whose json_schema does not answers_lines gets a not_offered_for_lines sentence",
+      "phase": "read from phase one_at_a_time alone"
+    },
+    "written_before_this_measurement_asked_any_model": true
+  },
+  "record_sha256": "993b43972ad967808cdcc004f0bae5b75133859e51810ffa649f7f7fe129fa3f"
+}

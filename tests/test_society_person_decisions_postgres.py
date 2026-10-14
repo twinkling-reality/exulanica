@@ -70,7 +70,7 @@ from exulanica.world.society_repository import SocietyRepository
 from psycopg.types.json import Jsonb
 
 import test_society_stay_requests_api as stays
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, as_hosted_deployment, chat_body, hosted_only
 from test_society_saved_world_api import OWNER, TOKEN, routes
 from tests_support_api import EVERY_PERMISSION
 
@@ -81,8 +81,11 @@ PROBE_RECORD = "docs/evaluation/2026-09-25-society-person-models-probe.json"
 
 
 def _offered():
-    """The manifest with one declared chat model verified to answer by a forced function."""
-    document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
+    """The manifest with one declared chat model verified to answer by a forced function, and
+    every model offered a hosted one with a price (``hosted_only``)."""
+    document = hosted_only(
+        json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
+    )
     model_id = next(
         model_id
         for model_id, raw in sorted(document["models"].items())
@@ -1071,13 +1074,17 @@ def test_a_host_that_can_ask_nobody_reserves_nothing_writes_nothing_and_says_why
 ):
     world, client = app
     services = _services(client)
-    manifest = load_manifest()
+    # Every model offered a hosted one with a price, and a hosted deployment's client, which
+    # refuses the free model on this computer (``hosted_only``, ``as_hosted_deployment``).
+    manifest = parse_manifest(
+        hosted_only(json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal))
+    )
     contract = decision_contract()
     spec = manifest.offered_models(person_role().chosen)[0]
     probe = BudgetGuard(ceiling_usd=Decimal(1), max_calls=100)
     smallest = smallest_ask_usd(person_role(), probe, manifest, contract)
     guard = _guard_for(cause, smallest)
-    transport = _Chooser()
+    transport = as_hosted_deployment(_Chooser())
     model_client = (
         None
         if guard is None
@@ -1130,7 +1137,11 @@ def test_a_person_whose_model_no_longer_fits_the_budget_is_asked_nothing_and_tol
     says why for their choice; the budget never refills, so this holds until a restart."""
     world, client = app
     services = _services(client)
-    manifest = load_manifest()
+    # Every model offered a hosted one with a price (``hosted_only``); the client is a hosted
+    # deployment's below, which refuses the free model on this computer.
+    manifest = parse_manifest(
+        hosted_only(json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal))
+    )
     contract = decision_contract()
     probe = BudgetGuard(ceiling_usd=Decimal(1), max_calls=100)
     offered = [
@@ -1148,7 +1159,7 @@ def test_a_person_whose_model_no_longer_fits_the_budget_is_asked_nothing_and_tol
     model_client = ModelClient(
         api_key="test-key-not-real",
         manifest=manifest,
-        transport=(transport := _Chooser()),
+        transport=(transport := as_hosted_deployment(_Chooser())),
         budget=BudgetGuard(ceiling_usd=ceiling, max_calls=100),
     )
     assert host_refusal(person_role(), model_client, manifest, contract) is None

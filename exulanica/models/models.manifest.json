@@ -12,6 +12,14 @@
       "catalog_format": "model_flavors",
       "catalog_retrieved_at": "2026-08-27",
       "description": "Nebius Token Factory, which serves open models behind one OpenAI-compatible API."
+    },
+    "ollama_local": {
+      "base_url": "http://localhost:11434/v1",
+      "api_key_env": null,
+      "catalog_url": "http://localhost:11434/api/tags",
+      "catalog_format": "ollama_tags",
+      "catalog_retrieved_at": "2026-10-13",
+      "description": "This computer, through Ollama: an open model running on the machine that serves this app, free, private and offline, with no account and no key."
     }
   },
 
@@ -169,6 +177,38 @@
       "catalog_license": "Apache 2.0 License",
       "region_informational": "eu-north1",
       "note": "Runtime-verified 2026-08-27 to return 4096 dimensions, not the 1024 the schema document assumed."
+    },
+    "exulanica-qwen3-4b-instruct-2507-nothink": {
+      "provider": "ollama_local",
+      "description": "Qwen3 4B Instruct, an open model from the Qwen team that runs on this computer and answers without reasoning first.",
+      "answering": {"json_schema": "docs/evaluation/2026-10-13-laptop-mind-probe.json"},
+      "input_usd_per_mtok": 0,
+      "output_usd_per_mtok": 0,
+      "context_window_tokens": 16384,
+      "min_max_tokens": 256,
+      "default_max_tokens": 512,
+      "emits_inline_reasoning": false,
+      "supports_json_schema": true,
+      "catalog_type": "text2text",
+      "catalog_use_cases": ["text"],
+      "catalog_license": "apache-2.0",
+      "region_informational": "this computer",
+      "recipe": {
+        "server": "ollama",
+        "from": "qwen3:4b-instruct",
+        "parameters": {"num_ctx": 16384},
+        "renderer": "qwen3-vl-instruct",
+        "parser": "qwen3-vl-instruct",
+        "server_environment": {
+          "OLLAMA_NUM_PARALLEL": "8",
+          "OLLAMA_KEEP_ALIVE": "60m",
+          "OLLAMA_MAX_LOADED_MODELS": "1",
+          "OLLAMA_CONTEXT_LENGTH": "16384",
+          "OLLAMA_NO_CLOUD": "1",
+          "basis": "The server settings the probe the answering names measured under: eight requests at once, as many as the decision contract asks in one minute (concurrent_calls_maximum), each with the recipe's whole context; a model kept loaded for an hour, since a load added about 2.9 s to the first answer; one model loaded at a time; the server's default context the recipe's own; and the server's cloud features off."
+        }
+      },
+      "note": "Created with `ollama create exulanica-qwen3-4b-instruct-2507-nothink` from a Modelfile stating the recipe (FROM, PARAMETER num_ctx, RENDERER, PARSER) over the Ollama library model qwen3:4b-instruct, which is Qwen/Qwen3-4B-Instruct-2507 quantized Q4_K_M (library manifest sha256 0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0, weights layer sha256 85e4a5b7b8ef0e48af0e8658f5aaab9c2324c76c1641493f4d1e25fce54b18b9, licence layer sha256 d18a5cc71b84bc4af394a31116bd3932b42241de70c77d2b76d69a314ec8aa12, the Apache License 2.0); Ollama 0.34.4 served the alias as sha256 a8aa49bc70ee2d052c659a0b211c64924803447256f988081e1a4675d20d7e3a. The renderer and parser are the server's own Qwen chat format, named because that server reads the weights' embedded chat template as one that thinks and then lets the model write freely before a schema's answer. Asked by a strict JSON schema only: the server does not honour tool_choice, so a call is never forced by name. Under the server settings above the loaded model held 22.7 GB, and the probe measured 22 of 22 exact answers one at a time and the 95th percentile answer at 3.2 s with eight asks at once."
     }
   },
 

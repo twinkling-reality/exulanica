@@ -47,6 +47,38 @@ def chat_body(
     }
 
 
+def hosted_only(document: dict[str, Any]) -> dict[str, Any]:
+    """A manifest document without the models a provider on this computer serves.
+
+    For a test whose premise is that every model offered is a hosted one with a price: a model on
+    this computer costs nothing, so a budget can never be too small for an ask of it, and a test
+    of what a spent budget refuses would otherwise always find that free ask. Changes ``document``
+    in place and returns it.
+    """
+    local = {key for key, raw in document["providers"].items() if raw["api_key_env"] is None}
+    document["models"] = {
+        model_id: raw
+        for model_id, raw in document["models"].items()
+        if raw["provider"] not in local
+    }
+    return document
+
+
+def as_hosted_deployment(transport: Any) -> Any:
+    """``transport`` carrying the egress allowlist a hosted deployment states: the origins of the
+    providers serving the roles the manifest binds, and not the model server on this computer.
+
+    A client built over it refuses that server by name (``provider_not_admitted``), as a hosted
+    deployment's does, so a read that judges the host's budget against every model the shipped
+    manifest offers (``Services.model_host_refusal``) leaves out the free model it cannot ask.
+    """
+    from exulanica.models.egress import parse_egress_allowlist
+    from exulanica.models.manifest import load_manifest
+
+    transport.egress = parse_egress_allowlist(sorted(load_manifest().bound_origins()))
+    return transport
+
+
 def model_not_found(model_id: str, *, status: int = 404) -> HttpResponse:
     """What the endpoint returns for an identifier that has been withdrawn."""
     return HttpResponse(

@@ -67,7 +67,7 @@ from exulanica.world.role_decisions import (
 from exulanica.world.society_engines import ENGINES
 from exulanica.world.society_play import play_contract
 
-from model_fakes import FakeTransport, RecordingPolicy, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body, hosted_only
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "decision_role_fixtures"
@@ -82,8 +82,11 @@ NOT_OFFERED = "turn every light blue"
 
 
 def _manifest():
-    """The manifest with one example model verified by a forced function, at stated prices."""
-    document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
+    """The manifest with one example model verified by a forced function, at stated prices, and
+    every model offered a hosted one with a price (``hosted_only``)."""
+    document = hosted_only(
+        json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
+    )
     template = next(
         raw
         for _model_id, raw in sorted(document["models"].items())
@@ -564,7 +567,12 @@ def test_the_deployment_gate_fails_when_a_role_s_model_loses_the_role_s_use_case
         spec.model_id
         for spec in as_read.offered_models(decision_roles().role("society_decision").chosen)
     }
-    only_offered = sorted(offered - primaries)[0]
+    # A hosted model: a model on this computer that loses a use case is reported, never failed.
+    only_offered = sorted(
+        model_id
+        for model_id in offered - primaries
+        if not as_read.provider(as_read.spec(model_id).provider).on_this_computer
+    )[0]
     for binding in document["roles"].values():
         if binding["fallback"] == only_offered:
             binding["fallback"] = None

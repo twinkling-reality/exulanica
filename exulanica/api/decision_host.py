@@ -232,14 +232,21 @@ def ask_bound_usd(
 
 
 def smallest_ask_usd(
-    role: DecisionRole, budget: BudgetGuard, manifest: Manifest, contract: DecisionContract
+    role: DecisionRole,
+    budget: BudgetGuard,
+    manifest: Manifest,
+    contract: DecisionContract,
+    *,
+    refused: Collection[str] = (),
 ) -> Decimal | None:
     """The least that one ask of an offered model may need, the smallest ``ask_bound_usd``. A
-    process whose remainder is under it can ask no model for the role; None with none offered."""
+    process whose remainder is under it can ask no model for the role; None with none offered.
+    ``refused`` names providers the asking client refuses, whose models it can never ask: a model
+    on this computer that costs nothing is no ask a process whose allowlist refuses it can make."""
     bounds = [
         ask_bound_usd(role, budget, spec, contract)
         for spec in manifest.offered_models(role.chosen)
-        if contract.mechanism_for(spec) is not None
+        if contract.mechanism_for(spec) is not None and spec.provider not in refused
     ]
     return min(bounds) if bounds else None
 
@@ -247,14 +254,18 @@ def smallest_ask_usd(
 def offered_providers(
     role: DecisionRole, manifest: Manifest, contract: DecisionContract
 ) -> tuple[str, ...]:
-    """The providers an ask for ``role`` can reach: those serving the models the manifest offers
-    it and its contract can ask, each once, in the order the manifest offers them. An ask reaches
-    its chosen model's provider alone."""
+    """The billed providers an ask for ``role`` can reach: those serving the models the manifest
+    offers it and its contract can ask, each once, in the order the manifest offers them, whose
+    allowance a durable authority spends. An ask reaches its chosen model's provider alone. A
+    provider on this computer is left out: it takes no credential and its asks cost nothing, so
+    no allowance of it is ever spent, and its being offered never keeps a role whose every billed
+    allowance is spent from reading as spent."""
     return tuple(
         dict.fromkeys(
             spec.provider
             for spec in manifest.offered_models(role.chosen)
             if contract.mechanism_for(spec) is not None
+            and manifest.provider(spec.provider).takes_credential
         )
     )
 
@@ -291,12 +302,16 @@ def host_refusal(
 
     A code from ``HOST_REFUSALS`` other than ``models_not_run_here``, which is the host's own
     listing: no client, or a budget whose remainder, by what is spent, fits no ask of any offered
-    model (``smallest_ask_usd``), in the whole budget or once the part kept for the process's other
-    work is set aside. Either holds until the process restarts.
+    model the client does not refuse (``smallest_ask_usd``), in the whole budget or once the part
+    kept for the process's other work is set aside. Either holds until the process restarts. A
+    model on this computer costs nothing, so while its provider is admitted only the call limit
+    can refuse the host.
     """
     if client is None:
         return PROVIDER_CREDENTIAL_ABSENT
-    smallest = smallest_ask_usd(role, client.budget, manifest, contract)
+    smallest = smallest_ask_usd(
+        role, client.budget, manifest, contract, refused=frozenset(client.refusals)
+    )
     return None if smallest is None else _budget_refusal(client.budget, contract, smallest)
 
 

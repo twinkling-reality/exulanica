@@ -58,7 +58,7 @@ def _names(model_id: str) -> set[str]:
 def test_every_licence_class_is_the_verdict_word_of_that_model_s_own_row_in_the_matrix():
     classes = _document()["licence_classes"]
     rows = _verdict_rows()
-    assert len(classes) == 25 and len(rows) > 60
+    assert len(classes) == 26 and len(rows) > 60
     for entry in classes:
         model_id, cited, verdict = entry["model_id"], entry["row"], entry["verdict"]
         assert entry["matrix"] == "docs/license-matrix.md"
@@ -116,19 +116,21 @@ def test_the_classes_are_the_ones_the_matrix_gives_today():
         "NousResearch/Hermes-4-405B",
     }
     assert by_class[catalog.REJECTED] == {"moonshotai/Kimi-K3"}
-    assert len(by_class[catalog.ACCEPTED]) == 21
+    assert len(by_class[catalog.ACCEPTED]) == 22
     # Two models of one publisher under two licences are two rows, each with its own verdict.
     named = [names for names, _cell in _verdict_rows()]
     assert named.count(["zai-org/GLM-5.3"]) == 1 and named.count(["zai-org/GLM-5.3-Flash"]) == 1
     # Every row written from a licence read on a stated day says how strong the reading is.
     matrix = MATRIX.read_text(encoding="utf-8")
     assert matrix.count("on 2026-10-10, read through a text fetch; no file hashed") == 17
-    # Every model the provider states today has a class; a model the matrix does not name has
-    # none, whatever its licence is called, and neither has the same id under another provider.
-    stated = {model.model_id for model in catalog.provider_models().values()}
-    assert len(stated) == 25
+    # Every model a provider states today has a class under that provider; a model the matrix
+    # does not name has none, whatever its licence is called, and neither has the same id under
+    # another provider.
+    stated = {(model.provider, model.model_id) for model in catalog.provider_models().values()}
+    assert len(stated) == 26
     assert all(
-        catalog.licence_class(PROVIDER, model_id) != catalog.NOT_CLASSIFIED for model_id in stated
+        catalog.licence_class(provider, model_id) != catalog.NOT_CLASSIFIED
+        for provider, model_id in stated
     )
     assert not any(_names("someone/New-Model-9B") & set(names) for names in named)
     assert catalog.licence_class(PROVIDER, "someone/New-Model-9B") == catalog.NOT_CLASSIFIED
@@ -257,7 +259,7 @@ def _complete_public(*flavors: dict) -> list[dict]:
                 "license": spec.catalog_license,
             }
             for spec in load_manifest().models.values()
-            if spec.model_id not in extra
+            if spec.model_id not in extra and spec.provider == PROVIDER
         ],
     )
 
@@ -346,10 +348,11 @@ def test_the_command_reads_the_public_catalog_once_with_no_key_and_writes_the_fi
         NEW["model_id"],
         KEPT["model_id"],
     }
-    assert len(classes) == 25
+    assert len(classes) == 26
+    served = [spec for spec in load_manifest().models.values() if spec.provider == PROVIDER]
     assert (
         capsys.readouterr().out.strip()
-        == f"{len(load_manifest().models) + 2} models stated; 1 of them not classified"
+        == f"{len(served) + 2} models stated; 1 of them not classified"
     )
     # The shipped file is not written by a refresh to another path.
     assert json.loads(catalog.CATALOG.read_text(encoding="utf-8")) == _document()

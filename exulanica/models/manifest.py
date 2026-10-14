@@ -30,6 +30,15 @@ its provider, and no code names one. The origin a provider's requests reach is d
 spelling, so it is never stated a second time, and a URL the allowlist could not declare is
 refused here. A role's chain stays on one provider, because a hand-over names one destination.
 
+**A provider on this computer takes no credential.** A provider whose every URL reaches
+``localhost`` (a model server such as Ollama running beside the application) states
+``api_key_env`` as null: nothing is read for it and no ``Authorization`` header is sent to it. Any
+other provider names its key's variable; null is refused for it, so a hosted endpoint can never be
+reached without a credential by a manifest's mistake. Such a provider serves no role the manifest
+binds: its models are only ever chosen. It bills nothing, and every model it serves is priced at
+0, so spending reads, grants and allowances name only the providers that bill
+(:meth:`Manifest.billing_providers`).
+
 **A chosen role has no model here, and no entry.** A world names a model for a decision role, a
 person today, among the models the manifest offers the role. The roles themselves are declared as
 data by the decision role registry above this package (``exulanica.world.decision_roles``), which
@@ -60,8 +69,10 @@ is ever used and nothing in this codebase branches on a region.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
+import urllib.parse
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -140,6 +151,14 @@ class CatalogFormat(StrEnum):
     #: A JSON array of models, each with ``flavors[]`` naming ``model_id``, ``use_cases`` and
     #: prices per million tokens.
     MODEL_FLAVORS = "model_flavors"
+    #: An Ollama server's ``/api/tags`` object: ``models[]``, each naming the model it serves as
+    #: ``name`` (``<model>:<tag>``), its manifest ``digest`` and its ``capabilities``. It states no
+    #: price, since a model on this computer costs nothing per call.
+    OLLAMA_TAGS = "ollama_tags"
+
+
+#: The one host a provider may be reached at without a credential: this computer.
+_LOCAL_HOST: Final = "localhost"
 
 
 class AnsweringMechanism(StrEnum):
@@ -166,7 +185,9 @@ class Provider:
 
     provider_id: str
     base_url: str
-    api_key_env: str
+    #: The variable this provider's credential is read from; None for a provider on this computer,
+    #: which is sent no credential (``on_this_computer``).
+    api_key_env: str | None
     catalog_url: str
     catalog_format: CatalogFormat
     catalog_retrieved_at: str
@@ -181,6 +202,20 @@ class Provider:
     def catalog_origin(self) -> str:
         """The origin the preflight reaches for this provider's catalog."""
         return declared_origin(self.catalog_url)
+
+    @property
+    def takes_credential(self) -> bool:
+        """Whether a credential is read for this provider and sent with each request to it."""
+        return self.api_key_env is not None
+
+    @property
+    def on_this_computer(self) -> bool:
+        """Whether every request to this provider, its catalog's included, stays on this computer:
+        both URLs reach ``localhost``, the one host the egress allowlist accepts plain http for."""
+        return all(
+            urllib.parse.urlsplit(url).hostname == _LOCAL_HOST
+            for url in (self.base_url, self.catalog_url)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,6 +269,13 @@ class ModelSpec:
     #: (``exulanica.ingest.place_proposal``). Empty for a model admitted to judge nothing. Left
     #: out of the hash, as ``answering`` is.
     judging: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}), hash=False)
+    #: For a model a server on this computer serves, how that server is made to serve it under
+    #: this identifier, as data: the server (``ollama``), the model it is created ``from``, the
+    #: ``parameters`` it is created with (``num_ctx``, its context, is the context window above),
+    #: the server's own chat ``renderer`` and ``parser`` where they are named, and the
+    #: ``server_environment`` it was measured under, with why. Empty for a hosted model. Left out
+    #: of the hash, as ``answering`` is.
+    recipe: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), hash=False)
 
     def cost_usd(self, *, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Billable cost of one call, exactly.
@@ -440,7 +482,8 @@ class Manifest:
 
     def credential_variables(self, roles: Iterable[Role]) -> frozenset[str]:
         """The variables the credentials of the providers serving ``roles`` are read from."""
-        return frozenset(self.provider(self[role].provider).api_key_env for role in roles)
+        providers = (self.provider(self[role].provider) for role in roles)
+        return frozenset(p.api_key_env for p in providers if p.api_key_env is not None)
 
     def model_name(self, model_id: str) -> str:
         """The name a person reads for a model: its description up to its first comma, or its
@@ -493,6 +536,13 @@ class Manifest:
         """
         return frozenset(self.provider(b.provider).origin for b in self.roles.values())
 
+    def billing_providers(self) -> tuple[str, ...]:
+        """The providers that bill, in the manifest's order: every provider that takes a
+        credential. A provider on this computer takes none and every model it serves is priced
+        at nothing (the parser holds both), so no spending read, grant, allowance or durable
+        admission concerns it: it is the one list spending reads its providers from."""
+        return tuple(key for key, provider in self.providers.items() if provider.takes_credential)
+
     def referenced_model_ids(self) -> frozenset[str]:
         """Identifiers reachable through a role, bound or chosen. This is what the preflight checks.
 
@@ -524,7 +574,11 @@ def _text(raw: Mapping[str, Any], key: str, where: str) -> str:
     return value
 
 
-def _key_variable(raw: Mapping[str, Any], where: str) -> str:
+def _key_variable(raw: Mapping[str, Any], where: str) -> str | None:
+    if _need(raw, "api_key_env", where) is None:
+        # Admitted only for a provider on this computer, which ``_provider_from`` checks once
+        # both of its URLs are read.
+        return None
     name = _text(raw, "api_key_env", where)
     if not _KEY_VARIABLE.fullmatch(name):
         raise ManifestError(
@@ -574,6 +628,11 @@ def _provider_from(provider_id: str, raw: Any) -> Provider:
             raise ManifestError(
                 f"{where}: {name} names no origin an allowlist declares: {exc}"
             ) from exc
+    if not provider.takes_credential and not provider.on_this_computer:
+        raise ManifestError(
+            f"{where}: api_key_env is null, which only a provider on this computer may state "
+            f"(every URL at {_LOCAL_HOST}); a provider anywhere else names its key's variable"
+        )
     return provider
 
 
@@ -625,6 +684,60 @@ def _judging(model_id: str, raw: Any) -> Mapping[str, str]:
                 f"docs/evaluation JSON path, not {record!r}"
             )
     return MappingProxyType(dict(raw))
+
+
+#: What a recipe states: the server and the model it starts from, always; the rest where it
+#: applies.
+_RECIPE_FIELDS: Final = frozenset(
+    {"server", "from", "parameters", "renderer", "parser", "server_environment"}
+)
+#: The one server a recipe is written for.
+_RECIPE_SERVER: Final = "ollama"
+
+
+def _recipe(
+    model_id: str, raw: Any, provider: Provider, context_window_tokens: int
+) -> Mapping[str, Any]:
+    """A model's recipe, required of a model on this computer and refused of any other."""
+    if not provider.on_this_computer:
+        if raw is not None:
+            raise ManifestError(
+                f"{model_id}: a recipe says how a server on this computer serves a model, and "
+                f"{provider.provider_id} is not on this computer"
+            )
+        return MappingProxyType({})
+    if not isinstance(raw, Mapping) or not {"server", "from", "parameters"} <= set(raw):
+        raise ManifestError(
+            f"{model_id}: a model on this computer states its recipe: the server, the model it is "
+            "created from and the parameters it is created with"
+        )
+    if set(raw) - _RECIPE_FIELDS:
+        raise ManifestError(
+            f"{model_id}: a recipe states {sorted(_RECIPE_FIELDS)} and nothing else, "
+            f"not {sorted(set(raw) - _RECIPE_FIELDS)}"
+        )
+    if raw["server"] != _RECIPE_SERVER or not isinstance(raw["from"], str) or not raw["from"]:
+        raise ManifestError(f"{model_id}: a recipe names its server ({_RECIPE_SERVER}) and source")
+    parameters = raw["parameters"]
+    if not isinstance(parameters, Mapping) or parameters.get("num_ctx") != context_window_tokens:
+        raise ManifestError(
+            f"{model_id}: the recipe's parameters state num_ctx, the context the server gives the "
+            f"model, as the context window the entry states ({context_window_tokens})"
+        )
+    for key in ("renderer", "parser"):
+        if key in raw and (not isinstance(raw[key], str) or not raw[key]):
+            raise ManifestError(f"{model_id}: a recipe's {key} names one of the server's own")
+    environment = raw.get("server_environment")
+    if environment is not None and (
+        not isinstance(environment, Mapping)
+        or not isinstance(environment.get("basis"), str)
+        or not all(isinstance(value, str) for value in environment.values())
+    ):
+        raise ManifestError(
+            f"{model_id}: a recipe's server_environment maps each setting to its value, with its "
+            "basis, all as text"
+        )
+    return MappingProxyType(copy.deepcopy(dict(raw)))
 
 
 def _declared_number(role: Role, raw: Mapping[str, Any], key: str) -> DeclaredNumber | None:
@@ -704,17 +817,25 @@ def _spec_from(
     provider = _text(raw, "provider", model_id)
     if provider not in providers:
         raise ManifestError(f"{model_id}: provider {provider!r} is not declared in providers")
+    if not providers[provider].takes_credential and any(
+        as_decimal(key) != 0 for key in ("input_usd_per_mtok", "output_usd_per_mtok")
+    ):
+        raise ManifestError(
+            f"{model_id}: {provider} takes no credential, so it bills nothing, and every model it "
+            "serves is priced at 0"
+        )
     answering = _answering(model_id, raw.get("answering"))
     order, order_record, order_reason = _answering_order(
         model_id, raw.get("answering_order"), answering
     )
+    context_window_tokens = int(need("context_window_tokens"))
     return ModelSpec(
         model_id=model_id,
         provider=provider,
         description=_text(raw, "description", model_id),
         input_usd_per_mtok=as_decimal("input_usd_per_mtok"),
         output_usd_per_mtok=as_decimal("output_usd_per_mtok"),
-        context_window_tokens=int(need("context_window_tokens")),
+        context_window_tokens=context_window_tokens,
         min_max_tokens=as_optional_int("min_max_tokens"),
         default_max_tokens=as_optional_int("default_max_tokens"),
         emits_inline_reasoning=bool(need("emits_inline_reasoning")),
@@ -733,6 +854,7 @@ def _spec_from(
         answering_order_reason=order_reason,
         judging=_judging(model_id, raw.get("judging")),
         not_offered_for_lines=_not_offered_for_lines(model_id, raw.get("not_offered_for_lines")),
+        recipe=_recipe(model_id, raw.get("recipe"), providers[provider], context_window_tokens),
     )
 
 
@@ -836,6 +958,12 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
                 f"role {role}: the primary is served by {specs[primary_id].provider} and the "
                 f"fallback by {specs[fallback_id].provider}. A role's chain stays on one provider, "
                 "because a hand-over names one destination."
+            )
+        if not providers[specs[primary_id].provider].takes_credential:
+            raise ManifestError(
+                f"role {role}: its chain is served by {specs[primary_id].provider}, a provider on "
+                "this computer, which serves only models a world chooses: a deployment must reach "
+                "every role the manifest binds, and none has to run a model server of its own"
             )
         timeout_seconds, timeout_basis = _role_timeout(role, raw, specs[primary_id], rule)
         bindings[role] = RoleBinding(

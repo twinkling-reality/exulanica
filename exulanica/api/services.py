@@ -104,7 +104,11 @@ from exulanica.epistemics.hosted_requests import (
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
-from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
+from exulanica.models.egress import (
+    EGRESS_ALLOWLIST_ENV,
+    EgressConfigurationError,
+    load_egress_allowlist,
+)
 from exulanica.models.errors import ModelError
 from exulanica.models.manifest import MANIFEST_PATH, Manifest, Role, load_manifest
 from exulanica.models.spending import SpendingRefused
@@ -364,6 +368,11 @@ class Services:
     executor_shares_the_write_role: bool
     #: None when no model credential is configured. Model-dependent endpoints say so.
     model_client: ModelClient | None
+    #: Where no model credential is configured and the egress allowlist admits a provider on this
+    #: computer (``Provider.on_this_computer``): a client that serves no manifest-bound role and
+    #: asks only the models a world chose, refusing every other provider by name. None otherwise;
+    #: every endpoint reading :attr:`model_client` still finds none. See :attr:`decision_client`.
+    choice_client: ModelClient | None = None
     #: The only directory whose already-local files the environment admission route may name.
     #: None disables that write surface while retaining metadata and byte reads.
     environment_admission_root: Path | None = None
@@ -496,6 +505,14 @@ class Services:
         return self.runs_society_control_worker or bool(self.society_control_workspaces)
 
     @property
+    def decision_client(self) -> ModelClient | None:
+        """The client a world's chosen models are asked through, and judged refused or not by:
+        the process's model client, or where it has none, the one asking only chosen models
+        (:attr:`choice_client`), so a deployment with no model credential can still ask a model
+        on this computer. None where neither exists."""
+        return self.model_client if self.model_client is not None else self.choice_client
+
+    @property
     def discovers_model_workspaces(self) -> bool:
         """Whether this host asks models for workspaces account discovery finds, beside the ones
         its environment lists: only where discovery is on and spending is durable, so every ask
@@ -595,7 +612,7 @@ class Services:
         return DecisionHost(
             database=self.database,
             runtime=self.society_runtime,
-            client=self.model_client,
+            client=self.decision_client,
             workspaces=frozenset(self.society_control_workspaces),
             policy_for=self.person_decision_policy,
             manifest=load_manifest(),
@@ -1116,19 +1133,20 @@ class Services:
         """
         if not self.asks_models_for(workspace_id):
             return "models_not_run_here"
-        return host_refusal(role, self.model_client, load_manifest(), _asked(role, engine))
+        return host_refusal(role, self.decision_client, load_manifest(), _asked(role, engine))
 
     def provider_refusal(self, provider: str) -> str | None:
         """Why this process asks no model a provider serves, or None when it may ask them."""
-        if self.model_client is None:
+        client = self.decision_client
+        if client is None:
             return PROVIDER_CREDENTIAL_ABSENT
-        return self.model_client.refusals.get(provider)
+        return client.refusals.get(provider)
 
     def smallest_reservation_usd(self) -> dict[str, Decimal]:
         """By provider, the smallest reservation one attempt of any model a person may be given
         takes: its answer bound at its prices with no prompt. A remainder below it admits no ask
         of that provider's models; empty with no model client."""
-        client = self.model_client
+        client = self.decision_client
         if client is None:
             return {}
         floors: dict[str, Decimal] = {}
@@ -1208,7 +1226,7 @@ class Services:
         which the caller lends idle: for a society's ``engine``, that engine's description alone.
         """
         manifest = self.workspace_choice_manifest(connection, workspace_id, engine)
-        client = self.model_client
+        client = self.decision_client
         if (
             client is not None
             and model["model_id"] not in load_manifest().models
@@ -1222,7 +1240,7 @@ class Services:
                 },
             )
         refusal = model_refusal(role, client, manifest, _asked(role, engine), model)
-        if refusal is not None or self.model_client is None:
+        if refusal is not None or self.decision_client is None:
             return refusal
         assert client is not None
         return question_refusal(
@@ -1301,6 +1319,12 @@ class Services:
                 "no model credential is configured, so the endpoints that plan a Selection from "
                 "a question or compose an answer will refuse rather than guess."
             )
+            if self.choice_client is not None:
+                notes.append(
+                    "only models on this computer are asked here: a being whose owner chose one "
+                    "is asked it, and a being whose owner chose a hosted model is decided for by "
+                    "its routine."
+                )
         else:
             # Said only where a playback host asks models for people: for the workspaces the
             # environment lists, or for the watched ones under durable spending; a host enabled by
@@ -1539,6 +1563,11 @@ def build_services(
         client = ModelClient()
     if client is not None and spending is not None and client.spending_source is None:
         client = client.with_spending_source(spending)
+    choice_client = None
+    if client is None and _admits_a_provider_on_this_computer(environ):
+        choice_client = ModelClient(local_only=True)
+        if spending is not None:
+            choice_client = choice_client.with_spending_source(spending)
     if (
         accounts is not None
         and accounts.guest is not None
@@ -1564,6 +1593,7 @@ def build_services(
         tokens=tokens,
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
+        choice_client=choice_client,
         accounts=accounts,
         door=door_runtime(database, environ, open_to=_door_open_to(accounts)),
         environment_admission_root=data_dir / "environment-inbox",
@@ -1658,6 +1688,21 @@ def _role_credentials_set(environ: Mapping[str, str]) -> bool:
     """
     manifest = load_manifest()
     return all(environ.get(name) for name in manifest.credential_variables(manifest.roles))
+
+
+def _admits_a_provider_on_this_computer(environ: Mapping[str, str]) -> bool:
+    """Whether the egress allowlist this process states admits a provider on this computer, whose
+    models a world may choose with no credential configured (``Services.choice_client``). An
+    absent or unreadable allowlist admits none: it is then refused where a client is built."""
+    try:
+        egress = load_egress_allowlist(environ)
+    except EgressConfigurationError:
+        return False
+    return any(
+        egress.declares(provider.base_url)
+        for provider in load_manifest().providers.values()
+        if provider.on_this_computer
+    )
 
 
 def _society_runtime(store: ContentAddressedStore, environ: Mapping[str, str]) -> SocietyRuntime:
@@ -1926,7 +1971,13 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         API_TOKENS_ENV,
         *AdmissionSettings.variables(),
         env_name(RETAINED_BYTES_SETTING),
-        *sorted({provider.api_key_env for provider in load_manifest().providers.values()}),
+        *sorted(
+            {
+                provider.api_key_env
+                for provider in load_manifest().providers.values()
+                if provider.api_key_env is not None
+            }
+        ),
         "EXULANICA_GOOGLE_CLIENT_ID",
         "EXULANICA_GOOGLE_CLIENT_SECRET",
         "EXULANICA_GOOGLE_CALLBACK_URI",
