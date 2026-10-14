@@ -48,8 +48,9 @@ from conftest import (
     write_point_map,
 )
 from model_fakes import chat_body
+from pg_harness import migrated_schema
 from route_probes import ACCOUNT_ROUTES, ROUTE_PROBES, fill
-from tests_support_api import EVERY_PERMISSION
+from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_support import registered_world
 
 
@@ -226,6 +227,45 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
         )
 
 
+@pytest.fixture(scope="module")
+def refusing_client(tmp_path_factory):
+    """The application the two refusal sweeps ask, built once for the module.
+
+    The same tokens and services as ``deployment``, over a migrated schema of its own that holds
+    no rows. These sweeps ask who may reach a route, which :func:`route_probes.fill` answers with
+    fresh ids, and a refused request writes nothing, so one application serves every route.
+    """
+    with migrated_schema() as (_psycopg, admin):
+        scratch = admin.execute("select current_schema()").fetchone()[0]
+        admin.commit()
+        root = tmp_path_factory.mktemp("refusals")
+        tokens = {
+            _OWNER_TOKEN: {
+                "workspace_id": str(uuid.uuid4()),
+                "actor": str(uuid.uuid4()),
+                "permissions": EVERY_PERMISSION,
+            },
+            _STRANGER_TOKEN: {
+                "workspace_id": str(uuid.uuid4()),
+                "actor": str(uuid.uuid4()),
+                "permissions": EVERY_PERMISSION,
+            },
+        }
+        database = scratch_database(scratch)
+        services = Services(
+            database=database,
+            readonly_database=database,
+            store=LocalContentAddressedStore(root / "blobs"),
+            tokens=load_token_directory({"EXULANICA_API_TOKENS": json.dumps(tokens)}),
+            executor_shares_the_write_role=True,
+            model_client=None,
+            environment_admission_root=root,
+            tiles=tile_store(root / "tiles"),
+        )
+        with TestClient(create_app(services, verify=False)) as client:
+            yield client
+
+
 # -- the sweep ----------------------------------------------------------------------------
 #
 # The guard on the guard (the walk sees the authenticated surface by name), the coverage check
@@ -233,20 +273,20 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
 # database in tests/test_route_probes.py.
 
 
+@pytest.mark.postgres
 @pytest.mark.parametrize(("method", "path"), sorted(ROUTE_PROBES))
-def test_every_authenticated_route_refuses_an_anonymous_caller(deployment, method, path):
-    response = deployment.client.request(
-        method, deployment.fill(path), **ROUTE_PROBES[(method, path)]
-    )
+def test_every_authenticated_route_refuses_an_anonymous_caller(refusing_client, method, path):
+    response = refusing_client.request(method, fill(path), **ROUTE_PROBES[(method, path)])
     assert response.status_code == 401, response.text
     assert response.json()["code"] == "unauthenticated"
 
 
+@pytest.mark.postgres
 @pytest.mark.parametrize(("method", "path"), sorted(ROUTE_PROBES))
-def test_every_authenticated_route_refuses_a_bad_token(deployment, method, path):
-    response = deployment.client.request(
+def test_every_authenticated_route_refuses_a_bad_token(refusing_client, method, path):
+    response = refusing_client.request(
         method,
-        deployment.fill(path),
+        fill(path),
         headers={"Authorization": "Bearer not-a-configured-token-but-long-enough"},
         **ROUTE_PROBES[(method, path)],
     )
