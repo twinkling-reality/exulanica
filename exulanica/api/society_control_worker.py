@@ -18,6 +18,7 @@ no such lock; a process whose loop hangs still holds it, so it reads as running.
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import hashlib
 import logging
 import threading
@@ -28,13 +29,20 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Final
 
 import psycopg
+from psycopg.rows import dict_row
 
+from exulanica.api.session_spending import close_closed_session_bounds
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database
 from exulanica.selection.validation import Session
+from exulanica.spending import DurableSpending
 from exulanica.world.society import UnavailableSocietyInput
-from exulanica.world.society_control_repository import SocietyControlRepository
+from exulanica.world.society_control_repository import (
+    SocietyControlRepository,
+    open_session_receipt,
+    open_sessions_past_deadline,
+)
 from exulanica.world.society_controls import (
     DEFAULT_BASE_TICK_INTERVAL_MS,
     LEASE_SECONDS,
@@ -45,6 +53,8 @@ from exulanica.world.society_controls import (
 from exulanica.world.society_repository import SocietyInputBehind, SocietyRepository
 
 _LOG = logging.getLogger(__name__)
+#: How often the living-session reaper runs for a workspace the worker plays, at most.
+REAP_SECONDS: Final = 30.0
 
 #: Why this host does not advance a workspace's playing societies on its own, by code, in the
 #: words a person reads beside the playback control.
@@ -235,6 +245,7 @@ class SocietyControlWorker:
         base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
         before_minute: Callable[[ControlClaim, float], bool] | None = None,
         workers: int = 1,
+        spending: DurableSpending | None = None,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
         if not 1 <= workers <= 8:
@@ -249,6 +260,11 @@ class SocietyControlWorker:
         #: Asks the chosen models before a claimed minute, given the claim and the monotonic time
         #: its lease runs out; says whether the world runs people by models.
         self._before_minute = before_minute
+        #: The durable spending authority, where the host spends durably: the reaper closes the
+        #: bounds of the living sessions that closed.
+        self._spending = spending
+        #: When the reaper last ran for each workspace, by the monotonic clock.
+        self._reaped: dict[uuid.UUID, float] = {}
         self._configured_workspaces = frozenset(workspaces)
         self._workspace_source = workspace_source
         self._workspace_lock = threading.Lock()
@@ -332,8 +348,41 @@ class SocietyControlWorker:
             raise ValueError("workspace is not configured for this playback worker")
         return self._run_authorized_once(workspace)
 
+    def reap(self, workspace: uuid.UUID) -> int:
+        """Close what the workspace's living sessions left behind; answer how many sessions it
+        closed. A session past its wall deadline whose world is no longer claimed closes
+        (``session_deadline``), and, where spending is durable, every bound of a closed session
+        still open is closed, so nothing more is admitted under it. Runs before a workspace's
+        first round, and then at most every ``REAP_SECONDS``."""
+        self._reaped[workspace] = time.monotonic()
+        closed = 0
+        with self.database.session(workspace) as connection:
+            now = (
+                connection.cursor(row_factory=dict_row)
+                .execute("select clock_timestamp() as now")
+                .fetchone()["now"]
+            )
+            for found in open_sessions_past_deadline(connection, workspace, now):
+                repository = self._repository(connection, workspace, found["world_id"])
+                if repository.close_session_past_deadline(found["version_id"]):
+                    closed += 1
+            if self._spending is not None:
+                close_closed_session_bounds(self._spending, connection, workspace)
+        return closed
+
+    def _reap_when_due(self, workspace: uuid.UUID) -> None:
+        last = self._reaped.get(workspace)
+        if last is not None and time.monotonic() - last < REAP_SECONDS:
+            return
+        try:
+            self.reap(workspace)
+        except Exception as exc:
+            # The next round asks again; never the exception's text.
+            _LOG.error("The living-session reaper failed with %s", type(exc).__qualname__)
+
     def _run_authorized_once(self, workspace: uuid.UUID) -> dict | None:
         """Run after the caller captured one fresh, immutable round snapshot."""
+        self._reap_when_due(workspace)
         # The claim considers every world the workspace holds and names the world it was taken
         # in. It runs only in that world.
         with self.database.session(workspace) as connection:
@@ -348,6 +397,25 @@ class SocietyControlWorker:
         # Read before the telling, whose wait for the workspace's lock is part of the lease: a
         # model's deadline never outlasts it.
         lease_ends = time.monotonic() + LEASE_SECONDS
+        # A living session that reached a limit closes before its next minute, which then does
+        # not run; one still open runs a minute a claim, its asks ending by its wall deadline.
+        try:
+            with self.database.session(workspace) as connection:
+                repository = self._repository(connection, workspace, claim.world_id)
+                opened = open_session_receipt(connection, workspace, claim.society_id)
+                limit = None if opened is None else repository.session_limit(claim)
+                if limit is not None:
+                    repository.close_session_at_limit(claim, limit)
+        except LeaseLost:
+            return {"status": "lease_lost"}
+        if limit is not None:
+            if self._spending is not None:
+                self._reaped.pop(workspace, None)
+                self._reap_when_due(workspace)
+            return {"status": "session_closed", "reason": limit}
+        if opened is not None:
+            left = dt.datetime.fromisoformat(opened["ends_by"]) - dt.datetime.now(dt.UTC)
+            lease_ends = min(lease_ends, time.monotonic() + max(0.0, left.total_seconds()))
         erasure = self._tell_of_erased_kinds(workspace, claim)
         # Unless the telling answered clear, the state may still hold an erased being until the
         # society's minute runs (one just told of, one the erasing request already told of, one
@@ -366,7 +434,9 @@ class SocietyControlWorker:
         try:
             with self.database.session(workspace) as connection:
                 return self._repository(connection, workspace, claim.world_id).execute(
-                    claim, max_ticks=1 if one_minute else None, untold=erasure == "untold"
+                    claim,
+                    max_ticks=1 if one_minute or opened is not None else None,
+                    untold=erasure == "untold",
                 )
         except LeaseLost:
             return {"status": "lease_lost"}

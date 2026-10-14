@@ -55,7 +55,10 @@ admission:
   session's own limit and what the grant has left, so it never asks the authority for more than the
   grant holds; a provider whose grant is not live, or has nothing left, is refused before anything
   is sent (`exulanica/api/session_spending.py`). The host asks a society's chosen models only
-  inside an open session.
+  inside an open session. A session's bounds are closed once it closes: at once where the worker
+  closed it at a limit, and otherwise by the worker's reaper, which closes every bound of a closed
+  session still open (`close_closed_session_bounds`). A reservation of unknown cost stays held
+  under the closed bound until an operator reconciles it.
 - **Providers that bill.** Every level names a provider that bills: one that takes a credential
   (`Manifest.billing_providers`). A provider on this computer, an Ollama server that takes no
   credential and whose every model the manifest prices at 0, bills nothing: no authority, grant,

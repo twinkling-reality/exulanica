@@ -84,6 +84,7 @@ from exulanica.world.society_model_choice_repository import (
 )
 from exulanica.world.society_play import answer_played
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.society_sessions import decisions_left
 
 __all__ = [
     "HOST_REFUSALS",
@@ -1061,6 +1062,19 @@ class DecisionHost:
                 due = self._due(role, contract, chosen, row["state"], client, spent)
                 if due:
                     planned.append((role, contract, lease_ends, due))
+            if planned and session_open is not None:
+                # No minute asks more models than the session's decisions have left, in the order
+                # each role states its due subjects.
+                left = decisions_left(
+                    connection, claim.workspace_id, row["society_id"], session_open
+                )
+                capped = []
+                for role, contract, ends, due in planned:
+                    if left <= 0:
+                        break
+                    capped.append((role, contract, ends, due[:left]))
+                    left -= len(due[:left])
+                planned = capped
             outside_planned = []
             for role, contract, outside in outside_roles:
                 present = set(role.adapter.subjects(row["state"]))

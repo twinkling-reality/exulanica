@@ -29,10 +29,11 @@ from exulanica.models.usage import CallUsage
 from exulanica.spending import DurableSpending
 from exulanica.spending.status import admission_refusal, read_workspace_status
 
-__all__ = ["SessionGate", "bound_key"]
+__all__ = ["SessionGate", "bound_key", "close_closed_session_bounds"]
 
-#: Why a host opens a session's bound, as the authority records it.
+#: Why a host opens a session's bound, and why the worker closes it, as the authority records it.
 _OPENED: Final = "a living session asked a model of this provider"
+_CLOSED: Final = "the living session closed"
 _KEY: Final = "living-session:{session_id}:"
 #: The bounds a session's key names in the workspace, read as its runtime role: row-level security
 #: keeps every other workspace's grants out.
@@ -143,3 +144,38 @@ class SessionGate:
 
     def release(self, ticket: SpendingTicket) -> None:
         self._workspace.release(ticket)
+
+
+#: The session bounds of the workspace no closure names yet, read as its runtime role.
+_STILL_OPEN: Final = """
+select g.grant_id, g.bound_key
+  from spending_grant g
+ where g.workspace_id = %(workspace)s and g.parent_grant_id is not null
+   and starts_with(g.bound_key, 'living-session:')
+   and not exists (
+     select 1 from spending_grant_revocation v
+      where v.workspace_id = g.workspace_id and v.grant_id = g.grant_id
+   )
+"""
+_SESSION_CLOSED: Final = """
+select 1 from world_society_control_event
+ where workspace_id = %s and document->>'kind' = 'session_closed' and document->>'session_id' = %s
+ limit 1
+"""
+
+
+def close_closed_session_bounds(
+    spending: DurableSpending, connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> int:
+    """Close every bound of a closed living session in the workspace that is still open, so
+    nothing more is admitted under it; answer how many this closed. A reservation of unknown cost
+    stays held, as the ledger keeps it, for an operator to reconcile. ``connection`` is scoped to
+    the workspace; each closure is the authority's own step."""
+    closed = 0
+    for row in connection.execute(_STILL_OPEN, {"workspace": workspace_id}).fetchall():
+        session_id = str(row["bound_key"]).split(":")[1]
+        if connection.execute(_SESSION_CLOSED, (workspace_id, session_id)).fetchone() is None:
+            continue
+        if spending.close_bound(workspace_id, uuid.UUID(str(row["grant_id"])), reason=_CLOSED):
+            closed += 1
+    return closed

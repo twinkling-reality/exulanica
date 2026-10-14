@@ -38,9 +38,11 @@ from exulanica.world.society_repository import SocietyInputBehind, SocietyReposi
 from exulanica.world.society_sessions import (
     SESSION_CLOSED,
     SESSION_KINDS,
+    SESSION_LIMIT_REASONS,
     SESSION_MAXIMA,
     SESSION_OPENED,
     SessionRefused,
+    limit_reached,
     session_limits,
     sessions_from,
 )
@@ -118,6 +120,31 @@ def open_session_receipt(
         return None
     doc = _verified_receipt(row)
     return doc if doc["kind"] == SESSION_OPENED else None
+
+
+def open_sessions_past_deadline(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, now: dt.datetime
+) -> list[dict]:
+    """Every society of the workspace whose open living session is past its wall deadline, by its
+    world and version (``world_id``, ``version_id``), for the playback worker's reaper."""
+    rows = (
+        connection.cursor(row_factory=dict_row)
+        .execute(
+            "select distinct on (e.society_id) e.society_id, s.version_id, s.world_id, "
+            "e.document, e.document_sha256 from world_society_control_event e "
+            "join world_society s using (workspace_id, society_id) "
+            "where e.workspace_id=%s and e.document->>'kind' in (%s,%s) "
+            "order by e.society_id, e.event_seq desc",
+            (workspace_id, *SESSION_KINDS),
+        )
+        .fetchall()
+    )
+    found = []
+    for row in rows:
+        doc = _verified_receipt(row)
+        if doc["kind"] == SESSION_OPENED and now >= dt.datetime.fromisoformat(doc["ends_by"]):
+            found.append({"world_id": row["world_id"], "version_id": row["version_id"]})
+    return found
 
 
 def _refuse_untold(_version_id: uuid.UUID) -> None:
@@ -543,6 +570,59 @@ class SocietyControlRepository:
                 reason="guest_pressed_play",
             )
             return self.read(version_id)
+
+    def _pause_for_session(self, society: dict, opened: dict, reason: str) -> dict:
+        """Pause the society because its open session reached a limit, and close the session
+        with that reason and no person: the system closed it."""
+        self.connection.execute(
+            "update world_society_control set mode='paused',"
+            "revision=revision+1,reason=%s,next_due_at=null,lease_token=null,"
+            "claimed_at=null,lease_expires_at=null where workspace_id=%s and "
+            "society_id=%s",
+            (reason, self.workspace_id, society["society_id"]),
+        )
+        return self._close_session(society, opened, reason=reason, closed_by=None)
+
+    def session_limit(self, claim: ControlClaim, now: dt.datetime | None = None) -> str | None:
+        """The limit the claimed society's open session has reached, or None while it has
+        reached none or none is open (``limit_reached``)."""
+        with self.connection.transaction():
+            society = self._scope(claim.version_id)
+            opened = self._open_session(society["society_id"])
+            if opened is None:
+                return None
+            return limit_reached(
+                self.connection,
+                self.workspace_id,
+                society,
+                opened,
+                self._now() if now is None else now,
+            )
+
+    def close_session_at_limit(self, claim: ControlClaim, reason: str) -> dict:
+        """Close the claimed society's open session at a limit it reached, under the claim's
+        lease: the society pauses with ``reason`` and runs no minute. A claim that lost its lease
+        changes nothing (:class:`LeaseLost`)."""
+        if reason not in SESSION_LIMIT_REASONS:
+            raise ValueError(f"no session limit {reason!r}")
+        with self.connection.transaction():
+            society = self._scope(claim.version_id)
+            self._check_lease(self._control(society["society_id"]), claim)
+            opened = self._open_session(society["society_id"])
+            if opened is not None:
+                self._pause_for_session(society, opened, reason)
+            return self.read(claim.version_id)
+
+    def close_session_past_deadline(self, version_id: uuid.UUID) -> bool:
+        """Close the society's open session if its wall deadline has passed: the reaper's close
+        for a world whose minutes are no longer claimed. True when this closed one."""
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            opened = self._open_session(society["society_id"])
+            if opened is None or self._now() < dt.datetime.fromisoformat(opened["ends_by"]):
+                return False
+            self._pause_for_session(society, opened, "session_deadline")
+            return True
 
     def stop_session(
         self, version_id: uuid.UUID, *, actor: uuid.UUID, session_id: uuid.UUID

@@ -731,7 +731,9 @@ programs under a door grant are answered as before. Inside one, where spending i
 attempt is admitted under the session's own bound of its provider
 (`exulanica/api/session_spending.py`), and every ask is made under its request's key,
 `decision:<request_id>`, so a request asked again after a crash cannot send a call twice: the
-authority's duplicate refusal records no answer (`spending_unavailable`). In order:
+authority's duplicate refusal records no answer (`spending_unavailable`). A minute asks no more
+models than the session's decisions have left (its limit less the model receipts since its first
+minute), taking each role's due subjects in their order. In order:
 
 1. **Close what an earlier host left open.** A request reserved in the last four minutes with no
    receipt, left by a host that stopped between reserving and recording, is closed as

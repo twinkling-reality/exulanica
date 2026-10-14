@@ -1275,6 +1275,7 @@ class Services:
             base_tick_interval_ms=self.society_base_tick_interval_ms,
             before_minute=(None if (host := self.decision_host()) is None else host.before_minute),
             workers=self.society_playback_workers,
+            spending=self.spending,
         )
 
     def playback_configuration_sha256(self) -> str:

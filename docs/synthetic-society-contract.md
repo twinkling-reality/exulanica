@@ -1463,7 +1463,18 @@ with the receipts of the minutes they played (`exulanica/world/society_sessions.
 The limits are `wall_seconds`, `minutes`, `decisions`, `usd` and `calls`, every one stated,
 positive and at most the installation's maxima (`SESSION_MAXIMA`: a day of wall time, 1,440
 minutes, 10,000 decisions, 100 US dollars, 10,000 calls); `usd` is a decimal string of at most
-eight places, stored at the ledger's quantum. They are recorded when the session opens.
+eight places, stored at the ledger's quantum. They are recorded when the session opens and
+enforced by the playback worker. Before each claimed minute of a society with an open session it
+checks them in this order, and the first that holds closes the session under the claim's lease,
+pauses the society with that reason, and runs no minute: the wall deadline passed
+(`session_deadline`); the session played its minutes (`session_minutes`); its model decisions,
+every receipt of a request asked of a model since its first minute, reached its limit
+(`session_decisions`); a decision of it was refused because its bound or the grant under it had
+nothing left (`session_spending_limit`); or a call under its bound may have cost what is not known
+(`session_liability_unknown`), which only an operator's reconciliation settles
+(`limit_reached`, `exulanica/world/society_sessions.py`). While a session is open each claim runs
+one minute, so catch-up never plays past its minutes; its asks end by its wall deadline, and a
+minute asks no more models than its decisions have left.
 
 A session opens only on a paused society, at the control revision, tick and state digest its
 caller read, and opening it sets the society playing in the same transaction: a `configured`
@@ -1476,7 +1487,11 @@ society's current tick and digest. A session closes when:
 - a person stops it (`stopped_by_person`), which pauses the society;
 - a person pauses the society (`paused_by_person`); another speed while playing keeps it open;
 - the worker pauses the society for an error, with that pause's own reason
-  (`lease_recovery_limit`, `source_unavailable` or `invalid_society_state`) and no person.
+  (`lease_recovery_limit`, `source_unavailable` or `invalid_society_state`) and no person;
+- the worker finds it at one of its limits before a minute, with that limit's reason and no person;
+- the worker's reaper finds it past its wall deadline in a world whose minutes are no longer
+  claimed (`session_deadline`, no person). The reaper runs before a workspace's first round and
+  then at most every 30 seconds (`REAP_SECONDS`, `exulanica/api/society_control_worker.py`).
 
 Under the base route, `/sessions`:
 

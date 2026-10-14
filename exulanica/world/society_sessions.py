@@ -17,12 +17,18 @@ The limits are stored when a session opens and enforced by the playback worker
 
 from __future__ import annotations
 
+import datetime as dt
 import re
+import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 from typing import Any, Final
 
+import psycopg
+from psycopg.rows import dict_row
+
 from exulanica.models.usage import usd_string
+from exulanica.world.deciders import is_external, is_person_ask
 
 #: The profile a session reads as.
 SESSION_PROFILE: Final = "exulanica.society-session/v1"
@@ -141,3 +147,91 @@ def sessions_from(receipts: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     if open_one is not None:
         found.append(_view(open_one, None))
     return found[::-1]
+
+
+#: Why a session closes at one of its limits, in the order they are checked before each minute.
+SESSION_LIMIT_REASONS: Final = (
+    "session_deadline",
+    "session_minutes",
+    "session_decisions",
+    "session_spending_limit",
+    "session_liability_unknown",
+)
+
+_RECEIPTS: Final = """
+select d.document as receipt, r.document as request
+  from world_society_decision d
+  join world_society_decision_request r using (workspace_id, society_id, request_id)
+ where d.workspace_id = %s and d.society_id = %s
+   and (r.document->>'base_tick')::bigint >= %s
+"""
+_UNKNOWN: Final = """
+select 1
+  from spending_reservation v
+  join spending_grant g on g.workspace_id = v.workspace_id and g.grant_id = v.bound_id
+ where v.workspace_id = %s and v.state = 'unknown' and starts_with(g.bound_key, %s)
+ limit 1
+"""
+
+
+def model_receipts(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    society_id: uuid.UUID,
+    start_tick: int,
+) -> list[dict[str, Any]]:
+    """The receipts of the model decisions asked since a session's first minute: every receipt
+    whose request was asked of a model (not a person playing a being, not an outside program) at
+    or after ``start_tick``. Read on a connection scoped to the workspace."""
+    rows = (
+        connection.cursor(row_factory=dict_row)
+        .execute(_RECEIPTS, (workspace_id, society_id, start_tick))
+        .fetchall()
+    )
+    return [
+        row["receipt"]
+        for row in rows
+        if not is_external(row["request"]["provider_config"])
+        and not is_person_ask(row["request"]["provider_config"])
+    ]
+
+
+def decisions_left(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    society_id: uuid.UUID,
+    opened: Mapping[str, Any],
+) -> int:
+    """How many model decisions the open session may still ask for."""
+    used = len(model_receipts(connection, workspace_id, society_id, opened["start_tick"]))
+    return max(0, int(opened["limits"]["decisions"]) - used)
+
+
+def limit_reached(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    society: Mapping[str, Any],
+    opened: Mapping[str, Any],
+    now: dt.datetime,
+) -> str | None:
+    """The first of ``SESSION_LIMIT_REASONS`` that holds for the open session ``opened`` of
+    ``society`` (its row: ``society_id``, ``current_tick``) at ``now``, or None while none does.
+
+    Its wall deadline passed; its minutes are played; its decisions are asked; a decision of it was
+    refused because its bound (or the grant under it) had nothing left; or a call under its bound
+    may have cost what is not known, which only an operator's reconciliation settles.
+    """
+    limits = opened["limits"]
+    if now >= dt.datetime.fromisoformat(opened["ends_by"]):
+        return "session_deadline"
+    if society["current_tick"] - opened["start_tick"] >= int(limits["minutes"]):
+        return "session_minutes"
+    receipts = model_receipts(connection, workspace_id, society["society_id"], opened["start_tick"])
+    if len(receipts) >= int(limits["decisions"]):
+        return "session_decisions"
+    if any(receipt["reason"] == "spending_limit_reached" for receipt in receipts):
+        return "session_spending_limit"
+    prefix = f"living-session:{opened['session_id']}:"
+    if connection.execute(_UNKNOWN, (workspace_id, prefix)).fetchone() is not None:
+        return "session_liability_unknown"
+    return None
