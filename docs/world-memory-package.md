@@ -750,7 +750,8 @@ and its disposition, the served model and recorded cost with `cost_known`. Leavi
 keeps a record's digest unchanged. No record carries system instructions, raw provider bodies,
 hidden model reasoning, private conversations, raw logs or model weights.
 
-An evidence file holds one session's records with the model assignments they were made under, so
+The evidence file format is specified field by field in the
+[world project evidence format](world-project-evidence-format.md). An evidence file holds one session's records with the model assignments they were made under, so
 a record stays bound after the checkpoint's assignment changes. Each file has its own digest,
 separate from the checkpoint's; evidence is what happened, never part of the world definition. A
 file holds at most 1024 records; `watch` continues a longer session in numbered files.
@@ -911,7 +912,19 @@ with its own plain-word message and only the `world-project.json` and `evidence/
 changed, each chained by `expectedHeadOid`. The branch is matched to the newest saved checkpoint
 whose files it holds; a branch matching none, or more than 50 unpublished checkpoints, is
 published as one commit of the last saved state, using `--message` when given. The pull request text describes, against the base branch, the changes to the
-world and, separately, the decision evidence, which is never called part of the world. When the
+world and, separately, the decision evidence, which is never called part of the world. It then
+tells what the beings did in each session (each decision's offered option count, its answer and
+its verdict in the browser's choice account words, `assets/catalogs/roles/choice-account-words.v1.json`)
+and how each model did (the served measures of `exulanica/world/decision_measures.py`: counts out
+of totals, "not enough data yet" below a measure's minimum sample, latency, and cost as computed
+or bounded, never a bill). It is regenerated from the committed files on every review and ends
+with their digests. What the files cannot support (requests no minute took up, receipts older
+files lack) is named as unavailable, never shown as zero. Labels, spoken lines and situations
+appear only when the repository's visibility reads `PRIVATE`; a public or internal repository gets
+option numbers and codes only, and the review digest binds which. The generated text passes the
+value scan and stays within 60,000 characters, below the 65,536 GitHub is reported to accept
+(its pull request API page states no limit); it leaves out decision lines first, then older
+sessions' detail, and says so, never the counts or the model table. When the
 saved project again equals the base branch, the open pull request is closed instead. Unchanged
 files make no commit and unchanged text is not rewritten. The review digest binds the target,
 both branch heads, the pull request, each commit's message and file digests, and the text; `publish-branch` recomputes

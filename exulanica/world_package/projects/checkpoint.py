@@ -89,10 +89,11 @@ def document(value: Any) -> dict[str, Any]:
 
 
 def _drop_absent_readable(decisions: list[dict[str, Any]]) -> None:
-    # The readable record is an optional addition: leaving it out must not change a digest.
+    # Optional additions to a record: leaving them out must not change a digest.
     for decision in decisions:
-        if decision.get("readable") is None:
-            decision.pop("readable", None)
+        for key in ("readable", "receipt"):
+            if decision.get(key) is None:
+                decision.pop(key, None)
 
 
 def validate_evidence(value: Any) -> Evidence:
@@ -111,6 +112,9 @@ def evidence_document(value: Any) -> dict[str, Any]:
     result["models"].sort(key=lambda item: item["thing_id"] + "\x00" + item["model_id"])
     result["decisions"].sort(key=lambda item: (item["tick"], item["record_id"]))
     _drop_absent_readable(result["decisions"])
+    for key in ("coverage", "captured_at"):
+        if result.get(key) is None:
+            result.pop(key, None)
     return result
 
 

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "catalog_id": "choice-account-words",
+  "catalog_version": 1,
+  "purpose": "The words of a recorded choice's verdict, read by the browser's choice account (web/packages/app/src/composition/decision-record.ts) and by the world project's pull request insight (exulanica/world_package/projects/insight.py), so both say the same thing.",
+  "rule": "A verdict is the first of verdict_order that holds. Its template is filled ({why} is the reason's words, {minute} the minute), then made a sentence: the first letter capitalised and a full stop added unless it ends in '.', '!' or '?'. A no_answer verdict is followed, after a space, by no_answer_untaken when no minute took the request up, otherwise by no_answer_routine. A reason with no words in the society words catalog's decision_reason table reads as reason_unknown; no reason reads as reason_none.",
+  "verdict_order": [
+    "awaiting_answer",
+    "refused",
+    "no_answer",
+    "stale",
+    "not_applied",
+    "pending",
+    "applied"
+  ],
+  "entries": [
+    {
+      "key": "verdict.awaiting_answer",
+      "kind": "verdict",
+      "code": "awaiting_answer",
+      "words": "No answer is recorded yet.",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when no receipt is recorded for a request yet."
+    },
+    {
+      "key": "verdict.refused",
+      "kind": "verdict",
+      "code": "refused",
+      "words": "Refused: {why}",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when the engine rejected the model's answer, followed by why."
+    },
+    {
+      "key": "verdict.no_answer",
+      "kind": "verdict",
+      "code": "no_answer",
+      "words": "No usable answer: {why}",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when the model gave no usable answer, such as a timeout, followed by why."
+    },
+    {
+      "key": "verdict.stale",
+      "kind": "verdict",
+      "code": "stale",
+      "words": "Not applied: the world had moved on before minute {minute} could act on it. Its routine acted instead.",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when the world had moved on before a minute could act on the answer."
+    },
+    {
+      "key": "verdict.not_applied",
+      "kind": "verdict",
+      "code": "not_applied",
+      "words": "Accepted but not applied in minute {minute}: {why}",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when a minute took an accepted answer up but did not apply it."
+    },
+    {
+      "key": "verdict.pending",
+      "kind": "verdict",
+      "code": "pending",
+      "words": "Accepted; no minute has acted on it yet.",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when an accepted answer has not been taken up by any minute yet."
+    },
+    {
+      "key": "verdict.applied",
+      "kind": "verdict",
+      "code": "applied",
+      "words": "Applied in minute {minute}.",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: the verdict when a minute applied the accepted answer."
+    },
+    {
+      "key": "continuation.no_answer_routine",
+      "kind": "continuation",
+      "code": "no_answer_routine",
+      "words": "Its routine acted in minute {minute}.",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: what follows a no_answer verdict when a minute went on with the being's routine."
+    },
+    {
+      "key": "continuation.no_answer_untaken",
+      "kind": "continuation",
+      "code": "no_answer_untaken",
+      "words": "No minute has taken it up yet.",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: what follows a no_answer verdict when no minute took the request up."
+    },
+    {
+      "key": "reason_phrase.reason_none",
+      "kind": "reason_phrase",
+      "code": "reason_none",
+      "words": "no reason was recorded",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: how a missing reason code is said inside a verdict."
+    },
+    {
+      "key": "reason_phrase.reason_unknown",
+      "kind": "reason_phrase",
+      "code": "reason_unknown",
+      "words": "of a reason recorded as {code}",
+      "reason": "Authored: worded in web/packages/app/src/composition/decision-record.ts for the browser's choice account, kept here so the pull request insight says the same: how a reason code with no words in the society words catalog is said inside a verdict."
+    }
+  ]
+}

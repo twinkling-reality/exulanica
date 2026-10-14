@@ -29,6 +29,7 @@ from exulanica.world_package.projects.checkpoint import (
     evidence_document,
     pretty,
 )
+from exulanica.world_package.projects.insight import insight
 from exulanica.world_package.projects.repository import (
     append_only,
     check_message,
@@ -326,7 +327,7 @@ _BRANCH_QUERY = (
     """query($owner:String!, $name:String!, $base:String!, $head:String!, $branch:String!) {
   viewer { login }
   repository(owner:$owner, name:$name) {
-    id nameWithOwner viewerPermission isArchived isDisabled owner { login }
+    id nameWithOwner viewerPermission isArchived isDisabled visibility owner { login }
     base: ref(qualifiedName:$base) { target { ... on Commit { oid """
     + _FILES
     + """ } } }
@@ -375,6 +376,8 @@ class Remote:
     base_files: dict[str, bytes]
     branch_files: dict[str, bytes] | None
     pull_request: dict[str, Any] | None
+    #: PUBLIC, PRIVATE or INTERNAL; anything but PRIVATE gets codes only, never world text.
+    visibility: str = "PUBLIC"
 
 
 def _blob(entry: dict[str, Any] | None) -> bytes | None:
@@ -481,6 +484,9 @@ class RollingPullRequests:
                 base_files=_files(base),
                 branch_files=None if head is None else _files(head),
                 pull_request=requests[0] if requests else None,
+                visibility=repo.get("visibility")
+                if isinstance(repo.get("visibility"), str)
+                else "PUBLIC",
             )
         except (KeyError, TypeError, AttributeError) as exc:
             raise ProjectError("GitHub returned incomplete repository metadata") from exc
@@ -549,6 +555,7 @@ class RollingPullRequests:
                 *(["open-pull-request"] if remote.pull_request is None else []),
             ]
         title = f"World changes for {world['project_id']}"
+        text = "readable" if remote.visibility == "PRIVATE" else "codes"
         body = "\n".join(
             [
                 "Changes to the world:",
@@ -556,8 +563,11 @@ class RollingPullRequests:
                 "",
                 "Decision evidence (what happened while models played; not part of the world):",
                 *(f"- {line}" for line in evidence or ["none"]),
+                *(["", *insight(world, sessions, readable=text == "readable")] if sessions else []),
                 "",
                 "Recorded from a local Exulanica project. Review every value before merging.",
+                "From the committed files: "
+                + ", ".join(f"{path} {digest(data)}" for path, data in sorted(local.items())),
             ]
         )
         if (
@@ -581,6 +591,7 @@ class RollingPullRequests:
             "title": title,
             "body": body,
             "actions": actions,
+            "text": text,
             "checkpoint_sha256": checkpoint_digest(world),
             "evidence_sha256": {name: evidence_digest(s) for name, s in sorted(sessions.items())},
             "publication": "Only saved checkpoints and their evidence are published. Review all "

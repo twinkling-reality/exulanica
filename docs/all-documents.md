@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**111 documents** in the public catalog.
+**112 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -85,6 +85,7 @@ Read the contract for the state or operation being changed.
 | [Workspace asset admission](workspace-asset-admission.md) | contract | A person's own uploaded 3D assets: profile, declaration and rights, preparation, delivery, withdrawal and erasure |
 | [World version authorities](world-version-authorities.md) | contract | Versioned structure, appearance and comfort-settings authorities |
 | [One place across captures and time](place-identity.md) | contract | Place identity, coordinate frames and cross-capture alignment |
+| [World project evidence format](world-project-evidence-format.md) | contract | The versioned world project evidence file, field by field, with its versioning rule and privacy boundary, for Exulanica and outside readers |
 | [World Memory Package v1](world-memory-package.md) | contract | Portable package profiles, integrity, projections, permissions and editable repository checkpoints |
 
 <a id="environments"></a>

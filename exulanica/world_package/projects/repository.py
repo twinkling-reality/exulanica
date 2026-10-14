@@ -546,13 +546,18 @@ def accumulate(saved: Sessions, captured: Any) -> list[dict[str, Any]]:
             if model not in kept and binding_sha256(ModelBinding.model_validate(model)) in bound:
                 kept.append(model)
         result.append(
-            {
-                **incoming,
-                "session_id": part,
-                "source": old["source"] if old else incoming["source"],
-                "models": kept,
-                "decisions": decisions,
-            }
+            evidence_document(
+                {
+                    **incoming,
+                    "session_id": part,
+                    "source": old["source"] if old else incoming["source"],
+                    # A session was captured when its first file was written; later captures of
+                    # the same session must not change that, or every poll would be a change.
+                    "captured_at": old.get("captured_at") if old else incoming.get("captured_at"),
+                    "models": kept,
+                    "decisions": decisions,
+                }
+            )
         )
     return result
 

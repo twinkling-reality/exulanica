@@ -14,6 +14,30 @@
 import type { PersonDecision, SocietyDecisionDetail } from '../society-models-api.js';
 import { DECISION_WORDS, outcomeWords } from '../society-inhabitant-words.js';
 import { ACTION_LABELS, ACTIVITY_LABELS } from '../society-activity-words.js';
+import accountWordsText from '../../../../../assets/catalogs/roles/choice-account-words.v1.json?raw';
+
+interface AccountWordsEntry { readonly key: string; readonly kind: string; readonly code: string; readonly words: string }
+const accountCatalog = JSON.parse(accountWordsText) as {
+  readonly verdict_order: readonly string[];
+  readonly entries: readonly AccountWordsEntry[];
+};
+const accountTable = (kind: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(accountCatalog.entries.filter((entry) => entry.kind === kind).map((entry) => [entry.code, entry.words]));
+
+/**
+ * The verdict words of a choice's account, shared with the server's pull request insight
+ * (`assets/catalogs/roles/choice-account-words.v1.json`), so both say the same thing.
+ */
+export const ACCOUNT_WORDS = {
+  verdict_order: accountCatalog.verdict_order,
+  verdicts: accountTable('verdict'),
+  continuations: accountTable('continuation') as Readonly<Record<'no_answer_untaken' | 'no_answer_routine', string>>,
+  reasons: accountTable('reason_phrase') as Readonly<Record<'reason_none' | 'reason_unknown', string>>,
+};
+
+/** A catalog template with its `{slots}` filled. */
+const fill = (template: string, values: Readonly<Record<string, string | number | null>>): string =>
+  template.replace(/\{([a-z_]+)\}/g, (_, key: string) => String(values[key]));
 
 
 /** One event of the society's history, as much of it as a record reads. */
@@ -157,7 +181,9 @@ const sentence = (text: string): string => {
 
 /** A reason code in the words catalog's words, or the code itself said as a code. */
 const why = (code: string | null): string =>
-  code === null ? 'no reason was recorded' : DECISION_WORDS[code] ?? `of a reason recorded as ${code}`;
+  code === null
+    ? ACCOUNT_WORDS.reasons.reason_none
+    : DECISION_WORDS[code] ?? fill(ACCOUNT_WORDS.reasons.reason_unknown, { code });
 
 const metres = (millimetres: number): number => Math.round(millimetres / 1000);
 
@@ -531,24 +557,27 @@ function verdictOf(
   receipt: Held | null, consumed: ReturnType<typeof consumption>,
 ): ChoiceAccount['verdict'] {
   const reason = words(receipt?.['reason']);
-  if (receipt === null) return { kind: 'awaiting_answer', reason: null, words: 'No answer is recorded yet.' };
-  if (receipt['status'] === 'rejected') return { kind: 'refused', reason, words: sentence(`Refused: ${why(reason)}`) };
+  const said = ACCOUNT_WORDS.verdicts;
+  const minute = consumed.tick;
+  if (receipt === null) return { kind: 'awaiting_answer', reason: null, words: sentence(said['awaiting_answer']!) };
+  if (receipt['status'] === 'rejected') return { kind: 'refused', reason, words: sentence(fill(said['refused']!, { why: why(reason) })) };
   if (receipt['status'] !== 'accepted') {
+    const after = ACCOUNT_WORDS.continuations;
     return {
       kind: 'no_answer', reason,
-      words: sentence(`No usable answer: ${why(reason)}`) + (consumed.tick === null
-        ? ' No minute has taken it up yet.'
-        : ` Its routine acted in minute ${consumed.tick}.`),
+      words: `${sentence(fill(said['no_answer']!, { why: why(reason) }))} ${minute === null
+        ? after.no_answer_untaken
+        : fill(after.no_answer_routine, { minute })}`,
     };
   }
   if (consumed.disposition === 'stale') {
-    return { kind: 'stale', reason: consumed.reason, words: `Not applied: the world had moved on before minute ${consumed.tick} could act on it. Its routine acted instead.` };
+    return { kind: 'stale', reason: consumed.reason, words: sentence(fill(said['stale']!, { minute })) };
   }
   if (consumed.disposition === 'rejected' || consumed.disposition === 'superseded') {
-    return { kind: 'not_applied', reason: consumed.reason, words: sentence(`Accepted but not applied in minute ${consumed.tick}: ${why(consumed.reason)}`) };
+    return { kind: 'not_applied', reason: consumed.reason, words: sentence(fill(said['not_applied']!, { minute, why: why(consumed.reason) })) };
   }
-  if (consumed.disposition === null) return { kind: 'pending', reason: null, words: 'Accepted; no minute has acted on it yet.' };
-  return { kind: 'applied', reason: consumed.reason, words: `Applied in minute ${consumed.tick}.` };
+  if (consumed.disposition === null) return { kind: 'pending', reason: null, words: sentence(said['pending']!) };
+  return { kind: 'applied', reason: consumed.reason, words: sentence(fill(said['applied']!, { minute })) };
 }
 
 /** What a stored answer chose and proposed to say. */

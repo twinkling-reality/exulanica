@@ -368,3 +368,16 @@ def test_project_commands_round_trip(tmp_path, capsys):
     capsys.readouterr()
     assert main(["record", str(tmp_path / "nowhere")]) == 1
     assert "no .git" in capsys.readouterr().out
+
+
+def test_a_session_keeps_its_first_capture_time():
+    from exulanica.world_package.projects.repository import accumulate, session_file
+
+    project, _ = sample()
+    _, evidence = evidence_from(project)
+    first = {**evidence, "captured_at": "2026-10-14T01:00:00Z"}
+    [kept] = accumulate({}, first)
+    later = {**more_records(evidence, 1), "captured_at": "2026-10-14T02:00:00Z"}
+    [grown] = accumulate({session_file("session:one"): kept}, later)
+    assert grown["captured_at"] == "2026-10-14T01:00:00Z"
+    assert len(grown["decisions"]) == 2

@@ -11,6 +11,7 @@ from exulanica.world_package.projects.checkpoint import Conflict, ProjectError, 
 from exulanica.world_package.projects.github import GitHubProjects, Target, gh_graphql
 
 from test_world_project import sample
+from test_world_project_apply import fields_used
 
 TARGET = Target("learner/world", "main")
 
@@ -277,6 +278,42 @@ def test_unknown_outcome_never_retries(monkeypatch):
 # -- rolling pull request ------------------------------------------------------------------
 
 
+#: Fields the rolling branch read names. Repository.visibility (PUBLIC, PRIVATE or INTERNAL) and
+#: isPrivate were confirmed by introspection on 14 October 2026; the rest were confirmed on 13
+#: October or have been read from GitHub by this query.
+BRANCH_QUERY_FIELDS = {
+    "viewer",
+    "login",
+    "repository",
+    "id",
+    "nameWithOwner",
+    "viewerPermission",
+    "isArchived",
+    "isDisabled",
+    "isPrivate",
+    "visibility",
+    "owner",
+    "ref",
+    "target",
+    "oid",
+    "file",
+    "mode",
+    "object",
+    "text",
+    "byteSize",
+    "isTruncated",
+    "entries",
+    "name",
+    "pullRequests",
+    "nodes",
+    "number",
+    "url",
+    "baseRefName",
+    "title",
+    "body",
+}
+
+
 class Repository:
     """A fake personal repository with branches of files and pull requests."""
 
@@ -287,6 +324,7 @@ class Repository:
         self.writes = []
         self.owner = "learner"
         self.move = None
+        self.visibility = "PRIVATE"
 
     def oid(self):
         self.count += 1
@@ -328,6 +366,9 @@ class Repository:
 
     def request(self, query, variables):
         if query.startswith("query"):
+            if "pullRequests(headRefName:$branch, states:OPEN" in query:
+                unknown = fields_used(query) - BRANCH_QUERY_FIELDS
+                assert not unknown, f"GitHub declares no field {sorted(unknown)}"
             if self.move:
                 self.move()
                 self.move = None
@@ -335,6 +376,7 @@ class Repository:
                 "viewer": {"login": "learner"},
                 "repository": {
                     "id": "R_1",
+                    "visibility": self.visibility,
                     "nameWithOwner": "learner/world",
                     "owner": {"login": self.owner},
                     "viewerPermission": "ADMIN",
@@ -433,8 +475,9 @@ def test_one_rolling_pull_request_collects_saved_checkpoints(tmp_path):
     moved["things"][0]["transform"]["x_mm"] = 2000
     local.save(moved)
     review, result = publish(client, target, local, "Move the knight")
-    # The commit carries its own sentence; the request's text against main is unchanged.
-    assert result["actions"] == ["commit"]
+    # The commit carries its own sentence; the request's text names the committed files'
+    # digests, so it is rewritten to stay in step with them.
+    assert result["actions"] == ["commit", "update-pull-request"]
     assert [list(c["files"]) for c in review["commits"]] == [["world-project.json"]]
     assert review["commits"][0]["message"] == "Moved the knight 2 m east"
     assert len(remote.pulls) == 1 and "moved the knight 2 m east" not in pr["body"]
@@ -674,3 +717,28 @@ def test_publication_resumes_on_a_branch_created_before_a_failed_commit(tmp_path
     assert review["actions"] == ["commit", "open-pull-request"]
     assert result["actions"] == ["commit", "open-pull-request"]
     assert client.review(target, local)["actions"] == []
+
+
+def test_visibility_decides_whether_the_request_reads_labels_or_codes(tmp_path):
+    from exulanica.world_package.projects.github import BranchTarget, RollingPullRequests
+
+    from test_world_project_insight import session
+
+    local, _, _ = local_project(tmp_path)
+    world, evidence = session(count=2)
+    local.save(world, evidence=[{**evidence, "session_id": "session:labelled"}])
+    target = BranchTarget("learner/world", "main", "exulanica/world")
+    remote = Repository()
+    client = RollingPullRequests(remote.request)
+    private = client.review(target, local)
+    assert private["text"] == "readable"
+    assert "\u201crest by the well\u201d" in private["body"]
+    assert "What the beings did" in private["body"]
+    remote.visibility = "PUBLIC"
+    public = client.review(target, local)
+    assert public["text"] == "codes"
+    assert "rest by the well" not in public["body"] and "option 2 (go)" in public["body"]
+    assert public["review_sha256"] != private["review_sha256"]
+    remote.visibility = "INTERNAL"
+    assert client.review(target, local)["text"] == "codes"
+    assert remote.writes == []

@@ -12,6 +12,7 @@ import re
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlsplit
@@ -203,6 +204,30 @@ def _events(reader: WorldReader, version: str, subjects: set[str]) -> list[dict[
     raise ProjectError("society history is longer than capture reads; select fewer records")
 
 
+def _receipt(receipt: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
+    """The receipt and its minute as codes and numbers, from the record alone: no words."""
+    provider = receipt.get("provider") or {}
+    cost = provider.get("cost_usd")
+    disposition = event["document"].get("disposition")
+    return {
+        "status": receipt["status"],
+        "reason": _name(receipt.get("reason")),
+        "disposition": disposition
+        if disposition in ("applied", "rejected", "superseded", "stale")
+        else None,
+        "disposition_reason": None
+        if event["document"].get("reason") is None
+        else _name(event["document"]["reason"]),
+        "consumed_tick": _natural(event.get("tick")),
+        "served_model_id": provider.get("served_model_id")
+        if isinstance(provider.get("served_model_id"), str)
+        and _NAME.fullmatch(provider["served_model_id"])
+        else None,
+        "cost_usd": cost if isinstance(cost, str) else None,
+        "cost_known": provider.get("cost_known") is True,
+    }
+
+
 def _readable(
     request: dict[str, Any], receipt: dict[str, Any], event: dict[str, Any]
 ) -> dict[str, Any]:
@@ -238,6 +263,7 @@ def capture(
     max_decisions: int = 256,
     licence: str = "unreviewed",
     session_id: str | None = None,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
     progress: Callable[[str], None] | None = None,
 ) -> Capture:
     """Read one version and build the explicitly selected checkpoint and its dependency bytes.
@@ -420,6 +446,7 @@ def capture(
                         skipped.get("applied without a recorded choice", 0) + 1
                     )
                     continue
+                decision["receipt"] = _receipt(receipt, event)
                 if readable:
                     decision["readable"] = _readable(request, receipt, event)
                 decisions.append(decision)
@@ -441,6 +468,10 @@ def capture(
                 "source": source,
                 "models": models,
                 "decisions": decisions,
+                # Only decisions a minute took up are enumerated (decision_applied events): a
+                # request that never got a usable answer and was never consumed is absent.
+                "coverage": {"decisions": "consumed"},
+                "captured_at": now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
         )
         decisions = []

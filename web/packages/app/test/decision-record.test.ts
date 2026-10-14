@@ -2,9 +2,10 @@
 // engine and the minute did with it, what the being's events record after it, and what the call
 // cost. Records here are written by hand in the decision route's and the events route's shapes.
 import { describe, expect, it } from 'vitest';
+import accountWordsText from '../../../../assets/catalogs/roles/choice-account-words.v1.json?raw';
 import {
-  VERDICT_ORDER, choiceAccount, choiceTimeline, decisionChange, explainDecisionRecord, knownDecisions,
-  parseDecisionEvents, rewind, type DecisionEvent,
+  ACCOUNT_WORDS, VERDICT_ORDER, choiceAccount, choiceTimeline, decisionChange, explainDecisionRecord,
+  knownDecisions, parseDecisionEvents, rewind, type DecisionEvent,
 } from '../src/composition/decision-record.js';
 import type { PersonDecision, SocietyDecisionDetail } from '../src/society-models-api.js';
 
@@ -279,5 +280,20 @@ describe('rewinding a being\'s choices', () => {
     expect(rewind(timeline, 'second')).toEqual({ index: 1, total: 3, previous: timeline[0], next: timeline[2] });
     expect(rewind(timeline, 'first')!.previous).toBeNull();
     expect(rewind(timeline, 'missing')).toBeNull();
+  });
+});
+
+describe('the shared choice account words', () => {
+  it('are the catalog the server reads too, in the account\'s verdict order', () => {
+    const catalog = JSON.parse(accountWordsText) as {
+      verdict_order: string[]; entries: { kind: string; code: string; words: string }[];
+    };
+    const table = (kind: string) => Object.fromEntries(
+      catalog.entries.filter((entry) => entry.kind === kind).map((entry) => [entry.code, entry.words]));
+    expect(ACCOUNT_WORDS.verdicts).toEqual(table('verdict'));
+    expect(ACCOUNT_WORDS.continuations).toEqual(table('continuation'));
+    expect(ACCOUNT_WORDS.reasons).toEqual(table('reason_phrase'));
+    expect(Object.keys(ACCOUNT_WORDS.verdicts).sort()).toEqual([...VERDICT_ORDER].sort());
+    expect([...VERDICT_ORDER]).toEqual(catalog.verdict_order);
   });
 });

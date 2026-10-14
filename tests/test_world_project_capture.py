@@ -360,3 +360,36 @@ def test_capture_command_reads_a_token_file_and_saves_privately(world, tmp_path,
     assert output.stat().st_mode & 0o777 == 0o600
     assert evidence.stat().st_mode & 0o777 == 0o600
     assert TOKEN not in output.read_text() + evidence.read_text()
+
+
+def test_a_session_capture_records_receipts_coverage_and_its_time(world):
+    from datetime import UTC, datetime
+
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            session_id="session:one",
+            now=lambda: datetime(2026, 10, 14, 1, 2, 3, tzinfo=UTC),
+        )
+    evidence = result.evidence
+    assert evidence["coverage"] == {"decisions": "consumed"}
+    assert evidence["captured_at"] == "2026-10-14T01:02:03Z"
+    receipts = {d["record_id"]: d["receipt"] for d in evidence["decisions"]}
+    assert receipts["request:r1"] == {
+        "status": "accepted",
+        "reason": "validated_choice",
+        "disposition": "applied",
+        "disposition_reason": "applied",
+        "consumed_tick": 5,
+        "served_model_id": "synthetic-model-rev-1",
+        "cost_usd": "0.00001",
+        "cost_known": True,
+    }
+    assert receipts["request:r2"]["disposition"] == "rejected"
+    assert receipts["request:r2"]["disposition_reason"] == "option_no_longer_offered"
+    assert receipts["request:r3"]["disposition"] == "superseded"
+    # Receipts carry no words: nothing readable unless asked for.
+    assert all("readable" not in d for d in evidence["decisions"])

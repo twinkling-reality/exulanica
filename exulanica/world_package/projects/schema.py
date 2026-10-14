@@ -136,6 +136,33 @@ class Option(Closed):
     target_id: Name | None
 
 
+Code = Annotated[str, Field(min_length=1, max_length=200, pattern=r"^[a-z0-9_.:-]+$")]
+Usd = Annotated[str, Field(pattern=r"^[0-9]{1,6}(\.[0-9]{1,12})?$")]
+
+
+class Receipt(Closed):
+    """What the source receipt and its minute recorded, as codes and numbers: no words.
+
+    `status` is the receipt's (did the model give a usable answer the engine accepted);
+    `disposition` is what a minute did with an accepted answer, or null when none has.
+    """
+
+    status: Literal["accepted", "rejected", "unavailable", "stale"]
+    reason: Code
+    disposition: Literal["applied", "rejected", "superseded", "stale"] | None
+    disposition_reason: Code | None
+    consumed_tick: Natural | None
+    served_model_id: Name | None
+    cost_usd: Usd | None
+    cost_known: bool
+
+
+class Coverage(Closed):
+    """Which of the session's decisions the file holds: those a minute took up, or all."""
+
+    decisions: Literal["consumed", "all"]
+
+
 class Readable(Closed):
     """What a source decision record itself stores, made readable. Opt-in at capture.
 
@@ -152,7 +179,7 @@ class Readable(Closed):
     consumed_tick: Natural
     disposition: Name
     served_model_id: Name | None
-    cost_usd: Annotated[str, Field(pattern=r"^[0-9]{1,6}(\.[0-9]{1,12})?$")] | None
+    cost_usd: Usd | None
     cost_known: bool
 
     @model_validator(mode="after")
@@ -178,8 +205,9 @@ class Decision(Closed):
     elapsed_ms: Natural | None
     input_tokens: Natural | None
     output_tokens: Natural | None
-    # Optional, so a checkpoint without it keeps its digest (see checkpoint.document).
+    # Optional additions: a record without them keeps its digest (see checkpoint.document).
     readable: Readable | None = None
+    receipt: Receipt | None = None
 
     @model_validator(mode="after")
     def choice(self) -> Self:
@@ -273,6 +301,15 @@ class Evidence(Closed):
     source: Source
     models: Annotated[list[ModelBinding], Field(min_length=1, max_length=256)]
     decisions: Annotated[list[Decision], Field(min_length=1, max_length=1024)]
+    # Optional additions; an older file without them keeps its digest.
+    coverage: Coverage | None = None
+    captured_at: (
+        Annotated[
+            str,
+            Field(pattern=r"^20[0-9]{2}-[01][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9]Z$"),
+        ]
+        | None
+    ) = None
 
     @model_validator(mode="after")
     def references(self) -> Self:

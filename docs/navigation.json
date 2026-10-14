@@ -56,6 +56,7 @@
         {"path": "workspace-asset-admission.md", "role": "contract", "owns": "A person's own uploaded 3D assets: profile, declaration and rights, preparation, delivery, withdrawal and erasure"},
         {"path": "world-version-authorities.md", "role": "contract", "owns": "Versioned structure, appearance and comfort-settings authorities"},
         {"path": "place-identity.md", "role": "contract", "owns": "Place identity, coordinate frames and cross-capture alignment"},
+        {"path": "world-project-evidence-format.md", "role": "contract", "owns": "The versioned world project evidence file, field by field, with its versioning rule and privacy boundary, for Exulanica and outside readers"},
         {"path": "world-memory-package.md", "role": "contract", "owns": "Portable package profiles, integrity, projections, permissions and editable repository checkpoints"}
       ]
     },
