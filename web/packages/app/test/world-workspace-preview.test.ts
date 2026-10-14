@@ -48,10 +48,10 @@ function diagnostics(file: string, text: string): string[] {
 }
 
 /**
- * What the edit adds, beyond what the file says unpatched. The workspace import is a `/@fs/` path
- * Vite serves, never resolvable here, so its import is expected to be unresolved.
+ * What the edit adds, beyond what the file says unpatched. The workspace imports are `/@fs/` paths
+ * Vite serves, never resolvable here, so they are expected to be unresolved.
  */
-const EXPECTED = [/^TS(2307|2792): Cannot find module '\/@fs\/.*contextual-world\.ts'/u];
+const EXPECTED = [/^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview)\.ts'/u];
 function introduced(file: string, before: string, after: string): string[] {
   const left = new Map<string, number>();
   for (const one of diagnostics(file, before)) left.set(one, (left.get(one) ?? 0) + 1);
@@ -65,7 +65,10 @@ function introduced(file: string, before: string, after: string): string[] {
 describe('the world workspace preview\'s edits to this app', () => {
   it('finds each seam exactly once in the sources', async () => {
     const { SEAMS, occurrences } = await seams();
-    expect(SEAMS.map((one) => one.seam)).toEqual(['picker hook', 'start() deep link', 'begin() await', 'objects.begin mount']);
+    expect(SEAMS.map((one) => one.seam)).toEqual([
+      'picker hook', 'start() deep link', 'begin() await', 'objects.begin mount',
+      'Your worlds pictures', 'Your worlds open', 'Your worlds front door',
+    ]);
     for (const one of SEAMS) expect(occurrences(source(one.file), one.target), `${one.seam} in ${one.file}`).toBe(1);
   });
 
@@ -98,7 +101,7 @@ describe('the world workspace preview\'s edits to this app', () => {
 
 describe('the world workspace preview\'s own checks', () => {
   // Each script asserts at its top level; importing it runs it, and a failed assertion fails here.
-  it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-explanation.mjs', 'verify-read-backoff.mjs', 'verify-entity-activity.mjs'])('%s passes', async (script) => {
+  it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-explanation.mjs', 'verify-read-backoff.mjs', 'verify-entity-activity.mjs', 'verify-front-door.mjs'])('%s passes', async (script) => {
     await expect(preview(script)).resolves.toBeDefined();
   });
 });

@@ -31,16 +31,19 @@
 #contextual-world .cw-fact small { display:block; color:var(--cw-muted); font-size:11px; margin-top:4px; }
 #contextual-world .cw-panel-footer { flex:none; padding:12px 24px 16px; border-top:1px solid #ffffff13; }
 #contextual-world .cw-back { display:flex; align-items:center; gap:10px; padding:0; min-height:32px; border:0; border-radius:0; color:#fff; background:transparent; cursor:pointer; font-size:12px; }
-#contextual-world .cw-back kbd { display:grid; place-items:center; min-width:34px; height:25px; padding:0 5px; border:1px solid #ffffff50; border-radius:7px; font:400 10px/1 "IBM Plex Mono",monospace; background:#ffffff0c; color:#fff; box-shadow:inset 0 1px 0 #ffffff16; }
+#contextual-world .cw-back kbd,#contextual-world .cw-worlds kbd { display:grid; place-items:center; min-width:34px; height:25px; padding:0 5px; border:1px solid #ffffff50; border-radius:7px; font:400 10px/1 "IBM Plex Mono",monospace; background:#ffffff0c; color:#fff; box-shadow:inset 0 1px 0 #ffffff16; }
 #contextual-world .cw-reading,#contextual-world .cw-empty { margin:0; font-size:13px; line-height:1.6; color:var(--cw-muted); }
 #contextual-world .cw-retry { color:#fff; background:#ffffff0b; border:1px solid #ffffff65; border-radius:9px; min-height:40px; margin-top:14px; padding:8px 14px; cursor:pointer; }
-#contextual-world .cw-notice { position:absolute; top:24px; left:24px; max-width:360px; margin:0; padding:12px 16px; color:#fff; background:var(--cw-glass); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border:1px solid var(--cw-edge); border-radius:12px; pointer-events:none; }
+#contextual-world .cw-notice { position:absolute; top:76px; left:24px; max-width:360px; margin:0; padding:12px 16px; color:#fff; background:var(--cw-glass); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border:1px solid var(--cw-edge); border-radius:12px; pointer-events:none; }
+/* Your worlds: back to the front door. Hidden while a panel is open, whose own Esc closes it. */
+#contextual-world .cw-worlds { position:absolute; top:20px; left:24px; display:flex; align-items:center; gap:10px; min-height:44px; margin:0; padding:6px 14px 6px 6px; border:1px solid var(--cw-edge); border-radius:12px; color:#fff; background:linear-gradient(145deg,#ffffff12,#ffffff02 55%),var(--cw-glass); -webkit-backdrop-filter:blur(16px) saturate(110%); backdrop-filter:blur(16px) saturate(110%); box-shadow:inset 0 1px 0 #ffffff1c,0 5px 20px #00000012; font-size:12px; line-height:1; pointer-events:auto; cursor:pointer; transition:background-color .16s,border-color .16s; }
+#contextual-world .cw-worlds:hover { border-color:#ffffff65; background-color:rgba(18,24,32,.77); }
 body.ux-world-cleared #atlas:focus { outline:none; }
 @keyframes cw-acquire { from { opacity:0; margin-top:-7px; } to { opacity:var(--cw-marker-opacity,1); margin-top:0; } }
 @keyframes cw-float { 0%,100% { transform:translateY(0); opacity:1; } 50% { transform:translateY(-3px); opacity:.76; } }
 @keyframes cw-reveal { from { opacity:0; margin-left:4px; } to { opacity:1; margin-left:0; } }
 @media(max-width:760px) { #contextual-world .cw-guidance { left:16px; right:16px; bottom:16px; justify-content:space-between; gap:12px; } }
-@media(prefers-reduced-motion:reduce) { #contextual-world .cw-marker,#contextual-world .cw-marker-glyph,#contextual-world .cw-prompt,#contextual-world .cw-panel { left:0; top:0; animation:none; transition:none; } #contextual-world .cw-inspect { transition:none; } }
+@media(prefers-reduced-motion:reduce) { #contextual-world .cw-marker,#contextual-world .cw-marker-glyph,#contextual-world .cw-prompt,#contextual-world .cw-panel { left:0; top:0; animation:none; transition:none; } #contextual-world .cw-inspect,#contextual-world .cw-worlds { transition:none; } }
 @media(prefers-contrast:more) { #contextual-world { --cw-glass:rgba(18,24,32,.97); --cw-muted:#fff; --cw-edge:#fff8; } }
 
 #contextual-world .cw-reticle { position:absolute; left:50%; top:50%; width:14px; height:14px; transform:translate(-50%,-50%); pointer-events:none; opacity:.6; filter:drop-shadow(0 1px 1px #000a); }

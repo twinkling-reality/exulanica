@@ -7,6 +7,8 @@ import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { DECIDER_MARKS } from '/src/decider-marks.ts';
 import { DISCOVERY, attentionCandidates, inspectionReach, promptPresentation, layoutDiscovery, markerAt } from './discovery-policy.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
+import { returnToFrontDoor } from './front-door.ts';
+import { keepWorldPicture } from '/src/composition/world-pictures.ts';
 import './entity-sheet.css';
 import './blank-world.css';
 import './contextual-world.css';
@@ -42,7 +44,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   if (shell) { shell.inert = true; shell.setAttribute('aria-hidden', 'true'); }
   const root = document.createElement('div'); root.id = 'contextual-world';
   root.dataset.revision = 'center-aim-proximity-v6';
-  root.innerHTML = `<div class="cw-reticle" aria-label="Centre aim" role="img"><i></i><i></i><i></i><i></i></div><div class="cw-discovery" aria-label="Visible entities"></div>
+  root.innerHTML = `<button class="cw-worlds" type="button" aria-keyshortcuts="Escape"><kbd>Esc</kbd><span>Your worlds</span></button>
+    <div class="cw-reticle" aria-label="Centre aim" role="img"><i></i><i></i><i></i><i></i></div><div class="cw-discovery" aria-label="People and things in view"></div>
     <aside class="cw-prompt" hidden aria-label="Available action"><button class="cw-inspect" type="button"><kbd>E</kbd><span>Inspect</span></button></aside>
     <p class="cw-guidance"><span class="cw-mouse-hint">Drag to look</span><span class="cw-walk-hint">WASD to move · E to inspect</span></p>
     <section class="cw-panel" hidden role="dialog" aria-modal="true" aria-labelledby="cw-panel-title"></section>
@@ -57,7 +60,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   const $ = (selector) => root.querySelector(selector);
   const prompt = $('.cw-prompt'), discovery = $('.cw-discovery'), panel = $('.cw-panel');
-  const guidance = $('.cw-guidance'), mouseHint = $('.cw-mouse-hint');
+  const guidance = $('.cw-guidance'), mouseHint = $('.cw-mouse-hint'), worlds = $('.cw-worlds');
+  // Your worlds: back to the front door with this world chosen, after keeping a picture of it for
+  // its card, as the app does when a person leaves a world.
+  let leaving = false;
+  const leaveWorld = () => {
+    if (leaving) return;
+    leaving = true;
+    void keepWorldPicture(b, entry.entryId).catch(() => false).finally(() => returnToFrontDoor(entry.entryId));
+  };
+  worlds.onclick = leaveWorld;
   let rows = [], inventory = null, target = null, held = null, pointer = null;
   let dragging = null, overPrompt = false, serial = 0, lastPick = 0, frameId = 0;
   const activityLabels = new Map([...Object.entries(ACTION_LABELS), ...ACTIVITY_LABELS]);
@@ -320,7 +332,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     held = row; panel.hidden = false; prompt.hidden = true; notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     if (document.pointerLockElement) document.exitPointerLock();
-    guidance.hidden = true;
+    guidance.hidden = true; worlds.hidden = true;
     const request = ++serial;
     const previousOffer = offers.get(row.key)?.offer;
     const heading = previousOffer ? inspectionFacts(row, previousOffer, null, activityLabels).title : 'Loading details';
@@ -346,7 +358,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     entitySheet?.dispose(); entitySheet = null; panel.classList.remove('cw-entity-sheet');
     ++serial; panel.hidden = true; panel.replaceChildren(); held = null; dragging = null; overPrompt = false;
     canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
-    guidance.hidden = false; setTarget(null); canvas.focus({ preventScroll: true });
+    guidance.hidden = false; worlds.hidden = false; setTarget(null); canvas.focus({ preventScroll: true });
   }
   $('.cw-inspect').onclick = () => { void inspect(); };
   prompt.addEventListener('pointerenter', () => { overPrompt = true; }, { signal: lifetime.signal });
@@ -408,8 +420,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     }
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code)) return;
     if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); void inspect(); }
-    else if (event.code === 'Escape') { event.preventDefault(); setTarget(null); canvas.focus({ preventScroll: true }); }
-    else if (event.code === 'Enter' && event.target?.closest?.('.cw-prompt')) return;
+    else if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) leaveWorld(); }
+    else if (event.code === 'Enter' && event.target?.closest?.('.cw-prompt,.cw-worlds')) return;
     else if (event.code === 'Tab') return;
     else if (event.code !== 'Escape') event.preventDefault();
     event.stopImmediatePropagation();

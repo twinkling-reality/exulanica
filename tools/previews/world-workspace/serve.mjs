@@ -1,6 +1,8 @@
 import { createServer, loadConfigFromFile } from '../../../web/packages/app/node_modules/vite/dist/node/index.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { CAPTURE_ROUTE } from './front-door-routes.mjs';
+import { capturePictures, capturesModule, readCaptureCatalog, scenePreviewWriteGuard } from './front-door-server.mjs';
 import { observerRequestGuard } from './observer-request-guard.mjs';
 import { patchSource } from './seams.mjs';
 
@@ -16,6 +18,10 @@ try { runtime = JSON.parse(readFileSync(runtimeStateFile, 'utf8')); }
 catch { throw Error('The private runtime descriptor could not be read.'); }
 if (!Number.isInteger(runtime.ports?.api) || runtime.ports.api < 1024 || runtime.ports.api > 65535 || typeof runtime.token_file !== 'string') throw Error('Review runtime API/token binding is invalid.');
 if (observerOnly && runtime.ports.api !== 20031) throw Error('The pilot observer must use its isolated API20031.');
+// Optional private captures for the front door's filmstrip; without them each card shows the
+// picture this browser kept of its world.
+const previewDirectory = process.env.EXULANICA_REVIEW_PREVIEWS_DIRECTORY || null;
+const captures = readCaptureCatalog(previewDirectory);
 const token = readFileSync(runtime.token_file, 'utf8').trim();
 const api = 'http://127.0.0.1:' + runtime.ports.api;
 process.env.VITE_EXULANICA_TOKEN = token;
@@ -25,12 +31,16 @@ const loaded = await loadConfigFromFile({ command: 'serve', mode: 'development' 
 const plugin = {
   name: 'private-blank-world-workspace',
   enforce: 'pre',
+  ...capturesModule(captures),
   // The edits and their seams live in seams.mjs, which the app's tests check against the sources.
   transform(code, id) {
     return id.startsWith(root + '/') ? patchSource(id.slice(root.length + 1), code, here) : null;
   },
   configureServer(server) {
+    // Before the API proxy: a scene preview only reads.
+    server.middlewares.use(scenePreviewWriteGuard);
     if (observerOnly) server.middlewares.use('/api', observerRequestGuard);
+    server.middlewares.use(CAPTURE_ROUTE.slice(0, -1), capturePictures(captures, previewDirectory));
     server.middlewares.use('/review-api', async (req, res) => {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Type', 'application/json');
@@ -49,4 +59,4 @@ const server = await createServer({
   server: { ...loaded.config.server, watch: null, port: reviewPort, host: '127.0.0.1', strictPort: true, fs: { allow: [root] } },
 });
 await server.listen();
-console.log('World workspace preview: http://127.0.0.1:' + reviewPort + '/?entry=<owned-entry-id>');
+console.log('World workspace preview: http://127.0.0.1:' + reviewPort + '/');

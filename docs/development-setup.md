@@ -467,7 +467,14 @@ EXULANICA_REVIEW_RUNTIME_STATE_FILE=/absolute/private/runtime.json \
   node tools/previews/product-uiux/serve.mjs
 ```
 
-The world workspace uses loopback port19974 and an owned `?entry=<entry-id>`. It shows center aiming,
+The world workspace uses loopback port 19974. Its start page is the front door: the chosen saved world
+drawn live behind its title, a filmstrip of saved worlds, Details (the world's kind, size and look) and
+Open, which goes to the workspace's world view of that world at `?entry=<entry-id>`; Esc in the world
+returns to the front door with that world still chosen. The live background is the same saved world in
+an inert frame that only reads; the page and the server refuse its other requests. An optional private
+`EXULANICA_REVIEW_PREVIEWS_DIRECTORY` supplies captures for the filmstrip, bound to matching entry,
+version, style and state identities; without one each card shows the picture this browser kept of its
+world. The world view shows center aiming,
 limited object-relative discovery, proximity-gated Inspect, declared entity data, and separate
 behavior/activity and selected-record Companion flows. Model offers come from the server's role
 catalog; an assigned model does not prove a connected provider or a recorded decision. These
