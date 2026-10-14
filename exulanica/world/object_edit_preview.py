@@ -52,13 +52,14 @@ __all__ = [
     "ObjectEditPreview",
     "preview_object_move",
     "preview_object_removal",
+    "preview_redo",
     "preview_thing_move",
     "preview_thing_removal",
     "preview_undo",
     "read_only_snapshot",
 ]
 
-EditKind = Literal["move_object", "remove_object", "move_thing", "remove_thing", "undo"]
+EditKind = Literal["move_object", "remove_object", "move_thing", "remove_thing", "undo", "redo"]
 
 #: Each refusal a preview reports, and its code: the ``code`` the object routes answer the same
 #: refusal with (``OBJECT_PROBLEMS`` in ``exulanica.api.world_edit``; a test holds the two equal).
@@ -278,6 +279,37 @@ def preview_undo(
             None,
             version,
             "undo",
+            candidate.subject_id,
+            candidate.current,
+            candidate.restores,
+            {
+                "edit_id": str(candidate.edit_id),
+                "edit_seq": candidate.edit_seq,
+                "kind": candidate.kind,
+                "subject": candidate.subject.value,
+            },
+        )
+
+
+def preview_redo(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    *,
+    base_state_sha256: str,
+) -> ObjectEditPreview:
+    """What ``POST .../things/redo`` would record: the undo it would reverse (``undoes``) and
+    what it would put back. Takes no lock and writes nothing."""
+    with read_only_snapshot(repository.connection):
+        version = _version_block(repository, version_id)
+        try:
+            candidate = repository.validate_redo(version_id, base_state_sha256=base_state_sha256)
+        except Exception as exc:
+            return _blocked(exc, version, "redo", None)
+        return ObjectEditPreview(
+            None,
+            None,
+            version,
+            "redo",
             candidate.subject_id,
             candidate.current,
             candidate.restores,

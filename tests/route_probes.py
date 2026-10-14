@@ -656,6 +656,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     },
     "POST /world/versions/{version_id}/things/on-support": build.support_placement_probe(),
     "POST /world/versions/{version_id}/things/on-support/preview": build.support_placement_probe(),
+    "POST /world/versions/{version_id}/things/redo": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
+    "POST /world/versions/{version_id}/things/redo/preview": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
     "POST /world/versions/{version_id}/things/undo": {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},

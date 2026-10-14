@@ -7,6 +7,17 @@ requires an edit to name exactly that column (``world_alternate_edit_names_its_s
 is the one kind with no subject of its own: it names the edit it reverses in ``undone_edit_id`` and
 repeats that edit's subject columns.
 
+**Undo and redo are one kind.** A plain undo reverses an edit of a registered kind. A redo reverses
+a plain undo: it is an undo whose ``undone_edit_id`` names an undo, and it restores what that undo
+took back by the one rule every undo follows (restore the named edit's ``before_document``).
+Nothing reverses a redo: an undo after a redo reverses the redone edit again, with a new plain undo.
+An edit is undone while a plain undo names it that no redo names (:func:`undone_edits`). Undo takes
+the newest edit that is not undone (:func:`undo_candidate`); redo takes the newest plain undo that
+no redo names and after which no edit of a registered kind was made (:func:`redo_candidate`), so
+any new edit ends redo, as editors do, and undos and redos never do. No migration admits a
+``redo`` kind: the log, its constraints and every package format already admit an undo that names
+an earlier edit.
+
 **Why a registry rather than a list in each place.** Every migration that admits a kind (0042, 0050,
 0093, 0096, 0152) restates the whole list, and the projector's SQL and both package verifiers name
 kinds by hand. A kind added in one place and not another is lost without a sound: a migration that
@@ -28,9 +39,11 @@ Pure: no connection and no SQL, so a verifier can read it.
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final
+from typing import Final, Protocol
 
 from exulanica.world.errors import InvalidObjectState
 
@@ -40,9 +53,13 @@ __all__ = [
     "UNDO",
     "EditKind",
     "EditSubject",
+    "LoggedEdit",
     "UnregisteredEditKind",
     "edit_kind",
     "kinds_of",
+    "redo_candidate",
+    "undo_candidate",
+    "undone_edits",
 ]
 
 
@@ -117,7 +134,8 @@ EDIT_KINDS: Final[tuple[EditKind, ...]] = (
     EditKind("remove_thing", EditSubject.THING, "0152_a_thing_is_placed_by_its_kind"),
 )
 
-#: The kind that reverses another edit. It has no subject of its own and is never itself undone.
+#: The kind that reverses another edit. It has no subject of its own. An undo that reverses an
+#: undo is a redo; nothing reverses a redo.
 UNDO: Final = "undo"
 
 #: Every value ``world_alternate_version_edit.kind`` may hold.
@@ -146,3 +164,70 @@ def edit_kind(name: str) -> EditKind:
 def kinds_of(subject: EditSubject) -> frozenset[str]:
     """The names of every kind that changes this subject."""
     return frozenset(kind.name for kind in EDIT_KINDS if kind.subject is subject)
+
+
+class LoggedEdit(Protocol):
+    """What the undo and redo rules read of one row of a version's edit log."""
+
+    @property
+    def edit_id(self) -> uuid.UUID: ...
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def undone_edit_id(self) -> uuid.UUID | None: ...
+
+
+def _named(edit: LoggedEdit, kinds: dict[uuid.UUID, str]) -> str | None:
+    """The kind of the edit an undo names, or None for an edit that names none."""
+    return None if edit.undone_edit_id is None else kinds.get(edit.undone_edit_id)
+
+
+def _redone(edits: Sequence[LoggedEdit], kinds: dict[uuid.UUID, str]) -> set[uuid.UUID]:
+    """The plain undos a redo names."""
+    return {
+        edit.undone_edit_id
+        for edit in edits
+        if edit.kind == UNDO and edit.undone_edit_id is not None and _named(edit, kinds) == UNDO
+    }
+
+
+def undone_edits(edits: Sequence[LoggedEdit]) -> frozenset[uuid.UUID]:
+    """The edits of a log that stand undone: each named by a plain undo that no redo names.
+
+    ``edits`` is the whole log in ``edit_seq`` order. A plain undo names an edit of a registered
+    kind; a redo names a plain undo.
+    """
+    kinds = {edit.edit_id: edit.kind for edit in edits}
+    redone = _redone(edits, kinds)
+    return frozenset(
+        edit.undone_edit_id
+        for edit in edits
+        if edit.kind == UNDO
+        and edit.undone_edit_id is not None
+        and _named(edit, kinds) != UNDO
+        and edit.edit_id not in redone
+    )
+
+
+def undo_candidate(edits: Sequence[LoggedEdit]) -> uuid.UUID | None:
+    """The edit an undo would reverse: the newest edit of a registered kind not undone."""
+    undone = undone_edits(edits)
+    for edit in reversed(edits):
+        if edit.kind != UNDO and edit.edit_id not in undone:
+            return edit.edit_id
+    return None
+
+
+def redo_candidate(edits: Sequence[LoggedEdit]) -> uuid.UUID | None:
+    """The plain undo a redo would reverse: the newest one no redo names, made after the newest
+    edit of a registered kind, so any new edit ends redo."""
+    kinds = {edit.edit_id: edit.kind for edit in edits}
+    redone = _redone(edits, kinds)
+    for edit in reversed(edits):
+        if edit.kind != UNDO:
+            return None
+        if _named(edit, kinds) != UNDO and edit.edit_id not in redone:
+            return edit.edit_id
+    return None

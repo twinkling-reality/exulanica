@@ -153,6 +153,7 @@ __all__ = [
 
 #: Every subject id column of the edit log, in the order the table declares them.
 _SUBJECT_COLUMNS: Final = ",".join(subject.column for subject in EditSubject)
+_SUBJECT_COLUMNS_OF_U: Final = ",".join(f"u.{subject.column}" for subject in EditSubject)
 
 
 class CarryOutcome(StrEnum):
@@ -1134,6 +1135,43 @@ class WorldObjectRepository:
         self._require_edit_base(row, base_state_sha256)
         return self._checked_removal(version_id, object_id)
 
+    def validate_redo(self, version_id: uuid.UUID, *, base_state_sha256: str) -> UndoCandidate:
+        """The undo ``redo`` would reverse and what it would restore, without a lock or a write.
+
+        ``current`` is the subject's document as the log last recorded it, the ``before`` the redo
+        would record; ``restores`` is the undo's ``before_document``, what the redo puts back. The
+        restore checks the writer makes are made here too.
+        """
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        undo = self._redo_candidate_row(version_id)
+        subject = self._subject_of_row(undo)
+        subject_id = str(undo[subject.column])
+        restores = undo["before_document"]
+        if restores is None:
+            raise InvalidObjectState("the undo to redo recorded no document to restore")
+        if subject is EditSubject.ENVIRONMENT_INSTANCE:
+            self._check_environment_restore(version_id, restores)
+        if subject is EditSubject.POINT_MAP_INSTANCE:
+            self._check_point_map_restore(version_id, restores)
+        if subject is EditSubject.THING:
+            self._check_thing_restore(version_id, restores)
+        current = self.connection.execute(
+            "select after_document from world_alternate_version_edit "
+            f"where workspace_id=%s and world_id=%s and version_id=%s and {subject.column}=%s "
+            "order by edit_seq desc limit 1",
+            (self.workspace_id, self.world_id, version_id, subject_id),
+        ).fetchone()
+        return UndoCandidate(
+            edit_id=undo["edit_id"],
+            edit_seq=int(undo["edit_seq"]),
+            kind=str(undo["kind"]),
+            subject=subject,
+            subject_id=subject_id,
+            current=None if current is None else current["after_document"],
+            restores=restores,
+        )
+
     def validate_undo(self, version_id: uuid.UUID, *, base_state_sha256: str) -> UndoCandidate:
         """The edit ``undo`` would reverse and what it would restore, without a lock or a write.
 
@@ -1321,8 +1359,8 @@ class WorldObjectRepository:
         permanently: the override was newest, it was not an object edit, and nothing could ever
         move past it.
 
-        Undo is still not redo. An undo edit is never itself a candidate, and undoing an undo
-        would be a redo, which is a second meaning for one control.
+        Undo is still not redo. An undo edit is never itself a candidate: reversing an undo is
+        :meth:`redo`'s, and an undo after a redo reverses the redone edit again, with a new undo.
 
         **A kind with no rule is refused, by name, before anything is written.** The rule is found
         through the edit-kind registry: the kind names its subject and the subject names the
@@ -1351,6 +1389,41 @@ class WorldObjectRepository:
             )
         return self._written(version_id)
 
+    def redo(
+        self, version_id: uuid.UUID, *, base_state_sha256: str, actor: uuid.UUID
+    ) -> AlternateVersion:
+        """Reverse the newest undo that has not been redone, unless an edit was made since.
+
+        A redo is an undo of an undo (:mod:`exulanica.world.edit_kinds`): a new row of kind
+        ``undo`` naming the undo it reverses, which restores that undo's ``before_document`` by
+        the restore rule every undo uses, and repeats its subject columns. Content addresses the
+        state, so the version returns exactly to the token it had before the undo. A new edit of
+        any registered kind ends redo; undos and redos do not. Nothing to redo is refused as
+        ``InvalidObjectState``, and a redo meets the same restore checks an undo does.
+        """
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            undo = self._redo_candidate_row(version_id)
+            subject_kind = self._subject_of_row(undo)
+            if undo["before_document"] is None:
+                raise InvalidObjectState("the undo to redo recorded no document to restore")
+            restore = getattr(self, self._UNDO_RULES[subject_kind])
+            edit_id = uuid.uuid4()
+            subject, after = restore(
+                version_id, undo[subject_kind.column], undo["before_document"], edit_id
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="undo",
+                before=subject,
+                after=after,
+                actor=actor,
+                undone_edit_id=undo["edit_id"],
+                **{each.column: undo[each.column] for each in EditSubject},
+            )
+        return self._written(version_id)
+
     def _undo_object(
         self,
         version_id: uuid.UUID,
@@ -1358,8 +1431,8 @@ class WorldObjectRepository:
         before: Mapping[str, Any] | None,
         edit_id: uuid.UUID,
     ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
-        current = self._require_object(version_id, object_id)
         if before is None:
+            current = self._require_object(version_id, object_id)
             self.connection.execute(
                 "update world_alternate_object set removed=true,last_edit_id=%s,"
                 "addition_undone=true "
@@ -1367,8 +1440,10 @@ class WorldObjectRepository:
                 (edit_id, self.workspace_id, self.world_id, version_id, object_id),
             )
             return object_document(current), None
+        # A redo of an undone addition restores a subject that stands undone: it has no document.
+        present = [obj for obj in self._objects(version_id) if obj.object_id == object_id]
         self._restore_object(version_id, before, edit_id)
-        return object_document(current), object_document(
+        return (object_document(present[0]) if present else None), object_document(
             self._require_object(version_id, object_id)
         )
 
@@ -1403,8 +1478,8 @@ class WorldObjectRepository:
         edit_id: uuid.UUID,
     ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
         """Restore stored authored state without re-authorizing withdrawn source use."""
-        current = self._require_environment(version_id, instance_id)
         if before is None:
+            current = self._require_environment(version_id, instance_id)
             self.connection.execute(
                 "update world_alternate_environment_instance "
                 "set removed=true,addition_undone=true,last_edit_id=%s "
@@ -1412,10 +1487,12 @@ class WorldObjectRepository:
                 (edit_id, self.workspace_id, self.world_id, version_id, instance_id),
             )
             return environment_instance_document(current), None
+        # A redo of an undone addition restores a subject that stands undone: it has no document.
+        present = self._stored_environment(version_id, instance_id, include_undone=False)
         self._restore_environment(version_id, before, edit_id)
-        return environment_instance_document(current), environment_instance_document(
-            self._require_environment(version_id, instance_id)
-        )
+        return (
+            None if present is None else environment_instance_document(present)
+        ), environment_instance_document(self._require_environment(version_id, instance_id))
 
     # -- element overrides ------------------------------------------------------------------
 
@@ -1865,7 +1942,9 @@ class WorldObjectRepository:
     ) -> None:
         """Refuse restoring a stored environment document whose binding the instance left: the
         writer's check and the undo preview's one rule."""
-        current = self._require_environment(version_id, document["instance_id"])
+        current = self._stored_environment(version_id, document["instance_id"], include_undone=True)
+        if current is None:
+            raise UnknownWorldResource("no such environment instance")
         current_document = environment_instance_document(current)
         if (
             current_document["source"] != document["source"]
@@ -2229,7 +2308,11 @@ class WorldObjectRepository:
             raise InvalidObjectState(f"{instance.instance_id} already exists in this version")
 
     def _point_map_instances(
-        self, version_id: uuid.UUID, *, with_availability: bool = True
+        self,
+        version_id: uuid.UUID,
+        *,
+        with_availability: bool = True,
+        include_undone: bool = False,
     ) -> tuple[PointMapInstance, ...]:
         rows = self.connection.execute(
             """
@@ -2240,10 +2323,11 @@ class WorldObjectRepository:
                    stage_version,rung,declared_metric,declared_fov_y_microdegrees,region_id,
                    x_mm,y_mm,z_mm,yaw_microradians,scale_milli,origin_kind,origin_role,removed
               from world_alternate_point_map_instance
-             where workspace_id=%s and world_id=%s and version_id=%s and not addition_undone
+             where workspace_id=%s and world_id=%s and version_id=%s
+               and (%s or not addition_undone)
              order by instance_id
             """,
-            (self.workspace_id, self.world_id, version_id),
+            (self.workspace_id, self.world_id, version_id, include_undone),
         ).fetchall()
         return tuple(self._point_map_from_row(row, with_availability) for row in rows)
 
@@ -2308,6 +2392,20 @@ class WorldObjectRepository:
                 return instance
         raise UnknownWorldResource(f"no point map instance {instance_id} in this version")
 
+    def _stored_point_map(
+        self, version_id: uuid.UUID, instance_id: str, *, include_undone: bool
+    ) -> PointMapInstance | None:
+        """A point map instance's row as stored, or None; an undone addition's with
+        ``include_undone``."""
+        found = [
+            instance
+            for instance in self._point_map_instances(
+                version_id, with_availability=False, include_undone=include_undone
+            )
+            if instance.instance_id == instance_id
+        ]
+        return found[0] if found else None
+
     def _point_map_edit_ids(
         self, version_id: uuid.UUID, instance_id: str
     ) -> tuple[uuid.UUID, uuid.UUID]:
@@ -2332,8 +2430,8 @@ class WorldObjectRepository:
         already stored, and whether it may be DRAWN is decided on read, where every other change
         of permission is decided too.
         """
-        current = self._require_point_map(version_id, instance_id)
         if before is None:
+            current = self._require_point_map(version_id, instance_id)
             self.connection.execute(
                 "update world_alternate_point_map_instance "
                 "set removed=true,addition_undone=true,last_edit_id=%s "
@@ -2341,15 +2439,21 @@ class WorldObjectRepository:
                 (edit_id, self.workspace_id, self.world_id, version_id, instance_id),
             )
             return point_map_instance_document(current), None
+        # A redo of an undone addition restores a subject that stands undone: it has no document.
+        present = self._stored_point_map(version_id, instance_id, include_undone=False)
         self._restore_point_map(version_id, before, edit_id)
-        return point_map_instance_document(current), point_map_instance_document(
-            self._require_point_map(version_id, instance_id)
-        )
+        return (
+            None if present is None else point_map_instance_document(present)
+        ), point_map_instance_document(self._require_point_map(version_id, instance_id))
 
     def _check_point_map_restore(self, version_id: uuid.UUID, document: Mapping[str, Any]) -> None:
         """Refuse restoring a stored point map document whose binding the instance left: the
         writer's check and the undo preview's one rule."""
-        current = self._require_point_map(version_id, document["instance_id"])
+        current = self._stored_point_map(version_id, document["instance_id"], include_undone=True)
+        if current is None:
+            raise UnknownWorldResource(
+                f"no point map instance {document['instance_id']} in this version"
+            )
         current_document = point_map_instance_document(current)
         if (
             current_document["source"] != document["source"]
@@ -2364,7 +2468,7 @@ class WorldObjectRepository:
         transform = document["transform"]
         self.connection.execute(
             "update world_alternate_point_map_instance set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,"
-            "yaw_microradians=%s,scale_milli=%s,removed=%s,last_edit_id=%s "
+            "yaw_microradians=%s,scale_milli=%s,removed=%s,last_edit_id=%s,addition_undone=false "
             "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
             (
                 document["region_id"],
@@ -2716,7 +2820,9 @@ class WorldObjectRepository:
         if written is None:
             raise InvalidObjectState(f"{thing.thing_id} already exists in this version")
 
-    def _things(self, version_id: uuid.UUID) -> tuple[PlacedThing, ...]:
+    def _things(
+        self, version_id: uuid.UUID, *, include_undone: bool = False
+    ) -> tuple[PlacedThing, ...]:
         # A workspace kind is gone when the workspace no longer holds it, or erased it after the
         # thing was placed (so the same document kept again never brings the thing back). Gone asks
         # only whether the kind's row is there: a kind the drawing later cannot read stays present
@@ -2730,8 +2836,8 @@ class WorldObjectRepository:
             f"{THING_KIND_GONE_SQL} as kind_gone "
             "from world_alternate_thing t "
             "where t.workspace_id=%s and t.world_id=%s and t.version_id=%s "
-            "and not t.addition_undone order by t.thing_id",
-            (self.workspace_id, self.world_id, version_id),
+            "and (%s or not t.addition_undone) order by t.thing_id",
+            (self.workspace_id, self.world_id, version_id, include_undone),
         ).fetchall()
         return tuple(_thing_from_row(row) for row in rows)
 
@@ -2740,6 +2846,18 @@ class WorldObjectRepository:
             if thing.thing_id == thing_id:
                 return thing
         raise UnknownWorldResource(f"no placed thing {thing_id} in this version")
+
+    def _stored_thing(
+        self, version_id: uuid.UUID, thing_id: str, *, include_undone: bool
+    ) -> PlacedThing | None:
+        """A thing's row as it is stored, or None. With ``include_undone``, an undone addition's
+        retained row too, which only a redo restores."""
+        found = [
+            thing
+            for thing in self._things(version_id, include_undone=include_undone)
+            if thing.thing_id == thing_id
+        ]
+        return found[0] if found else None
 
     def _thing_edit_ids(self, version_id: uuid.UUID, thing_id: str) -> tuple[uuid.UUID, uuid.UUID]:
         row = self.connection.execute(
@@ -2756,8 +2874,8 @@ class WorldObjectRepository:
         before: Mapping[str, Any] | None,
         edit_id: uuid.UUID,
     ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
-        current = self._require_thing(version_id, thing_id)
         if before is None:
+            current = self._require_thing(version_id, thing_id)
             self.connection.execute(
                 "update world_alternate_thing set removed=true,addition_undone=true,"
                 "last_edit_id=%s "
@@ -2765,15 +2883,20 @@ class WorldObjectRepository:
                 (edit_id, self.workspace_id, self.world_id, version_id, thing_id),
             )
             return placed_thing_document(current), None
+        # A redo of an undone addition restores a subject that stands undone: it has no document.
+        present = self._stored_thing(version_id, thing_id, include_undone=False)
         self._restore_thing(version_id, before, edit_id)
-        return placed_thing_document(current), placed_thing_document(
+        return (None if present is None else placed_thing_document(present)), placed_thing_document(
             self._require_thing(version_id, thing_id)
         )
 
     def _check_thing_restore(self, version_id: uuid.UUID, document: Mapping[str, Any]) -> None:
         """Refuse restoring a stored document that names another kind or origin than the thing
         has: the writer's check and the undo preview's one rule."""
-        current = placed_thing_document(self._require_thing(version_id, document["thing_id"]))
+        stored = self._stored_thing(version_id, document["thing_id"], include_undone=True)
+        if stored is None:
+            raise UnknownWorldResource(f"no placed thing {document['thing_id']} in this version")
+        current = placed_thing_document(stored)
         if current["kind"] != document["kind"] or current["origin"] != document["origin"]:
             raise InvalidObjectState("stored undo kind disagrees with the thing as it stands")
         support = self._support_from_document(document)
@@ -2854,7 +2977,8 @@ class WorldObjectRepository:
         self.connection.execute(
             "update world_alternate_thing set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,"
             "yaw_microradians=%s,removed=%s,last_edit_id=%s,support_snapshot_id=%s,"
-            "support_receipt_sha256=%s,support_network_sha256=%s,support_surface_id=%s "
+            "support_receipt_sha256=%s,support_network_sha256=%s,support_surface_id=%s,"
+            "addition_undone=false "
             "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
             (
                 document["region_id"],
@@ -2954,7 +3078,11 @@ class WorldObjectRepository:
         )
 
     def _environment_instances(
-        self, version_id: uuid.UUID, *, with_availability: bool = True
+        self,
+        version_id: uuid.UUID,
+        *,
+        with_availability: bool = True,
+        include_undone: bool = False,
     ) -> tuple[EnvironmentInstance, ...]:
         """The version's environment instances, sorted by id.
 
@@ -2972,10 +3100,10 @@ class WorldObjectRepository:
                    origin_kind,origin_role,removed
               from world_alternate_environment_instance
              where workspace_id=%s and world_id=%s and version_id=%s
-               and not addition_undone
+               and (%s or not addition_undone)
              order by instance_id
             """,
-            (self.workspace_id, self.world_id, version_id),
+            (self.workspace_id, self.world_id, version_id, include_undone),
         ).fetchall()
         return tuple(self._environment_from_row(row, with_availability) for row in rows)
 
@@ -3088,7 +3216,9 @@ class WorldObjectRepository:
         return current, replace(current, removed=True)
 
     def _undo_candidate_row(self, version_id: uuid.UUID) -> Mapping[str, Any]:
-        """The newest edit no undo names: what :meth:`undo` reverses and its preview names."""
+        """The newest edit that does not stand undone: what :meth:`undo` reverses and its preview
+        names. An edit stands undone while a plain undo names it that no redo names
+        (:func:`~exulanica.world.edit_kinds.undone_edits`, which a test holds this query to)."""
         newest = self.connection.execute(
             f"select edit_id,edit_seq,kind,{_SUBJECT_COLUMNS},before_document "
             "from world_alternate_version_edit e "
@@ -3096,7 +3226,10 @@ class WorldObjectRepository:
             "and e.kind <> 'undo' "
             "and not exists (select 1 from world_alternate_version_edit u "
             " where u.workspace_id=e.workspace_id and u.world_id=e.world_id "
-            " and u.version_id=e.version_id and u.undone_edit_id=e.edit_id) "
+            " and u.version_id=e.version_id and u.undone_edit_id=e.edit_id "
+            " and not exists (select 1 from world_alternate_version_edit r "
+            "  where r.workspace_id=u.workspace_id and r.world_id=u.world_id "
+            "  and r.version_id=u.version_id and r.undone_edit_id=u.edit_id)) "
             "order by e.edit_seq desc limit 1",
             (self.workspace_id, self.world_id, version_id),
         ).fetchone()
@@ -3104,12 +3237,62 @@ class WorldObjectRepository:
             raise InvalidObjectState("this version has no edit left to undo")
         return newest
 
+    def _redo_candidate_row(self, version_id: uuid.UUID) -> Mapping[str, Any]:
+        """The newest plain undo no redo names, made after the newest edit of a registered kind:
+        what :meth:`redo` reverses and its preview names
+        (:func:`~exulanica.world.edit_kinds.redo_candidate`, which a test holds this query to).
+        Any new edit ends redo; undos and redos do not."""
+        newest = self.connection.execute(
+            f"select u.edit_id,u.edit_seq,u.kind,{_SUBJECT_COLUMNS_OF_U},u.before_document "
+            "from world_alternate_version_edit u "
+            "join world_alternate_version_edit t on t.workspace_id=u.workspace_id "
+            " and t.world_id=u.world_id and t.version_id=u.version_id "
+            " and t.edit_id=u.undone_edit_id and t.kind <> 'undo' "
+            "where u.workspace_id=%s and u.world_id=%s and u.version_id=%s and u.kind='undo' "
+            "and not exists (select 1 from world_alternate_version_edit r "
+            " where r.workspace_id=u.workspace_id and r.world_id=u.world_id "
+            " and r.version_id=u.version_id and r.undone_edit_id=u.edit_id) "
+            "and not exists (select 1 from world_alternate_version_edit d "
+            " where d.workspace_id=u.workspace_id and d.world_id=u.world_id "
+            " and d.version_id=u.version_id and d.kind <> 'undo' and d.edit_seq > u.edit_seq) "
+            "order by u.edit_seq desc limit 1",
+            (self.workspace_id, self.world_id, version_id),
+        ).fetchone()
+        if newest is None:
+            raise InvalidObjectState("this version has no undo left to redo")
+        return newest
+
+    @staticmethod
+    def _subject_of_row(row: Mapping[str, Any]) -> EditSubject:
+        """The subject a row of the log changes: its kind's, or, for an undo, which repeats the
+        subject columns of the edit it reverses, the one column it names."""
+        if row["kind"] != "undo":
+            return edit_kind(row["kind"]).subject
+        named = [subject for subject in EditSubject if row[subject.column] is not None]
+        if len(named) != 1:
+            raise InvalidObjectState("an undo in this version's log names no single subject")
+        return named[0]
+
     def _require_environment(self, version_id: uuid.UUID, instance_id: str) -> EnvironmentInstance:
         # Read by writers only, from rows: a writer may hold the asset read lock.
         for instance in self._environment_instances(version_id, with_availability=False):
             if instance.instance_id == instance_id:
                 return instance
         raise UnknownWorldResource("no such environment instance")
+
+    def _stored_environment(
+        self, version_id: uuid.UUID, instance_id: str, *, include_undone: bool
+    ) -> EnvironmentInstance | None:
+        """An environment instance's row as stored, or None; an undone addition's with
+        ``include_undone``."""
+        found = [
+            instance
+            for instance in self._environment_instances(
+                version_id, with_availability=False, include_undone=include_undone
+            )
+            if instance.instance_id == instance_id
+        ]
+        return found[0] if found else None
 
     def _object_edit_ids(
         self, version_id: uuid.UUID, obj: AuthoredObject

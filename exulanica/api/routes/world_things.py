@@ -1,5 +1,5 @@
-"""Things placed in an authored version by their kind: place, move, remove and undo, and the look
-each thing of a version wears.
+"""Things placed in an authored version by their kind: place, move, remove, undo and redo, and the
+look each thing of a version wears.
 
 A placed thing names a shipped thing kind by key, version and digest, or a kind its workspace keeps
 (a creature drafted from a person's words) by the digest of the kind's document alone, and stands
@@ -44,6 +44,7 @@ from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.object_edit_preview import (
+    preview_redo,
     preview_thing_move,
     preview_thing_removal,
     preview_undo,
@@ -240,6 +241,42 @@ def remove_thing_preview(
     return preview_thing_removal(
         repository, version_id, thing_id, base_state_sha256=body.base_state_sha256
     ).document()
+
+
+@router.post(
+    "/versions/{version_id}/things/redo",
+    response_model=AlternateVersionView,
+    summary="Reverse the newest undo not yet redone, unless an edit was made since.",
+)
+def redo_thing_edit(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: BaseStateBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return commit_edit(
+        request,
+        repository,
+        version_id,
+        body,
+        lambda: repository.redo(
+            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/things/redo/preview",
+    response_model=dict[str, object],
+    summary="Which undo a redo would reverse, and what it would put back. Writes nothing.",
+)
+def redo_thing_edit_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: ThingEditPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    return preview_redo(repository, version_id, base_state_sha256=body.base_state_sha256).document()
 
 
 @router.post(

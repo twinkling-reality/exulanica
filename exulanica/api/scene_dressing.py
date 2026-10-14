@@ -46,6 +46,7 @@ from exulanica.api.world_edit import (
     writing_repository,
 )
 from exulanica.models.manifest import load_manifest
+from exulanica.world.edit_kinds import undone_edits
 from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.objects import ObjectOrigin
 from exulanica.world.placed_things import ThingPlacement, named_kind
@@ -115,16 +116,16 @@ class DressedWorld:
 
 
 def _undone(version: Any, thing_id: str) -> bool:
-    """Whether the owner undid this thing's newest placing: an undo names the newest add_thing
-    edit of its id. Undo is a stack and an undo is never itself undone, so a thing placed again
-    after an undo answers by its newest placing, not by an older one."""
+    """Whether this thing's newest placing stands undone: a plain undo names it that no redo
+    names (:func:`~exulanica.world.edit_kinds.undone_edits`). A thing placed again after an undo
+    answers by its newest placing, not by an older one."""
     placings = [
         edit for edit in version.edits if edit.kind == "add_thing" and edit.thing_id == thing_id
     ]
     if not placings:
         return False
     newest = max(placings, key=lambda edit: edit.edit_seq).edit_id
-    return any(edit.kind == "undo" and edit.undone_edit_id == newest for edit in version.edits)
+    return newest in undone_edits(version.edits)
 
 
 def dress_saved_world(

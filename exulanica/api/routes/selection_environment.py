@@ -48,6 +48,7 @@ from exulanica.world import (
     UnavailableAsset,
     WorldObjectRepository,
 )
+from exulanica.world.edit_kinds import undo_candidate
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/selection", tags=["selection"])
@@ -143,8 +144,9 @@ class EnvironmentProposalResponse(BaseModel):
 
 
 def _has_reversible_edit(version: Any) -> bool:
-    undone = {edit.undone_edit_id for edit in version.edits if edit.undone_edit_id is not None}
-    return any(edit.kind != "undo" and edit.edit_id not in undone for edit in version.edits)
+    """Whether an undo has an edit to reverse (:func:`~exulanica.world.edit_kinds.undo_candidate`):
+    an edit undone and then redone is reversible again."""
+    return undo_candidate(version.edits) is not None
 
 
 @router.post(

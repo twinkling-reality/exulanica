@@ -682,6 +682,14 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "validates a chosen passive rigid kind, exact source support and authored base; "
             "the version read does not enumerate source-bound placement candidates"
         ),
+        ("POST", "/world/versions/{version_id}/things/redo"): (
+            "reverses the newest undo not yet redone, the control the workspace's build mode "
+            "offers beside undo; no Companion plan step makes it yet"
+        ),
+        ("POST", "/world/versions/{version_id}/things/redo/preview"): (
+            "a read-only preview of a redo for the workspace's build mode; the capability read "
+            "projects the edits themselves, and a Companion plan step does not prepare through it"
+        ),
         ("POST", "/world/versions/{version_id}/things/undo/preview"): (
             "a read-only preview of a placed thing's undo for the workspace's build mode; "
             "the capability read projects the edits themselves, and a Companion plan step "

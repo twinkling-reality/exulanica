@@ -495,7 +495,7 @@ added, fails the first of those.
 **Undo** appends a new edit of kind `undo` naming the edit it reverses, and restores that edit's
 `before_document`. History is never rewritten.
 
-It reverses **the newest edit that no undo already names**, so a person who made three edits can
+It reverses **the newest edit that does not stand undone**, so a person who made three edits can
 take all three back. Reversing "the newest edit" instead would refuse the second undo, because by
 then the newest edit is an undo, and a control that works once is not an undo. The repository
 defines an inverse for every subject the registry names: object, element-override, environment
@@ -506,9 +506,21 @@ rather than being read as some other subject's document. The ordinary runtime ca
 edits without deletion authority. Tests exercise that restricted role, including replacement and
 restoration of element overrides and environment addition, movement and removal.
 
-Undo is still not redo. An undo edit is never itself a candidate. When every edit has been
-reversed, a further undo is refused with `invalid_object_state`, as it is on a version with no
-edits at all.
+An undo edit is never itself an undo's candidate. When every edit has been reversed, a further
+undo is refused with `invalid_object_state`, as it is on a version with no edits at all.
+
+**Redo** reverses an undo. It appends an edit of kind `undo` that names the undo it reverses, so a
+redo is an undo of an undo: it restores that undo's `before_document` by the same rule, repeats its
+subject columns, and returns the version to exactly the state token it had before the undo. A
+plain undo names an edit of a registered kind; a redo names a plain undo; nothing names a redo. An
+edit stands undone while a plain undo names it that no redo names, so an undo after a redo
+reverses the redone edit again with a new plain undo. Redo takes the newest plain undo that no
+redo names and after which no edit of a registered kind was made: any new edit ends redo, as it
+does in an editor, and undos and redos do not. With nothing to redo it is refused with
+`invalid_object_state`; it meets every restore check an undo meets. No migration admits a redo
+kind: the log's constraints and every package format already admit an undo that names an earlier
+edit, and `exulanica/world/edit_kinds.py` states the rule once, which the repository's queries are
+held to. Redoing an undone addition clears `addition_undone` on every subject's row.
 
 Undoing an `add_object` retains its projection row with `addition_undone = true`, because the
 ordinary runtime has no deletion authority. Canonical reads and authored-world package export
@@ -567,6 +579,8 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/move` | Replace one placed thing's pose where the world's ground takes it (section 14) |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/remove` | Store a placed thing's removal |
 | `POST` | `/world/versions/{version_id}/things/undo` | Reverse the newest edit not already reversed |
+| `POST` | `/world/versions/{version_id}/things/redo` | Reverse the newest undo not yet redone, unless an edit was made since |
+| `POST` | `/world/versions/{version_id}/things/redo/preview` | Which undo a redo would reverse and what it would put back; writes nothing |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/move/preview` | What the move would record and where the thing would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/remove/preview` | What the removal would record, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/things/undo/preview` | Which edit an undo would reverse and what it would restore; writes nothing |
