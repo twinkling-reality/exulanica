@@ -94,17 +94,17 @@ ROOF_FORMS: Final = _words("site-roof-form")
 #: The engine roles a part may take: what the engine does with it, with the forms that may take
 #: each (``kind-role``, which :mod:`exulanica.world.kinds.catalogs` reads for the forms).
 ROLES: Final = _words("kind-role", ("forms", key_list_field))
+#: The most a single span, count or length may state: a 32-bit integer, far past any site.
+_FIGURE_MAXIMUM: Final = 2_147_483_647
 #: The look families a part's look role may name (``look-family``, whose fit, dressing and fill
 #: bounds :mod:`exulanica.world.kinds.catalogs` reads).
 LOOK_FAMILIES: Final = _words(
     "look-family",
     ("fit", text_field),
     ("dressing", text_field),
-    ("fill_minimum_permille", integer_field(0, 2**31 - 1)),
-    ("fill_maximum_permille", integer_field(0, 2**31 - 1)),
+    ("fill_minimum_permille", integer_field(0, _FIGURE_MAXIMUM)),
+    ("fill_maximum_permille", integer_field(0, _FIGURE_MAXIMUM)),
 )
-#: The most a single span, count or length may state: a 32-bit integer, far past any site.
-_FIGURE_MAXIMUM: Final = 2_147_483_647
 
 
 def _require(condition: bool, message: str) -> None:
