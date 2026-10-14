@@ -210,7 +210,7 @@ if it is large, with the people in it visible, because it is the model that find
 embedding model, which is sent the descriptions made from it; and the composer, which is sent the
 descriptions and dates of the photographs a question finds. Recording the human review offers the
 depth estimate. `GET /personal-admission` states every offered right in `model_right_offers`: its
-notice, filled from [`model-right-uses.v1.json`](../exulanica/ingest/model-right-uses.v1.json) with
+notice, filled from [`model-right-uses.v2.json`](../exulanica/ingest/model-right-uses.v2.json) with
 the host and every model of the role's chain, and the words that stop it. The browser keeps no copy
 of any of them, sends the notice back unchanged, and the server refuses any other text (rule P6). A
 role the app does not offer, such as a local segmentation role, is granted through the route only
@@ -517,7 +517,7 @@ Several of these are FTC Section 5 deception exposure, not merely bad manners. E
 
 A person grants a right against exact words the server states, and the grant keeps those words
 (rule P6). The words are data: a personal model right's notice is filled from
-[`model-right-uses.v1.json`](../exulanica/ingest/model-right-uses.v1.json) with the host and every
+[`model-right-uses.v2.json`](../exulanica/ingest/model-right-uses.v2.json) with the host and every
 model of the role's chain, and a place-name right's from
 [`place-name-uses.v1.json`](../exulanica/consent/place-name-uses.v1.json). A notice names what is
 sent, to which models at which host, for what purpose and for how long, and how to stop it. A change
