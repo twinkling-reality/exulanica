@@ -38,9 +38,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "simulation, appearance and the utterance entry",
     ),
     "exulanica/world/object_repository.py": (
-        3_607,
+        3_690,
         "alternate world versions and the objects, environments, point maps and things "
-        "authored in them",
+        "authored in them, and the changes made to a site world's made parts",
     ),
     "web/packages/app/src/composition/environment-selection.ts": (
         3_335,
@@ -56,8 +56,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the v2 society's input, graph, spots, talk and minute",
     ),
     "exulanica/api/society_runtime.py": (
-        2_401,
-        "society composition for districts and for authored worlds, and the site reads",
+        2_421,
+        "society composition for districts and for authored worlds, and the site reads, "
+        "with the version's changes to a site's made parts",
     ),
     "exulanica/world/society_things.py": (2_291, "the society of things, exulanica-society/v7"),
     "exulanica/evaluation/visual_gate.py": (

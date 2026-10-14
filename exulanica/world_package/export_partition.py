@@ -32,6 +32,12 @@ admitted and prepared names bytes only that workspace may deliver
 :data:`WORKSPACE_ASSETS`, which no family carries: it and every version branched from it are
 withheld under ``section_not_carried`` with that name, and the versions before it still export.
 
+**Nor is a change to a made part.** A person's move or removal of a part a site world was made
+with is stored as an element override that names the part (``part:<identity>``,
+:mod:`exulanica.world.site_parts`), not an element of the source snapshot, which is all a package's
+override may name. A version whose overrides ever named a part, undone or not, needs
+:data:`MADE_PART_CHANGES` and is withheld as a workspace's own asset is.
+
 **Where a withheld version is counted.** In the requested format of the family its own state and
 chain need or, when that family was not requested, in the nearest smaller family that was, so a
 receiver of an authored-world directory alone is told about every version it does not get. That is
@@ -59,6 +65,7 @@ from exulanica.world_package.extension_formats import (
 from exulanica.world_package.package import PackageError
 
 __all__ = [
+    "MADE_PART_CHANGES",
     "REASON_KIND_NOT_ADMITTED",
     "REASON_SECTION_NOT_CARRIED",
     "REASON_SOURCE_INVALIDATED",
@@ -74,6 +81,8 @@ __all__ = [
 #: The name under which a version holding an object placed from a workspace's own asset is
 #: withheld: content its state holds that no extension format carries.
 WORKSPACE_ASSETS: Final = "workspace_assets"
+#: The name under which a version whose overrides ever named a site world's made part is withheld.
+MADE_PART_CHANGES: Final = "made_part_changes"
 
 
 @dataclass(frozen=True, slots=True)

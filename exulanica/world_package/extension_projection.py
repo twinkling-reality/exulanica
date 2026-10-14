@@ -43,8 +43,10 @@ from exulanica.world.authored_delta import DELTA_SECTIONS, canonical_delta_docum
 from exulanica.world.edit_kinds import EditSubject
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject
+from exulanica.world.site_parts import PART_PREFIX
 from exulanica.world_package import authored, environments
 from exulanica.world_package.export_partition import (
+    MADE_PART_CHANGES,
     WORKSPACE_ASSETS,
     ExportPlan,
     PlaneVersion,
@@ -182,6 +184,16 @@ def _plane_versions(
             (workspace_id, world_id),
         ).fetchall()
     }
+    # A change to a site world's made part names the part, not an element of the snapshot, so no
+    # package's override can hold it; its chain holds it once made, so undone ones count too.
+    changing_made_parts = {
+        row["version_id"]
+        for row in cursor.execute(
+            "select distinct version_id from world_alternate_element_override "
+            "where workspace_id=%s and world_id=%s and element_id like %s",
+            (workspace_id, world_id, f"{PART_PREFIX}%"),
+        ).fetchall()
+    }
     return tuple(
         PlaneVersion(
             version_id=row["version_id"],
@@ -190,10 +202,13 @@ def _plane_versions(
             chain_kinds=frozenset(kinds.get(row["version_id"], ())),
             chain_subjects=frozenset(subjects.get(row["version_id"], ())),
             state_sections=frozenset(sections.get(row["version_id"], ())),
-            uncarried=(
-                frozenset({WORKSPACE_ASSETS})
-                if row["version_id"] in holding_workspace_assets
-                else frozenset()
+            uncarried=frozenset(
+                name
+                for name, holding in (
+                    (WORKSPACE_ASSETS, holding_workspace_assets),
+                    (MADE_PART_CHANGES, changing_made_parts),
+                )
+                if row["version_id"] in holding
             ),
         )
         for row in cursor.execute(

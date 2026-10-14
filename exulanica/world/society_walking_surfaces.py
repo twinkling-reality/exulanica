@@ -44,6 +44,7 @@ from exulanica.world.authored_delta import AlternateVersion, version_delta_sha25
 from exulanica.world.composers import composer_module
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.placed_things import PlacedThing
+from exulanica.world.site_parts import part_identity
 from exulanica.world.society_authored_ground import (
     PLACE_NODE_PREFIX,
     PLACED_THING_PREFIX,
@@ -812,7 +813,9 @@ def build_walking_surfaces_input(
         reason = reason or "authored_ground_snapshot_mismatch"
     if version.source_invalidated:
         reason = reason or "authored_source_invalidated"
-    if version.element_overrides:
+    if any(part_identity(o.element_id) is None for o in version.element_overrides):
+        # A person's change to a site's made part is in the place already, made from the changed
+        # records (exulanica.world.site_parts); any other structural override is not.
         reason = reason or "unsupported_structural_overrides"
     if place["availability"] != "available":
         reason = reason or f"walking_surfaces_unavailable:{place['unavailable_reason']}"

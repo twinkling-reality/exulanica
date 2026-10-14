@@ -165,8 +165,8 @@ The delta has four parts, and the version stores all four:
 | Part | Storage | Public mutation route |
 | --- | --- | --- |
 | Additions | `world_alternate_object` rows with `removed = false` and `addition_undone = false` | Yes |
-| Removals | authored objects with `removed = true` and `addition_undone = false`; source elements in `world_alternate_element_override` with `suppressed = true` | Authored objects yes; source elements no |
-| Transforms | the fixed-point transform on an authored object; a replacement transform on a source element override | Authored objects yes; source elements no |
+| Removals | authored objects with `removed = true` and `addition_undone = false`; source elements in `world_alternate_element_override` with `suppressed = true` | Authored objects yes; source elements no; a site world's made parts yes ([section 15](#15-a-site-worlds-made-parts)) |
+| Transforms | the fixed-point transform on an authored object; a replacement transform on a source element override | Authored objects yes; source elements no; a site world's made parts yes ([section 15](#15-a-site-worlds-made-parts)) |
 | Appearance references | `style_version_id` on the version | At creation only |
 
 Source-element suppression and source-element transform are stored, digested, read back and
@@ -174,7 +174,9 @@ tested, because the World state contract requires an alternate version to store 
 transforms of its source and because the package extension cannot be specified against a data
 contract that is missing half of the delta. They have no public mutation route: suppressing a
 structural element changes what a person can reach, which is a protected-value review rather than
-an object edit, so only the reviewed composer writes them.
+an object edit, so only the reviewed composer writes them. The one exception is a part a site world
+was made with, whose override names the part rather than a snapshot element: every change to one is
+held to the place its people walk before it is kept ([section 15](#15-a-site-worlds-made-parts)).
 
 ## 3. A created object
 
@@ -1188,6 +1190,54 @@ delete the thing's support columns and edit history with their owning world; res
 prevent the removed world from serving again. Shared inhabitant path heights, seated-body
 clearance, giant movement, ramps, lifts and city transit are not established by this placement
 operation.
+
+## 15. A site world's made parts
+
+A site world (one made from a world kind: a garden, a farm) is read back from its generation receipt
+as records, never stored, each part with an identity its rule derives from its owner and ordinal and
+never from its position. A person may move, turn and remove three kinds of them: a building, a
+fixture standing in a garden area (a bench, a tree, a sign) and an area (a pond, a field). Paths,
+zones, walls, rooms and the fixtures inside a building are not changed on their own; a building
+carries its walls, rooms and room fixtures with it.
+
+| Route | What it does |
+| --- | --- |
+| `GET /world/versions/{version_id}/parts` | Every changeable part as it stands with the version's changes (`exulanica.site-parts/v1`): identity, kind (`building`, `fixture`, `area`), words, garden area, centre and size (east, north), and the version's changes. |
+| `POST .../parts/{part_id}/move` and `/move/preview` | Stand the part at a new centre (`pose`: `x_mm` east, `z_mm` south, `y_mm` 0) turned a whole number of quarter turns from how it was made (`yaw_microradians` 0, 1570796, 3141593 or 4712389): every part is an axis-aligned rectangle. |
+| `POST .../parts/{part_id}/remove` and `/remove/preview` | Remove the part. |
+
+**Stored as an element override that names the part.** A change is a row of
+`world_alternate_element_override` whose `element_id` is `part:<identity>`: a move its new pose, a
+removal `suppressed`. It is written with the `transform_element` and `suppress_element` edit kinds,
+in the version's edit log, so `POST .../things/undo` and `.../things/redo` undo and redo it as any
+edit. No migration was needed: the table names no snapshot element by key. The receipt is never
+changed, so the world as made still reads from it alone, its people stay on the same version, and a
+version with no part changes keeps its digest.
+
+**Checked before it is kept.** The kind worker, which alone generates a site's records, applies the
+version's changes and this one, and holds the part to the records: inside its own garden area, clear
+of every building, every other fixture, every path and every pond (a fixture may stand in a field),
+and the records' own rules. It then makes the place the world's people walk from the changed records
+and requires every place of it to be reached from the entry. A part somebody of the version's
+society lives or works in is not removed: the refusal names up to three of them and says the part can
+be moved instead, since a person's home and work name the part, not its position. A refusal is
+answered as a placed thing's refused landing (422, its `code`, `where` and a sentence): codes
+`part_unknown`, `part_not_changeable`, `part_outside_zone`, `part_blocked`, `part_records_refused`,
+`part_strands_people`, `part_houses_people` and `parts_not_served`. The previews answer the same
+verdicts and write nothing.
+
+**What follows a kept change.** The world as it stands is the receipt's records with the version's
+changes applied, named by the digest of those changes, which keys the worker's drawing and place
+(unchanged for a world nobody changed): the site drawing (`GET .../site`), the ground a placed thing
+lands on, and the place the version's society walks, which takes the change as its next input. A
+living society's stored place is reused only for a version whose parts were never changed.
+
+**What is served.** A site on level ground with nothing standing on its parts (site-plan composer
+version 1). A world whose things stand on its parts (version 2), one on land (version 5) and one
+made of terrain are refused by name (`parts_not_served`). A version whose overrides ever named a
+part is withheld from package export as `made_part_changes`: a package's override names only
+snapshot elements. Supported placement on a version holding part changes stays refused, as with any
+source override.
 
 ## Bounded scene-extraction preparation
 

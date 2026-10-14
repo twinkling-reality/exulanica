@@ -57,6 +57,7 @@ __all__ = [
     "SiteWorld",
     "check_samples",
     "compose_site",
+    "first_unreached",
     "layout_budget",
     "sample_values",
     "site_seed",
@@ -157,6 +158,13 @@ def _reached(place: Mapping[str, Any], start: str) -> set[str]:
     return seen
 
 
+def first_unreached(world_place: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """The first of a place's destinations, in its order, that nobody reaches from its entry, or
+    None: what a kind's candidate is refused for, and a change to a made part."""
+    reached = _reached(world_place, "entry")
+    return next((d for d in world_place["destinations"] if d["node_id"] not in reached), None)
+
+
 def _needs(
     world_place: Mapping[str, Any],
     routine: RoutineModel,
@@ -179,14 +187,12 @@ def _needs(
             "kind_population_out_of_bounds",
             f"it houses {residents} people; a world houses {low} to {high}",
         )
-    reached = _reached(world_place, "entry")
-    for destination in world_place["destinations"]:
-        if destination["node_id"] not in reached:
-            return (
-                "kind_unreachable",
-                f"{destination['label']} ({destination['destination_id']}) is not reached from "
-                "the entry",
-            )
+    unreached = first_unreached(world_place)
+    if unreached is not None:
+        return (
+            "kind_unreachable",
+            f"{unreached['label']} ({unreached['destination_id']}) is not reached from the entry",
+        )
     staffed = [d for d in world_place["destinations"] if d["staff_capacity"] > 0]
     if staffed and residents * employment // 1000 < 1:
         return (

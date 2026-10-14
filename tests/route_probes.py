@@ -538,6 +538,22 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/parts/{part_id}/move": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "pose": _POSE},
+    },
+    "POST /world/versions/{version_id}/parts/{part_id}/move/preview": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "pose": _POSE},
+    },
+    "POST /world/versions/{version_id}/parts/{part_id}/remove": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
+    "POST /world/versions/{version_id}/parts/{part_id}/remove/preview": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
     "POST /world/versions/{version_id}/society": {
         **_IN_WORLD,
         "json": {"place_id": str(uuid.uuid4()), "region_id": "region-a"},
@@ -982,6 +998,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/objects/{object_id}": Owned(
         build.world_object, build.invented_object
     ),
+    "/world/versions/{version_id}/parts/{part_id}": Owned(build.made_part),
     "/world/versions/{version_id}/society/actions/{request_id}": Owned(build.action_request),
     "/world/versions/{version_id}/society/comparisons/{comparison_id}": Owned(build.comparison),
     "/world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}": Owned(
@@ -1054,6 +1071,10 @@ EXISTENCE_REQUESTS: Final[Mapping[str, Callable[[Any], dict[str, Any]]]] = {
     "POST /models/probes/{probe_id}/start": build.model_probe_start_request,
     "PUT /world-entries/{entry_id}": build.entry_update_request,
     "POST /world/styles/previews/{preview_id}/apply": build.style_apply_request,
+    "POST /world/versions/{version_id}/parts/{part_id}/move": build.made_part_move_request,
+    "POST /world/versions/{version_id}/parts/{part_id}/move/preview": build.made_part_move_request,
+    "POST /world/versions/{version_id}/parts/{part_id}/remove": build.made_part_request,
+    "POST /world/versions/{version_id}/parts/{part_id}/remove/preview": build.made_part_request,
     "POST /world/versions/{version_id}/things/on-support": build.support_placement_request,
     "POST /world/versions/{version_id}/things/on-support/preview": build.support_placement_request,
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": build.generated_tile_request,

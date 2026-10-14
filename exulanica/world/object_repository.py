@@ -119,6 +119,7 @@ from exulanica.world.placed_things import (
 )
 from exulanica.world.point_map_source_authority import PointMapSourceAuthority
 from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
+from exulanica.world.site_parts import PART_PREFIX, PartChange, changes_of, part_identity
 from exulanica.world.society import inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.thing_kind_gone import THING_KIND_GONE_SQL
@@ -1536,6 +1537,88 @@ class WorldObjectRepository:
                 actor=actor,
             )
         return self._written(version_id)
+
+    # -- a site world's made parts ----------------------------------------------------------
+
+    def part_changes(self, version_id: uuid.UUID) -> tuple[PartChange, ...]:
+        """The changes a person made to the made parts of the version's site world: its overrides
+        that name a part (:mod:`exulanica.world.site_parts`), in identity order."""
+        return changes_of(self._overrides(version_id))
+
+    def parts_ever_changed(self, version_id: uuid.UUID) -> bool:
+        """Whether a person ever changed a made part of the version, undone or not: a place a
+        society stored before cannot say which changes it was made from."""
+        row = self.connection.execute(
+            "select exists(select 1 from world_alternate_element_override where workspace_id=%s "
+            "and world_id=%s and version_id=%s and element_id like %s) as present",
+            (self.workspace_id, self.world_id, version_id, f"{PART_PREFIX}%"),
+        ).fetchone()
+        return bool(row["present"])
+
+    def validate_part_change(
+        self,
+        version_id: uuid.UUID,
+        override: ElementOverride,
+        *,
+        base_state_sha256: str,
+        part_ids: frozenset[str],
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any]]:
+        """Validate exactly what ``set_part_change`` would, without a lock or a write: the part's
+        override as it stands (None: unchanged) and as the change would leave it."""
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._checked_part_change(version_id, override, part_ids)
+
+    def set_part_change(
+        self,
+        version_id: uuid.UUID,
+        override: ElementOverride,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+        part_ids: frozenset[str],
+    ) -> AlternateVersion:
+        """Move, turn or remove a made part of the version's site world, as an element override
+        whose id names the part (``part:<identity>``), with the edit kinds, log and undo every
+        element override has. ``part_ids`` are the parts of the world's records a person may
+        change, read by the caller from the kind worker, which alone generates a site's records;
+        whether the part may stand where the change leaves it is the caller's check, made from the
+        same records before this is called."""
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            before, after = self._checked_part_change(version_id, override, part_ids)
+            edit_id = uuid.uuid4()
+            self._write_override(version_id, override, edit_id)
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="suppress_element" if override.suppressed else "transform_element",
+                object_id=None,
+                element_id=override.element_id,
+                before=before,
+                after=after,
+                actor=actor,
+            )
+        return self._written(version_id)
+
+    def _checked_part_change(
+        self, version_id: uuid.UUID, override: ElementOverride, part_ids: frozenset[str]
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any]]:
+        identity = part_identity(override.element_id)
+        if identity is None or identity not in part_ids:
+            raise InvalidObjectData(
+                f"{override.element_id} names no part of this world a person may change"
+            )
+        try:
+            changes_of((override,))
+        except ValueError as exc:
+            raise InvalidObjectData(str(exc)) from exc
+        current = {o.element_id: o for o in self._overrides(version_id)}.get(override.element_id)
+        if current is not None and current.suppressed:
+            raise InvalidObjectState("that part was removed; undo brings it back")
+        return (None if current is None else override_document(current)), override_document(
+            override
+        )
 
     # -- edit plumbing ----------------------------------------------------------------------
 

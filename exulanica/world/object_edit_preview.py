@@ -42,8 +42,9 @@ from exulanica.world.errors import (
     ThingLandingRefused,
 )
 from exulanica.world.object_repository import WorldObjectRepository
-from exulanica.world.objects import Transform, object_document
+from exulanica.world.objects import ElementOverride, Transform, object_document
 from exulanica.world.placed_things import placed_thing_document
+from exulanica.world.site_parts import PART_CODES, PartChangeRefused
 from exulanica.world.thing_landing import LANDING_CODES, LandingGround
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 
@@ -52,6 +53,7 @@ __all__ = [
     "ObjectEditPreview",
     "preview_object_move",
     "preview_object_removal",
+    "preview_part_change",
     "preview_redo",
     "preview_thing_move",
     "preview_thing_removal",
@@ -59,7 +61,16 @@ __all__ = [
     "read_only_snapshot",
 ]
 
-EditKind = Literal["move_object", "remove_object", "move_thing", "remove_thing", "undo", "redo"]
+EditKind = Literal[
+    "move_object",
+    "remove_object",
+    "move_thing",
+    "remove_thing",
+    "move_part",
+    "remove_part",
+    "undo",
+    "redo",
+]
 
 #: Each refusal a preview reports, and its code: the ``code`` the object routes answer the same
 #: refusal with (``OBJECT_PROBLEMS`` in ``exulanica.api.world_edit``; a test holds the two equal).
@@ -78,8 +89,11 @@ _REFUSALS: Final[tuple[tuple[type[Exception], str], ...]] = (
 )
 
 #: Every code ``blocked_reason`` can carry. Stable: codes are added, never renamed. A thing's
-#: landing refusal carries its own (``thing_landing``'s ``LANDING_CODES``).
-OBJECT_EDIT_BLOCKED_REASONS: Final = frozenset(code for _kind, code in _REFUSALS) | LANDING_CODES
+#: landing refusal carries its own (``thing_landing``'s ``LANDING_CODES``), and a made part's
+#: change its own (``site_parts``' ``PART_CODES``).
+OBJECT_EDIT_BLOCKED_REASONS: Final = (
+    frozenset(code for _kind, code in _REFUSALS) | LANDING_CODES | PART_CODES
+)
 
 #: What a ready edit leaves unchanged on the version, as a composition preview states it.
 _PRESERVES: Final = ("source_snapshot_id", "style_version_id", "other_subjects", "prior_edits")
@@ -230,6 +244,49 @@ def preview_thing_move(
             placed_thing_document(moved),
             None,
             checked,
+        )
+
+
+def preview_part_change(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    kind: Literal["move_part", "remove_part"],
+    override: ElementOverride,
+    *,
+    base_state_sha256: str,
+    part_ids: frozenset[str],
+    refusal: PartChangeRefused | None,
+) -> ObjectEditPreview:
+    """What ``POST .../parts/{part_id}/move`` or ``.../remove`` would record. ``refusal`` is the
+    caller's verdict on where the part would stand, made from the world's records in the kind
+    worker (None: it may), and ``part_ids`` the parts a person may change there; the base is checked
+    first, as the write checks it. Takes no lock and writes nothing."""
+    subject_id = override.element_id
+    with read_only_snapshot(repository.connection):
+        version = _version_block(repository, version_id)
+        try:
+            if refusal is not None:
+                repository.require_edit_base(
+                    repository.edit_base_row(version_id), base_state_sha256
+                )
+                return ObjectEditPreview(
+                    refusal.code,
+                    str(refusal),
+                    version,
+                    kind,
+                    subject_id,
+                    None,
+                    None,
+                    None,
+                    {"checked": True, "where": dict(refusal.where)},
+                )
+            before, after = repository.validate_part_change(
+                version_id, override, base_state_sha256=base_state_sha256, part_ids=part_ids
+            )
+        except Exception as exc:
+            return _blocked(exc, version, kind, subject_id)
+        return ObjectEditPreview(
+            None, None, version, kind, subject_id, before, after, None, {"checked": True}
         )
 
 

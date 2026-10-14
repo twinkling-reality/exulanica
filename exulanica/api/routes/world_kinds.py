@@ -1035,6 +1035,7 @@ def read_site_drawing(
     from exulanica.world.kinds.worker import TerrainDressingWorkerCompiler
     from exulanica.world.object_repository import WorldObjectRepository
     from exulanica.world.reviewed_catalog import ReviewedCatalog
+    from exulanica.world.site_parts import changes_document, changes_sha256
     from exulanica.world.terrain_authoring import TerrainAuthoringRefused
     from exulanica.world.terrain_dressing_authority import (
         require_terrain_dressing_current,
@@ -1063,15 +1064,19 @@ def read_site_drawing(
                 receipt_terrain(receipt),
                 compile_coverage=TerrainDressingWorkerCompiler(session.workspace_id),
             )
+        # The world as it stands: its records with the changes a person made to its parts
+        # (exulanica.world.site_parts), none for a world nobody changed, whose key is as it was.
+        changes = repository.part_changes(version_id)
         worker = kind_worker()
         outcome = worker.run(
-            drawing_key(str(session.workspace_id), digest),
+            drawing_key(str(session.workspace_id), digest, changes_sha256(changes)),
             DRAWING_SECONDS,
             drawing_job,
             str(session.workspace_id),
             world_id,
             dict(receipt),
             digest,
+            changes_document(changes),
             workspace=str(session.workspace_id),
             kept=worker.drawings,
         )

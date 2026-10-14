@@ -75,6 +75,9 @@ __all__ = [
     "drawing_job",
     "drawing_key",
     "kind_worker",
+    "part_check_key",
+    "part_job",
+    "parts_job",
     "place_job",
     "place_key",
     "site_ground_place_id",
@@ -201,15 +204,27 @@ def check_key(workspace: str, document_sha256: str) -> str:
     return f"check:{workspace}:{document_sha256}"
 
 
-def drawing_key(workspace: str, receipt_sha256: str) -> str:
-    """Where a site world's drawing is kept: by its workspace and its receipt."""
-    return f"drawing:{workspace}:{receipt_sha256}"
+def drawing_key(workspace: str, receipt_sha256: str, parts_sha256: str = "") -> str:
+    """Where a site world's drawing is kept: by its workspace, its receipt and the digest of the
+    changes a person made to its parts (:func:`~exulanica.world.site_parts.changes_sha256`), which
+    is empty, and leaves the key as it was, for a world nobody changed."""
+    key = f"drawing:{workspace}:{receipt_sha256}"
+    return f"{key}:{parts_sha256}" if parts_sha256 else key
 
 
-def place_key(workspace: str, receipt_sha256: str, place_id: str) -> str:
-    """Where the place a site world's society walks is kept: by its workspace, its receipt and
-    its place."""
-    return f"place:{workspace}:{receipt_sha256}:{place_id}"
+def place_key(workspace: str, receipt_sha256: str, place_id: str, parts_sha256: str = "") -> str:
+    """Where the place a site world's society walks is kept: by its workspace, its receipt, its
+    place and the digest of the changes made to its parts (empty, the key unchanged, for none)."""
+    key = f"place:{workspace}:{receipt_sha256}:{place_id}"
+    return f"{key}:{parts_sha256}" if parts_sha256 else key
+
+
+def part_check_key(
+    workspace: str, receipt_sha256: str, place_id: str, parts_sha256: str, part_id: str
+) -> str:
+    """Where one part change's check is kept: under its world's place, so forgetting a receipt's
+    places forgets its checks."""
+    return f"{place_key(workspace, receipt_sha256, place_id, parts_sha256)}:check:{part_id}"
 
 
 # -- in the worker process -----------------------------------------------------------------------
@@ -230,9 +245,15 @@ def _keep_records(workspace: str, receipt_sha256: str, records: tuple[object, ..
             _records.popitem(last=False)
 
 
-def _records_of(workspace: str, receipt: Mapping[str, Any], receipt_sha256: str) -> Any:
-    """The records a receipt generates again, or the ones this process kept for it; a refusal's
-    words when its receipt no longer reads."""
+def _records_of(
+    workspace: str,
+    receipt: Mapping[str, Any],
+    receipt_sha256: str,
+    changes: list[dict[str, Any]] | None = None,
+) -> Any:
+    """The records a receipt generates again, or the ones this process kept for it, with the
+    changes a person made to its parts applied (:func:`~exulanica.world.site_parts.apply_changes`);
+    a refusal's words when its receipt no longer reads or a change no longer applies."""
     from exulanica.world.composers.site_plan import records
     from exulanica.world.errors import InvalidStructuralData
 
@@ -244,6 +265,14 @@ def _records_of(workspace: str, receipt: Mapping[str, Any], receipt_sha256: str)
         except InvalidStructuralData as exc:
             return str(exc)
         _keep_records(workspace, receipt_sha256, found)
+    if changes:
+        from exulanica.world.errors import ThingLandingRefused
+        from exulanica.world.site_parts import apply_changes, changes_from_document
+
+        try:
+            found = apply_changes(found, changes_from_document(changes))
+        except ThingLandingRefused as exc:
+            return f"generated_world_part_changes_refused: {exc}"
     return found
 
 
@@ -429,25 +458,109 @@ def compose_terrain_job(workspace: str, authoring: dict, world_id: str) -> dict[
 
 
 def drawing_job(
-    workspace: str, world_id: str, receipt: dict[str, Any], receipt_sha256: str
+    workspace: str,
+    world_id: str,
+    receipt: dict[str, Any],
+    receipt_sha256: str,
+    changes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """A site world's drawing, from the records its receipt generates again (or the ones its making
-    left here), or the reason its receipt no longer reads."""
-    found = _records_of(workspace, receipt, receipt_sha256)
+    left here) with ``changes`` to its parts applied, or the reason it cannot be drawn."""
+    found = _records_of(workspace, receipt, receipt_sha256, changes)
     if isinstance(found, str):
         return {"status": "refused", "detail": found}
     return {"status": "done", **_drawn(world_id, receipt, receipt_sha256, found)}
 
 
 def place_job(
-    workspace: str, receipt: dict[str, Any], receipt_sha256: str, place_id: str
+    workspace: str,
+    receipt: dict[str, Any],
+    receipt_sha256: str,
+    place_id: str,
+    changes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The place a site world's society walks, from the records its receipt generates again (or
-    the ones its making left here), or the reason it cannot be made."""
-    found = _records_of(workspace, receipt, receipt_sha256)
+    the ones its making left here) with ``changes`` to its parts applied, or the reason it cannot
+    be made."""
+    found = _records_of(workspace, receipt, receipt_sha256, changes)
     if isinstance(found, str):
         return {"status": "refused", "code": "kind_place_refused", "detail": found}
     return _placed(place_id, receipt, found)
+
+
+def part_job(
+    workspace: str,
+    receipt: dict[str, Any],
+    receipt_sha256: str,
+    place_id: str,
+    changes: list[dict[str, Any]],
+    part_id: str,
+) -> dict[str, Any]:
+    """Whether one part may stand as ``changes`` leave it (:func:`~exulanica.world.site_parts.
+    check_change`), and whether people still reach every place of the world it makes from the
+    entry: its place, as :func:`place_job` answers for the same changes, or the refusal by code
+    with what refused it (``where``) and a sentence a person reads."""
+    from exulanica.world.errors import ThingLandingRefused
+    from exulanica.world.kinds.samples import first_unreached
+    from exulanica.world.site_parts import (
+        apply_changes,
+        changeable_parts,
+        changes_from_document,
+        check_change,
+    )
+
+    found = _records_of(workspace, receipt, receipt_sha256)
+    if isinstance(found, str):
+        return {"status": "refused", "code": "kind_place_refused", "detail": found}
+    uses = _part_uses(receipt)
+    made = changeable_parts(found, uses)
+    try:
+        changed = apply_changes(found, changes_from_document(changes))
+        check_change(
+            changed,
+            part_id,
+            root_identity=str(receipt["subject_identity"]),
+            uses=uses,
+        )
+    except ThingLandingRefused as exc:
+        return {"status": "refused", "code": exc.code, "where": exc.where, "detail": str(exc)}
+    placed = _placed(place_id, receipt, changed)
+    if placed["status"] != "done":
+        return placed
+    unreached = first_unreached(placed["place"])
+    if unreached is not None:
+        return {
+            "status": "refused",
+            "code": "part_strands_people",
+            "where": {"part_id": part_id, "destination_id": unreached["destination_id"]},
+            "detail": f"Not here: people could no longer reach the {unreached['label']} from "
+            "the entry.",
+        }
+    return {
+        **placed,
+        "part_ids": [part.identity for part in made],
+        "label": next((part.label for part in made if part.identity == part_id), ""),
+    }
+
+
+def parts_job(
+    workspace: str,
+    receipt: dict[str, Any],
+    receipt_sha256: str,
+    changes: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """The parts of a site world a person may change, as they stand with ``changes`` applied
+    (:func:`~exulanica.world.site_parts.changeable_parts`), or the reason its records do not
+    read."""
+    from exulanica.world.site_parts import changeable_parts
+
+    found = _records_of(workspace, receipt, receipt_sha256, changes)
+    if isinstance(found, str):
+        return {"status": "refused", "detail": found}
+    return {
+        "status": "done",
+        "parts": [part.document() for part in changeable_parts(found, _part_uses(receipt))],
+    }
 
 
 # -- in the server ------------------------------------------------------------------------------

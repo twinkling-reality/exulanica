@@ -37,6 +37,7 @@ from exulanica.world.kinds.worker import (
     place_key,
     site_ground_place_id,
 )
+from exulanica.world.site_parts import changes_document, changes_sha256
 from exulanica.world.society_authored_ground import SocietyGround, read_authored_ground
 from exulanica.world.society_city_place import city_blocked_parts
 from exulanica.world.society_walking_surfaces import surface_height_above, walking_surfaces_place
@@ -92,7 +93,7 @@ def prepare_landing_in_region(
         )
         return LandingGround(ground.region_id, area, rests_on_plane(ground.elevation_mm), ())
     if states_site(connection, repository.workspace_id, repository.world_id, ground.snapshot_id):
-        answer = _site_place(repository, ground)
+        answer = _site_place(repository, ground, version_id)
         if answer is None:
             return None
         place, parts = answer
@@ -112,23 +113,26 @@ def prepare_landing_in_region(
 
 
 def _site_place(
-    repository: WorldObjectRepository, ground: SocietyGround
+    repository: WorldObjectRepository, ground: SocietyGround, version_id: uuid.UUID
 ) -> tuple[Mapping[str, Any], tuple[BlockedPart, ...]] | None:
-    """A site world's place and blocked parts, as its society reads them, or None for a site the
-    worker makes no place for (one made from terrain)."""
+    """A site world's place and blocked parts as the version's society reads them, made from its
+    records with the version's changes to its parts, or None for a site the worker makes no place
+    for (one made from terrain)."""
     digest, receipt = generation_receipt(
         repository.connection, repository.workspace_id, repository.world_id, ground.snapshot_id
     )
+    changes = repository.part_changes(version_id)
     worker = kind_worker()
     workspace = str(repository.workspace_id)
     placed = worker.run(
-        place_key(workspace, digest, site_ground_place_id()),
+        place_key(workspace, digest, site_ground_place_id(), changes_sha256(changes)),
         PLACE_SECONDS,
         place_job,
         workspace,
         dict(receipt),
         digest,
         site_ground_place_id(),
+        changes_document(changes),
         workspace=workspace,
         kept=worker.places,
     )

@@ -1842,6 +1842,15 @@ kind's own use classes and employment share and is named by its own digest. The
 [world kinds contract](world-kinds-contract.md#people-in-a-site-world) owns the site place and
 the overlay.
 
+A person's change to a part the world was made with (moved, turned or removed in build mode,
+[world objects contract](world-objects-contract.md#15-a-site-worlds-made-parts)) is the society's
+next input like any authored edit: the place is made again from the site's records with the
+version's changes applied, kept under their digest, so its people walk the world as it now stands.
+A home or workplace keeps its people when it moves, because a person's home and work name the part,
+not its position; a part somebody lives or works in is not removed. Any other structural override
+still makes the input unavailable. A stored input's place is reused only for a version whose parts
+were never changed.
+
 **Its day is data.** The town's routine (`TOWN_ROUTINE_VERSIONS` in
 `exulanica/world/society_catalogs.py`) reads the living routine's needs and capacities with
 catalogs of its own under `assets/catalogs/society/`, each entry with its reason:

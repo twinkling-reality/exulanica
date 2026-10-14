@@ -678,6 +678,23 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "reads current appearance facts for typed inventory entities without changing the "
             "world; it is an inventory query, not a version action"
         ),
+        ("POST", "/world/versions/{version_id}/parts/{part_id}/move"): (
+            "moves or turns a made part of a site world from the workspace's build mode, checked "
+            "against the world's records in the kind worker first; no Companion plan step makes "
+            "it yet"
+        ),
+        ("POST", "/world/versions/{version_id}/parts/{part_id}/move/preview"): (
+            "a read-only preview of a made part's move for the workspace's build mode; no "
+            "Companion plan step prepares through it"
+        ),
+        ("POST", "/world/versions/{version_id}/parts/{part_id}/remove"): (
+            "removes a made part of a site world nobody lives or works in, from the workspace's "
+            "build mode; no Companion plan step makes it yet"
+        ),
+        ("POST", "/world/versions/{version_id}/parts/{part_id}/remove/preview"): (
+            "a read-only preview of a made part's removal for the workspace's build mode; no "
+            "Companion plan step prepares through it"
+        ),
         ("POST", "/world/versions/{version_id}/things/on-support/preview"): (
             "validates a chosen passive rigid kind, exact source support and authored base; "
             "the version read does not enumerate source-bound placement candidates"

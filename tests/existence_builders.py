@@ -1737,6 +1737,68 @@ def generated_tile(owner) -> dict[str, Any]:
     }
 
 
+def _made_farm(owner) -> dict[str, Any]:
+    """A farm made from the fixture kind on level ground, in a world of its own (domain), and the
+    barn it was made with, read through the parts route (API)."""
+    from exulanica.world.generated_worlds import create_kind_world_authorities
+    from exulanica.world.kinds.document import read_kind
+    from exulanica.world.kinds.worker import WorkerComposer
+    from exulanica.world.worlds import GENERATED, new_world_id
+
+    from kind_briefs import fixture_kind
+
+    if "made_farm" not in owner.memo:
+        kind = read_kind(fixture_kind("farm"))
+        world_id = new_world_id(GENERATED)
+        composer = WorkerComposer(owner.workspace_id)
+        composed = composer(kind, kind.values(kind.presets[0][0]), world_id)
+        _, _, version = create_kind_world_authorities(
+            owner.repository.connection,
+            workspace_id=owner.workspace_id,
+            actor=owner.actor,
+            title="Existence parts fixture",
+            kind=kind.kind,
+            version=kind.version,
+            composed=composed,
+        )
+        composer.keep()
+        parts = _ok(
+            owner.request("GET", f"/world/versions/{version}/parts", params={"world_id": world_id}),
+            200,
+        )
+        barn = next(part for part in parts["parts"] if part["part_key"] == "barn")
+        owner.memo["made_farm"] = {"world_id": world_id, "version_id": version, "barn": barn}
+    return owner.memo["made_farm"]
+
+
+def made_part(owner) -> dict[str, Any]:
+    """A part a farm was made with (the barn), in that farm's version. Its world is the owner's
+    alone, so every request about it names that world (:func:`made_part_request`)."""
+    farm = _made_farm(owner)
+    return {
+        "/world/versions/{version_id}": farm["version_id"],
+        "/world/versions/{version_id}/parts/{part_id}": farm["barn"]["part_id"],
+    }
+
+
+def made_part_request(owner) -> dict[str, Any]:
+    """A removal (or its preview) in the farm's world against a base nobody holds: the owner is
+    answered past the part's lookup, and nothing is changed."""
+    return {
+        "params": {"world_id": _made_farm(owner)["world_id"]},
+        "json": {"base_state_sha256": "0" * 64},
+    }
+
+
+def made_part_move_request(owner) -> dict[str, Any]:
+    """A move (or its preview) of the barn to where it stands, as :func:`made_part_request`."""
+    farm = _made_farm(owner)
+    east, north = farm["barn"]["centre_mm"]
+    request = made_part_request(owner)
+    request["json"]["pose"] = {"x_mm": east, "y_mm": 0, "z_mm": -north, "yaw_microradians": 0}
+    return request
+
+
 def generated_tile_request(owner) -> dict[str, Any]:
     """A request in the generated world the tile belongs to."""
     generated_tile(owner)

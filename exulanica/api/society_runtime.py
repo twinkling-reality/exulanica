@@ -66,6 +66,7 @@ from exulanica.world.kinds.worker import (
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject
 from exulanica.world.placed_things import WorkspaceKindReference
+from exulanica.world.site_parts import changes_document, changes_sha256
 from exulanica.world.society import (
     SocietyBytesNotRead,
     SocietyPlaceWaiting,
@@ -256,7 +257,12 @@ def _site_read(
     transaction that holds the workspace's lock: the place its last stored input carries
     (``stored``), else the one the kind worker keeps (made with the world, or before the
     transaction by :meth:`SocietyRuntime.prepare_saved_world`). One neither holds is asked of the
-    worker without waiting, so asking again reads it, and is answered as waiting."""
+    worker without waiting, so asking again reads it, and is answered as waiting.
+
+    The place is made from the site's records with the version's changes to its parts
+    (:mod:`exulanica.world.site_parts`), kept under their digest. A stored input's place is reused
+    only for a version whose parts nobody ever changed: a place carries no record of the changes
+    it was made from."""
     digest, receipt = generation_receipt(
         connection, binding.workspace_id, binding.world_id, ground.snapshot_id
     )
@@ -264,7 +270,16 @@ def _site_read(
         routine = site_plan.receipt_routine(receipt)
     except InvalidStructuralData as exc:
         return _TownRead(None, None, str(exc))
-    place = _stored_site_place(stored, ground, routine)
+    versions = WorldObjectRepository(
+        connection, binding.workspace_id, world_id=binding.world_id, store=None
+    )
+    changes = versions.part_changes(binding.version_id)
+    parts_sha256 = changes_sha256(changes)
+    place = (
+        None
+        if versions.parts_ever_changed(binding.version_id)
+        else _stored_site_place(stored, ground, routine)
+    )
     bound = connection.execute(
         "select exists(select 1 from world_alternate_thing where workspace_id=%s "
         "and world_id=%s and version_id=%s and support_snapshot_id is not null "
@@ -277,7 +292,7 @@ def _site_read(
     if place is None:
         worker = kind_worker()
         workspace = str(binding.workspace_id)
-        key = place_key(workspace, digest, ground.place_id)
+        key = place_key(workspace, digest, ground.place_id, parts_sha256)
         answer = worker.places.get(key)
         if answer is None:
             outcome = worker.run(
@@ -288,6 +303,7 @@ def _site_read(
                 dict(receipt),
                 digest,
                 ground.place_id,
+                changes_document(changes),
                 workspace=workspace,
                 kept=worker.places,
             )
@@ -584,18 +600,22 @@ class SocietyRuntime:
             digest, receipt = generation_receipt(
                 connection, binding.workspace_id, binding.world_id, ground.snapshot_id
             )
+            changes = WorldObjectRepository(
+                connection, binding.workspace_id, world_id=binding.world_id, store=None
+            ).part_changes(version_id)
         except (UnavailableSocietyInput, InvalidStructuralData):
             return
         worker = kind_worker()
         workspace = str(binding.workspace_id)
         outcome = worker.run(
-            place_key(workspace, digest, ground.place_id),
+            place_key(workspace, digest, ground.place_id, changes_sha256(changes)),
             seconds,
             place_job,
             workspace,
             dict(receipt),
             digest,
             ground.place_id,
+            changes_document(changes),
             workspace=workspace,
             kept=worker.places,
         )

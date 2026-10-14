@@ -15044,6 +15044,450 @@
     }
    }
   },
+  "/world/versions/{version_id}/parts": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The parts of a site world a person may change, as they stand. Writes nothing.",
+    "operationId": "read_parts_world_versions__version_id__parts_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Read Parts World Versions  Version Id  Parts Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/parts/{part_id}/move": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Stand a made part at a new centre, turned in quarter turns, where the world takes it.",
+    "operationId": "move_part_world_versions__version_id__parts__part_id__move_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "part_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 36,
+       "maxLength": 36,
+       "pattern": "^[0-9a-f-]{36}$",
+       "title": "Part Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MovePartBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AlternateVersionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/parts/{part_id}/move/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What moving or turning a made part would record, and whether it may. Writes nothing.",
+    "operationId": "move_part_preview_world_versions__version_id__parts__part_id__move_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "part_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 36,
+       "maxLength": 36,
+       "pattern": "^[0-9a-f-]{36}$",
+       "title": "Part Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MovePartPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Move Part Preview World Versions  Version Id  Parts  Part Id  Move Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/parts/{part_id}/remove": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Remove a made part nobody lives or works in, where people still reach every place.",
+    "operationId": "remove_part_world_versions__version_id__parts__part_id__remove_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "part_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 36,
+       "maxLength": 36,
+       "pattern": "^[0-9a-f-]{36}$",
+       "title": "Part Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BaseStateBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AlternateVersionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/parts/{part_id}/remove/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What removing one made part would record, and whether it may. Writes nothing.",
+    "operationId": "remove_part_preview_world_versions__version_id__parts__part_id__remove_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "part_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 36,
+       "maxLength": 36,
+       "pattern": "^[0-9a-f-]{36}$",
+       "title": "Part Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ThingEditPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Remove Part Preview World Versions  Version Id  Parts  Part Id  Remove Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/things/{thing_id}/character": {
    "post": {
     "tags": [
@@ -35458,6 +35902,54 @@
     ],
     "title": "MoveObjectBody"
    },
+   "MovePartBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "saved_entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SavedEntryAdvanceBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "pose": {
+      "$ref": "#/components/schemas/PartPoseBody"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "pose"
+    ],
+    "title": "MovePartBody"
+   },
+   "MovePartPreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "pose": {
+      "$ref": "#/components/schemas/PartPoseBody"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "pose"
+    ],
+    "title": "MovePartPreviewBody"
+   },
    "MovePreviewBody": {
     "properties": {
      "base_state_sha256": {
@@ -36498,6 +36990,38 @@
      "source"
     ],
     "title": "ParameterView"
+   },
+   "PartPoseBody": {
+    "properties": {
+     "x_mm": {
+      "type": "integer",
+      "title": "X Mm"
+     },
+     "y_mm": {
+      "type": "integer",
+      "title": "Y Mm"
+     },
+     "z_mm": {
+      "type": "integer",
+      "title": "Z Mm"
+     },
+     "yaw_microradians": {
+      "type": "integer",
+      "maximum": 6283185.0,
+      "minimum": 0.0,
+      "title": "Yaw Microradians"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "x_mm",
+     "y_mm",
+     "z_mm",
+     "yaw_microradians"
+    ],
+    "title": "PartPoseBody",
+    "description": "Where a part stands, region-local (east, up, south of the site's south-west corner), and its\nturn from how it was made: on the ground, a whole number of quarter turns."
    },
    "PerformIntent": {
     "properties": {
