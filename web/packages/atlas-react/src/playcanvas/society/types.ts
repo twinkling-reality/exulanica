@@ -194,15 +194,6 @@ export interface OwnedSocietyState {
   readonly things?: readonly SocietyThingSnapshot[];
   /** v7: the ability modules its first input recorded, such as `exulanica-ability/hands/v1`. */
   readonly modules?: readonly string[];
-  /** v7: the movement modules its first input recorded, such as `exulanica-movement/walking/v2`. */
-  readonly movement_modules?: readonly string[];
-  /** v7: what the society runs of each kind its workspace keeps (its run form), by the kind's digest. */
-  readonly kinds?: Readonly<Record<string, KindRunForm>>;
-}
-
-/** The part of a kept kind's run form the crowd reads: how it moves, each move's module and figures. */
-export interface KindRunForm {
-  readonly moves?: readonly { readonly module: string; readonly parameters?: Readonly<Record<string, unknown>> }[];
 }
 
 export type CrowdDetail = 'near' | 'far';
@@ -254,6 +245,13 @@ export interface CrowdTiming {
    * position changes. Absent or zero, everyone is drawn at their recorded point, as before.
    */
   readonly conversationMetres?: number;
+  /**
+   * What one tick lets each person whose kind states its own pace walk, millimetres, by id, as the
+   * server serves it beside the state (`walk_budgets_mm_per_tick`). Such a person walks that budget
+   * and, when nothing hurries them and their figure states no pace, walks at it over the tick's
+   * simulated seconds. Anyone not named walks the budget the state records.
+   */
+  readonly walkBudgetsMm?: ReadonlyMap<string, number>;
 }
 
 export interface InhabitantIdentity {

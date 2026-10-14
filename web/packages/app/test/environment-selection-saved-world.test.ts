@@ -327,6 +327,30 @@ describe('what the people panel says of a saved world\'s playback', () => {
     }
   });
 
+  it('hands the crowd the walk budgets the server serves beside the minute it draws', async () => {
+    vi.useFakeTimers();
+    const { mounted, controlClient, societyClient, crowd, panel } = mount();
+    try {
+      await mounted.begin();
+      let tick = 0;
+      controlClient.read.mockImplementation(async () => ({ ...control(tick), mode: tick === 0 ? 'paused' : 'playing' }));
+      bringIn(panel);
+      await vi.advanceTimersByTimeAsync(0);
+      const timingOf = (call: unknown[] | undefined) => call?.[2] as { walkBudgetsMm?: ReadonlyMap<string, number> };
+      // None served, none handed: everybody walks the budget the state records.
+      expect(timingOf(crowd.setSociety.mock.calls.at(-1)).walkBudgetsMm).toBeUndefined();
+      tick = 1;
+      const budgets = new Map([['person-0', 41_100]]);
+      societyClient.read.mockResolvedValue({ ...society(1, true), walkBudgetsMm: budgets });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect((crowd.setSociety.mock.calls.at(-1) as unknown[])[0]).toEqual(society(1, true).state);
+      expect(timingOf(crowd.setSociety.mock.calls.at(-1)).walkBudgetsMm).toBe(budgets);
+    } finally {
+      mounted.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps observing after a failed read of the saved world itself, reading it again after the longer wait', async () => {
     vi.useFakeTimers();
     const { mounted, controlClient, worldClient, panel } = mount();

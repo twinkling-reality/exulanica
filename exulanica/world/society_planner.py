@@ -1874,6 +1874,23 @@ def tick_budgets(state: Mapping[str, Any]) -> Callable[[Mapping[str, Any]], int]
     return lambda person: own_budget_mm(budget, pace(person))
 
 
+def own_walk_budgets(state: Mapping[str, Any]) -> dict[str, int]:
+    """Each inhabitant whose kind states its own pace, by id: what one tick lets it walk, in
+    millimetres (:func:`tick_budgets`). Empty where the society's walking paces nobody or records
+    no budget. A served projection beside the state, never part of it: a page walks such a body
+    at this budget, and everyone not named here walks the budget the state records."""
+    if "movement_budget_mm_per_tick" not in state or walker_paces(state) is None:
+        return {}
+    from exulanica.world.society_kinds import pace_permille_of
+
+    budget = tick_budgets(state)
+    return {
+        str(person["id"]): budget(person)
+        for person in state.get("inhabitants", ())
+        if person.get("kind") is not None and pace_permille_of(state, person["kind"]) is not None
+    }
+
+
 def advance_purposeful_society(
     state: dict[str, Any],
     seed: str,

@@ -41,6 +41,23 @@ export interface SocietySnapshot {
   readonly places: SocietyPlaces | null;
   /** Whether the people are here, or were sent away, and since which simulated minute. */
   readonly presence: SocietyPresence;
+  /**
+   * What one tick lets each inhabitant whose kind states its own pace walk, millimetres, as the
+   * server serves it beside the state (`walk_budgets_mm_per_tick`); absent where nobody walks at
+   * a pace of their own.
+   */
+  readonly walkBudgetsMm?: ReadonlyMap<string, number>;
+}
+
+/** The served walk budgets, each a positive whole number of millimetres for an inhabitant the state holds. */
+function walkBudgetsOf(row: Readonly<Record<string, unknown>>, ids: ReadonlySet<string>): ReadonlyMap<string, number> | null {
+  if (row['walk_budgets_mm_per_tick'] === undefined) return null;
+  const budgets = new Map<string, number>();
+  for (const [id, mm] of Object.entries(record(row['walk_budgets_mm_per_tick']))) {
+    if (!ids.has(id) || !integer(mm, 1)) throw new Error('Invalid society walk budgets');
+    budgets.set(id, mm);
+  }
+  return budgets;
 }
 
 /** Everyone here, or everyone sent away by the person whose world it is. */
@@ -472,11 +489,13 @@ export function parseSociety(value: unknown): SocietySnapshot {
       row['branch_id'] !== state['branch_id'] || !integer(state['input_seq'], 1) ||
       row['input_seq'] !== state['input_seq'] || !digest(state['input_sha256']) ||
       row['input_sha256'] !== state['input_sha256'])) throw new Error('Invalid society branch or input');
+  const walkBudgetsMm = walkBudgetsOf(row, ids);
   return Object.freeze({
     societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
     ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
     populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
     state: state as unknown as OwnedSocietyState, places: v2 ? placesOf(row) : null, presence,
+    ...(walkBudgetsMm === null ? {} : { walkBudgetsMm }),
   });
 }
 

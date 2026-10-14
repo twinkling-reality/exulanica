@@ -1446,7 +1446,12 @@ and one naming another region is refused with `409 society_lives_elsewhere`. Ste
 only `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected. Every
 snapshot these routes return, and the society a playback step returns, carries `seed_digest` in
 place of the seed, and so does every state and event document that holds one; the first engine's
-hold none.
+hold none. Beside the state, never inside it, a snapshot carries `walk_budgets_mm_per_tick`: for
+each inhabitant whose kind states its own pace under a walking module that paces walkers, what
+one tick lets it walk in millimetres, the engine's own figure (`own_walk_budgets` in
+`exulanica/world/society_planner.py`). It is absent where nobody walks at a pace of their own,
+and `state_sha256` does not cover it. A page walks such a body at that budget, and at that budget
+over the tick's simulated seconds when nothing hurries it.
 
 Every society, action, playback, decision, experiment and district route requires the world as a
 `world_id` query parameter, as every world route does, and a world the workspace does not hold

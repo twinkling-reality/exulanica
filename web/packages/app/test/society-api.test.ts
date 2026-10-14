@@ -307,3 +307,30 @@ describe('what a town\'s place calls a premises, on a society of things\' input'
       .toThrow('Invalid society place name');
   });
 });
+
+describe('the walk budgets a society of things is served beside its state', () => {
+  const being = {
+    id: 'creature', synthetic: true, position_mm: [1000, 2000], motion_path_mm: [[1000, 2000]], display_name: 'Creature',
+    role: 'two legged creature', goal: null, route: null,
+    action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'awaiting_goal' },
+    explanation: { summary: 'Creature (simulated) waits.', event_ids: [] },
+  };
+  const read = (extra: Record<string, unknown> = {}) => parseSociety({
+    society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'p', population_size: 1,
+    current_tick: 3, state_sha256: '3'.repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
+    state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick: 3, input_seq: 1,
+      input_sha256: 'b'.repeat(64), movement_budget_mm_per_tick: 60_000, inhabitants: [being] },
+    ...extra,
+  });
+
+  it('reads each budget by its inhabitant, and nothing where none is served', () => {
+    expect(read({ walk_budgets_mm_per_tick: { creature: 41_100 } }).walkBudgetsMm).toEqual(new Map([['creature', 41_100]]));
+    expect(read().walkBudgetsMm).toBeUndefined();
+  });
+
+  it('refuses a budget for somebody the state does not hold, and one that is not a whole positive figure', () => {
+    expect(() => read({ walk_budgets_mm_per_tick: { stranger: 41_100 } })).toThrow('Invalid society walk budgets');
+    expect(() => read({ walk_budgets_mm_per_tick: { creature: 0 } })).toThrow('Invalid society walk budgets');
+    expect(() => read({ walk_budgets_mm_per_tick: { creature: 41.5 } })).toThrow('Invalid society walk budgets');
+  });
+});

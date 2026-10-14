@@ -23,7 +23,7 @@ import type {
   OwnedSocietyState,
   SocietyInhabitantSnapshot,
 } from './types.js';
-import { isMadeKind, pickReach } from './types.js';
+import { pickReach } from './types.js';
 
 /**
  * The whole synthetic population, drawn by distance.
@@ -339,33 +339,6 @@ function heading(a: readonly [number, number], b: readonly [number, number], hel
   return Math.hypot(dx, dz) < 1e-6 ? held : Math.atan2(-dx, -dz);
 }
 
-/** The walking module whose walkers each walk at the pace their kind states. */
-const PACED_WALKING = 'exulanica-movement/walking/v2';
-/** The pace a kind states is in thousandths of the society's. */
-const PACE_PER = 1000;
-
-/**
- * What one tick lets this person walk, millimetres, where their society's walking paces each body
- * by its kind: the society's bound times the pace their kind states over a thousand, floored, and
- * at least one. Null where the state records no bound, its walking paces nobody, or the person's
- * kind states no pace; they then walk the society's bound, as the engine walks them (a kind that
- * states none walks the module's reference pace, a thousand in a thousand). A copy of the engine's
- * rule, whose authority is `tick_budgets` in `exulanica/world/society_planner.py` (with
- * `own_budget_mm` in `exulanica/movement/walking_v2.py`): change both together.
- */
-export function ownWalkBudgetMm(state: OwnedSocietyState, person: SocietyInhabitantSnapshot): number | null {
-  const bound = state.movement_budget_mm_per_tick;
-  if (bound === undefined || !(state.movement_modules ?? []).includes(PACED_WALKING)) return null;
-  const kind = person.kind;
-  if (kind === undefined || !isMadeKind(kind)) return null;
-  for (const move of state.kinds?.[kind.sha256]?.moves ?? []) {
-    const pace = move.parameters?.['pace_permille'];
-    if (pace === undefined) continue;
-    return typeof pace === 'number' && Number.isInteger(pace) && pace > 0 ? Math.max(1, Math.floor((bound * pace) / PACE_PER)) : null;
-  }
-  return null;
-}
-
 /** The activity a snapshot states for a person: the kind of an action that is under way. */
 function stateActivity(person: SocietyInhabitantSnapshot): string | null {
   return person.action?.status === 'active' ? person.action.kind : null;
@@ -553,9 +526,10 @@ export class SocietyCrowd {
       const end = [person.position_mm[0] / 1000, person.position_mm[1] / 1000] as const;
       const recorded = person.motion_path_mm?.map(([x, z]) => [x / 1000, z / 1000] as const);
       const previous = continuing ? this.walkers.get(person.id) : undefined;
-      // A body the engine paces by its kind walks its own bound, and that bound over the tick's
-      // simulated seconds is the pace it walks at when nothing hurries it (`walkSpeedOf`).
-      const own = person.walk_speed_mm_per_tick === undefined ? ownWalkBudgetMm(state, person) : null;
+      // A body the engine paces by its kind walks the budget the server serves for it, and that
+      // budget over the tick's simulated seconds is the pace it walks at when nothing hurries it
+      // (`walkSpeedOf`).
+      const own = person.walk_speed_mm_per_tick === undefined ? options.walkBudgetsMm?.get(person.id) ?? null : null;
       if (own !== null && state.tick_seconds !== undefined && state.tick_seconds > 0) {
         ownPaces.set(person.id, own / 1000 / state.tick_seconds);
       }
@@ -852,7 +826,7 @@ export class SocietyCrowd {
   /**
    * How fast a person walks when nothing hurries them, metres a second: the pace the figure drawing
    * them states (`CrowdRenderable.walkSpeed`, a rigged thing's declared walk), else the pace the
-   * engine walks their kind at (`ownWalkBudgetMm` over the tick's simulated seconds), else the
+   * engine walks their kind at (`CrowdTiming.walkBudgetsMm` over the tick's simulated seconds), else the
    * catalog person's of their id, its walk clip's measured ground speed at their height.
    */
   private walkSpeedOf(id: string): number {

@@ -4,7 +4,7 @@ import * as pc from 'playcanvas';
 import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
 import { farAppearance } from '../src/playcanvas/character/far.js';
 import { inhabitantLookOf } from '../src/playcanvas/character/inhabitant.js';
-import { SocietyCrowd, ownWalkBudgetMm } from '../src/playcanvas/society/crowd.js';
+import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
 import type { CrowdPose, CrowdRenderableFactory, OwnedSocietyState } from '../src/playcanvas/society/types.js';
 import { serveFixturePeople } from './served-people.js';
 
@@ -330,54 +330,44 @@ describe('a paced crowd', () => {
 /*
  * A society of things whose walking paces each body by its kind: the engine lets a body walk the
  * society's bound times its kind's pace over a thousand each tick (`tick_budgets` in
- * exulanica/world/society_planner.py). The figures are a drafted creature's as one saved world
- * recorded them: a pace of 685 thousandths, a bound of 60 m, a minute of 60 simulated seconds.
+ * exulanica/world/society_planner.py), and the server serves that budget beside the state
+ * (`walk_budgets_mm_per_tick`). The figures are a drafted creature's as one saved world recorded
+ * them: a pace of 685 thousandths of a 60 m bound, 41,100 mm a tick, a minute of 60 simulated seconds.
  */
 describe('a body the engine paces by its kind', () => {
-  const KIND = 'f'.repeat(64);
-  const things = (tick: number, path: readonly (readonly [number, number])[], modules = ['exulanica-movement/walking/v2'], pace: number | null = 685): OwnedSocietyState => {
-    const state = v2(tick, path, 60_000);
-    return {
-      ...state,
-      profile: 'exulanica-society/v7' as NonNullable<OwnedSocietyState['profile']>,
-      tick_seconds: 60,
-      movement_modules: modules,
-      kinds: { [KIND]: { moves: [{ module: 'exulanica-movement/walking/v1', parameters: pace === null ? {} : { pace_permille: pace } }] } },
-      inhabitants: state.inhabitants.map((person) => ({ ...person, kind: { source: 'workspace' as const, sha256: KIND } })),
-    };
-  };
-
-  it('walks its own bound, the society\'s times its kind\'s pace over a thousand, floored', () => {
-    const state = things(0, [[0, 0]]);
-    expect(ownWalkBudgetMm(state, state.inhabitants[0]!)).toBe(41_100);
-    // A walking that paces nobody, a kind that states no pace, and a shipped kind walk the society's bound.
-    const unpaced = things(0, [[0, 0]], ['exulanica-movement/walking/v1']);
-    expect(ownWalkBudgetMm(unpaced, unpaced.inhabitants[0]!)).toBeNull();
-    const none = things(0, [[0, 0]], undefined, null);
-    expect(ownWalkBudgetMm(none, none.inhabitants[0]!)).toBeNull();
-    const shipped = { ...state, inhabitants: state.inhabitants.map((p) => ({ ...p, kind: { kind: 'knight', version: 1, sha256: KIND } })) };
-    expect(ownWalkBudgetMm(shipped, shipped.inhabitants[0]!)).toBeNull();
+  const things = (tick: number, path: readonly (readonly [number, number])[]): OwnedSocietyState => ({
+    ...v2(tick, path, 60_000),
+    profile: 'exulanica-society/v7' as NonNullable<OwnedSocietyState['profile']>,
+    tick_seconds: 60,
   });
+  const served = new Map([['walker', 41_100]]);
 
-  it('walks a short path at that bound over the minute\'s simulated seconds, not at a person\'s pace', () => {
+  it('walks a short path at its served budget over the minute\'s simulated seconds, not at a person\'s pace', () => {
     const { society, done } = crowd();
-    society.set(things(0, [[0, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
-    const steps = watch(society, 0, 6_000, new Map([[0, things(1, [[0, 0], [3, 0]])]]), 0);
+    society.set(things(0, [[0, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS, walkBudgetsMm: served });
+    const steps: { at: number; step: number }[] = [];
+    let held = society.positionOf('walker')!;
+    society.set(things(1, [[0, 0], [3, 0]]), [0, 0], { nowMs: FRAME_MS, intervalMs: INTERVAL_MS, walkBudgetsMm: served });
+    for (let at = 2 * FRAME_MS; at < 2_000; at += FRAME_MS) {
+      society.update(at);
+      const now = society.positionOf('walker')!;
+      steps.push({ at, step: Math.hypot(now[0] - held[0], now[1] - held[1]) });
+      held = now;
+    }
     // 41.1 m a 60 s minute is 0.685 m/s.
     const pace = 41_100 / 1000 / 60;
-    const walking = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 2_000);
+    const walking = steps.filter(({ at }) => at > 3 * FRAME_MS);
     expect(walking.length).toBeGreaterThan(100);
     for (const { at, step } of walking) expect(step, `frame at ${at.toFixed(0)} ms`).toBeCloseTo((pace * FRAME_MS) / 1000, 9);
     expect(Math.abs(pace - WALKER_PACE)).toBeGreaterThan(0.2);
     done();
   });
 
-  it('walks at a person\'s pace where its society\'s walking paces nobody (the control for the above)', () => {
+  it('walks at a person\'s pace where the server serves it no budget of its own (the control for the above)', () => {
     const { society, done } = crowd();
-    const old = (tick: number, path: readonly (readonly [number, number])[]) => things(tick, path, ['exulanica-movement/walking/v1']);
-    society.set(old(0, [[0, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
-    const steps = watch(society, 0, 6_000, new Map([[0, old(1, [[0, 0], [3, 0]])]]), 0);
-    const walking = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 2_000);
+    society.set(things(0, [[0, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+    const steps = watch(society, 0, 2_000, new Map([[0, things(1, [[0, 0], [3, 0]])]]), 0);
+    const walking = steps.filter(({ at }) => at > 2 * FRAME_MS);
     for (const { at, step } of walking) expect(step, `frame at ${at.toFixed(0)} ms`).toBeCloseTo((WALKER_PACE * FRAME_MS) / 1000, 9);
     done();
   });

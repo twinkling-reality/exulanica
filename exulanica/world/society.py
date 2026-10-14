@@ -268,10 +268,20 @@ def served_document(document: dict[str, Any]) -> dict[str, Any]:
 def served_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     """A society snapshot as a response carries it: ``seed_digest`` in place of the seed, and its
     state served by :func:`served_document`. ``state_sha256`` still names the stored state, the
-    one a later request names as its base; nothing the page does recomputes it."""
+    one a later request names as its base; nothing the page does recomputes it.
+
+    Beside the state, never inside it, ``walk_budgets_mm_per_tick`` names what one tick lets each
+    inhabitant whose kind states its own pace walk
+    (:func:`~exulanica.world.society_planner.own_walk_budgets`), so a page draws the engine's own
+    figure; it is absent where nobody walks at a pace of their own."""
+    from exulanica.world.society_planner import own_walk_budgets
+
     served = {key: value for key, value in snapshot.items() if key != "seed"}
     served["seed_digest"] = seed_digest(snapshot["seed"])
     served["state"] = served_document(snapshot["state"])
+    budgets = own_walk_budgets(snapshot["state"])
+    if budgets:
+        served["walk_budgets_mm_per_tick"] = budgets
     return served
 
 

@@ -2598,6 +2598,9 @@ export function mountEnvironmentSelection(
       startLagMs: playing ? pollDelayMs() + readRoundMs : 0,
       // Two who stand talking are drawn a conversation apart, however near their recorded points.
       conversationMetres: CONVERSATION_DISTANCE_METRES,
+      // The engine's own walk budget for each body paced by its kind; a kind's pace does not change
+      // between minutes, so minutes rebuilt from events walk by the latest read's.
+      ...(next.walkBudgetsMm === undefined ? {} : { walkBudgetsMm: next.walkBudgetsMm }),
     };
     const observer = [deps.state.atlas!.binding.controls.state.x, deps.state.atlas!.binding.controls.state.z] as const;
     const shown = renderedSnapshot?.societyId === next.societyId ? renderedSnapshot.state : null;
