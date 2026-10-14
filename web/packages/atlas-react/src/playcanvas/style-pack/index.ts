@@ -3,7 +3,7 @@ export { applyUp, swatchMaterial, upChunks } from './swatch-material.js';
 export { applyPattern, patternChunks } from './pattern-material.js';
 export { BORDER_PARAMETERS, applyBorder, bordersRun, clearPlaneBorder, setPlaneBorder, withBorder } from './border-material.js';
 export type { SurfaceFinish, WaterRect } from './ground-finish.js';
-export { FINISH_WATERS_MOST, SURFACE_FINISH_PROFILE, applyGroundFinish, applyWaterFinish, finishRuns, readSurfaceFinish, setFinishWaters, withFinish } from './ground-finish.js';
+export { FINISH_WATERS_MOST, SURFACE_FINISH_PROFILE, SURFACE_FINISH_PROFILE_V2, applyGroundFinish, applySeaFinish, applyWaterFinish, finishRuns, readSurfaceFinish, setFinishWaters, withFinish } from './ground-finish.js';
 export { PlanarReflection } from './planar-reflection.js';
 export type { TownLookRoles, TownSurfaceDressing } from './town-surfaces.js';
 export { dressTownSurfaces } from './town-surfaces.js';

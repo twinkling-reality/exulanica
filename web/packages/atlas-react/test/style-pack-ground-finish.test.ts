@@ -1,7 +1,9 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { withBorder } from '../src/playcanvas/style-pack/border-material.js';
-import { FINISH_WATERS_MOST, finishRuns, readSurfaceFinish, setFinishWaters, withFinish, type WaterRect } from '../src/playcanvas/style-pack/ground-finish.js';
+import { FINISH_WATERS_MOST, applySeaFinish, finishRuns, readSurfaceFinish, setFinishWaters, withFinish, type WaterRect } from '../src/playcanvas/style-pack/ground-finish.js';
+import * as pc from 'playcanvas';
 
 /*
  * The surface finish is read from its catalog, refused by what is wrong with it, and set after a
@@ -9,7 +11,7 @@ import { FINISH_WATERS_MOST, finishRuns, readSurfaceFinish, setFinishWaters, wit
  * border keep working whatever order they are set in.
  */
 
-const CATALOG = JSON.parse(readFileSync(new URL('../../../../assets/catalogs/world-kinds/surface-finish.v1.json', import.meta.url), 'utf8')) as {
+const CATALOG = JSON.parse(readFileSync('../assets/catalogs/world-kinds/surface-finish.v1.json', 'utf8')) as {
   profile: string;
   entries: { key: string; value: number; unit: string; class: string; reason: string }[];
 };
@@ -94,5 +96,59 @@ describe('the waters a finish measures from', () => {
   it('are measured only on the WebGL2 device the finish is written for', () => {
     expect(finishRuns({ isWebGPU: false } as never)).toBe(true);
     expect(finishRuns({ isWebGPU: true } as never)).toBe(false);
+  });
+});
+
+const CATALOG_V2 = JSON.parse(readFileSync('../assets/catalogs/world-kinds/surface-finish.v2.json', 'utf8')) as typeof CATALOG;
+
+describe('the surface finish catalog, version 2', () => {
+  it('reads version 1 figure for figure with the sea and lakes of land at their depths, and version 1 with none', () => {
+    const v2 = readSurfaceFinish(CATALOG_V2);
+    const stated2 = (key: string) => CATALOG_V2.entries.find((entry) => entry.key === key)!.value;
+    expect(v2.waterDepthFullM).toBe(stated2('water_depth_full_m'));
+    expect(v2.waterShoreFadeM).toBe(stated2('water_shore_fade_m'));
+    expect(Object.keys(v2)).toHaveLength(CATALOG_V2.entries.length);
+    // Every version 1 figure is the same in version 2.
+    const v1 = readSurfaceFinish(CATALOG);
+    expect({ ...v2, waterDepthFullM: undefined, waterShoreFadeM: undefined }).toEqual({ ...v1, waterDepthFullM: undefined, waterShoreFadeM: undefined });
+    expect(v1.waterDepthFullM).toBeUndefined();
+  });
+
+  it('refuses a depth figure in version 1, and version 2 without one', () => {
+    const extra = CATALOG_V2.entries.find((entry) => entry.key === 'water_shore_fade_m')!;
+    expect(() => readSurfaceFinish({ ...CATALOG, entries: [...CATALOG.entries, extra] })).toThrow(/does not read: water_shore_fade_m/);
+    expect(() => readSurfaceFinish({ ...CATALOG_V2, entries: CATALOG_V2.entries.filter((entry) => entry !== extra) })).toThrow(/states no water_shore_fade_m/);
+    expect(() => readSurfaceFinish({ ...CATALOG_V2, entries: CATALOG_V2.entries.map((entry) => (entry === extra ? { ...entry, value: 3 } : entry)) })).toThrow(/water_shore_fade_m is not a figure from 0 to 2/);
+  });
+});
+
+describe('the sea and lakes of a site on land', () => {
+  it('take their depth from the scene behind them, never its colour, and keep one colour function', () => {
+    const sea = withFinish(CHUNK, 'sea');
+    expect(count(sea, 'void getAlbedo() {')).toBe(1);
+    expect(sea).toContain('smoothstep(0.0, exuFinishSea.x, exuSeaDepth())');
+    expect(sea).not.toContain('exuFinishDepth(p))');
+    expect(sea).toContain('#include "screenDepthPS"');
+    expect(sea).not.toContain('uSceneColorMap');
+    // Set once: a chunk that carries it is left as it is.
+    expect(withFinish(sea, 'sea')).toBe(sea);
+  });
+
+  it('are blended over the scene and fade in at their shore, and are left as they are with no depth figures', () => {
+    const device = new pc.NullGraphicsDevice(document.createElement('canvas'));
+    // A material with its own colour chunk, as a pack's swatch has.
+    const material = new pc.StandardMaterial();
+    material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set('diffusePS', CHUNK);
+    expect(applySeaFinish(device, material, readSurfaceFinish(CATALOG_V2))).toBe(true);
+    const glsl = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
+    expect(glsl.get('opacityPS')).toContain('dAlpha = smoothstep(0.0, max(exuFinishSea.y, 0.0001), exuSeaDepth());');
+    // The depth helper is declared once, whichever chunk comes first.
+    for (const chunk of [glsl.get('opacityPS')!, glsl.get('diffusePS')!]) expect(chunk).toContain('#ifndef EXU_SEA_DEPTH');
+    expect(material.blendType).toBe(pc.BLEND_NORMAL);
+    expect(material.depthWrite).toBe(false);
+    const plain = new pc.StandardMaterial();
+    expect(applySeaFinish(device, plain, readSurfaceFinish(CATALOG))).toBe(false);
+    expect(plain.getShaderChunks(pc.SHADERLANGUAGE_GLSL).has('opacityPS')).toBe(false);
+    expect(plain.blendType).toBe(pc.BLEND_NONE);
   });
 });

@@ -138,7 +138,12 @@ rise inside the walkable land is refused.
 The datum is the sea's level, the same level the exact contact treats as wet below 350 mm. A shore
 states a sea at level 0 on its side; a filled basin states a lake (centre, radius, level); a layout
 grades ponds (rectangle, level). A lake's level is the lowest sample on the 2 m ring just outside
-it, before it is carved, less its freeboard. Basins that overlap or share a rim are refused.
+it, before it is carved, less its freeboard. Basins that overlap or share a rim are refused. In the
+browser the sea and lakes wear the look's water as a pack dresses it: the look's own depth water
+where the look states one, otherwise the surface finish's water with its depth taken from the land
+under the surface and its edge faded in at the shore
+(`assets/catalogs/world-kinds/surface-finish.v2.json`); where no pack dresses the site they are
+drawn in one plain colour.
 
 ## Grading
 

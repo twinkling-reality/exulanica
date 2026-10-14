@@ -13,11 +13,12 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { canonicalJson, chunkHeightMm, readLandChunk, readLandSurfaces, readRoofForms, readSurfaceMaterials, type SceneryPiece } from '@exulanica/atlas-core';
+import { canonicalJson, chunkHeightMm, readLandChunk, readLandSurfaces, readRoofForms, readStylePackManifest, readSurfaceMaterials, resolveStylePack, type LookFamily, type SceneryPiece, type StylePackManifest } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
   baseGroundSlot,
+  drawSiteLand,
   drawSiteScenery,
   parseStructuredSiteDrawing,
   readSiteLand,
@@ -31,7 +32,8 @@ import {
 } from '../src/playcanvas/generated-site/index.js';
 import type { TileLook } from '../src/playcanvas/generated-tile/look.js';
 import { withLandSurfaces } from '../src/playcanvas/generated-site/land-slope.js';
-import { withFinish } from '../src/playcanvas/style-pack/ground-finish.js';
+import { readSurfaceFinish, withFinish } from '../src/playcanvas/style-pack/ground-finish.js';
+import { packSiteDresser } from '../src/playcanvas/style-pack/site-dresser.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 const FIXTURE = JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-land.v5.json', 'utf8')) as Record<string, unknown>;
@@ -214,6 +216,25 @@ describe('drawing a site on land', () => {
     expect(environmentRoot.findByName('site-land')).toBeNull();
   });
 
+  it('wears its sea in a material it is handed, keeps plain water where it is handed none, and frees only its own', () => {
+    const { app } = nullApp();
+    const drawn = drawSiteLand(app.graphicsDevice, landOf(drawing), new pc.StandardMaterial(), [0.4, 0.5, 0.3]);
+    expect(drawn.water.map((one) => [one.body.id, one.body.kind])).toEqual([['sea', 'sea']]);
+    const plain = drawn.water[0]!.instance.material;
+    const given = new pc.StandardMaterial();
+    let destroyed = 0;
+    const own = given.destroy.bind(given);
+    given.destroy = () => { destroyed += 1; own(); };
+    drawn.wearWater((body) => (body.kind === 'sea' ? given : null));
+    expect(drawn.water[0]!.instance.material).toBe(given);
+    drawn.wearWater(() => null);
+    expect(drawn.water[0]!.instance.material).toBe(plain);
+    drawn.wearWater(() => given);
+    drawn.destroy();
+    // The water's material is its maker's to free; the land frees its own plain water.
+    expect(destroyed).toBe(0);
+  });
+
   it('draws the land in place of the base ground and the flat plane beyond, out to its horizon, and takes it all away', () => {
     const land = landOf(drawing);
     const { app, camera, environmentRoot } = nullApp();
@@ -365,5 +386,61 @@ describe("a site on land in the land's own surfaces", () => {
     expect(Math.max(...greens)).toBeGreaterThan(wooded + 0.05);
     attachment.dispose();
     expect(environmentRoot.findByName('site-land')).toBeNull();
+  });
+});
+
+describe('the sea of a site on land, dressed', () => {
+  const drawing = parseStructuredSiteDrawing(served());
+  const CASES = JSON.parse(readFileSync('../assets/style-packs/manifest-cases.v1.json', 'utf8')) as { context: { texture_sets: string[] }; cases: { name: string; manifest: StylePackManifest }[] };
+  const LOOK_FAMILIES = JSON.parse(readFileSync('../assets/catalogs/world-kinds/look-family.v1.json', 'utf8')) as {
+    entries: { key: string; fit: LookFamily['fit']; dressing: LookFamily['dressing']; fill_minimum_permille: number; fill_maximum_permille: number }[];
+  };
+  const families = new Map<string, LookFamily>(LOOK_FAMILIES.entries.map((entry) => [entry.key, {
+    fit: entry.fit, dressing: entry.dressing, fillMinimumPermille: entry.fill_minimum_permille, fillMaximumPermille: entry.fill_maximum_permille,
+  }]));
+  const manifest = (name: string): StylePackManifest => CASES.cases.find((one) => one.name === name)!.manifest;
+  const FINISH = readSurfaceFinish(JSON.parse(readFileSync('../assets/catalogs/world-kinds/surface-finish.v2.json', 'utf8')));
+  const PBR = { model: 'pbr', toon: null, ink: null } as const;
+
+  /** The material the land's sea is drawn in, mounted with a pack's dresser from `name`'s manifest, or with none. */
+  interface Seen { readonly name: string; readonly chunks: Map<string, string>; readonly blendType: number; readonly depthWrite: boolean; readonly diffuse: pc.Color }
+  const seaOf = (name: string | null, look?: TileLook): Seen => {
+    const { app, camera, environmentRoot } = nullApp();
+    const pack = name === null ? null : resolveStylePack([readStylePackManifest(manifest(name), { families, textureSets: new Set(CASES.context.texture_sets) })]);
+    const dress = pack === null ? undefined
+      : packSiteDresser({ pack, families, pieces: { pieces: new Map() }, shading: PBR, materials: MATERIALS, finish: FINISH, ...(look === undefined ? {} : { look }) });
+    const attachment = siteMount(drawing, { servedBytes: 1, land: landOf(drawing), materials: MATERIALS, ...(dress === undefined ? {} : { dress }), ...(look === undefined ? {} : { look }) })
+      .attach({ app, camera, environmentRoot });
+    const material = (environmentRoot.findByName('site-land:water:sea') as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial;
+    const glsl = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
+    const seen: Seen = { name: material.name, chunks: new Map([...glsl.keys()].map((key) => [key, String(glsl.get(key))])), blendType: material.blendType, depthWrite: material.depthWrite, diffuse: material.diffuse.clone() };
+    attachment.dispose();
+    return seen;
+  };
+  const chunk = (material: Seen, name: string): string => material.chunks.get(name) ?? '';
+
+  it('is drawn in the pack\'s water with the finish over it, its depth the land\'s own, faded in at the shore', () => {
+    const sea = seaOf('a complete pack with no base');
+    expect(sea.name).toBe('style-pack:land-water:sea:sea');
+    expect(chunk(sea, 'diffusePS')).toContain('smoothstep(0.0, exuFinishSea.x, exuSeaDepth())');
+    expect(chunk(sea, 'opacityPS')).toContain('exuSeaDepth()');
+    expect(sea.blendType).toBe(pc.BLEND_NORMAL);
+    expect(sea.depthWrite).toBe(false);
+    // The pack states no water, so the sea takes the surface catalog's own sea colour, as a pond would.
+    const swatch = MATERIALS.materials.find((one) => one.key === 'sea')!.swatch.srgb8;
+    expect([sea.diffuse.r, sea.diffuse.g, sea.diffuse.b].map((c) => Math.round(c * 255))).toEqual([...swatch]);
+  });
+
+  it('takes the look\'s own depth water where the look states one', () => {
+    const watered = manifest('a preset with haze and a pack with a water finish');
+    const look = renderLookOfPreset(watered.light!.presets[watered.light!.default_preset]!, watered.shading!, watered.edge, 1, watered.water);
+    const sea = seaOf('a complete pack with no base', look);
+    expect(chunk(sea, 'opacityPS')).toContain('getLinearScreenDepth');
+    expect(chunk(sea, 'opacityPS')).not.toContain('exuSeaDepth');
+    expect(chunk(sea, 'diffusePS')).not.toContain('exuFinishSea');
+  });
+
+  it('keeps plain water where no pack dresses the site', () => {
+    expect(seaOf(null).name).toBe('site-land:water');
   });
 });

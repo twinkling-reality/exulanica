@@ -264,6 +264,13 @@ export interface DrawnSiteLand {
    */
   wear(material: pc.Material): void;
   surfaces(): void;
+  /** The sea and the lakes as drawn, each with its body; a pond is a site slot, not here. */
+  readonly water: readonly { readonly instance: pc.MeshInstance; readonly body: LandWater }[];
+  /**
+   * Wear each sea and lake in the material the callback gives for its body (the look's water, as a
+   * dresser makes it), or keep plain water where it gives none. The materials stay the caller's.
+   */
+  wearWater(material: (body: LandWater) => pc.Material | null): void;
   destroy(): void;
 }
 
@@ -394,12 +401,14 @@ export function drawSiteLand(
   // The sea and the lakes, level at their own heights, wide enough to meet the backdrop's edge.
   const water = plainMaterial('site-land:water', PLAIN_WATER, 0.85);
   made.push(water);
+  const waters: { readonly instance: pc.MeshInstance; readonly body: LandWater }[] = [];
   for (const body of land.section.water) {
     if (body.kind === 'pond') continue;
     const [x, z, half] = body.kind === 'sea' ? [0, 0, reach] : [body.centreMm[0] / 1000, -body.centreMm[1] / 1000, body.radiusMm / 1000];
     const mesh = pc.Mesh.fromGeometry(device, new pc.PlaneGeometry({ halfExtents: new pc.Vec2(half, half) }));
     meshes.push(mesh);
     const surface = new pc.MeshInstance(mesh, water);
+    waters.push({ instance: surface, body });
     const entity = new pc.Entity(`site-land:water:${body.id}`);
     entity.setLocalPosition(x, body.levelMm / 1000, z);
     entity.addComponent('render', { meshInstances: [surface], castShadows: false, receiveShadows: true });
@@ -419,6 +428,10 @@ export function drawSiteLand(
     },
     surfaces(): void {
       for (const instance of ground) instance.material = overlaid(instance.material);
+    },
+    water: waters,
+    wearWater(material: (body: LandWater) => pc.Material | null): void {
+      for (const one of waters) one.instance.material = material(one.body) ?? water;
     },
     destroy(): void {
       if (destroyed) return;

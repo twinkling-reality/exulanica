@@ -7,7 +7,7 @@ import { SURFACE_FINISH } from '../src/surface-finish.js';
  * figure, and makes no reflection camera while the catalog states no reflection strength.
  */
 const CATALOG = JSON.parse(readFileSync(
-  new URL('../../../../assets/catalogs/world-kinds/surface-finish.v1.json', import.meta.url), 'utf8',
+  new URL('../../../../assets/catalogs/world-kinds/surface-finish.v2.json', import.meta.url), 'utf8',
 )) as { entries: { key: string; value: number }[] };
 const stated = (key: string) => CATALOG.entries.find((entry) => entry.key === key)!.value;
 
@@ -18,6 +18,9 @@ describe('the surface finish the page hands its sites', () => {
     expect(SURFACE_FINISH.wetDarkening).toBe(stated('wet_darkening_share'));
     expect(SURFACE_FINISH.waterRipple).toBe(stated('water_ripple_share'));
     expect(SURFACE_FINISH.reflectionSizePx).toBe(stated('reflection_size_px'));
+    // Version 2's depth of a site on land's sea and lakes.
+    expect(SURFACE_FINISH.waterDepthFullM).toBe(stated('water_depth_full_m'));
+    expect(SURFACE_FINISH.waterShoreFadeM).toBe(stated('water_shore_fade_m'));
     expect(Object.keys(SURFACE_FINISH)).toHaveLength(CATALOG.entries.length);
   });
 

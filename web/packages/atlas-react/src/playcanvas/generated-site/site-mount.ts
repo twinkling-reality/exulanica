@@ -1,5 +1,5 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
@@ -51,7 +51,7 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * disposer, which runs before the slots are taken away and puts back everything it changed. It
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
-export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void };
+export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null };
 export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment, land?: SiteLand) => SiteUndress;
 
 export interface SiteMountOptions {
@@ -208,6 +208,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         // A pack's texture replaces what the land wears: the land's surfaces go over it again.
         drawnLand.surfaces();
       }
+      // The land's sea and lakes in the look's water, as the dresser makes it; plain where it makes none.
+      if (drawnLand !== null && undress?.landWater !== undefined) drawnLand.wearWater(undress.landWater);
       const withdrawSeats = options.seated === undefined ? undefined : options.seated(drawnSiteSeats(drawing, slots, undress?.seatTriangles));
       // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn
       // in once dressed, and the look's sun turned into the light under it.

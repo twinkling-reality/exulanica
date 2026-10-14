@@ -9,7 +9,13 @@ import * as pc from 'playcanvas';
  * as wet ground is, and draws water lighter where it is shallow at its edge and darker towards its
  * middle, with light that drifts over it and a brighter sheen seen at a low angle. Every figure is
  * read from one data file, each with its class and reason
- * (`assets/catalogs/world-kinds/surface-finish.v1.json`).
+ * (`assets/catalogs/world-kinds/surface-finish.v2.json`; version 1 is still read).
+ *
+ * THE SEA AND LAKES OF A SITE ON LAND (version 2) are drawn with the same water finish, but their
+ * depth is the land's own: the scene depth behind the surface (the depth contact shadowing writes,
+ * read as the graphics lane's depth water reads it, with no copy of the scene's colour), so a beach
+ * shelves from light to dark and a basin shows its bowl, and the water fades in over its shallowest
+ * depth, so the shoreline is soft (`applySeaFinish`).
  *
  * PRESENTATION ONLY. Nothing here changes where anything is, what a ground or water is, where a
  * person may walk or what a pick answers; a material keeps its own colour chunk and the finish works
@@ -24,6 +30,8 @@ import * as pc from 'playcanvas';
  */
 
 export const SURFACE_FINISH_PROFILE = 'exulanica.surface-finish/v1';
+/** Version 2 adds the depth figures of a site on land's sea and lakes. */
+export const SURFACE_FINISH_PROFILE_V2 = 'exulanica.surface-finish/v2';
 
 /** The finish as the drawing reads it: shares from 0 to 1, metres, metres a second, pixels. */
 export interface SurfaceFinish {
@@ -42,6 +50,10 @@ export interface SurfaceFinish {
   readonly waterSheen: number;
   readonly reflectionStrength: number;
   readonly reflectionSizePx: number;
+  /** From version 2: how deep a sea or lake on land is where it reads in its deepest colour, metres. */
+  readonly waterDepthFullM?: number;
+  /** From version 2: how deep a sea or lake on land is where its edge has faded in fully, metres. */
+  readonly waterShoreFadeM?: number;
 }
 
 interface Row {
@@ -71,6 +83,12 @@ const ROWS: Readonly<Record<string, Row>> = {
   reflection_size_px: { field: 'reflectionSizePx', unit: 'pixel', from: 64, to: 2048, whole: true },
 };
 
+/** The entries version 2 adds. */
+const ROWS_V2: Readonly<Record<string, Row>> = {
+  water_depth_full_m: { field: 'waterDepthFullM', unit: 'metre', from: 0.2, to: 50 },
+  water_shore_fade_m: { field: 'waterShoreFadeM', unit: 'metre', from: 0, to: 2 },
+};
+
 /** Read the surface finish catalog, or refuse it by what is wrong with it. */
 export function readSurfaceFinish(value: unknown): SurfaceFinish {
   const refuse = (what: string): never => {
@@ -78,13 +96,16 @@ export function readSurfaceFinish(value: unknown): SurfaceFinish {
   };
   if (typeof value !== 'object' || value === null || Array.isArray(value)) refuse('is not a document');
   const document = value as { readonly profile?: unknown; readonly entries?: unknown };
-  if (document.profile !== SURFACE_FINISH_PROFILE) refuse(`is not ${SURFACE_FINISH_PROFILE}`);
+  if (document.profile !== SURFACE_FINISH_PROFILE && document.profile !== SURFACE_FINISH_PROFILE_V2) {
+    refuse(`is not ${SURFACE_FINISH_PROFILE} or ${SURFACE_FINISH_PROFILE_V2}`);
+  }
   if (!Array.isArray(document.entries)) refuse('states no entries');
+  const rows: Readonly<Record<string, Row>> = document.profile === SURFACE_FINISH_PROFILE_V2 ? { ...ROWS, ...ROWS_V2 } : ROWS;
   const table: Partial<Record<keyof SurfaceFinish, number>> = {};
   for (const raw of document.entries as readonly unknown[]) {
     const entry = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
     const key = entry['key'];
-    const row = typeof key === 'string' && Object.hasOwn(ROWS, key) ? ROWS[key]! : refuse(`states an entry this page does not read: ${String(key)}`);
+    const row = typeof key === 'string' && Object.hasOwn(rows, key) ? rows[key]! : refuse(`states an entry this page does not read: ${String(key)}`);
     if (table[row.field] !== undefined) refuse(`states ${String(key)} twice`);
     if (entry['unit'] !== row.unit) refuse(`${String(key)} is not in ${row.unit}`);
     const stated = entry['value'];
@@ -96,7 +117,7 @@ export function readSurfaceFinish(value: unknown): SurfaceFinish {
     }
     table[row.field] = stated as number;
   }
-  for (const [key, row] of Object.entries(ROWS)) if (table[row.field] === undefined) refuse(`states no ${key}`);
+  for (const [key, row] of Object.entries(rows)) if (table[row.field] === undefined) refuse(`states no ${key}`);
   return Object.freeze(table as SurfaceFinish);
 }
 
@@ -175,6 +196,35 @@ void getAlbedo() {
 }
 `;
 
+/**
+ * A sea's or lake's depth, straight down to the land under it, from the scene depth behind the
+ * surface. Declared once whichever of the sea's two chunks the shader includes first.
+ */
+const SEA_DEPTH = `
+#ifndef EXU_SEA_DEPTH
+#define EXU_SEA_DEPTH
+#include "screenDepthPS"
+uniform vec4 exuFinishSea;
+float exuSeaDepth() {
+\tvec2 screen = gl_FragCoord.xy * uScreenSize.zw;
+\tfloat thickness = max(getLinearScreenDepth(screen) - 1.0 / gl_FragCoord.w, 0.0);
+\tvec3 view = normalize(view_position - vPositionW);
+\treturn thickness * max(abs(view.y), 0.08);
+}
+#endif
+`;
+
+/** The water finish of a sea or lake on land: the water's, with the land's own depth. */
+const SEA = WATER.replace('\tfloat deep = smoothstep(0.0, exuFinishWaterTone.z, exuFinishDepth(p));', '\tfloat deep = smoothstep(0.0, exuFinishSea.x, exuSeaDepth());')
+  .replace('uniform vec4 exuFinishWaterTone;', `${SEA_DEPTH}\nuniform vec4 exuFinishWaterTone;`);
+
+/** A sea's or lake's edge: faded in over the shore depth, so the shoreline is soft. */
+const SEA_OPACITY = `${SEA_DEPTH}
+void getOpacity() {
+\tdAlpha = smoothstep(0.0, max(exuFinishSea.y, 0.0001), exuSeaDepth());
+}
+`;
+
 /** Marks that say a chunk already carries a finish. */
 const GROUND_MARK = 'uniform vec4 exuFinishGround;';
 const WATER_MARK = 'uniform vec4 exuFinishWaterTone;';
@@ -185,15 +235,15 @@ const WATER_MARK = 'uniform vec4 exuFinishWaterTone;';
  * is; one with no colour function this module knows is refused, since a finish set into nothing
  * would silently draw none.
  */
-export function withFinish(chunk: string, finish: 'ground' | 'water'): string {
+export function withFinish(chunk: string, finish: 'ground' | 'water' | 'sea'): string {
   if (chunk.includes(GROUND_MARK) || chunk.includes(WATER_MARK)) return chunk;
   if (chunk.split(ALBEDO).length !== 2) throw new TypeError('a colour chunk the finish cannot be set into: it has no one colour function');
-  return chunk.replace(ALBEDO, BASE) + (finish === 'ground' ? GROUND : WATER);
+  return chunk.replace(ALBEDO, BASE) + (finish === 'ground' ? GROUND : finish === 'water' ? WATER : SEA);
 }
 
 const OFF = [0, 0, 0, 0];
 
-function wrap(device: pc.GraphicsDevice, material: pc.StandardMaterial, finish: 'ground' | 'water'): void {
+function wrap(device: pc.GraphicsDevice, material: pc.StandardMaterial, finish: 'ground' | 'water' | 'sea'): void {
   const chunks = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
   const held = chunks.get('diffusePS') as string | undefined;
   const plain = pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).get('diffusePS') as string | undefined;
@@ -220,6 +270,27 @@ export function applyWaterFinish(device: pc.GraphicsDevice, material: pc.Standar
   material.setParameter('exuFinishWaterTone', [finish.waterShallowLift, finish.waterDeepDarkening, finish.waterDeepM, finish.waterRipple]);
   material.setParameter('exuFinishWaterRipple', [finish.waterRippleM, finish.waterRippleSpeed, finish.waterSheen, 0]);
   material.update();
+}
+
+/**
+ * Give a site on land's sea or lake the water finish with the land's own depth, faded in at its
+ * shore, blended over the scene. Needs version 2's depth figures: false, and nothing set, without
+ * them. Its time and the eye are kept by `WaterRipples`.
+ */
+export function applySeaFinish(device: pc.GraphicsDevice, material: pc.StandardMaterial, finish: SurfaceFinish): boolean {
+  if (finish.waterDepthFullM === undefined || finish.waterShoreFadeM === undefined) return false;
+  wrap(device, material, 'sea');
+  material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set('opacityPS', SEA_OPACITY);
+  material.blendType = pc.BLEND_NORMAL;
+  material.depthWrite = false;
+  material.opacity = 1;
+  material.setParameter('exuFinishTime', 0);
+  material.setParameter('exuFinishEye', [0, 1000, 0]);
+  material.setParameter('exuFinishWaterTone', [finish.waterShallowLift, finish.waterDeepDarkening, finish.waterDeepM, finish.waterRipple]);
+  material.setParameter('exuFinishWaterRipple', [finish.waterRippleM, finish.waterRippleSpeed, finish.waterSheen, 0]);
+  material.setParameter('exuFinishSea', [finish.waterDepthFullM, finish.waterShoreFadeM, 0, 0]);
+  material.update();
+  return true;
 }
 
 /**

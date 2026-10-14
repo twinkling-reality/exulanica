@@ -2,7 +2,7 @@ import type * as pc from 'playcanvas';
 import {
   materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
   type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type SurfaceMaterials,
-  type SurfacePattern, type SurfacePatterns,
+  type LandWater, type StyleSlot, type SurfacePattern, type SurfacePatterns,
 } from '@exulanica/atlas-core';
 import type { StructuredSiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import { baseGroundSlot, type SiteDresser } from '../generated-site/site-mount.js';
@@ -11,7 +11,7 @@ import { attachTileInk } from '../generated-tile/ink.js';
 import type { RenderShading } from '../generated-tile/look.js';
 import { applyShading } from '../generated-tile/shading.js';
 import { applyBorder, bordersRun, clearPlaneBorder, setPlaneBorder } from './border-material.js';
-import { applyGroundFinish, applyWaterFinish, finishRuns, setFinishWaters, waterRectOf, type SurfaceFinish, type WaterRect } from './ground-finish.js';
+import { applyGroundFinish, applySeaFinish, applyWaterFinish, finishRuns, setFinishWaters, waterRectOf, type SurfaceFinish, type WaterRect } from './ground-finish.js';
 import { PlanarReflection } from './planar-reflection.js';
 import { dressSlots, type PieceSlot } from './dresser.js';
 import { applyPattern } from './pattern-material.js';
@@ -320,6 +320,26 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       undressed += 1;
     }
 
+    // A site on land's sea and lakes, in the pack's water as its ponds are, with the look's water
+    // over it: the look's own depth water where it states one, else the finish with the land's own
+    // depth. Made here, with everything else the dresser makes, so their time is kept from the start.
+    const landWaters = new Map<string, pc.StandardMaterial>();
+    for (const body of land?.section.water ?? []) {
+      if (body.kind === 'pond') continue;
+      const role: StyleSlot = { identity: `site-land:water:${body.id}`, lookRole: `water.${body.kind}`, positionMm: [0, 0, 0], yawQuarterTurns: 0, boxMm: [0, 0, 0] };
+      const resolved = catalog === null ? resolveLookRole(pack, role, families, 'surface') : resolveSurfaceLookRole(pack, role, families, 'surface', catalog);
+      const swatch = resolved?.kind === 'material' ? { swatch: resolved.material.swatch, up: null }
+        : resolved?.kind === 'surface' && resolved.swatch !== null ? { swatch: resolved.swatch, up: resolved.up } : null;
+      if (swatch === null) continue;
+      const material = swatchMaterial(swatch.swatch, swatch.up, shading, `style-pack:land-water:${body.kind}:${body.id}`);
+      made.push(material);
+      // No ripple normals here: over a lake or a sea seen from afar their two waves tile into a grid of
+      // glints. The finish's drift and sheen move the water's colour instead.
+      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish);
+      if (!byDepth && finish !== null && applySeaFinish(device, material, finish)) water.animate(material);
+      landWaters.set(body.id, material);
+    }
+
     // Where the site's waters are, from the engine's bounds of their planes as drawn (before any border
     // grows them), for the wet ground beside them and their own shallow edges; and the reflection in
     // them, where the finish states one and every water lies at one level.
@@ -491,6 +511,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     return Object.defineProperty(Object.assign(dispose, {
       seatTriangles,
       animating: water.animating,
+      landWater: (body: LandWater): pc.Material | null => landWaters.get(body.id) ?? null,
       dressBeyond(instance: pc.MeshInstance, slot: SiteSlot): void {
         const resolved = catalog === null
           ? resolveLookRole(pack, slot, families, 'either')
