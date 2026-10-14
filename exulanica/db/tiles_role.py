@@ -27,7 +27,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
-from exulanica.db.roles import _ROLE_LOCK_KEY
+from exulanica.db.roles import _ROLE_LOCK_KEY, take_provisioning_locks
 
 __all__ = [
     "PUBLISH_FUNCTION",
@@ -80,6 +80,7 @@ def provision_tiles_role(
     )
     with connection.transaction():
         connection.execute("select pg_advisory_xact_lock(%s)", (_ROLE_LOCK_KEY,))
+        take_provisioning_locks(connection)
         exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
         verb = sql.SQL("alter") if exists is not None else sql.SQL("create")
         connection.execute(sql.SQL("{} role {} {}").format(verb, role_name, attributes))

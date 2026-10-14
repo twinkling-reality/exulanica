@@ -81,6 +81,7 @@ __all__ = [
     "DOOR_RUNTIME_FUNCTIONS",
     "EXECUTOR_ROLE",
     "INSERT_ONLY_TABLES",
+    "POLICY_TABLES",
     "PURGE_CROSS_WORKSPACE_TABLES",
     "PURGE_ROLE",
     "READ_ONLY_TABLES",
@@ -100,6 +101,7 @@ __all__ = [
     "provision_backup_role",
     "provision_purge_role",
     "provision_runtime_role",
+    "take_provisioning_locks",
 ]
 
 #: The role the write path connects as: identity decisions, annotations, ingest. Owns nothing.
@@ -621,6 +623,32 @@ _CROSS_WORKSPACE_POLICY: Final = "purge_sees_every_holder_of_these_bytes"
 #: against one database, which is what a CI runner is.
 _ROLE_LOCK_KEY: Final = 119_622_309
 
+#: Every table a provisioning function drops or creates a policy on: the purge role's
+#: cross-workspace read policies (:func:`provision_purge_role`). Each such statement needs the
+#: table's ACCESS EXCLUSIVE lock.
+POLICY_TABLES: Final = tuple(sorted(_PURGE_READS))
+
+
+def take_provisioning_locks(connection: psycopg.Connection) -> None:
+    """ACCESS EXCLUSIVE on every :data:`POLICY_TABLES` table the schema holds, in one sorted order.
+
+    Every provisioning function calls this right after its advisory lock, before it changes
+    anything. Its callers run several provisionings in one transaction (``exulanica-db``
+    provisioning, and the test fixtures, on a connection that is not in autocommit), so the first
+    one called takes the locks before any grant changes a catalog row and the later ones find them
+    held. Asked for only when the policies were written, after the grants, the locks closed a cycle
+    with any session that held a lock on one of these tables and then needed a row a grant had
+    changed: provisioning waited for the table, that session waited for provisioning's
+    transaction, and PostgreSQL ended provisioning as a deadlock.
+    """
+    present = _present_tables(connection, POLICY_TABLES)
+    if present:
+        connection.execute(
+            sql.SQL("lock table {} in access exclusive mode").format(
+                sql.SQL(", ").join(sql.Identifier(table) for table in sorted(present))
+            )
+        )
+
 
 class RuntimeRoleUnsafe(ExulanicaError):
     """The process connected as an owner, superuser, or BYPASSRLS role."""
@@ -689,6 +717,7 @@ def provision_runtime_role(
 
     with connection.transaction():
         connection.execute("select pg_advisory_xact_lock(%s)", (_ROLE_LOCK_KEY,))
+        take_provisioning_locks(connection)
         exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
         if exists is None:
             connection.execute(sql.SQL("create role {} login nobypassrls").format(role_name))
@@ -861,6 +890,7 @@ def provision_purge_role(
 
     with connection.transaction():
         connection.execute("select pg_advisory_xact_lock(%s)", (_ROLE_LOCK_KEY,))
+        take_provisioning_locks(connection)
         exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
         if exists is None:
             connection.execute(sql.SQL("create role {} login nobypassrls").format(role_name))
@@ -986,6 +1016,7 @@ def provision_backup_role(
     )
     with connection.transaction():
         connection.execute("select pg_advisory_xact_lock(%s)", (_ROLE_LOCK_KEY,))
+        take_provisioning_locks(connection)
         exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
         verb = sql.SQL("alter") if exists is not None else sql.SQL("create")
         connection.execute(sql.SQL("{} role {} {}").format(verb, role_name, attributes))

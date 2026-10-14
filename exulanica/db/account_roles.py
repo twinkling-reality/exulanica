@@ -154,8 +154,12 @@ def provision_account_role(
     connection: psycopg.Connection, *, role: str = ACCOUNT_ROLE, password: str | None = None
 ) -> None:
     """Explicit administration only; supply existing peer/certificate or chosen password auth."""
+    # Inside the function: roles imports this module for its table lists.
+    from exulanica.db.roles import take_provisioning_locks
+
     with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
         cursor.execute("select pg_advisory_xact_lock(119622358)")
+        take_provisioning_locks(connection)
         if cursor.execute("select 1 from pg_roles where rolname=%s", (role,)).fetchone() is None:
             cursor.execute(
                 sql.SQL(

@@ -722,3 +722,64 @@ def test_the_purge_role_reads_hashes_across_workspaces_and_nothing_else(purged):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("insert into capture (workspace_id, blob_sha256) values (%s, %s)",
                       (purged.workspace_id, b"\x00" * 32))
+
+
+
+# -- provisioning takes the locks its policies need before it changes anything -------------------
+
+
+def test_an_analyze_of_artifact_during_provisioning_does_not_deadlock_it(spine_schema, repository):
+    """Provisioned as ``exulanica-db`` provisions (the runtime role, then the purge role, in one
+    transaction on a connection that is not in autocommit), the runtime role's ``grant ... on all
+    tables`` changes artifact's pg_class row. An ANALYZE of artifact (autovacuum's work after the
+    rows a test writes) then holds its lock on artifact while it waits for that transaction to
+    update the same row, and the purge role's policy on artifact needs ACCESS EXCLUSIVE: when that
+    lock was asked for only there, the two waited for each other and PostgreSQL ended provisioning
+    as a deadlock. Provisioning now takes the policy tables' locks before it changes anything, so
+    the ANALYZE waits for provisioning and provisioning finishes."""
+    import urllib.parse
+
+    from exulanica.db.session import Database
+
+    _psycopg, scratch = spine_schema
+    base = env_get("TEST_DATABASE_URL")
+    assert base is not None
+    options = urllib.parse.quote(f"-csearch_path={scratch},public", safe="")
+    owner = Database(url=f"{base}{'&' if '?' in base else '?'}options={options}")
+    analyzer = psycopg.connect(base, autocommit=True)
+    analyzer.execute(f'set search_path to "{scratch}", public')
+    watcher = psycopg.connect(base, autocommit=True)
+    analyzed: dict[str, str] = {}
+
+    def analyze() -> None:
+        try:
+            analyzer.execute("analyze artifact")
+            analyzed["analyze"] = "completed"
+        except psycopg.Error as error:
+            analyzed["analyze"] = type(error).__name__
+
+    try:
+        with owner.unscoped() as connection:
+            connection.execute(f"set search_path to {scratch}, public")
+            provision_runtime_role(connection, role=_APP_ROLE, password=_APP_PASSWORD)
+            analyzing = threading.Thread(target=analyze)
+            analyzing.start()
+            waited = False
+            for _ in range(1000):
+                row = watcher.execute(
+                    "select wait_event_type from pg_stat_activity where pid = %s",
+                    (analyzer.info.backend_pid,),
+                ).fetchone()
+                if row is not None and row[0] == "Lock":
+                    waited = True
+                    break
+                threading.Event().wait(0.02)
+            # A positive control: the ANALYZE is waiting on provisioning when the purge role's
+            # policies are written, which is the interleaving under test.
+            assert waited, "the ANALYZE never waited on the provisioning transaction"
+            provision_purge_role(connection, role=_PURGE_ROLE, password=_PURGE_PASSWORD)
+        analyzing.join(30)
+    finally:
+        analyzer.close()
+        watcher.close()
+    assert analyzed == {"analyze": "completed"}, analyzed

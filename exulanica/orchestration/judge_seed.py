@@ -61,6 +61,7 @@ from exulanica.db.roles import (
     SPENDING_ADMIN_TABLES,
     SPENDING_READ_FUNCTIONS,
     grant_workspace_partition,
+    take_provisioning_locks,
 )
 from exulanica.errors import ExulanicaError
 from exulanica.evidence.blob import BlobId
@@ -1781,6 +1782,7 @@ def provision_judge_role(
 
     with connection.transaction():
         connection.execute("select pg_advisory_xact_lock(%s)", (_JUDGE_ROLE_LOCK_KEY,))
+        take_provisioning_locks(connection)
         exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
         if exists is None:
             connection.execute(sql.SQL("create role {} login nobypassrls").format(role_name))
