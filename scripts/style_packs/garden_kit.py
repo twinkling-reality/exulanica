@@ -16,6 +16,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from scripts.style_packs.authored_packs import Piece  # noqa: E402, standalone CLI bootstrap
+from scripts.style_packs.architecture import (  # noqa: E402, standalone CLI bootstrap
+    ARCHITECTURE_RECIPES,
+    ARCHITECTURE_SWATCHES,
+    validate_architecture_row,
+)
 from exulanica.world import style_packs  # noqa: E402, standalone CLI bootstrap
 from exulanica.world.style_pack_pieces import read_palette_piece  # noqa: E402, standalone CLI bootstrap
 
@@ -184,6 +189,7 @@ RECIPES = {
     "rounded_seat": rounded_seat,
     "fan_tree": fan_tree,
     "flower_cluster": flower_cluster,
+    **ARCHITECTURE_RECIPES,
 }
 
 
@@ -199,6 +205,20 @@ def validate_document(document):
         or not 1 <= len(document.get("variants", [])) <= 16
     ):
         raise ValueError("the kit has bounded piece and variant counts")
+    for variant in document["variants"]:
+        colours = variant.get("architecture_srgb8", {})
+        keys = {key for key, *_ in ARCHITECTURE_SWATCHES}
+        if (
+            not isinstance(colours, dict)
+            or not set(colours) <= keys
+            or any(
+                not isinstance(rgb, list)
+                or len(rgb) != 3
+                or any(type(c) is not int or not 0 <= c <= 255 for c in rgb)
+                for rgb in colours.values()
+            )
+        ):
+            raise ValueError("architecture colours name its swatches with three 8-bit channels")
     for row in document["pieces"]:
         if row.get("recipe") not in RECIPES:
             raise ValueError("unknown module recipe")
@@ -228,6 +248,8 @@ def validate_document(document):
             type(row.get("blooms")) is not int or not 1 <= row["blooms"] <= 16
         ):
             raise ValueError("bloom count is bounded")
+        if row["recipe"] in ARCHITECTURE_RECIPES:
+            validate_architecture_row(row)
         path = Path(row["file"])
         if path.is_absolute() or ".." in path.parts:
             raise ValueError("a module is written inside its pack")
@@ -281,6 +303,20 @@ def build(document, output):
                     emission_permille=0,
                 )
             )
+        # Architecture pieces draw with six more swatches, added only when the kit has one, so a
+        # kit without them keeps its palette and its bytes.
+        if any(row["recipe"] in ARCHITECTURE_RECIPES for row in document["pieces"]):
+            colours = variant.get("architecture_srgb8", {})
+            for key, rgb, rough, metal in ARCHITECTURE_SWATCHES:
+                palette.append(
+                    dict(
+                        key=key,
+                        srgb8=list(colours.get(key, rgb)),
+                        roughness_permille=rough,
+                        metalness_permille=metal,
+                        emission_permille=0,
+                    )
+                )
         manifest["palette"]["swatches"] = palette
         manifest["surfaces"] = {
             **{
