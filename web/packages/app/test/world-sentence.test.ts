@@ -48,8 +48,8 @@ const wire = (state: string, extra: Record<string, unknown> = {}) => ({
   draft_id: DRAFT, state, description: state === 'ready' || state === 'refused' ? '' : WORDS,
   started_at: '2026-10-10T12:00:00Z', elapsed_seconds: 4,
   poll_after_seconds: state === 'ready' || state === 'refused' ? null : 3, deadline_seconds: 240,
-  tool: null, entry: null, made: [], left_out: [], look: null, setting: null, refusal: null, model_name: null, execution: null,
-  refusals: REFUSALS, ...extra,
+  tool: null, entry: null, made: [], left_out: [], look: null, setting: null, land: null, refusal: null, model_name: null,
+  execution: null, refusals: REFUSALS, ...extra,
 });
 
 const BOAT = { key: 'boat', label: 'fishing boat', form: 'fixture', look: 'vehicle.fishing_boat', drawn: 4, box_mm: [2400, 6000, 1800] };

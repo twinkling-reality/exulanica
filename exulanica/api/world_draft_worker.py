@@ -53,6 +53,7 @@ FIELDS = (
     "left_out",
     "look",
     "setting",
+    "land",
     "refusal",
     "model_id",
     "calls",
@@ -238,8 +239,11 @@ class WorldDraftWorker:
         store: Any,
         policy_for: Callable,
         workspaces: Callable[[], Iterable[uuid.UUID]],
+        on_land: bool = False,
     ) -> None:
         self.database, self.client, self.spending = database, client, spending
+        #: Whether a place made from a sentence stands on land (``EXULANICA_WORLDS_ON_LAND``).
+        self.on_land = on_land
         self.holder, self.store, self.policy_for, self.workspaces = (
             holder,
             store,
@@ -445,6 +449,7 @@ class WorldDraftWorker:
                         store=self.store,
                         guest=claimed.guest,
                         fixed_world_id=claimed.world_id,
+                        on_land=self.on_land,
                     )
             except Exception as failure:
                 if draft.state == "drafting":

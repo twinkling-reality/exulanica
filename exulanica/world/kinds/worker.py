@@ -702,8 +702,12 @@ class WorkerComposer:
         *,
         support: Mapping[str, Any] | None = None,
         land: Mapping[str, Any] | None = None,
+        seconds: float = COMPOSE_SECONDS,
     ) -> None:
         self.workspace = str(workspace)
+        #: How long a making waits for its world: a request's limit unless the caller holds no
+        #: request (a draft's job), which may wait longer for a world on land.
+        self._seconds = seconds
         self._worker = kind_worker()
         self._epoch = self._worker.epoch
         self._support = None if support is None else copy.deepcopy(dict(support))
@@ -738,7 +742,7 @@ class WorkerComposer:
         outcome = self._worker.run(
             f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
             f"{json.dumps(dict(values), sort_keys=True)}" + self._support_key + self._land_key,
-            COMPOSE_SECONDS,
+            self._seconds,
             compose_job,
             self.workspace,
             dict(kind.document),

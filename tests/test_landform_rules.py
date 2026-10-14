@@ -30,6 +30,7 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "landform"
 #: edit, since a world made on land names the catalogs that shaped it.
 SHIPPED = {
     "landform-feature.v1.json": "5da02f1b42b263f9d54981f34baedcd56a62af2df81c2878a94cb1f5977fbc50",
+    "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
     "landform-value.v1.json": "328c2b0f98b5fa7621a048916d774ef5de6b81cd68042bd58d4e0c77aeb9a9e6",
 }

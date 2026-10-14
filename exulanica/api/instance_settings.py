@@ -84,6 +84,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_worker_not_boolean": "must be an explicit boolean",
     "society_of_things_not_boolean": "must be an explicit boolean",
     "kinds_from_people_not_boolean": "must be an explicit boolean",
+    "worlds_on_land_not_boolean": "must be an explicit boolean",
     "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
@@ -132,6 +133,10 @@ SOCIETY_OF_THINGS_ENV: Final = env_name("SOCIETY_OF_THINGS")
 #: (``POST /worlds/kinds``). Off unless it is set on. The document is the person's own and is kept
 #: in rows no removal reaches, so a deployment states this only where it can be destroyed again.
 KINDS_FROM_PEOPLE_ENV: Final = env_name("KINDS_FROM_PEOPLE")
+#: Whether a place made from a sentence stands on land chosen from its words (a land recipe,
+#: :mod:`exulanica.world.land_choice`), or on level ground as a place made before it does. Off
+#: unless it is set on.
+WORLDS_ON_LAND_ENV: Final = env_name("WORLDS_ON_LAND")
 
 
 def _style_pack_uploads(environ: Mapping[str, str]) -> bool:

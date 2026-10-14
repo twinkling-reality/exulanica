@@ -34940,6 +34940,16 @@
        }
       ]
      },
+     "land": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/TakenLandView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "refusal": {
       "anyOf": [
        {
@@ -45890,6 +45900,48 @@
      "srgb8"
     ],
     "title": "SwatchBody"
+   },
+   "TakenLandView": {
+    "properties": {
+     "recipe": {
+      "type": "string",
+      "title": "Recipe"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "chosen_by": {
+      "type": "string",
+      "enum": [
+       "words",
+       "setting",
+       "default"
+      ],
+      "title": "Chosen By"
+     },
+     "words": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Words"
+     },
+     "fell_back": {
+      "type": "boolean",
+      "title": "Fell Back"
+     }
+    },
+    "type": "object",
+    "required": [
+     "recipe",
+     "title",
+     "chosen_by",
+     "words",
+     "fell_back"
+    ],
+    "title": "TakenLandView",
+    "description": "The land a place made from a sentence stands on (a land recipe), and what chose it."
    },
    "TakenLookView": {
     "properties": {

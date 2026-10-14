@@ -132,7 +132,8 @@ def _drafts_alias(request, bench, monkeypatch):
 
     monkeypatch.setattr(ModelClient, "provider_prices", price_read)
 
-    def app(*args, **kwargs):
+    def app(*args, on_land: bool = False, **kwargs):
+        """``on_land``: a deployment that makes places from a sentence on land."""
         if kwargs.get("spending") is None:
             for provider in load_manifest().providers:
                 if bench.query(
@@ -165,7 +166,10 @@ def _drafts_alias(request, bench, monkeypatch):
             kwargs["spending"] = durable
         original = factory(*args, **kwargs)
         services = replace(
-            original.app.state.services, database=bench.runtime, readonly_database=bench.runtime
+            original.app.state.services,
+            database=bench.runtime,
+            readonly_database=bench.runtime,
+            worlds_on_land=on_land,
         )
         application = create_app(services, verify=False)
         application.dependency_overrides.update(original.app.dependency_overrides)
@@ -285,8 +289,10 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
         # Both steps' calls are shown with what they cost: the chooser's, then the drafter's.
         roles = [call["role"] for call in ended["execution"]["calls"]]
         assert roles == ["world_tool_chooser", "kind_drafter", "look_chooser", "setting_chooser"]
-        # The words asked for no look and no setting, and none was taken.
-        assert (ended["look"], ended["setting"]) == (None, None)
+        # The words asked for no look and no setting, and none was taken; the server makes
+        # places on level ground unless its deployment says on land.
+        assert (ended["look"], ended["setting"], ended["land"]) == (None, None, None)
+        assert receipt["composer"] == {"key": "site-plan", "version": 1}
         # The page reads the made world's drawing next: it was kept with the world.
         site = client.get(
             f"/world/versions/{entry['authored_version_id']}/site?world_id={entry['world_id']}",
@@ -328,6 +334,96 @@ def test_a_site_reports_missing_content_even_when_an_overlapping_setting_is_take
         assert ended["state"] == "ready", ended
         assert ended["left_out"] == ["sea with flying boats"]
         assert "not_supported" not in _receipt(client, ended["entry"])["kind"]["document"]
+
+
+def test_on_land_a_place_stands_on_the_land_its_words_name_and_says_so(drafts, fixed_identities):
+    from exulanica.grammar.landform import land_recipes
+
+    coast = next(recipe for recipe in land_recipes() if recipe.key == "coast")
+    app, transport = drafts
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            _brief(_farm()),
+            _look(None),
+            _setting("sea", ground="sea"),
+        ]
+    )
+    with app(on_land=True) as client:
+        ended = _ended(client, _start(client, "a small farm by the sea").json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["land"] == {
+            "recipe": "coast",
+            "title": coast.title,
+            "chosen_by": "words",
+            "words": ["sea"],
+            "fell_back": False,
+        }
+        receipt = _receipt(client, ended["entry"])
+        assert receipt["composer"] == {"key": "site-plan", "version": 5}
+        assert receipt["land_sha256"] == coast.land_sha256
+        # The setting the words chose is taken as ever, beside the land.
+        assert [part["key"] for part in ended["setting"]["parts"]] == ["sea"]
+        entry = ended["entry"]
+        site = client.get(
+            f"/world/versions/{entry['authored_version_id']}/site?world_id={entry['world_id']}",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+        )
+        assert site.status_code == 200 and site.json()["profile"] == "exulanica.site-drawing/v5"
+
+
+def test_on_land_words_that_name_no_land_stand_on_the_default(drafts, fixed_identities):
+    app, transport = drafts
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app(on_land=True) as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert (ended["land"]["recipe"], ended["land"]["chosen_by"]) == ("rolling", "default")
+        assert (ended["land"]["words"], ended["land"]["fell_back"]) == ([], False)
+        assert _receipt(client, ended["entry"])["composer"]["version"] == 5
+
+
+def test_on_land_a_place_no_layout_of_which_fits_its_land_is_made_level_and_says_so(
+    drafts, fixed_identities, monkeypatch
+):
+    from exulanica.grammar.landform import LandRecipe, read_land_document
+    from exulanica.world.land_choice import LandChoice
+
+    # Land rising higher than near land may stand: every layout candidate is refused on it.
+    land = read_land_document(
+        {
+            "profile": "exulanica.landform/v1",
+            "ground_mm": 40000,
+            "features": [
+                {"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 120},
+                {"id": "wall", "kind": "rise", "side": "north", "distance_mm": 0,
+                 "width_mm": 600000, "depth_mm": 100000, "height_mm": 40000,
+                 "roughness_permille": 0},
+            ],
+        }
+    )  # fmt: skip
+    steep = LandRecipe(
+        key="steep",
+        title="a steep test slope",
+        words=(),
+        for_ground=(),
+        default=False,
+        land=land.canonical(),
+        land_sha256=land.sha256,
+    )
+    monkeypatch.setattr(
+        world_making,
+        "choose_land",
+        lambda *args, **kwargs: LandChoice(recipe=steep, chosen_by="default", spans=()),
+    )
+    app, transport = drafts
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app(on_land=True) as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert (ended["land"]["recipe"], ended["land"]["fell_back"]) == ("steep", True)
+        receipt = _receipt(client, ended["entry"])
+        assert receipt["composer"] == {"key": "site-plan", "version": 1} and "land" not in receipt
 
 
 def test_where_the_chooser_is_unsure_the_place_tool_is_taken_and_said(drafts, fixed_identities):
@@ -769,7 +865,6 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
         bound = connection.execute("select bound_id from world_draft_bound").fetchall()
         used = connection.execute("select bound_id from spending_reservation").fetchall()
     assert {row["bound_id"] for row in used} <= {row["bound_id"] for row in bound}
-
 
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")

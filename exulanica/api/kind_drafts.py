@@ -267,6 +267,10 @@ class KindDraft:
     #: each with the person's own words that chose it; None where none was taken.
     look: Mapping[str, Any] | None = None
     setting: Mapping[str, Any] | None = None
+    #: For a world made on land: the recipe it stands on and what chose it (the person's own
+    #: words, its setting or the default), and whether its layout did not fit and it was made on
+    #: level ground instead; None where it was made on level ground as asked.
+    land: Mapping[str, Any] | None = None
     #: Content erased with the resulting world; timing remains for the starts-per-hour budget.
     erased: bool = False
 
@@ -544,7 +548,7 @@ class KindDrafts:
         draft.refusal = draft.model_id = None
         draft.stage = draft.tool = draft.tool_chosen = None
         draft.calls = draft.made = draft.left_out = ()
-        draft.look = draft.setting = None
+        draft.look = draft.setting = draft.land = None
 
     def erase_kind(self, workspace_id: uuid.UUID, kind: str, version: int) -> None:
         """Scrub a removed kind's drafts, including the gap between commit and finish."""

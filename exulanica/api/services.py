@@ -83,6 +83,7 @@ from exulanica.api.instance_settings import (
     SOCIETY_MINUTE_COST_SCALE_ENV,
     SOCIETY_OF_THINGS_ENV,
     SOCIETY_TICK_INTERVAL_MS_ENV,
+    WORLDS_ON_LAND_ENV,
     SocietySettingRefused,
     _comparison_player,
     _enabled,
@@ -351,6 +352,9 @@ class Services(ServiceRefusals, WorkerFactories):
     #: (:data:`KINDS_FROM_PEOPLE_ENV`); off for a hand-built Services, as for a host that does
     #: not set it.
     kinds_from_people: bool = False
+    #: Whether a place made from a sentence stands on land (:data:`WORLDS_ON_LAND_ENV`); off for a
+    #: hand-built Services, as for a host that does not set it.
+    worlds_on_land: bool = False
     #: How a society that is made opens (:data:`SOCIETY_OPENING_ENV`, read by
     #: :mod:`exulanica.api.society_opening`): advanced until a share of its people is outdoors or,
     #: for a society of things, doing something, or not at all. Nothing for a hand-built
@@ -1248,6 +1252,9 @@ def build_services(
             SOCIETY_OF_THINGS_ENV,
         ),
         kinds_from_people=_kinds_from_people(environ),
+        worlds_on_land=_explicitly_enabled(
+            env_get("WORLDS_ON_LAND", environ), "worlds_on_land_not_boolean", WORLDS_ON_LAND_ENV
+        ),
         society_opening=_society_opening(env_get("SOCIETY_OPENING", environ)),
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",

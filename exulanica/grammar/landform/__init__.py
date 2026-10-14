@@ -7,6 +7,7 @@
   drawn to the horizon; water bodies.
 * :mod:`.grading`: pads, corridors, banks and walls, ponds, and the checks a graded land meets.
 * :mod:`.rules`: the land rules a world's receipt names, so its land rebuilds the same.
+* :mod:`.recipes`: the land a world made from a sentence stands on, as data.
 
 Nothing here opens a database, a store or evidence: a land is a pure function of its document
 and the world's seed, as every generated subject is.
@@ -64,6 +65,7 @@ from exulanica.grammar.landform.realize import (
     realize_region,
     water_bodies,
 )
+from exulanica.grammar.landform.recipes import LandRecipe, land_recipes, load_land_recipes
 from exulanica.grammar.landform.rules import LAND_RULES_VERSION, check_land_rules, land_rules
 
 __all__ = [
@@ -89,6 +91,7 @@ __all__ = [
     "LandChunk",
     "LandDocument",
     "LandFeature",
+    "LandRecipe",
     "LandformCatalog",
     "LandformRefused",
     "NearLand",
@@ -101,9 +104,11 @@ __all__ = [
     "grade_land",
     "height_at",
     "land_heights",
+    "land_recipes",
     "land_rules",
     "landform_catalog",
     "level_land",
+    "load_land_recipes",
     "load_landform_catalog",
     "near_chunks",
     "near_domain",

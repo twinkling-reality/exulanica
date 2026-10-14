@@ -69,6 +69,7 @@ class WorkerFactories:
                 (frozenset() if self.tokens is None else self.tokens.workspaces)
                 | self.watched_workspaces()
             ),
+            on_land=self.worlds_on_land,
         )
 
     def build_model_probe_worker(self) -> ModelProbeWorker | None:

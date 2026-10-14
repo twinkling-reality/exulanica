@@ -1,12 +1,14 @@
 # Landform
 
-Status: **IMPLEMENTED BOUNDARY: DATA, READERS AND SITE WORLDS ON LAND, DRAWN; NOT YET ASKED FOR**.
-A world's land can be stated as data, realized, graded and read back in Python and in the browser,
-and a site world can be made on land through its route: graded, regenerated from its receipt, its
-people's places standing on the land, its drawing and its land served. The application draws such
-a site on its land, to the horizon, and stands its people and things on it. No product page or
-drafter asks for land, so every world anyone has made stands on level ground, as the
-[world kinds contract](world-kinds-contract.md) and the [city grammar](grammar-package.md) state.
+Status: **IMPLEMENTED BOUNDARY: DATA, READERS AND SITE WORLDS ON LAND, DRAWN; ASKED FOR WHERE A
+DEPLOYMENT TURNS IT ON**. A world's land can be stated as data, realized, graded and read back in
+Python and in the browser, and a site world can be made on land through its route: graded,
+regenerated from its receipt, its people's places standing on the land, its drawing and its land
+served. The application draws such a site on its land, to the horizon, and stands its people and
+things on it. A place drafted from a person's words stands on land chosen from what was said where
+the deployment turns that on (`EXULANICA_WORLDS_ON_LAND`, off by default); elsewhere, and for every
+town, worlds stand on level ground, as the [world kinds contract](world-kinds-contract.md) and the
+[city grammar](grammar-package.md) state.
 
 This document owns the land document (`exulanica.landform/v1`), the landform catalogs, the pure
 function that realizes a land, the grading a layout applies to it, and the chunk and backdrop
@@ -28,6 +30,7 @@ documents a reader receives. The exact contact predicates a chunk is read with b
 - [The land's look](#the-lands-look)
 - [Sites on land](#sites-on-land)
 - [A world's land rules](#a-worlds-land-rules)
+- [Land for a world made from a sentence](#land-for-a-world-made-from-a-sentence)
 - [Refusals](#refusals)
 - [Limits](#limits)
 
@@ -68,8 +71,9 @@ offset east by `offset_mm` and north by `distance_mm`.
 ## The catalogs
 
 Two catalogs in `assets/catalogs/landform/` shape land, read through the grammar's catalog loader so
-each entry carries a reason and a licence (`exulanica/grammar/landform/catalog.py`); a third beside
-them states [the land's look](#the-lands-look):
+each entry carries a reason and a licence (`exulanica/grammar/landform/catalog.py`). Beside them,
+`landform-surface.v1.json` states [the land's look](#the-lands-look) and `landform-recipe.v1.json`
+the [land a place made from a sentence stands on](#land-for-a-world-made-from-a-sentence):
 
 - `landform-feature.v1.json`: one entry per kind: `words` (what a person or a model reads),
   `domain` (`near_and_far`, or `far` for a feature drawn only), `composition` (`additive` or
@@ -257,6 +261,40 @@ of it. A world's appearance should change only when its look does, so the surfac
 world wears is to be named by its look (its style pack or style version), as its other choices of
 appearance are; that naming is planned, not built (see [Limits](#limits)).
 
+## Land for a world made from a sentence
+
+Where the deployment turns it on (`EXULANICA_WORLDS_ON_LAND=on`, [deployment](deployment.md)), a
+place drafted from a person's words (`POST /worlds/drafts`,
+[world kinds](world-kinds-contract.md#a-world-made-from-a-sentence)) stands on one of the land
+recipes in [`landform-recipe.v1.json`](../assets/catalogs/landform/landform-recipe.v1.json), read by
+[`recipes.py`](../exulanica/grammar/landform/recipes.py). Each recipe is a whole land document, read
+by the landform reader as the catalog is read, with the words a made world's card says of it, the
+whole words that name it in a sentence, the setting's ground parts that bring it, and a reason:
+
+| Recipe | Named by words such as | Brought by the setting | What it is |
+| --- | --- | --- | --- |
+| `coast` | sea, coast, beach, shore, bay | By the sea | A beach and the sea below, a terraced hill behind |
+| `valley` | valley, dale, glen | | A broad floor between two long ridges, ranges at both ends |
+| `upland` | mountains, peaks, highlands, fells | Snowfields | Rough fells and crags, peaks 1.5 to 2 km away on three sides |
+| `hillside` | hillside, hill, slope | | Rising ground under a terraced hillside, a mountain behind |
+| `rolling` | meadows, countryside, downs | Desert sand, Wheat fields | The default: gentle hills, far hills and ranges in haze |
+
+The land is chosen without a model ([`land_choice.py`](../exulanica/world/land_choice.py)): first a
+recipe a word of the sentence names, in the catalog's order (a word right after "no", "not",
+"without", "far from" or "away from", an article between them aside, is not taken, nor a word inside
+a saved name), then the recipe the setting chooser's ground part brings, then the default. The
+place is composed on that land as `POST /worlds/kinds/{kind}/worlds` composes one, its receipt
+keeping the recipe's land document and naming the land rules. Where no layout candidate of the
+place fits the land, it is composed once more on level ground. The draft states the land either
+way (`land`: the recipe, what chose it, the person's own words that did, and `fell_back` where the
+place was made level). A phrase the drafter reported it could not make is answered by the land only
+where every word of it but the small joining words is one of the recipe's ("in a valley"; never
+"sea with flying boats"). A draft's making waits up to 60 s for a place on land, since no request
+waits on it.
+
+The recipes are data: a new or changed recipe is a new catalog version, and a world keeps the land
+document it was made with, so a later recipe never moves it.
+
 ## Refusals
 
 | Code | When |
@@ -276,7 +314,19 @@ appearance are; that naming is planned, not built (see [Limits](#limits)).
 
 ## Limits
 
-- No product page or drafter asks for land. Towns are laid out on level ground.
+- Only a place drafted from words stands on land, and only where the deployment turns it on; no
+  page asks for land otherwise. Towns stay level.
+- Walkable land stays within 64 m above or below the sea, so "high ground" cannot be high: an
+  upland is a place among peaks, not a place on a high plateau. Raising the bound is a change to
+  the land rules.
+- Mountains read as mountains from about 1.5 km away or more; nearer, they fill the sky as a pale
+  wall. The recipes keep their ranges that far out.
+- The land is chosen from listed words, the setting and a default, not by reading the sentence:
+  a "not" more than a word before a land word is not seen, and land the recipes do not hold (an
+  island, a canyon) cannot be asked for. Two worlds on one recipe differ only in the land's noise,
+  which their seeds draw; sides and offsets are the recipe's.
+- Making a place on land takes longer than on level ground: 6 to 11 s a world on the development
+  machine's copy, and once more than the route's 15 s under heavy load.
 - The application draws a site's land with no shadow from it: hills cast none. A pick is not
   hidden by a hill. Faces steeper than about 35 degrees are drawn in the surface catalog's stone
   colour, not a style pack's surface.

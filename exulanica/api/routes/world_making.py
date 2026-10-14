@@ -171,6 +171,22 @@ class TakenSettingView(BaseModel):
     words: list[str]
 
 
+class TakenLandView(BaseModel):
+    """The land a place made from a sentence stands on (a land recipe), and what chose it."""
+
+    #: The land recipe's key (``assets/catalogs/landform/landform-recipe.v1.json``) and the words a
+    #: card says of it, its preposition included ("on a coast, ...", "in a valley ...").
+    recipe: str
+    title: str
+    #: ``words`` where the person's words named it, ``setting`` where the setting's ground part
+    #: brought it, ``default`` where nothing named any land.
+    chosen_by: Literal["words", "setting", "default"]
+    #: The person's own words that chose it; empty unless ``chosen_by`` is ``words``.
+    words: list[str]
+    #: True where no layout of the place fitted this land, so the world was made on level ground.
+    fell_back: bool
+
+
 class WorldDraftRefusalView(BaseModel):
     code: str
     detail: str
@@ -210,6 +226,9 @@ class MadeWorldDraftView(BaseModel):
     #: a person changes either afterwards in the world's look.
     look: TakenLookView | None = None
     setting: TakenSettingView | None = None
+    #: The land a place stands on, where the server makes places from a sentence on land; null for
+    #: a town, and where it does not.
+    land: TakenLandView | None = None
     refusal: WorldDraftRefusalView | None
     model_name: str | None
     execution: ExecutionView | None
@@ -359,6 +378,7 @@ def _draft_view(
         left_out=list(draft.left_out),
         look=None if draft.look is None else TakenLookView(**draft.look),
         setting=None if draft.setting is None else TakenSettingView(**draft.setting),
+        land=None if draft.land is None else TakenLandView(**draft.land),
         refusal=None if draft.refusal is None else WorldDraftRefusalView(**draft.refusal),
         model_name=None if draft.model_id is None else load_manifest().model_name(draft.model_id),
         execution=_execution(draft.calls, (), prompt_version=prompt_version)
@@ -392,6 +412,7 @@ def _durable_view(row: dict[str, Any], connection: Any, services: Services) -> M
         "left_out",
         "look",
         "setting",
+        "land",
         "refusal",
         "model_id",
     ):

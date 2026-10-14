@@ -12,7 +12,10 @@ waits on a model. The job does, in order, saying which it is at:
     kind document, held to both stages of the kind checks, or the specification drafter a town's
     preset and values, held to the gate every town passes.
 *   **making**: the world is composed and its entry saved, as ``POST /worlds/kinds/{kind}/worlds``
-    and ``POST /worlds/generated`` make one. The person meets no card, preset or value.
+    and ``POST /worlds/generated`` make one. The person meets no card, preset or value. Where the
+    server makes places on land (``EXULANICA_WORLDS_ON_LAND``), a place stands on the land its
+    words, its setting or the default name (:mod:`exulanica.world.land_choice`), or on level
+    ground where no layout of it fits that land, and the draft says which.
 
 It ends ``ready`` with the saved entry, every part that was made (its words, its look role and
 the box it is drawn in, where it has one) and the phrases of the description that were left out,
@@ -43,6 +46,7 @@ from typing import Any, Final
 
 from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, drafted_kind
 from exulanica.api.world_draft_offer import calls_at_most as counted_calls
+from exulanica.grammar.landform import LandformRefused
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import load_manifest
@@ -63,6 +67,7 @@ from exulanica.world.kinds.document import KindDocument
 from exulanica.world.kinds.library import town_adapter
 from exulanica.world.kinds.samples import SiteRefused
 from exulanica.world.kinds.worker import KindWorkWaiting, WorkerComposer
+from exulanica.world.land_choice import LandChoice, choose_land, said_by_land
 from exulanica.world.models import StylePackBinding
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.style_pack_library import style_pack_context, style_pack_library
@@ -111,6 +116,11 @@ _FAILED: Final = {
     "code": "world_draft_failed",
     "detail": "The draft stopped before a world was made. Say it again.",
 }
+#: How long a draft's making waits for a place on land: no request waits on a draft's job, and
+#: grading a layout on land takes longer than on level ground (6 to 11 s a world on the
+#: development machine's copy, one over the route's 15 s once under heavy load, 14 October 2026),
+#: so four times the route's limit, within the kind worker's bound for a stuck job.
+LAND_COMPOSE_SECONDS: Final = 60.0
 
 
 def calls_at_most(client: ModelClient | None) -> int:
@@ -402,10 +412,12 @@ def make_world(
     store: Any,
     guest: bool,
     fixed_world_id: str | None = None,
+    on_land: bool = False,
 ) -> None:
     """Choose the tool for ``sent`` (the words as sent, every saved name replaced), draft with it
     and make the world, leaving the draft ``ready`` with its saved entry or ``refused`` by name,
-    with every call it made either way.
+    with every call it made either way. With ``on_land`` a place stands on land chosen from what
+    was said (a town stays level).
 
     ``opened`` opens a connection scoped to the draft's workspace that may write; none is held
     while a model runs. ``fixed_world_id`` fixes the world's identity instead of drawing one: the
@@ -441,9 +453,25 @@ def make_world(
     tool = tool_for_unsure() if tool is None else tool
     drafts.advance(draft, stage="drafting", tool=tool.key, tool_chosen=chosen)
 
-    path = _make_place if tool.drafter == "kind" else _make_town
     try:
-        path(draft, drafts, log, client, opened, actor, sent, store, guest, fixed_world_id)
+        if tool.drafter == "kind":
+            _make_place(
+                draft,
+                drafts,
+                log,
+                client,
+                opened,
+                actor,
+                sent,
+                store,
+                guest,
+                fixed_world_id,
+                on_land,
+            )
+        else:
+            _make_town(
+                draft, drafts, log, client, opened, actor, sent, store, guest, fixed_world_id
+            )
     except Exception as failed:  # anything unnamed, after paid calls, still shows what it cost
         _LOG.warning("a world draft failed: %s", type(failed).__qualname__)
         refused(_FAILED)
@@ -488,6 +516,7 @@ def _make_place(
     store: Any,
     guest: bool,
     fixed_world_id: str | None,
+    on_land: bool,
 ) -> None:
     outcome = drafted_kind(
         draft,
@@ -508,7 +537,21 @@ def _make_place(
         drafts.finish(draft, state="refused", refusal=dict(_FAILED), calls=log.calls)
         return
     drafts.advance(draft, stage="making")
-    composer = WorkerComposer(draft.workspace_id)
+    land = (
+        choose_land(
+            sent.text,
+            taken.parts.get("ground"),
+            names=[(start, end) for start, end, _, _ in sent.replaced],
+        )
+        if on_land
+        else None
+    )
+    composer = (
+        WorkerComposer(draft.workspace_id)
+        if land is None
+        else WorkerComposer(draft.workspace_id, land=land.recipe.land, seconds=LAND_COMPOSE_SECONDS)
+    )
+    fell_back = False
 
     def make() -> Any:
         with opened() as connection:
@@ -530,7 +573,19 @@ def _make_place(
         except KindWorkWaiting:
             return make()
 
-    created = _saved(draft, drafts, log, made_or_once_more)
+    def made_on_its_land() -> Any:
+        nonlocal composer, fell_back
+        if land is None:
+            return made_or_once_more()
+        try:
+            return made_or_once_more()
+        except (SiteRefused, LandformRefused):
+            # No layout of the place fits its land: it is made on level ground, and said so.
+            fell_back = True
+            composer = WorkerComposer(draft.workspace_id)
+            return made_or_once_more()
+
+    created = _saved(draft, drafts, log, made_on_its_land)
     if created is None:
         return
     # The world exists from here on, so the draft ends ready whatever follows.
@@ -543,18 +598,43 @@ def _make_place(
         _LOG.warning("a made world's parts were not counted: %s", type(failed).__qualname__)
         made = site_parts(kind, None)
     worn = _worn(opened, draft, store, guest, actor, created, taken)
+    # A phrase the drafter could not make that names only the land the place stands on ("in a
+    # valley") is said by that land; one that asks for more of it ("sea with flying boats") is not.
+    omitted = tuple(
+        span
+        for span in outcome.not_supported_at
+        if land is None or fell_back or not said_by_land(sent.text[span[0] : span[1]], land.recipe)
+    )
     drafts.made(
         draft,
         entry_id=created.entry_id,
         made=made,
         # Site omissions describe content/geometry/behavior. An overlapping setting phrase
         # cannot fulfill one: sea beyond the site does not add a harbour basin or a boat.
-        left_out=_left_out(sent, outcome.not_supported_at, ()),
+        left_out=_left_out(sent, omitted, ()),
         look=worn.look,
         setting=worn.setting,
+        land=None if land is None else _land_taken(sent, land, fell_back=fell_back),
         calls=log.calls,
         model_id=outcome.model_id,
     )
+
+
+def _land_taken(sent: SentDescription, land: LandChoice, *, fell_back: bool) -> dict[str, Any]:
+    """What a draft says of the land its place stands on: the recipe, what chose it with the
+    person's own words where words did, and whether the place was made on level ground instead."""
+    try:
+        words = [sent.typed_words(start, end) for start, end in land.spans]
+    except Exception as failed:
+        _LOG.warning("a land word could not be said back: %s", type(failed).__qualname__)
+        words = []
+    return {
+        "recipe": land.recipe.key,
+        "title": land.recipe.title,
+        "chosen_by": land.chosen_by,
+        "words": words,
+        "fell_back": fell_back,
+    }
 
 
 #: The tiles every town covers at least: whole 128 m tiles, never none.
