@@ -398,7 +398,7 @@ def test_a_session_capture_records_receipts_coverage_and_its_time(world):
 SESSION_ID = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
 
 
-def with_session(world, *, counted=7, maximum=2000, reason="session_minutes"):
+def with_session(world, *, counted=7, maximum=2000, total=None, reason="session_minutes"):
     """Give the fake world one closed living session from minute 3, with a timed-out request."""
     timed_out = record("r9", world.knight, 7, "wait here a minute")
     timed_out["decision"].update(status="unavailable", reason="model_timed_out", proposal=None)
@@ -481,7 +481,11 @@ def with_session(world, *, counted=7, maximum=2000, reason="session_minutes"):
             }
         ],
         "decisions": listed,
-        "decisions_read": {"counted": counted, "maximum": maximum},
+        "decisions_read": {
+            "counted": counted,
+            "maximum": maximum,
+            "total": counted if total is None else total,
+        },
         "measures": {},
         "by_model": [],
     }
@@ -555,7 +559,7 @@ def test_a_living_session_is_captured_with_every_request_it_asked(world):
 
 
 def test_a_capped_session_list_falls_back_to_the_decisions_minutes_took_up(world):
-    with_session(world, counted=2000, maximum=2000)
+    with_session(world, counted=2000, maximum=2000, total=2001)
     with WorldReader(world.url, TOKEN, WORLD) as reader:
         result = capture(
             reader,
@@ -584,3 +588,18 @@ def test_a_session_a_person_stopped_says_so(world):
         )
     closed = result.evidence["living_session"]["closed"]
     assert (closed["reason"], closed["by"]) == ("stopped_by_person", "person")
+
+
+def test_a_session_of_exactly_the_listing_cap_is_complete(world):
+    # The list is complete exactly when it holds every decision of the session, cap or not.
+    with_session(world, counted=2000, maximum=2000, total=2000)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            living_session=SESSION_ID,
+        )
+    assert result.evidence["coverage"] == {"decisions": "all"}
+    assert "request:r9" in {d["record_id"] for d in result.evidence["decisions"]}

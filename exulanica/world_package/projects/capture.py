@@ -431,9 +431,11 @@ def capture(
         records: dict[str, tuple[dict[str, Any] | None, dict[str, Any], str]] = {}
         if (
             session is not None
-            and session["decisions_read"]["counted"] < session["decisions_read"]["maximum"]
+            and session["decisions_read"]["counted"] == session["decisions_read"]["total"]
         ):
-            # The session lists every request asked in its minutes: the unanswered ones too.
+            # The session's list holds every decision asked in its minutes (its total), the
+            # unanswered ones too. Each record is still read in full below: the list carries no
+            # source record digest, options, choice, latency, tokens or cost.
             coverage = "all"
             asked = [
                 (entry["request_id"], entry["subject_id"])

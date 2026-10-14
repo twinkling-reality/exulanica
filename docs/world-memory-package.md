@@ -849,8 +849,8 @@ uv run python -m exulanica.world_package.projects watch ./my-project --api http:
 
 `--living-session ID` (or `latest`) on `capture`, `record-world` and `watch` captures one living
 session as its own evidence file: the decisions asked in its minutes, every request with its
-receipt when the society can list them all (`coverage: all`, so unanswered and timed-out requests
-appear), and the session's receipts and spending as the spending authority reads them; the watcher
+receipt when the session read lists them all (its counted decisions equal its total;
+`coverage: all`, so unanswered and timed-out requests appear), and the session's receipts and spending as the spending authority reads them; the watcher
 records a checkpoint as soon as the session closes. The fields are in the
 [evidence format](world-project-evidence-format.md#living_session).
 
@@ -927,7 +927,12 @@ tells what the beings did in each session (each decision's offered option count,
 its verdict in the browser's choice account words, `assets/catalogs/roles/choice-account-words.v1.json`)
 and how each model did (the served measures of `exulanica/world/decision_measures.py`: counts out
 of totals, "not enough data yet" below a measure's minimum sample, latency, and cost as computed
-or bounded, never a bill). It is regenerated from the committed files on every review and ends
+or bounded, never a bill). A living session's evidence is headed by its minutes, why it stopped
+in the society's own words (`SESSION_CLOSED_WORDS`, `exulanica/world/society_sessions.py`, the
+table the page reads), its limits and its spending as the spending authority read it, including
+the most that calls of unknown cost can have cost; a table by living session sets each session's
+models side by side, with timeouts only where every request of the session was read. It is
+regenerated from the committed files on every review and ends
 with their digests. What the files cannot support (requests no minute took up, receipts older
 files lack) is named as unavailable, never shown as zero. Labels, spoken lines and situations
 appear only when the repository's visibility reads `PRIVATE`; a public or internal repository gets

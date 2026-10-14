@@ -85,9 +85,13 @@ captured. It carries no account, actor, request or bound identity.
 A bound's `state` is `open` or `closed`. An open session's block may later
 become closed, and its spending may change while it is open; a closed block never changes, even
 when a later reconciliation settles an unknown cost, which is recorded as a new entry naming the
-session and the provider rather than as an edit. When a capture could read every request the
-session asked (fewer than the society's listing cap), the file's `coverage` is `all` and requests
-no minute took up are present with their receipts; otherwise it is `consumed`.
+session and the provider rather than as an edit. When the session read lists every decision asked
+in the session's minutes (its `decisions_read.counted` equals its `decisions_read.total`), the
+file's `coverage` is `all` and requests no minute took up are present with their receipts;
+otherwise capture enumerates the decisions minutes took up and the file's `coverage` is
+`consumed`. Each listed request's full record is still read one by one: the session list names
+each request and its status, but a decision in this format also needs what only the receipt holds
+(its source record digest, offered options, choice, latency, tokens and cost).
 
 ### `source`
 

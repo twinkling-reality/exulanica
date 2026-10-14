@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
 from exulanica.world.decision_measures import LATENCY_MINIMUM, measures
+from exulanica.world.society_sessions import closed_words
 from exulanica.world_package.projects.checkpoint import ProjectError
 from exulanica.world_package.projects.schema import ModelBinding, binding_sha256, scan_values
 from exulanica.world_package.projects.summary import thing_names
@@ -229,6 +231,79 @@ def _model_table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     return lines
 
 
+def _session_header(session: Mapping[str, Any], count: str) -> list[str]:
+    """A living session's minutes, why it stopped in the society's own words, its limits and its
+    spending as the spending authority read it. Never a bill."""
+    held = session["living_session"]
+    opened, closed = held["opened"], held["closed"]
+    limits, used = opened["limits"], held["spending"]["used"]
+    end = "now" if closed is None else closed["tick"]
+    why = "open when captured." if closed is None else closed_words(closed["reason"])
+    wall = limits["wall_seconds"]
+    wall_words = f"{wall // 60} minutes" if wall % 60 == 0 else f"{wall} seconds"
+    spent = f"Spending as found: ${used['usd']} committed for {used['calls']} calls"
+    if used["unresolved_count"]:
+        spent += (
+            f", of which at most ${used['unresolved_usd']} for {used['unresolved_count']} calls "
+            "is not known yet"
+        )
+    within = Decimal(used["usd"]) <= Decimal(limits["usd"])
+    spent += f", {'within' if within else 'over'} its ${limits['usd']} limit. Not a bill."
+    return [
+        f"Living session {held['session_id'][:8]}, minutes {opened['tick']} to {end}: {why} "
+        f"{count} ({_coverage(session)}).",
+        f"Limits: {limits['minutes']} minutes, {limits['decisions']} decisions, "
+        f"${limits['usd']}, {limits['calls']} calls, {wall_words} of wall time.",
+        spent,
+    ]
+
+
+def _session_table(sessions: Mapping[str, Mapping[str, Any]]) -> list[str]:
+    """Each living session's models side by side; timeouts only where every request was read."""
+    living = [(name, s) for name, s in sorted(sessions.items()) if s.get("living_session")]
+    if not living:
+        return []
+    lines = [
+        "",
+        "By living session:",
+        "",
+        "| session | model | decisions | applied | timeouts | latency p50 / p95 | bound |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for name, session in living:
+        held = session["living_session"]
+        bounds = {b["provider"]: b for b in held["spending"]["bounds"]}
+        grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+        for row in _rows({name: session}):
+            grouped.setdefault((row["provider"], row["model_id"]), []).append(row)
+        for (provider, model_id), own in sorted(grouped.items()):
+            label = f"| {held['session_id'][:8]} | {provider}/{model_id} | {len(own)} |"
+            if not all(row["has_receipt"] for row in own):
+                lines.append(f"{label} unavailable: receipts were not recorded | | | |")
+                continue
+            counted = measures(own)
+            timeouts = (
+                str(counted["counts"]["timeouts"])
+                if _coverage(session) == "every request of the session"
+                else "unavailable"
+            )
+            latency = counted["latency_ms"]
+            timing = (
+                f"{latency['p50']} / {latency['p95']} ms"
+                if latency["p50"] is not None
+                else "not enough data yet"
+            )
+            bound = bounds.get(provider)
+            limit = (
+                "no bound read"
+                if bound is None
+                else f"${bound['committed_usd']} of ${bound['ceiling_usd']}"
+            )
+            applied = _rate(counted["rates"]["applied"], "applied")
+            lines.append(f"{label} {applied} | {timeouts} | {timing} | {limit} |")
+    return lines
+
+
 def _coverage(session: Mapping[str, Any]) -> str:
     held = (session.get("coverage") or {}).get("decisions")
     return {
@@ -260,8 +335,14 @@ def _sessions_text(
             continue
         lines += [
             "",
-            f"{session['session_id']}, minutes {min(ticks)} to {max(ticks)}, {count} "
-            f"({_coverage(session)})",
+            *(
+                _session_header(session, count)
+                if session.get("living_session")
+                else [
+                    f"{session['session_id']}, minutes {min(ticks)} to {max(ticks)}, {count} "
+                    f"({_coverage(session)})"
+                ]
+            ),
         ]
         rows = _rows({name: session})
         models = {
@@ -303,7 +384,7 @@ def insight(
     if not sessions:
         return []
     said = words or choice_words()
-    table = _model_table(_rows(sessions))
+    table = _model_table(_rows(sessions)) + _session_table(sessions)
     unavailable = []
     if any(_coverage(s) != "every request of the session" for s in sessions.values()):
         unavailable = [
