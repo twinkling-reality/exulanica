@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "catalog_id": "site-enclosure",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "open",
+      "reason": "Open ground under the sky, such as a farm, a building site or a harbour, entered through a gate in the middle of its south edge.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "indoor",
+      "reason": "One building's inside, such as a cafe or a flat: its edge is its outer walls, its zones are rooms behind inner walls, and its way in is a door.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

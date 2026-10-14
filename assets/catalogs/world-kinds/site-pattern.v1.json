@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "catalog_id": "site-pattern",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "fill",
+      "reason": "An area covers its share of its zone's ground; areas, and only areas, are laid out by fill.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "row",
+      "reason": "Fixtures stand side by side in one line along the front edge of their area, spread evenly.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "grid",
+      "reason": "Fixtures stand in even rows and columns over their area.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "scatter",
+      "reason": "Fixtures stand in the cells of a grid over their area, tried in a seeded order and moved within each cell; one that does not fit is left out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "perimeter",
+      "reason": "Fixtures line the back of their area first, as many as fit along it, and the rest line its two sides.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "cluster",
+      "reason": "Fixtures stand close together in a block at the centre of their area.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "centre",
+      "reason": "Fixtures stand together in a block at the centre of their area, laid out as a cluster is.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "back_wall",
+      "reason": "Fixtures stand side by side flush against the back of their area, spread evenly.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

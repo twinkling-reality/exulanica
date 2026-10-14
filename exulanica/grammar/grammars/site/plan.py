@@ -7,13 +7,17 @@ on a stated step, and nothing a person still has to choose. The grammar refuses 
 malformed by name (:class:`~exulanica.grammar.errors.InvalidParameterError`) rather than reading
 around it, so a plan built by hand in a test is held to the same rules as one resolved from a kind.
 
-Words are closed and append-only: the forms a part takes, where a zone is placed, how a holding is
-laid out, the engine roles and the look families. The look families are the ones the world kinds'
-look-family catalog states (``assets/catalogs/world-kinds/look-families.v1.json``); a test holds
-them equal. A part's own key and a look role's leaf are open: a kind may name a part
-``milking_parlour`` and dress it as ``structure.milking_parlour``.
+Words are closed and append-only: the enclosure of a site, the forms a part takes, where a zone is
+placed, how a holding is laid out, whether a zone is walked into, the form of a roof, the engine
+roles and the look families. Each list is read once, at import, from its world kinds catalog in
+``assets/catalogs/world-kinds/`` (``site-enclosure``, ``site-form``, ``site-placement``,
+``site-pattern``, ``site-access``, ``site-roof-form``, ``kind-role``, ``look-family``), where each
+word says what it means. Every one is pinned at version 1: a word is part of the record format, so
+a later version of a catalog is a later plan version, never read in place of these. A part's own key
+and a look role's leaf are open: a kind may name a part ``milking_parlour`` and dress it as
+``structure.milking_parlour``.
 
-Pure: no catalog file, no clock and no float. A plan is its own canonical document
+No clock and no float, and no file read after import. A plan is its own canonical document
 (:func:`plan_payload`), whose digest a world's receipt records.
 """
 
@@ -21,9 +25,18 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import ClassVar, Final
 
 from exulanica.canonical import sha256_of_canonical
+from exulanica.grammar.catalogs import (
+    CatalogSchema,
+    FieldCheck,
+    integer_field,
+    key_list_field,
+    load_catalog,
+    text_field,
+)
 from exulanica.grammar.errors import InvalidParameterError
 from exulanica.grammar.records import KEY_PATTERN, record_payload
 
@@ -51,68 +64,44 @@ __all__ = [
     "plan_sha256",
 ]
 
+#: Where the words below are read from: the world kinds' catalogs, found from this source file as
+#: :mod:`exulanica.world.kinds.catalogs` finds them.
+_CATALOGS: Final = Path(__file__).resolve().parents[4].joinpath("assets", "catalogs", "world-kinds")
+
+
+def _words(catalog_id: str, *fields: tuple[str, FieldCheck]) -> tuple[str, ...]:
+    """The keys of a world kinds catalog at version 1, in the order it states them. ``fields`` are
+    the catalog's fields besides ``reason``, checked only as far as reading needs."""
+    schema = CatalogSchema(catalog_id, 1, (*fields, ("reason", text_field)))
+    catalog = load_catalog(_CATALOGS.joinpath(f"{catalog_id}.v1.json"), schema)
+    return tuple(entry.key for entry in catalog.entries)
+
+
 #: A site is open ground (a farm, a building site, a harbour) or one building's inside (a cafe, a
 #: flat): an indoor site's edge is its outer walls and its zones are rooms behind inner walls.
-ENCLOSURES: Final = ("open", "indoor")
+ENCLOSURES: Final = _words("site-enclosure")
 #: What a part is to the generator: how it is laid out and drawn.
-FORMS: Final = ("path", "area", "structure", "room", "fixture", "boundary")
+FORMS: Final = _words("site-form")
 #: Where a zone lies: beside the spine near the entry (``front``), further in (``middle``,
 #: ``back``), on one side of it (``left``, ``right``), or across the far edge of the site
 #: (``edge_back``), which fronts a cross path.
-PLACEMENTS: Final = ("front", "middle", "back", "left", "right", "edge_back")
+PLACEMENTS: Final = _words("site-placement")
 #: How a zone or a room lays out what it holds.
-PATTERNS: Final = (
-    "fill",
-    "row",
-    "grid",
-    "scatter",
-    "perimeter",
-    "cluster",
-    "centre",
-    "back_wall",
-)
+PATTERNS: Final = _words("site-pattern")
 #: A zone people may walk into, or one they never enter (a crane's reach, a private yard).
-ACCESS: Final = ("open", "closed")
-ROOF_FORMS: Final = ("flat", "gable")
-#: The engine roles a part may take: what the engine does with it. The kind-role catalog
-#: (``assets/catalogs/world-kinds/kind-role.v1.json``) states each with the forms that may take it
-#: and why; a test holds the two equal.
-ROLES: Final = (
-    "bed",
-    "boundary",
-    "decoration",
-    "field",
-    "gathering",
-    "ground",
-    "home",
-    "no_go",
-    "obstruction",
-    "parking",
-    "path",
-    "road",
-    "seat",
-    "shop",
-    "water",
-    "workplace",
-)
-#: The look families a part's look role may name, closed and append-only.
-LOOK_FAMILIES: Final = (
-    "animal",
-    "boundary",
-    "character",
-    "door",
-    "fixture",
-    "ground",
-    "path",
-    "plant",
-    "prop",
-    "road",
-    "roof",
-    "structure",
-    "vehicle",
-    "wall",
-    "water",
-    "window",
+ACCESS: Final = _words("site-access")
+ROOF_FORMS: Final = _words("site-roof-form")
+#: The engine roles a part may take: what the engine does with it, with the forms that may take
+#: each (``kind-role``, which :mod:`exulanica.world.kinds.catalogs` reads for the forms).
+ROLES: Final = _words("kind-role", ("forms", key_list_field))
+#: The look families a part's look role may name (``look-family``, whose fit, dressing and fill
+#: bounds :mod:`exulanica.world.kinds.catalogs` reads).
+LOOK_FAMILIES: Final = _words(
+    "look-family",
+    ("fit", text_field),
+    ("dressing", text_field),
+    ("fill_minimum_permille", integer_field(0, 2**31 - 1)),
+    ("fill_maximum_permille", integer_field(0, 2**31 - 1)),
 )
 #: The most a single span, count or length may state: a 32-bit integer, far past any site.
 _FIGURE_MAXIMUM: Final = 2_147_483_647

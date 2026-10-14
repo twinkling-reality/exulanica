@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "catalog_id": "site-form",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "path",
+      "reason": "A walking way of a stated width, and with the road role a driving way; a site's spine and its cross path are paths.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "area",
+      "reason": "Ground a zone is given over to, such as a field, a pond, a laydown yard or a car park.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "structure",
+      "reason": "A building: a shell of walls under a roof, with a door when anything is done inside it and rooms when it holds any; one with no rooms and no role is solid.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "room",
+      "reason": "A room of a structure: its share of the inside, its floor and what it holds, reached through a door from the entrance.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "fixture",
+      "reason": "A thing placed on the ground or a floor, such as a bed, a bench, a workbench or a hay bale, where people sit, stand or sleep along its front.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "boundary",
+      "reason": "A fence or a wall round a zone or the site, with a gate where it meets a path.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

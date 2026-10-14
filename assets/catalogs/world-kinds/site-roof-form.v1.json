@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "catalog_id": "site-roof-form",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "flat",
+      "reason": "A structure's roof is flat.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "gable",
+      "reason": "A structure's roof rises to a ridge between two sloping sides.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

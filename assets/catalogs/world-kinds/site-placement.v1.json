@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "catalog_id": "site-placement",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "front",
+      "reason": "The zone's lot is cut first, beside the spine nearest the entry, on whichever side of the spine holds less so far.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "middle",
+      "reason": "The zone's lot is cut after the front lots, on whichever side of the spine holds less so far.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "back",
+      "reason": "The zone's lot is cut last along the spine, furthest from the entry, on whichever side holds less so far.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "left",
+      "reason": "The zone's lot is cut after the front lots and always on the spine's left, walking in from the entry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "right",
+      "reason": "The zone's lot is cut after the front lots and always on the spine's right, walking in from the entry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "edge_back",
+      "reason": "The zone takes a strip the site's whole width across its far edge, fronting a cross path the spine's width.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}
