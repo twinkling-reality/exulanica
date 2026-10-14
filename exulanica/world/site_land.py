@@ -20,6 +20,10 @@ cost:
 Steeper natural ground lies only outside the zones, where the place lays no nodes. A site whose land
 cannot be graded so is refused by name (``exulanica.grammar.landform`` grading refusals).
 
+The receipt also names the land rules that made its land (``exulanica.grammar.landform.rules``):
+land is realized and graded again only under the same rules, and a receipt that names others is
+refused by name (``generated_world_land_rules_changed``), never drawn as other land.
+
 The site's own frame keeps its origin at height 0, which is the land's datum, the sea's level: every
 height here, in the drawing, the place and the browser is above the same zero.
 
@@ -52,9 +56,11 @@ from exulanica.grammar.landform import (
     GradingPlan,
     LandChunk,
     LandDocument,
+    LandformRefused,
     Pad,
     WaterBody,
     WorldFrame,
+    check_land_rules,
     grade_land,
     landform_catalog,
     read_land_document,
@@ -67,6 +73,7 @@ from exulanica.world.society_place import STEP_LIMIT_MM
 __all__ = [
     "ROUNDING_MARGIN_MM",
     "SiteLand",
+    "check_receipt_land_rules",
     "land_seed",
     "path_grade_permille",
     "site_grading",
@@ -281,11 +288,23 @@ def site_land(
     return _KEPT[key]
 
 
+def check_receipt_land_rules(receipt: Mapping[str, Any]) -> None:
+    """Refuse a receipt whose land was made by other land rules than this code's, by name."""
+    try:
+        check_land_rules(receipt.get("land_rules"))
+    except LandformRefused as exc:
+        from exulanica.world.errors import InvalidStructuralData
+
+        raise InvalidStructuralData(f"generated_world_land_rules_changed: {exc.detail}") from exc
+
+
 def site_land_of(
     receipt: Mapping[str, Any], records: Sequence[object], station_mm: int
 ) -> SiteLand:
-    """The graded land a version 5 receipt states, for its regenerated records, its land document
-    read again and held to the digest the receipt names."""
+    """The graded land a version 5 receipt states, for its regenerated records, under the land
+    rules the receipt names, its land document read again and held to the digest the receipt
+    names."""
+    check_receipt_land_rules(receipt)
     land = read_land_document(receipt["land"])
     if land.sha256 != receipt["land_sha256"]:
         from exulanica.world.errors import InvalidStructuralData

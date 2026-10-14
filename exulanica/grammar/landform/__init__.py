@@ -6,6 +6,7 @@
 * :mod:`.realize`: ``H(x, y)``; near land in 128 m chunks on the city's tile grid; the backdrop
   drawn to the horizon; water bodies.
 * :mod:`.grading`: pads, corridors, banks and walls, ponds, and the checks a graded land meets.
+* :mod:`.rules`: the land rules a world's receipt names, so its land rebuilds the same.
 
 Nothing here opens a database, a store or evidence: a land is a pure function of its document
 and the world's seed, as every generated subject is.
@@ -63,6 +64,7 @@ from exulanica.grammar.landform.realize import (
     realize_region,
     water_bodies,
 )
+from exulanica.grammar.landform.rules import LAND_RULES_VERSION, check_land_rules, land_rules
 
 __all__ = [
     "BACKDROP_PROFILE",
@@ -73,6 +75,7 @@ __all__ = [
     "CHUNK_PROFILE",
     "CUT_FILL_MOST_MM",
     "DRY_ABOVE_WATER_MM",
+    "LAND_RULES_VERSION",
     "NEAR_BOUND_MM",
     "PROFILE",
     "SAMPLES_PER_SIDE",
@@ -94,9 +97,11 @@ __all__ = [
     "Wall",
     "WaterBody",
     "WorldFrame",
+    "check_land_rules",
     "grade_land",
     "height_at",
     "land_heights",
+    "land_rules",
     "landform_catalog",
     "level_land",
     "load_landform_catalog",

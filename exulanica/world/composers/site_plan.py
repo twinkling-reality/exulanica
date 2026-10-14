@@ -47,7 +47,7 @@ from exulanica.grammar.grammars.site import (
 from exulanica.grammar.grammars.site.layout import LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import plan_sha256
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SitePathRecord
-from exulanica.grammar.landform import LandformRefused, read_land_document
+from exulanica.grammar.landform import LandformRefused, land_rules, read_land_document
 from exulanica.world.composers import (
     RECEIPT_PROFILE,
     ComposedWorld,
@@ -65,7 +65,7 @@ from exulanica.world.kinds.document import (
 )
 from exulanica.world.kinds.routine import kind_overlay, overlay_routine
 from exulanica.world.kinds.samples import SiteWorld, compose_site, layout_budget
-from exulanica.world.site_land import SiteLand, site_land_of
+from exulanica.world.site_land import SiteLand, check_receipt_land_rules, site_land_of
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_site_place import (
     CAPSULE_RADIUS_MM,
@@ -98,7 +98,8 @@ __all__ = [
 ]
 
 COMPOSER_KEY: Final = "site-plan"
-#: The composer version of a site laid out on land: its receipt carries the land document.
+#: The composer version of a site laid out on land: its receipt carries the land document and
+#: names the land rules that made its land.
 LAND_COMPOSER_VERSION: Final = 5
 COMPOSER_VERSIONS: Final = (1, 2, *TERRAIN_COMPOSER_VERSIONS, LAND_COMPOSER_VERSION)
 REGION_ID: Final = "region:generated"
@@ -329,7 +330,8 @@ def compose_kind(
     candidate and its records, and with ``place_id`` the place its society walks there, the one its
     checks built (:func:`society_place` makes the same from the receipt). With ``land`` (an
     ``exulanica.landform/v1`` document) the site is laid out on that land as composer version
-    :data:`LAND_COMPOSER_VERSION`: its receipt carries the land document and its digest, its
+    :data:`LAND_COMPOSER_VERSION`: its receipt carries the land document and its digest and names
+    the land rules that made its land (:func:`~exulanica.grammar.landform.land_rules`), its
     candidates are graded (:mod:`exulanica.world.site_land`) and a person arrives at the land's
     height; the document is refused as :class:`~exulanica.grammar.landform.LandformRefused`, and
     land with a support declaration is not served. Refused as
@@ -385,6 +387,7 @@ def compose_kind(
     if document is not None:
         receipt["land"] = document.canonical()
         receipt["land_sha256"] = document.sha256
+        receipt["land_rules"] = land_rules()
         receipt["composer"]["version"] = LAND_COMPOSER_VERSION
         composer_version = LAND_COMPOSER_VERSION
         graded = site_land_of(receipt, world.records, routine.policy["footway_station_spacing_mm"])
@@ -494,6 +497,12 @@ def _check_current(receipt: Mapping[str, Any]) -> None:
         )
     if (composer["version"] == LAND_COMPOSER_VERSION) != ("land" in receipt):
         raise InvalidStructuralData("generated_world_land_changed: composer/land binding mismatch")
+    if composer["version"] == LAND_COMPOSER_VERSION:
+        check_receipt_land_rules(receipt)
+    elif "land_rules" in receipt:
+        raise InvalidStructuralData(
+            "generated_world_land_rules_changed: composer/land rules binding mismatch"
+        )
     grammar = receipt["grammar"]
     if (grammar["grammar_id"], grammar["grammar_version"]) != (
         SITE_GRAMMAR_ID,

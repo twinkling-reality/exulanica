@@ -18,8 +18,15 @@ from exulanica.grammar.grammars.site.records import (
     SiteWallRecord,
     SiteZoneRecord,
 )
-from exulanica.grammar.landform import CHUNK_PROFILE, LandformRefused, read_land_chunk
+from exulanica.grammar.landform import (
+    CHUNK_PROFILE,
+    LAND_RULES_VERSION,
+    LandformRefused,
+    land_rules,
+    read_land_chunk,
+)
 from exulanica.world.composers import site_plan
+from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.kinds import samples
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.site_drawing import LAND_DRAWING_PROFILE, site_drawing, site_drawing_sha256
@@ -71,7 +78,7 @@ def test_a_world_made_without_land_is_the_level_world_it_always_was(name: str) -
     asked = made(name, land=None, world_id="world:generated:level")
     assert asked.receipt == level.receipt and asked.receipt_sha256 == level.receipt_sha256
     assert level.receipt["composer"]["version"] == 1
-    assert "land" not in level.receipt and "land_sha256" not in level.receipt
+    assert not {"land", "land_sha256", "land_rules"} & set(level.receipt)
     drawing = drawn(level)
     assert drawing["profile"] == "exulanica.site-drawing/v1" and "land" not in drawing
     assert not any("drape" in slot for slot in drawing["slots"])
@@ -95,6 +102,32 @@ def test_a_site_on_land_is_composer_five_and_regenerates_from_its_receipt(name: 
     assert site_drawing_sha256(first) == site_drawing_sha256(second)
     level = made(name, land=None)
     assert level.receipt["output_digest"] == receipt["output_digest"], "same layout, other ground"
+
+
+def test_a_world_on_land_names_the_land_rules_that_made_it_and_other_rules_are_refused() -> None:
+    world = made("site")
+    assert world.receipt["land_rules"] == land_rules()
+    assert world.receipt["land_rules"]["version"] == LAND_RULES_VERSION
+    named = world.receipt["land_rules"]
+    changed = [
+        {**named, "version": LAND_RULES_VERSION + 1},
+        {**named, "catalogs": {**named["catalogs"], "landform-value.v1": "0" * 64}},
+        None,
+    ]
+    for rules in changed:
+        receipt = copy.deepcopy(world.receipt)
+        if rules is None:
+            del receipt["land_rules"]
+        else:
+            receipt["land_rules"] = rules
+        with pytest.raises(InvalidStructuralData, match=r"^generated_world_land_rules_changed: "):
+            site_plan.records(receipt)
+        with pytest.raises(InvalidStructuralData, match=r"^generated_world_land_rules_changed: "):
+            site_land_of(receipt, world.records, 4000)
+    level = made("site", land=None)
+    named_on_level = {**copy.deepcopy(level.receipt), "land_rules": land_rules()}
+    with pytest.raises(InvalidStructuralData, match=r"^generated_world_land_rules_changed: "):
+        site_plan.records(named_on_level)
 
 
 def test_every_zone_is_a_level_terrace_and_every_walking_edge_stays_within_a_step() -> None:

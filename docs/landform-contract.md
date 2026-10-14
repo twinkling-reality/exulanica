@@ -27,6 +27,7 @@ documents a reader receives. The exact contact predicates a chunk is read with b
 - [Readers in the browser](#readers-in-the-browser)
 - [The land's look](#the-lands-look)
 - [Sites on land](#sites-on-land)
+- [A world's land rules](#a-worlds-land-rules)
 - [Refusals](#refusals)
 - [Limits](#limits)
 
@@ -66,8 +67,9 @@ offset east by `offset_mm` and north by `distance_mm`.
 
 ## The catalogs
 
-Two catalogs in `assets/catalogs/landform/`, read through the grammar's catalog loader so each entry
-carries a reason and a licence (`exulanica/grammar/landform/catalog.py`):
+Two catalogs in `assets/catalogs/landform/` shape land, read through the grammar's catalog loader so
+each entry carries a reason and a licence (`exulanica/grammar/landform/catalog.py`); a third beside
+them states [the land's look](#the-lands-look):
 
 - `landform-feature.v1.json`: one entry per kind: `words` (what a person or a model reads),
   `domain` (`near_and_far`, or `far` for a feature drawn only), `composition` (`additive` or
@@ -220,6 +222,35 @@ its base's centre), since a terrace is level only inside its edges, where it mee
 terraces at other levels; a building and its rooms stand level on their terrace, and water at its
 level. A world made without land is the level world it always was, byte for byte.
 
+## A world's land rules
+
+A world made on land keeps its land document, and its land is realized and graded again from that
+document whenever it is drawn, served or walked. The same document under other rules would be other
+land, so the receipt also names the rules that made it, `land_rules`
+([`rules.py`](../exulanica/grammar/landform/rules.py)):
+
+```json
+{"version": 1, "catalogs": {"landform-feature.v1": "<sha256>", "landform-value.v1": "<sha256>"}}
+```
+
+- `version` stands for the realizer, its grading and the grading plan a site's layout asks of its
+  land. A change to any of them that moves land is the next version.
+- `catalogs` names each catalog that shapes land by the digest of its canonical entries. A catalog
+  changes by a new file (`landform-value.v2.json`), never by an edit of a shipped one.
+
+A receipt that names other rules than the server's is refused by name before its layout is
+generated again (`generated_world_land_rules_changed`, saying both rules); its world is never drawn
+as other land. A level world's receipt names no land rules, and one that does is refused the same
+way. The tests pin every shipped landform catalog byte for byte, and each rules version with the
+catalogs it names and the graded land of one golden site that uses every feature kind
+([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a change that moves land fails
+until it is the next version.
+
+The land's look is not part of the rules: `landform-surface.v1.json` colours land and shapes none
+of it. A world's appearance should change only when its look does, so the surface catalog version a
+world wears is to be named by its look (its style pack or style version), as its other choices of
+appearance are; that naming is planned, not built (see [Limits](#limits)).
+
 ## Refusals
 
 | Code | When |
@@ -234,6 +265,7 @@ level. A world made without land is the level world it always was, byte for byte
 | `landform_water_spills` | Water would stand above the ground beside it |
 | `landform_unreachable` | A door cannot be reached from the entry |
 | `landform_digest_mismatch` | A chunk is not the one its digest names |
+| `landform_rules_changed` | A receipt names other land rules than the server's; the world is refused as `generated_world_land_rules_changed` |
 | `landform_not_served` | Land asked of the town, or with a support declaration |
 
 ## Limits
@@ -248,3 +280,7 @@ level. A world made without land is the level world it always was, byte for byte
 - A corridor steeper than its grade is refused rather than given stairs.
 - Below the datum a shore's sea covers everything; a valley carved below it floods.
 - Performance is measured only on the development machine's tests; no drawing cost is stated here.
+- The server realizes land by one rules version. A world made under other rules is refused, not
+  realized by the rules it names.
+- A world does not name the land surface catalog it wears: a newer land look reaches every world on
+  land. Naming it by the world's look is planned.
