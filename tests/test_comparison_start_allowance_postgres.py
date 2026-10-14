@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from exulanica.api import services as services_module
+from exulanica.api import service_refusals
 from exulanica.api.society_comparison_start import asked_providers
 from exulanica.models.spending import SpendingRefused
 from exulanica.spending import (
@@ -129,14 +129,14 @@ def _durable(app: FastAPI, spine_schema, tmp_path, workspace: uuid.UUID) -> Allo
 
 def _reads(monkeypatch) -> list[uuid.UUID]:
     """Every workspace whose allowance the application reads from now on, in order."""
-    read = services_module.read_spending_refusals
+    read = service_refusals.read_spending_refusals
     seen: list[uuid.UUID] = []
 
     def counted(connection, workspace_id, **kwargs):
         seen.append(workspace_id)
         return read(connection, workspace_id, **kwargs)
 
-    monkeypatch.setattr(services_module, "read_spending_refusals", counted)
+    monkeypatch.setattr(service_refusals, "read_spending_refusals", counted)
     return seen
 
 
