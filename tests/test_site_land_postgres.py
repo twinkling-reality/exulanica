@@ -111,3 +111,28 @@ def test_land_the_catalog_refuses_or_the_route_does_not_serve_is_refused_by_name
         "/worlds/kinds/town/worlds", {"preset": "small_town", "title": "Hill town", "land": LAND}
     )
     assert (town.status_code, town.json()["code"]) == (422, "landform_not_served")
+
+
+def test_a_world_whose_land_rules_the_server_does_not_serve_is_listed_unavailable_by_name(
+    made, monkeypatch
+):
+    """The listing runs the checks a world's drawing runs first, so it never offers a world on land
+    that would refuse to open."""
+    from exulanica.grammar.landform import rules
+
+    api = made
+    on_land = _farm(api, "Farm on older land rules", land=LAND)
+    level = _farm(api, "Level farm beside it")
+    assert on_land.status_code == 201 and level.status_code == 201, (on_land.text, level.text)
+    monkeypatch.setattr(rules, "LAND_RULES_VERSION", rules.LAND_RULES_VERSION + 1)
+    listed = {entry["entry_id"]: entry for entry in api.get("/world-entries").json()}
+    refused = listed[on_land.json()["entry_id"]]
+    assert (refused["availability"], refused["unavailable_reason"]) == (
+        "unavailable",
+        "generated_world_land_rules_changed",
+    )
+    assert refused["generated_site"] is None
+    one = api.get(f"/world-entries/{on_land.json()['entry_id']}").json()
+    assert one["unavailable_reason"] == "generated_world_land_rules_changed"
+    kept = listed[level.json()["entry_id"]]
+    assert kept["availability"] == "available" and kept["generated_site"] is not None

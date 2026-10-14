@@ -85,6 +85,7 @@ __all__ = [
     "LAND_COMPOSER_VERSION",
     "REGION_ID",
     "SITE_MODULE",
+    "check_receipt",
     "compose",
     "compose_kind",
     "receipt_digest_of",
@@ -482,7 +483,11 @@ def receipt_support(receipt: Mapping[str, Any], generated: tuple[object, ...]) -
         ) from exc
 
 
-def _check_current(receipt: Mapping[str, Any]) -> None:
+def check_receipt(receipt: Mapping[str, Any]) -> None:
+    """Refuse by name a stored receipt this server no longer makes its world from, by the checks
+    that generate nothing: its composer, its support and land bindings, the land rules it names and
+    the site grammar's descriptor. Generating a receipt's records again runs these first, and a
+    saved world's entry is listed by them, so a world listed available is one these let open."""
     composer = receipt.get("composer", {})
     if composer.get("key") != COMPOSER_KEY or composer.get("version") not in COMPOSER_VERSIONS:
         raise InvalidStructuralData(
@@ -565,7 +570,7 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
     unless the bounds catalog has since lowered it, which is refused by name)."""
     if receipt.get("composer", {}).get("version") in TERRAIN_COMPOSER_VERSIONS:
         return (receipt_terrain(receipt),)
-    _check_current(receipt)
+    check_receipt(receipt)
     kind = receipt_kind(receipt)
     try:
         plan = kind.plan(receipt["values"])

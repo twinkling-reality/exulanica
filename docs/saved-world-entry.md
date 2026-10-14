@@ -93,7 +93,13 @@ people live in and where a person arrives, facing which way. An available genera
 exactly one of the two, and an unavailable one neither. Its receipt carries the kind's whole document, so a later version of the kind never
 moves it, and the kind catalogs' digests are provenance: only its grammar, its routine catalogs or
 its records coming out otherwise make it unavailable, with the reasons above
-([world kinds](world-kinds-contract.md#a-world-made-from-a-kind)).
+([world kinds](world-kinds-contract.md#a-world-made-from-a-kind)). A world made on land is also
+unavailable when its receipt names land rules this server does not make land by
+(`generated_world_land_rules_changed`) or its land no longer takes its layout
+(`generated_world_land_changed`; [landform](landform-contract.md#a-worlds-land-rules)). The entry is
+read through the checks its drawing is made under that generate nothing (its composer and bindings,
+its land rules and the grammar's descriptor), so the catalog never lists available a world those
+refuse; a refusal found only by generating its records again is named when the world is opened.
 
 Every entry states `society_engine`: the engine a society over its world is created with, the
 engine table's for the ground its snapshot's composer states

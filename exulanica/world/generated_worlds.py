@@ -84,13 +84,16 @@ BAKE_JOB_KIND: Final = "bake_generated_tile"
 #: worked on are kept, and a world read again later is generated again.
 _RECORDS_KEPT: Final = 4
 #: The refusals a generated world's composer names first when its receipt no longer generates what
-#: it recorded: the grammar or the catalogs changed under it, or the records came out otherwise.
+#: it recorded: the grammar or the catalogs changed under it, the records came out otherwise, or a
+#: world on land no longer takes its layout or names land rules this server does not make land by.
 #: Any other refusal to read a generated world is ``generated_world_unreadable``.
 UNREADABLE_REASONS: Final = frozenset(
     {
         "generated_world_grammar_changed",
         "generated_world_catalogs_changed",
         "generated_world_output_changed",
+        "generated_world_land_changed",
+        "generated_world_land_rules_changed",
     }
 )
 
@@ -557,8 +560,13 @@ def states_site(
 def generated_site(
     connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
 ) -> GeneratedSite:
-    """The drawing a saved entry of a world made from a world kind declares."""
+    """The drawing a saved entry of a world made from a world kind declares, once its receipt meets
+    the checks its drawing is made under first (refused by name as
+    :class:`~exulanica.world.errors.InvalidStructuralData`)."""
+    from exulanica.world.composers.site_plan import check_receipt
+
     _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+    check_receipt(receipt)
     extent = generated_extent(connection, workspace_id, world_id, snapshot_id)
     kind = receipt["kind"]
     facing = receipt["arrival"]["facing_mm"]

@@ -240,8 +240,9 @@ land, so the receipt also names the rules that made it, `land_rules`
 
 A receipt that names other rules than the server's is refused by name before its layout is
 generated again (`generated_world_land_rules_changed`, saying both rules); its world is never drawn
-as other land. A level world's receipt names no land rules, and one that does is refused the same
-way. The tests pin every shipped landform catalog byte for byte, and each rules version with the
+as other land, and its saved entry is listed unavailable by the same name
+([saved world entry](saved-world-entry.md)). A level world's receipt names no land rules, and one
+that does is refused the same way. The tests pin every shipped landform catalog byte for byte, and each rules version with the
 catalogs it names and the graded land of one golden site that uses every feature kind
 ([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a change that moves land fails
 until it is the next version.

@@ -520,6 +520,8 @@ const GENERATED_UNREADABLE: ReadonlySet<string> = new Set([
   'generated_world_grammar_changed',
   'generated_world_catalogs_changed',
   'generated_world_output_changed',
+  'generated_world_land_changed',
+  'generated_world_land_rules_changed',
   'generated_world_unreadable',
 ]);
 

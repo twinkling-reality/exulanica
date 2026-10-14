@@ -164,6 +164,14 @@ describe('choosing between saved worlds', () => {
     expect(text).not.toContain('22222222');
   });
 
+  it('says a world made on land by rules this server does not serve cannot be opened', () => {
+    for (const reason of ['generated_world_land_rules_changed', 'generated_world_land_changed']) {
+      const text = surface([entry({ availability: 'unavailable', unavailableReason: reason })])
+        .textContent ?? '';
+      expect(text).toContain('no longer holds, so it cannot be opened');
+    }
+  });
+
   it('explains deletion and concurrent authored change in actionable language', () => {
     const deleted = surface([entry({
       availability: 'unavailable', unavailableReason: 'source_deleted',
