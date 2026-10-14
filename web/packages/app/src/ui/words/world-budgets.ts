@@ -1,7 +1,7 @@
 /**
  * How a making the world-count policy refused is said, in the person's own terms.
  *
- * The policy holds a workspace to two budgets (`exulanica/world/world-count-policy.v3.json`): the
+ * The policy holds a workspace to two budgets (`exulanica/world/world-count-policy.v4.json`): the
  * generated worlds it may hold at once, and the tiles its towns may come to in a day. A making
  * past the first is `world_limit_reached`; past the second it is `tile_budget_reached`, whose
  * answer carries `returns_at`, the instant room returns. The page says that instant as a person

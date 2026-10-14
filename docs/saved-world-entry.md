@@ -360,7 +360,7 @@ with the kind its stored rows state; no dataset package was registered as a worl
 | `personal-source` | A world composed from the workspace's own photographs and other personal sources | `POST /worlds/personal-source`; composing personal sources into a region; a frontier build manifest |
 | `authored-starter` | A source-independent authored world that starts empty | `POST /world-entries/starter` |
 
-**One personal-source world per account.** `exulanica/world/world-count-policy.v3.json` states,
+**One personal-source world per account.** `exulanica/world/world-count-policy.v4.json` states,
 for each kind, the most worlds one workspace may hold, with the reason for each figure. It allows
 one personal-source world and sets no count for authored starters, whose route creates one only
 for a workspace with no saved world. Sign-in gives each account one owned workspace, so the limit

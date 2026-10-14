@@ -125,10 +125,10 @@ _SCHEMA_NAME: Final = re.compile(rf"{SCHEMA_ID}\.v[1-9][0-9]*")
 #: How a composer is named: the key a snapshot records, which names its module with ``-`` read as
 #: ``_``.
 _COMPOSER_NAME: Final = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
-#: The most tiles a recipe may state. A workspace holds at most the world-count policy's limit of
-#: generated worlds and no route deletes one, so that limit times this figure bounds every tile
-#: bake a workspace can ever cause, and the policy's tiles a day bound how fast
-#: (``world-count-policy.v3.json`` says so beside each figure). Four is a
+#: The most tiles a recipe may state. The world-count policy's tiles a day bound the bakes a
+#: workspace's worlds can cause in a day, counting a world later removed
+#: (``world-count-policy.v4.json`` says so beside each figure), and this figure bounds one world's
+#: share of them. Four is a
 #: town of two tiles by two: one bake of the one-tile town took 13.3 s on the development machine,
 #: so four keep one world's bakes near a minute of one worker's time.
 TILES_MAXIMUM: Final = 4

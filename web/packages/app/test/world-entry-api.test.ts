@@ -13,7 +13,7 @@ import { engineCreatedOver } from '../src/society-engines.js';
 
 /** The count policy the server checks world creation against, read from the server's own file. */
 const SERVER_POLICY = JSON.parse(readFileSync(
-  new URL('../../../../exulanica/world/world-count-policy.v2.json', import.meta.url), 'utf8',
+  new URL('../../../../exulanica/world/world-count-policy.v4.json', import.meta.url), 'utf8',
 )) as { readonly limits: Readonly<Record<string, number | null>> };
 
 const worldsWire = (worlds: readonly { readonly world_id: string; readonly kind: string }[]) => ({

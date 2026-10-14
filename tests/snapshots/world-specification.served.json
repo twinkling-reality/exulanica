@@ -457,8 +457,8 @@
   "generated_tiles_a_day_for_a_guest": 12,
   "world_count_policy": {
    "policy_id": "exulanica.world-count",
-   "version": 3,
-   "sha256": "f8b357d5f227cb9b0f7ca8e719a09e29490d833a8847022cc0e519d5afd97bec"
+   "version": 4,
+   "sha256": "a625125a146df4742f2d27d1b03a4eb97a6414d648d41e7ccef27faf4cab1d22"
   },
   "tick": {
    "budget_ms_p95": 200,

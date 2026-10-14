@@ -16,18 +16,20 @@ states whether it is source-independent, which is what the style layer asks of a
 latest migration that lists the kinds in ``world_identity``'s CHECK restates the list, because a
 database cannot import this module, and ``tests/test_worlds.py`` holds the two equal.
 
-**How many.** :data:`WORLD_COUNT_POLICY` is read from ``world-count-policy.v3.json`` and states,
+**How many.** :data:`WORLD_COUNT_POLICY` is read from ``world-count-policy.v4.json`` and states,
 for every kind, the most worlds of that kind one workspace may hold, or ``null`` for a kind the
-policy does not count, with the reason for each figure. Version 3 allows one personal-source
-world, and for generated worlds states two chosen budgets in place of version 2's three: the
+policy does not count, with the reason for each figure. It allows one personal-source world, and
+for generated worlds states two chosen budgets, version 3's in place of version 2's three: the
 worlds a workspace may hold at once, and the tiles its generated worlds may come to in a day, each
 with a figure for a signed-in person's workspace and one for a guest's, and each replaceable by a
-deployment through the environment variable the policy names. Both are checked by the
-server when a world is created, under the workspace lock every world writer takes, and a creation
-past either is refused by name: :class:`WorldLimitReached`, or :class:`TileBudgetReached` with
-the instant room returns. Worlds that already exist are never removed by a
-policy: the policy governs creation. Allowing several personal-source worlds is another version of
-the policy; what else it needs is in ``docs/saved-world-entry.md``.
+deployment through the environment variable the policy names. Version 4 states version 3's figures
+with the reason for the worlds held corrected now that a generated world can be removed. A world
+records the version and digest it was created under, so a published version is never edited.
+Both budgets are checked by the server when a world is created, under the workspace lock every
+world writer takes, and a creation past either is refused by name: :class:`WorldLimitReached`, or
+:class:`TileBudgetReached` with the instant room returns. Worlds that already exist are never
+removed by a policy: the policy governs creation. Allowing several personal-source worlds is
+another version of the policy; what else it needs is in ``docs/saved-world-entry.md``.
 
 **The personal-source world.** Code that means "the world composed from this workspace's own
 sources" asks :func:`resolve_personal_source_world`, which answers from the registry and refuses by
@@ -404,7 +406,7 @@ def load_world_count_policy(path: Path) -> WorldCountPolicy:
 
 #: The policy the server checks every world creation against.
 WORLD_COUNT_POLICY: WorldCountPolicy = load_world_count_policy(
-    Path(__file__).with_name("world-count-policy.v3.json")
+    Path(__file__).with_name("world-count-policy.v4.json")
 )
 
 

@@ -45,9 +45,11 @@ its tiles off the request. The application draws the town once its tiles are bak
 runtime](../generated-tile-runtime.md#73-a-saved-worlds-own-tiles)), every surface it draws dressed,
 the ground beyond its blocks as bare soil, with its people walking from
 tile to tile and its vehicles driving its streets ([served
-traffic](../traffic-contract.md#served-traffic)). A generated world takes no photographs, and a
-workspace holds at most three. Every kind of saved world can host people, whose choices the world's
-owner can hand to open models ([people and models in a world](simulation.md)).
+traffic](../traffic-contract.md#served-traffic)). A generated world takes no photographs. How many
+generated worlds a workspace holds and how many tiles they may come to in a day are the world-count
+policy's chosen budgets ([the worlds a workspace holds](../saved-world-entry.md#the-worlds-a-workspace-holds)),
+and a generated world can be removed. Every kind of saved world can host people, whose choices the
+world's owner can hand to open models ([people and models in a world](simulation.md)).
 
 The largest town is three tiles long and one deep, and the schema states why for each bound.
 Traffic refused all 23 towns two tiles deep that were measured, most of them for junctions whose
@@ -217,8 +219,9 @@ A town's people are compared
 from the Compare view, a model deciding for a group of them within the most a comparison lets it
 ([what a comparison can read](../society-experiments.md#running-a-comparison)). The owner may also
 hand a town's traffic lights to an open model ([people and models](simulation.md)); fixed timing
-decides whenever the model does not, and no evaluation record measures whether that helps traffic. The page still
-offers Add photos in a generated world, which the server refuses by name.
+decides whenever the model does not, and no evaluation record measures whether that helps traffic. The page
+offers no Add photos in a generated world, which takes none, and the server refuses an attachment to
+one by name.
 
 Sentence-based kind creation requires a deployment enabling `EXULANICA_KINDS_FROM_PEOPLE` and
 separate removal and retention verification; generation validation does not establish that

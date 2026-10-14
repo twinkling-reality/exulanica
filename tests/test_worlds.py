@@ -19,6 +19,7 @@ from types import MappingProxyType
 
 import psycopg
 import pytest
+from exulanica.canonical import sha256_of_canonical
 from exulanica.world import worlds
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.worlds import (
@@ -48,7 +49,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MIGRATION = (
     ROOT / "exulanica" / "migrations" / ("0099_a_world_is_registered_before_it_holds_anything.sql")
 )
-POLICY = ROOT / "exulanica" / "world" / "world-count-policy.v3.json"
+POLICY = ROOT / "exulanica" / "world" / "world-count-policy.v4.json"
+#: Every published version of the policy and the digest of its document. A world records the
+#: version and digest it was created under (``register_world``), so a published version is never
+#: edited: a change is the next version, and these stay what earlier worlds name.
+PUBLISHED_POLICY_DIGESTS: dict[int, str] = {
+    1: "b7f48364ffbed6e143ba53432da74ca75a12b5626083d07682947ac3a1d886e3",
+    2: "1cd34fedc304e8c1f8fbc303558e099b645b105017d20763def6cda3cc1b2493",
+    3: "f8b357d5f227cb9b0f7ca8e719a09e29490d833a8847022cc0e519d5afd97bec",
+}
 
 #: World tables whose rows do not all name a world: the stored generated column each one's key
 #: reads instead of ``world_id``, and that column's expression as the catalog prints it.
@@ -78,12 +87,33 @@ def _raised(limit: int) -> worlds.WorldCountPolicy:
 
 def test_the_policy_allows_one_personal_source_world_and_states_every_kind():
     assert WORLD_COUNT_POLICY.policy_id == "exulanica.world-count"
-    assert WORLD_COUNT_POLICY.version == 3
+    assert WORLD_COUNT_POLICY.version == 4
     assert WORLD_COUNT_POLICY.limit(PERSONAL_SOURCE, environ={}) == 1
     assert WORLD_COUNT_POLICY.limit(AUTHORED_STARTER, environ={}) is None
     assert set(WORLD_COUNT_POLICY.limits) == {kind.name for kind in WORLD_KINDS}
     document = json.loads(POLICY.read_text(encoding="utf-8"))
     assert WORLD_COUNT_POLICY.limits == document["limits"]
+
+
+def test_a_published_policy_version_is_never_edited():
+    """Worlds keep the version and digest they were created under, so each earlier version's
+    document still has the digest it was published with, and the version in force is the next."""
+    for version, digest in PUBLISHED_POLICY_DIGESTS.items():
+        path = POLICY.with_name(f"world-count-policy.v{version}.json")
+        document = json.loads(path.read_text(encoding="utf-8"))
+        assert document["version"] == version
+        assert sha256_of_canonical(document).hex() == digest, path.name
+    assert WORLD_COUNT_POLICY.version == max(PUBLISHED_POLICY_DIGESTS) + 1
+    assert WORLD_COUNT_POLICY.sha256 not in PUBLISHED_POLICY_DIGESTS.values()
+
+
+def test_the_policy_says_removal_frees_a_place_but_not_the_day_s_tiles():
+    """A generated world can be removed, so the reason for the worlds held no longer claims that
+    count bounds every bake; the day's tiles, which count removed worlds, do."""
+    reasons = json.loads(POLICY.read_text(encoding="utf-8"))["reasons"]
+    assert "No route removes a world" not in reasons[GENERATED]
+    assert "DELETE /worlds/{world_id}" in reasons[GENERATED]
+    assert "removing and making again cannot reopen the bound" in reasons["tiles_a_day"]
 
 
 def test_generated_worlds_have_two_budgets_each_with_a_person_s_figure_and_a_guest_s():
