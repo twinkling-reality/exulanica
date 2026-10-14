@@ -37,9 +37,10 @@ listed is counted, and a layout that would try more than the budget allows is re
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
+from types import MappingProxyType
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
@@ -71,6 +72,8 @@ from exulanica.grammar.grammars.site.records import (
 
 __all__ = [
     "DOOR_HEIGHT_MM",
+    "LOT_ORDER",
+    "PATTERN_REALIZERS",
     "SPACING",
     "LayoutBudget",
     "LayoutOverBudget",
@@ -78,6 +81,12 @@ __all__ = [
     "lay_out",
 ]
 
+#: The order the lots along the spine are cut from the entry, by a zone's placement word in the
+#: world kinds' site-placement catalog: front first, then middle, left and right in the plan's
+#: order, then back. A zone placed ``edge_back`` takes the strip across the far edge instead.
+LOT_ORDER: Final[Mapping[str, int]] = MappingProxyType(
+    {"front": 0, "left": 1, "right": 1, "middle": 1, "back": 2}
+)
 #: How tall a door's opening is: a standard doorway, 2,100 mm (2.1 m), and never taller than its
 #: wall.
 DOOR_HEIGHT_MM: Final = 2_100
@@ -481,6 +490,149 @@ class _Occupied:
         )
 
 
+#: Candidate footprint centres and the way each faces, in the order a pattern tries them.
+Candidates = Iterator[tuple[int, int, str]] | list[tuple[int, int, str]]
+
+#: Where a fixture that does not fit at its candidate goes instead: the pattern's next candidate,
+#: the nearest free point along its own line (past a doorway's clear way), or the nearest free point
+#: of a grid over the area.
+LEFT_OUT: Final = "left_out"
+ALONG_ITS_LINE: Final = "along_its_line"
+NEAREST_POINT: Final = "nearest_point"
+
+
+@dataclass(frozen=True, slots=True)
+class _Holding:
+    """What a pattern lays out: ``count`` fixtures ``w`` by ``d`` in the local rectangle ``area``,
+    ``clearance`` clear round each, drawing from ``cursor`` where the pattern draws."""
+
+    area: _Rect
+    count: int
+    w: int
+    d: int
+    clearance: int
+    cursor: DomainCursor
+
+    @property
+    def width_u(self) -> int:
+        return self.area.a1 - self.area.a0
+
+    @property
+    def depth_v(self) -> int:
+        return self.area.b1 - self.area.b0
+
+    def along(self, number: int, size: int) -> list[int]:
+        """``number`` centres along u, spread evenly where there is room and never closer than
+        ``size`` plus the clearance, the group centred in the area."""
+        if number <= 0:
+            return []
+        pitch = max(size + self.clearance, (self.width_u - self.clearance) // number)
+        span = pitch * (number - 1) + size
+        first = self.area.a0 + (self.width_u - span) // 2 + size // 2
+        return [first + pitch * index for index in range(number)]
+
+
+def _row(h: _Holding) -> Candidates:
+    return [(cu, h.area.b0 + h.clearance + h.d // 2, "-v") for cu in h.along(h.count, h.w)]
+
+
+def _grid(h: _Holding) -> Candidates:
+    columns = 1
+    while columns * columns < h.count:
+        columns += 1
+    rows = (h.count + columns - 1) // columns
+    pitch_u, pitch_v = h.width_u // columns, h.depth_v // rows
+    return [
+        (
+            h.area.a0 + pitch_u * (index % columns) + pitch_u // 2,
+            h.area.b0 + pitch_v * (index // columns) + pitch_v // 2,
+            "-v",
+        )
+        for index in range(h.count)
+    ]
+
+
+def _cluster(h: _Holding) -> Candidates:
+    centre_u, centre_v = (h.area.a0 + h.area.a1) // 2, (h.area.b0 + h.area.b1) // 2
+    columns = 1
+    while columns * columns < h.count:
+        columns += 1
+    pitch_u, pitch_v = h.w + h.clearance, h.d + h.clearance
+    origin_u = centre_u - (pitch_u * (columns - 1)) // 2
+    rows = (h.count + columns - 1) // columns
+    origin_v = centre_v - (pitch_v * (rows - 1)) // 2
+    return [
+        (origin_u + pitch_u * (index % columns), origin_v + pitch_v * (index // columns), "-v")
+        for index in range(h.count)
+    ]
+
+
+def _lined(h: _Holding, inset: int, back_count: int) -> Candidates:
+    """``back_count`` along the back of the area, ``inset`` from it, and the rest split between
+    its two sides, the low side taking the odd one."""
+    lined = [(cu, h.area.b1 - inset - h.d // 2, "-v") for cu in h.along(back_count, h.w)]
+    rest = h.count - back_count
+    if rest:
+        low_count = (rest + 1) // 2
+        for side, number, cu in (
+            ("+u", low_count, h.area.a0 + inset + h.d // 2),
+            ("-u", rest - low_count, h.area.a1 - inset - h.d // 2),
+        ):
+            pitch = max(h.w + h.clearance, (h.depth_v - h.d - 2 * h.clearance) // max(number, 1))
+            lined.extend(
+                (cu, h.area.b0 + h.d + h.clearance + pitch * index + pitch // 2, side)
+                for index in range(number)
+            )
+    return lined
+
+
+def _back_wall(h: _Holding) -> Candidates:
+    return _lined(h, 0, h.count)
+
+
+def _perimeter(h: _Holding) -> Candidates:
+    along_back = max(1, (h.width_u - h.clearance) // (h.w + h.clearance))
+    return _lined(h, h.clearance // 2, min(h.count, along_back))
+
+
+def _scatter(h: _Holding) -> Candidates:
+    cell = max(h.w, h.d) + 2 * h.clearance
+    return _scattered(
+        max(h.width_u // cell, 0),
+        max(h.depth_v // cell, 0),
+        cell,
+        cell - max(h.w, h.d) - h.clearance,
+        h.area,
+        h.cursor,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _Realizer:
+    """How one pattern lays out fixtures: the candidates it tries, and where a fixture that does
+    not fit at its candidate goes (:data:`LEFT_OUT`, :data:`ALONG_ITS_LINE` or
+    :data:`NEAREST_POINT`)."""
+
+    candidates: Callable[[_Holding], Candidates]
+    when_it_does_not_fit: str
+
+
+#: Every pattern a fixture may be laid out by, keyed by its word in the world kinds' site-pattern
+#: catalog, which says what each means; ``fill`` lays out areas, never fixtures. A new pattern is a
+#: new word there and one realizer here.
+PATTERN_REALIZERS: Final[Mapping[str, _Realizer]] = MappingProxyType(
+    {
+        "row": _Realizer(_row, ALONG_ITS_LINE),
+        "grid": _Realizer(_grid, NEAREST_POINT),
+        "scatter": _Realizer(_scatter, LEFT_OUT),
+        "perimeter": _Realizer(_perimeter, ALONG_ITS_LINE),
+        "cluster": _Realizer(_cluster, NEAREST_POINT),
+        "centre": _Realizer(_cluster, NEAREST_POINT),
+        "back_wall": _Realizer(_back_wall, ALONG_ITS_LINE),
+    }
+)
+
+
 def _place(
     *,
     pattern: str,
@@ -510,76 +662,10 @@ def _place(
             cv - along_v // 2 + along_v,
         )
 
-    def along(number: int, size: int) -> list[int]:
-        """``number`` centres along u, spread evenly where there is room and never closer than
-        ``size`` plus the clearance, the group centred in the area."""
-        if number <= 0:
-            return []
-        pitch = max(size + clearance, (width_u - clearance) // number)
-        span = pitch * (number - 1) + size
-        first = area.a0 + (width_u - span) // 2 + size // 2
-        return [first + pitch * index for index in range(number)]
-
-    candidates: Iterator[tuple[int, int, str]] | list[tuple[int, int, str]] = []
-    if pattern == "row":
-        candidates = [(cu, area.b0 + clearance + d // 2, "-v") for cu in along(count, w)]
-    elif pattern == "grid":
-        columns = 1
-        while columns * columns < count:
-            columns += 1
-        rows = (count + columns - 1) // columns
-        pitch_u, pitch_v = width_u // columns, depth_v // rows
-        candidates = [
-            (
-                area.a0 + pitch_u * (index % columns) + pitch_u // 2,
-                area.b0 + pitch_v * (index // columns) + pitch_v // 2,
-                "-v",
-            )
-            for index in range(count)
-        ]
-    elif pattern in ("cluster", "centre"):
-        centre_u, centre_v = (area.a0 + area.a1) // 2, (area.b0 + area.b1) // 2
-        columns = 1
-        while columns * columns < count:
-            columns += 1
-        pitch_u, pitch_v = w + clearance, d + clearance
-        origin_u = centre_u - (pitch_u * (columns - 1)) // 2
-        rows = (count + columns - 1) // columns
-        origin_v = centre_v - (pitch_v * (rows - 1)) // 2
-        candidates = [
-            (origin_u + pitch_u * (index % columns), origin_v + pitch_v * (index // columns), "-v")
-            for index in range(count)
-        ]
-    elif pattern in ("back_wall", "perimeter"):
-        inset = 0 if pattern == "back_wall" else clearance // 2
-        along_back = max(1, (width_u - clearance) // (w + clearance))
-        back_count = count if pattern == "back_wall" else min(count, along_back)
-        lined = [(cu, area.b1 - inset - d // 2, "-v") for cu in along(back_count, w)]
-        rest = count - back_count
-        if rest:
-            low_count = (rest + 1) // 2
-            for side, number, cu in (
-                ("+u", low_count, area.a0 + inset + d // 2),
-                ("-u", rest - low_count, area.a1 - inset - d // 2),
-            ):
-                pitch = max(w + clearance, (depth_v - d - 2 * clearance) // max(number, 1))
-                lined.extend(
-                    (cu, area.b0 + d + clearance + pitch * index + pitch // 2, side)
-                    for index in range(number)
-                )
-        candidates = lined
-    elif pattern == "scatter":
-        cell = max(w, d) + 2 * clearance
-        candidates = _scattered(
-            max(width_u // cell, 0),
-            max(depth_v // cell, 0),
-            cell,
-            cell - max(w, d) - clearance,
-            area,
-            cursor,
-        )
-    else:
+    realizer = PATTERN_REALIZERS.get(pattern)
+    if realizer is None:
         raise _refuse(f"{where}: a fixture is not laid out by {pattern}")
+    candidates = realizer.candidates(_Holding(area, count, w, d, clearance, cursor))
     step = max(200, (min(w, d) + clearance) // 2)
     grid_u = range(area.a0 + step // 2, area.a1, step)
     grid_v = range(area.b0 + step // 2, area.b1, step)
@@ -600,12 +686,11 @@ def _place(
         spend(1)
         rect = footprint(cu, cv, facing)
         if not fits(rect):
-            if pattern == "scatter":
+            if realizer.when_it_does_not_fit == LEFT_OUT:
                 continue
-            # The nearest free point facing the same way: a row, a back wall or a perimeter
-            # fixture slides along its own line past a doorway's clear way; a grid, cluster or
-            # centred fixture steps to the nearest free point of a grid over the area.
-            if pattern in ("row", "back_wall", "perimeter"):
+            # The nearest free point facing the same way: along the fixture's own line past a
+            # doorway's clear way, or the nearest free point of a grid over the area.
+            if realizer.when_it_does_not_fit == ALONG_ITS_LINE:
                 if facing in ("-v", "+v"):
                     line = _by_distance(grid_u, range(cv, cv + 1), cu, cv, spend)
                 else:
@@ -1146,10 +1231,9 @@ def lay_out(
         )
     if x0 - inset < 4 * module:
         raise _refuse(f"the site is {width} mm wide; its sides of the spine are too narrow")
-    rank = {"front": 0, "left": 1, "right": 1, "middle": 1, "back": 2}
     core = sorted(
         ((index, zone) for index, zone in enumerate(plan.zones) if zone.placement != "edge_back"),
-        key=lambda pair: (rank[pair[1].placement], pair[0]),
+        key=lambda pair: (LOT_ORDER[pair[1].placement], pair[0]),
     )
     left: list[tuple[int, ZonePlan]] = []
     right: list[tuple[int, ZonePlan]] = []
