@@ -88,6 +88,9 @@ GUARDS: Final[dict[str, str]] = {
     ),
     "test_final_read_check.py": "the final read check is stated once and reached from there",
     "test_flight_page_words.py": "the page has words for every flight code the server can send",
+    "test_grammar_draw.py": (
+        "the grammar package's source holds to its rules for a draw; scans the package"
+    ),
     "test_grammar_layering.py": "generated content cannot name a citation",
     "test_hosted_boundary.py": (
         "every hosted request passes one boundary, and no saved name crosses it"
@@ -106,6 +109,9 @@ GUARDS: Final[dict[str, str]] = {
     "test_models_manifest.py": (
         "no module reads a credential from a variable it spells; scans exulanica/"
     ),
+    "test_module_sizes.py": (
+        "no listed module grows and no other passes the line; reads the product tree"
+    ),
     "test_movement_layering.py": "the movement modules cannot reach what they must not",
     "test_no_creature_code.py": "no code is written for a particular creature",
     "test_optional_stacks.py": "a test that needs an optional stack says which one",
@@ -115,6 +121,9 @@ GUARDS: Final[dict[str, str]] = {
     ),
     "test_place_names.py": (
         "each offered place role lists exactly the modules that name it; scans exulanica/"
+    ),
+    "test_place_source_frame.py": (
+        "the place source frame's callers across exulanica/; scans the package"
     ),
     "test_project_context_policy_boundary.py": (
         "what a project keeps can inform a proposal and never author policy or a grant"
