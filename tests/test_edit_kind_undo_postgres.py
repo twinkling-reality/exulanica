@@ -449,6 +449,7 @@ def test_undo_reverses_each_thing_kind(world, kind):
             Transform(-2_000, 500, 0, 0, 1_000),
             base_state_sha256=version.state_sha256,
             actor=uuid.uuid4(),
+            landing=None,
         )
     else:
         after_edit = worlds.remove_thing(

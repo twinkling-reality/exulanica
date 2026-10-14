@@ -47,6 +47,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from itertools import pairwise
 from typing import Any, Final
 
@@ -83,6 +84,7 @@ __all__ = [
     "READ_KINDS",
     "CityNavigation",
     "CityObstructions",
+    "city_blocked_parts",
     "city_navigation",
     "city_obstructions",
     "city_street_names",
@@ -385,6 +387,23 @@ class _LowPart:
         dx, dy = point[0] - self.origin[0], point[1] - self.origin[1]
         return (dx * self.unit[0] + dy * self.unit[1], -dx * self.unit[1] + dy * self.unit[0])
 
+    def corners(self) -> tuple[tuple[Fraction, Fraction], ...]:
+        """The box's corners in the plan frame, exactly: :meth:`_local` turned back."""
+        ux, uy = self.unit
+        det = ux * ux + uy * uy
+        return tuple(
+            (
+                self.origin[0] + Fraction(ux * u - uy * v, det),
+                self.origin[1] + Fraction(uy * u + ux * v, det),
+            )
+            for u, v in (
+                self.low,
+                (self.high[0], self.low[1]),
+                self.high,
+                (self.low[0], self.high[1]),
+            )
+        )
+
     def near_point(self, point: Point, radius: int) -> bool:
         u, v = self._local(point)
         du = max(self.low[0] - u, 0, u - self.high[0])
@@ -510,6 +529,38 @@ def _obstructions_of(
         for building in by_type.get(MassingRecord, ()):
             obstructions.add_ring(building.tiers[0].ring_mm)
     return obstructions
+
+
+def city_blocked_parts(
+    records: Sequence[object], navigation: CityNavigation | None = None
+) -> list[tuple[str, str, tuple[tuple[Fraction | int, Fraction | int], ...]]]:
+    """What :func:`city_obstructions` keeps a standing person clear of, each part by itself, with
+    what it is (``building``, ``furniture`` or ``tree``), the words that name it and its outline in
+    the city's plan frame (east, north): a building's base ring, and each low part of a piece of
+    street furniture or a tree as the box :class:`_LowPart` holds. The same records by the same
+    navigation table, so a move of a placed thing is kept off exactly what people walk round
+    (:mod:`exulanica.world.thing_landing`)."""
+    navigation = navigation if navigation is not None else city_navigation()
+    parts: list[tuple[str, str, tuple[tuple[Fraction | int, Fraction | int], ...]]] = []
+    furniture = navigation.obstruction.get(StreetFurnitureRecord.RECORD_KIND) == "low_parts"
+    trees = navigation.obstruction.get(StreetTreeRecord.RECORD_KIND) == "low_parts"
+    for record in records:
+        if furniture and type(record) is StreetFurnitureRecord:
+            direction: Point = (record.facing_dx_mm, record.facing_dy_mm)
+            part_kind, label = "furniture", record.furniture_class.replace("_", " ")
+        elif trees and type(record) is StreetTreeRecord:
+            direction, part_kind, label = (1, 0), "tree", "tree"
+        else:
+            continue
+        for part in record.parts:
+            if part.offset_z_mm < navigation.capsule_height_mm:
+                low = _LowPart(record.identity, (record.x_mm, record.y_mm), direction, part)
+                parts.append((part_kind, label, low.corners()))
+    if navigation.obstruction.get(MassingRecord.RECORD_KIND) == "base_ring":
+        for building in records:
+            if type(building) is MassingRecord:
+                parts.append(("building", "building", tuple(building.tiers[0].ring_mm)))
+    return parts
 
 
 @dataclass(frozen=True, slots=True)

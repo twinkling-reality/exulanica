@@ -15151,6 +15151,284 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/things/{thing_id}/move/preview",
+    "method": "post",
+    "id": "move_thing_preview_world_versions__version_id__things__thing_id__move_preview_post",
+    "title": "What moving one placed thing would record, and where it would stand. Writes nothing.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "thing_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "Thing Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/MoveThingPreviewBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true,
+              "title": "Response Move Thing Preview World Versions  Version Id  Things  Thing Id  Move Preview Post"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/things/{thing_id}/remove/preview",
+    "method": "post",
+    "id": "remove_thing_preview_world_versions__version_id__things__thing_id__remove_preview_post",
+    "title": "What removing one placed thing would record. Writes nothing.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "thing_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "Thing Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ThingEditPreviewBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true,
+              "title": "Response Remove Thing Preview World Versions  Version Id  Things  Thing Id  Remove Preview Post"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/things/undo/preview",
+    "method": "post",
+    "id": "undo_thing_edit_preview_world_versions__version_id__things_undo_preview_post",
+    "title": "Which edit an undo would reverse, and what it would restore. Writes nothing.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ThingEditPreviewBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true,
+              "title": "Response Undo Thing Edit Preview World Versions  Version Id  Things Undo Preview Post"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/things/{thing_id}/remove",
     "method": "post",
     "id": "remove_thing_world_versions__version_id__things__thing_id__remove_post",

@@ -122,6 +122,12 @@ from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
 from exulanica.world.society import inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.thing_kind_gone import THING_KIND_GONE_SQL
+from exulanica.world.thing_landing import (
+    LandingGround,
+    blocking_things,
+    footprint_half_extents,
+    landing_refusal,
+)
 from exulanica.world.thing_store import ThingStore
 from exulanica.world.workspace_assets import (
     ResolvedWorkspaceAsset,
@@ -2465,6 +2471,74 @@ class WorldObjectRepository:
         )
         return replace(thing, support=read_support_reference(dict(reference))), receipt
 
+    def placed_thing(self, version_id: uuid.UUID, thing_id: str) -> PlacedThing:
+        """One placed thing of a version as it stands, removed or not, or ``UnknownWorldResource``.
+        Read without a lock: what a move's landing is prepared from before its transaction."""
+        return self._require_thing(version_id, thing_id)
+
+    def validate_thing_move(
+        self,
+        version_id: uuid.UUID,
+        thing_id: str,
+        transform: Transform,
+        *,
+        base_state_sha256: str,
+        landing: LandingGround | None,
+    ) -> tuple[PlacedThing, PlacedThing]:
+        """Validate exactly what ``move_thing`` would, without a lock or a write: the same base
+        check, then the same thing, pose and landing checks through :meth:`_checked_thing_move`.
+        Answers the thing as it stands and as the move would leave it."""
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._checked_thing_move(version_id, thing_id, transform, landing)
+
+    def validate_thing_removal(
+        self, version_id: uuid.UUID, thing_id: str, *, base_state_sha256: str
+    ) -> tuple[PlacedThing, PlacedThing]:
+        """Validate exactly what ``remove_thing`` would, without a lock or a write."""
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._checked_thing_removal(version_id, thing_id)
+
+    def _checked_thing_move(
+        self,
+        version_id: uuid.UUID,
+        thing_id: str,
+        transform: Transform,
+        landing: LandingGround | None,
+    ) -> tuple[PlacedThing, PlacedThing]:
+        """The thing as it stands and as the move would leave it, or the refusal: removed, its
+        kind gone, a pose out of bounds, or (with ``landing``) a place the world's ground does
+        not take it (:func:`~exulanica.world.thing_landing.landing_refusal`). A landing prepared
+        for another region than the thing's is not this thing's, and is refused as a fault."""
+        current = self._require_thing(version_id, thing_id)
+        if current.removed:
+            raise InvalidObjectState(f"{thing_id} is removed in this version")
+        if current.kind_gone:
+            raise ThingKindGone(f"{thing_id}'s kind is no longer held by its workspace")
+        moved = replace(current, transform=transform, support=None)
+        validate_placed_thing(moved, region_ids=frozenset({current.region_id}), kinds=None)
+        if landing is not None:
+            if landing.region_id != current.region_id:
+                raise ValueError("a landing prepared for another region than the thing's")
+            refusal = landing_refusal(
+                landing,
+                moved,
+                footprint_half_extents(moved),
+                blocking_things(self._things(version_id), thing_id),
+            )
+            if refusal is not None:
+                raise refusal
+        return current, moved
+
+    def _checked_thing_removal(
+        self, version_id: uuid.UUID, thing_id: str
+    ) -> tuple[PlacedThing, PlacedThing]:
+        current = self._require_thing(version_id, thing_id)
+        if current.removed:
+            raise InvalidObjectState(f"{thing_id} is already removed in this version")
+        return current, replace(current, removed=True)
+
     def move_thing(
         self,
         version_id: uuid.UUID,
@@ -2473,16 +2547,14 @@ class WorldObjectRepository:
         *,
         base_state_sha256: str,
         actor: uuid.UUID,
+        landing: LandingGround | None,
     ) -> AlternateVersion:
+        """Move a placed thing to ``transform`` in its region. ``landing`` is the world's ground
+        the move is held to (:func:`~exulanica.world.thing_landing_source.prepare_landing`), or
+        None where it is not checked; every caller states which."""
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            current = self._require_thing(version_id, thing_id)
-            if current.removed:
-                raise InvalidObjectState(f"{thing_id} is removed in this version")
-            if current.kind_gone:
-                raise ThingKindGone(f"{thing_id}'s kind is no longer held by its workspace")
-            moved = replace(current, transform=transform, support=None)
-            validate_placed_thing(moved, region_ids=frozenset({current.region_id}), kinds=None)
+            current, _moved = self._checked_thing_move(version_id, thing_id, transform, landing)
             edit_id = uuid.uuid4()
             self.connection.execute(
                 "update world_alternate_thing "
@@ -2523,9 +2595,7 @@ class WorldObjectRepository:
     ) -> AlternateVersion:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            current = self._require_thing(version_id, thing_id)
-            if current.removed:
-                raise InvalidObjectState(f"{thing_id} is already removed in this version")
+            current, _removed = self._checked_thing_removal(version_id, thing_id)
             edit_id = uuid.uuid4()
             self.connection.execute(
                 "update world_alternate_thing set removed=true,last_edit_id=%s "

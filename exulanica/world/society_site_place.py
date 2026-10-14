@@ -69,6 +69,7 @@ __all__ = [
     "place_from_site_records",
     "place_residents",
     "site_blocked_boxes",
+    "site_blocked_parts",
     "site_obstructions",
 ]
 
@@ -445,33 +446,55 @@ def place_residents(place: Mapping[str, Any]) -> int:
     return sum(int(dest["resident_capacity"]) for dest in place["destinations"])
 
 
-def _blocked(records: Sequence[object]) -> list[_Box]:
-    """What a walker keeps out of on a site, from its records: every structure, every area, every
-    fixture that blocks inside a zone, every closed zone and every wall's pieces."""
+def _blocked_parts(
+    records: Sequence[object], uses: Mapping[str, PartUse] | None = None
+) -> list[tuple[str, str, _Box]]:
+    """What a walker keeps out of on a site, from its records, each with what it is and the words
+    that name it: every structure, every area (water where its roles say so), every fixture that
+    blocks inside a zone, every closed zone and every wall's pieces, in that order. A part's words
+    are its kind's (``uses``) where they are given, else its key's."""
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
     zone_ids = {zone.identity for zone in zones}
-    blocked = [
-        _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
+
+    def words(key: str) -> str:
+        use = None if uses is None else uses.get(key)
+        return use.label if use is not None and use.label else key.replace("_", " ")
+
+    parts = [
+        ("structure", words(s.part_key), _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm))
         for s in records
         if isinstance(s, SiteStructureRecord)
     ]
-    blocked += [
-        _Box(a.min_x_mm, a.min_y_mm, a.max_x_mm, a.max_y_mm)
+    parts += [
+        (
+            "water" if "water" in a.roles else "area",
+            words(a.part_key),
+            _Box(a.min_x_mm, a.min_y_mm, a.max_x_mm, a.max_y_mm),
+        )
         for a in records
         if isinstance(a, SiteAreaRecord)
     ]
-    blocked += [
-        _fixture_box(f)
+    parts += [
+        ("fixture", words(f.part_key), _fixture_box(f))
         for f in records
         if isinstance(f, SiteFixtureRecord) and f.blocks and f.owner_identity in zone_ids
     ]
-    blocked += [
-        _Box(z.min_x_mm, z.min_y_mm, z.max_x_mm, z.max_y_mm) for z in zones if z.access == "closed"
+    parts += [
+        ("closed", words(z.zone_key), _Box(z.min_x_mm, z.min_y_mm, z.max_x_mm, z.max_y_mm))
+        for z in zones
+        if z.access == "closed"
     ]
     for wall in records:
         if isinstance(wall, SiteWallRecord):
-            blocked += _wall_boxes(wall)
-    return blocked
+            parts += [("wall", "wall", box) for box in _wall_boxes(wall)]
+    return parts
+
+
+def _blocked(records: Sequence[object]) -> list[_Box]:
+    """What a walker keeps out of on a site, from its records: every structure, every area, every
+    fixture that blocks inside a zone, every closed zone and every wall's pieces
+    (:func:`_blocked_parts`, without their names)."""
+    return [box for _kind, _words, box in _blocked_parts(records)]
 
 
 def site_blocked_boxes(records: Sequence[object]) -> list[list[int]]:
@@ -481,6 +504,19 @@ def site_blocked_boxes(records: Sequence[object]) -> list[list[int]]:
     clear of on a site (:func:`site_obstructions`), handed over with the place by whoever holds
     the records."""
     return [[box.x0, box.y0, box.x1, box.y1] for box in _blocked(records)]
+
+
+def site_blocked_parts(
+    records: Sequence[object], uses: Mapping[str, PartUse] | None = None
+) -> list[dict[str, Any]]:
+    """A site's blocked boxes as :func:`site_blocked_boxes` states them, in the same order, each
+    with what it is (``structure``, ``water``, ``area``, ``fixture``, ``closed`` or ``wall``) and
+    the words that name it: what a move of a placed thing is kept off, and told about by name
+    (:mod:`exulanica.world.thing_landing`)."""
+    return [
+        {"part": kind, "label": label, "box": [box.x0, box.y0, box.x1, box.y1]}
+        for kind, label, box in _blocked_parts(records, uses)
+    ]
 
 
 def site_obstructions(boxes: Iterable[Sequence[int]]) -> CityObstructions:

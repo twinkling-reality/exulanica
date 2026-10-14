@@ -14212,6 +14212,272 @@
     }
    }
   },
+  "/world/versions/{version_id}/things/{thing_id}/move/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What moving one placed thing would record, and where it would stand. Writes nothing.",
+    "operationId": "move_thing_preview_world_versions__version_id__things__thing_id__move_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "thing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "maxLength": 200,
+       "title": "Thing Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MoveThingPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Move Thing Preview World Versions  Version Id  Things  Thing Id  Move Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/things/{thing_id}/remove/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What removing one placed thing would record. Writes nothing.",
+    "operationId": "remove_thing_preview_world_versions__version_id__things__thing_id__remove_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "thing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "maxLength": 200,
+       "title": "Thing Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ThingEditPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Remove Thing Preview World Versions  Version Id  Things  Thing Id  Remove Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/things/undo/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Which edit an undo would reverse, and what it would restore. Writes nothing.",
+    "operationId": "undo_thing_edit_preview_world_versions__version_id__things_undo_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ThingEditPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Undo Thing Edit Preview World Versions  Version Id  Things Undo Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/things/{thing_id}/remove": {
    "post": {
     "tags": [
@@ -34885,6 +35151,25 @@
     ],
     "title": "MoveThingBody"
    },
+   "MoveThingPreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "pose": {
+      "$ref": "#/components/schemas/ThingPoseBody"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "pose"
+    ],
+    "title": "MoveThingPreviewBody"
+   },
    "NameRequest": {
     "properties": {
      "occurrence_id": {
@@ -45367,6 +45652,22 @@
      "character"
     ],
     "title": "ThingCharacterBody"
+   },
+   "ThingEditPreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256"
+    ],
+    "title": "ThingEditPreviewBody",
+    "description": "The base a preview is read against. No saved entry: a preview advances nothing."
    },
    "ThingKindBody": {
     "properties": {

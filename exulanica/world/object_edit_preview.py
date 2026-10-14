@@ -1,4 +1,4 @@
-"""Server previews for the object edits that had none: move, remove and undo.
+"""Server previews for the object and thing edits that had none: move, remove and undo.
 
 Transport-independent, like :mod:`exulanica.world.composition_preview`: each preview runs the read
 that the durable writer runs first (the version row, then the base, then the subject), through the
@@ -36,10 +36,15 @@ from exulanica.world.errors import (
     InvalidEnvironmentState,
     InvalidObjectData,
     InvalidObjectState,
+    InvalidThingPlacement,
     StaleObjectBase,
+    ThingKindGone,
+    ThingLandingRefused,
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import Transform, object_document
+from exulanica.world.placed_things import placed_thing_document
+from exulanica.world.thing_landing import LANDING_CODES, LandingGround
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 
 __all__ = [
@@ -47,11 +52,13 @@ __all__ = [
     "ObjectEditPreview",
     "preview_object_move",
     "preview_object_removal",
+    "preview_thing_move",
+    "preview_thing_removal",
     "preview_undo",
     "read_only_snapshot",
 ]
 
-EditKind = Literal["move_object", "remove_object", "undo"]
+EditKind = Literal["move_object", "remove_object", "move_thing", "remove_thing", "undo"]
 
 #: Each refusal a preview reports, and its code: the ``code`` the object routes answer the same
 #: refusal with (``OBJECT_PROBLEMS`` in ``exulanica.api.world_edit``; a test holds the two equal).
@@ -64,10 +71,14 @@ _REFUSALS: Final[tuple[tuple[type[Exception], str], ...]] = (
     (InvalidEnvironmentState, "invalid_environment_state"),
     #: A move of an object whose workspace asset was withdrawn, or whose workspace was erased.
     (WorkspaceAssetWithdrawn, "withdrawn"),
+    #: A thing's pose out of bounds, and a thing whose workspace kind is gone.
+    (InvalidThingPlacement, "invalid_thing_placement"),
+    (ThingKindGone, "thing_kind_erased"),
 )
 
-#: Every code ``blocked_reason`` can carry. Stable: codes are added, never renamed.
-OBJECT_EDIT_BLOCKED_REASONS: Final = frozenset(code for _kind, code in _REFUSALS)
+#: Every code ``blocked_reason`` can carry. Stable: codes are added, never renamed. A thing's
+#: landing refusal carries its own (``thing_landing``'s ``LANDING_CODES``).
+OBJECT_EDIT_BLOCKED_REASONS: Final = frozenset(code for _kind, code in _REFUSALS) | LANDING_CODES
 
 #: What a ready edit leaves unchanged on the version, as a composition preview states it.
 _PRESERVES: Final = ("source_snapshot_id", "style_version_id", "other_subjects", "prior_edits")
@@ -87,6 +98,8 @@ class ObjectEditPreview:
     after: Mapping[str, Any] | None
     #: For an undo, the edit it would reverse.
     undoes: Mapping[str, Any] | None
+    #: For a move of a thing, whether where it would stand was checked, and what refused it.
+    landing: Mapping[str, Any] | None = None
 
     @property
     def availability(self) -> Literal["ready", "blocked"]:
@@ -107,6 +120,8 @@ class ObjectEditPreview:
                 "undoes": None if self.undoes is None else dict(self.undoes),
                 "preserves": list(_PRESERVES) if ready else [],
             },
+            # Stated only for a thing's move, so every other preview keeps the bytes it had.
+            **({} if self.landing is None else {"landing": dict(self.landing)}),
         }
 
 
@@ -163,6 +178,84 @@ def preview_object_removal(
             object_id,
             object_document(current),
             object_document(removed),
+            None,
+        )
+
+
+def preview_thing_move(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    thing_id: str,
+    transform: Transform,
+    *,
+    base_state_sha256: str,
+    landing: LandingGround | None,
+) -> ObjectEditPreview:
+    """What ``POST .../things/{thing_id}/move`` would record, held to the same ``landing`` the
+    write is (None: where it would stand is not checked, and the preview says so). Takes no lock
+    and writes nothing."""
+    checked = {"checked": landing is not None}
+    with read_only_snapshot(repository.connection):
+        version = _version_block(repository, version_id)
+        try:
+            current, moved = repository.validate_thing_move(
+                version_id,
+                thing_id,
+                transform,
+                base_state_sha256=base_state_sha256,
+                landing=landing,
+            )
+        except ThingLandingRefused as exc:
+            return ObjectEditPreview(
+                exc.code,
+                str(exc),
+                version,
+                "move_thing",
+                thing_id,
+                None,
+                None,
+                None,
+                {**checked, "where": dict(exc.where)},
+            )
+        except Exception as exc:
+            return _blocked(exc, version, "move_thing", thing_id)
+        return ObjectEditPreview(
+            None,
+            None,
+            version,
+            "move_thing",
+            thing_id,
+            placed_thing_document(current),
+            placed_thing_document(moved),
+            None,
+            checked,
+        )
+
+
+def preview_thing_removal(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    thing_id: str,
+    *,
+    base_state_sha256: str,
+) -> ObjectEditPreview:
+    """What ``POST .../things/{thing_id}/remove`` would record. No lock, and no write."""
+    with read_only_snapshot(repository.connection):
+        version = _version_block(repository, version_id)
+        try:
+            current, removed = repository.validate_thing_removal(
+                version_id, thing_id, base_state_sha256=base_state_sha256
+            )
+        except Exception as exc:
+            return _blocked(exc, version, "remove_thing", thing_id)
+        return ObjectEditPreview(
+            None,
+            None,
+            version,
+            "remove_thing",
+            thing_id,
+            placed_thing_document(current),
+            placed_thing_document(removed),
             None,
         )
 

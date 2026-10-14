@@ -42,6 +42,7 @@ __all__ = [
     "StaleStyleVersion",
     "StyleWriteBusy",
     "ThingKindGone",
+    "ThingLandingRefused",
     "UnavailableAsset",
     "UnknownWorldResource",
     "WorldNotConfigured",
@@ -160,6 +161,18 @@ class ThingLimitReached(WorldStyleError):
 class ThingKindGone(WorldStyleError):
     """A placed thing's kind is a workspace's own kind the workspace no longer holds, or erased
     after the thing was placed: the thing is gone, so nothing is done with it."""
+
+
+class ThingLandingRefused(WorldStyleError):
+    """A placed thing would be moved where the world's ground does not take it: past its edge,
+    off its ground, or onto something people cannot walk through
+    (:mod:`exulanica.world.thing_landing`). ``code`` names which, ``where`` what refused it, and
+    the message is a sentence a person reads."""
+
+    def __init__(self, code: str, where: dict[str, object], words: str) -> None:
+        super().__init__(words)
+        self.code = code
+        self.where = dict(where)
 
 
 class InvalidEnvironmentState(WorldStyleError):

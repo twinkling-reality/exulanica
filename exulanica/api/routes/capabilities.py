@@ -682,6 +682,21 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "validates a chosen passive rigid kind, exact source support and authored base; "
             "the version read does not enumerate source-bound placement candidates"
         ),
+        ("POST", "/world/versions/{version_id}/things/undo/preview"): (
+            "a read-only preview of a placed thing's undo for the workspace's build mode; "
+            "the capability read projects the edits themselves, and a Companion plan step "
+            "does not prepare through it yet"
+        ),
+        ("POST", "/world/versions/{version_id}/things/{thing_id}/move/preview"): (
+            "a read-only preview of a placed thing's move for the workspace's build mode; "
+            "the capability read projects the edits themselves, and a Companion plan step "
+            "does not prepare through it yet"
+        ),
+        ("POST", "/world/versions/{version_id}/things/{thing_id}/remove/preview"): (
+            "a read-only preview of a placed thing's removal for the workspace's build mode; "
+            "the capability read projects the edits themselves, and a Companion plan step "
+            "does not prepare through it yet"
+        ),
         ("POST", "/world/versions/{version_id}/things/on-support"): (
             "places the passive rigid kind against the exact support and authored state "
             "checked by POST /world/versions/{version_id}/things/on-support/preview; "

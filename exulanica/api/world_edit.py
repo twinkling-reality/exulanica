@@ -60,7 +60,12 @@ from exulanica.world import (
     Transform,
     WorldObjectRepository,
 )
-from exulanica.world.errors import InvalidThingPlacement, ThingKindGone, ThingLimitReached
+from exulanica.world.errors import (
+    InvalidThingPlacement,
+    ThingKindGone,
+    ThingLandingRefused,
+    ThingLimitReached,
+)
 from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.society import SocietyPlaceWaiting, UnavailableSocietyInput
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
@@ -268,6 +273,10 @@ def object_problem_code(exc: Exception) -> tuple[int, str, int | None] | None:
         # A site world's place the kind worker has not made yet, which an edit composing its
         # people's next input needed: the edit is not made; ask again after Retry-After.
         return 503, exc.code, exc.retry_seconds
+    if isinstance(exc, ThingLandingRefused):
+        # Where a moved thing would stand, refused by the world's own ground: its code names which
+        # refusal (past the edge, off the ground, onto something blocked) and its detail says it.
+        return 422, exc.code, None
     for kind, status, code in OBJECT_PROBLEMS:
         if isinstance(exc, kind):
             return status, code, None
@@ -279,9 +288,12 @@ def object_problem(exc: Exception) -> JSONResponse | None:
     if answer is None:
         return None
     status, code, retry_seconds = answer
+    content: dict[str, object] = {"code": code, "detail": str(exc)}
+    if isinstance(exc, ThingLandingRefused):
+        content["where"] = dict(exc.where)
     return JSONResponse(
         status_code=status,
-        content={"code": code, "detail": str(exc)},
+        content=content,
         headers=None if retry_seconds is None else {"Retry-After": str(retry_seconds)},
     )
 

@@ -564,9 +564,12 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/apply` | Add an arrangement's objects as ordinary edits |
 | `POST` | `/world/versions/{version_id}/things` | Place one thing by its kind, shipped or its workspace's own (section 14) |
-| `POST` | `/world/versions/{version_id}/things/{thing_id}/move` | Replace one placed thing's pose |
+| `POST` | `/world/versions/{version_id}/things/{thing_id}/move` | Replace one placed thing's pose where the world's ground takes it (section 14) |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/remove` | Store a placed thing's removal |
 | `POST` | `/world/versions/{version_id}/things/undo` | Reverse the newest edit not already reversed |
+| `POST` | `/world/versions/{version_id}/things/{thing_id}/move/preview` | What the move would record and where the thing would stand, or its refusal; writes nothing |
+| `POST` | `/world/versions/{version_id}/things/{thing_id}/remove/preview` | What the removal would record, or its refusal; writes nothing |
+| `POST` | `/world/versions/{version_id}/things/undo/preview` | Which edit an undo would reverse and what it would restore; writes nothing |
 | `GET` | `/world/assets` | The reviewed assets a person may place, with availability, each kind's use and what inhabitants do there |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset of any kind, and whether it may be placed |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
@@ -1022,7 +1025,23 @@ holds at most 256 placed things, removed ones included, since its delta keeps th
 refused as `409 thing_limit_reached`, and undoing a placement makes room again. What a placed
 thing is never changes after it is placed: the table's trigger refuses a change to its kind or
 origin, and a move keeps its region. An unbound move changes its pose; a freeform move of a
-support-bound thing also clears its support affinity. `add_thing`, `move_thing`
+support-bound thing also clears its support affinity. A move is held to the world's ground as the
+world's society reads it (`exulanica/world/thing_landing.py`), so where a thing may be moved and
+what the world's people can reach never disagree: inside the walkable area where the world's own
+ground states one, resting on the ground by the society's own rule (the ground plane, or the
+nearest walking line of a world that states its walking surfaces), and with its kind's box, turned
+with it, overlapping nothing people cannot walk through: a site's structures, water and other
+areas, walls, blocking fixtures and closed zones, a town's buildings, street furniture and trees,
+and the version's other placed objects whose kinds block walking. A being is held by its centre.
+Touching a face is not overlapping. A refusal is `422` with one code per kind,
+`thing_landing_outside`, `thing_landing_off_ground` or `thing_landing_blocked`, a `where` naming
+what refused it (the part's kind and words, or the height above the ground) and a sentence a person
+reads as `detail`; nothing is written. The world's ground is prepared before the move's
+transaction, through the kind worker's place cache for a site world, so a move asked while that
+place is being made is answered `503` with `Retry-After` and writes nothing. A world whose ground
+the rule cannot read, such as one made from terrain, which has no society projection, is moved as
+before; the move's preview says it was not checked. Placing a thing is not yet held to the ground.
+`add_thing`, `move_thing`
 and `remove_thing` append to the version's edit log under the same compare-and-swap as every edit,
 naming the thing in the log's `thing_id`, and undo restores the stored document; an undone addition
 is a retained, removed row, and the same id may be placed again. A same-source branch keeps

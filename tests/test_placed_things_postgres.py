@@ -96,6 +96,7 @@ def test_the_deployed_writer_places_moves_removes_and_undoes_a_thing(
             Transform(-1_000, 0, 0, 1_570_796, 1_000),
             base_state_sha256=placed.state_sha256,
             actor=uuid.uuid4(),
+            landing=None,
         )
         assert moved.things[0].transform.x_mm == -1_000
         removed = runtime.remove_thing(

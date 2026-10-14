@@ -278,11 +278,17 @@ def _placed(
     """The place a site world's society walks, made from its records within the walking graph's
     budget, or why it cannot be, by name. With the place goes ``blocked``, the site's blocked
     boxes as plain figures: what a society of things keeps a placed thing's standing places clear
-    of, which only the records state and the place does not carry."""
+    of, which only the records state and the place does not carry; and ``blocked_parts``, the same
+    boxes each with what it is and its words, which a move of a placed thing is kept off and told
+    about by name."""
     from exulanica.grammar.errors import CatalogError
     from exulanica.world.composers.site_plan import society_place
     from exulanica.world.errors import InvalidStructuralData
-    from exulanica.world.society_site_place import GraphOverBudget, site_blocked_boxes
+    from exulanica.world.society_site_place import (
+        GraphOverBudget,
+        site_blocked_boxes,
+        site_blocked_parts,
+    )
 
     try:
         if receipt["composer"]["version"] in TERRAIN_COMPOSER_VERSIONS:
@@ -298,6 +304,7 @@ def _placed(
             "status": "done",
             "place": society_place(place_id, receipt, records),
             "blocked": site_blocked_boxes(records),
+            "blocked_parts": site_blocked_parts(records, _part_uses(receipt)),
         }
     except GraphOverBudget as exc:
         return {
@@ -307,6 +314,19 @@ def _placed(
         }
     except (CatalogError, InvalidStructuralData, ValueError) as exc:
         return {"status": "refused", "code": "kind_place_refused", "detail": str(exc)}
+
+
+def _part_uses(receipt: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """The words a site's kind gives each part, from the receipt, or None where it states none."""
+    from exulanica.world.society_site_place import SiteSociety
+
+    society = receipt.get("society")
+    if not isinstance(society, Mapping):
+        return None
+    try:
+        return SiteSociety.read(society).uses
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def check_job(document: dict[str, Any]) -> dict[str, Any]:
@@ -338,7 +358,7 @@ def compose_job(
     from exulanica.world.composers.site_plan import compose_kind
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
-    from exulanica.world.society_site_place import site_blocked_boxes
+    from exulanica.world.society_site_place import site_blocked_boxes, site_blocked_parts
     from exulanica.world.support_surfaces import SupportRefused
 
     place_id = site_ground_place_id()
@@ -367,6 +387,7 @@ def compose_job(
             "status": "done",
             "place": composed.place,
             "blocked": site_blocked_boxes(records),
+            "blocked_parts": site_blocked_parts(records, _part_uses(composed.receipt)),
         },
     }
 

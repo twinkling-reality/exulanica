@@ -126,7 +126,8 @@ def test_normal_supported_add_reopen_move_undo_branch_and_remove(made):
         prefix + "/things/thing:supported-bench/move" + scope,
         {
             "base_state_sha256": saved["state_sha256"],
-            "pose": {"x_mm": 2000, "y_mm": 5000, "z_mm": -3000, "yaw_microradians": 123456},
+            # A freeform move onto open ground, as the farm's ground takes it, clears its support.
+            "pose": {"x_mm": 45000, "y_mm": 0, "z_mm": -7000, "yaw_microradians": 123456},
         },
     )
     assert moved.status_code == 200, moved.text

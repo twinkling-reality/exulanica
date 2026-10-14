@@ -1,0 +1,140 @@
+"""A world's ground as a move of a placed thing reads it, prepared before the move's transaction.
+
+:func:`prepare_landing` reads the version's source the way its society does
+(:func:`~exulanica.world.society_authored_ground.read_authored_ground`), and returns the
+:class:`~exulanica.world.thing_landing.LandingGround` a move is held to, or None for a world whose
+ground the rule cannot read, which is moved as before and said to be unchecked:
+
+* a ground walked on a lattice (a starter, a world made from photographs): the plane at its
+  elevation, edged where the world's own ground states its area;
+* a site world: its place and named blocked parts from the kind worker, through the cache its
+  society reads (made with the world, or asked of the worker here, outside any lock, answered as
+  :class:`~exulanica.world.kinds.worker.KindWorkWaiting` while it is being made); a site world
+  made from terrain has no society projection and is not checked;
+* a town: its records (:func:`~exulanica.world.generated_worlds.town_records`), the walking
+  surfaces its society walks and their blocked parts.
+
+Every figure is turned into the region's frame (east and south), the frame a placed thing's pose
+is in. The version's other placed objects are read inside the move's own transaction
+(:func:`~exulanica.world.thing_landing.blocking_things`), so they cannot have moved since.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
+
+from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
+from exulanica.world.generated_worlds import generation_receipt, states_site, town_records
+from exulanica.world.kinds.worker import (
+    PLACE_SECONDS,
+    KindWorkWaiting,
+    kind_worker,
+    place_job,
+    place_key,
+    site_ground_place_id,
+)
+from exulanica.world.society_authored_ground import SocietyGround, read_authored_ground
+from exulanica.world.society_city_place import city_blocked_parts
+from exulanica.world.society_walking_surfaces import surface_height_above, walking_surfaces_place
+from exulanica.world.thing_landing import BlockedPart, LandingGround, rests_on_plane
+
+if TYPE_CHECKING:
+    from exulanica.world.object_repository import WorldObjectRepository
+
+__all__ = ["prepare_landing"]
+
+
+def prepare_landing(
+    repository: WorldObjectRepository, version_id: uuid.UUID, thing_id: str
+) -> LandingGround | None:
+    """The ground a move of ``thing_id`` in ``version_id`` is held to, or None where it is not
+    checked. Raises ``UnknownWorldResource`` for an unknown version, as the move does first, and
+    ``KindWorkWaiting`` while a site's place is being made. An unknown thing is left to the move,
+    which checks its base before it looks the thing up: a stale base is answered as stale
+    whatever the id."""
+    row = repository.edit_base_row(version_id)
+    try:
+        thing = repository.placed_thing(version_id, thing_id)
+    except UnknownWorldResource:
+        return None
+    connection = repository.connection
+    try:
+        ground = read_authored_ground(
+            connection,
+            repository.workspace_id,
+            repository.world_id,
+            row["source_snapshot_id"],
+            region_id=thing.region_id,
+        )
+    except InvalidStructuralData:
+        return None
+    if ground is None:
+        return None
+    if ground.navigation_form != "walking_surfaces":
+        area = (
+            ground.area
+            if ground.area.source == "ground" and ground.ground_kind != "endless"
+            else None
+        )
+        return LandingGround(ground.region_id, area, rests_on_plane(ground.elevation_mm), ())
+    if states_site(connection, repository.workspace_id, repository.world_id, ground.snapshot_id):
+        answer = _site_place(repository, ground)
+        if answer is None:
+            return None
+        place, parts = answer
+    else:
+        try:
+            generated = town_records(
+                connection, repository.workspace_id, repository.world_id, ground.snapshot_id
+            )
+        except InvalidStructuralData:
+            return None
+        place = walking_surfaces_place(ground.place_id, generated.records)
+        parts = tuple(
+            BlockedPart(kind, label, tuple((x, -y) for x, y in ring))
+            for kind, label, ring in city_blocked_parts(generated.records)
+        )
+    return LandingGround(ground.region_id, ground.area, surface_height_above(place, ground), parts)
+
+
+def _site_place(
+    repository: WorldObjectRepository, ground: SocietyGround
+) -> tuple[Mapping[str, Any], tuple[BlockedPart, ...]] | None:
+    """A site world's place and blocked parts, as its society reads them, or None for a site the
+    worker makes no place for (one made from terrain)."""
+    digest, receipt = generation_receipt(
+        repository.connection, repository.workspace_id, repository.world_id, ground.snapshot_id
+    )
+    worker = kind_worker()
+    workspace = str(repository.workspace_id)
+    placed = worker.run(
+        place_key(workspace, digest, site_ground_place_id()),
+        PLACE_SECONDS,
+        place_job,
+        workspace,
+        dict(receipt),
+        digest,
+        site_ground_place_id(),
+        workspace=workspace,
+        kept=worker.places,
+    )
+    if placed.status != "done" or placed.value is None:
+        raise KindWorkWaiting(placed.status, kept=True, reason=placed.reason)
+    if placed.value["status"] != "done":
+        return None
+    named = placed.value.get("blocked_parts")
+    if named is None:
+        # A place the worker kept before it named its parts: the same boxes, unnamed.
+        named = [{"part": "blocked", "label": "", "box": box} for box in placed.value["blocked"]]
+    return placed.value["place"], tuple(_site_part(part) for part in named)
+
+
+def _site_part(part: Mapping[str, Any]) -> BlockedPart:
+    """A site's box (east and north from its south-west corner) as a ring in the region's frame,
+    whose east is the site's and whose south is minus its north."""
+    x0, y0, x1, y1 = (int(value) for value in part["box"])
+    return BlockedPart(
+        part["part"], str(part["label"]), ((x0, -y0), (x1, -y0), (x1, -y1), (x0, -y1))
+    )

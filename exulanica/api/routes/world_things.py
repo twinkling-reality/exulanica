@@ -38,10 +38,17 @@ from exulanica.api.world_edit import (
     ReadObjects,
     WriteObjects,
     commit_edit,
+    object_problem,
 )
 from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world.authored_delta import AlternateVersion
+from exulanica.world.object_edit_preview import (
+    preview_thing_move,
+    preview_thing_removal,
+    preview_undo,
+)
+from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
 from exulanica.world.placed_things import (
     UNSCALED_MILLI,
@@ -50,6 +57,8 @@ from exulanica.world.placed_things import (
     workspace_kind_reference,
 )
 from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.thing_landing import LandingGround
+from exulanica.world.thing_landing_source import prepare_landing
 from exulanica.world.thing_looks import ThingLookRefused, look_choices
 
 router = APIRouter(prefix="/world", tags=["world"])
@@ -101,6 +110,32 @@ class MoveThingBody(EntryBoundEditBody):
     pose: ThingPoseBody
 
 
+class ThingEditPreviewBody(BaseModel):
+    """The base a preview is read against. No saved entry: a preview advances nothing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class MoveThingPreviewBody(ThingEditPreviewBody):
+    pose: ThingPoseBody
+
+
+def _landing(
+    repository: WorldObjectRepository, version_id: uuid.UUID, thing_id: str
+) -> LandingGround | Response | None:
+    """The ground a move of the thing is held to, prepared before any transaction, or the problem
+    that stopped it (503 with Retry-After while a site's place is being made)."""
+    try:
+        return prepare_landing(repository, version_id, thing_id)
+    except Exception as exc:
+        problem = object_problem(exc)
+        if problem is None:
+            raise
+        return problem
+
+
 @router.post(
     "/versions/{version_id}/things",
     response_model=AlternateVersionView,
@@ -146,6 +181,9 @@ def move_thing(
     session: CurrentSession,
     request: Request,
 ) -> Response | AlternateVersionView:
+    landing = _landing(repository, version_id, thing_id)
+    if isinstance(landing, Response):
+        return landing
     return commit_edit(
         request,
         repository,
@@ -157,8 +195,64 @@ def move_thing(
             body.pose.domain(),
             base_state_sha256=body.base_state_sha256,
             actor=session.actor,
+            landing=landing,
         ),
     )
+
+
+@router.post(
+    "/versions/{version_id}/things/{thing_id}/move/preview",
+    response_model=dict[str, object],
+    summary="What moving one placed thing would record, and where it would stand. Writes nothing.",
+)
+def move_thing_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    thing_id: Annotated[str, Path(max_length=200)],
+    body: MoveThingPreviewBody,
+    repository: WriteObjects,
+) -> Response | dict[str, object]:
+    # The write-scoped connection, read only, as the object previews use it, and the same ground
+    # the write is held to, so the verdict is the one the move then answers.
+    landing = _landing(repository, version_id, thing_id)
+    if isinstance(landing, Response):
+        return landing
+    return preview_thing_move(
+        repository,
+        version_id,
+        thing_id,
+        body.pose.domain(),
+        base_state_sha256=body.base_state_sha256,
+        landing=landing,
+    ).document()
+
+
+@router.post(
+    "/versions/{version_id}/things/{thing_id}/remove/preview",
+    response_model=dict[str, object],
+    summary="What removing one placed thing would record. Writes nothing.",
+)
+def remove_thing_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    thing_id: Annotated[str, Path(max_length=200)],
+    body: ThingEditPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    return preview_thing_removal(
+        repository, version_id, thing_id, base_state_sha256=body.base_state_sha256
+    ).document()
+
+
+@router.post(
+    "/versions/{version_id}/things/undo/preview",
+    response_model=dict[str, object],
+    summary="Which edit an undo would reverse, and what it would restore. Writes nothing.",
+)
+def undo_thing_edit_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: ThingEditPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    return preview_undo(repository, version_id, base_state_sha256=body.base_state_sha256).document()
 
 
 @router.post(
