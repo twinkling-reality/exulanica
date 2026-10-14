@@ -128,7 +128,28 @@
         202
       ],
       "sun_elevation_mdeg": 19000,
-      "version": 5
+      "version": 6,
+      "finish": {
+        "sky_model": {
+          "kind": "analytic",
+          "turbidity_permille": 3000,
+          "rayleigh_permille": 1200,
+          "mie_micro": 5000,
+          "mie_direction_permille": 800
+        },
+        "sky_intensity_permille": 300,
+        "haze": {
+          "density_micro": 300,
+          "falloff_micro": 1000,
+          "base_mm": 0,
+          "max_depth_permille": 2500,
+          "colour": [
+            204,
+            218,
+            236
+          ]
+        }
+      }
     }
   ]
 }

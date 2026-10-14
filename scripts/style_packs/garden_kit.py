@@ -370,6 +370,17 @@ def build(document, output):
         day["post"]["vignette"] = None
         day["post"]["bloom"]["intensity_permille"] = 25
         manifest["edge"].update(ground=[95, 136, 105], reach_mm=2000000, drop_mm=200)
+        # A variant may state the optional finish: an analytic sky (with the sky's brightness it
+        # is drawn at), haze, and a water finish. The reader below holds every value to its range.
+        finish = variant.get("finish")
+        if finish is not None:
+            if "sky_model" in finish:
+                day["sky"]["model"] = finish["sky_model"]
+                day["sky"]["intensity_permille"] = finish["sky_intensity_permille"]
+            if "haze" in finish:
+                day["haze"] = finish["haze"]
+            if "water" in finish:
+                manifest["water"] = finish["water"]
         checked = style_packs.read_manifest(manifest, style_packs.load_context(ROOT))
         (folder / "manifest.json").write_text(style_packs.canonical_json(checked) + "\n")
         print(
