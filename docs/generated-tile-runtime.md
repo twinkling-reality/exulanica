@@ -172,14 +172,17 @@ A `glazing` set is glTF metallic-roughness with metalness 0 plus `KHR_materials_
 roughness in green. It reflects the environment probe and the sun with reflectance
 `((n - 1) / (n + 1))^2` face on, from `ior_millionths`, rising with angle by Schlick's approximation
 with its value at grazing incidence the surface's gloss (`glazing-fresnel.ts`): the glazing material
-replaces the engine's Schlick term, whose value at grazing incidence stays at 0.04 for glass. It
-transmits what the scene drew before it, from a copy of the scene colour the environment keeps once
-glazing is drawn (`requestSceneColor`), tinted by the base colour, times the transmission map, times
-(1 - Fresnel), blurred by roughness; where transmission is below full, the rest is the film the base
-colour and roughness maps carry, lit like an opaque surface. It is drawn after the opaque scene,
-depth tested, writes no depth, casts no shadow (`castsShadow`) and is one sided. What lies behind the
-pane is geometry the grammar states; the runtime never draws the far side of a building through
-glass, because the scene copy holds only what was drawn in front of it. The film the class object
+replaces the engine's Schlick term, whose value at grazing incidence stays at 0.04 for glass. Its
+reflection is drawn at full strength whatever the pane's coverage. The pane is blended over what the
+scene drew before it by its coverage, one less the transmission map (uploaded in the map's blue
+channel), so what lies behind shows through where the pane transmits; where transmission is below
+full, the rest is the film the base colour and roughness maps carry, lit like an opaque surface. What
+shows through is not tinted by the base colour or blurred by roughness: the runtime keeps no copy of
+the scene's colour for glazing, because on a tiled GPU that copy splits the scene pass, and on the
+Canopy garden (14 October 2026) blending instead halved the glazing's GPU cost at the view through it.
+It is drawn after the opaque scene, depth tested, writes no depth, casts no shadow (`castsShadow`) and
+is one sided. What lies behind the pane is geometry the grammar states; the runtime never draws the
+far side of a building through glass, because only what was drawn before the pane is behind it. The film the class object
 declares is for laying more film by position, which waits for its inputs.
 
 Measured on the bench on the published `cc0.float-glazing`, against a test-only checker backing 0.6 m

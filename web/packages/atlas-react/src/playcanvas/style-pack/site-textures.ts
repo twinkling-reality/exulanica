@@ -80,6 +80,7 @@ export class SiteTextures {
     this.uploads = new TileTextureUploads(device, look);
   }
 
+  /** Wear a texture set; returns whether what it now wears needs the scene's colour copied, which none does. */
   wear(instance: pc.MeshInstance, slot: SiteSlot, setId: string, up: StylePackSwatch | null, root: pc.GraphNode): boolean {
     let resolution = this.#resolutions.get(setId);
     if (resolution === undefined) {
@@ -106,7 +107,8 @@ export class SiteTextures {
       instance.mesh = original; instance.material = material; instance.castShadow = shadow; instance.drawBucket = bucket;
       mesh.destroy();
     });
-    return resolution.state === 'available' && resolution.set.materialClass === 'glazing';
+    // Glazing is blended over what lies behind it and needs no copy of the scene's colour.
+    return false;
   }
 
   metrics(): SiteTextureMetrics {

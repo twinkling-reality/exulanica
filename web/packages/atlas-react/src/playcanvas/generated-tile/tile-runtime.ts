@@ -753,8 +753,6 @@ function attachTile(
         material = resolution.material;
         shadows = castsShadow(resolution.set);
         bucket = drawBucket(resolution.set);
-        // Glazing transmits what the scene drew behind it, which needs the colour copied before it draws.
-        if (resolution.set.materialClass === 'glazing') environment.requestSceneColor();
       }
       // The UV is already final, so the builder is handed it as the surface pair and passes it on.
       const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);

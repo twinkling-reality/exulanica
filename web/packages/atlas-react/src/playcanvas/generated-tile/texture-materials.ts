@@ -39,10 +39,13 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * write, pulled toward the camera by a depth bias, lit with its own maps, receiving shadows and casting
  * none, drawn after opaque and cutout surfaces and before glazing ({@link drawBucket}). For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
  * bytes. A glazing set is metallic-roughness with metalness 0 plus glTF's transmission and index of
- * refraction: it reflects the environment and the sun by angle, transmits what the scene drew behind
- * it (a copy the environment keeps when glazing is drawn), tinted by its base colour and blurred by
- * its roughness, lights the film its maps carry where transmission is below full, writes no depth and
- * casts no shadow. The film its class object declares is for laying more film by position, which this
+ * refraction: it reflects the environment and the sun by angle at full strength, and is laid over what
+ * the scene drew behind it by its coverage, one less its transmission, so what lies behind shows
+ * through where it transmits; where transmission is below full, the film its maps carry is lit like an
+ * opaque surface. It writes no depth and casts no shadow. It needs no copy of the scene's colour: such a
+ * copy splits the scene pass on a tiled GPU, and measured on the Canopy garden (14 October 2026) the
+ * blend halved the glazing's GPU cost at the view through it, the glass tinting what lies behind a
+ * little less. The film its class object declares is for laying more film by position, which this
  * runtime does not do yet. A cutout set is drawn as glTF's `alphaMode: MASK` with `doubleSided: true`: its
  * base_color_coverage map is uploaded as sRGB colour with linear coverage, every mip level built by
  * `coveragePreservingMips` so the share of covered texels stays the set's `coverage_permille` at any
@@ -184,13 +187,17 @@ export function drawBucket(set: Pick<DecodedTextureSet, 'materialClass'>): numbe
 export const DECAL_DEPTH_BIAS = -1;
 export const DECAL_SLOPE_DEPTH_BIAS = -2;
 
-/** The transmission and roughness map as RGBA: transmission in red, roughness in green. */
+/**
+ * The transmission and roughness map as RGBA: transmission in red, roughness in green, and in blue the
+ * coverage the pane is blended by, one less its transmission.
+ */
 export function transmissionRoughnessTexels(bytes: Uint8Array): Uint8Array {
   const texels = bytes.length / 2;
   const out = new Uint8Array(texels * 4);
   for (let texel = 0; texel < texels; texel += 1) {
     out[texel * 4] = bytes[texel * 2]!;
     out[texel * 4 + 1] = bytes[texel * 2 + 1]!;
+    out[texel * 4 + 2] = 255 - bytes[texel * 2]!;
     out[texel * 4 + 3] = 255;
   }
   return out;
@@ -221,14 +228,6 @@ export function normalTexels(set: DecodedTextureSet): Uint8Array | null {
   }
   return out;
 }
-
-/** Transmission inputs PlayCanvas's StandardMaterial has at runtime and its type declarations leave out. */
-type TransmissiveMaterial = pc.StandardMaterial & {
-  refractionMap: pc.Texture | null;
-  refractionMapChannel: string;
-  useDynamicRefraction: boolean;
-  thickness: number;
-};
 
 /** A map the upload needs, which the set's layout must hold. */
 function requiredMap(set: DecodedTextureSet, name: TextureMapName): Uint8Array {
@@ -398,19 +397,18 @@ export class TileTextureUploads {
       material.metalnessMapChannel = 'b';
     } else {
       // glTF metallic-roughness with metalness 0, KHR_materials_transmission and KHR_materials_ior.
-      // Reflection is specular with reflectance ((n - 1) / (n + 1))^2 by angle; what was drawn behind
-      // the pane is seen through it, tinted by the base colour, times the transmission map; where
-      // transmission is below full, the rest is the film the base colour and roughness maps carry,
-      // lit like an opaque surface. Drawn after the opaque scene, depth tested, no depth write.
-      const glass = material as TransmissiveMaterial;
+      // Reflection is specular with reflectance ((n - 1) / (n + 1))^2 by angle, at full strength
+      // whatever the pane's coverage; the pane is laid over what was drawn behind it by its coverage,
+      // one less the transmission map (its blue channel), so what lies behind shows through where it
+      // transmits; where transmission is below full, the rest is the film the base colour and
+      // roughness maps carry, lit like an opaque surface. Drawn after the opaque scene, depth tested,
+      // no depth write.
+      const glass = material;
       glass.metalness = 0;
-      glass.refraction = 1;
-      glass.refractionMap = surface;
-      glass.refractionMapChannel = 'r';
       glass.refractionIndex = 1_000_000 / glazing.iorMillionths;
-      glass.useDynamicRefraction = true;
-      // A pane is thin: the view through it is not displaced.
-      glass.thickness = 0;
+      glass.opacityMap = surface;
+      glass.opacityMapChannel = 'b';
+      glass.opacityFadesSpecular = false;
       glass.blendType = pc.BLEND_NORMAL;
       glass.depthWrite = false;
       // Reflectance that rises with angle, which the engine's own Schlick term does not give a dielectric.

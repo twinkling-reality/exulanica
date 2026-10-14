@@ -71,7 +71,8 @@ describe('physical site texture dressing',()=>{
   const {app,drawing,slots,instance}=scene(),prepared=await prepare('fixture.glazing');
   const textures=new SiteTextures(app.graphicsDevice,TILE_LOOK_V1,new Map([[prepared.setId,prepared]]));
   const originals=drawing.slots.map(slot=>({mesh:instance(slot.identity).mesh,material:instance(slot.identity).material,shadow:instance(slot.identity).castShadow,bucket:instance(slot.identity).drawBucket})),world=JSON.stringify(drawing);
-  for(const slot of drawing.slots)expect(textures.wear(instance(slot.identity),slot,prepared.setId,null,slots.root)).toBe(true);
+  // Glazing is blended over what lies behind it: wearing it asks for no copy of the scene's colour.
+  for(const slot of drawing.slots)expect(textures.wear(instance(slot.identity),slot,prepared.setId,null,slots.root)).toBe(false);
   expect(instance('paving').material).toBe(instance('wall').material); const glass=instance('wall').material as pc.StandardMaterial;
   expect(glass.depthWrite).toBe(false);expect(glass.blendType).toBe(pc.BLEND_NORMAL);expect(instance('wall').castShadow).toBe(false);
   expect(textures.metrics()).toMatchObject({transferredBytes:prepared.state==='decoded'?prepared.transferredBytes:-1,unavailableSurfaces:0});expect(textures.metrics().decodedTextureBytes).toBeGreaterThan(0);expect(JSON.stringify(drawing)).toBe(world);

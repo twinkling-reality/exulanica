@@ -35,7 +35,7 @@ function app(width = 320, height = 200): { readonly app: pc.AppBase; readonly ca
 }
 
 describe('a glazing set as a material', () => {
-  it('reflects by its index of refraction, transmits what is drawn behind it by the transmission map, and writes no depth', async () => {
+  it('reflects by its index of refraction at full strength, lies over what is drawn behind it by its coverage, and writes no depth', async () => {
     const { device } = app();
     const textures = new TileTextureLibrary(device, TILE_LOOK_V1, fixtures, async (entry) =>
       new Uint8Array(readFileSync(`${CONFORMANCE}${entry.setId}.ltex`)), subtle);
@@ -50,15 +50,16 @@ describe('a glazing set as a material', () => {
     expect(material.refractionIndex).toBeCloseTo(1_000_000 / parameters.iorMillionths, 12);
     const n = 1 / (material.refractionIndex as number);
     expect(((n - 1) / (n + 1)) ** 2).toBeCloseTo(0.04, 12);
-    // Transmission from the red channel, roughness from the green, of the same map.
-    expect(material['refraction']).toBe(1);
-    expect(material['refractionMap']).toBe(material.glossMap);
-    expect(material['refractionMapChannel']).toBe('r');
+    // Coverage (one less transmission) from the blue channel, roughness from the green, of the same
+    // map; no copy of the scene's colour is read, and the reflection is not faded by the coverage.
+    expect(material.opacityMap).toBe(material.glossMap);
+    expect(material.opacityMapChannel).toBe('b');
+    expect(material.opacityFadesSpecular).toBe(false);
     expect(material.glossMapChannel).toBe('g');
     expect(material.glossInvert).toBe(true);
-    expect(material['useDynamicRefraction']).toBe(true);
-    expect(material['thickness']).toBe(0);
-    // The base colour tints transmitted light and colours the film.
+    expect(material['useDynamicRefraction']).toBeFalsy();
+    expect(material['refraction'] ?? 0).toBe(0);
+    // The base colour colours the film.
     expect(material.diffuseMap).not.toBeNull();
     expect(material.aoMap).toBeNull();
     // Drawn after the opaque scene, depth tested, no depth write, one side.
@@ -89,8 +90,8 @@ describe('a glazing set as a material', () => {
     expect(engine(0, 0.98)).toBeCloseTo(0.04, 12);
   });
 
-  it('lays transmission in red and roughness in green', () => {
-    expect([...transmissionRoughnessTexels(new Uint8Array([255, 5, 128, 200]))]).toEqual([255, 5, 0, 255, 128, 200, 0, 255]);
+  it('lays transmission in red, roughness in green and the coverage, one less transmission, in blue', () => {
+    expect([...transmissionRoughnessTexels(new Uint8Array([255, 5, 128, 200]))]).toEqual([255, 5, 0, 255, 128, 200, 127, 255]);
   });
 
   it('keeps shadows for opaque and cutout, and casts none for glazing or decal', () => {
