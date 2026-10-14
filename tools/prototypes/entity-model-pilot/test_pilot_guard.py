@@ -203,3 +203,59 @@ def test_mixed_primary_readonly_services_refuse_before_factory(case):
     )
     with pytest.raises(pg.PilotStop, match="readonly_target_differs"):
         pg.observed_worker(services, case.guard)
+
+
+def test_the_worker_reads_and_closes_living_sessions_through_the_guard_and_nothing_more(case):
+    """Besides a minute, the worker reads a living session's limit and closes a session at it or
+    past its deadline through the repository the guard hands it. Those pass through untouched; no
+    other repository name does, so the guard's execute stays the only way a minute runs."""
+    calls = []
+
+    class Repository:
+        def execute(self, claim, **kwargs):
+            calls.append("execute")
+
+        def session_limit(self, claim):
+            calls.append("session_limit")
+            return "session_minutes"
+
+        def close_session_at_limit(self, claim, reason):
+            calls.append(("close_session_at_limit", reason))
+            return True
+
+        def close_session_past_deadline(self, version_id):
+            calls.append(("close_session_past_deadline", version_id))
+            return True
+
+        def configure(self, *args, **kwargs):
+            calls.append("configure")
+
+        def manual_step(self, *args, **kwargs):
+            calls.append("manual_step")
+
+        def open_session(self, *args, **kwargs):
+            calls.append("open_session")
+
+        def read(self, *args, **kwargs):
+            calls.append("read")
+
+    worker = SimpleNamespace(
+        _tell_of_erased_kinds=lambda workspace, claim: "clear",
+        _before_minute=lambda claim, lease_ends: True,
+        _repository=lambda *args, **kwargs: Repository(),
+    )
+    with pg.install_worker_guards(worker, case.guard):
+        handed = worker._repository("connection", "workspace", "world")
+        assert handed.session_limit("claim") == "session_minutes"
+        assert handed.close_session_at_limit("claim", "session_minutes") is True
+        assert handed.close_session_past_deadline("version") is True
+        for name in ("configure", "manual_step", "open_session", "read"):
+            with pytest.raises(AttributeError):
+                getattr(handed, name)
+    assert calls == [
+        "session_limit",
+        ("close_session_at_limit", "session_minutes"),
+        ("close_session_past_deadline", "version"),
+    ]
+    # The worker's own repository comes back once the guard is lifted.
+    assert isinstance(worker._repository(), Repository)

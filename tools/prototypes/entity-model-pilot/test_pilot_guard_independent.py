@@ -117,6 +117,11 @@ def rig(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "exulanica.api.society_control_worker.SocietyControlRepository.claim_in_workspace", claim
     )
+    # No living session is open in this world, and the worker's reaper finds nothing to close: the
+    # guard's checks are what these tests are about, not a session's limits.
+    monkeypatch.setattr(
+        "exulanica.api.society_control_worker.open_session_receipt", lambda *args: None
+    )
 
     def host(_claim, lease_end):
         value.host_calls += 1
@@ -160,6 +165,7 @@ def rig(tmp_path, monkeypatch):
         return {"status": "advanced"}
 
     worker._tell_of_erased_kinds = tell
+    worker.reap = lambda workspace: 0
     worker._repository = lambda *args, **kwargs: SimpleNamespace(execute=execute)
 
     def cleanup(name, result):

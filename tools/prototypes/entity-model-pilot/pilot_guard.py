@@ -351,7 +351,7 @@ class PilotGuard:
             }
         )
 
-    def check(self: Any, *, claim: Any=None, before_new_ask: bool = True) -> Snapshot:
+    def check(self: Any, *, claim: Any = None, before_new_ask: bool = True) -> Snapshot:
         if self.stopped or self.baseline is None or self.deadline is None:
             raise PilotStop("pilot_not_active")
         if self._time() >= self.deadline:
@@ -422,6 +422,16 @@ class PilotGuard:
         }
 
 
+#: What the worker asks of the repository the guard hands it besides a minute: a living session's
+#: limit, and closing a session at it or past its wall deadline. Each only reads a limit or closes a
+#: session, never asks a model or spends, so each passes through; any other name is refused.
+SESSION_CLOSES: tuple[str, ...] = (
+    "session_limit",
+    "close_session_at_limit",
+    "close_session_past_deadline",
+)
+
+
 @contextmanager
 def install_worker_guards(worker: Any, guard: PilotGuard) -> Any:
     """Wrap actual claim/tell/callback/execute seams without changing production worker code."""
@@ -452,13 +462,18 @@ def install_worker_guards(worker: Any, guard: PilotGuard) -> Any:
         def __init__(self: Any, repository: Any) -> None:
             self.repository = repository
 
-        def execute(self: Any, claim: Any, *, max_ticks: Any=None, untold: Any=False) -> Any:
+        def execute(self: Any, claim: Any, *, max_ticks: Any = None, untold: Any = False) -> Any:
             guard.check(claim=claim, before_new_ask=False)
             if untold:
                 raise PilotStop("erasure_not_clear")
             result = self.repository.execute(claim, max_ticks=1, untold=False)
             guard.check(claim=claim, before_new_ask=False)
             return result
+
+        def __getattr__(self: Any, name: str) -> Any:
+            if name in SESSION_CLOSES:
+                return getattr(self.repository, name)
+            raise AttributeError(name)
 
     def repository(*args: Any, **kwargs: Any) -> Any:
         return Execution(originals["_repository"](*args, **kwargs))
