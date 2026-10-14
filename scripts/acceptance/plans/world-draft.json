@@ -1,0 +1,114 @@
+{
+  "profile": "q10-scripted-model-plan/v1",
+  "note": "The sentence journey (POST /worlds/drafts) with no provider: each step answered from here, matched on its own wording and the person's words. Results establish mechanics only, never what a model would draft. Words: {\"town with a look and a setting\": \"a cozy little town by the sea at dusk, with a bakery, a bookshop and a lighthouse\", \"place\": \"a small farm with a farmhouse, a barn and a duck pond\", \"no place, refused after the place drafter's repairs\": \"tell me a joke about cats\", \"no place, refused by the town tool\": \"a song about the rain\", \"provider failure\": \"a quiet harbour where the boats come in\", \"any other words\": \"no rule answers them, so they end refused as a failed provider\"}. The offer reads prices only with provider_models. A draft starts only under durable spending with a grant: run launch.py up with --scripted-model this file and --spending durable, then, as the run's operator (EXULANICA_DATABASE_URL the run's owner URL, EXULANICA_SPENDING_WITNESS_DIR the run's spending-witness directory), python -m exulanica.spending issue for the provider and grant for the run's workspace. That issue and grant are allowed only on such a private scripted runtime, where no provider is reachable and no money can move; never on a process that holds a real provider key. The launcher holds a workspace to 3 generated worlds and the draft policy allows 12 starts an hour; DELETE /worlds/{world_id} frees a place among the worlds held.",
+  "provider_models": "manifest",
+  "bounds": {
+    "ceiling_usd": "0.50",
+    "max_calls": 200
+  },
+  "rules": [
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na cozy little town by the sea at dusk, with a bakery, a bookshop and a lighthouse\\n\\nThe tools:"
+      },
+      "content": "{\"tool\": \"town\", \"tool_words\": [\"a cozy little town\"]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The description:\\n\\\"\\\"\\\"a cozy little town by the sea at dusk, with a bakery, a bookshop and a lighthouse\\\"\\\"\\\""
+      },
+      "content": "{\"preset\": \"small_town\", \"fit\": \"part\", \"city_extent_x_mm\": null, \"block_length_mm\": null, \"storey_band_low\": null, \"storey_band_high\": null, \"high_street_count\": null, \"cross_street_hierarchy\": null, \"typology_weight_apartment_block_permille\": null, \"typology_weight_loft_building_permille\": null, \"typology_weight_mansion_block_permille\": null, \"typology_weight_rowhouse_permille\": null, \"typology_weight_shophouse_permille\": null, \"ground_floor_use_weight_bakery_permille\": null, \"ground_floor_use_weight_bookshop_permille\": null, \"ground_floor_use_weight_cafe_permille\": null, \"ground_floor_use_weight_grocery_permille\": null, \"ground_floor_use_weight_office_permille\": null, \"ground_floor_use_weight_pharmacy_permille\": null, \"ground_floor_use_weight_restaurant_permille\": null, \"ground_floor_use_weight_workshop_permille\": null, \"not_supported\": [\"a lighthouse\"]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na cozy little town by the sea at dusk, with a bakery, a bookshop and a lighthouse\\n\\nThe looks:"
+      },
+      "content": "{\"look\": \"exulanica.cozy-town\", \"look_words\": [\"cozy\"]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na cozy little town by the sea at dusk, with a bakery, a bookshop and a lighthouse\\n\\nThe parts of a setting, by axis:"
+      },
+      "content": "{\"sky\": \"dusk\", \"ground\": \"sea\", \"cover\": null, \"words\": [\"at dusk\", \"by the sea\"]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na small farm with a farmhouse, a barn and a duck pond\\n\\nThe tools:"
+      },
+      "content": "{\"tool\": \"place\", \"tool_words\": [\"a small farm\"]}"
+    },
+    {
+      "match": {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "contains": "The description:\\n\\\"\\\"\\\"a small farm with a farmhouse, a barn and a duck pond\\\"\\\"\\\""
+      },
+      "content": "{\"kind\": \"fixture_farm\", \"label\": \"A test farm\", \"summary\": \"A hand-written test fixture: a farmhouse, barns, fields and a pond on a track.\", \"enclosure\": \"open\", \"site_width_mm\": 96000, \"site_depth_mm\": 128000, \"ground\": \"ground.grass\", \"site_fenced\": true, \"employment_permille\": 1000, \"offsite_residents\": 0, \"offsite_home\": \"homes nearby\", \"place_words\": {\"here\": \"here\", \"around\": \"around here\"}, \"spine\": {\"label\": \"farm track\", \"look\": \"path.track\", \"width_mm\": 4000, \"road\": true}, \"boundary\": {\"label\": \"fence\", \"look\": \"boundary.fence_wood\", \"shape_class\": \"\", \"shape_source\": \"stated\", \"height_mm\": 1200, \"thickness_mm\": 100, \"gate_width_mm\": 3000}, \"zones\": [{\"label\": \"farmyard\", \"placement\": \"front\", \"share\": 400, \"ground\": \"ground.gravel\", \"access\": \"open\", \"fenced\": false, \"structures\": [{\"label\": \"farmhouse\", \"description\": \"an old stone farmhouse\", \"look\": \"structure.farmhouse\", \"shape_class\": \"\", \"shape_source\": \"stated\", \"count\": {\"from\": 1, \"to\": 1}, \"width_mm\": {\"from\": 10000, \"to\": 14000}, \"depth_mm\": {\"from\": 8000, \"to\": 10000}, \"storeys\": {\"from\": 2, \"to\": 2}, \"storey_height_mm\": 2800, \"roof_form\": \"gable\", \"roof_look\": \"roof.tile\", \"wall_look\": \"wall.stone\", \"door_width_mm\": 1000, \"use_role\": \"home\", \"residents\": 0, \"work\": [], \"visit\": [], \"rooms\": [{\"label\": \"kitchen\", \"description\": \"\", \"look\": \"ground.floor_tile\", \"count\": {\"from\": 1, \"to\": 1}, \"share\": 3, \"fixtures\": [{\"label\": \"table\", \"description\": \"a farmhouse table\", \"look\": \"fixture.table\", \"size_source\": \"stated\", \"count\": {\"from\": 1, \"to\": 1}, \"pattern\": \"centre\", \"width_mm\": 1600, \"depth_mm\": 900, \"height_mm\": 750, \"seats\": 0, \"stands\": 0, \"sleepers\": 0, \"blocks\": true, \"use_role\": \"\", \"roles\": [\"decoration\"], \"work\": [], \"visit\": []}]}, {\"label\": \"bedroom\", \"description\": \"\", \"look\": \"ground.floor_wood\", \"count\": {\"from\": 2, \"to\": 2}, \"share\": 2, \"fixtures\": [{\"label\": \"bed\", \"description\": \"a single bed\", \"look\": \"fixture.bed\", \"size_source\": \"stated\", \"count\": {\"from\": 1, \"to\": 2}, \"pattern\": \"back_wall\", \"width_mm\": 1000, \"depth_mm\": 2000, \"height_mm\": 600, \"seats\": 0, \"stands\": 0, \"sleepers\": 1, \"blocks\": true, \"use_role\": \"\", \"roles\": [\"bed\"], \"work\": [], \"visit\": []}]}]}, {\"label\": \"barn\", \"description\": \"a red timber barn\", \"look\": \"structure.barn\", \"shape_class\": \"\", \"shape_source\": \"stated\", \"count\": {\"from\": 1, \"to\": 1}, \"width_mm\": {\"from\": 12000, \"to\": 16000}, \"depth_mm\": {\"from\": 8000, \"to\": 12000}, \"storeys\": {\"from\": 1, \"to\": 1}, \"storey_height_mm\": 4500, \"roof_form\": \"gable\", \"roof_look\": \"roof.metal\", \"wall_look\": \"wall.timber\", \"door_width_mm\": 3000, \"use_role\": \"workplace\", \"residents\": 0, \"work\": [{\"role_label\": \"dairy hand\", \"staff_per_unit\": 2, \"opening_minute\": 300, \"closing_minute\": 1140, \"shifts\": [\"early\"]}], \"visit\": [], \"rooms\": []}], \"areas\": [], \"fixtures\": [{\"label\": \"bench\", \"description\": \"a weathered wooden bench\", \"look\": \"fixture.bench\", \"size_source\": \"stated\", \"count\": {\"from\": 2, \"to\": 2}, \"pattern\": \"row\", \"width_mm\": 1800, \"depth_mm\": 500, \"height_mm\": 900, \"seats\": 2, \"stands\": 0, \"sleepers\": 0, \"blocks\": true, \"use_role\": \"\", \"roles\": [\"seat\"], \"work\": [], \"visit\": []}, {\"label\": \"hay bale\", \"description\": \"a round hay bale\", \"look\": \"prop.hay_bale\", \"size_source\": \"stated\", \"count\": {\"from\": 3, \"to\": 6}, \"pattern\": \"scatter\", \"width_mm\": 1200, \"depth_mm\": 1200, \"height_mm\": 1000, \"seats\": 0, \"stands\": 0, \"sleepers\": 0, \"blocks\": true, \"use_role\": \"\", \"roles\": [\"obstruction\"], \"work\": [], \"visit\": []}]}, {\"label\": \"fields\", \"placement\": \"back\", \"share\": 500, \"ground\": \"ground.grass\", \"access\": \"open\", \"fenced\": true, \"structures\": [], \"areas\": [{\"label\": \"field\", \"description\": \"rows of wheat\", \"look\": \"ground.crop_rows\", \"count\": {\"from\": 2, \"to\": 3}, \"use_role\": \"workplace\", \"roles\": [\"field\"], \"work\": [{\"role_label\": \"farmer\", \"staff_per_unit\": 1, \"opening_minute\": 360, \"closing_minute\": 1080, \"shifts\": [\"day\"]}]}], \"fixtures\": []}, {\"label\": \"pond corner\", \"placement\": \"right\", \"share\": 200, \"ground\": \"ground.grass\", \"access\": \"open\", \"fenced\": false, \"structures\": [], \"areas\": [{\"label\": \"duck pond\", \"description\": \"a small duck pond\", \"look\": \"water.pond\", \"count\": {\"from\": 1, \"to\": 1}, \"use_role\": \"\", \"roles\": [\"water\"], \"work\": []}], \"fixtures\": [{\"label\": \"pond rail\", \"description\": \"a rail to lean on by the water\", \"look\": \"fixture.rail\", \"size_source\": \"stated\", \"count\": {\"from\": 1, \"to\": 1}, \"pattern\": \"row\", \"width_mm\": 2400, \"depth_mm\": 200, \"height_mm\": 1000, \"seats\": 0, \"stands\": 3, \"sleepers\": 0, \"blocks\": true, \"use_role\": \"\", \"roles\": [\"gathering\"], \"work\": [], \"visit\": []}]}], \"requirements\": [{\"words\": \"farm\", \"status\": \"fulfilled\", \"omission\": \"\", \"form\": \"structure\", \"look\": \"\", \"shape_class\": \"\", \"roof_form\": \"\", \"minimum_count\": 1, \"roles\": [\"home\"], \"part_labels\": [\"farmhouse\"]}]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na small farm with a farmhouse, a barn and a duck pond\\n\\nThe looks:"
+      },
+      "content": "{\"look\": null, \"look_words\": []}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na small farm with a farmhouse, a barn and a duck pond\\n\\nThe parts of a setting, by axis:"
+      },
+      "content": "{\"sky\": null, \"ground\": null, \"cover\": null, \"words\": []}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\ntell me a joke about cats\\n\\nThe tools:"
+      },
+      "content": "{\"tool\": null, \"tool_words\": []}"
+    },
+    {
+      "match": {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "contains": "The description:\\n\\\"\\\"\\\"tell me a joke about cats\\\"\\\"\\\""
+      },
+      "content": "{\"kind\": \"fixture_farm\", \"label\": \"A test farm\", \"summary\": \"A hand-written test fixture: a farmhouse, barns, fields and a pond on a track.\", \"enclosure\": \"open\", \"site_width_mm\": 96000, \"site_depth_mm\": 128000, \"ground\": \"ground.grass\", \"site_fenced\": true, \"employment_permille\": 1000, \"offsite_residents\": 0, \"offsite_home\": \"homes nearby\", \"place_words\": {\"here\": \"here\", \"around\": \"around here\"}, \"spine\": {\"label\": \"farm track\", \"look\": \"path.track\", \"width_mm\": 4000, \"road\": true}, \"boundary\": {\"label\": \"fence\", \"look\": \"boundary.fence_wood\", \"shape_class\": \"\", \"shape_source\": \"stated\", \"height_mm\": 1200, \"thickness_mm\": 100, \"gate_width_mm\": 3000}, \"zones\": [], \"requirements\": [{\"words\": \"farm\", \"status\": \"fulfilled\", \"omission\": \"\", \"form\": \"structure\", \"look\": \"\", \"shape_class\": \"\", \"roof_form\": \"\", \"minimum_count\": 1, \"roles\": [\"home\"], \"part_labels\": [\"farmhouse\"]}]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na song about the rain\\n\\nThe tools:"
+      },
+      "content": "{\"tool\": \"town\", \"tool_words\": [\"the rain\"]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The description:\\n\\\"\\\"\\\"a song about the rain\\\"\\\"\\\""
+      },
+      "content": "{\"preset\": \"small_town\", \"fit\": \"none\", \"city_extent_x_mm\": null, \"block_length_mm\": null, \"storey_band_low\": null, \"storey_band_high\": null, \"high_street_count\": null, \"cross_street_hierarchy\": null, \"typology_weight_apartment_block_permille\": null, \"typology_weight_loft_building_permille\": null, \"typology_weight_mansion_block_permille\": null, \"typology_weight_rowhouse_permille\": null, \"typology_weight_shophouse_permille\": null, \"ground_floor_use_weight_bakery_permille\": null, \"ground_floor_use_weight_bookshop_permille\": null, \"ground_floor_use_weight_cafe_permille\": null, \"ground_floor_use_weight_grocery_permille\": null, \"ground_floor_use_weight_office_permille\": null, \"ground_floor_use_weight_pharmacy_permille\": null, \"ground_floor_use_weight_restaurant_permille\": null, \"ground_floor_use_weight_workshop_permille\": null, \"not_supported\": [\"a song about the rain\"]}"
+    },
+    {
+      "match": {
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "contains": "The person's description:\\na quiet harbour where the boats come in\\n\\nThe tools:"
+      },
+      "content": "{\"tool\": \"place\", \"tool_words\": [\"a quiet harbour\"]}"
+    },
+    {
+      "match": {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "contains": "The description:\\n\\\"\\\"\\\"a quiet harbour where the boats come in\\\"\\\"\\\""
+      },
+      "status": 503,
+      "body": {
+        "error": {
+          "message": "scripted provider failure for the place drafter"
+        }
+      }
+    }
+  ]
+}

@@ -14,15 +14,18 @@ import importlib.util
 import json
 import sys
 import tomllib
+from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
 
 import pytest
-from exulanica.models.manifest import load_manifest
+from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.provider_catalog import ProviderPricesUnreadable
 from exulanica.models.transport import HttpResponse
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "acceptance" / "scripted_model.py"
+PLANS = SCRIPT.parent / "plans"
 
 
 def _load() -> ModuleType:
@@ -95,6 +98,8 @@ def test_durable_spending_without_its_witness_is_refused(tmp_path):
         ({"rules": [{"choose": {"containing": "a"}, "line": {"text": ""}}]}, "on a choose rule"),
         ({"rules": [{"match": {"role": "vision"}, "content": "a"}]}, "unknown fields"),
         ({"bounds": {"ceiling_usd": "1"}}, "bounds"),
+        ({"provider_models": "live"}, "provider_models"),
+        ({"provider_models": True}, "provider_models"),
     ],
 )
 def test_a_plan_that_would_answer_ambiguously_is_refused(tmp_path, overrides, reason):
@@ -282,6 +287,88 @@ def test_a_choice_that_takes_a_line_is_answered_with_none_said(tmp_path):
     assert json.loads(plain["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]) == {
         "action": "wait"
     }
+
+
+def _priced_client(transport):
+    """A client over ``transport`` as ``build`` makes one: every provider given a stand-in key."""
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.client import ModelClient
+
+    manifest = load_manifest()
+    return ModelClient(
+        api_key={provider: "scripted-not-a-key" for provider in manifest.providers},
+        transport=transport,
+        budget=BudgetGuard(ceiling_usd=Decimal("0.01"), max_calls=5),
+    )
+
+
+def test_a_plan_may_answer_each_provider_s_models_at_the_manifest_s_prices(tmp_path):
+    """With ``provider_models: manifest`` a price read (a world draft's operation sheet) reads the
+    shipped models at the manifest's own prices and context windows, through the real reader."""
+    plan, _ = SCRIPTED.load_plan(_plan(tmp_path, provider_models="manifest"))
+    manifest = load_manifest()
+    transport = SCRIPTED.ScriptedTransport(
+        plan, None, HttpResponse, models=SCRIPTED.provider_models(manifest)
+    )
+    provider = manifest[Role.WORLD_TOOL_CHOOSER].primary.provider
+    read = _priced_client(transport).provider_prices(provider)
+    shipped = [spec for spec in manifest.models.values() if spec.provider == provider]
+    assert shipped
+    for spec in shipped:
+        price = read[spec.model_id]
+        assert (price.input_usd_per_mtok, price.output_usd_per_mtok) == (
+            spec.input_usd_per_mtok,
+            spec.output_usd_per_mtok,
+        )
+        assert price.context_window_tokens == spec.context_window_tokens
+
+
+def test_without_provider_models_a_price_read_is_refused_as_before(tmp_path):
+    plan, _ = SCRIPTED.load_plan(_plan(tmp_path))
+    manifest = load_manifest()
+    provider = manifest[Role.WORLD_TOOL_CHOOSER].primary.provider
+    transport = SCRIPTED.ScriptedTransport(plan, None, HttpResponse)
+    with pytest.raises(ProviderPricesUnreadable, match="no model the manifest prices"):
+        _priced_client(transport).provider_prices(provider)
+
+
+def test_the_world_draft_plan_answers_in_the_forms_its_steps_ask_for():
+    """The sentence journey's plan states what the served specification, the look library and the
+    setting parts offer today, so a change to any of them fails here and not in a run."""
+    from exulanica.world import specification_source
+    from exulanica.world.style_pack_library import style_pack_library
+    from exulanica.world.world_settings import setting_parts
+
+    plan, _ = SCRIPTED.load_plan(PLANS / "world-draft.json")
+    assert plan["provider_models"] == "manifest"
+    manifest = load_manifest()
+    drafter = manifest[Role.SPECIFICATION_DRAFTER].primary.model_id
+    looks = manifest[Role.LOOK_CHOOSER].primary.model_id
+    settings = manifest[Role.SETTING_CHOOSER].primary.model_id
+    served = specification_source.served_document()
+    presets = {preset["key"] for preset in served["presets"]}
+    adjustable = {value["key"] for value in served["values"] if value["adjustable"]}
+    offered = set(style_pack_library().chooser_offers)
+    axes = dict(setting_parts().axes)
+    parts = set(setting_parts().parts)
+    answered = {"town": 0, "look": 0, "setting": 0}
+    for rule in plan["rules"]:
+        if "content" not in rule:
+            continue
+        model, wanted = rule["match"].get("model"), rule["match"].get("contains", "")
+        content = json.loads(rule["content"])
+        if model == drafter and "The description:" in wanted:
+            assert set(content) == {"preset", "fit", "not_supported"} | adjustable, rule
+            assert content["preset"] in presets
+            answered["town"] += 1
+        elif model == looks and "The looks:" in wanted:
+            assert content["look"] is None or content["look"] in offered, rule
+            answered["look"] += 1
+        elif model == settings and "The parts of a setting" in wanted:
+            assert set(content) == set(axes) | {"words"}, rule
+            assert all((axis, content[axis]) in parts for axis in axes if content[axis]), rule
+            answered["setting"] += 1
+    assert all(answered.values()), answered
 
 
 def test_the_transport_declares_no_egress_so_the_client_knows_it_reaches_no_network(tmp_path):

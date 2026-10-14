@@ -33,7 +33,10 @@ otherwise its line is null, since only the caller knows which options speak and 
 that does not is refused.
 Each takes an optional ``status``. A request no rule matches, and one a ``choose`` rule matches
 that offers no options, is answered 500, as an unavailable provider would be, so the product's own
-fallback runs. Every request is appended to ``EXULANICA_SCRIPTED_MODEL_LOG`` as one JSON line
+fallback runs. A provider's list of models, which a price read asks for (a world draft's operation
+sheet), is empty, so that read is refused as an unreadable list, unless the plan states
+``"provider_models": "manifest"``: then each provider's list is its shipped models at the
+manifest's own prices and context windows, so the read states exactly the prices the manifest does. Every request is appended to ``EXULANICA_SCRIPTED_MODEL_LOG`` as one JSON line
 holding the model, the matched rule, the option a ``choose`` rule chose and the payload's digest,
 never headers. ``/readyz`` answers with an added
 ``acceptance_model`` member naming the mode and the plan's digest; the application's own answer is
@@ -72,6 +75,8 @@ CHOICE_FUNCTION = "act"
 CHOICE_ARGUMENT = "action"
 #: The second argument of a choice some of whose options say something, which a reply must state.
 LINE_ARGUMENT = "line"
+#: What a plan's ``provider_models`` may state: each provider's list answered from the manifest.
+PROVIDER_MODELS = ("manifest",)
 
 
 class Refused(SystemExit):
@@ -124,7 +129,29 @@ def load_plan(path: Path) -> tuple[dict[str, Any], str]:
     bounds = plan.get("bounds") or {}
     if not {"ceiling_usd", "max_calls"} <= set(bounds):
         raise Refused("the plan states no ceiling_usd and max_calls bounds")
+    if "provider_models" in plan and plan["provider_models"] not in PROVIDER_MODELS:
+        raise Refused(f"the plan's provider_models may be only {', '.join(PROVIDER_MODELS)}")
     return plan, hashlib.sha256(raw).hexdigest()
+
+
+def provider_models(manifest: Any) -> dict[str, list[dict[str, Any]]]:
+    """Each provider's list of models as its API states them, keyed by the provider's address:
+    every shipped model of the provider at the manifest's own prices, in dollars a million tokens,
+    and its context window."""
+    listed: dict[str, list[dict[str, Any]]] = {}
+    for spec in manifest.models.values():
+        address = manifest.providers[spec.provider].base_url.rstrip("/")
+        listed.setdefault(address, []).append(
+            {
+                "id": spec.model_id,
+                "pricing": {
+                    "prompt": str(spec.input_usd_per_mtok),
+                    "completion": str(spec.output_usd_per_mtok),
+                },
+                "context_length": spec.context_window_tokens,
+            }
+        )
+    return listed
 
 
 def completion(content: str, model: str) -> dict[str, Any]:
@@ -229,10 +256,19 @@ class ScriptedTransport:
     """The model transport, answering from the plan. It carries no egress allowlist, which is how
     the client knows it reaches no network (``exulanica.models.client``)."""
 
-    def __init__(self, plan: Mapping[str, Any], log: Path | None, response_type: Any) -> None:
+    def __init__(
+        self,
+        plan: Mapping[str, Any],
+        log: Path | None,
+        response_type: Any,
+        *,
+        models: Mapping[str, list[dict[str, Any]]] | None = None,
+    ) -> None:
         self.rules = list(plan["rules"])
         self.log = log
         self.response_type = response_type
+        #: Each provider's list of models by its address (:func:`provider_models`), or none.
+        self.models = dict(models or {})
         self.calls = 0
         self._lock = threading.Lock()
 
@@ -299,8 +335,12 @@ class ScriptedTransport:
         return self.response_type(status_code=int(rule.get("status", 200)), text=json.dumps(body))
 
     def get_json(self, url: str, *, headers: Mapping[str, str], timeout: float) -> Any:
-        del url, headers, timeout
-        return self.response_type(status_code=200, text=json.dumps({"data": []}))
+        del headers, timeout
+        rows = next(
+            (rows for address, rows in self.models.items() if url.startswith(f"{address}/models")),
+            [],
+        )
+        return self.response_type(status_code=200, text=json.dumps({"data": rows}))
 
 
 class ReadinessLabel:
@@ -361,7 +401,12 @@ def build(plan_path: Path, environ: Mapping[str, str] | None = None) -> Any:
     from exulanica.models.transport import HttpResponse
 
     log = Path(environ[LOG_VARIABLE]) if environ.get(LOG_VARIABLE) else None
-    transport = ScriptedTransport(plan, log, HttpResponse)
+    transport = ScriptedTransport(
+        plan,
+        log,
+        HttpResponse,
+        models=provider_models(manifest) if plan.get("provider_models") == "manifest" else None,
+    )
     durable = environ.get(DURABLE_SPENDING[0]) == DURABLE_SPENDING[1]
     if durable and not environ.get(WITNESS_VARIABLE):
         raise Refused(f"durable spending needs {WITNESS_VARIABLE}")
