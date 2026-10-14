@@ -7,7 +7,7 @@ import { ACTION_LABELS, ACTIVITY_LABELS } from '/src/society-activity-words.ts';
 import { modelRunState, runSelectedModel, readEntityActivity, decisionView } from './entity-execution.mjs';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { openThingLibrary } from '/src/things-library.ts';
-import { choiceRefusalWords, HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS } from '/src/ui/society-models.ts';
+import { choiceRefusalWords, HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS } from '/src/ui/words/model-refusals.ts';
 import { problemSentence } from '/src/ui/words/problems.ts';
 import { entityProperties, assignmentSubject } from './entity-properties.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
