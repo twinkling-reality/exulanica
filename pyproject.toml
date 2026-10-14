@@ -891,11 +891,19 @@ ignore_imports = ["exulanica.orchestration.installation.maintenance -> exulanica
 # The door reads worlds and the decision records and keeps its own tables; it never reaches a
 # workflow that handles photographs, evidence, people or packages. What a bridge sends is checked
 # here and becomes a receipt through the decision host, never a direct write anywhere else. Indirect
-# imports count, except the world layer's own imports of the store: the decision contract the door
-# reads its bounds from reaches the store through the world's catalogs and composition.
+# imports count, except the five edges by which the world layer reads the asset store on the way
+# from `exulanica.door.crossings`: a crossing names a visitor's kind and look, so it reads the thing
+# library, a kind's stored look and the reviewed assets and textures they are made of, each by
+# digest. Every other path from the door to the store is refused.
 name = "The door reaches no photograph, evidence or person workflow"
 type = "forbidden"
-ignore_imports = ["exulanica.world.** -> exulanica.store.**"]
+ignore_imports = [
+  "exulanica.world.asset_import -> exulanica.store.base",
+  "exulanica.world.assets -> exulanica.store.base",
+  "exulanica.world.texture_assets -> exulanica.store.base",
+  "exulanica.world.thing_store -> exulanica.store.base",
+  "exulanica.world.thing_store -> exulanica.store.namespaces",
+]
 source_modules = ["exulanica.door"]
 forbidden_modules = [
   "exulanica.capture",
@@ -1073,9 +1081,8 @@ forbidden_modules = [
 # What a being notices and remembers is built by rule from a society's stored state, its input and
 # its minute's events, so a replay rebuilds it to the byte. These modules cannot open the database,
 # reach the HTTP surface, the door or the spending authority, or ask a model: what a decider is
-# shown is never fetched, and nothing in it is written by a model. The store is not listed: they
-# read the planner's routine and walking graph, whose ground composition reaches the asset store's
-# readers.
+# shown is never fetched, and nothing in it is written by a model. Nor can they read the asset
+# store: the planner's routine and walking graph they read stand on figures, not on stored assets.
 name = "What a being notices and remembers is built by rule, with no database, door or model call"
 type = "forbidden"
 source_modules = [
@@ -1089,4 +1096,37 @@ forbidden_modules = [
   "exulanica.door",
   "exulanica.models.client",
   "exulanica.spending",
+  "exulanica.store",
+]
+
+[[tool.importlinter.contracts]]
+# A society's minute is computed from its input, its state and what its records bind (a crossing a
+# minute takes is bound to that minute's event), so a replay rebuilds every recorded minute to the
+# byte. An engine module reaches no database, asset store, HTTP surface, door, spending authority
+# or model call: it is handed what it reads.
+# The reach figures the engines share with the composition of authored objects (which reads the
+# store) are stated in `exulanica.world.society_reach` for that reason, so no engine imports the
+# composition. Indirect imports count, except one edge: `exulanica.world.crossings` names the
+# connection type in the port a door's crossings stream fills, and holds the door's lookup of a
+# version's society beside the checks a society of things runs on each crossing. The engine opens
+# no connection through it.
+name = "A society engine reaches no database, store, door, spending authority or model call"
+type = "forbidden"
+ignore_imports = ["exulanica.world.crossings -> psycopg"]
+source_modules = [
+  "exulanica.world.society_decision_contract",
+  "exulanica.world.society_living",
+  "exulanica.world.society_planner",
+  "exulanica.world.society_recollection",
+  "exulanica.world.society_surroundings",
+  "exulanica.world.society_things",
+]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.api",
+  "exulanica.db",
+  "exulanica.door",
+  "exulanica.models.client",
+  "exulanica.spending",
+  "exulanica.store",
 ]

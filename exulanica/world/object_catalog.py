@@ -37,7 +37,7 @@ origin that holds every part lower than the city grammar's walker capsule, since
 under a crown, an awning or a lamp's arm and not under a table top. The places are stated as rows,
 a side of the kind and how many people stand along it, and each place is derived from the
 society's own figures: the navigation clearance and a standing radius out from that side, and a
-standing spacing and :data:`exulanica.world.society_composition.TURNED_PLACE_MARGIN_MM` from its
+standing spacing and :data:`exulanica.world.society_reach.TURNED_PLACE_MARGIN_MM` from its
 neighbour, centred on the side. The margin is what turning an object can take from the gap between
 two places, so at the kind's own size or larger, turned any way, the society keeps every place. The
 markers state no rows, and the society keeps the rules it has always applied to them (one place in
@@ -773,8 +773,8 @@ def _place_figures() -> tuple[int, int]:
     margin turning an object can take from the gap between two places.
     """
     from exulanica.world.society_catalogs import load_routine_model
-    from exulanica.world.society_composition import TURNED_PLACE_MARGIN_MM
     from exulanica.world.society_planner import CLEARANCE_MM
+    from exulanica.world.society_reach import TURNED_PLACE_MARGIN_MM
 
     policy = load_routine_model().policy
     return (
@@ -932,7 +932,7 @@ def _derived_use(where: str, recipe: Recipe, stated: _StatedUse) -> ObjectUse:
 
 
 def _check_use(kind: WorldObjectKind) -> None:
-    from exulanica.world.society_composition import MAX_REACH_MM
+    from exulanica.world.society_reach import MAX_REACH_MM
 
     where = f"world object {kind.key}"
     use = kind.use

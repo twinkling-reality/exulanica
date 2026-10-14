@@ -44,7 +44,6 @@ from typing import Any, Final
 
 from exulanica.grammar.catalogs import CatalogSchema, integer_field, load_catalog, text_field
 from exulanica.grammar.errors import CatalogError
-from exulanica.world.society_composition import REVIEWED_REACH_MM
 from exulanica.world.society_engines import (
     CREATES,
     CREATES_HOLDING_THINGS,
@@ -63,6 +62,7 @@ from exulanica.world.society_minute_cost import (
     people_within,
 )
 from exulanica.world.society_planner import CLEARANCE_MM
+from exulanica.world.society_reach import REVIEWED_REACH_MM
 
 __all__ = [
     "CATALOG_DIRECTORY",
