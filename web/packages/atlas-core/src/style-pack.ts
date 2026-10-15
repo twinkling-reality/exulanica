@@ -185,6 +185,8 @@ export interface StylePackLightPreset {
       readonly colour: Srgb8;
     } | null;
     readonly taa: boolean;
+    /** How much the frame is sharpened, per mille; absent in a preset written before it: not at all. */
+    readonly sharpness_permille?: number;
   };
   /** Absent in a preset written before it: the preset's fog is drawn. */
   readonly haze?: StylePackHaze;
@@ -246,6 +248,8 @@ export interface StylePackVariant {
    * lies below `low` and above `high` keeps its size, so a frame keeps its bars whatever the hole.
    */
   readonly stretch_mm: readonly [StretchZone | null, StretchZone | null, StretchZone | null];
+  /** The share of a wind's sway the variant's pieces take, per mille; absent, the whole of it. */
+  readonly sway_permille?: number;
 }
 
 export type StretchZone = readonly [number, number];
@@ -475,6 +479,8 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
         intensity_permille: permille(0, 1000), inner_permille: permille(0, 1500), outer_permille: permille(0, 2000), curvature_permille: permille(100, 10_000), colour: srgb8,
       })),
       taa: boolean,
+      // Added within the profile: absent, the frame is not sharpened, as before.
+      sharpness_permille: optional(permille(0, 1000)),
     }),
     // Added within the profile: a preset written before it draws its fog.
     haze: optional((v, p) => object(v, p, {
@@ -667,6 +673,8 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
             return z.map((n, k) => integer(0, 50_000)(n, `${q}[${k}]`));
           })(zone, `${r}[${i}]`));
         },
+        // Added within the profile: absent, the variant's pieces take the whole of a wind's sway.
+        sway_permille: optional(integer(0, 4000)),
       }), 1, STYLE_PACK_MAX_VARIANTS),
     }), 512),
     files: list((v, p) => object(v, p, {

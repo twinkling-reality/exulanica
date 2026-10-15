@@ -564,6 +564,8 @@ def _light_preset(value: Any, path: str) -> dict[str, Any]:
             )
         ),
         "taa": _boolean,
+        # Added within the profile: absent, the frame is not sharpened, as before.
+        "sharpness_permille": _Optional(_integer(0, 1000)),
     }
     return _object(
         value,
@@ -943,6 +945,9 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                                     "lod1": _nullable(glb),
                                     "size_mm": size,
                                     "stretch_mm": stretch,
+                                    # Added within the profile: the share of a wind's sway the
+                                    # variant's pieces take; absent, the whole of it.
+                                    "sway_permille": _Optional(_integer(0, 4000)),
                                 },
                             ),
                             1,

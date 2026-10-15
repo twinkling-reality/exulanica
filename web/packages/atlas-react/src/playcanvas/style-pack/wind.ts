@@ -8,9 +8,11 @@ import type { RenderWind } from '../generated-tile/look.js';
  *
  * A swaying piece bends from its foot: a vertex moves by the square of its height over the piece's own
  * height, so the foot stays where it stands and the top moves farthest. The top leans along the wind
- * by up to the wind's sway and back at the wind's pace, each piece at its own phase (drawn from where it
- * stands), and flutters across the wind by the wind's flutter at four times that pace. Gusts are a
- * smooth field, one gust scale across, carried downwind one gust scale for each sway: where a gust is
+ * by up to the wind's sway, scaled by the piece's own share of it (a stiff tree takes less than a
+ * tuft of grass), and back at the wind's pace, each piece at its own phase (drawn from where it
+ * stands). A cut-out material (leaves, blades, petals) also flutters across the wind by the wind's
+ * flutter at four times that pace; an opaque one (a trunk, a stem) bends whole and does not. Gusts are
+ * a smooth field, one gust scale across, carried downwind one gust scale for each sway: where a gust is
  * not, a piece sways by one less the gust share of its sway.
  *
  * The working replaces the engine's local position in its transform chunk (`transformCoreVS`), once
@@ -70,16 +72,25 @@ function stated(wind: RenderWind): { readonly wind: number[]; readonly gust: [nu
   };
 }
 
+/** How one material sways: its piece's share of the wind's sway, and whether it flutters. */
+export interface MaterialSway {
+  /** The share of the wind's sway the piece takes; 1 when absent. */
+  readonly share?: number;
+  /** Whether the material flutters: true for a cut-out (alpha-tested) material when absent. */
+  readonly flutters?: boolean;
+}
+
 /** The wind over one site: the materials of its swaying pieces, and the time they sway by. */
 export class PlantWind {
-  readonly #materials = new Set<pc.StandardMaterial>();
+  /** Each swaying material and the flutter it is given, metres. */
+  readonly #materials = new Map<pc.StandardMaterial, number>();
   readonly #figures: ReturnType<typeof stated>;
   #time = 0;
   #disposed = false;
   readonly #tick = (dt: number): void => {
     this.#time = (this.#time + Math.min(dt, 0.1)) % 3600;
-    const [scale, share, flutter] = this.#figures.gust;
-    for (const material of this.#materials) material.setParameter('exuWindGust', [scale, share, this.#time, flutter]);
+    const [scale, share] = this.#figures.gust;
+    for (const [material, flutter] of this.#materials) material.setParameter('exuWindGust', [scale, share, this.#time, flutter]);
   };
 
   constructor(private readonly app: pc.AppBase, wind: RenderWind) {
@@ -91,10 +102,10 @@ export class PlantWind {
   get materials(): number { return this.#materials.size; }
 
   /**
-   * Sway a piece's material, the piece `heightM` tall in its own metres. Returns whether it sways:
-   * false on a device the working is not written for, or where it already does.
+   * Sway a piece's material, the piece `heightM` tall in its own metres, by its share of the wind.
+   * Returns whether it sways: false on a device the working is not written for, or where it already does.
    */
-  add(material: pc.StandardMaterial, heightM: number): boolean {
+  add(material: pc.StandardMaterial, heightM: number, { share = 1, flutters = material.alphaTest > 0 }: MaterialSway = {}): boolean {
     const device = this.app.graphicsDevice;
     if (this.#disposed || !windRuns(device) || this.#materials.has(material)) return false;
     const chunks = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
@@ -103,13 +114,15 @@ export class PlantWind {
     if (held === undefined && plain === undefined) throw new TypeError('the engine states no transform chunk to set the wind into');
     material.shaderChunksVersion = '2.8';
     chunks.set('transformCoreVS', withWind(held ?? plain!));
-    const [scale, share, flutter] = this.#figures.gust;
-    material.setParameter('exuWind', this.#figures.wind);
-    material.setParameter('exuWindGust', [scale, share, this.#time, flutter]);
+    const [scale, gustShare, flutterM] = this.#figures.gust;
+    const [x, z, swayM, pace] = this.#figures.wind;
+    const flutter = flutters ? flutterM : 0;
+    material.setParameter('exuWind', [x!, z!, swayM! * share, pace!]);
+    material.setParameter('exuWindGust', [scale, gustShare, this.#time, flutter]);
     material.setParameter('exuWindHeight', Math.max(heightM, 1e-3));
     material.update();
     if (this.#materials.size === 0) this.app.on('update', this.#tick);
-    this.#materials.add(material);
+    this.#materials.set(material, flutter);
     return true;
   }
 

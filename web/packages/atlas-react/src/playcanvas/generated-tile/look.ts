@@ -500,6 +500,8 @@ export interface RenderPost {
   readonly enhance: { readonly shadows: number; readonly highlights: number; readonly midtones: number; readonly vibrance: number; readonly dehaze: number };
   readonly vignette: { readonly intensity: number; readonly inner: number; readonly outer: number; readonly curvature: number; readonly colour: Rgb } | null;
   readonly taa: boolean;
+  /** How much the frame is sharpened after it is drawn, 0 to 1; absent, not at all. Keeps a frame drawn with TAA as fine as without it. */
+  readonly sharpness?: number;
 }
 
 export interface RenderToon {
@@ -640,6 +642,7 @@ const RENDER_SHAPE: Shape = obj({
     enhance: obj({ shadows: num(-1, 1), highlights: num(-1, 1), midtones: num(-1, 1), vibrance: num(-1, 1), dehaze: num(-1, 1) }),
     vignette: nullable(obj({ intensity: num(0, 1), inner: num(0, 1.5), outer: num(0, 2), curvature: num(0.1, 10), colour: rgb })),
     taa: { kind: 'boolean' },
+    sharpness: optional(num(0, 1)),
   }),
   shading: obj({
     model: enumOf('pbr', 'toon', 'flat'),

@@ -83,6 +83,8 @@ describe('the wind over a site', () => {
     const app = application();
     const wind = new PlantWind(app, lookOf(WINDY).wind!);
     const material = new pc.StandardMaterial();
+    // A cut-out material: blades and petals flutter.
+    material.alphaTest = 0.5;
     expect(wind.add(material, 0.35)).toBe(true);
     expect(wind.add(material, 0.35)).toBe(false);
     expect([wind.animating, wind.materials]).toEqual([true, 1]);
@@ -96,6 +98,25 @@ describe('the wind over a site', () => {
     app.fire('update', 0.05);
     expect((parameter(material, 'exuWindGust') as number[])[2]).toBeCloseTo(0.1, 6);
     expect(wind.add(new pc.StandardMaterial(), 1)).toBe(false);
+  });
+
+  it('sways a piece by its own share of the wind, and flutters only a cut-out material', () => {
+    const app = application();
+    const wind = new PlantWind(app, lookOf(WINDY).wind!);
+    const bark = new pc.StandardMaterial();
+    const leaves = new pc.StandardMaterial();
+    leaves.alphaTest = 0.45;
+    expect(wind.add(bark, 9, { share: 0.35 })).toBe(true);
+    expect(wind.add(leaves, 9, { share: 0.35 })).toBe(true);
+    for (const material of [bark, leaves]) expect((parameter(material, 'exuWind') as number[])[2]).toBeCloseTo(0.042, 6);
+    app.fire('update', 0.05);
+    expect((parameter(bark, 'exuWindGust') as number[])[3]).toBe(0);
+    expect((parameter(leaves, 'exuWindGust') as number[])[3]).toBeCloseTo(0.015, 6);
+    // A caller may say otherwise: an opaque card that should flutter.
+    const card = new pc.StandardMaterial();
+    wind.add(card, 1, { flutters: true });
+    expect((parameter(card, 'exuWindGust') as number[])[3]).toBeCloseTo(0.015, 6);
+    wind.dispose();
   });
 
   it('sways nothing on WebGPU, where its working is not written', () => {

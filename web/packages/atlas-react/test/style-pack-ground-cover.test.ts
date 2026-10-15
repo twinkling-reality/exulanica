@@ -196,7 +196,7 @@ function grownOn(drawing: ReturnType<typeof drawingOf>, dressedPack: typeof pack
   return summaries[0]!.cover;
 }
 
-function site(windy: boolean) {
+function site(windy: boolean, manifest: StylePackManifest = MANIFEST) {
   const drawing = parseStructuredSiteDrawing({
     profile: 'exulanica.site-drawing/v1', world_id: 'world-lawn', receipt_sha256: 'a'.repeat(64),
     kind: { kind: 'fixture_path', version: 1, label: 'Lawn' },
@@ -212,11 +212,12 @@ function site(windy: boolean) {
     seats: [],
   });
   const summaries: SiteDressingSummary[] = [];
-  const preset = MANIFEST.light!.presets[MANIFEST.light!.default_preset]!;
+  const preset = manifest.light!.presets[manifest.light!.default_preset]!;
   const still = { ...preset };
   delete (still as { wind?: unknown }).wind;
-  const look = renderLookOfPreset(windy ? preset : still, MANIFEST.shading!, MANIFEST.edge, 1, MANIFEST.water);
-  const dresser = packSiteDresser({ pack, families, pieces: fetchedCover(), shading: { model: 'pbr', toon: null, ink: null }, look, told: (summary) => summaries.push(summary) });
+  const look = renderLookOfPreset(windy ? preset : still, manifest.shading!, manifest.edge, 1, manifest.water);
+  const dressedPack = manifest === MANIFEST ? pack : resolveStylePack([readStylePackManifest(manifest, { families, textureSets: new Set(CASES.context.texture_sets) })]);
+  const dresser = packSiteDresser({ pack: dressedPack, families, pieces: fetchedCover(), shading: { model: 'pbr', toon: null, ink: null }, look, told: (summary) => summaries.push(summary) });
   const canvas = document.createElement('canvas');
   const app = new pc.AppBase(canvas);
   const options = new pc.AppOptions();
@@ -228,12 +229,16 @@ function site(windy: boolean) {
   app.root.addChild(camera);
   const environmentRoot = new pc.Entity('environment');
   app.root.addChild(environmentRoot);
-  let during: { instanced: string | undefined; cover: string | undefined; wind: string | undefined; animating: boolean } | null = null;
+  let during: { instanced: string | undefined; cover: string | undefined; wind: string | undefined; animating: boolean; sways: number[] } | null = null;
   const attached = siteMount(drawing, {
     servedBytes: 1,
     dress: (host, drawn, dressing) => {
       const undress = dresser(host, drawn, dressing);
-      during = { instanced: canvas.dataset['sitePieceInstances'], cover: canvas.dataset['siteCover'], wind: canvas.dataset['siteWind'], animating: undress.animating === true };
+      // Each cover cell's material's sway, metres: what the wind gives each piece.
+      const sways = (drawn.root.find((node) => node.name.startsWith('style-pack:instanced:cover:')) as pc.Entity[])
+        .flatMap((cell) => cell.render?.meshInstances ?? [])
+        .map((instance) => Number(((instance.material.getParameter('exuWind') as { data: number[] } | undefined)?.data[2] ?? -1).toFixed(4)));
+      during = { instanced: canvas.dataset['sitePieceInstances'], cover: canvas.dataset['siteCover'], wind: canvas.dataset['siteWind'], animating: undress.animating === true, sways: [...new Set(sways)].sort() };
       return undress;
     },
   }).attach({ app, camera, environmentRoot });
@@ -266,6 +271,12 @@ describe('a site dressed in a pack with cover', () => {
     ]);
     // The base lies under both, so only the meadow grows: 200 square metres at 600 a hundred.
     expect(grownOn(drawing, dressed)).toEqual({ pieces: 1200, slots: 1, leftOut: 0 });
+  });
+
+  it('gives each piece its variant\'s share of the wind: the stiff flowers less, the grass all of it', () => {
+    const stiff = CASES.cases.find((one) => one.name === 'a stiff plant taking a share of its wind, in a sharpened frame')!.manifest;
+    expect(site(true, stiff).during.sways).toEqual([0.042, 0.12]);
+    expect(site(true).during.sways).toEqual([0.12]);
   });
 
   it('grows the same cover, still, in a look with no wind', () => {

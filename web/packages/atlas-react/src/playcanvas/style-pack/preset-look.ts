@@ -125,6 +125,7 @@ export function renderLookOfPreset(
         colour: linearRgb(post.vignette.colour),
       },
       taa: post.taa,
+      ...(post.sharpness_permille === undefined ? {} : { sharpness: post.sharpness_permille / 1000 }),
     },
     shading: {
       model: shading.model,

@@ -199,6 +199,7 @@ function finishFrame(frame: pc.CameraFrame, look: RenderLook): void {
     frame.vignette.color = colour(post.vignette.colour);
   }
   frame.taa.enabled = post.taa;
+  frame.rendering.sharpness = post.sharpness ?? 0;
 }
 
 /** How many samples the frame is multisampled with, at full quality, for every look. */

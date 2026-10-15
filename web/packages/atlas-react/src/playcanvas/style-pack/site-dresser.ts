@@ -369,7 +369,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
           const file = module.files.get(variant.file);
           const piece = file === undefined ? undefined : pieces.get(module, file);
           if (piece?.textured === undefined) continue;
-          for (const primitive of [...piece.textured.lod0, ...(piece.textured.lod1 ?? [])]) wind.add(primitive.material, piece.bounds[4]);
+          // Its own share of the wind; a cut-out material (its leaves) flutters, an opaque one (its trunk) bends whole.
+          const share = (variant.sway_permille ?? 1000) / 1000;
+          for (const primitive of [...piece.textured.lod0, ...(piece.textured.lod1 ?? [])]) wind.add(primitive.material, piece.bounds[4], { share });
         }
       }
     }

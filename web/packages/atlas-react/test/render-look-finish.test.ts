@@ -23,6 +23,7 @@ const caseNamed = (name: string): StylePackManifest => {
   return found.manifest;
 };
 const PLAIN = caseNamed('a complete pack with no base');
+const SHARPENED = caseNamed('a stiff plant taking a share of its wind, in a sharpened frame');
 const FINISHED = caseNamed('a preset with haze and a pack with a water finish');
 const lookOf = (pack: StylePackManifest) => renderLookOfPreset(pack.light!.presets[pack.light!.default_preset]!, pack.shading!, pack.edge, 1, pack.water);
 
@@ -41,6 +42,16 @@ describe('a render look from a pack that states no finish', () => {
     const look = lookOf(PLAIN);
     expect('haze' in look).toBe(false);
     expect('water' in look).toBe(false);
+  });
+});
+
+describe('a render look\'s sharpness', () => {
+  it('is the preset\'s in the look\'s units, absent where the preset states none, and read as a whole look within 0 to 1', () => {
+    const look = lookOf(SHARPENED);
+    expect(look.post.sharpness).toBe(1);
+    expect('sharpness' in lookOf(PLAIN).post).toBe(false);
+    expect(validateRenderLook(look).post.sharpness).toBe(1);
+    expect(refused({ ...look, post: { ...look.post, sharpness: 1.5 } })).toBe('post.sharpness: must be within 0 to 1');
   });
 });
 
@@ -199,6 +210,17 @@ describe('the environment a look with haze builds', () => {
     environment.dispose();
     expect(app.scene.fog.type).toBe(before);
     expect(app.graphicsDevice.scope.resolve('exuHaze').getValue()[3]).toBe(0);
+  });
+
+  it('sharpens the frame by the look\'s sharpness, and not at all for a look that states none', () => {
+    const { app, camera } = scene();
+    const sharpened = applyTileEnvironment(app, camera, lookOf(SHARPENED));
+    expect(sharpened.frame?.rendering.sharpness).toBe(1);
+    expect(sharpened.frame?.taa.enabled).toBe(true);
+    sharpened.dispose();
+    const plain = applyTileEnvironment(app, camera, lookOf(PLAIN));
+    expect(plain.frame?.rendering.sharpness).toBe(0);
+    plain.dispose();
   });
 
   it('leaves the fog and the end chunk alone for a look with no haze', () => {
