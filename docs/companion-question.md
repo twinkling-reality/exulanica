@@ -342,7 +342,7 @@ only that simulated people are in view and which one is selected, by placeholder
 Ask buttons supply one, which needs no model. It is answered from the society's current state and
 its latest recorded events, read under the same current authorization the inspector's reads take,
 each input authorized once per question however many of those reads it is behind ([society
-question](../exulanica/selection/society_question.py)), and a society Selection that reaches `POST
+scene](../exulanica/selection/society_scene.py)), and a society Selection that reaches `POST
 /selection` or `POST /selection/packet` is refused as `malformed_plan`, because it is never
 searched.
 

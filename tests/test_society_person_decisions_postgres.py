@@ -49,7 +49,7 @@ from exulanica.models.egress import parse_egress_allowlist
 from exulanica.models.manifest import MANIFEST_PATH, load_manifest, parse_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
-from exulanica.selection.society_question import EVENT_LINES
+from exulanica.selection.society_scene import EVENT_LINES
 from exulanica.world.decision_roles import DecisionRole, load_decision_roles
 from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
 from exulanica.world.society_controls import LEASE_SECONDS, MAX_CATCHUP_TICKS, ControlClaim

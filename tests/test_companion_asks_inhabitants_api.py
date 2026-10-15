@@ -34,7 +34,7 @@ from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import TransportError
 from exulanica.models.transport import HttpResponse
-from exulanica.selection import society_question
+from exulanica.selection import society_scene
 from exulanica.selection.plan import Intent, SelectionPlan, SocietyAspect, SocietyScope
 from exulanica.selection.society_question import (
     COMPOSER_WAIT_SECONDS,
@@ -402,7 +402,7 @@ def test_why_cites_the_explaining_event_long_after_it_left_the_latest_events(wor
     """The explaining event is read by its id, not looked for among the latest events. The window
     is narrowed to the latest two events here, because in this small world everybody is recorded
     most minutes; what is held is the read by id through the database, as the runtime role."""
-    monkeypatch.setattr(society_question, "EVENT_LINES", WINDOW)
+    monkeypatch.setattr(society_scene, "EVENT_LINES", WINDOW)
     with world["open_app"]() as client:
         scope, _, society = routes(world)
         snapshot = client.get(society, headers=OWNER, params=scope).json()
@@ -588,7 +588,7 @@ def test_an_explaining_event_under_a_withdrawn_input_is_left_out_and_the_state_a
     world, monkeypatch
 ):
     """One withdrawal leaves out the events recorded under it, and only them."""
-    monkeypatch.setattr(society_question, "EVENT_LINES", WINDOW)
+    monkeypatch.setattr(society_scene, "EVENT_LINES", WINDOW)
     with world["open_app"]() as client:
         scope, _, society = routes(world)
         # An object placed after people are here gives the society a second input.

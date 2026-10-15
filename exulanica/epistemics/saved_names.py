@@ -201,7 +201,7 @@ def recognised_spans(text: str, names: Iterable[SavedName]) -> list[tuple[int, i
     The same patterns in the same order, longest first, each span kept only where no longer one
     and no placeholder already in the text covers it. For a caller that must leave a saved name's
     own words as they are while it rewrites the rest of a text, such as the Companion writing a
-    simulated person's name as a placeholder (``exulanica/selection/society_question.py``).
+    simulated person's name as a placeholder (``exulanica/selection/society_scene.py``).
     """
     return recogniser(names)(text)
 

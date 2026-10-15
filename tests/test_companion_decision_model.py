@@ -17,13 +17,13 @@ import uuid
 import pytest
 from exulanica.models.manifest import load_manifest
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
-from exulanica.selection.society_question import (
+from exulanica.selection.society_question import _Builder
+from exulanica.selection.society_scene import (
     _APPLIED,
     _CHOSEN_BY_THEIR_MODEL,
     SocietyScene,
     _authorized_events,
     _AuthorizedOnce,
-    _Builder,
     _deciding_models,
     _deciding_origins,
 )

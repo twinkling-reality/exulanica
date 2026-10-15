@@ -96,10 +96,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         1_721,
         "what a person keeps about their work in a world",
     ),
-    "exulanica/selection/society_question.py": (
-        1_693,
-        "the Companion's answers about a world's simulated people",
-    ),
     "exulanica/world/static_glb.py": (
         1_624,
         "a workspace's static glTF binary, admitted and prepared",
