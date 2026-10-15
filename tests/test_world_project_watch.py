@@ -114,6 +114,35 @@ def test_daily_cap_holds_changes_pending_until_the_next_day(setup):
     assert watcher.step()["state"] == "checkpointed"
 
 
+def committed_at(folder):
+    return int(
+        subprocess.run(
+            ["git", f"--git-dir={folder / '.git'}", "log", "-1", "--format=%ct"],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
+        ).stdout
+    )
+
+
+def test_the_day_s_count_is_read_from_the_project_so_a_new_watcher_holds_the_cap(setup):
+    _, folder, world, clock, watcher = setup
+    for x_mm in (1000, 2000):
+        move(world, x_mm)
+        watcher.step()
+        clock.now += 120
+        assert watcher.step()["state"] == "checkpointed"
+        # A checkpoint is recorded at the watcher's own time, which the day's count reads.
+        assert committed_at(folder) == int(clock.now)
+    restarted = Watcher(Project(folder, author=AUTHOR), world.read, watcher.policy, clock)
+    move(world, 3000)
+    restarted.step()
+    clock.now += 120
+    assert restarted.step()["state"] == "capped"
+    assert commits(folder) == 3
+
+
 def test_run_stops_cleanly_and_records_the_pending_change_once(setup):
     _, folder, world, _, watcher = setup
     move(world, 4000)

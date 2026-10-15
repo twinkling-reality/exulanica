@@ -3,7 +3,9 @@
 The watcher reads the selected checkpoint at a bounded interval and records an automatic
 checkpoint once the selection has stayed the same for a settle period. Edits that cancel out
 before then (a model switched away and back) leave nothing pending and record nothing. It writes
-only the local project folder: never the world and never a remote.
+only the local project folder: never the world and never a remote. A checkpoint is recorded at the
+watcher's own time, and the day's count is read back from the project's history, so a watcher
+started again on the same day holds the same cap.
 """
 
 from __future__ import annotations
@@ -12,7 +14,6 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any
 
 from exulanica.world_package.projects.capture import Capture
@@ -32,6 +33,8 @@ from exulanica.world_package.projects.summary import evidence_summary, summarize
 
 MIN_POLL_SECONDS = 5.0
 MAX_POLL_SECONDS = 300.0
+#: A day, for the daily cap: midnight to midnight, UTC.
+DAY_SECONDS = 86_400
 
 
 @dataclass(frozen=True)
@@ -63,10 +66,11 @@ class Watcher:
     _seen: str | None = None
     _since: float | None = None
     _first: float | None = None
-    _counts: dict[str, int] = field(default_factory=dict)
 
-    def _today(self, now: float) -> str:
-        return datetime.fromtimestamp(now, UTC).date().isoformat()
+    def _recorded_today(self, now: float) -> int:
+        """Checkpoints the project recorded in the UTC day holding `now`, from its history."""
+        start = now // DAY_SECONDS * DAY_SECONDS
+        return self.project.checkpoints_between(start, start + DAY_SECONDS)
 
     def _pending(self, captured: Capture) -> tuple[dict[str, Any], list[str], list[str]]:
         """The candidate, and what differs from the last record: world and evidence apart."""
@@ -128,16 +132,17 @@ class Watcher:
         return self._record(captured, now, pending)
 
     def _record(self, captured: Capture, now: float, pending: dict[str, Any]) -> dict[str, Any]:
-        day = self._today(now)
-        if self._counts.get(day, 0) >= self.policy.daily_cap:
+        if self._recorded_today(now) >= self.policy.daily_cap:
             return {"state": "capped", **pending}
+        # Every pending session file, not only the one this capture read: a session the cap held
+        # back stays pending in the folder while a later poll reads another session.
+        sessions = self._sessions(self.project.working_sessions(), captured)
         result = self.project.save(
             captured.checkpoint,
-            evidence=self._files(self.project.working_sessions(), captured),
+            evidence=list(sessions.values()),
             dependencies=captured.dependencies,
+            when=now,
         )
-        if result["committed"]:
-            self._counts = {day: self._counts.get(day, 0) + 1}
         self._seen = self._since = self._first = None
         return {"state": "checkpointed" if result["committed"] else "clean", **result}
 

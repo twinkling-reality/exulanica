@@ -79,6 +79,15 @@ def _origin(url: str) -> tuple[str, EgressAllowlist]:
         ) from exc
 
 
+def check_origin(url: str) -> str:
+    """The one origin a World API client may reach for `url`, or `ProjectError` by name."""
+    return _origin(url)[0]
+
+
+class NothingSelectable(ProjectError):
+    """The version holds no placed thing a project can hold yet: nothing to record, no fault."""
+
+
 def segment(value: str) -> str:
     if not isinstance(value, str) or _SEGMENT.fullmatch(value) is None:
         raise ProjectError("an identifier read from the world has an unsupported form")
@@ -119,22 +128,38 @@ class WorldReader:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def _get(self, route: str, path: str, params: dict[str, Any]) -> httpx.Response:
+    def _send(self, route: str, path: str, params: dict[str, Any]) -> httpx.Response:
         try:
-            response = self._client.get(path, params=params)
+            return self._client.get(path, params=params)
         except (httpx.HTTPError, EgressError) as exc:
             raise ProjectError(f"world API read {route} did not complete") from exc
+
+    @staticmethod
+    def _ok(route: str, response: httpx.Response) -> httpx.Response:
         if response.status_code != 200:
             # Neither the body nor the request line is echoed: either may carry selected values.
             raise ProjectError(f"world API refused {route} with status {response.status_code}")
         return response
 
-    def json(self, route: str, path: str, **params: Any) -> Any:
-        response = self._get(route, path, {"world_id": self.world_id, **params})
+    @staticmethod
+    def _decoded(route: str, response: httpx.Response) -> Any:
         try:
             return response.json()
         except ValueError as exc:
             raise ProjectError(f"world API returned malformed JSON for {route}") from exc
+
+    def _get(self, route: str, path: str, params: dict[str, Any]) -> httpx.Response:
+        return self._ok(route, self._send(route, path, params))
+
+    def json(self, route: str, path: str, **params: Any) -> Any:
+        return self._decoded(route, self._get(route, path, {"world_id": self.world_id, **params}))
+
+    def json_if_found(self, route: str, path: str, **params: Any) -> Any:
+        """As `json`, except that a resource the world answers 404 for is None: it is absent."""
+        response = self._send(route, path, {"world_id": self.world_id, **params})
+        if response.status_code == 404:
+            return None
+        return self._decoded(route, self._ok(route, response))
 
     def raw(self, route: str, path: str) -> bytes:
         return self._get(route, path, {}).content
@@ -253,6 +278,19 @@ def _readable(
 _PERSON_STOPS: Final = ("stopped_by_person", "paused_by_person")
 
 
+def sessions_listing(reader: WorldReader, version: str) -> list[dict[str, Any]] | None:
+    """The society's living sessions, newest first, or None where the version has no society."""
+    listed = reader.json_if_found(
+        "GET living sessions", f"/world/versions/{segment(version)}/society/control/sessions"
+    )
+    if listed is None:
+        return None
+    sessions = listed.get("sessions") if isinstance(listed, dict) else None
+    if not isinstance(sessions, list):
+        raise ProjectError("world API returned a malformed living session list")
+    return sessions
+
+
 def read_session(reader: WorldReader, version: str, which: str) -> dict[str, Any]:
     """One living session as the society read serves it: by id, or the newest for "latest"."""
     base = f"/world/versions/{version}/society/control/sessions"
@@ -323,7 +361,7 @@ def capture(
     *,
     version_id: str,
     project_id: str,
-    thing_ids: Sequence[str],
+    thing_ids: Sequence[str] | None,
     include_models: bool = True,
     include_decisions: bool = True,
     readable: bool = False,
@@ -331,16 +369,22 @@ def capture(
     licence: str = "unreviewed",
     session_id: str | None = None,
     living_session: str | None = None,
+    revisions: Mapping[tuple[str, str, str], str] | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     progress: Callable[[str], None] | None = None,
 ) -> Capture:
     """Read one version and build the explicitly selected checkpoint and its dependency bytes.
 
-    Only placed things named in `thing_ids` are read into the selection, with their current model
-    assignment and the model decisions the society consumed for them. Readable decision text is
-    added only when `readable` is set. Shipped kind bytes stay in the installed catalog.
+    Only placed things named in `thing_ids` are read into the selection, or, with None, every
+    placed thing a checkpoint can hold (none at all is `NothingSelectable`), with their current
+    model assignment and the model decisions the society consumed for them. Readable decision
+    text is added only when `readable` is set. Shipped kind bytes stay in the installed catalog.
     With `session_id`, decisions go into that session's evidence file instead of the
     checkpoint, which then holds the world and its model assignments only.
+
+    A model assignment's revision is the model the provider served its latest read record; a
+    capture that reads no record for it takes the one `revisions` names for that thing, provider
+    and model (what the project holds for it), so reading no record never changes it.
     """
     note = progress or (lambda _: None)
     version = segment(version_id)
@@ -370,9 +414,21 @@ def capture(
         raise ProjectError("the source snapshot digest is served only for a saved world entry")
 
     placed = {thing["thing_id"]: thing for thing in view["things"]}
-    wanted = sorted(set(thing_ids))
-    if not wanted or not set(wanted) <= placed.keys():
-        raise ProjectError("select at least one thing, all present in the version")
+    unheld = 0
+    if thing_ids is None:
+        # Every placed thing a checkpoint can hold; the others are counted, not failed on.
+        wanted = sorted(
+            thing_id
+            for thing_id, thing in placed.items()
+            if not thing.get("gone") and "support" not in thing
+        )
+        unheld = len(placed) - len(wanted)
+        if not wanted:
+            raise NothingSelectable("this version holds no placed thing a project can hold yet")
+    else:
+        wanted = sorted(set(thing_ids))
+        if not wanted or not set(wanted) <= placed.keys():
+            raise ProjectError("select at least one thing, all present in the version")
     things = []
     for thing_id in wanted:
         thing = dict(placed[thing_id])
@@ -408,6 +464,9 @@ def capture(
             declare("thing-kind", None, sha, f"kind:{thing['kind']['kind']}")
 
     subjects = {subject_id(reader.world_id, t["thing_id"]): t["thing_id"] for t in things}
+    # A model is assigned only to a thing still in the world: a removed one keeps no assignment,
+    # whatever choice the society still lists for it.
+    standing = {s for s, thing_id in subjects.items() if not placed[thing_id].get("removed")}
     models: list[dict[str, Any]] = []
     decisions: list[dict[str, Any]] = []
     skipped: dict[str, int] = {}
@@ -421,7 +480,7 @@ def capture(
         latest: dict[str, dict[str, Any]] = {}
         for choice in society.get("choices", []):
             decider = choice.get("decider") or {}
-            if choice.get("subject_id") in subjects and decider.get("kind") == "model":
+            if choice.get("subject_id") in standing and decider.get("kind") == "model":
                 held = latest.get(choice["subject_id"])
                 if held is None or choice["choice_seq"] > held["choice_seq"]:
                     latest[choice["subject_id"]] = choice
@@ -464,10 +523,13 @@ def capture(
                 for _, record, asked_for in records.values()
                 if asked_for == subject and record.get("decision")
             ]
+            known = (revisions or {}).get(
+                (subjects[subject], decider.get("provider"), decider.get("model_id"))
+            )
             manifest = {
                 "provider": _name(decider.get("provider")),
                 "model_id": _name(decider.get("model_id")),
-                "revision": _name(served[-1] if served else None),
+                "revision": _name(served[-1] if served else known),
             }
             manifest_bytes = canonical_json(manifest)
             contract_bytes = canonical_json(contract)
@@ -590,6 +652,7 @@ def capture(
         dependencies,
         {
             "things": len(things),
+            "things_not_held": unheld,
             "models": len(models),
             "decisions": len(evidence["decisions"]) if evidence else len(decisions),
             "decisions_in": "evidence" if evidence else "checkpoint",

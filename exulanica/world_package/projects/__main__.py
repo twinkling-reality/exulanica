@@ -7,8 +7,10 @@ import json
 import os
 import signal
 import threading
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from exulanica.world_package.projects.apply import apply as apply_merge
 from exulanica.world_package.projects.apply import review as review_apply
@@ -28,6 +30,13 @@ from exulanica.world_package.projects.checkpoint import (
     pretty_evidence,
     read,
     save,
+)
+from exulanica.world_package.projects.follow import PROFILE as FOLLOW_PROFILE
+from exulanica.world_package.projects.follow import (
+    read_follow,
+    read_world,
+    stop_following,
+    write_follow,
 )
 from exulanica.world_package.projects.github import (
     BranchTarget,
@@ -163,6 +172,30 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--message")
     command.add_argument("--author-name")
     command.add_argument("--author-email")
+    command = commands.add_parser(
+        "follow", help="follow a world: its project folder keeps itself current from now on"
+    )
+    command.add_argument("folder", type=Path)
+    command.add_argument("--api", help="needed for a new folder: http://localhost:PORT or https")
+    command.add_argument("--token-file", type=Path, help="needed for a new folder")
+    command.add_argument("--world", help="needed for a new folder")
+    command.add_argument("--version", help="needed for a new folder")
+    command.add_argument("--project-id", help="needed for a new folder")
+    things = command.add_mutually_exclusive_group()
+    things.add_argument("--thing", action="append", help="follow these placed things only")
+    things.add_argument("--every", action="store_true", help="follow every placed thing")
+    command.add_argument("--readable", action=argparse.BooleanOptionalAction, default=None)
+    sessions = command.add_mutually_exclusive_group()
+    sessions.add_argument("--sessions-since", help="record living sessions opened since (UTC)")
+    sessions.add_argument("--no-sessions", action="store_true", help="record no living session")
+    for name in FOLLOW_LIMITS:
+        command.add_argument(f"--{name.replace('_', '-')}", type=int)
+    command.add_argument("--author-name")
+    command.add_argument("--author-email")
+    command = commands.add_parser("unfollow", help="stop following; the project stays as it is")
+    command.add_argument("folder", type=Path)
+    command.add_argument("--author-name")
+    command.add_argument("--author-email")
     command = commands.add_parser("capture", help="read a selection from a running world (GET)")
     _world_arguments(command)
     command.add_argument("--project-id", required=True)
@@ -171,6 +204,84 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--evidence-output", type=Path)
     command.add_argument("--dependencies-output", type=Path)
     return root
+
+
+FOLLOW_LIMITS = ("poll_seconds", "settle_seconds", "max_pending_seconds", "daily_cap")
+
+
+def _now_instant() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _follow_settings(base: Mapping[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    """The settings a follow command states: what the folder followed, with each flag given."""
+    settings = dict(base)
+    if args.version is not None:
+        settings["version_id"] = args.version
+    if args.thing:
+        settings["things"] = sorted(set(args.thing))
+    elif args.every:
+        settings["things"] = "every"
+    if args.readable is not None:
+        settings["readable"] = args.readable
+    if args.no_sessions:
+        settings["sessions"] = None
+    elif args.sessions_since is not None:
+        settings["sessions"] = {"since": args.sessions_since}
+    limits = dict(base.get("limits") or {})
+    limits.update(
+        {name: getattr(args, name) for name in FOLLOW_LIMITS if getattr(args, name) is not None}
+    )
+    if limits:
+        settings["limits"] = limits
+    return settings
+
+
+def follow_command(args: argparse.Namespace) -> dict[str, object]:
+    """Follow a world into a folder: a new folder starts its project from one GET read first."""
+    author = _author(args)
+    if args.folder.exists() or args.folder.is_symlink():
+        project = Project(args.folder, author=author)
+        source = project.at("HEAD")["source"]
+        if args.world is not None and args.world != source["world_id"]:
+            raise Conflict(
+                "this project belongs to another world; follow that world in a new folder"
+            )
+        base = read_follow(args.folder) or {
+            "profile": FOLLOW_PROFILE,
+            "world_id": source["world_id"],
+            "version_id": source["version_id"],
+            "things": "every",
+            "readable": False,
+            "sessions": {"since": _now_instant()},
+        }
+        return {**write_follow(project, _follow_settings(base, args)), "started": False}
+    if None in (args.api, args.token_file, args.world, args.version, args.project_id):
+        raise ProjectError(
+            "a new folder needs --api, --token-file, --world, --version and --project-id"
+        )
+    settings = _follow_settings(
+        {
+            "profile": FOLLOW_PROFILE,
+            "world_id": args.world,
+            "version_id": args.version,
+            "things": "every",
+            "readable": False,
+            "sessions": {"since": _now_instant()},
+        },
+        args,
+    )
+    with WorldReader(args.api, read_token(args.token_file), args.world) as reader:
+        captured = read_world(reader, settings, args.project_id)
+    create(
+        args.folder,
+        captured.checkpoint,
+        author=author,
+        message="Start the project",
+        dependencies=captured.dependencies,
+    )
+    followed = write_follow(Project(args.folder, author=author), settings)
+    return {**followed, "started": True, "report": captured.report}
 
 
 def _world_arguments(command: argparse.ArgumentParser) -> None:
@@ -250,6 +361,10 @@ def project_command(args: argparse.Namespace) -> dict[str, object]:
         return Project(args.folder, author=_author(args)).link(
             args.repository, args.base, args.branch
         )
+    if args.command == "follow":
+        return follow_command(args)
+    if args.command == "unfollow":
+        return stop_following(Project(args.folder, author=_author(args)))
     if args.command == "record-world":
         return record_world(args)
     if args.command == "create":
@@ -437,7 +552,14 @@ def main(argv: list[str] | None = None) -> int:
                 )
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
-        if args.command in (*PROJECT_COMMANDS, "capture", "link", "record-world"):
+        if args.command in (
+            *PROJECT_COMMANDS,
+            "capture",
+            "link",
+            "record-world",
+            "follow",
+            "unfollow",
+        ):
             print(json.dumps(project_command(args), indent=2, sort_keys=True))
             return 0
         if args.command == "diff":

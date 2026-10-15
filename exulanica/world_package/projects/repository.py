@@ -81,12 +81,16 @@ def check_message(message: str) -> str:
 DEFAULT_AUTHOR: Final = Author("Exulanica project", "project@exulanica.invalid")
 
 
-def _environment() -> dict[str, str]:
+def _environment(when: float | None = None) -> dict[str, str]:
     environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     # Neither the system's nor the person's git configuration applies, and git never prompts.
     environment.update(
         GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0"
     )
+    if when is not None:
+        # A commit made at a stated time: the watcher's own, which its daily count reads back.
+        stamp = f"@{int(when)} +0000"
+        environment.update(GIT_AUTHOR_DATE=stamp, GIT_COMMITTER_DATE=stamp)
     return environment
 
 
@@ -101,7 +105,7 @@ class Project:
     def file(self) -> Path:
         return self.folder / PROJECT_FILE
 
-    def git(self, *arguments: str, check: bool = True) -> str:
+    def git(self, *arguments: str, check: bool = True, when: float | None = None) -> str:
         options = [
             f"--git-dir={self.folder / '.git'}",
             f"--work-tree={self.folder}",
@@ -125,7 +129,7 @@ class Project:
                 text=True,
                 timeout=60,
                 check=False,
-                env=_environment(),
+                env=_environment(when),
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise ProjectError("git did not complete in the project folder") from exc
@@ -203,6 +207,17 @@ class Project:
             with path.open("rb") as stream:
                 result[path.name] = evidence_document(decode(stream.read(MAX_BYTES + 1)))
         return result
+
+    def checkpoints_between(self, start: float, end: float) -> int:
+        """How many commits that changed the world or its evidence were made from `start` up to
+        `end` (Unix seconds, by the time each commit records), among the latest 1,000 such."""
+        self._require()
+        if self.head() is None:
+            return 0
+        times = self.git(
+            "log", "--max-count=1000", "--format=%ct", "--", PROJECT_FILE, f"{EVIDENCE_DIR}/"
+        ).split()
+        return sum(1 for value in times if start <= int(value) < end)
 
     def history(self) -> list[dict[str, str]]:
         self._require()
@@ -321,9 +336,10 @@ class Project:
         self._require()
         self._write(checkpoint, {}, self._merge(self.working_sessions(), evidence))
 
-    def _commit(self, paths: list[str], message: str) -> str:
+    def _commit(self, paths: list[str], message: str, when: float | None = None) -> str:
         self.git("add", "--", *paths)
-        self.git("commit", "--quiet", "--no-verify", "-m", check_message(message), "--", *paths)
+        text = check_message(message)
+        self.git("commit", "--quiet", "--no-verify", "-m", text, "--", *paths, when=when)
         head = self.head()
         if head is None:
             raise ProjectError("git reported no commit after saving")
@@ -344,12 +360,14 @@ class Project:
         evidence: Sequence[Any] = (),
         message: str | None = None,
         dependencies: dict[str, bytes] | None = None,
+        when: float | None = None,
     ) -> dict[str, Any]:
         """Commit when the selection or its evidence differs from the last commit.
 
         Without a checkpoint argument the folder's edited files are saved. A session file passed
         in `evidence` replaces its working copy; saved records may only be added to, never
-        changed or removed.
+        changed or removed. `when` is the time the commit records, the caller's clock (now when
+        none is given).
         """
         self._require()
         selected = document(self.working() if checkpoint is None else checkpoint)
@@ -381,7 +399,7 @@ class Project:
         paths = self._write(selected, new_dependencies, changed_sessions)
         return {
             "committed": True,
-            "commit": self._commit(paths, text),
+            "commit": self._commit(paths, text, when),
             "message": check_message(text),
             "checkpoint_sha256": checkpoint_digest(selected),
             **changed,

@@ -21,6 +21,7 @@ from exulanica.world_package.projects.checkpoint import (
     evidence_digest,
     evidence_warnings,
 )
+from exulanica.world_package.projects.follow import FOLLOW_FILE, read_follow
 from exulanica.world_package.projects.link import LINK_FILE, read_link
 from exulanica.world_package.projects.repository import (
     DEPENDENCY_DIR,
@@ -91,12 +92,15 @@ def applications_at(project: Project, revision: str) -> list[dict[str, Any]]:
 
 
 def _kind(project: Project, commit: str) -> str:
-    """checkpoint (world, evidence or dependency files), link or application, by what changed."""
+    """checkpoint (world, evidence or dependency files), link, follow or application, by what
+    changed."""
     changed = set(
         project.git("show", "--name-only", "--format=", "--no-renames", commit).splitlines()
     )
     if changed == {LINK_FILE}:
         return "link"
+    if changed == {FOLLOW_FILE}:
+        return "follow"
     if changed and all(path.startswith(f"{APPLICATION_DIR}/") for path in changed):
         return "application"
     content = (PROJECT_FILE, f"{EVIDENCE_DIR}/", f"{DEPENDENCY_DIR}/")
@@ -203,6 +207,8 @@ def history_read(
         "project_id": world["project_id"],
         "forked_from": world["forked_from"],
         "link": read_link(project.folder),
+        # What the folder follows, as its follow file states it, or None where it follows none.
+        "follow": read_follow(project.folder),
         "head": head,
         "pending": {
             "world": [] if edited == world else report(world, edited)["summary"],

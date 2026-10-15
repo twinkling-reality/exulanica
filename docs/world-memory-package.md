@@ -872,8 +872,52 @@ pending for a maximum time (default 30 minutes, since evidence grows while model
 once when stopped. Edits that cancel out before then record nothing. Each capture is merged into
 the session's saved and pending records, so a record the capture window no longer returns is kept,
 and a session past 1024 records continues as `session:S:2`, `session:S:3` and so on. A daily cap (default 48)
-holds further changes pending. An unreachable world is reported and retried. The watcher writes
-only the local project folder, never the world and never a remote.
+holds further changes pending; a checkpoint is committed at the watcher's own time and the cap
+counts the day's checkpoints in the project's history, so a watcher started again the same day
+holds it. A record takes every pending session file, including one the cap held back. An
+unreachable world is reported and retried. The watcher writes only the local project folder,
+never the world and never a remote.
+
+### Following a world
+
+`follow FOLDER` makes a project folder follow its world with nobody running a command afterwards.
+For a new folder it reads the world once by GET and starts the project from every placed thing a
+checkpoint can hold (or the `--thing` list), then writes `project-follow.json` (profile
+`exulanica.world-project-follow/v1`) as one local commit: the world and version; the things,
+`every` or a list; whether readable text is kept (`--readable`); `sessions.since`, the instant from
+which living sessions are recorded, the command's own time unless `--sessions-since` names another,
+or null with `--no-sessions`; and optional `limits` in whole numbers (`--poll-seconds`,
+`--settle-seconds`, `--max-pending-seconds`, `--daily-cap`), each absent one at the watcher's
+default. Running it again on a followed folder changes only what its flags name. The file holds no
+origin, credential or path, is scanned like a checkpoint and is never published. `unfollow FOLDER`
+removes it as one commit and leaves the project as it is, pending changes included. `history`
+names these commits `follow` and returns the folder's settings as `follow`.
+
+```sh
+uv run python -m exulanica.world_package.projects follow ./projects/my-world --api http://localhost:PORT --token-file TOKEN --world WORLD --version VERSION --project-id project:mine
+uv run python -m exulanica.orchestration.project_worker --projects ./projects --api http://localhost:PORT --token-file TOKEN
+```
+
+The project worker keeps every followed folder of one projects directory current, in a process of
+its own beside the API. The HTTP surface may not import this package, and a follower is a client
+of the World API rather than of its database: it needs the API's origin, plain http only for
+`localhost`, and a bearer with `world.read`, and no database, store or model key. A folder that
+gains, changes or loses its follow file is followed, followed anew or left within a few seconds.
+Each poll reads the world's living sessions, then captures the world through the watcher above
+with at most one living session as its own evidence file: one the project holds as open until it
+is held closed, else the oldest one opened since `sessions.since` that the project does not hold,
+so a session that opened and closed between two polls, or while no worker ran, is still recorded.
+A closed session that leaves no evidence of a followed thing is passed over. A version with no
+society is followed for its edits alone, and one with nothing placed waits. A capture that reads
+no decision record for a model keeps the revision the project holds for it, so a binding does not
+change between sessions. One project's fault never stops another, one worker holds a projects
+directory at a time, and it follows at most 64 folders unless `EXULANICA_PROJECTS_MAXIMUM` states
+another number. The three settings may also be given as `EXULANICA_PROJECTS_DIRECTORY`,
+`EXULANICA_PROJECT_API_URL` and `EXULANICA_PROJECT_TOKEN_FILE`. SIGTERM or SIGINT stops it: the
+round in hand finishes, each project with pending changes records them once within 60 seconds
+(`EXULANICA_PROJECT_FINISH_SECONDS`), and it exits 0. Each event is one line of JSON naming a
+folder by its name, never its path, and never carrying the bearer. It writes only the project
+folders, never the world and never a remote.
 
 ### GitHub transport
 
@@ -1002,9 +1046,10 @@ and evidence digests can still be private. Local saves, GitHub access and native
 permissions are separate. Publication cannot recall copies already fetched by others.
 
 Synthetic tests cover native selection, project folders, append-only evidence, plain-word
-summaries, capture against a fake World API, automatic tracking with a fake clock, dependency
-failures, base conflicts, evidence playback, review binding and concurrent publication refusal
-through a fake GitHub server. They do not establish hosted publication, live-world restoration,
-real model behavior, verified engine replay, or educational/portfolio value. The latter requires
+summaries, capture against a fake World API, automatic tracking and following with a fake clock,
+a project worker process stopped by SIGTERM, dependency failures, base conflicts, evidence
+playback, review binding and concurrent publication refusal through a fake GitHub server. They do
+not establish hosted publication, a worker following a running world for days, live-world
+restoration, real model behavior, verified engine replay, or educational/portfolio value. The latter requires
 a learner completing the connected task and explaining a behavior change from authentic
 execution evidence.
