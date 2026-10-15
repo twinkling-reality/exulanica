@@ -284,7 +284,8 @@ async function siteInLook(
   const terrainOccupancy = terrainLease.read;
   const terrainOptions = isTerrainSiteDrawing(drawing) ? {terrainOccupancy, dressingReadiness, ...(preparedDressing === undefined ? {} : {preparedDressing})} : {};
   // A site on land is mounted on its land in every look it is drawn in.
-  const landOptions = land === null ? {} : { land, landSurfaces: (await import('../land-surfaces.js')).LAND_SURFACES, ...(landscape === null ? {} : { landscape }) };
+  const landSurfaces = land === null ? null : (await import('../land-surfaces.js')).LAND_SURFACES;
+  const landOptions = land === null || landSurfaces === null ? {} : { land, landSurfaces, ...(landscape === null ? {} : { landscape }) };
   const measure = new URLSearchParams(search).has('measure') ? { measure: true } : {};
   const seated = (seats: Parameters<typeof rememberSiteSeats>[2]): (() => void) => rememberSiteSeats(entry.entryId, entry.authoredVersionId!, seats);
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
@@ -314,7 +315,7 @@ async function siteInLook(
       ...[...setIds].map(async setId => [setId, await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256))] as const),
       ...[...packTextures].map(async key => [packTextureSetId(key), await preparePackTexture(prepared.pack, key, prepared.packFile)] as const),
     ]));
-    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish, ...('landSurfaces' in landOptions ? { landSurfaces: landOptions.landSurfaces } : {}) });
+    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish, ...(landSurfaces === null ? {} : { landSurfaces }) });
     return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
   };
   let choice = worldLook.worldLookChoice(search, bound);
