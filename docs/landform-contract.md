@@ -281,7 +281,18 @@ on a land document and grades the land for it
 The graded land is sampled at a 1 m cell in the town's terrain records. A layout the land cannot
 take is refused with the grading's code, and the next candidate is tried. The town's walking place
 reads the street records the land raised, and a door's step is its threshold above the footway under
-it. No route, recipe or sentence makes a town on land, and the tessellator does not draw one.
+it.
+
+The town composer's version 3
+([`city_grammar_town.py`](../exulanica/world/composers/city_grammar_town.py), `on_land`) makes such
+a town from a level town's recipe and a land document. It generates the recipe's specification
+carried to city grammar version 6 by that version's migration, with the land, and a person arrives
+on the graded footway as version 2 arrives. The receipt keeps the land document, its digest and the
+land rules. The recipe's reference names the land's digest and rules, so a town's seeds, the land's
+noise drawn from them and each tile's bake key are that land's own. A stored town is generated
+again only after its land reads again under the rules its receipt names and to the digest it names
+(`generated_world_land_changed`, `generated_world_land_rules_changed`). No route or sentence asks
+for a town on land, and the tessellator does not draw one.
 
 ## A world's land rules
 
@@ -381,8 +392,8 @@ as walls up to about 4 m.
 ## Limits
 
 - Only a place drafted from words stands on land, and only where the deployment turns it on; no
-  page asks for land otherwise. Every town made stands on level ground: the city grammar lays a
-  town on land, but nothing makes or draws one.
+  page asks for land otherwise. Every town made stands on level ground: the city grammar and the
+  town composer lay a town on land, but no route or sentence asks for one and nothing draws one.
 - Walkable land stays within 64 m above or below the sea, so "high ground" cannot be high: an
   upland is a place among peaks, not a place on a high plateau. Raising the bound is a change to
   the land rules.

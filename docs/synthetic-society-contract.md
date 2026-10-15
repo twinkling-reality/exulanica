@@ -567,8 +567,9 @@ is, because a ground module need not state an edge.
   version 1 selects the standing spot nearest the centre of the world's extent; version 2 selects
   the nearest non-seat footway spot that is at least 2,000 mm from furniture and tree extents and
   from the home nodes where residents begin, with spot identity breaking ties. The receipt pins
-  the selection policy and town routine so the spawn replays with its original rule. The
-  activities are the world's own: every premises whose use class admits
+  the selection policy and town routine so the spawn replays with its original rule; version 3, a
+  town on its land ([landform contract](landform-contract.md#towns-on-land)), arrives as version 2
+  does, on the graded footway. The activities are the world's own: every premises whose use class admits
   visitors is somewhere to visit, stood at at its entrance, and every piece of street furniture
   whose use class seats people is somewhere to rest, one place per seat; a place that cannot keep a
   standing spacing from another, and any object the person placed in the town, is recorded as

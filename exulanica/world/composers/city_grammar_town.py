@@ -26,6 +26,13 @@ world it made as a structural snapshot and a receipt:
   nodes at which genesis starts residents. Ties use spot identity. The snapshot states that spot
   as the world's spawn. A person arriving there faces the nearest point of a street's crown line;
   the receipt records that plan vector because a structural destination states no direction.
+* **A town on land** is composer v3 (:func:`on_land`): a level town's recipe carrying a land
+  document. It generates the recipe's specification, migrated to the city grammar version that lays
+  a town on its land (:data:`~exulanica.grammar.grammars.city.descriptor.CITY_LAND_VERSIONS`),
+  with that land, and arrives as v2 does, on the graded footway. Its receipt keeps the land, its
+  digest and the land rules, and the recipe's reference names the land's digest and rules, so its
+  seeds and every tile baked from them are that land's own. :func:`records` reads the land again
+  under the rules its receipt names and holds it to its digest before generating.
 
 The grammar and its catalogs are not edited here: a receipt names the grammar version and catalog
 digest it was generated under, and a world whose grammar or catalogs no longer match is refused by
@@ -34,6 +41,7 @@ name rather than regenerated into something else.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -42,14 +50,19 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica.grammar import CascadeBinding, generate
 from exulanica.grammar.catalogs import Catalog, catalog_digest
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
+from exulanica.grammar.grammars.city import city_grammar_with
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 from exulanica.grammar.grammars.city.common import TILE_SIZE_MM
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATHS,
     CITY_GENERATING_VERSIONS,
     CITY_GRAMMAR_ID,
+    CITY_LAND_VERSIONS,
+    CITY_MIGRATION_PATHS,
+    CITY_SURFACES,
 )
 from exulanica.grammar.grammars.city.document import (
     TileDocument,
@@ -69,10 +82,20 @@ from exulanica.grammar.grammars.city.streets import StreetSegmentRecord
 from exulanica.grammar.grammars.city.tile import tile_inputs_digest
 from exulanica.grammar.grammars.specified import (
     GENERATED_LOD,
+    WORLD_COVERAGE,
+    Specification,
     covered_tiles,
     derived_identity,
     generate_specified,
 )
+from exulanica.grammar.landform import (
+    LandDocument,
+    LandformRefused,
+    land_rules,
+    landform_catalog,
+    read_land_document,
+)
+from exulanica.grammar.migration import ParameterMigration
 from exulanica.world.composers import (
     RECEIPT_PROFILE,
     ComposedWorld,
@@ -83,6 +106,7 @@ from exulanica.world.composers import (
     seed_candidate,
 )
 from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.site_land import check_receipt_land_rules
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, RoutineModel, load_routine_model
 from exulanica.world.society_city_place import city_navigation
 from exulanica.world.society_grounds import (
@@ -101,10 +125,13 @@ __all__ = [
     "COMPOSER_VERSIONS",
     "DESTINATION_ID",
     "GRAMMAR_VERSIONS",
+    "LAND_COMPOSER_VERSION",
     "REGION_ID",
     "TILE_MODULE",
     "compose",
+    "on_land",
     "receipt_digest_of",
+    "receipt_land",
     "records",
     "records_with",
     "region_point",
@@ -114,7 +141,16 @@ __all__ = [
 ]
 
 COMPOSER_KEY: Final = "city-grammar-town"
-COMPOSER_VERSIONS: Final = (1, 2)
+COMPOSER_VERSIONS: Final = (1, 2, 3)
+#: The version that lays a town on its land (the module docstring's last section).
+LAND_COMPOSER_VERSION: Final = 3
+#: The versions a person arrives by version 2's rules: on a footway spot clear of furniture, trees
+#: and resident starts, under the routine and arrival policy the receipt pins.
+_ARRIVING_ON_FOOTWAYS: Final = (2, LAND_COMPOSER_VERSION)
+#: The city grammar version a town on land is laid out at, and the level version its recipe's
+#: specification is migrated from.
+_LAND_GRAMMAR_VERSION: Final = max(CITY_LAND_VERSIONS)
+_LEVEL_GRAMMAR_VERSION: Final = _LAND_GRAMMAR_VERSION - 1
 _ARRIVAL_POLICY_PATH: Final = Path(__file__).with_name("town-arrival.v1.json")
 #: The city grammar versions this composer generates: every version the city grammar itself
 #: generates. Each version reads its own catalogs, tile records and descriptor, and this composer
@@ -369,6 +405,65 @@ def _candidate(
     )
 
 
+def on_land(recipe: WorldRecipe, land: object) -> WorldRecipe:
+    """The town ``recipe`` makes, laid on ``land`` (a land document): composed at
+    :data:`LAND_COMPOSER_VERSION`, carrying the land's canonical form, its digest and the land rules
+    it is made by. A land document the landform catalog refuses is refused by name
+    (:class:`~exulanica.grammar.landform.LandformRefused`)."""
+    if recipe.composer_key != COMPOSER_KEY or recipe.composer_version != 2 or recipe.land:
+        raise ValueError(f"recipe {recipe.key} is not a level town {COMPOSER_KEY} lays on land")
+    document = read_land_document(land)
+    return dataclasses.replace(
+        recipe,
+        composer_version=LAND_COMPOSER_VERSION,
+        land=document.canonical(),
+        land_sha256=document.sha256,
+        land_rules=land_rules(),
+    )
+
+
+def _migrated(bindings: Sequence[CascadeBinding]) -> tuple[CascadeBinding, ...]:
+    """A level town's bindings carried to the version that lays a town on its land, by that
+    version's own migration."""
+    return (
+        ParameterMigration.read(CITY_MIGRATION_PATHS[_LAND_GRAMMAR_VERSION])
+        .migrate(
+            CITY_SURFACES[_LEVEL_GRAMMAR_VERSION], CITY_SURFACES[_LAND_GRAMMAR_VERSION], bindings
+        )
+        .bindings
+    )
+
+
+def _on_its_land(bindings: Sequence[CascadeBinding], land: LandDocument) -> Specification:
+    """A specification at the version that lays a town on its land, with ``land``: not a
+    registered grammar, since no request names it, so read here rather than from the registry."""
+    return Specification(
+        city_grammar_with(_LAND_GRAMMAR_VERSION, land=land),
+        tuple(bindings),
+        WORLD_COVERAGE[CITY_GRAMMAR_ID],
+    )
+
+
+def _specification(recipe: WorldRecipe) -> Specification:
+    """The specification ``recipe`` generates: its own, or for a town on land its own migrated to
+    the version that lays a town on its land, with the recipe's land."""
+    spec = read_specification(recipe.specification)
+    version = spec.grammar.key.grammar_version
+    if recipe.composer_version != LAND_COMPOSER_VERSION:
+        if recipe.land is not None or version in CITY_LAND_VERSIONS:
+            raise UnknownWorldComposer(
+                f"{COMPOSER_KEY} version {recipe.composer_version} lays a town on level ground"
+            )
+        return spec
+    if recipe.land is None or version != _LEVEL_GRAMMAR_VERSION:
+        raise UnknownWorldComposer(
+            f"{COMPOSER_KEY} version {LAND_COMPOSER_VERSION} lays a version "
+            f"{_LEVEL_GRAMMAR_VERSION} town's specification on its land, and recipe {recipe.key} "
+            f"names version {version}{'' if recipe.land is not None else ' and no land'}"
+        )
+    return _on_its_land(_migrated(spec.bindings), read_land_document(recipe.land))
+
+
 def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
     """The world ``recipe`` makes for ``world_id``: the first seed candidate that generates.
 
@@ -379,7 +474,7 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
     """
     if recipe.composer_key != COMPOSER_KEY or recipe.composer_version not in COMPOSER_VERSIONS:
         raise ValueError(f"recipe {recipe.key} is not composed by {COMPOSER_KEY}")
-    spec = read_specification(recipe.specification)
+    spec = _specification(recipe)
     if spec.grammar.key.grammar_version not in GRAMMAR_VERSIONS:
         raise UnknownWorldComposer(
             f"{COMPOSER_KEY} generates city grammar version "
@@ -389,6 +484,7 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
     version = spec.grammar.key.grammar_version
     catalogs = load_city_catalogs(grammar_version=version)
     ground = society_ground_for_composer(COMPOSER_KEY)
+    arriving = recipe.composer_version in _ARRIVING_ON_FOOTWAYS
     refused: list[dict[str, object]] = []
     for candidate in range(recipe.candidates):
         seed = seed_candidate(recipe, world_id, candidate)
@@ -401,13 +497,13 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
             # A world is kept only if every tile document it makes passes the grammar's own
             # checks, so every world a recipe makes can be baked.
             _documents(seed, identity, generated, tiles, catalogs, version)
-            arrival_routine = town_routine() if recipe.composer_version == 2 else None
+            arrival_routine = town_routine() if arriving else None
             place = walking_surfaces_place(
                 f"generated:{world_id}", generated, routine=arrival_routine
             )
             arrival = (
                 _arrival_v2(place, tiles, generated, arrival_routine)
-                if recipe.composer_version == 2
+                if arriving
                 else _arrival(place, tiles)
             )
             # A world is kept only if a society can start on it: someone lives there, and no more
@@ -450,16 +546,21 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
                 "spot_id": arrival["spot_id"],
                 "position_mm": list(arrival["position_mm"]),
                 "facing_mm": _facing(arrival["position_mm"], generated),
-                **(
-                    {"support_z_mm": arrival["support_z_mm"]}
-                    if recipe.composer_version == 2
-                    else {}
-                ),
+                **({"support_z_mm": arrival["support_z_mm"]} if arriving else {}),
             },
-            **({"arrival_policy": _arrival_policy_pin()} if recipe.composer_version == 2 else {}),
+            **({"arrival_policy": _arrival_policy_pin()} if arriving else {}),
             **(
                 {"arrival_routine": arrival_routine.binding()}
                 if arrival_routine is not None
+                else {}
+            ),
+            **(
+                {
+                    "land": recipe.land,
+                    "land_sha256": recipe.land_sha256,
+                    "land_rules": recipe.land_rules,
+                }
+                if recipe.composer_version == LAND_COMPOSER_VERSION
                 else {}
             ),
         }
@@ -502,6 +603,12 @@ def _version(receipt: Mapping[str, Any]) -> int:
             "generated_world_grammar_changed: this world was generated under city grammar "
             f"version {version}, which this server does not generate"
         )
+    on_land = receipt.get("composer", {}).get("version") == LAND_COMPOSER_VERSION
+    if on_land != (version in CITY_LAND_VERSIONS):
+        raise InvalidStructuralData(
+            "generated_world_grammar_changed: this world's receipt names city grammar version "
+            f"{version} for a town {'on' if on_land else 'off'} its land"
+        )
     return int(version)
 
 
@@ -511,9 +618,18 @@ def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> N
         raise InvalidStructuralData(
             "generated_world_composer_changed: unknown town composer version"
         )
-    if composer["version"] == 2 and receipt.get("arrival_policy") != _arrival_policy_pin():
+    if (
+        composer["version"] in _ARRIVING_ON_FOOTWAYS
+        and receipt.get("arrival_policy") != _arrival_policy_pin()
+    ):
         raise InvalidStructuralData(
             "generated_world_arrival_policy_changed: town arrival policy differs"
+        )
+    if composer["version"] == LAND_COMPOSER_VERSION:
+        receipt_land(receipt)
+    elif {"land", "land_sha256", "land_rules"} & set(receipt):
+        raise InvalidStructuralData(
+            "generated_world_land_changed: a town on level ground states no land"
         )
     grammar = receipt["grammar"]
     if grammar["descriptor_sha256"] != descriptor_sha256(CITY_DESCRIPTOR_PATHS[_version(receipt)]):
@@ -528,18 +644,65 @@ def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> N
         )
 
 
+def receipt_land(receipt: Mapping[str, Any]) -> LandDocument:
+    """The land a town's receipt names, read again under the land rules it names and held to the
+    digest it names; refused by name when either no longer holds."""
+    try:
+        land = read_land_document(
+            receipt["land"], landform_catalog(check_receipt_land_rules(receipt))
+        )
+    except LandformRefused as exc:
+        raise InvalidStructuralData(
+            f"generated_world_land_changed: its land document no longer reads: {exc.detail}"
+        ) from exc
+    except KeyError as exc:
+        raise InvalidStructuralData(
+            "generated_world_land_changed: a town on land states its land, its digest and its "
+            "land rules"
+        ) from exc
+    if land.sha256 != receipt.get("land_sha256"):
+        raise InvalidStructuralData(
+            "generated_world_land_changed: its land document no longer reads as the one its "
+            "receipt names"
+        )
+    return land
+
+
+def _receipt_specification(
+    receipt: Mapping[str, Any],
+) -> tuple[Specification, LandDocument | None]:
+    """The specification a receipt names, read as it was generated: for a town on land, at the
+    version that lays a town on its land, with the land the receipt names (:func:`receipt_land`)."""
+    specification = receipt["specification"]
+    if receipt["composer"]["version"] != LAND_COMPOSER_VERSION:
+        return read_specification(
+            {
+                "grammar_id": specification["grammar_id"],
+                "grammar_version": specification["grammar_version"],
+                "bindings": specification["bindings"],
+            }
+        ), None
+    land = receipt_land(receipt)
+    spec = _on_its_land(
+        [
+            CascadeBinding.of(binding["level"], binding["values"])
+            for binding in specification["bindings"]
+        ],
+        land,
+    )
+    if spec.payload() != specification:
+        raise InvalidStructuralData(
+            "generated_world_output_changed: this world's specification does not read back as the "
+            "one its receipt names"
+        )
+    return spec, land
+
+
 def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
     """The records a stored receipt generates again, held to its output digest."""
     catalogs = load_city_catalogs(grammar_version=_version(receipt))
     _check_current(receipt, catalogs)
-    specification = receipt["specification"]
-    spec = read_specification(
-        {
-            "grammar_id": specification["grammar_id"],
-            "grammar_version": specification["grammar_version"],
-            "bindings": specification["bindings"],
-        }
-    )
+    spec, _land = _receipt_specification(receipt)
     generation = generate_specified(
         spec, seed=receipt["seed"], subject_identity=receipt["subject_identity"]
     )
@@ -549,7 +712,7 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
             "other records"
         )
     generated = city_records(generation)
-    if receipt["composer"]["version"] == 2:
+    if receipt["composer"]["version"] in _ARRIVING_ON_FOOTWAYS:
         binding = receipt.get("arrival_routine")
         if not isinstance(binding, dict) or not isinstance(binding.get("catalog_versions"), dict):
             raise InvalidStructuralData(
@@ -591,14 +754,17 @@ def records_with(
     generated = records(receipt)
     if not changes:
         return generated
-    specification = receipt["specification"]
-    spec = read_specification(
-        {
-            "grammar_id": specification["grammar_id"],
-            "grammar_version": specification["grammar_version"],
-            "bindings": specification["bindings"],
-        }
-    )
+    spec, land = _receipt_specification(receipt)
+    if land is not None:
+        # A town on its land: the changes and the land enter the one grammar together.
+        return city_records(
+            generate(
+                city_grammar_with(_LAND_GRAMMAR_VERSION, changes, land=land),
+                seed=receipt["seed"],
+                subject_identity=receipt["subject_identity"],
+                bindings=spec.bindings,
+            )
+        )
     return city_records(
         generate_specified(
             spec,

@@ -514,10 +514,16 @@ class WorldRecipe:
     #: A preset's adjustable values, the preset's own or those a request made it with; None for a
     #: version 1 recipe, which names a whole specification file instead.
     values: Mapping[str, int | str] | None = None
+    #: The land a world of this recipe stands on (a land document's canonical form), its SHA-256
+    #: and the land rules it is made by; None for a world on level ground.
+    land: Mapping[str, Any] | None = None
+    land_sha256: str | None = None
+    land_rules: Mapping[str, Any] | None = None
 
     def reference(self) -> dict[str, object]:
         """What a world made from this recipe records of it; a world's seed is drawn from it, so
-        two worlds made from one preset with other values are other worlds."""
+        two worlds made from one preset with other values, or on other land or by other land
+        rules, are other worlds."""
         stated: dict[str, object] = {
             "catalog_id": CATALOG_ID,
             "catalog_version": self.catalog_version,
@@ -527,6 +533,9 @@ class WorldRecipe:
         }
         if self.values is not None:
             stated["values"] = dict(self.values)
+        if self.land is not None:
+            stated["land_sha256"] = self.land_sha256
+            stated["land_rules"] = dict(self.land_rules or {})
         return stated
 
 
