@@ -40,9 +40,10 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from itertools import pairwise
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.canonical import sha256_of_canonical
@@ -76,6 +77,7 @@ __all__ = [
     "INDOOR_LATTICE_MM",
     "OFFSITE_HOME_ID",
     "SITE_RECORDS_PROFILE",
+    "ArcadeUse",
     "GraphOverBudget",
     "PartUse",
     "SiteSociety",
@@ -111,6 +113,15 @@ class PartUse:
 
 
 @dataclass(frozen=True, slots=True)
+class ArcadeUse:
+    """What a world's kind says people do under a structure's arches: the use class they stand
+    there by, and how many stand in each bay of each covered walk."""
+
+    use_class: str
+    stands_per_bay: int
+
+
+@dataclass(frozen=True, slots=True)
 class SiteSociety:
     """What a site's society reads beside its records: each part's use by key, how many people
     live off the site and come in through its entry, and the words and use class of the home they
@@ -123,8 +134,21 @@ class SiteSociety:
     #: What is said of where its people are ("on this farm") and walk ("across the farm").
     here: str
     around: str
+    #: The structures, by part key, whose covered walks people stand in, and by what; none for
+    #: every kind that names no such use, whose society document reads as it did before.
+    arcades: Mapping[str, ArcadeUse] = field(default_factory=lambda: MappingProxyType({}))
 
     def document(self) -> dict[str, object]:
+        stood = (
+            {
+                "arcades": {
+                    key: {"use_class": use.use_class, "stands_per_bay": use.stands_per_bay}
+                    for key, use in sorted(self.arcades.items())
+                }
+            }
+            if self.arcades
+            else {}
+        )
         return {
             "uses": {
                 key: {"label": use.label, "use_class": use.use_class}
@@ -136,6 +160,7 @@ class SiteSociety:
                 "use_class": self.offsite_home.use_class,
             },
             "place_words": {"here": self.here, "around": self.around},
+            **stood,
         }
 
     @classmethod
@@ -164,6 +189,12 @@ class SiteSociety:
             offsite_home=offsite_home,
             here=str(words["here"]),
             around=str(words["around"]),
+            arcades=MappingProxyType(
+                {
+                    str(key): ArcadeUse(str(value["use_class"]), int(value["stands_per_bay"]))
+                    for key, value in document.get("arcades", {}).items()
+                }
+            ),
         )
 
 
@@ -598,8 +629,11 @@ class _Arcade:
     in front of it outside and the point on the walk's middle behind it."""
 
     walk: SiteLoggiaRecord
+    part_key: str
     middle: tuple[Point, ...]
     arches: tuple[tuple[Point, Point], ...]
+    #: The unit step along the walk, from its lesser end.
+    along: Point
 
 
 def _arcades(
@@ -658,7 +692,9 @@ def _arcades(
         middle = tuple(
             (figure, middle_at) if along_x else (middle_at, figure) for figure in sorted(figures)
         )
-        found.setdefault(structure.zone_identity, []).append(_Arcade(walk, middle, tuple(arches)))
+        found.setdefault(structure.zone_identity, []).append(
+            _Arcade(walk, structure.part_key, middle, tuple(arches), (1, 0) if along_x else (0, 1))
+        )
     return found
 
 
@@ -739,6 +775,8 @@ def place_from_site_records(
     # near a corridor, to it; and a gate joined to the corridor and to the nearest path station.
     spacing_of = SPACING[extent.enclosure]
     lattice_of: dict[str, list[str]] = {}
+    #: Each covered walk's node behind each of its arches, by the walk's identity.
+    behind_arches: dict[str, list[str]] = {}
     for zone in sorted(zones, key=lambda z: z.ordinal):
         if zone.access == "closed":
             continue
@@ -772,6 +810,7 @@ def place_from_site_records(
         outside: list[str] = []
         for index, arcade in enumerate(walks):
             line(f"loggia{index}", arcade.middle)
+            behind_arches[arcade.walk.identity] = [at_point[inside] for _, inside in arcade.arches]
             for arch, (out, inside) in enumerate(arcade.arches):
                 if not graph.free(out):
                     continue
@@ -908,6 +947,45 @@ def place_from_site_records(
             indoors=True,
             residents=residents,
         )
+    # People standing under the arches: for each covered walk of a structure whose kind names a use
+    # for it, one destination, its places along the walk's middle at each arch, the routine's
+    # standing spacing apart.
+    for zone_walks in arcades.values():
+        for arcade in zone_walks:
+            stood = society.arcades.get(arcade.part_key)
+            names = behind_arches.get(arcade.walk.identity)
+            if stood is None or names is None:
+                continue
+            name = f"loggia:{arcade.walk.identity}"
+            made = []
+            for arch, ((_, inside), node) in enumerate(zip(arcade.arches, names, strict=True)):
+                for index in range(stood.stands_per_bay):
+                    offset = (2 * index - (stood.stands_per_bay - 1)) * spacing // 2
+                    point = (
+                        inside[0] + arcade.along[0] * offset,
+                        inside[1] + arcade.along[1] * offset,
+                    )
+                    if not graph.free(point):
+                        continue
+                    spot_id = f"{name}:stand:{arch:02d}:{index}"
+                    spots[spot_id] = {
+                        "spot_id": spot_id,
+                        "node_id": node,
+                        "position_mm": [point[0], point[1]],
+                        "support_z_mm": graph.height(point),
+                        "destination_ids": [name],
+                    }
+                    made.append(spot_id)
+            destination(
+                name,
+                f"site.loggia:{arcade.walk.identity}",
+                names[len(names) // 2],
+                "furniture",
+                stood.use_class,
+                routine.use_classes[stood.use_class].label,
+                indoors=False,
+                spot_ids=made,
+            )
     for area in sorted(areas, key=lambda a: a.identity):
         part = use_of(area.part_key)
         if not set(area.roles) & {"workplace", "shop"} or not part.use_class:

@@ -69,7 +69,7 @@ from exulanica.grammar.grammars.site.plan import (
 from exulanica.grammar.records import KEY_PATTERN
 from exulanica.world.kinds.catalogs import KindCatalogs, load_arcade_catalog, load_kind_catalogs
 from exulanica.world.society_catalogs import SCHEMAS, RoutineModel
-from exulanica.world.society_site_place import PartUse, SiteSociety
+from exulanica.world.society_site_place import ArcadeUse, PartUse, SiteSociety
 
 __all__ = [
     "GENERATOR_KEY",
@@ -569,14 +569,33 @@ def _read_use_classes(reader: _Reader, raw: object) -> dict[str, dict[str, Any]]
     return found
 
 
-def _arcade(where: str, raw: object, module: int) -> tuple[int, int, int | None]:
+@dataclass(frozen=True, slots=True)
+class _StatedArcade:
+    """A structure's arcade as its kind states it, with the arcade catalog version it is read by."""
+
+    bays: int
+    depth_mm: int
+    sides: int | None
+    use_class: str
+    stands_per_bay: int | None
+    version: int
+
+
+#: The keys an arcade may state beyond its bays and depth, and the arcade catalog version that
+#: first reads each: a kind stating none of them reads version 1, as it did before they existed.
+_ARCADE_OPTIONAL: Final = {"sides": 2, "use_class": 3, "stands_per_bay": 3}
+
+
+def _arcade(where: str, raw: object, module: int) -> _StatedArcade:
     """A structure's arcade: how many bays its front has, how deep its covered walk is and,
-    optionally, on how many sides it runs (its front, or its front and its back), each held to the
-    arcade catalog (``structure-arcade.v1.json``, or version 2 where the sides are stated); the
-    depth a whole number of the site's module."""
-    keys = {"bays", "depth_mm"} | ({"sides"} if isinstance(raw, dict) and "sides" in raw else set())
-    stated = _keys(where, raw, frozenset(keys))
-    catalog = load_arcade_catalog(version=2 if "sides" in stated else 1)
+    optionally, on how many sides it runs (its front, or its front and its back), the use class
+    people stand under its arches by and how many stand in each bay, each held to the arcade
+    catalog version that states it (``structure-arcade.v<N>.json``); the depth a whole number of
+    the site's module."""
+    optional = set(raw) & set(_ARCADE_OPTIONAL) if isinstance(raw, dict) else set()
+    stated = _keys(where, raw, frozenset({"bays", "depth_mm"} | optional))
+    version = max((_ARCADE_OPTIONAL[key] for key in optional), default=1)
+    catalog = load_arcade_catalog(version=version)
     bays = _int(f"{where}.bays", stated["bays"], catalog.bound("bays"))
     depth = _int(f"{where}.depth_mm", stated["depth_mm"], catalog.bound("depth_mm"))
     if depth % module:
@@ -585,12 +604,25 @@ def _arcade(where: str, raw: object, module: int) -> tuple[int, int, int | None]
             f"{depth} mm is not whole {module} mm modules",
             f"{where}.depth_mm",
         )
-    sides = (
-        _int(f"{where}.sides", stated["sides"], catalog.bound("sides"))
-        if "sides" in stated
-        else None
+    figure = {
+        key: _int(f"{where}.{key}", stated[key], catalog.bound(key))
+        for key in ("sides", "stands_per_bay")
+        if key in stated
+    }
+    use_class = stated.get("use_class", "")
+    if "use_class" in stated and (
+        type(use_class) is not str or KEY_PATTERN.fullmatch(use_class) is None
+    ):
+        raise _invalid(f"{where}.use_class", "is a use class key")
+    if "stands_per_bay" in stated and not use_class:
+        raise KindRefused(
+            "kind_role_unmet",
+            "people stand under the arches by a use class, so standing places name one",
+            f"{where}.stands_per_bay",
+        )
+    return _StatedArcade(
+        bays, depth, figure.get("sides"), use_class, figure.get("stands_per_bay"), version
     )
-    return bays, depth, sides
 
 
 @dataclass(frozen=True, slots=True)
@@ -736,6 +768,18 @@ def _read_part(
         )
     _check_roles(reader, where, form, roles, use_class, fields, use_classes)
     if arcaded:
+        walk_use = fields["arcade"].use_class
+        if walk_use and (
+            _use_kind(reader, use_classes, walk_use) != "furniture"
+            or "visit" not in _offers(reader, use_classes, walk_use)
+        ):
+            raise KindRefused(
+                "kind_role_unmet"
+                if _use_kind(reader, use_classes, walk_use)
+                else "kind_reference_unknown",
+                f"people stand under the arches by furniture people visit, not {walk_use!r}",
+                f"{where}.arcade.use_class",
+            )
         if not roles and not fields["rooms"]:
             raise KindRefused(
                 "kind_role_unmet",
@@ -1060,12 +1104,26 @@ class KindDocument:
             if not use and "home" in part.roles:
                 use = self._home_use
             uses[part.key] = PartUse(part.label, use)
+        stood = [
+            part
+            for part in self.parts.values()
+            if "arcade" in part.fields and part.fields["arcade"].use_class
+        ]
+        # Standing places per bay where a kind names none: the least the catalog allows.
+        least = load_arcade_catalog(version=3).bound("stands_per_bay")[0] if stood else 0
+        arcades = {
+            part.key: ArcadeUse(
+                part.fields["arcade"].use_class, part.fields["arcade"].stands_per_bay or least
+            )
+            for part in stood
+        }
         return SiteSociety(
             uses=MappingProxyType(uses),
             offsite_residents=self.offsite_residents(values),
             offsite_home=self._offsite_home,
             here=self._place_words[0],
             around=self._place_words[1],
+            arcades=MappingProxyType(arcades),
         )
 
     @property
@@ -1076,11 +1134,17 @@ class KindDocument:
 
     @property
     def arcade_version(self) -> int:
-        """The arcade catalog version this kind's arcades are laid out by: 2 where an arcade states
-        its sides, else 1 (every figure version 1 states, version 2 states unchanged); 0 for a
-        kind with no arcade."""
-        stated = [part.fields["arcade"] for part in self.parts.values() if "arcade" in part.fields]
-        return 0 if not stated else 2 if any(arcade[2] is not None for arcade in stated) else 1
+        """The arcade catalog version this kind's arcades are laid out by: the newest any of its
+        arcades needs (each version states every figure of the one before unchanged), 1 for
+        arcades of bays and depth alone; 0 for a kind with no arcade."""
+        return max(
+            (
+                part.fields["arcade"].version
+                for part in self.parts.values()
+                if "arcade" in part.fields
+            ),
+            default=0,
+        )
 
     def plan(self, values: Mapping[str, int]) -> SitePlan:
         """The site plan these values make: every figure resolved, every span kept for the seed."""
@@ -1156,12 +1220,12 @@ class KindDocument:
         arcades = tuple(
             Arcade(
                 part.key,
-                part.fields["arcade"][0],
-                part.fields["arcade"][1],
+                part.fields["arcade"].bays,
+                part.fields["arcade"].depth_mm,
                 arcade.bound("pier_mm")[0],
                 part.fields["storey_height_mm"] - arcade.bound("lintel_mm")[0],
                 arcade.bound("least_opening_mm")[0],
-                part.fields["arcade"][2] or 1,
+                part.fields["arcade"].sides or 1,
             )
             for part in self.parts.values()
             if arcade is not None and "arcade" in part.fields

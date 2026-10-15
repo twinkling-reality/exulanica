@@ -12,6 +12,7 @@ reader under test.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 from exulanica.api.services import SocietySettingRefused, _minute_cost_scale_milli
@@ -234,7 +235,7 @@ def test_a_town_refuses_nobody_and_no_head_count():
 
 
 def test_every_published_version_of_the_ground_catalog_still_reads():
-    assert CATALOG_VERSION == 6
+    assert CATALOG_VERSION == 7
     by_version = {
         version: {ground.key: ground for ground in load_society_grounds(version=version)}
         for version in range(1, CATALOG_VERSION + 1)
@@ -244,7 +245,7 @@ def test_every_published_version_of_the_ground_catalog_still_reads():
     assert by_version[5]["generated_town"].population == 128
     assert all(
         not ground.minute_cost and not ground.minute_share_milli
-        for version in range(1, CATALOG_VERSION)
+        for version in range(1, 6)
         for ground in by_version[version].values()
     )
     # Apart from the head count and the cost, the sixth version's grounds are the fifth's.
@@ -254,6 +255,13 @@ def test_every_published_version_of_the_ground_catalog_still_reads():
             assert getattr(ground, name) == getattr(earlier, name)
         assert ground.population_kind == earlier.population_kind
         assert ground.record_subjects == earlier.record_subjects
+    # The seventh version's grounds are the sixth's, but that a site's people also use the covered
+    # walks behind its arcades.
+    for key, ground in by_version[7].items():
+        earlier = by_version[6][key]
+        added = ("site.loggia",) if key == "generated_site" else ()
+        assert ground.record_subjects == tuple(sorted((*earlier.record_subjects, *added)))
+        assert replace(ground, record_subjects=earlier.record_subjects) == earlier
 
 
 def test_a_released_catalog_is_not_held_to_the_engine_table_of_a_later_day(tmp_path, monkeypatch):

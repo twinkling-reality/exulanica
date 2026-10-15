@@ -260,6 +260,8 @@ def test_an_activity_may_name_only_the_records_its_own_ground_states():
     site = society_ground_for_composer("site-plan")
     town = society_ground_for_composer("city-grammar-town")
     validate_local_affordances(document(site.navigation_profile, "site.fixture"), {"sit"})
+    # A covered walk behind a site's arcade is a record its people use.
+    validate_local_affordances(document(site.navigation_profile, "site.loggia"), {"sit"})
     validate_local_affordances(document(town.navigation_profile, "city.street_furniture"), {"sit"})
     # A site's input naming a town's record kind, or a town's a site's, is refused.
     for profile, subject in (

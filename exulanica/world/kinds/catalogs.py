@@ -150,7 +150,8 @@ _SCHEMAS: Final = {
 #: read only for a kind whose structure states an arcade, so it is none of the four catalogs a
 #: kind is always read with and no world without an arcade names it. Each version keeps every entry
 #: of the one before unchanged and adds to it: version 2 adds ``sides``, read only for a kind whose
-#: arcade states it, so a kind written for version 1 reads as it did.
+#: arcade states it, so a kind written for version 1 reads as it did; version 3 adds
+#: ``stands_per_bay``, read only for a kind whose arcade names a use class people stand at.
 _ARCADE_SCHEMA: Final = CatalogSchema(
     "structure-arcade",
     1,
@@ -161,6 +162,15 @@ ARCADE_FIGURES: Final[Mapping[int, tuple[str, ...]]] = MappingProxyType(
     {
         1: ("bays", "depth_mm", "pier_mm", "lintel_mm", "least_opening_mm"),
         2: ("bays", "depth_mm", "pier_mm", "lintel_mm", "least_opening_mm", "sides"),
+        3: (
+            "bays",
+            "depth_mm",
+            "pier_mm",
+            "lintel_mm",
+            "least_opening_mm",
+            "sides",
+            "stands_per_bay",
+        ),
     }
 )
 

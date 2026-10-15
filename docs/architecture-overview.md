@@ -113,7 +113,7 @@ The contract in `pyproject.toml` owns the exact order.
 | Responsibility | Entry points |
 | --- | --- |
 | Society engines, chosen by what each can do | `exulanica/world/society_engines.py`, which loads the newest `society-engines.vN.json` beside that module; the purposeful planner `exulanica/world/society_planner.py` |
-| The ground a society stands on | `exulanica/world/society_grounds.py`, catalog version 6, [`society-ground.v6.json`](../assets/catalogs/society-ground/society-ground.v6.json) |
+| The ground a society stands on | `exulanica/world/society_grounds.py`, catalog version 7, [`society-ground.v7.json`](../assets/catalogs/society-ground/society-ground.v7.json) |
 | Composing and serving a society | `exulanica/api/society_runtime.py` and the routes in `exulanica/api/routes/society.py` |
 | Playback | `exulanica/api/society_control_worker.py` |
 | Decision roles | The newest `decision-roles.vN.json` under [`assets/catalogs/roles`](../assets/catalogs/roles), loaded by `exulanica/world/decision_roles.py`, one adapter per role in `exulanica/world/roles/`, the one path in `exulanica/world/role_decisions.py`, the decider descriptor `exulanica/world/deciders.py`, an outside program's port `exulanica/api/external_asking.py`, the decision tables of migrations `0117_a_decision_role_s_documents_are_admitted_by_their_shape.sql` and `0122_a_model_may_decide_a_town_s_signal.sql`, and each role's host in `exulanica/api/role_hosts.py`, served by `exulanica/api/routes/world_models.py` |

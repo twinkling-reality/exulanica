@@ -75,7 +75,12 @@ states the ones every arch is laid out with, each with its reason: 1 to 24 bays,
 and an arch at least 1,500 mm wide.
 [Version 2](../assets/catalogs/world-kinds/structure-arcade.v2.json) keeps every entry of version
 1 and adds `sides` (1 or 2); it is read only for a kind whose arcade states its sides, and every
-arcade of such a kind is laid out by it. A structure with an arcade takes a role or rooms, since its
+arcade of such a kind is laid out by it. An arcade may also name a `use_class` people stand under
+its arches by, furniture people visit (`kind_role_unmet` otherwise, `kind_reference_unknown` for
+one the kind and the routine do not state), and `stands_per_bay`, how many stand in each bay of
+each covered walk, which needs a use class;
+[version 3](../assets/catalogs/world-kinds/structure-arcade.v3.json) adds `stands_per_bay` (1 to
+4, its least where the kind states none) and is read for a kind whose arcade names either. A structure with an arcade takes a role or rooms, since its
 walk leads to a door (`kind_role_unmet`), and a ground storey high enough for a door's 2,100 mm
 under an arch's head (`kind_out_of_bounds`). The catalog is read only for a kind that states an
 arcade.
@@ -256,7 +261,11 @@ fixtures with places along their fronts, and the kind's homes, workplaces and sh
 destinations. A structure with an arcade is walked through: its covered walk is open ground, a
 line of places runs along its middle, each arch joins the zone's ground to that line through the
 arch, and the structure's door, at the front walk's back, is reached from the walk; a back walk
-is walked the same way from the ground behind the structure. A fixture is
+is walked the same way from the ground behind the structure. Where the kind names a use class
+for an arcade, each covered walk is a destination of that use, outdoors, its subject the walk's
+record (`site.loggia`), with standing places along the walk's middle at each arch, the
+routine's standing spacing apart; the society records each such arcade's use class and standing
+places per bay in the receipt's society (`arcades`, absent for every kind that names none). A fixture is
 approached from its front; where something the layout set within its
 clearance stands on that approach, from its back, and its places then face its back. People the
 kind states as off-site residents live in one home at the entry (`home:offsite`) and come in

@@ -92,7 +92,7 @@ __all__ = [
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 6
+CATALOG_VERSION: Final = 7
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -430,6 +430,9 @@ _SCHEMAS: Final = MappingProxyType(
         4: CatalogSchema(CATALOG_ID, 4, _FIELDS_V4, entry_check=_entry_check_v4),
         5: CatalogSchema(CATALOG_ID, 5, _FIELDS_V5, entry_check=_entry_check_v5),
         6: CatalogSchema(CATALOG_ID, 6, _FIELDS_V6, entry_check=_entry_check_v6),
+        # Version 7 states version 6's fields; the site's ground names the covered walks behind its
+        # arcades among the records its people use.
+        7: CatalogSchema(CATALOG_ID, 7, _FIELDS_V6, entry_check=_entry_check_v6),
     }
 )
 

@@ -412,3 +412,73 @@ def test_arcade_catalog_version_2_keeps_every_figure_version_1_states() -> None:
     first, second = load_arcade_catalog(version=1), load_arcade_catalog(version=2)
     assert {key: second.bound(key) for key in first.bounds} == dict(first.bounds)
     assert set(second.bounds) - set(first.bounds) == {"sides"}
+
+
+def _shaded_farm(**arcade: Any) -> dict[str, Any]:
+    """The farm with a use class people visit a covered walk by, and the barn's arcade naming it."""
+
+    def barn(part: dict[str, Any]) -> None:
+        part["arcade"] = {"bays": 4, "depth_mm": 3000, "sides": 2, **arcade}
+
+    document = _farm(barn=barn)
+    visit = next(u for u in document["use_classes"] if u["kind"] == "furniture")
+    document["use_classes"].append({**visit, "key": "shaded_walk", "label": "shaded walk"})
+    return document
+
+
+@pytest.fixture(scope="module", name="shaded_barn")
+def _shaded_barn() -> ComposedWorld:
+    return _compose(
+        _shaded_farm(use_class="shaded_walk", stands_per_bay=2), "world:generated:shade"
+    )
+
+
+def test_people_stand_under_the_arches_by_the_use_class_the_kind_names(
+    shaded_barn: ComposedWorld,
+) -> None:
+    place = shaded_barn.place
+    assert place is not None
+    assert first_unreached(place) is None
+    barn = next(s for s in _structures(shaded_barn) if s.part_key == "barn")
+    walks = [
+        r
+        for r in shaded_barn.records
+        if isinstance(r, SiteLoggiaRecord) and r.structure_identity == barn.identity
+    ]
+    spots = {spot["spot_id"]: spot for spot in place["spots"]}
+    for walk in walks:
+        destination = next(
+            d for d in place["destinations"] if d["subject_id"] == f"site.loggia:{walk.identity}"
+        )
+        assert destination["use_class"] == "shaded_walk"
+        assert destination["indoors"] is False
+        assert len(destination["spot_ids"]) == walk.bays * 2
+        for spot_id in destination["spot_ids"]:
+            x, y = spots[spot_id]["position_mm"]
+            assert walk.min_x_mm < x < walk.max_x_mm and walk.min_y_mm < y < walk.max_y_mm
+    assert shaded_barn.receipt["society"]["arcades"] == {
+        "barn": {"use_class": "shaded_walk", "stands_per_bay": 2}
+    }
+    assert records(shaded_barn.receipt) == shaded_barn.records
+    stated = (CATALOG_DIRECTORY / "structure-arcade.v3.json").read_bytes()
+    assert shaded_barn.receipt["catalogs"]["structure-arcade"] == hashlib.sha256(stated).hexdigest()
+    plain = json.loads((FIXTURES / "fixture-farm.json").read_text(encoding="utf-8"))
+    assert "arcades" not in _compose(plain, "world:generated:plain").receipt["society"]
+
+
+@pytest.mark.parametrize(
+    ("arcade", "code"),
+    [
+        ({"stands_per_bay": 2}, "kind_role_unmet"),
+        ({"use_class": "dairy"}, "kind_role_unmet"),
+        ({"use_class": "no_such_use"}, "kind_reference_unknown"),
+        ({"use_class": "shaded_walk", "stands_per_bay": 5}, "kind_out_of_bounds"),
+    ],
+    ids=["places with no use", "a workplace", "an unknown use", "too many in a bay"],
+)
+def test_the_kind_refuses_standing_places_it_cannot_offer_by_name(
+    arcade: dict[str, Any], code: str
+) -> None:
+    with pytest.raises(KindRefused) as refused:
+        read_kind(_shaded_farm(**arcade))
+    assert refused.value.code == code

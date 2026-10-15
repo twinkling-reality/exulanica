@@ -92,7 +92,7 @@ Implementation:
   declared area of each, the dependency its input names its place under, the kinds of the
   world's own records its people's activities may name, the thing kind its population is made
   of and, for a town, the measured cost of a minute in place of a head count:
-  `assets/catalogs/society-ground/society-ground.v6.json` (versions 1 to 5 kept beside it), read by
+  `assets/catalogs/society-ground/society-ground.v7.json` (versions 1 to 6 kept beside it), read by
   `exulanica/world/society_grounds.py`; the reader of the measured points:
   `exulanica/world/society_minute_cost.py`;
 - sending a society's people away and bringing them back:
@@ -607,7 +607,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v6.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v7.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
@@ -1844,7 +1844,12 @@ kind's own use classes and employment share and is named by its own digest. The
 the overlay. A building with an arcade is walked through: people walk the covered walk behind its
 arches (along its front, or its front and its back) and in and out through any arch, and enter
 the building from the front walk; a site without one makes the place it made before arcades
-existed.
+existed. Where the kind names a use class for a structure's arcade, each of its covered walks is
+also a destination people visit and stand at, its standing places along the walk at each arch,
+its subject the walk's own record (`site.loggia`, which ground catalog version 7 adds to the
+site ground's `record_subjects`; versions 1 to 6 read as they were). The input checks a record
+subject only on an activity it records as unreachable, and a walk people visit records none, so
+the entry states what people use rather than a check a walk passes today.
 
 A person's change to a part the world was made with (moved, turned or removed in build mode,
 [world objects contract](world-objects-contract.md#15-a-site-worlds-made-parts)) is the society's
