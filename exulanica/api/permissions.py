@@ -778,6 +778,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/inputs/{input_seq}",
     "GET /world/versions/{version_id}/society/models",
     "GET /world/versions/{version_id}/society/models/history",
+    "GET /world/versions/{version_id}/society/people/{subject_id}/asks-again",
     "GET /world/versions/{version_id}/society/play/{subject_id}/turn",
     "GET /world/versions/{version_id}/society/replay",
     "GET /world/versions/{version_id}/society/things/{thing_id}",

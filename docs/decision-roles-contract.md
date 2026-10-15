@@ -999,6 +999,24 @@ input, request, receipt, transition or minute reads an ask.
 cost and tokens) and every ask, oldest first, each with `same_choice` and `same_kind`. Asks are
 deleted only with their society, by its erasure, its world's or its workspace's tombstone.
 
+`GET /world/versions/{version_id}/society/people/{subject_id}/asks-again?world_id=W&model=P/M`
+(`world.read`) answers what asking that person's last answered decisions again would be, before
+anything is asked: the workspace's comparison of a character with a second model. It reads the
+person's newest decisions (at most `ASK_AGAIN_SCAN`), keeps the last `ASK_AGAIN_MOST` (12) a model
+answered, oldest first, and for each answers `request_id`, `base_tick`, the model that answered it,
+what it chose and the line it proposed, and either `ask_usd` (`chosen`: the least bound of an ask
+of model `P/M`; `again`: of an ask once more of the model that answered it, or null with
+`again_refusal`) or `refusal` (`decision_not_reproducible`, `not_the_same_request`, or a refusal
+of model `P/M` that depends on that decision's recorded contract: `model_no_longer_offered`,
+`process_budget_spent`, `process_share_spent`), by the same checks an ask makes before it reserves
+anything. With `&request_id=R` it reads only that decision of the person's, whatever its age, so a
+decision's own page can compare it; a request that is not the person's, or that no model answered,
+offers nothing. `most_usd` is the sum of every bound offered, the most asking them all can cost;
+`askable` counts the decisions offered; `most` is `ASK_AGAIN_MOST`. Where model `P/M` may not be
+asked for the person's role here whatever the decision, `refusal` names the choice's code and
+nothing is offered; a model not written `provider/model_id` is 422 `model_unreadable`. It asks and writes nothing. Each ask is then the POST above, bounded by the
+offered `ask_usd`.
+
 ## Model discovery and admission preflight
 
 `GET /models`, with `world.read`, serves `exulanica.model-discovery/v1`: models ordered by

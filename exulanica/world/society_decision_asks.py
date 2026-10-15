@@ -13,7 +13,10 @@ kept.
 
 :func:`record` appends an ask; :func:`asks` reads them back; :func:`comparison` sets them beside the
 original: each model, what it chose, whether the choice and its kind match the original's, and
-what it cost.
+what it cost. A person's last :data:`ASK_AGAIN_MOST` answered decisions are what one comparison of a
+character asks again, each of a chosen model and once more of the model that answered it
+(:func:`exulanica.api.decision_asks.ask_again_offer` states what that would cost before anything is
+asked).
 """
 
 from __future__ import annotations
@@ -42,6 +45,8 @@ from exulanica.world.society_decision_repository import SocietyDecisionRepositor
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
+    "ASK_AGAIN_MOST",
+    "ASK_AGAIN_SCAN",
     "ASK_REFUSALS",
     "MAX_BOUND_USD",
     "DecisionAskRefused",
@@ -57,6 +62,14 @@ __all__ = [
 
 #: The most one ask may spend: a few answers of the largest model a person may choose.
 MAX_BOUND_USD: Final = Decimal("0.10")
+
+#: The most recorded decisions of one person a comparison asks again: a stretch of a run long enough
+#: to show how often two models choose alike, short enough that its asks finish in about a minute.
+ASK_AGAIN_MOST: Final = 12
+
+#: How many of a person's newest decisions are read to find their last answered ones: a decision a
+#: model never answered (timed out, refused) is skipped, so a few times as many as are asked.
+ASK_AGAIN_SCAN: Final = 4 * ASK_AGAIN_MOST
 
 #: Why a recorded decision is not asked again, by code.
 ASK_REFUSALS: Final = {

@@ -147,6 +147,8 @@ class SocietyDecisionRepository:
         latest: int | None = None,
         authorized: Mapping[str, Any] | None = None,
         ticks: tuple[int, int | None] | None = None,
+        subject_id: uuid.UUID | None = None,
+        request_id: uuid.UUID | None = None,
     ) -> list[dict]:
         """``role``'s decisions this society recorded, in order, with what their minutes did.
 
@@ -157,7 +159,9 @@ class SocietyDecisionRepository:
         comparison of models is made from. ``latest`` keeps only that many of the most recent,
         for a reader that must not grow with the world's age. ``ticks`` (``start``, ``end``) keeps
         only the decisions asked for the minutes from ``start`` up to ``end`` (none: every one
-        since), as a living session's read takes its own.
+        since), as a living session's read takes its own. ``subject_id`` keeps only one subject's,
+        so ``latest`` counts that subject's own (the decisions a person asks again), and
+        ``request_id`` only that request's (one decision asked again from its page, at any age).
 
         Reading the society's snapshot authorizes its inputs. ``authorized`` is the snapshot the
         caller read through this same society in this transaction; when it is this society's,
@@ -184,6 +188,8 @@ class SocietyDecisionRepository:
             "where d.workspace_id=%s and d.society_id=%s and d.document->>'profile'=%s "
             "and (%s::bigint is null or r.base_tick>=%s) "
             "and (%s::bigint is null or r.base_tick<%s) "
+            "and (%s::uuid is null or r.subject_id=%s::uuid) "
+            "and (%s::uuid is null or r.request_id=%s::uuid) "
             "order by d.decision_seq desc limit %s",
             (
                 row["workspace_id"],
@@ -193,6 +199,10 @@ class SocietyDecisionRepository:
                 start,
                 end,
                 end,
+                subject_id,
+                subject_id,
+                request_id,
+                request_id,
                 latest,
             ),
         ).fetchall()

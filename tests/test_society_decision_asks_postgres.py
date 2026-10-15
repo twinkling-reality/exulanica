@@ -14,7 +14,12 @@ routes, its answer scripted too, so nothing is paid and nothing reaches a networ
 *   a request whose messages no longer digest as recorded, an undeclared model, a bound out of
     range, an unknown request, a stranger and a reader who may not ask models are each refused by
     name, asking nothing;
-*   the asks go with their society when it is erased.
+*   the asks go with their society when it is erased;
+*   a person's last answered decisions are offered to be asked again, of a chosen model and once
+    more of the model that answered each, with the least bound of each ask (the one an ask then
+    accepts) and the most it all can cost, asking and writing nothing; a model that may not be asked
+    here, a request no longer sent as it was, an unreadable model and a stranger are answered by
+    name, and somebody with no answered decision is offered nothing.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from exulanica.api import decision_asks
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import load_manifest
@@ -112,6 +118,15 @@ def _counts(services, world, society_id) -> dict[str, int]:
                 "world_society_decision_ask",
             )
         }
+
+
+def _offer(client, society, subject_id, headers, scope, model=ASKED, **params):
+    named = model if isinstance(model, str) else f"{model['provider']}/{model['model_id']}"
+    return client.get(
+        f"{society}/people/{subject_id}/asks-again",
+        headers=headers,
+        params={**scope, "model": named, **params},
+    )
 
 
 def _ask(client, society, request_id, headers, scope, **body):
@@ -242,3 +257,113 @@ def test_the_asks_go_with_their_society(app) -> None:
             (world["workspace"],),
         ).fetchone()["n"]
     assert left == 0
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_persons_last_decisions_are_offered_asking_and_writing_nothing(app) -> None:
+    world, client = app
+    transport = _Waiter()
+    services, snapshot, receipt = _recorded(world, client, transport)
+    owner = _callers(client, world, listed=True)["owner"][0]
+    scope, _version, society = routes(world)
+    before = _counts(services, world, snapshot["society_id"])
+
+    offered = _offer(client, society, receipt["subject_id"], owner, scope)
+    assert offered.status_code == 200, offered.text
+    body = offered.json()
+    assert body["most"] == society_decision_asks.ASK_AGAIN_MOST
+    assert body["model"] == ASKED and body["refusal"] is None
+    # The positive control: the recorded decision is offered, as it was answered.
+    entry = next(item for item in body["decisions"] if item["request_id"] == receipt["request_id"])
+    assert entry["chose"] == receipt["proposal"]["label"]
+    assert entry["model_id"] == receipt["provider"]["model_id"] and entry["refusal"] is None
+    assert Decimal(entry["ask_usd"]["chosen"]) > 0
+    # Once more of the model that answered it: here a model this square's own manifest declared,
+    # which the server's no longer offers, so the offer names what an ask of it would answer.
+    own = {"provider": entry["provider"], "model_id": entry["model_id"]}
+    assert entry["ask_usd"]["again"] is None
+    asked_own = _ask(client, society, receipt["request_id"], owner, scope, model=own)
+    assert (asked_own.status_code, asked_own.json()["code"]) == (409, entry["again_refusal"])
+    offered_usd = [
+        Decimal(item["ask_usd"][which])
+        for item in body["decisions"]
+        if item["ask_usd"] is not None
+        for which in ("chosen", "again")
+        if item["ask_usd"][which] is not None
+    ]
+    assert Decimal(body["most_usd"]) == sum(offered_usd)
+    assert body["askable"] == sum(1 for item in body["decisions"] if item["ask_usd"] is not None)
+    assert len(body["decisions"]) <= society_decision_asks.ASK_AGAIN_MOST
+    # One decision, by its request id, from its own page; another request, or another person's,
+    # offers nothing.
+    one = _offer(
+        client, society, receipt["subject_id"], owner, scope, request_id=receipt["request_id"]
+    ).json()
+    assert [item["request_id"] for item in one["decisions"]] == [receipt["request_id"]]
+    assert one["decisions"][0] == entry
+    assert Decimal(one["most_usd"]) == sum(
+        Decimal(value) for value in entry["ask_usd"].values() if value is not None
+    )
+    for subject, request in (
+        (receipt["subject_id"], uuid.uuid4()),
+        (uuid.uuid4(), receipt["request_id"]),
+    ):
+        elsewhere = _offer(client, society, subject, owner, scope, request_id=request)
+        assert elsewhere.status_code == 200 and elsewhere.json()["decisions"] == []
+    # Nothing was asked or written.
+    assert transport.requests == []
+    assert _counts(services, world, snapshot["society_id"]) == before
+
+    # The bound offered is the least an ask accepts.
+    asked = _ask(
+        client, society, receipt["request_id"], owner, scope, bound_usd=entry["ask_usd"]["chosen"]
+    )
+    assert asked.status_code == 201, asked.text
+    below = Decimal(entry["ask_usd"]["chosen"]) - Decimal("0.00000001")
+    refused = _ask(client, society, receipt["request_id"], owner, scope, bound_usd=str(below))
+    assert (refused.status_code, refused.json()["code"]) == (422, "bound_out_of_range")
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_an_offer_is_answered_by_name_and_asks_nothing(app, monkeypatch) -> None:
+    world, client = app
+    transport = _Waiter()
+    services, snapshot, receipt = _recorded(world, client, transport)
+    callers = _callers(client, world, listed=True)
+    owner = callers["owner"][0]
+    scope, _version, society = routes(world)
+    subject = receipt["subject_id"]
+
+    undeclared = _offer(
+        client, society, subject, owner, scope, model={**ASKED, "model_id": "no/such"}
+    )
+    assert undeclared.status_code == 200, undeclared.text
+    assert undeclared.json()["refusal"] == "model_not_declared"
+    assert undeclared.json()["decisions"] == [] and Decimal(undeclared.json()["most_usd"]) == 0
+    unreadable = _offer(client, society, subject, owner, scope, model="nonsense")
+    assert (unreadable.status_code, unreadable.json()["code"]) == (422, "model_unreadable")
+    assert _offer(client, society, subject, callers["stranger"][0], scope).status_code == 404
+    nobody = _offer(client, society, str(uuid.uuid4()), owner, scope)
+    assert nobody.status_code == 200 and nobody.json()["decisions"] == []
+    assert nobody.json()["askable"] == 0
+
+    # A refusal that depends on the decision's own contract (here the budget no longer fitting one
+    # ask under it) is that decision's, and the offer stands; any other is the whole offer's.
+    with monkeypatch.context() as patched:
+        patched.setattr(decision_asks, "model_refusal", lambda *args: "process_budget_spent")
+        spent = _offer(client, society, subject, owner, scope).json()
+    assert spent["refusal"] is None and spent["askable"] == 0
+    assert {item["refusal"] for item in spent["decisions"]} == {"process_budget_spent"}
+    with monkeypatch.context() as patched:
+        patched.setattr(decision_asks, "model_refusal", lambda *args: "provider_changed")
+        changed_provider = _offer(client, society, subject, owner, scope).json()
+    assert changed_provider["refusal"] == "provider_changed" and changed_provider["decisions"] == []
+
+    monkeypatch.setattr(society_decision_asks, "society_state_sha256", lambda state: "0" * 64)
+    changed = _offer(client, society, subject, owner, scope).json()
+    entry = next(
+        item for item in changed["decisions"] if item["request_id"] == receipt["request_id"]
+    )
+    assert entry["refusal"] == "decision_not_reproducible" and entry["ask_usd"] is None
+    assert transport.requests == []
+    assert _counts(services, world, snapshot["society_id"])["world_society_decision_ask"] == 0

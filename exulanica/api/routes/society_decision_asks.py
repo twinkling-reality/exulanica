@@ -5,6 +5,12 @@
     ask and its answer: what it chose and what it cost. Nothing is applied to the world.
 *   ``GET /world/versions/{version_id}/society/decisions/{request_id}/asks`` answers the original
     answer and every ask beside it, each with whether its choice and its kind are the original's.
+*   ``GET /world/versions/{version_id}/society/people/{subject_id}/asks-again?model=P/M`` answers
+    what asking that person's last answered decisions again would be (at most
+    :data:`~exulanica.world.society_decision_asks.ASK_AGAIN_MOST`), each of model ``P/M`` and once
+    more of the model that answered it: every decision with the least bound of each ask, or why it
+    cannot be asked again, and the most it all can cost. It asks and writes nothing; each ask is
+    then the POST above.
 
 A request the workspace does not hold answers as the decision read does: an unknown resource.
 """
@@ -15,26 +21,32 @@ import uuid
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.decision_asks import ModelNotAsked, ask_again
+from exulanica.api.decision_asks import ModelNotAsked, ask_again, ask_again_offer
 from exulanica.api.dependencies import (
     CurrentSession,
+    ReadOnlySessions,
     ScopedConnection,
     ScopedSessions,
     get_services,
 )
 from exulanica.api.routes.society import _call, _repository
+from exulanica.api.routes.society_models import _role_refused
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
+from exulanica.world.decision_roles import RoleRefused, decision_roles
 from exulanica.world.society_decision_asks import (
+    ASK_AGAIN_MOST,
+    ASK_AGAIN_SCAN,
     DecisionAskRefused,
     asks,
     comparison,
     recorded,
 )
+from exulanica.world.society_decision_repository import SocietyDecisionRepository
 
 __all__ = ["router"]
 
@@ -130,3 +142,57 @@ def read_decision_asks(
             return comparison(held, asks(connection, session.workspace_id, held))
 
     return _call(read, invalid_status=409)
+
+
+@router.get("/versions/{version_id}/society/people/{subject_id}/asks-again")
+def offer_asks_again(
+    version_id: uuid.UUID,
+    subject_id: uuid.UUID,
+    model: Annotated[str, Query(min_length=3, max_length=265)],
+    connection: ScopedConnection,
+    sessions: ReadOnlySessions,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+    services: Annotated[Services, Depends(get_services)],
+    request_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> Any:
+    """What asking a person's last answered decisions again of ``model`` (``provider/model_id``),
+    and once more of the model that answered each, would be; with ``request_id``, that one decision
+    of the person's, whatever its age. Asks and writes nothing: its checks read through read-only
+    sessions."""
+    provider, _, model_id = model.partition("/")
+    if not provider or not model_id:
+        return _refusal(422, "model_unreadable", "name the model as provider/model_id")
+
+    def found() -> Any:
+        with connection.transaction():
+            society = _repository(connection, session, request, world_id)
+            rows = SocietyDecisionRepository(society).role_decisions(
+                decision_roles().deciding_for("person"),
+                version_id,
+                latest=ASK_AGAIN_SCAN,
+                subject_id=subject_id,
+                request_id=request_id,
+            )
+            # Answered by a model: a minute nobody's model answered has nothing to ask again.
+            answered = [
+                row for row in rows if row["asked_model"] and row["status"] != "unavailable"
+            ][-ASK_AGAIN_MOST:]
+            return [
+                recorded(society, version_id, uuid.UUID(str(row["request_id"]))) for row in answered
+            ]
+
+    try:
+        held = _call(found, invalid_status=409)
+    except RoleRefused as refused:
+        return _role_refused(refused)
+    if isinstance(held, JSONResponse):
+        return held
+    return ask_again_offer(
+        services,
+        held,
+        sessions,
+        workspace_id=session.workspace_id,
+        model={"provider": provider, "model_id": model_id},
+    )

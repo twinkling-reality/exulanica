@@ -14,6 +14,11 @@ a minute.
 The model is asked outside any transaction: the request is read and proved first, then asked, then
 the answer recorded, under its request's foreign key, which waits for or fails against a society
 being erased meanwhile.
+
+:func:`ask_again_offer` states what asking a person's recorded decisions again would be, asking and
+writing nothing: for each, the least bound an ask of the chosen model and an ask of the model that
+answered it need, by the same checks an ask makes before it reserves (:func:`_asking`), and their
+sum, the most the comparison can cost.
 """
 
 from __future__ import annotations
@@ -21,9 +26,10 @@ from __future__ import annotations
 import datetime as dt
 import time
 import uuid
-from collections.abc import Callable, Mapping
-from decimal import Decimal
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from decimal import ROUND_CEILING, Decimal
+from typing import Any, Final
 
 import psycopg
 
@@ -37,19 +43,22 @@ from exulanica.api.decision_host import (
 )
 from exulanica.epistemics.saved_names import saved_names
 from exulanica.models.budget import BoundedBudget
-from exulanica.models.manifest import load_manifest
+from exulanica.models.manifest import AnsweringMechanism, ModelSpec, load_manifest
 from exulanica.models.spending import spending_request_key
+from exulanica.models.usage import USD_QUANTUM, usd_string
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_decision_asks import (
+    ASK_AGAIN_MOST,
     MAX_BOUND_USD,
     DecisionAskRefused,
     Recorded,
+    Reproduced,
     earlier_ask,
     record,
     reproduced,
 )
 
-__all__ = ["ModelNotAsked", "ask_again"]
+__all__ = ["ModelNotAsked", "ask_again", "ask_again_offer"]
 
 #: How long an ask's bound stays open: one ask's deadline, with room.
 _BOUND_MINUTES = 10
@@ -61,6 +70,76 @@ class ModelNotAsked(ValueError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+#: Refusals of a model that depend on one decision's recorded contract (whether the contract can ask
+#: the model at all, and whether one ask under it still fits the budget): an offer records them on
+#: that decision, so a person whose decisions span two contracts is offered those that can be asked.
+_CONTRACT_REFUSALS: Final = frozenset(
+    {"model_no_longer_offered", "process_budget_spent", "process_share_spent"}
+)
+
+
+def _bound(value: Decimal) -> Decimal:
+    """A least bound at the ledger's quantum, rounded up, so the bound an offer names is never
+    below what the ask needs."""
+    return value.quantize(USD_QUANTUM, rounding=ROUND_CEILING)
+
+
+@dataclass(frozen=True, slots=True)
+class _Asking:
+    """An ask of one model, proved sendable: the model, the mechanism it answers by, the client
+    under the workspace's request rules, and the least the ask's bound may be."""
+
+    spec: ModelSpec
+    mechanism: AnsweringMechanism
+    policed: Any
+    least: Decimal
+
+
+def _asking(
+    services: Any,
+    held: Recorded,
+    proved: Reproduced,
+    connection: Any,
+    workspace_id: uuid.UUID,
+    model: Mapping[str, str],
+) -> _Asking:
+    """Every check an ask of ``model`` makes before anything is reserved: a model the role may not
+    be asked by here (:class:`ModelNotAsked`), and a request it would not be sent whole
+    (``not_the_same_request``)."""
+    role, contract = proved.role, proved.contract
+    client = services.decision_client
+    if client is None:
+        raise ModelNotAsked("provider_not_admitted")
+    manifest = services.workspace_choice_manifest(connection, workspace_id, held.engine)
+    spec = manifest.models.get(model["model_id"])
+    if spec is None:
+        raise ModelNotAsked("model_not_declared")
+    if spec.provider != model["provider"]:
+        raise ModelNotAsked("provider_changed")
+    if model["model_id"] not in load_manifest().models:
+        client = client.with_chosen_manifest(
+            manifest,
+            {
+                key: (role.key, role.terms(held.engine).prompt_version)
+                for key in manifest.models.keys() - load_manifest().models.keys()
+            },
+        )
+    refusal = model_refusal(role, client, manifest, contract, model)
+    policed = client.with_policy(services.person_decision_policy(workspace_id))
+    if refusal is None:
+        refusal = question_refusal(role, policed, model["model_id"], held.engine)
+    if refusal is not None:
+        raise ModelNotAsked(refusal)
+    mechanism = contract.mechanism_for(spec)
+    if mechanism is None:
+        raise ModelNotAsked("model_no_longer_offered")
+    labels = [option["label"] for option in held.request["context"]["options"]]
+    sendable = sendable_labels(role, policed, model["model_id"], labels, held.engine)
+    if sendable is None or set(sendable) != set(labels):
+        raise DecisionAskRefused("not_the_same_request")
+    return _Asking(spec, mechanism, policed, ask_bound_usd(role, policed.budget, spec, contract))
 
 
 def ask_again(
@@ -92,39 +171,10 @@ def ask_again(
     proved = reproduced(held)
     role, contract = proved.role, proved.contract
     context = held.request["context"]
-    client = services.decision_client
-    if client is None:
-        raise ModelNotAsked("provider_not_admitted")
     with reading() as connection:
-        manifest = services.workspace_choice_manifest(connection, workspace_id, held.engine)
-        spec = manifest.models.get(model["model_id"])
-        if spec is None:
-            raise ModelNotAsked("model_not_declared")
-        if spec.provider != model["provider"]:
-            raise ModelNotAsked("provider_changed")
-        if model["model_id"] not in load_manifest().models:
-            client = client.with_chosen_manifest(
-                manifest,
-                {
-                    key: (role.key, role.terms(held.engine).prompt_version)
-                    for key in manifest.models.keys() - load_manifest().models.keys()
-                },
-            )
-        refusal = model_refusal(role, client, manifest, contract, model)
-        policed = client.with_policy(services.person_decision_policy(workspace_id))
-        if refusal is None:
-            refusal = question_refusal(role, policed, model["model_id"], held.engine)
-        if refusal is not None:
-            raise ModelNotAsked(refusal)
-        mechanism = contract.mechanism_for(spec)
-        if mechanism is None:
-            raise ModelNotAsked("model_no_longer_offered")
-        labels = [option["label"] for option in context["options"]]
-        sendable = sendable_labels(role, policed, model["model_id"], labels, held.engine)
-        if sendable is None or set(sendable) != set(labels):
-            raise DecisionAskRefused("not_the_same_request")
+        asking = _asking(services, held, proved, connection, workspace_id, model)
         names = saved_names(connection, workspace_id)
-    least = ask_bound_usd(role, policed.budget, spec, contract)
+    spec, mechanism, policed, least = asking.spec, asking.mechanism, asking.policed, asking.least
     if not (bound_usd.is_finite() and least <= bound_usd <= MAX_BOUND_USD):
         raise DecisionAskRefused(
             "bound_out_of_range", f"an ask of this model needs {least} to {MAX_BOUND_USD} USD"
@@ -188,3 +238,81 @@ def ask_again(
             )
             assert earlier is not None
             return earlier
+
+
+def ask_again_offer(
+    services: Any,
+    found: Sequence[Recorded],
+    reading: Callable[[], Any],
+    *,
+    workspace_id: uuid.UUID,
+    model: Mapping[str, str],
+) -> dict[str, Any]:
+    """What asking ``found`` again would be, asking and writing nothing.
+
+    Each recorded decision, oldest first, with what it chose and said and the model that answered
+    it, and either the least bound of an ask of ``model`` and of an ask once more of its own model
+    (``ask_usd``; ``again`` is None where its own model is no longer asked here, with why in
+    ``again_refusal``), or why it cannot be asked again (``refusal``: the request no longer sent as
+    it was, or a refusal of ``model`` that depends on that decision's contract). ``most_usd`` is the
+    sum of every bound offered: the most the comparison can cost. Where ``model`` itself may not be
+    asked here whatever the decision, the offer's ``refusal`` names why and nothing is offered."""
+    decisions: list[dict[str, Any]] = []
+    refusal: str | None = None
+    most = Decimal(0)
+    with reading() as connection:
+        for held in found:
+            answer = held.decision or {}
+            provider = answer.get("provider") if isinstance(answer.get("provider"), Mapping) else {}
+            proposal = answer.get("proposal") if isinstance(answer.get("proposal"), Mapping) else {}
+            own = {"provider": provider.get("provider"), "model_id": provider.get("model_id")}
+            entry: dict[str, Any] = {
+                "request_id": str(held.request["request_id"]),
+                "base_tick": held.request.get("base_tick"),
+                "provider": own["provider"],
+                "model_id": own["model_id"],
+                "chose": proposal.get("label"),
+                "line": proposal.get("line"),
+                "ask_usd": None,
+                "refusal": None,
+                "again_refusal": None,
+            }
+            try:
+                proved = reproduced(held)
+                chosen = _asking(services, held, proved, connection, workspace_id, model)
+            except DecisionAskRefused as refused:
+                entry["refusal"] = refused.code
+                decisions.append(entry)
+                continue
+            except ModelNotAsked as refused:
+                if refused.code in _CONTRACT_REFUSALS:
+                    entry["refusal"] = refused.code
+                    decisions.append(entry)
+                    continue
+                refusal = refused.code
+                break
+            again: Decimal | None = None
+            if isinstance(own["provider"], str) and isinstance(own["model_id"], str):
+                try:
+                    again = _bound(
+                        _asking(services, held, proved, connection, workspace_id, own).least
+                    )
+                except (ModelNotAsked, DecisionAskRefused) as refused:
+                    entry["again_refusal"] = refused.code
+            least = _bound(chosen.least)
+            entry["ask_usd"] = {
+                "chosen": usd_string(least),
+                "again": None if again is None else usd_string(again),
+            }
+            most += least + (again or Decimal(0))
+            decisions.append(entry)
+    if refusal is not None:
+        decisions, most = [], Decimal(0)
+    return {
+        "most": ASK_AGAIN_MOST,
+        "model": {"provider": model["provider"], "model_id": model["model_id"]},
+        "refusal": refusal,
+        "decisions": decisions,
+        "askable": sum(1 for entry in decisions if entry["ask_usd"] is not None),
+        "most_usd": usd_string(most),
+    }
