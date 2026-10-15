@@ -138,9 +138,17 @@ export function moveWords(from, to) {
   return parts.length ? parts.join(', ') : 'where it was';
 }
 
-/** What a kept move did. */
+/**
+ * What a kept move did, from its words (moveWords): "Moved the bench 3.5 m west, turned 15°.", and
+ * a turn alone "Turned the bench 90°." or "Turned the bench round.".
+ */
 export function movedNote(name, words) {
-  return `Moved the ${name} ${words}.`;
+  return words.startsWith('turned ') ? `Turned the ${name} ${words.slice('turned '.length)}.` : `Moved the ${name} ${words}.`;
+}
+
+/** The card's line for a thing a person placed. */
+export function placedLine() {
+  return 'Placed in this world';
 }
 
 /** What keeping a move will do, said before it is kept. */

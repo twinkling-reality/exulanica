@@ -10,7 +10,7 @@
 // write is asked of the server first as a preview, and only the server's answer is shown.
 // What a key does in each state, and every sentence, is build-words.mjs.
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
-import { changeWords, keepLine, keyAction, moveWords, movedNote, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
+import { changeWords, keepLine, keyAction, moveWords, movedNote, placedLine, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
 import './build-mode.css';
 
 /** How long a note of what was done stays, in milliseconds. */
@@ -175,7 +175,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       card.append(node('p', removeQuestion(name), 'bm-line'));
       actions.append(chip('Enter', 'Remove', () => { void confirmRemove(); }), chip('Esc', 'Keep it', cancel));
     } else if (!busy) {
-      if (!failure) card.append(node('p', 'Placed in this world', 'bm-line'));
+      if (!failure) card.append(node('p', placedLine(), 'bm-line'));
       actions.append(chip('⌫', 'Remove', () => { void askRemove(); }), chip('Esc', 'Close', deselect));
     }
     card.append(actions);

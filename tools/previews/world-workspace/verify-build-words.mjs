@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { MAX_YAW, changeWords, keyAction, moveWords, movedNote, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
+import { MAX_YAW, changeWords, keyAction, moveWords, movedNote, placedLine, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
@@ -29,6 +29,12 @@ assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: -500, z: 0, yaw: 0 }), '0.5 
 assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: 3_141_593 }), 'turned round');
 assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: 20, z: 0, yaw: 0 }), 'where it was');
 assert.equal(movedNote('bench', '6.5 m east'), 'Moved the bench 6.5 m east.');
+// A turn alone is said as a turn; a move with a turn as a move (History and pull requests read the same).
+assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: 1_570_796 })), 'Turned the bench 90°.');
+assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: 3_141_593 })), 'Turned the bench round.');
+assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: -3500, z: 0, yaw: 261_799 })), 'Moved the bench 3.5 m west, turned 15°.');
+// The card's line for a placed thing, which the chosen card outside build mode reads too.
+assert.equal(placedLine(), 'Placed in this world');
 // Snapping: half metres and 15 degree steps unless free; a yaw stays within one revolution.
 assert.equal(snapped(1249, false), 1000);
 assert.equal(snapped(1251, false), 1500);
