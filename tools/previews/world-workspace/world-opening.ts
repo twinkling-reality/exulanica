@@ -3,6 +3,7 @@
 // reports a real stage (seams.mjs dispatches the reports), the stage's words, and one tip. It ends
 // when the world view mounts (contextual-world.ts) or the front door shows instead (front-door.ts).
 import { OPENING_EVENT, OPENING_HANDOFF_KEY, openingProgress, readHandoff } from './opening-steps.mjs';
+import { isScenePreview } from './front-door-routes.mjs';
 import { OPENING_WORDS } from './world-words.mjs';
 import { keyWord, mountUiScale, promptRow } from './world-ui.ts';
 
@@ -24,10 +25,14 @@ function keptPicture(entryId: string): string | null {
   } catch { return null; }
 }
 
-/** Shows the opening on a world's address; does nothing anywhere else. */
+/**
+ * Shows the opening on a world's address; does nothing anywhere else. A scene preview (the front
+ * door's live background) draws a world too, but never mounts the world view that ends the opening,
+ * so it shows none.
+ */
 export function mountOpening(): void {
   const entryId = new URLSearchParams(location.search).get('entry');
-  if (!entryId || shown !== null) return;
+  if (!entryId || shown !== null || isScenePreview(new URL(location.href))) return;
   let handoff = null;
   try { handoff = readHandoff(sessionStorage.getItem(OPENING_HANDOFF_KEY), entryId); } catch { /* No handoff: a reload. */ }
   const lifetime = new AbortController();
