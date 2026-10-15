@@ -1556,7 +1556,11 @@ async function mountWorld(): Promise<void> {
   const PLANNED_EDITS = new Set([
     'objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place',
     'things.place', 'things.move', 'things.remove', 'things.undo', 'things.redo',
+    'parts.move', 'parts.remove',
   ]);
+  // Edits that may change a site world's made parts, and so its drawing: a part's own, and an undo or
+  // redo, which takes back or does again whatever was changed last.
+  const PART_EDITS = new Set(['parts.move', 'parts.remove', 'things.undo', 'things.redo']);
   const sendPlanned = async (
     request: PlannedRequest,
   ): Promise<{ readonly status: number; readonly body: unknown }> => {
@@ -1578,6 +1582,19 @@ async function mountWorld(): Promise<void> {
       await recordAuthoredEntryAdvance(version, binding);
       await objects.begin(version.versionId);
       await environmentSelection.afterAuthoredEdit(version.versionId);
+      // The made world drawn again as it now stands, its walking world handed to the binding: only
+      // when its drawing changed, so a thing's undo costs one read of the site.
+      const now = state.activeWorldEntry;
+      if (PART_EDITS.has(request.actionId) && now !== null && now.generatedSite != null) {
+        // The change is kept whatever happens here: a world that cannot be drawn again now (its
+        // drawing unread, its look unreadable) is drawn as it stands the next time it opens.
+        try {
+          const site = (await import('./composition/site-world.js')).currentOpenSite();
+          await site?.redraw(now, (walking) => state.atlas?.binding.replaceNavigation(walking));
+        } catch (error) {
+          console.warn('The changed world could not be drawn again while open:', error);
+        }
+      }
     }
     return sent;
   };

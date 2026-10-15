@@ -162,7 +162,7 @@ export class FirstPersonControls {
   /** Only the never-accepted original entry may wait for an asynchronous source attachment. */
   private pendingTerrainEntry: {readonly x: number; readonly y: number; readonly z: number;
     readonly worldId: string; readonly receiptSha256: string; readonly geometrySha256: string; readonly contactSha256: string} | null = null;
-  private readonly navigationWorld: NavigationWorld | null;
+  private navigationWorld: NavigationWorld | null;
   private cameraHold: CameraHold;
   /** How far from the field's centre a view held at altitude may pan; see `altitudeReachFrom`. */
   private altitudeReach = 0;
@@ -459,6 +459,25 @@ export class FirstPersonControls {
   }
 
   /**
+   * The walking world replaced while the world stays open (a made part moved or removed, a basin
+   * graded again): on the ground, the person stands on the new ground where they are, or on the
+   * nearest clear ground around them as landing finds it; held at altitude or flying, the view keeps
+   * its height and its reach is read again. Only a world walked on its surface is replaced so: a
+   * world of terrain or of supports keeps the walking world it opened with.
+   */
+  replaceNavigation(next: NavigationWorld): void {
+    const now = this.navigationWorld;
+    if (now === null || now.terrain !== undefined || now.support !== undefined || next.terrain !== undefined || next.support !== undefined) {
+      throw new Error('Only a world walked on its surface takes a new walking world while it is open.');
+    }
+    this.navigationWorld = next;
+    // Where the person last stood stays the place to go back to only while it is still open ground.
+    if (this.lastSafe !== null && !isNavigationPositionClear(next, this.lastSafe)) this.lastSafe = null;
+    if (this.cameraHold === 'ground') this.standOnOpenGround();
+    else this.altitudeReach = altitudeReachFrom(next, this.state);
+  }
+
+  /**
    * Stand on the ground again from wherever the pose is, as travel does: its transition ends on
    * the surface, and the frames after it are walked.
    */
@@ -514,6 +533,15 @@ export class FirstPersonControls {
    * support network lands where the person took off, since a new stand there needs its own contact.
    */
   private land(): void {
+    this.standOnOpenGround();
+    this.onFlyChange?.(false);
+  }
+
+  /**
+   * Stand on the open ground below, or the nearest open ground within a few metres of it, or else
+   * back where the person last stood, still: landing's search, which says nothing about flying.
+   */
+  private standOnOpenGround(): void {
     const world = this.navigationWorld;
     const { yaw, pitch } = this.state;
     const back = (): void => {
@@ -552,7 +580,6 @@ export class FirstPersonControls {
     this.vx = 0;
     this.vy = 0;
     this.vz = 0;
-    this.onFlyChange?.(false);
   }
 
   get movementSpeed(): number {

@@ -63,6 +63,77 @@ export function siteSightRings(
   return rings;
 }
 
+/** A made part a ray meets first: the part it belongs to, and how far along the ray, in metres. */
+export interface SlotPick { readonly identity: string; readonly distance: number }
+
+/** How thick a plane (a pond, a field) is to a ray, in millimetres: a ray along the ground still meets it. */
+const PLANE_THICKNESS_MM = 100;
+
+/**
+ * The made part a ray meets first among the drawing's slots that `pickable` admits: the nearest box
+ * or plane it enters, named by the part it belongs to (a building's own pieces name it by
+ * `structure`), or null when it meets none or when a box nobody may change stands in front (a
+ * zone's wall hides the part behind it; a plane nobody may change, the ground or a path, hides
+ * nothing, and nor does a box the ray starts inside, as a canopy over the person does). The ray is in the frame the workspace's rays are in
+ * (metres, x east, y up, z south, from the site's corner). A slot stands on its base's centre (site
+ * millimetres, x east, y north, z up) with its height above that, turned by quarter turns; a plane
+ * is a thin slab at its base. A slot that follows the land is read at its stated base, the land's
+ * height at its centre, which is close enough to point at it.
+ */
+export function pickSiteSlot(
+  drawing: { readonly slots: readonly {
+    readonly identity: string; readonly structure?: string; readonly primitive: string;
+    readonly positionMm: readonly [number, number, number]; readonly boxMm: readonly [number, number, number];
+    readonly yawQuarterTurns: number;
+  }[] },
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+  pickable: (identity: string) => boolean,
+): SlotPick | null {
+  let best: SlotPick | null = null;
+  let hidden = Number.POSITIVE_INFINITY;
+  for (const slot of drawing.slots) {
+    if (slot.primitive !== 'box' && slot.primitive !== 'plane') continue;
+    const identity = slot.structure ?? slot.identity;
+    const mine = pickable(identity);
+    if (!mine && slot.primitive !== 'box') continue;
+    const [x, y, z] = slot.positionMm;
+    const [width, depth, height] = slot.boxMm;
+    // A quarter turn lays the width along north and south.
+    const turned = slot.yawQuarterTurns % 2 !== 0;
+    const east = (turned ? depth : width) / 2, north = (turned ? width : depth) / 2;
+    const [bottom, top] = slot.primitive === 'plane' ? [z - PLANE_THICKNESS_MM / 2, z + PLANE_THICKNESS_MM / 2] : [z, z + height];
+    const min = [(x - east) / 1000, bottom / 1000, -(y + north) / 1000] as const;
+    const max = [(x + east) / 1000, top / 1000, -(y - north) / 1000] as const;
+    if (!mine && origin.every((v, axis) => v >= min[axis]! && v <= max[axis]!)) continue;
+    const distance = slabEntry(origin, direction, min, max);
+    if (distance === null) continue;
+    if (!mine) hidden = Math.min(hidden, distance);
+    else if (best === null || distance < best.distance) best = { identity, distance };
+  }
+  return best !== null && best.distance <= hidden ? best : null;
+}
+
+/** Where a ray enters an axis-aligned box (metres along the ray, 0 when it starts inside), or null. */
+function slabEntry(
+  origin: readonly [number, number, number], direction: readonly [number, number, number],
+  min: readonly [number, number, number], max: readonly [number, number, number],
+): number | null {
+  let near = 0, far = Infinity;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const from = origin[axis]!, along = direction[axis]!, low = min[axis]!, high = max[axis]!;
+    if (Math.abs(along) < 1e-12) {
+      if (from < low || from > high) return null;
+      continue;
+    }
+    let enter = (low - from) / along, leave = (high - from) / along;
+    if (enter > leave) [enter, leave] = [leave, enter];
+    near = Math.max(near, enter); far = Math.min(far, leave);
+    if (near > far) return null;
+  }
+  return near;
+}
+
 /**
  * Hold what hides a being on the session for the world about to be mounted: none from now, and the
  * world's own once it states its plan. What stands within `marginMm` of a point is the thing the

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { switchableWorld, type GeneratedWorld } from '../src/composition/generated-world.js';
-import { WORLD_LOOK_REDRAW_EVENT, redrawWorldLook, swappableDrawing } from '../src/composition/world-look-redraw.js';
+import { WORLD_LOOK_REDRAW_EVENT, redrawWorldLook, swappableDrawing, type LookDrawing, type WorldLookState } from '../src/composition/world-look-redraw.js';
 import type { WorldLookChoice } from '../src/world-look.js';
 
 const HOST = {} as GeneratedTileHost;
@@ -170,4 +170,45 @@ it('forwards source selection to the current look attachment and withdraws it on
   expect(attachment.sourceCurrent?.()).toBe(false);
   expect(pick()).toBeNull();
   expect(parts[1]!.calls).toBe(1);
+});
+
+describe('drawing the open world again from a new reading of it', () => {
+  /** A reading of a world: its drawing, logged as it goes up and comes down, and how to draw it in another look. */
+  interface Reading { readonly look: WorldLookState; readonly drawing: LookDrawing; relook(choice: WorldLookChoice): Promise<Reading> }
+  const readingOf = (name: string, log: string[]): Reading => ({
+    look: { pack: null, source: 'default', drawn: true, reason: null },
+    drawing: {
+      attach() {
+        log.push(`attach ${name}`);
+        return { metrics: {}, animating: false, dispose: () => log.push(`take down ${name}`) } as unknown as ReturnType<LookDrawing['attach']>;
+      },
+    },
+    async relook(choice) {
+      log.push(`relook ${name} in ${choice.packId}`);
+      return readingOf(`${name} in ${choice.packId}`, log);
+    },
+  });
+
+  it('draws it on the same host in the look the world shows now, and later redraws start from it', async () => {
+    const log: string[] = [];
+    const first = readingOf('first', log);
+    const looks: unknown[] = [];
+    const wrapped = swappableDrawing(first.drawing, first.relook, (next) => next.drawing, (next) => looks.push(next.look), document.createElement('div'));
+    const attachment = wrapped.attach(HOST);
+    // Before any redraw the world shows the look it opened in: the new reading goes up as it was read.
+    expect(await wrapped.replace(readingOf('second', log))).toBe(true);
+    // A redraw starts from the new reading, and the next reading is drawn in the look it chose.
+    await redrawWorldLook(TOON);
+    expect(await wrapped.replace(readingOf('third', log))).toBe(true);
+    expect(log).toEqual([
+      'attach first', 'take down first', 'attach second',
+      `relook second in ${TOON.packId}`, 'take down second', `attach second in ${TOON.packId}`,
+      `relook third in ${TOON.packId}`, `take down second in ${TOON.packId}`, `attach third in ${TOON.packId}`,
+    ]);
+    // Only the redraw changed the look.
+    expect(looks).toHaveLength(1);
+    attachment.dispose();
+    expect(await wrapped.replace(readingOf('fourth', log))).toBe(false);
+    expect(log.filter((line) => line.startsWith('attach'))).toHaveLength(4);
+  });
 });

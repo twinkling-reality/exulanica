@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
-import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
+import { DRAWING_ASKS, currentOpenSite, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { siteSightRings } from '../src/composition/sight.js';
 import { GROUND_BORDERS } from '../src/ground-borders.js';
@@ -331,6 +331,51 @@ describe('redrawing an open site in another pack', () => {
     expect(stated).toEqual([{ pack: 'exulanica.toon-town', source: 'redraw', drawn: true, reason: null }]);
     attachment.dispose();
     expect(log.at(-1)).toBe('take down exulanica.toon-town');
+  });
+});
+
+describe('drawing an open site again after a person changes one of its made parts', () => {
+  it('draws a changed reading in place, hands on its sight and walking world, and leaves an unchanged one', async () => {
+    const log: string[] = [];
+    // A site with one barn 4 m square and 3 m tall, standing `east` millimetres east of the corner.
+    const world = (name: string, east: number, drawingSha256: string): SiteWorld => {
+      const mount = {
+        drawing: { profile: 'exulanica.site-drawing/v5', slots: [{ identity: 'barn', primitive: 'box', positionMm: [east, 10000, 0], boxMm: [4000, 4000, 3000], yawQuarterTurns: 0 }] },
+        navigationWorld: { eyeHeight: 1.6, name },
+        attach() {
+          log.push(`attach ${name}`);
+          return { metrics: { lookId: name }, animating: false, dispose: () => log.push(`take down ${name}`) };
+        },
+      } as unknown as GeneratedSiteMount;
+      return {
+        mount, drawingSha256,
+        look: { pack: 'exulanica.cozy-town', source: 'default', drawn: true, reason: null },
+        async relook(choice: WorldLookChoice) { return { ...world(`${name} in ${choice.packId}`, east, drawingSha256) }; },
+      };
+    };
+    const readings = [world('unchanged', 0, 'a'.repeat(64)), world('moved', 3000, 'b'.repeat(64))];
+    const sights: unknown[] = [];
+    const walked: unknown[] = [];
+    const mounted = switchableSite(world('first', 0, 'a'.repeat(64)), () => {}, document.createElement('div'), {
+      read: async () => readings.shift() ?? null,
+      standing: (blockers) => sights.push(blockers),
+    });
+    const attachment = mounted.attach({} as GeneratedTileHost);
+    const site = currentOpenSite()!;
+    const entry = {} as never;
+    // The same drawing read again: nothing is drawn again.
+    expect(await site.redraw(entry, (next) => walked.push(next))).toBe(false);
+    // The barn moved 3 m east: the new reading goes up in place, with its sight and walking world.
+    expect(await site.redraw(entry, (next) => walked.push(next))).toBe(true);
+    expect(log).toEqual(['attach first', 'take down first', 'attach moved']);
+    // What hides a being is read from the barn where it now stands, at the eye height it is walked at.
+    expect(sights).toEqual([siteSightRings(site.drawing() as never, 1600)]);
+    expect((site.drawing() as unknown as { slots: { positionMm: number[] }[] }).slots[0]!.positionMm[0]).toBe(3000);
+    expect(walked).toEqual([{ eyeHeight: 1.6, name: 'moved' }]);
+    // Taken down, the site is no longer open.
+    attachment.dispose();
+    expect(currentOpenSite()).toBeNull();
+    expect(log.at(-1)).toBe('take down moved');
   });
 });
 

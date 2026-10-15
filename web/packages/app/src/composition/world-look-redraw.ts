@@ -82,6 +82,17 @@ export interface LookDrawing {
   attach(host: GeneratedTileHost): GeneratedTileAttachment;
 }
 
+/** A drawing whose look can be swapped, and which can be drawn again from a new reading of its world. */
+export interface SwappableDrawing<T> extends LookDrawing {
+  /**
+   * Draw `world` in place of what is up now, on the same host and after any redraw under way, in
+   * the look the world shows now (the last look a redraw drew, else the world's own), so a person's
+   * change to the world is drawn without changing its look; later look redraws start from `world`.
+   * False when the world was taken down first.
+   */
+  replace(world: T & { readonly relook: (choice: WorldLookChoice) => Promise<T> }): Promise<boolean>;
+}
+
 /**
  * An open world's drawing whose look can be swapped while it stays mounted, as `redrawWorldLook`
  * asks. Each redraw waits for the one before it and reads the pack first (`relook`, which throws
@@ -99,8 +110,12 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
   drawingOf: (next: T) => LookDrawing,
   swapped: (next: T) => void,
   shell: Element,
-): LookDrawing {
+): SwappableDrawing<T> {
   let current = first;
+  /** The look the last redraw drew, or null while the world shows the look it opened in. */
+  let lastChoice: WorldLookChoice | null = null;
+  /** How the world now up is drawn in another look: the first reading's, then each replacement's. */
+  let relookNow = relook;
   let host: GeneratedTileHost | null = null;
   let attachment: GeneratedTileAttachment | null = null;
   let queue: Promise<unknown> = Promise.resolve();
@@ -114,14 +129,15 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
           pack: packId, source: 'redraw', drawn, reason, elapsedMs: Math.round(performance.now() - started),
         });
         let next: T;
+        const choice: WorldLookChoice = pack === null
+          ? { packId, manifestSha256: null, source: 'default' }
+          : {
+            packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw',
+            ...(pack.own?.wearable === true ? { own: true, ...(pack.own.base === null ? {} : { ownBase: pack.own.base }) } : {}),
+            ...(pack.setting === undefined ? {} : { setting: pack.setting.document }),
+          };
         try {
-          next = await relook(pack === null
-            ? { packId, manifestSha256: null, source: 'default' }
-            : {
-              packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw',
-              ...(pack.own?.wearable === true ? { own: true, ...(pack.own.base === null ? {} : { ownBase: pack.own.base }) } : {}),
-              ...(pack.setting === undefined ? {} : { setting: pack.setting.document }),
-            });
+          next = await relookNow(choice);
         } catch (error) {
           return result(false, error instanceof Error ? error.message : String(error));
         }
@@ -130,6 +146,7 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
         attachment?.dispose();
         current = drawingOf(next);
         attachment = current.attach(host);
+        lastChoice = choice;
         swapped(next);
         return result(next.look.drawn, null);
       }).then((done) => {
@@ -145,6 +162,19 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
     void redrawable.redraw(detail);
   };
   return {
+    replace(world) {
+      const run = queue.then(async (): Promise<boolean> => {
+        const next = lastChoice === null ? world : await world.relook(lastChoice);
+        if (host === null) return false;
+        attachment?.dispose();
+        current = drawingOf(next);
+        attachment = current.attach(host);
+        relookNow = world.relook;
+        return true;
+      });
+      queue = run.catch(() => false);
+      return run;
+    },
     attach(next: GeneratedTileHost): GeneratedTileAttachment {
       host = next;
       attachment = current.attach(next);

@@ -237,6 +237,29 @@ describe('an editor\'s see-through copy of a placed thing', () => {
     expect(region.findByName('thing-ghost:well')).toBeNull();
   });
 
+  it('draws the copy of a made part as its box, posed as its drawing poses it, in the same light', async () => {
+    const { layer, region } = await drawnWell();
+    const box = () => region.findByName('part-ghost') as pc.Entity | null;
+    layer.setBoxGhost({ regionId: 'r', xMm: 9000, yMm: 500, zMm: 1000, sizeMm: [2000, 500, 450], quarterTurns: 1, refused: false });
+    const copy = box()!;
+    expect(copy.getLocalPosition().x).toBeCloseTo(9, 6);
+    expect(copy.getLocalPosition().y).toBeCloseTo(0.5, 6);
+    expect(copy.getLocalEulerAngles().y).toBeCloseTo(90, 3);
+    const shape = copy.findByName('part-ghost:shape') as pc.Entity;
+    expect([shape.getLocalScale().x, shape.getLocalScale().y, shape.getLocalScale().z].map((v) => Math.round(v * 1000))).toEqual([2000, 450, 500]);
+    expect(shape.getLocalPosition().y).toBeCloseTo(0.225, 6);
+    const material = () => (box()!.findByName('part-ghost:shape') as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial;
+    expect(material().useLighting).toBe(false);
+    expect(material().opacity).toBeCloseTo(0.3, 6);
+    expect((box()!.findByName('part-ghost:shape') as pc.Entity).render!.castShadows).toBe(false);
+    // A pond lies flat: its copy is a thin slab. Refused, the copy is coral.
+    layer.setBoxGhost({ regionId: 'r', xMm: 0, yMm: 0, zMm: 0, sizeMm: [6000, 4000, 0], quarterTurns: 0, refused: true });
+    expect(Math.round((box()!.findByName('part-ghost:shape') as pc.Entity).getLocalScale().y * 1000)).toBe(50);
+    expect([material().emissive.r, material().emissive.g, material().emissive.b].map((v) => Math.round(v * 255))).toEqual([0xff, 0x8f, 0x7e]);
+    layer.setBoxGhost(null);
+    expect(box()).toBeNull();
+  });
+
   it('is a light copy, drawn unlit, and coral where the world refused the spot', async () => {
     const { layer, region } = await drawnWell();
     const materials = () => ((region.findByName('thing-ghost:well') as pc.Entity).findComponents('render') as pc.RenderComponent[])

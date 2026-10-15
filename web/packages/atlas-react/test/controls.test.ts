@@ -391,6 +391,27 @@ describe('flying (F)', () => {
   };
   const run = (controls: FirstPersonControls, seconds: number) => { for (let t = 0; t < seconds; t += 0.05) controls.update(0.05); };
 
+  it('stands a person on a new walking world: clear of a part moved onto them, on its own ground height', () => {
+    const flat = buildNavigationWorld(makeScene([], 1, 1));
+    const { controls, changes } = setUp(flat);
+    // A made part moved to where the person stands: the new walking world holds it there.
+    controls.replaceNavigation({ ...flat, obstacles: [{ id: 'barn', centre: atlasVec3(0, 0, 0), radius: 2 }] });
+    expect(Math.hypot(controls.state.x, controls.state.z)).toBeGreaterThan(2);
+    // Standing again is not landing from a flight: nothing is told that a flight ended.
+    expect(changes).toEqual([]);
+    expect(controls.state.y).toBeCloseTo(flat.eyeHeight, 6);
+    // A basin graded again: the same spot, half a metre higher.
+    const at = { x: controls.state.x, z: controls.state.z };
+    controls.replaceNavigation(buildNavigationWorld(makeScene([], 1, 1), { sample: () => ({ height: 0.5, normal: { x: 0, y: 1, z: 0 } }) }));
+    expect(controls.state).toMatchObject(at);
+    expect(controls.state.y).toBeCloseTo(0.5 + flat.eyeHeight, 6);
+    // A view held at altitude keeps its height.
+    controls.setView({ x: 0, y: 40, z: 30, yaw: 0, pitch: -0.4 }, 'altitude');
+    controls.replaceNavigation(flat);
+    expect(controls.state).toMatchObject({ x: 0, y: 40, z: 30 });
+    controls.destroy();
+  });
+
   it('takes off with F, passes through a wall walking stops at, and lands on open ground with F again', () => {
     const walking = setUp();
     key('KeyW');

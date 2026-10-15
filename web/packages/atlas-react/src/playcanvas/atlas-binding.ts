@@ -476,7 +476,8 @@ export class AtlasBinding {
   }[];
   readonly trainedSceneFailures: readonly { readonly sceneId: string; readonly reason: string }[];
   readonly scene: AtlasScene;
-  readonly navigationWorld: NavigationWorld;
+  /** Where a person can walk; replaced while the world stays open when a made part changes (`replaceNavigation`). */
+  navigationWorld: NavigationWorld;
   readonly field: WorldField;
   readonly topology: WorldTopologySnapshot;
   readonly composedWorld: ComposedWorld;
@@ -1643,6 +1644,16 @@ export class AtlasBinding {
       assetKey: surface.assetKey, contentSha256: surface.contentSha256,
       nodeIndex: surface.nodeIndex, meshIndex: surface.meshIndex,
       primitiveIndex: surface.primitiveIndex, distance: hit.distance });
+  }
+
+  /**
+   * Walk a new walking world from now on while the world stays open: a site world drawn again after
+   * a person changed one of its made parts. The person stands on it as the controls decide.
+   */
+  replaceNavigation(next: NavigationWorld): void {
+    this.navigationWorld = next;
+    this.controls.replaceNavigation(next);
+    this.invalidate();
   }
 
   /** Set a city view and hold it as it names (`camera-views.ts`); a kind without them ignores this. */

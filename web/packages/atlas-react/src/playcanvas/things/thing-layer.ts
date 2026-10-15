@@ -128,6 +128,40 @@ const REFUSED_LIGHT = new pc.Color(1, 0x8f / 255, 0x7e / 255);
 const GHOST_OPACITY = 0.3;
 const REFUSED_OPACITY = 0.4;
 
+/** Make `material` a ghost's: unlit, no maps or vertex colours, its light its colour, dithered. */
+function asGhost(material: pc.StandardMaterial, refused: boolean): pc.StandardMaterial {
+  // A light copy, not the thing's own surface: no maps or vertex colours, its colour its light.
+  material.useLighting = false;
+  material.diffuse = pc.Color.BLACK;
+  material.diffuseMap = null;
+  material.diffuseVertexColor = false;
+  material.emissive = refused ? REFUSED_LIGHT : GHOST_LIGHT;
+  material.emissiveMap = null;
+  material.emissiveVertexColor = false;
+  material.opacity = refused ? REFUSED_OPACITY : GHOST_OPACITY;
+  material.opacityDither = pc.DITHER_IGNNOISE;
+  material.opacityShadowDither = pc.DITHER_IGNNOISE;
+  material.update();
+  return material;
+}
+
+/**
+ * A made part's copy where it would stand: the base's centre in the region's frame (millimetres
+ * east, up and south), its box as its drawing states it (width along its front, depth, height,
+ * millimetres) and its quarter turns, and whether the world refused the spot.
+ */
+export interface BoxGhost {
+  readonly regionId: string;
+  readonly xMm: number;
+  readonly yMm: number;
+  readonly zMm: number;
+  readonly sizeMm: readonly [number, number, number];
+  readonly quarterTurns: number;
+  readonly refused: boolean;
+}
+/** How thin a copy of a part that lies flat (a pond, a field) is drawn, millimetres. */
+const FLAT_GHOST_MM = 50;
+
 export interface ThingMiss {
   readonly placedId: string;
   readonly reason: string;
@@ -222,6 +256,8 @@ export class ThingLayer {
   /** Makes every figure of this page from the library, a container once a digest. */
   readonly maker: ThingFigureMaker;
   private picked: string | null = null;
+  /** A made part's see-through box copy, and its one material. */
+  private boxGhost: { readonly refused: boolean; readonly root: pc.Entity; readonly shape: pc.Entity; readonly material: pc.StandardMaterial } | null = null;
   /** The see-through copy an editor asked for, and what it was made from. */
   private ghost: { readonly placedId: string; readonly refused: boolean; readonly source: ThingFigure; readonly root: pc.Entity; readonly materials: readonly pc.StandardMaterial[] } | null = null;
   /**
@@ -333,19 +369,7 @@ export class ThingLayer {
           // Only a part whose material can fade is drawn: a copy is never solid. A skinned part is
           // posed by its original's bones, so it would stand where the original stands: not drawn.
           if (!(instance.material instanceof pc.StandardMaterial) || instance.skinInstance != null) { instance.visible = false; continue; }
-          const material = instance.material.clone();
-          // A light copy, not the thing's own surface: no maps or vertex colours, its colour its light.
-          material.useLighting = false;
-          material.diffuse = pc.Color.BLACK;
-          material.diffuseMap = null;
-          material.diffuseVertexColor = false;
-          material.emissive = ghost.refused ? REFUSED_LIGHT : GHOST_LIGHT;
-          material.emissiveMap = null;
-          material.emissiveVertexColor = false;
-          material.opacity = ghost.refused ? REFUSED_OPACITY : GHOST_OPACITY;
-          material.opacityDither = pc.DITHER_IGNNOISE;
-          material.opacityShadowDither = pc.DITHER_IGNNOISE;
-          material.update();
+          const material = asGhost(instance.material.clone(), ghost.refused);
           instance.material = material;
           materials.push(material);
         }
@@ -356,6 +380,43 @@ export class ThingLayer {
     this.ghost.root.setLocalPosition(ghost.xMm / 1000, ghost.yMm / 1000, ghost.zMm / 1000);
     this.ghost.root.setLocalEulerAngles(0, (ghost.yawMicroradians / 1_000_000) * (180 / Math.PI), 0);
     this.options.invalidate?.();
+  }
+
+  /**
+   * Draw a see-through box where a made part would stand (a building, a fixture or a pond carried
+   * in build mode), in the ghost's own light, coral where the world refused the spot; null takes it
+   * away. A made part has no figure in this layer, so its copy is its box, posed as its drawing poses it.
+   */
+  setBoxGhost(ghost: BoxGhost | null): void {
+    const root = ghost === null ? null : this.options.regionRoot(ghost.regionId);
+    if (ghost === null || root === null) {
+      this.dropBoxGhost();
+      this.options.invalidate?.();
+      return;
+    }
+    if (this.boxGhost === null || this.boxGhost.refused !== ghost.refused || this.boxGhost.root.parent !== root) {
+      this.dropBoxGhost();
+      const entity = new pc.Entity('part-ghost');
+      const shape = new pc.Entity('part-ghost:shape');
+      const material = asGhost(new pc.StandardMaterial(), ghost.refused);
+      shape.addComponent('render', { type: 'box', material, castShadows: false });
+      entity.addChild(shape);
+      root.addChild(entity);
+      this.boxGhost = { refused: ghost.refused, root: entity, shape, material };
+    }
+    const [width, depth, height] = ghost.sizeMm.map((mm) => Math.max(mm, FLAT_GHOST_MM) / 1000) as [number, number, number];
+    this.boxGhost.root.setLocalPosition(ghost.xMm / 1000, ghost.yMm / 1000, ghost.zMm / 1000);
+    this.boxGhost.root.setLocalEulerAngles(0, 90 * (ghost.quarterTurns % 4), 0);
+    this.boxGhost.shape.setLocalPosition(0, height / 2, 0);
+    this.boxGhost.shape.setLocalScale(width, height, depth);
+    this.options.invalidate?.();
+  }
+
+  private dropBoxGhost(): void {
+    if (this.boxGhost === null) return;
+    this.boxGhost.root.destroy();
+    this.boxGhost.material.destroy();
+    this.boxGhost = null;
   }
 
   private dropGhost(): void {
@@ -447,6 +508,7 @@ export class ThingLayer {
     this.destroyed = true;
     this.options.app.off('update', this.onUpdate);
     this.dropGhost();
+    this.dropBoxGhost();
     this.ring.place(null, 0);
     for (const [id, entry] of this.entries) this.drop(id, entry);
     this.ring.destroy();

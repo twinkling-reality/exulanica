@@ -84,6 +84,8 @@ function waitMs(response: Response): number {
 /** A site world read and mounted in its look, and how to mount the same drawing in another. */
 export interface SiteWorld {
   readonly mount: GeneratedSiteMount;
+  /** The SHA-256 of the drawing as its route served it (its ETag): a changed world reads another. */
+  readonly drawingSha256?: string;
   readonly look: WorldLookState;
   /** The same drawing in another look: nothing is read or checked again. Throws, changing nothing, when the pack cannot be read. */
   readonly relook: (choice: WorldLookChoice) => Promise<{ readonly mount: GeneratedSiteMount; readonly look: WorldLookState }>;
@@ -138,7 +140,7 @@ export async function loadSiteWorld(
         || terrain.arrivalFacingMm.some((v, i) => v !== drawing.arrival.facingMm[i])) throw new Error("This world's terrain drawing differs from its saved entry.");
   } else if (entry.generatedSite == null) throw new Error("This world's drawing is not its declared terrain.");
   const land = isTerrainSiteDrawing(drawing) || drawing.land === undefined ? null : await loadSiteLand(access, entry, drawing);
-  return siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry, land);
+  return { ...await siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry, land), drawingSha256: actual };
 }
 
 /**
@@ -261,12 +263,73 @@ async function siteInLook(
  * The site as the page mounts it, with a look that can be swapped while it stays mounted: what
  * `redrawWorldLook` draws in while this world is attached.
  */
-export function switchableSite(world: SiteWorld, stated: (look: WorldLookState) => void, shell: Element): GeneratedSiteMount {
+export function switchableSite(
+  world: SiteWorld,
+  stated: (look: WorldLookState) => void,
+  shell: Element,
+  /** How to read the world again and hand on its plan of sight: given, the site can be drawn again while open (`openSite`). */
+  reading?: { readonly read: (entry: SavedWorldEntry) => Promise<SiteWorld | null>; readonly standing: (blockers: readonly SightBlocker[]) => void },
+): GeneratedSiteMount {
   const drawing = swappableDrawing(world.mount, world.relook, (next) => next.mount, (next) => {
     stated({ ...next.look, source: 'redraw' });
   }, shell);
-  return { ...world.mount, attach: (host) => drawing.attach(host) };
+  let shown = world;
+  // One redraw at a time, in the order asked, so an older reading never goes up after a newer one.
+  let redrawing: Promise<unknown> = Promise.resolve();
+  const site: OpenSite = {
+    drawing: () => shown.mount.drawing,
+    redraw(entry, walk) {
+      const run = redrawing.then(async (): Promise<boolean> => {
+        if (reading === undefined) return false;
+        const next = await reading.read(entry);
+        if (next === null || (next.drawingSha256 !== undefined && next.drawingSha256 === shown.drawingSha256)) return false;
+        if (!(await drawing.replace(next))) return false;
+        shown = next;
+        reading.standing(sightOf(next));
+        walk(next.mount.navigationWorld);
+        return true;
+      });
+      redrawing = run.catch(() => false);
+      return run;
+    },
+  };
+  return {
+    ...world.mount,
+    attach: (host) => {
+      const attachment = drawing.attach(host);
+      openSite = site;
+      const dispose = attachment.dispose;
+      return Object.assign(attachment, {
+        dispose() {
+          if (openSite === site) openSite = null;
+          dispose.call(attachment);
+        },
+      });
+    },
+  };
 }
+
+/** Every box a site's drawing draws across the eye height a person walks it at: what hides a being there. */
+function sightOf(world: SiteWorld): SightBlocker[] {
+  const drawing = world.mount.drawing;
+  if (isTerrainSiteDrawing(drawing)) return [];
+  const eyeMm = world.mount.navigationWorld.eyeHeight * 1000;
+  return world.mount.land === undefined ? siteSightRings(drawing, eyeMm) : siteSightRings(drawing, eyeMm, world.mount.land.groundMm);
+}
+
+/**
+ * The site world open now, drawn again from a new reading after a person changed one of its made
+ * parts: its drawing as it stands (what points at its parts reads it), and `redraw`, which reads the
+ * entry's version again and, when its drawing changed, draws it in place in the look the world shows
+ * now, hands on what hides a being and gives its walking world to `walk`. True when it drew again.
+ */
+export interface OpenSite {
+  readonly drawing: () => SiteDrawing;
+  redraw(entry: SavedWorldEntry, walk: (world: GeneratedSiteMount['navigationWorld']) => void): Promise<boolean>;
+}
+let openSite: OpenSite | null = null;
+/** The site world open now, or null. */
+export const currentOpenSite = (): OpenSite | null => openSite;
 
 /** The site to mount for a saved world made from a world kind, or null, with words, when it is not drawn. */
 export async function openSiteWorld(
@@ -291,14 +354,15 @@ export async function openSiteWorld(
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     if (world === null) return null;
     // Every box the drawing draws across the eye height a person walks it at.
-    if (!isTerrainSiteDrawing(world.mount.drawing)) {
-      standing(world.mount.land === undefined
-        ? siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000)
-        : siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000, world.mount.land.groundMm));
-    }
+    if (!isTerrainSiteDrawing(world.mount.drawing)) standing(sightOf(world));
     const stated = (look: WorldLookState): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(world.look);
-    return switchableSite(world, stated, env.shell);
+    // A site drawn on a plan (not terrain) is drawn again after a person changes one of its made parts.
+    const reading = isTerrainSiteDrawing(world.mount.drawing) ? undefined : {
+      read: (next: SavedWorldEntry) => loadSiteWorld(access, next, () => {}, undefined, undefined, bound, currentEntry),
+      standing,
+    };
+    return switchableSite(world, stated, env.shell, reading);
   } catch (error) {
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     console.warn(error);
