@@ -23,10 +23,13 @@ import { pop } from './world-ui-character.ts';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
 import { placedLine } from './build-words.mjs';
-import { keyWord, mountUiScale } from './world-ui.ts';
+import { areaBanner, keyWord, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
+import { endOpening } from './world-opening.ts';
+import { populationLine } from './opening-steps.mjs';
+import { OFFLINE_AFTER_FAILED_READS } from './world-ui-layout.mjs';
 import { worldKey, wakesHints } from './world-keys.mjs';
-import { CORNER_WORDS, availableHints } from './world-words.mjs';
+import { CORNER_WORDS, NOTE_WORDS, availableHints } from './world-words.mjs';
 import { openDecisionPage } from './decision-page.ts';
 import { DECISION_WORDS, askedAt, choiceRows, choicesLabel, decisionTitle, overLabel, resultLines, toldLabel, toldSections } from './decision-words.mjs';
 import { ASK_ASPECTS, askEntityCompanion, askWords } from './entity-companion.mjs';
@@ -103,7 +106,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // Play and Pause, the hints for what works here, the reticle and the note.
   // A read-only copy dims what needs the server (Play and Pause), as the offline state does.
   const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); },
-    readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1' });
+    readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed });
   const guidance = corners.hintsRoot, worlds = corners.backRoot, worldNotes = corners.notes;
   let rows = [], inventory = null, target = null, held = null;
   let dragging = null, serial = 0, lastPick = 0, frameId = 0;
@@ -897,6 +900,29 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     b.controls.onSummon = priorCallbacks.summon; b.controls.onCameraToggle = priorCallbacks.camera; b.controls.onFlyChange = priorCallbacks.fly;
     b.setFreeCursorActive(false); b.setControlsEnabled(true);
   };
-  try { await refreshInventory(); } catch (error) { notice(error.message); }
+  // The world's own read of what is in it: a failure retries quietly with the backoff, and only
+  // failures in a row say the world is not connected, until a read succeeds (DESIGN's ruling L14).
+  let inventoryFailures = 0, inventoryReading = false;
+  const readInventory = async () => {
+    if (inventoryReading || lifetime.signal.aborted) return;
+    inventoryReading = true;
+    try {
+      await refreshInventory();
+      if (inventoryFailures >= OFFLINE_AFTER_FAILED_READS) notice('');
+      inventoryFailures = 0; readBackoff.succeeded('world-inventory');
+    } catch {
+      inventoryFailures++; readBackoff.failed('world-inventory', performance.now());
+      if (inventoryFailures >= OFFLINE_AFTER_FAILED_READS && !lifetime.signal.aborted) corners.notes.show(NOTE_WORDS.offline, { ms: 0 });
+    } finally { inventoryReading = false; }
+  };
+  const retrying = window.setInterval(() => { if (inventoryFailures > 0 && readBackoff.ready('world-inventory', performance.now())) void readInventory(); }, 500);
+  lifetime.signal.addEventListener('abort', () => clearInterval(retrying), { once: true });
+  await readInventory();
   canvas.focus({ preventScroll: true }); frameId = requestAnimationFrame(frame);
+  // Arriving (frame 02): the opening gives way, and the world's name shows once with who lives here.
+  if (endOpening()) {
+    const banner = areaBanner({ name: entry.title, sub: populationLine(selection.people?.clock().population ?? null) ?? undefined });
+    root.append(banner.root);
+    void banner.play().then(() => banner.remove());
+  }
 }

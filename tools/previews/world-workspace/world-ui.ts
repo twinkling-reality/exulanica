@@ -482,7 +482,7 @@ export interface AreaBanner { readonly root: HTMLElement; play(): Promise<void>;
 
 /** The world's name on arrival (5.18): in 600 ms, holds 2.4 s, out 800 ms; once. */
 export function areaBanner({ name, over, sub }: { readonly name: string; readonly over?: string; readonly sub?: string }): AreaBanner {
-  const root = element('div', 'wu-banner');
+  const root = element('div', over ? 'wu-banner wu-made' : 'wu-banner');
   root.setAttribute('role', 'status');
   if (over) root.append(element('p', 'wu-banner-over', over));
   root.append(element('h1', 'wu-banner-name', name), element('div', 'wu-banner-line'));

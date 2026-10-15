@@ -2,6 +2,7 @@ import './front-door.css';
 import captures from 'virtual:front-door-captures';
 import { createScenePreview, scenePreviewPage } from './front-door-preview.ts';
 import { showWorldDetails } from './front-door-details.ts';
+import { endOpening, handOverOpening } from './world-opening.ts';
 import { capturedPicture, frontDoorAddress, openWorldAddress, worldAddress } from './front-door-routes.mjs';
 import { worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
@@ -19,9 +20,14 @@ export function frontDoorPicture(entry: SavedWorldEntry): string | null {
   return capturedPicture(captures, entry);
 }
 
+/** The saved worlds the front door shows, for Open to hand a world's name and picture to its opening. */
+let shownEntries: readonly SavedWorldEntry[] = [];
+
 /** Open: the workspace's world view of `entryId`. Settles as this page goes, so Open stays busy until then. */
-export function openFromFrontDoor(entryId: string): Promise<void> {
+export async function openFromFrontDoor(entryId: string): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entryId }, '', location.href);
+  const entry = shownEntries.find(one => one.entryId === entryId);
+  if (entry) await handOverOpening(entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry));
   location.assign(worldAddress(entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
@@ -52,6 +58,9 @@ export function keepWorldInAddress(entryId: string, signal: AbortSignal): void {
 export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: readonly SavedWorldEntry[] }): void {
   // A preview is one world drawn alone; it never holds a front door, or a live preview of its own.
   if (scenePreviewPage()) return;
+  // A world that did not open lands here: its opening gives way to the front door.
+  endOpening();
+  shownEntries = entries;
   document.body.classList.add('ux-review');
   root.classList.add('ux-world-entry', 'ux-noveuis');
   const brand = document.createElement('p'); brand.className = 'ux-entry-brand'; brand.textContent = 'exulanica';

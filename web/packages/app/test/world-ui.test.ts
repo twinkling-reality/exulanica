@@ -21,6 +21,7 @@ interface WorldUi {
   nameTag(options?: { scale?: () => number }): { readonly root: HTMLElement; set(words: { name: string; doing?: string | null; model?: string | null; live?: boolean }): void; place(x: number, y: number): void; hide(): void };
   outline(options?: { form?: 'chosen' | 'copy' | 'refused' | 'origin' }): { readonly root: SVGSVGElement; place(corners: readonly { x: number; y: number }[]): void; form(form: 'chosen' | 'copy' | 'refused' | 'origin'): void; hide(): void };
   path(): { readonly root: SVGSVGElement; place(from: { x: number; y: number }, to: { x: number; y: number }): void; hide(): void };
+  areaBanner(words: { name: string; over?: string; sub?: string }): { readonly root: HTMLElement; remove(): void };
 }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
 // module (outside this package) out of the program.
@@ -178,5 +179,19 @@ describe('the parts beside a subject', () => {
     const way = path();
     way.place({ x: 0, y: 0 }, { x: 70, y: 0 });
     expect(way.root.querySelector('path')!.getAttribute('d')).toBe('M0.0 0.0Q35.0 -10.0 70.0 0.0');
+  });
+});
+
+describe('the area banner', () => {
+  it('names the world once, with who lives there, and takes frame 22\'s form with an over-label', async () => {
+    const { areaBanner } = await parts();
+    const arriving = areaBanner({ name: 'Terraces on the bay', sub: '24 people live here' });
+    expect(arriving.root.getAttribute('role')).toBe('status');
+    expect(arriving.root.textContent).toBe('Terraces on the bay24 people live here');
+    expect(arriving.root.classList.contains('wu-made')).toBe(false);
+    const made = areaBanner({ name: 'Harbour at night', over: 'Made from your words' });
+    expect(made.root.classList.contains('wu-made')).toBe(true);
+    expect(made.root.querySelector('.wu-banner-over')!.textContent).toBe('Made from your words');
+    expect(made.root.querySelector('.wu-banner-sub')).toBeNull();
   });
 });

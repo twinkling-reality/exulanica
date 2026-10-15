@@ -60,6 +60,12 @@ export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = 
 export const WORLD_UI_TIMING = Object.freeze({ hintsFadeAfter: 10_000, hintsWake: 6_000, note: 4_000, noteWithPrompt: 8_000, banner: { in: 600, hold: 2_400, out: 800 } });
 
 /**
+ * A read the world makes by itself retries quietly (read-backoff.mjs); only after this many failures
+ * in a row does the offline note show, and it stays until a read succeeds (DESIGN's ruling L14).
+ */
+export const OFFLINE_AFTER_FAILED_READS = 3;
+
+/**
  * Whether the hints show at `now`, given the last moment they were woken and how long that wake
  * lasts. `since` is the moment the world view mounted (hints show for `hintsFadeAfter` from it).
  */

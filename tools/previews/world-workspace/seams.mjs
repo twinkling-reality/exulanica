@@ -3,8 +3,11 @@
 // it against the real sources, so a change to one of these lines fails a test instead of the
 // preview's start-up.
 
+import { OPENING_EVENT, OPENING_STAGES } from './opening-steps.mjs';
+
 const MAIN = 'web/packages/app/src/main.ts';
 const SELECTION = 'web/packages/app/src/composition/environment-selection.ts';
+const BOOTSTRAP = 'web/packages/app/src/bootstrap.ts';
 
 /** Each target must occur exactly once in its file; `seam` names it in a refusal. */
 export const SEAMS = Object.freeze([
@@ -22,7 +25,12 @@ export const SEAMS = Object.freeze([
   };`,
   },
   { seam: 'Your worlds front door', file: MAIN, target: '  replaceSurface(shell, [yourWorlds.root]);' },
+  { seam: 'land drawn', file: MAIN, target: '  const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null;' },
+  { seam: 'opening first', file: BOOTSTRAP, target: "void import('./main.js')" },
 ]);
+
+/** How a seam tells the opening (world-opening.ts) that a loading stage ended (opening-steps.mjs). */
+const report = (index, title = '') => `window.dispatchEvent(new CustomEvent('${OPENING_EVENT}', { detail: { report: '${OPENING_STAGES[index].report}'${title ? `, title: ${title}` : ''} } }));`;
 
 /** The files the preview edits, relative to the repository root. */
 export const SEAM_FILES = Object.freeze([...new Set(SEAMS.map(seam => seam.file))]);
@@ -40,12 +48,18 @@ export const occurrences = (code, target) => code.split(target).length - 1;
  * Your worlds becomes the front door (front-door.ts): its pictures, its Open, which goes to this
  * workspace's world view of the chosen world, and its look. A world opened by its address
  * (`?entry=`) mounts the workspace's world view, or, in a scene preview, only the preview's camera.
+ * A world's page shows its opening (world-opening.ts) from the app's first script, beside the app's
+ * own start (its small module loads while the app's large one does), and the app reports each
+ * loading stage to it as the stage ends: the world read, the land drawn, the people in.
  */
 export function patchSource(file, code, here) {
   if (!SEAM_FILES.includes(file)) return null;
   for (const one of SEAMS.filter(each => each.file === file)) {
     const found = occurrences(code, one.target);
     if (found !== 1) throw Error(`World workspace seam "${one.seam}" occurs ${found} times in ${file}; it must occur exactly once.`);
+  }
+  if (file === BOOTSTRAP) {
+    return code.replace(seam('opening first'), `void import('/@fs/${here}/world-opening.ts').then((opening) => opening.mountOpening(), () => {});\n` + seam('opening first'));
   }
   if (file === SELECTION) {
     return code.replace(seam('picker hook'), '    atlas.__workspacePick = pickedAlong;\n    atlas.__workspaceThings = () => things;\n' + seam('picker hook'));
@@ -57,11 +71,12 @@ import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-pre
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
       const reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
-      if (reviewEntry) { await openWorldEntryContext(state, reviewEntry); state.worldEntryError = null; shell.removeAttribute('data-world-state'); await mount(); return; }
+      if (reviewEntry) { await openWorldEntryContext(state, reviewEntry); ${report(0, 'reviewEntry.title')} state.worldEntryError = null; shell.removeAttribute('data-world-state'); await mount(); return; }
       pendingEntryProblem = 'This saved world is no longer available. Choose a world here.';
     }
 ` + seam('start() deep link'))
-    .replace(seam('begin() await'), 'await environmentSelection.begin();')
+    .replace(seam('begin() await'), `await environmentSelection.begin();\n  ${report(2)}`)
+    .replace(seam('land drawn'), `  ${report(1)}\n` + seam('land drawn'))
     .replace(seam('objects.begin mount'), `await objects.begin(state.activeWorldEntry?.authoredVersionId);
       if (scenePreviewPage()) mountScenePreview({ state, renderer });
       else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects, send: sendPlanned, binding: activeEntryWriteBinding});`)

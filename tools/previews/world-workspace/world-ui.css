@@ -23,7 +23,8 @@
   --glass-fill: rgba(13, 20, 27, .68);
   --glass-blur: blur(30px) saturate(120%) brightness(.92);
   /* A crisp dark halo first, so white text keeps an edge on pale sunlit ground (DESIGN's ruling L8). */
-  --text-shadow: 0 0 1px rgba(0, 0, 0, .7), 0 0 3px rgba(0, 0, 0, .4), 0 1px 2px rgba(0, 0, 0, .42), 0 0 22px rgba(0, 0, 0, .30);
+  --text-halo: 0 0 1px rgba(0, 0, 0, .7), 0 0 3px rgba(0, 0, 0, .4);
+  --text-shadow: var(--text-halo), 0 1px 2px rgba(0, 0, 0, .42), 0 0 22px rgba(0, 0, 0, .30);
   --cap-halo: 0 0 0 1px rgba(0, 0, 0, .22);
   --rim: linear-gradient(115deg, rgba(190, 222, 230, .95), rgba(255, 255, 255, .50) 26%, rgba(255, 255, 255, .06) 52%, rgba(125, 166, 179, .70) 84%, rgba(232, 240, 237, .90));
   --scrim-tone: rgba(6, 12, 16, .30);
@@ -191,13 +192,40 @@ span.wu-prompt { cursor: default; }
 .wu-note[data-place="build"] { bottom: calc(236 * var(--u)); }
 .wu-note[data-place="page"] { bottom: calc(46 * var(--u)); }
 
+/* The speed scale beside the Speed hint while flying (frame 03). */
+.wu-gauge { display: inline-flex; align-items: flex-end; gap: calc(4 * var(--u)); height: calc(18 * var(--u)); margin-left: calc(4 * var(--u)); }
+.wu-gauge i { width: calc(4 * var(--u)); border-radius: 1px; background: rgba(255, 255, 255, .28); }
+.wu-gauge i.wu-on { background: #fff; box-shadow: 0 0 8px rgba(191, 233, 240, .9); }
+
+/* ---------- Opening a world (8.1, frame 01) ---------- */
+.wu-opening { position: fixed; inset: 0; z-index: 60; background: #0c1216; color: var(--ink); pointer-events: none; }
+.wu-opening[data-leaving="true"] { animation: wu-fade-out 400ms var(--ease) both; }
+.wu-opening-world { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.wu-opening-fade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(6, 11, 15, .72) 0%, rgba(6, 11, 15, .40) 26%, rgba(6, 11, 15, 0) 52%), radial-gradient(calc(900 * var(--u)) calc(520 * var(--u)) at 0% 100%, rgba(6, 11, 15, .45), rgba(6, 11, 15, 0)); }
+.wu-opening-words { position: absolute; left: calc(96 * var(--u)); bottom: calc(118 * var(--u)); text-shadow: var(--text-shadow); }
+.wu-opening-over { margin-bottom: calc(16 * var(--u)); font: 400 max(12px, calc(15 * var(--u)))/1.45 var(--font-sans); letter-spacing: .03em; color: var(--ink-2); }
+.wu-opening-tip .wu-opening-over { color: var(--ink-3); }
+.wu-opening-name { margin: 0; font: 200 calc(84 * var(--u))/1 var(--font-sans); letter-spacing: -.025em; }
+.wu-opening-line { position: relative; width: calc(460 * var(--u)); height: 2px; margin-top: calc(30 * var(--u)); border-radius: 2px; background: rgba(255, 255, 255, .22); }
+.wu-opening-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 2px; background: linear-gradient(90deg, rgba(168, 203, 210, .6), #fff); box-shadow: 0 0 12px rgba(191, 233, 240, .9); transition: width 300ms var(--ease); }
+.wu-opening-end { position: absolute; left: 0; top: -3px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #fff; box-shadow: 0 0 12px rgba(191, 233, 240, 1); transition: left 300ms var(--ease); }
+.wu-opening-step { margin-top: calc(16 * var(--u)); font: 400 max(12px, calc(15 * var(--u)))/1.45 var(--font-sans); color: var(--ink-2); }
+.wu-opening-tip { position: absolute; right: calc(96 * var(--u)); bottom: calc(118 * var(--u)); text-align: right; text-shadow: var(--text-shadow); }
+.wu-opening-tip .wu-row { gap: calc(26 * var(--u)); }
+
 /* ---------- Area banner (5.18) ---------- */
-.wu-banner { position: absolute; left: 0; right: 0; top: calc(128 * var(--u)); text-align: center; pointer-events: none;
-  text-shadow: 0 2px 26px rgba(0, 30, 60, .35), 0 1px 2px rgba(0, 0, 0, .25); opacity: 0; }
+.wu-banner { --banner-centre: calc(37 * var(--u)); position: absolute; left: 0; right: 0; top: calc(128 * var(--u)); isolation: isolate; text-align: center; pointer-events: none;
+  text-shadow: var(--text-halo), 0 2px 26px rgba(0, 30, 60, .35), 0 1px 2px rgba(0, 0, 0, .25); opacity: 0; }
+/* Its own scrim behind the name, fading with it, so a bright sky or a moon never washes it out (L13). */
+.wu-banner::before { content: ''; position: absolute; left: 50%; top: var(--banner-centre); z-index: -1; width: calc(1200 * var(--u)); height: calc(360 * var(--u)); transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(6, 12, 16, .30), rgba(6, 12, 16, 0)); }
 .wu-banner-over { margin: 0 0 calc(18 * var(--u)); font: 500 calc(16 * var(--u))/1 var(--font-sans); letter-spacing: .06em; }
 .wu-banner-name { margin: 0; font: 200 calc(74 * var(--u))/1 var(--font-sans); letter-spacing: -.025em; }
 .wu-banner-line { width: calc(560 * var(--u)); height: 1px; margin: calc(26 * var(--u)) auto 0; background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .95), rgba(255, 255, 255, 0)); }
 .wu-banner-sub { margin: calc(16 * var(--u)) 0 0; font: 400 calc(17 * var(--u))/1 var(--font-sans); letter-spacing: .04em; color: rgba(255, 255, 255, .88); }
+/* The banner with an over-label, as a world made from words arrives (frame 22). */
+.wu-banner.wu-made { --banner-centre: calc(75 * var(--u)); top: calc(150 * var(--u)); text-shadow: var(--text-halo), 0 2px 30px rgba(0, 10, 40, .45), 0 1px 2px rgba(0, 0, 0, .3); }
+.wu-banner.wu-made .wu-banner-name { font-size: calc(78 * var(--u)); }
+.wu-banner.wu-made .wu-banner-over { margin-bottom: calc(20 * var(--u)); color: #fff; text-shadow: var(--text-halo), 0 1px 2px rgba(0, 10, 40, .6), 0 0 16px rgba(0, 20, 60, .65); }
 
 /* ---------- Pages (5.7), key row (5.11), rows (5.12), fields (5.16), steps (5.17) ---------- */
 .wu-page { position: absolute; inset: 0; pointer-events: auto; }
@@ -254,12 +282,15 @@ span.wu-prompt { cursor: default; }
 @keyframes wu-breath { 0%, 100% { opacity: 1; } 50% { opacity: .8; } }
 @keyframes wu-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @keyframes wu-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wu-fade-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes wu-page-in { from { opacity: 0; translate: 0 calc(8 * var(--u)); filter: blur(4px); } to { opacity: 1; translate: 0 0; filter: blur(0); } }
 
 @media (prefers-reduced-motion: reduce) {
   .wu-root { --t-hint: 120ms; --t-note-in: 120ms; --t-note-out: 120ms; }
   .wu-reveal, .wu-card, .wu-note, .wu-note[data-leaving="true"], .wu-page-content, .wu-page-shade, .wu-page-blur { animation-name: wu-fade; animation-duration: 120ms; }
   .wu-note[data-leaving="true"] { animation-name: wu-note-out; }
+  .wu-opening[data-leaving="true"] { animation-duration: 120ms; }
+  .wu-opening-fill, .wu-opening-end { transition: none; }
   .wu-ring { animation: wu-fade 120ms both; }
   .wu-live-dot, .wu-step[data-state="now"] .wu-step-dot::after { animation: none; }
 }

@@ -4,6 +4,7 @@
 // one note at a time. Built from the shared parts (world-ui.ts); the world view (contextual-world.ts)
 // and build mode tell the corners what to say.
 import { clockLine, worldTime } from './world-clock.mjs';
+import { SPEED_SCALE, speedBars } from './opening-steps.mjs';
 import { CORNER_WORDS, NOTE_WORDS } from './world-words.mjs';
 import { WORLD_UI_TIMING, hintsShown } from './world-ui-layout.mjs';
 import { keyWord, notes as mountNotes, promptColumn, promptRow, setWord, type Notes } from './world-ui.ts';
@@ -15,6 +16,7 @@ export interface CornerPeople {
     readonly mode: 'paused' | 'playing' | null;
     readonly minute: number | null;
     readonly startMinuteOfDay?: number | null;
+    readonly population?: number | null;
     readonly busy: boolean;
   };
   play(): Promise<void>;
@@ -22,7 +24,7 @@ export interface CornerPeople {
 }
 
 /** One hint: its caps and word; `gapBefore` starts the keys that do something. */
-export interface Hint { readonly keys: readonly string[] | 'mouse' | 'mouse-click'; readonly word: string; readonly shortcut?: string; readonly gapBefore?: boolean }
+export interface Hint { readonly keys: readonly string[] | 'mouse' | 'mouse-click'; readonly word: string; readonly shortcut?: string; readonly gapBefore?: boolean; readonly gauge?: boolean }
 
 export interface Corners {
   /** The Back corner's element (build mode hides it while building, as before). */
@@ -57,12 +59,14 @@ const div = (className: string): HTMLDivElement => { const made = document.creat
 /** How often the clock reads the people's state, in ms (a minute of the world is seconds of real time). */
 const CLOCK_READ_MS = 250;
 
-export function mountCorners({ host, people, onLeave, readOnly = false, timing = WORLD_UI_TIMING }: {
+export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed = () => NaN, timing = WORLD_UI_TIMING }: {
   readonly host: HTMLElement;
   readonly people: CornerPeople | null;
   readonly onLeave: () => void;
   /** A copy that may not change the world: Play and Pause show dimmed and do nothing. */
   readonly readOnly?: boolean;
+  /** The flying speed in metres a second, for the speed scale beside the Speed hint. */
+  readonly flySpeed?: () => number;
   readonly timing?: typeof WORLD_UI_TIMING;
 }): Corners {
   const scrims = Object.fromEntries(['tl', 'tr', 'bl', 'tc'].map((corner) => [corner, div(`wu-scrim wu-${corner}`)])) as Record<'tl' | 'tr' | 'bl' | 'tc', HTMLDivElement>;
@@ -96,9 +100,26 @@ export function mountCorners({ host, people, onLeave, readOnly = false, timing =
   let since = performance.now(), wokenAt = -Infinity, held = false, lastRead = -Infinity, shownTime = '', shownLine = '';
   let playing = false, present = false, sending = false;
 
+  // The speed scale (frame 03): seven bars, the lit ones the flying speed's share of its range.
+  let gauge: HTMLElement[] = [], litBars = -1;
   function drawHints(): void {
     const list = handed ?? own;
-    const prompts = list.map((hint) => keyWord({ keys: hint.keys, word: hint.word, ...(hint.shortcut ? { shortcut: hint.shortcut } : {}) }));
+    gauge = []; litBars = -1;
+    const prompts = list.map((hint) => {
+      const prompt = keyWord({ keys: hint.keys, word: hint.word, ...(hint.shortcut ? { shortcut: hint.shortcut } : {}) });
+      if (hint.gauge) {
+        const scale = div('wu-gauge');
+        scale.setAttribute('aria-hidden', 'true');
+        gauge = Array.from({ length: SPEED_SCALE.bars }, (_, index) => {
+          const bar = document.createElement('i');
+          bar.style.height = `calc(${6 + index * 2} * var(--u))`;
+          return bar;
+        });
+        scale.append(...gauge);
+        prompt.append(scale);
+      }
+      return prompt;
+    });
     const gaps = list.flatMap((hint, index) => (hint.gapBefore && index > 0 ? [index - 1] : []));
     const drawn = vertical && handed ? promptColumn(prompts) : promptRow(prompts, gaps);
     hintsRoot.className = `wu-hints ${drawn.className}`;
@@ -158,6 +179,10 @@ export function mountCorners({ host, people, onLeave, readOnly = false, timing =
     togglePlay,
     frame(now) {
       if (now - lastRead >= CLOCK_READ_MS) { lastRead = now; readClock(); }
+      if (gauge.length) {
+        const lit = speedBars(flySpeed());
+        if (lit !== litBars) { litBars = lit; gauge.forEach((bar, index) => bar.classList.toggle('wu-on', index < lit)); }
+      }
       const shown = hintsShown(now, { since, wokenAt, held, wake: timing.hintsWake, fadeAfter: timing.hintsFadeAfter });
       const faded = String(!shown);
       if (hintsRoot.dataset.faded !== faded) { hintsRoot.dataset.faded = faded; scrims.bl.style.opacity = shown ? '' : '0'; }
