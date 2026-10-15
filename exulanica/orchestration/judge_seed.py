@@ -907,7 +907,8 @@ def _refuse_private_workspace_assets(
 
 
 def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
-    """A workspace holding its own looks, thing kinds or kept web pictures cannot be seeded.
+    """A workspace holding its own looks, thing kinds, kept web pictures or a changed town's
+    tiles cannot be seeded.
 
     A look's container lives in its workspace's own ``looks`` namespace
     (:mod:`exulanica.world.thing_store`), outside the content store a seed copies from, and a look
@@ -917,25 +918,33 @@ def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID)
     workspace's own admitted assets; and so it does while the looks namespace still holds a
     container the purge has not destroyed (migration 0172's inventory, ``look_object``). A kept web
     picture (migration 0215) is a stranger's photograph kept for one person's private world, so a
-    workspace that keeps one, or whose web pictures namespace still holds bytes, is refused too.
+    workspace that keeps one, or whose web pictures namespace still holds bytes, is refused too, as
+    is one whose version tiles namespace holds a changed town's tiles (migration 0219), which live
+    outside the content store a seed copies from.
     """
     present = connection.execute(
         "select to_regclass('look_version') is not null as looks, "
         "to_regclass('look_object') is not null as objects, "
-        "to_regclass('web_picture_object') is not null as pictures"
+        "to_regclass('web_picture_object') is not null as pictures, "
+        "to_regclass('world_version_tile_object') is not null as tiles"
     ).fetchone()
-    if (
-        present["pictures"]
-        and connection.execute(
-            "select exists (select 1 from web_picture_object where workspace_id = %(w)s "
-            "and purged_at is null) as held",
-            {"w": workspace_id},
-        ).fetchone()["held"]
+    for held, table, words in (
+        (
+            "pictures",
+            "web_picture_object",
+            "keeps pictures from the web for its own private worlds",
+        ),
+        ("tiles", "world_version_tile_object", "holds tiles of towns its people changed"),
     ):
-        raise SeedRefused(
-            f"workspace {workspace_id} keeps pictures from the web for its own private worlds; "
-            "a seed cannot carry them"
-        )
+        if (
+            present[held]
+            and connection.execute(
+                f"select exists (select 1 from {table} where workspace_id = %(w)s "
+                "and purged_at is null) as held",
+                {"w": workspace_id},
+            ).fetchone()["held"]
+        ):
+            raise SeedRefused(f"workspace {workspace_id} {words}; a seed cannot carry them")
     if not present["looks"]:
         return
     # A schema between the store and its inventory holds looks and no inventory to count.

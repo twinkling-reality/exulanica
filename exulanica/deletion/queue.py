@@ -52,6 +52,7 @@ from exulanica.store.namespaces import (
     BLOB_NAMESPACE,
     LOOK_NAMESPACE,
     MATERIAL_NAMESPACE,
+    VERSION_TILE_NAMESPACE,
     WEB_PICTURE_NAMESPACE,
     WORKSPACE_ASSET_NAMESPACE,
     WORKSPACE_NAMESPACES,
@@ -114,6 +115,8 @@ MAX_ATTEMPTS: Final = 8
 #: (migration 0172), on the same terms again. Workspace style pack targets name a file's hash in
 #: its own style pack namespace (migration 0173), on the same terms. Web picture targets name a kept
 #: picture's hash in the workspace's own web pictures namespace (migration 0215), as looks do.
+#: Version tile targets name a version's changed tile's container in the workspace's own version
+#: tiles namespace (migration 0219), on the same terms.
 DESTROYABLE_KINDS: Final = (
     "blob",
     "artifact",
@@ -123,6 +126,7 @@ DESTROYABLE_KINDS: Final = (
     "look",
     "workspace_style_pack",
     "web_picture",
+    "version_tile",
 )
 
 #: The namespace each stored kind's bytes live in (:mod:`exulanica.store.namespaces`); in a
@@ -138,6 +142,7 @@ STORED_KIND_NAMESPACES: Final[Mapping[str, str]] = MappingProxyType(
         "look": LOOK_NAMESPACE,
         "workspace_style_pack": WORKSPACE_STYLE_PACK_NAMESPACE,
         "web_picture": WEB_PICTURE_NAMESPACE,
+        "version_tile": VERSION_TILE_NAMESPACE,
     }
 )
 
@@ -325,6 +330,13 @@ def claim_purge(
         if "web_picture" in kinds
         else ""
     )
+    # And for a version's changed tiles, whose function arrives in migration 0219.
+    version_tiles = (
+        "     and (pj.target_kind <> 'version_tile' or "
+        "       version_tile_purge_is_authorized(pj.workspace_id, pj.tombstone_id, pj.target_ref)) "
+        if "version_tile" in kinds
+        else ""
+    )
     row = connection.execute(
         "update purge_job set state = 'running', attempts = attempts + 1, "
         "  attempted_at = now(), last_error = null "
@@ -340,6 +352,7 @@ def claim_purge(
         + looks
         + style_packs
         + web_pictures
+        + version_tiles
         + "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
@@ -381,6 +394,7 @@ _LATER_QUESTIONS: Final[Mapping[str, str]] = MappingProxyType(
         "look": "look_purge_is_authorized(uuid,uuid,text)",
         "workspace_style_pack": "workspace_style_pack_purge_is_authorized(uuid,uuid,text)",
         "web_picture": "web_picture_purge_is_authorized(uuid,uuid,text)",
+        "version_tile": "version_tile_purge_is_authorized(uuid,uuid,text)",
     }
 )
 
@@ -485,6 +499,13 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
     if target.target_kind == "web_picture":
         connection.execute(
             "update web_picture_object set purged_at = now() "
+            "where workspace_id = %s and content_sha256 = %s and purged_at is null",
+            (target.workspace_id, target.target_ref),
+        )
+        return
+    if target.target_kind == "version_tile":
+        connection.execute(
+            "update world_version_tile_object set purged_at = now() "
             "where workspace_id = %s and content_sha256 = %s and purged_at is null",
             (target.workspace_id, target.target_ref),
         )

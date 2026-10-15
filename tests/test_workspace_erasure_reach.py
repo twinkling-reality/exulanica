@@ -241,6 +241,11 @@ KEPT: dict[str, str] = {
         "bytes' digest, and no address or words"
     ),
     "web_picture_object": _STUB,
+    "world_version_tile_object": (
+        "a stub row kept by the purge worker, naming the world whose version's tile it held: a "
+        "tombstone queues the stored object, the worker destroys it and sets purged_at, and the "
+        "row stays to say the bytes are gone"
+    ),
     "world_kind_erasure": (
         "immutable erasure record: document/key fingerprints retire a version through restore, "
         "without retaining its document, labels or validation report"

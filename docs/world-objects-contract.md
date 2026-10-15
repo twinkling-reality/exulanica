@@ -1257,7 +1257,9 @@ is reused only for a version whose parts were never changed.
 refused by name (`parts_not_served`), as is a world not made from a world kind. A version whose overrides ever named a
 part is withheld from package export as `made_part_changes`: a package's override names only
 snapshot elements. Supported placement on a version holding part changes stays refused, as with any
-source override.
+source override. A made town's buildings take the same overrides (removed, or so many storeys), and
+the town's tiles as a version's changes leave them are its workspace's own
+([generated tile runtime, section 7.3](generated-tile-runtime.md#73-a-saved-worlds-own-tiles)).
 
 ## Bounded scene-extraction preparation
 

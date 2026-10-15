@@ -1661,11 +1661,11 @@ class SavedWorldEntryRepository:
 
     def _entry(self, row: dict[str, object]) -> SavedWorldEntry:
         from exulanica.world.generated_worlds import (
-            generated_ground,
             generated_site,
             generated_terrain,
             states_site,
             unreadable_reason,
+            version_ground,
         )
         from exulanica.world.object_repository import version_holds_things
         from exulanica.world.society_authored_ground import declared_floor
@@ -1717,7 +1717,7 @@ class SavedWorldEntryRepository:
                 elif states_site(*scope):
                     site = generated_site(*scope)
                 else:
-                    ground = generated_ground(*scope)
+                    ground = version_ground(*scope, row["authored_version_id"])
             except InvalidStructuralData as exc:
                 unreadable = unreadable_reason(exc)
         unavailable = source_invalidated or authored_changed or unreadable is not None

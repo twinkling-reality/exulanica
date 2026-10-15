@@ -82,9 +82,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "on the server once a frame holds the drawn world, and a site redrawn after a part changes",
     ),
     "exulanica/orchestration/judge_seed.py": (
-        2_021,
+        2_030,
         "a workspace sealed into a verified archive; its refusals include a workspace that keeps "
-        "web pictures (0215)",
+        "web pictures (0215) or a changed town's tiles (0219)",
     ),
     "exulanica/grammar/grammars/city/document.py": (
         1_986,

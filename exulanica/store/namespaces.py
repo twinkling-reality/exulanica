@@ -41,6 +41,7 @@ __all__ = [
     "MATERIAL_NAMESPACE",
     "SHARED_NAMESPACES",
     "TILE_NAMESPACE",
+    "VERSION_TILE_NAMESPACE",
     "WEB_PICTURE_NAMESPACE",
     "WORKSPACE_ASSET_NAMESPACE",
     "WORKSPACE_NAMESPACES",
@@ -50,6 +51,7 @@ __all__ = [
     "look_lock_key",
     "material_stores",
     "tile_store",
+    "version_tile_lock_key",
     "web_picture_lock_key",
     "workspace_asset_lock_key",
     "workspace_style_pack_write_key",
@@ -85,6 +87,10 @@ WORKSPACE_STYLE_PACK_NAMESPACE: Final = "workspace-style-packs"
 #: photographs finds them. One namespace per workspace, so a picture is served only to the
 #: workspace that keeps its record.
 WEB_PICTURE_NAMESPACE: Final = "web-pictures"
+#: Where each workspace keeps a made town's tiles baked with a version's changes to its buildings
+#: (migration 0219): a tile carrying a person's change is not public, so it is never in the shared
+#: ``tiles`` store, and is served only to the workspace whose version it was baked for.
+VERSION_TILE_NAMESPACE: Final = "version-tiles"
 
 #: The namespaces holding one store for every workspace, in the order they are listed.
 SHARED_NAMESPACES: Final[tuple[str, ...]] = (
@@ -99,6 +105,7 @@ WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (
     LOOK_NAMESPACE,
     WORKSPACE_STYLE_PACK_NAMESPACE,
     WEB_PICTURE_NAMESPACE,
+    VERSION_TILE_NAMESPACE,
 )
 
 
@@ -180,6 +187,16 @@ def web_picture_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
     picture until the row naming it commits, and the purger takes it before destroying one.
     """
     return f"web-picture:{workspace_id}:{digest}"
+
+
+def version_tile_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
+    """The advisory lock key of one container in one workspace's version tiles namespace.
+
+    Keyed as a look's container is, by workspace and digest. A version's bake is published under it
+    (``record_version_baked_tile`` takes it, migration 0219), and the purger takes it before
+    destroying one, so a publish never names bytes a purge is destroying.
+    """
+    return f"version-tile:{workspace_id}:{digest}"
 
 
 def workspace_style_pack_write_key(workspace_id: uuid.UUID) -> str:

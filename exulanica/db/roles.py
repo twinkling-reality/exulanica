@@ -157,6 +157,10 @@ READ_ONLY_TABLES: Final = (
     # serve a faulted tile's first bake. Readers ask both; the owner alone writes either.
     "baked_tile_stage",
     "baked_tile_fault_clearance",
+    # Migration 0219: a made town's tiles baked with a version's changes, its workspace's own. The
+    # runtime reads them to list and serve a version's tiles; only record_version_baked_tile, which
+    # the tile role executes for a claimed job, writes them.
+    "world_version_baked_tile",
     "saved_world_source_current_membership",
     # Migration 0124's durable spending: the runtime reads its own workspace's rows and changes
     # them only through the functions in SPENDING_RUNTIME_FUNCTIONS. With INSERT or UPDATE it could
@@ -365,6 +369,9 @@ INSERT_ONLY_TABLES: Final = (
     "web_picture",
     "web_picture_object",
     "web_picture_erasure",
+    # Migration 0219 appends the objects of a workspace's version tiles namespace, each recorded by
+    # the tile worker before its bytes are put; only the purger marks one purged.
+    "world_version_tile_object",
     # Migration 0173 appends a workspace's own style pack versions, their files, their withdrawals,
     # their namespace inventory and their creators' publish requests; a workspace's erasure clears
     # their uploader text in a definer run as exulanica_definer, and only the purger marks an
@@ -593,6 +600,10 @@ _PURGE_WORKSPACE_READS: Final = {
     "look_version": ("workspace_id", "container_sha256"),
     "workspace_style_pack_blob": ("workspace_id", "content_sha256", "purged_at"),
     "web_picture_object": ("workspace_id", "content_sha256", "purged_at"),
+    "world_version_tile_object": ("workspace_id", "content_sha256", "purged_at"),
+    # Whether a version's stored bake still names bytes a tombstone enqueued: a world's bytes
+    # another world's bake holds are skipped and come back (worker.py).
+    "world_version_baked_tile": ("workspace_id", "container_sha256", "fault_container_sha256"),
     # Whether a picture the workspace still keeps names bytes a picture's erasure enqueued: the
     # same picture kept again holds the same bytes, and its job is skipped (worker.py).
     "web_picture": ("workspace_id", "content_sha256"),
@@ -605,11 +616,13 @@ _PURGE_WORKSPACE_WRITES: Final = {
     "look_object": ("purged_at",),
     "workspace_style_pack_blob": ("purged_at",),
     "web_picture_object": ("purged_at",),
+    "world_version_tile_object": ("purged_at",),
 }
 #: The destroy questions this role may ask, each revoked from PUBLIC by the migration that added
 #: it: a bake's in 0066, a withdrawn training right's in 0082, a workspace asset object's in 0126,
 #: a looks object's in 0172.
-#: Also a workspace style pack file's in 0173, and a kept web picture's in 0215.
+#: Also a workspace style pack file's in 0173, a kept web picture's in 0215 and a version tile's
+#: in 0219.
 _PURGE_FUNCTIONS: Final = (
     ("material_bake_purge_is_authorized", "uuid,uuid,bytea"),
     ("scene_training_withdrawal_releases_artifact", "uuid,bytea"),
@@ -617,6 +630,7 @@ _PURGE_FUNCTIONS: Final = (
     ("look_purge_is_authorized", "uuid,uuid,text"),
     ("workspace_style_pack_purge_is_authorized", "uuid,uuid,text"),
     ("web_picture_purge_is_authorized", "uuid,uuid,text"),
+    ("version_tile_purge_is_authorized", "uuid,uuid,text"),
 )
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker

@@ -163,13 +163,15 @@ def main(
                 yield owner
 
         web = env_get("WEB_DIRECTORY", environment)
+        stores = content_stores(environment)
         baker = GeneratedTileBaker(
             session=database.session,
             publisher=publisher,
-            store=content_stores(environment).tiles,
+            store=stores.tiles,
             web_directory=Path(web) if web else _CHECKOUT_WEB,
             worker=f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}",
             compiled=_compiled(environment),
+            version_stores=stores.version_tiles,
         )
     except Exception as error:
         _emit(output, "startup_failed", failure_class=type(error).__name__, message=str(error))

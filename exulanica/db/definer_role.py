@@ -532,6 +532,16 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     "0216": DefinerGrants(tables={"world_society_decision_ask": frozenset(("SELECT", "DELETE"))}),
     # A saved entry's trigger deletes the entry's picture before the entry itself, by its key.
     "0218": DefinerGrants(tables={"saved_world_entry_picture": frozenset(("SELECT", "DELETE"))}),
+    # A version's changed tile is published through record_version_baked_tile, which reads and
+    # writes its bakes (and marks a fault) and reads the namespace's inventory; world_erase_rows,
+    # made again with one statement more, deletes the bakes with their world, and a world's
+    # erasure and the purge question read both (0219). The job and world_erasure are 0197's.
+    "0219": DefinerGrants(
+        tables={
+            "world_version_baked_tile": frozenset(("SELECT", "INSERT", "UPDATE", "DELETE")),
+            "world_version_tile_object": frozenset(("SELECT",)),
+        }
+    ),
 }
 
 

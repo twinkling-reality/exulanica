@@ -348,7 +348,15 @@ def read_world_tile_bytes(
     session: CurrentSession,
     world_id: WorldId,
 ) -> Response:
-    """A baked tile's bytes, served only when the version's own snapshot names the tile."""
+    """A baked tile's bytes, served only when the version's own snapshot names the tile: a tile its
+    changes to a made town's buildings alter is its workspace's own bake, served from the
+    workspace's namespace (:mod:`exulanica.world.version_tiles`)."""
+    from exulanica.world.version_tiles import (
+        serve_version_tile,
+        stored_version_bake,
+        version_changes,
+    )
+
     require_world(connection, session.workspace_id, world_id)
     with connection.cursor(row_factory=dict_row) as cursor:
         row = cursor.execute(
@@ -358,21 +366,36 @@ def read_world_tile_bytes(
         ).fetchone()
     if row is None:
         return _problem(404, "unknown_reference", "no such world version")
+    scope = (connection, session.workspace_id, world_id, row["source_snapshot_id"])
     try:
-        tiles = generated_tiles(
-            connection, session.workspace_id, world_id, row["source_snapshot_id"]
-        )
+        tiles = generated_tiles(*scope, version_changes(*scope, version_id))
     except InvalidStructuralData as exc:
         return _problem(409, "generated_world_unreadable", str(exc))
-    if not any(tile.baked_tile_id == baked_tile_id for tile in tiles):
+    named = next((tile for tile in tiles if tile.baked_tile_id == baked_tile_id), None)
+    if named is None:
         return _problem(404, "unknown_reference", "this world names no such baked tile")
-    store = getattr(get_services(request), "tiles", None)
-    if store is None:
+    services = get_services(request)
+    own = stored_version_bake(connection, session.workspace_id, world_id, named.tile_inputs_digest)
+    stores = getattr(services, "content_stores", None)
+    store = getattr(services, "tiles", None)
+    if (stores is None) if own is not None else (store is None):
         return _problem(503, "tiles_unavailable", "this instance serves no baked tiles")
     try:
-        served = BakedTileRepository(connection=connection, store=store).serve_to_its_world(
-            baked_tile_id
-        )
+        if own is not None and stores is not None:
+            tile, data = serve_version_tile(
+                connection,
+                stores.version_tiles.for_workspace(session.workspace_id),
+                session.workspace_id,
+                world_id,
+                baked_tile_id,
+            )
+            container, inputs = tile.container_sha256, tile.tile_inputs_digest
+        else:
+            served = BakedTileRepository(connection=connection, store=store).serve_to_its_world(
+                baked_tile_id
+            )
+            data = served.data
+            container, inputs = served.tile.container_sha256, served.tile.tile_inputs_digest
     except UnknownBakedTile:
         return _problem(404, "unknown_reference", "no such baked tile")
     except BakedTileFaulted as exc:
@@ -382,12 +405,12 @@ def read_world_tile_bytes(
     except BakedTileError:
         raise
     return Response(
-        content=served.data,
+        content=data,
         media_type=TILE_MEDIA_TYPE,
         headers={
             **_HEADERS,
-            "ETag": f'"{served.tile.container_sha256}"',
+            "ETag": f'"{container}"',
             "Accept-Ranges": "none",
-            "X-Exulanica-Tile-Inputs-Digest": served.tile.tile_inputs_digest,
+            "X-Exulanica-Tile-Inputs-Digest": inputs,
         },
     )

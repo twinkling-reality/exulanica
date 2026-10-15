@@ -77,6 +77,7 @@ __all__ = [
     "town_records",
     "town_records_with",
     "unreadable_reason",
+    "version_ground",
 ]
 
 #: The job kind that bakes one tile of a generated world, off the request.
@@ -143,11 +144,14 @@ def forget_generated_records(digests: frozenset[str]) -> None:
     the records each receipt generates and those it generates with a version's building changes
     (kept under the receipt digest and the changes' digest)."""
     global _records_epoch
+    from exulanica.world.version_tiles import forget_changed_tiles
+
     with _records_lock:
         _records_epoch += 1
         for key in list(_records_kept):
             if key.split(":", 1)[0] in digests:
                 del _records_kept[key]
+    forget_changed_tiles(digests)
 
 
 class SiteRecordsElsewhere(RuntimeError):
@@ -495,9 +499,15 @@ def _changes_sha256(changes: Mapping[str, BuildingChange]) -> str:
 
 
 def generated_tiles(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    changes: Mapping[str, BuildingChange] | None = None,
 ) -> tuple[GeneratedTile, ...]:
-    """Every tile a generated world covers, with its baked tile where one is stored."""
+    """Every tile a generated world covers, with its baked tile where one is stored. With a
+    version's changes to a made town's buildings, a tile they alter is its workspace's bake of the
+    changed tile (:mod:`exulanica.world.version_tiles`), and every other tile the public one."""
     _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
     composer = receipt["composer"]
     tiles = composer_module(composer["key"], composer["version"]).tile_inputs(receipt)
@@ -534,6 +544,16 @@ def generated_tiles(
                 state=state,
             )
         )
+    if changes:
+        from exulanica.world.version_tiles import changed_tiles, version_tile_states
+
+        changed = version_tile_states(
+            connection,
+            workspace_id,
+            world_id,
+            changed_tiles(connection, workspace_id, world_id, snapshot_id, changes),
+        )
+        return tuple(changed.get((tile.tile_x, tile.tile_y), tile) for tile in found)
     return tuple(found)
 
 
@@ -639,10 +659,30 @@ def generated_site(
     )
 
 
-def generated_ground(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+def version_ground(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    version_id: uuid.UUID,
 ) -> GeneratedGround:
-    """The drawing a saved entry of a generated world declares."""
+    """The drawing a saved entry of a generated world declares for its version: a made town's
+    tiles as the version's changes to its buildings leave them (:func:`generated_ground`)."""
+    from exulanica.world.version_tiles import version_changes
+
+    changes = version_changes(connection, workspace_id, world_id, snapshot_id, version_id)
+    return generated_ground(connection, workspace_id, world_id, snapshot_id, changes)
+
+
+def generated_ground(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    changes: Mapping[str, BuildingChange] | None = None,
+) -> GeneratedGround:
+    """The drawing a saved entry of a generated world declares, its tiles as ``changes`` to a made
+    town's buildings leave them (none: as it was made)."""
     _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
     extent = generated_extent(connection, workspace_id, world_id, snapshot_id)
     recipe = receipt["recipe"]
@@ -659,7 +699,7 @@ def generated_ground(
             receipt["arrival"]["facing_mm"][0],
             -receipt["arrival"]["facing_mm"][1],
         ),
-        tiles=generated_tiles(connection, workspace_id, world_id, snapshot_id),
+        tiles=generated_tiles(connection, workspace_id, world_id, snapshot_id, changes),
         specification=None if values is None else recipe["specification"],
         values=None if values is None else MappingProxyType(dict(sorted(values.items()))),
     )

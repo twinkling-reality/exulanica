@@ -572,6 +572,27 @@ is not drawn rather than waiting. The world's people hang from a root at the cit
 environment root, at the height of the surface where a person arrives (`hostGeneratedSociety`),
 because the society states plan positions only.
 
+**A version's own tiles.** A version of a made town whose changes remove a building or stand it
+taller or lower (an element override naming `part:<building>`, migration 0217) is drawn from tiles
+baked with those changes, and a tile carrying a person's change is not public, so it is its
+workspace's own (migration 0219, `exulanica/world/version_tiles.py`). The entry's
+`generated_ground` lists the workspace's bake for each tile whose document the changes alter, under
+a key that folds every change of the version, in identity order, into the tile record's edit delta
+digest, so the same changes give the same key however many undos led there; every other tile is
+the public bake. A changed tile is found by making the town's tile documents with the changes and
+without them, since a change is felt beyond its own building (a removed building's neighbour shows
+a wall where it had a party wall, in a tile whose halo may not reach the removed building). The
+tile worker bakes it twice for a `bake_version_tile` job, records its bytes in the workspace's
+inventory before putting them in the workspace's own `version-tiles` namespace, and publishes
+through `record_version_baked_tile`, which the tile role alone may execute and which writes only
+for a running job of the session's workspace naming that version, tile and fold. The bytes route
+serves it from that namespace to a version whose tiles name it, and to no other version or
+workspace. A world's erasure deletes its version bakes, cancels its queued ones and destroys their
+bytes on its tombstone; a workspace's erasure destroys every object of the namespace; a judge seed
+refuses a workspace holding any. Limits: no route changes a made town's buildings yet, so nothing
+queues a version's bakes (`queue_version_bakes` is the call that does); the changed tiles are
+found again on each read of an entry, kept in memory for the few towns read last.
+
 ## 8. Budget
 
 Measured against the accepted Melbourne envelope per corridor: about 227,000 faces, 28 MB

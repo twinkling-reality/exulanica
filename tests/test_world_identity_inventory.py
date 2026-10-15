@@ -201,6 +201,21 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
     "exulanica/orchestration/judge_seed.py::_refuse_open_piece_requests [piece_request]": (
         "a seed is the whole workspace, so an open request for any of its worlds refuses it"
     ),
+    "exulanica/orchestration/judge_seed.py::_refuse_held_things [world_version_tile_object]": (
+        "a seed is the whole workspace, so bytes its version tiles namespace holds for any of its "
+        "worlds refuse it"
+    ),
+    "exulanica/deletion/queue.py::mark_purged [world_version_tile_object]": (
+        "the purger marks the workspace namespace's object for the digest it destroyed: the "
+        "partial unique index world_version_tile_object_live (migration 0219) keeps one live "
+        "object per digest in a workspace, and that object names its world, to which the purge "
+        "question already held the tombstone"
+    ),
+    "exulanica/deletion/worker.py::_version_tile_held [world_version_baked_tile]": (
+        "the purger asks whether any world of the workspace still names the bytes: one namespace "
+        "holds every world's version tiles, so a world's purge waits while another world's bake "
+        "names the same digest"
+    ),
     "exulanica/world/thing_kind_gone.py::<module> [world_alternate_version_edit]": (
         "THING_KIND_GONE_SQL is a condition on a placed thing's row, not a statement: it finds the "
         "one edit that placed the thing by that edit's primary key, and it is read only inside "

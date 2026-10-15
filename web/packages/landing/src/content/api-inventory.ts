@@ -24645,7 +24645,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "get",
     "id": "read_world_tile_bytes_world_versions__version_id__tiles__baked_tile_id__bytes_get",
     "title": "One baked tile of a generated world, for the world that names it.",
-    "description": "A baked tile's bytes, served only when the version's own snapshot names the tile.",
+    "description": "A baked tile's bytes, served only when the version's own snapshot names the tile: a tile its\nchanges to a made town's buildings alter is its workspace's own bake, served from the\nworkspace's namespace (:mod:`exulanica.world.version_tiles`).",
     "group": "world",
     "permission": {
       "requires": [

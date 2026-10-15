@@ -27,6 +27,15 @@ drains them one workspace at a time:
 
 A baked tile is keyed by the digest over its inputs, so a tile two worlds share is baked and stored
 once. A tile whose second bake differs is marked by the database and is never served.
+
+**A version's changed tile** (``bake_version_tile``, :mod:`exulanica.world.version_tiles`) is baked
+the same way from the town's records with the job's changes to its buildings, its tile record
+carrying their fold, and kept as its workspace's own (migration 0219): each bake's bytes are
+recorded in its inventory as the runtime role and put in the workspace's ``version-tiles``
+namespace only once that record has committed (``committed_writes``, the one post-commit flush), and
+the bake is published through ``record_version_baked_tile``, which the tile role may execute and
+which writes only for this claimed job, in its workspace. A baker built without the version tiles
+namespaces claims none of these jobs.
 """
 
 from __future__ import annotations
@@ -39,8 +48,8 @@ import subprocess
 import tempfile
 import time
 import uuid
-from collections.abc import Callable, Iterable, Mapping
-from contextlib import AbstractContextManager
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -48,13 +57,23 @@ from typing import Any, Final
 import psycopg
 from psycopg.rows import dict_row
 
+from exulanica.db.session import set_workspace
 from exulanica.grammar.grammars.city.tile import tile_inputs_digest
 from exulanica.grammar.records import record_payload
+from exulanica.ingest.committed_store import committed_writes
+from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages import STAGES, baked_tile_id
 from exulanica.store.base import ContentAddressedStore
+from exulanica.store.namespaces import WorkspaceStores, version_tile_lock_key
 from exulanica.world.baked_tiles import BakedTileRepository
 from exulanica.world.composers import composer_module
-from exulanica.world.generated_worlds import BAKE_JOB_KIND, town_records
+from exulanica.world.generated_worlds import BAKE_JOB_KIND, town_records, town_records_with
+from exulanica.world.version_tiles import (
+    VERSION_BAKE_JOB_KIND,
+    changes_fold,
+    folded,
+    version_changes,
+)
 
 __all__ = [
     "BAKE_TIMEOUT_SECONDS",
@@ -110,6 +129,21 @@ def child_environment(environ: Mapping[str, str]) -> dict[str, str]:
     return {name: value for name, value in environ.items() if name in CHILD_ENVIRONMENT}
 
 
+@contextmanager
+def _holding(connection: psycopg.Connection, key: str) -> Iterator[None]:
+    """Hold a session advisory lock on ``key`` (the purger takes the transaction-scoped one),
+    across commits, as a stored object's write does (``ingest/spine/blobs.py``)."""
+    connection.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (key,))
+    try:
+        yield
+    finally:
+        row = connection.execute(
+            "select pg_advisory_unlock(hashtextextended(%s, 0)) as unlocked", (key,)
+        ).fetchone()
+        if row is None or row["unlocked"] is not True:
+            raise RuntimeError("a version tile's advisory lock was not held")
+
+
 def _pause(seconds: float) -> None:
     """Wait before trying a refused publish again; a test replaces it to act at that moment."""
     time.sleep(seconds)
@@ -128,25 +162,32 @@ class BakeOutcome:
 
 
 def claim_bake(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, *, worker: str
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    *,
+    worker: str,
+    kinds: tuple[str, ...] = (BAKE_JOB_KIND,),
 ) -> Mapping[str, Any] | None:
-    """Take the next queued bake of this workspace, or None when there is none."""
+    """Take the next queued bake of this workspace of one of ``kinds``, or None when there is
+    none."""
     with connection.cursor(row_factory=dict_row) as cursor:
         return cursor.execute(
             "update job set state='running', claimed_by=%s, claimed_at=now(), "
             "attempts=attempts+1, claim_token=gen_random_uuid(), "
             "lease_expires_at=now()+make_interval(secs => %s) "
-            "where job_id=(select job_id from job where workspace_id=%s and kind=%s "
+            "where job_id=(select job_id from job where workspace_id=%s and kind=any(%s) "
             "and ((state='queued' and run_after<=now()) "
             "or (state='running' and lease_expires_at<now() and attempts<%s)) "
             "order by priority, job_id for update skip locked limit 1) "
-            "returning job_id, payload, claim_token, attempts",
-            (worker, LEASE_SECONDS, workspace_id, BAKE_JOB_KIND, MAXIMUM_CLAIMS),
+            "returning job_id, kind, payload, claim_token, attempts",
+            (worker, LEASE_SECONDS, workspace_id, list(kinds), MAXIMUM_CLAIMS),
         ).fetchone()
 
 
 def abandon_stranded(
-    connection: psycopg.Connection, workspace_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    kinds: tuple[str, ...] = (BAKE_JOB_KIND,),
 ) -> list[Mapping[str, Any]]:
     """End every bake of this workspace stranded :data:`MAXIMUM_CLAIMS` times, and return them.
 
@@ -163,9 +204,9 @@ def abandon_stranded(
             "completed_at=now(), failure_class='retry_exhausted_after_process_death', "
             "duration_ms=greatest(0, (extract(epoch from (now() - created_at)) * 1000)::bigint), "
             "last_error='claimed ' || attempts || ' times and stranded every time' "
-            "where workspace_id=%s and kind=%s and state='running' and lease_expires_at<now() "
+            "where workspace_id=%s and kind=any(%s) and state='running' and lease_expires_at<now() "
             "and attempts>=%s returning job_id, payload, last_error",
-            (workspace_id, BAKE_JOB_KIND, MAXIMUM_CLAIMS),
+            (workspace_id, list(kinds), MAXIMUM_CLAIMS),
         ).fetchall()
 
 
@@ -209,7 +250,8 @@ def _requeue(
 
 
 class GeneratedTileBaker:
-    """Drains ``bake_generated_tile`` jobs for the workspaces it is given."""
+    """Drains ``bake_generated_tile`` jobs, and ``bake_version_tile`` jobs when it is given the
+    version tiles namespaces, for the workspaces it is given."""
 
     def __init__(
         self,
@@ -220,14 +262,20 @@ class GeneratedTileBaker:
         web_directory: Path,
         worker: str,
         compiled: tuple[Path, Path] | None = None,
+        version_stores: WorkspaceStores | None = None,
     ) -> None:
         """``compiled`` is ``(node, cli.js)``: the tessellator compiled to JavaScript, as the tile
         worker's image carries it, run by Node with no package installed. Without it the checkout's
         TypeScript runs through ``tsx`` from ``web_directory``. Both bake the same bytes
-        (``tests/test_generated_tile_runner.py``)."""
+        (``tests/test_generated_tile_runner.py``). ``version_stores`` is each workspace's
+        ``version-tiles`` namespace; without it no ``bake_version_tile`` job is claimed."""
         self._session = session
         self._publisher = publisher
         self._store = store
+        self._version_stores = version_stores
+        self._kinds: tuple[str, ...] = (BAKE_JOB_KIND,) + (
+            (VERSION_BAKE_JOB_KIND,) if version_stores is not None else ()
+        )
         if compiled is None:
             cli = web_directory / "packages" / "loom-tess" / "src" / "node" / "cli.ts"
             tsx = web_directory / "node_modules" / ".bin" / "tsx"
@@ -250,7 +298,7 @@ class GeneratedTileBaker:
         outcomes = []
         for workspace_id in sorted(workspaces):
             with self._session(workspace_id) as connection:
-                for row in abandon_stranded(connection, workspace_id):
+                for row in abandon_stranded(connection, workspace_id, self._kinds):
                     payload = row["payload"]
                     outcomes.append(
                         BakeOutcome(
@@ -270,23 +318,17 @@ class GeneratedTileBaker:
 
     def bake_one(self, workspace_id: uuid.UUID) -> BakeOutcome | None:
         with self._session(workspace_id) as connection:
-            job = claim_bake(connection, workspace_id, worker=self._worker)
+            job = claim_bake(connection, workspace_id, worker=self._worker, kinds=self._kinds)
             if job is None:
                 return None
             payload = job["payload"]
             world_id = str(payload["world_id"])
             tile = (int(payload["tile"][0]), int(payload["tile"][1]))
             try:
-                generated = town_records(
-                    connection, workspace_id, world_id, uuid.UUID(payload["snapshot_id"])
-                )
-                if generated.receipt_sha256 != payload["receipt_sha256"]:
-                    raise ValueError("the job names another receipt than the world's snapshot")
-                composer = generated.receipt["composer"]
-                module = composer_module(composer["key"], composer["version"])
-                documents = module.tile_documents(generated.receipt, generated.records)
-                document = next(d for d in documents if (d.tile.tile_x, d.tile.tile_y) == tile)
-                key, answers = self._bake_and_publish(document, module, generated.receipt)
+                if job["kind"] == VERSION_BAKE_JOB_KIND:
+                    key, answers = self._bake_version(connection, workspace_id, job)
+                else:
+                    key, answers = self._bake_public(connection, workspace_id, payload, tile)
             except PublishRefused as exc:
                 # Refused for the moment through every try: a reader held the asset read lock or
                 # the connection dropped. Back to the queue while claims remain; a job that used
@@ -311,12 +353,161 @@ class GeneratedTileBaker:
                 detail = f"{type(exc).__name__}: {exc}"[:2000]
                 _finish(connection, job["job_id"], job["claim_token"], failed=detail)
                 return BakeOutcome(job["job_id"], world_id, tile, "failed", detail)
-            if answers[-1] != "identical":
-                detail = f"the second bake answered {answers[-1]}, not identical"
-                _finish(connection, job["job_id"], job["claim_token"], failed=detail)
-                return BakeOutcome(job["job_id"], world_id, tile, "failed", detail, key)
-            _finish(connection, job["job_id"], job["claim_token"], failed=None)
-            return BakeOutcome(job["job_id"], world_id, tile, "baked", " then ".join(answers), key)
+            return self._finished(connection, job, world_id, tile, key, answers)
+
+    def _bake_public(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        payload: Mapping[str, Any],
+        tile: tuple[int, int],
+    ) -> tuple[uuid.UUID, list[str]]:
+        """Bake a world's public tile from its records as its receipt generates them."""
+        generated = town_records(
+            connection, workspace_id, str(payload["world_id"]), uuid.UUID(payload["snapshot_id"])
+        )
+        if generated.receipt_sha256 != payload["receipt_sha256"]:
+            raise ValueError("the job names another receipt than the world's snapshot")
+        composer = generated.receipt["composer"]
+        module = composer_module(composer["key"], composer["version"])
+        documents = module.tile_documents(generated.receipt, generated.records)
+        document = next(d for d in documents if (d.tile.tile_x, d.tile.tile_y) == tile)
+        return self._bake_and_publish(
+            document,
+            module,
+            {
+                # The recipe and specification the tile's world was generated from. The world
+                # itself is a workspace's, so this table, which holds nothing a workspace owns
+                # (migration 0072), does not name it; the workspace's own job and receipt do.
+                "generated_from": {
+                    "recipe": generated.receipt["recipe"],
+                    "specification": generated.receipt["specification"],
+                }
+            },
+            lambda fields, container: self._publish(fields),
+        )
+
+    @staticmethod
+    def _finished(
+        connection: psycopg.Connection,
+        job: Mapping[str, Any],
+        world_id: str,
+        tile: tuple[int, int],
+        key: uuid.UUID,
+        answers: list[str],
+    ) -> BakeOutcome:
+        """End a job whose two bakes were published: done when the second answered identical."""
+        if answers[-1] != "identical":
+            detail = f"the second bake answered {answers[-1]}, not identical"
+            _finish(connection, job["job_id"], job["claim_token"], failed=detail)
+            return BakeOutcome(job["job_id"], world_id, tile, "failed", detail, key)
+        _finish(connection, job["job_id"], job["claim_token"], failed=None)
+        return BakeOutcome(job["job_id"], world_id, tile, "baked", " then ".join(answers), key)
+
+    def _bake_version(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID, job: Mapping[str, Any]
+    ) -> tuple[uuid.UUID, list[str]]:
+        """Bake a version's changed tile from the town's records with the version's changes, read
+        from the version (the job names only the version and their fold, so a person's changes live
+        in the version alone and go with it), its tile record carrying their fold, held to the key
+        the job names, and publish both bakes as the workspace's own."""
+        stores = self._version_stores
+        if stores is None:  # claim_bake was not given the kind; a job here is a programming error
+            raise RuntimeError("a version bake reached a baker with no version tiles namespaces")
+        payload = job["payload"]
+        world_id = str(payload["world_id"])
+        snapshot_id = uuid.UUID(payload["snapshot_id"])
+        changes = version_changes(
+            connection, workspace_id, world_id, snapshot_id, uuid.UUID(payload["version_id"])
+        )
+        fold = changes_fold(changes)
+        if not changes or fold != payload["edit_delta_digest"]:
+            raise ValueError(
+                "the version's changes are no longer the ones this bake was queued for"
+            )
+        generated = town_records_with(connection, workspace_id, world_id, snapshot_id, changes)
+        if generated.receipt_sha256 != payload["receipt_sha256"]:
+            raise ValueError("the job names another receipt than the world's snapshot")
+        composer = generated.receipt["composer"]
+        module = composer_module(composer["key"], composer["version"])
+        tile = (int(payload["tile"][0]), int(payload["tile"][1]))
+        documents = module.tile_documents(generated.receipt, generated.records)
+        document = folded(
+            next(d for d in documents if (d.tile.tile_x, d.tile.tile_y) == tile), fold
+        )
+        if tile_inputs_digest(document.tile) != payload["tile_inputs_digest"]:
+            raise ValueError("the job names another key than its changes make of the tile")
+        store = stores.for_workspace(workspace_id)
+
+        def publish(fields: Mapping[str, Any], container: bytes) -> str:
+            # Recorded, and committed, before the bytes are put (the one post-commit flush), so a
+            # tombstone finds every object the namespace holds and a tombstone that refuses the
+            # record leaves no bytes; the same bytes again (the second bake) are the object
+            # already recorded. The purger's lock for these bytes is held from before the record
+            # until after the flush, so a purge cannot mark them gone between the two and leave
+            # bytes no tombstone reaches; it is released before the publish, which takes it again.
+            content = hashlib.sha256(container).hexdigest()
+            lock = version_tile_lock_key(workspace_id, content)
+            repository = IngestRepository(connection, workspace_id)
+            with _holding(connection, lock), committed_writes(repository, store) as pending:
+                connection.execute(
+                    "insert into world_version_tile_object "
+                    "(workspace_id, world_id, content_sha256, byte_size) values (%s, %s, %s, %s) "
+                    "on conflict (workspace_id, content_sha256) where purged_at is null do nothing",
+                    (workspace_id, world_id, content, len(container)),
+                )
+                pending.append(container)
+            return self._publish_version(workspace_id, job, fields)
+
+        return self._bake_and_publish(document, module, {}, publish)
+
+    def _publish_version(
+        self, workspace_id: uuid.UUID, job: Mapping[str, Any], fields: Mapping[str, Any]
+    ) -> str:
+        """Record one bake of a version's tile through the publisher connection, in the job's
+        workspace, for the claimed job, tried again while the database refuses it for the moment
+        as :meth:`_publish` is."""
+        tile = fields["tile"]
+        arguments = (
+            job["job_id"],
+            job["claim_token"],
+            uuid.UUID(job["payload"]["version_id"]),
+            fields["baked_tile_id"],
+            fields["stage_version"],
+            fields["stage_params_sha256"],
+            bytes.fromhex(tile["tile_inputs_digest"]),
+            bytes.fromhex(tile["edit_delta_digest"]),
+            tile["tile_x"],
+            tile["tile_y"],
+            tile["lod"],
+            hashlib.sha256(fields["document"]).digest(),
+            len(fields["document"]),
+            hashlib.sha256(fields["container"]).digest(),
+            len(fields["container"]),
+            fields["render_batch_sha256"],
+            fields["nav_envelope_sha256"],
+            json.dumps(dict(fields["receipt"]), sort_keys=True),
+        )
+        tried = 0
+        while True:
+            try:
+                with self._publisher() as publisher:
+                    set_workspace(publisher, workspace_id)
+                    row = publisher.execute(
+                        "select record_version_baked_tile(%s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                        "%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) as outcome",
+                        arguments,
+                    ).fetchone()
+                    assert row is not None
+                    return str(row["outcome"] if isinstance(row, Mapping) else row[0])
+            except TRANSIENT_PUBLISH_REFUSALS as exc:
+                if tried == len(PUBLISH_RETRY_DELAYS):
+                    raise PublishRefused(
+                        f"the database refused the publish {tried + 1} times: "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+                _pause(PUBLISH_RETRY_DELAYS[tried] * (1.0 + random.random()))
+                tried += 1
 
     def _bake(self, document: Path, container: Path) -> dict[str, Any]:
         result = subprocess.run(
@@ -355,8 +546,14 @@ class GeneratedTileBaker:
                 tried += 1
 
     def _bake_and_publish(
-        self, document: Any, module: Any, receipt: Mapping[str, Any]
+        self,
+        document: Any,
+        module: Any,
+        provenance: Mapping[str, Any],
+        publish: Callable[[Mapping[str, Any], bytes], str],
     ) -> tuple[uuid.UUID, list[str]]:
+        """Bake ``document`` twice and publish each bake with ``publish(fields, container)``; the
+        receipt carries ``provenance`` beside the stage and the bake's statement."""
         spec = STAGES["baked_tile"]
         tile = document.tile
         key = baked_tile_id(spec, tile)
@@ -395,15 +592,8 @@ class GeneratedTileBaker:
                         "triangle_digest": spec.params["triangle_digest"],
                         "tile_document": spec.params["tile_document"],
                         "bake": statement,
-                        # The recipe and specification the tile's world was generated from. The
-                        # world itself is a workspace's, so this table, which holds nothing a
-                        # workspace owns (migration 0072), does not name it; the workspace's own
-                        # job and receipt do.
-                        "generated_from": {
-                            "recipe": receipt["recipe"],
-                            "specification": receipt["specification"],
-                        },
+                        **provenance,
                     },
                 }
-                answers.append(self._publish(fields))
+                answers.append(publish(fields, container))
         return key, answers

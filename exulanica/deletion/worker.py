@@ -42,6 +42,11 @@ workspace is erased, and a picture's when the picture is, asked of
 ``web_picture_purge_is_authorized``, as a look's container goes: bytes a picture still kept names
 (the same picture kept again) are skipped and come back. A worker built without
 ``web_picture_stores`` claims none of them.
+**A version's changed tiles** (migration 0219) go from the workspace's version tiles namespace when
+the workspace is erased, and a world's when the world is, asked of
+``version_tile_purge_is_authorized``, under the lock a publish of the same bytes takes: bytes
+another world's stored bake names are skipped and come back. A worker built without
+``version_tile_stores`` claims none of them.
 
 **A withdrawn training right is destroyed here too, and it is the one erasure whose subject stays
 alive.** Migration 0082 writes a ``scene_training`` tombstone when an account holder withdraws the
@@ -96,6 +101,7 @@ from exulanica.store.base import ContentAddressedStore, PurgeAuthorization, priv
 from exulanica.store.namespaces import (
     WorkspaceStores,
     look_lock_key,
+    version_tile_lock_key,
     web_picture_lock_key,
     workspace_asset_lock_key,
     workspace_style_pack_write_key,
@@ -157,6 +163,7 @@ class PurgeWorker:
         look_stores: WorkspaceStores | None = None,
         workspace_style_pack_stores: WorkspaceStores | None = None,
         web_picture_stores: WorkspaceStores | None = None,
+        version_tile_stores: WorkspaceStores | None = None,
     ) -> None:
         self._database = database
         self._store = store
@@ -165,6 +172,7 @@ class PurgeWorker:
         self._look_stores = look_stores
         self._workspace_style_pack_stores = workspace_style_pack_stores
         self._web_picture_stores = web_picture_stores
+        self._version_tile_stores = version_tile_stores
         self._kinds = tuple(
             kind
             for kind in queue.DESTROYABLE_KINDS
@@ -173,6 +181,7 @@ class PurgeWorker:
             and (kind != "look" or look_stores is not None)
             and (kind != "workspace_style_pack" or workspace_style_pack_stores is not None)
             and (kind != "web_picture" or web_picture_stores is not None)
+            and (kind != "version_tile" or version_tile_stores is not None)
         )
         self._workspaces = workspaces
         self._name = name
@@ -215,6 +224,7 @@ class PurgeWorker:
             look_stores=stores.looks,
             workspace_style_pack_stores=stores.workspace_style_packs,
             web_picture_stores=stores.web_pictures,
+            version_tile_stores=stores.version_tiles,
         )
 
     # -- driving it ---------------------------------------------------------------------
@@ -351,6 +361,9 @@ class PurgeWorker:
             return
         if target.target_kind == "web_picture":
             self._destroy_web_picture(connection, target, outcome)
+            return
+        if target.target_kind == "version_tile":
+            self._destroy_version_tile(connection, target, outcome)
             return
         blob_id = BlobId.from_hex(target.target_ref)
         # The lock and the question share one transaction, so nothing can start holding these
@@ -604,6 +617,63 @@ class PurgeWorker:
                 connection, target.workspace_id, purge_id=target.purge_id, state="done"
             )
 
+    def _destroy_version_tile(
+        self, connection: psycopg.Connection, target: queue.PurgeTarget, outcome: PurgeOutcome
+    ) -> None:
+        """A version's changed tile's container, from its workspace's version tiles namespace, as
+        a look's container goes: under the lock a publish of the same bytes takes, and skipped while
+        a stored bake of the workspace names them."""
+        stores = self._version_tile_stores
+        if stores is None:  # claim_purge was not given the kind; a job here is a programming error
+            raise RuntimeError(
+                "a version tile job reached a worker with no version tiles namespaces"
+            )
+        blob_id = BlobId.from_hex(target.target_ref)
+        store = stores.for_workspace(target.workspace_id)
+        with connection.transaction():
+            connection.execute(
+                "select purge_lock_object(%s)",
+                (version_tile_lock_key(target.workspace_id, target.target_ref),),
+            )
+            if _version_tile_held(connection, target):
+                outcome.skipped += 1
+                queue.finish_purge(
+                    connection,
+                    target.workspace_id,
+                    purge_id=target.purge_id,
+                    state="skipped",
+                    error=HELD_BY_A_LIVE_RECORD,
+                )
+                return
+            row = connection.execute(
+                "select version_tile_purge_is_authorized(%s, %s, %s) as allowed",
+                (target.workspace_id, target.tombstone_id, target.target_ref),
+            ).fetchone()
+            if row is None or not row["allowed"]:
+                raise ValueError("the tombstone does not authorize this version tile purge")
+            purger = privileged_purger(
+                store,
+                PurgeAuthorization(
+                    tombstone_id=str(target.tombstone_id),
+                    actor=str(target.requested_by),
+                    reason=target.reason or "a tombstone asked for these bytes to be destroyed",
+                ),
+            )
+            destroyed = purger.purge(blob_id)
+            if store.exists(blob_id):
+                raise RuntimeError(
+                    f"the version tiles namespace still holds {target.target_ref[:12]} after the "
+                    "purge"
+                )
+            if destroyed:
+                outcome.destroyed += 1
+            else:
+                outcome.already_absent += 1
+            queue.mark_purged(connection, target)
+            queue.finish_purge(
+                connection, target.workspace_id, purge_id=target.purge_id, state="done"
+            )
+
     def _destroy_workspace_style_pack(
         self, connection: psycopg.Connection, target: queue.PurgeTarget, outcome: PurgeOutcome
     ) -> None:
@@ -734,6 +804,17 @@ def _web_picture_held(connection: psycopg.Connection, target: queue.PurgeTarget)
     return bool(row and row["held"])
 
 
+def _version_tile_held(connection: psycopg.Connection, target: queue.PurgeTarget) -> bool:
+    """Whether a stored bake of its workspace names a version tile target's bytes."""
+    row = connection.execute(
+        "select exists (select 1 from world_version_baked_tile b where b.workspace_id = %s "
+        "and (b.container_sha256 = decode(%s, 'hex') "
+        "or b.fault_container_sha256 = decode(%s, 'hex'))) as held",
+        (target.workspace_id, target.target_ref, target.target_ref),
+    ).fetchone()
+    return bool(row and row["held"])
+
+
 def still_held(connection: psycopg.Connection, target: queue.PurgeTarget) -> bool:
     """Whether something live still holds a target's bytes: the destroy question its job is asked,
     read only. Restore replay asks it of a job left skipped, which keeps its tombstone open."""
@@ -741,6 +822,8 @@ def still_held(connection: psycopg.Connection, target: queue.PurgeTarget) -> boo
         return _look_held(connection, target)
     if target.target_kind == "web_picture":
         return _web_picture_held(connection, target)
+    if target.target_kind == "version_tile":
+        return _version_tile_held(connection, target)
     row = (
         connection.cursor(row_factory=dict_row)
         .execute(

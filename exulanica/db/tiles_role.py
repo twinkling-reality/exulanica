@@ -1,14 +1,17 @@
-"""The role a generated-tile worker publishes baked tiles as: one function, and nothing else.
+"""The role a generated-tile worker publishes baked tiles as: two functions, and nothing else.
 
 A baked tile is global: every workspace whose world covers it is served the same row and bytes
 (migration 0072). Migration 0138 makes ``record_baked_tile_bake`` run with its owner's rights and
 revokes it from PUBLIC; this module provisions ``exulanica_tiles``, the one role granted EXECUTE on
-it, and checks a connection is that role before a worker publishes through it.
+it, and checks a connection is that role before a worker publishes through it. A made town's tile
+baked with a version's changes is its workspace's own, published through
+``record_version_baked_tile`` (migration 0219), which writes only for a claimed bake job of the
+session's workspace; the same role alone executes it.
 
-*   **EXECUTE on ``record_baked_tile_bake`` and USAGE on the schema.** No table, sequence or other
+*   **EXECUTE on the two publish functions and USAGE on the schema.** No table, sequence or other
     function privilege, so a stolen credential can publish a bake and do nothing else: it cannot
-    read a workspace's rows, alter a stored tile (the function only stores, answers ``identical``
-    or marks a fault) or call another SECURITY DEFINER function.
+    read a workspace's rows, alter a stored tile (the functions only store, answer ``identical``
+    or mark a fault) or call another SECURITY DEFINER function.
 *   **No superuser, BYPASSRLS, CREATEDB, CREATEROLE, replication or INHERIT, and no membership in
     any role.** A membership would lend it a writer's privileges; any it holds is revoked.
 *   **Every privilege it holds is revoked first**, so a grant made by hand does not survive the
@@ -32,6 +35,7 @@ from exulanica.db.roles import _ROLE_LOCK_KEY, take_provisioning_locks
 __all__ = [
     "PUBLISH_FUNCTION",
     "TILES_ROLE",
+    "VERSION_PUBLISH_FUNCTION",
     "TilesRoleUnsafe",
     "assert_tiles_role",
     "provision_tiles_role",
@@ -47,17 +51,25 @@ PUBLISH_FUNCTION: Final = (
     "uuid,integer,bytea,bytea,bytea,jsonb,bytea,bytea,integer,integer,integer,integer,integer,"
     "bytea,bigint,bytea,bigint,bytea,bytea,jsonb",
 )
+#: The function the role publishes a version's changed tile through (migration 0219).
+VERSION_PUBLISH_FUNCTION: Final = (
+    "record_version_baked_tile",
+    "uuid,uuid,uuid,uuid,integer,bytea,bytea,bytea,integer,integer,integer,bytea,bigint,bytea,"
+    "bigint,bytea,bytea,jsonb",
+)
 
 
 class TilesRoleUnsafe(RuntimeError):
     """The connection is not the narrow tile publisher role this module provisions."""
 
 
-def _signature(connection: psycopg.Connection) -> sql.Composable:
+def _signature(
+    connection: psycopg.Connection, function: tuple[str, str] = PUBLISH_FUNCTION
+) -> sql.Composable:
     row = connection.execute("select current_schema()").fetchone()
     assert row is not None
     schema = row["current_schema"] if isinstance(row, dict) else row[0]
-    name, arguments = PUBLISH_FUNCTION
+    name, arguments = function
     return sql.SQL("{}.{}({})").format(
         sql.Identifier(schema), sql.Identifier(name), sql.SQL(arguments)
     )
@@ -66,10 +78,11 @@ def _signature(connection: psycopg.Connection) -> sql.Composable:
 def provision_tiles_role(
     connection: psycopg.Connection, *, role: str = TILES_ROLE, password: str | None = None
 ) -> None:
-    """Create or narrow ``role`` to EXECUTE on the publish function alone. Idempotent.
+    """Create or narrow ``role`` to EXECUTE on the publish functions alone. Idempotent.
 
     Run by ``exulanica-db`` as the owner after the migrations, as every other role is. Below
-    migration 0138 the function is not yet its owner's to lend, so nothing is granted.
+    migration 0138 the function is not yet its owner's to lend, so nothing is granted, and below
+    0219 the version's publish is not there to grant.
     """
     role_name = sql.Identifier(role)
     row = connection.execute("select current_schema()").fetchone()
@@ -101,21 +114,25 @@ def provision_tiles_role(
             )
         connection.execute(sql.SQL("grant usage on schema {} to {}").format(schema, role_name))
         connection.execute(sql.SQL("revoke create on schema {} from {}").format(schema, role_name))
-        if publish_function_installed(connection):
-            connection.execute(
-                sql.SQL("grant execute on function {} to {}").format(
-                    _signature(connection), role_name
+        for function in (PUBLISH_FUNCTION, VERSION_PUBLISH_FUNCTION):
+            if publish_function_installed(connection, function):
+                connection.execute(
+                    sql.SQL("grant execute on function {} to {}").format(
+                        _signature(connection, function), role_name
+                    )
                 )
-            )
 
 
-def publish_function_installed(connection: psycopg.Connection) -> bool:
-    """Whether the schema holds the publish function as its owner's to lend (migration 0138 or
-    later): a database provisioned below 0138 has nothing to grant and nothing to check."""
+def publish_function_installed(
+    connection: psycopg.Connection, function: tuple[str, str] = PUBLISH_FUNCTION
+) -> bool:
+    """Whether the schema holds a publish function as its owner's to lend (migration 0138 or
+    later, 0219 for the version's): a database provisioned below it has nothing to grant and
+    nothing to check."""
     row = connection.execute(
         "select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
         "where n.nspname = current_schema() and p.proname = %s and p.prosecdef",
-        (PUBLISH_FUNCTION[0],),
+        (function[0],),
     ).fetchone()
     return row is not None
 
@@ -139,8 +156,8 @@ def assert_tiles_role(connection: psycopg.Connection, role: str | None = None) -
     by name (as ``exulanica-db`` checks the role it just provisioned).
 
     The owner, a superuser or a BYPASSRLS role, a member of any role, a role that can create in
-    the schema, reach any table or sequence, or execute any other SECURITY DEFINER function, is
-    refused by name. So is a role that cannot execute the publish function.
+    the schema, reach any table or sequence, or execute any SECURITY DEFINER function but the two
+    publish functions, is refused by name. So is a role that cannot execute the publish function.
     """
     with connection.cursor(row_factory=dict_row) as cursor:
         if role is None:
@@ -184,9 +201,9 @@ def assert_tiles_role(connection: psycopg.Connection, role: str | None = None) -
         others = cursor.execute(
             "select p.oid::regprocedure::text signature from pg_proc p "
             "join pg_namespace n on n.oid = p.pronamespace "
-            "where n.nspname = current_schema() and p.prosecdef and p.proname <> %s "
+            "where n.nspname = current_schema() and p.prosecdef and p.proname <> all(%s) "
             "and has_function_privilege(%s, p.oid, 'EXECUTE') order by 1",
-            (PUBLISH_FUNCTION[0], role),
+            ([PUBLISH_FUNCTION[0], VERSION_PUBLISH_FUNCTION[0]], role),
         ).fetchall()
         if others:
             raise TilesRoleUnsafe(

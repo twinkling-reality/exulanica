@@ -64,6 +64,7 @@ from exulanica.store.namespaces import (
     MATERIAL_NAMESPACE,
     SHARED_NAMESPACES,
     TILE_NAMESPACE,
+    VERSION_TILE_NAMESPACE,
     WEB_PICTURE_NAMESPACE,
     WORKSPACE_ASSET_NAMESPACE,
     WORKSPACE_NAMESPACES,
@@ -232,6 +233,10 @@ class ContentStores:
     @property
     def web_pictures(self) -> WorkspaceStores:
         return self.per_workspace(WEB_PICTURE_NAMESPACE)
+
+    @property
+    def version_tiles(self) -> WorkspaceStores:
+        return self.per_workspace(VERSION_TILE_NAMESPACE)
 
     @property
     def tiles(self) -> ContentAddressedStore:

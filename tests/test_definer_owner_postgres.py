@@ -104,6 +104,10 @@ TABLE_PRIVILEGES = {
     "tombstone_embedding_target": {"SELECT"},
     # A kept web picture's erasure, and its workspace's, delete its record (0215).
     "web_picture": {"SELECT", "DELETE"},
+    # A version's changed tile is published, faulted and erased with its world, and a world's
+    # erasure and the purge question read the inventory of its bytes (0219).
+    "world_version_baked_tile": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    "world_version_tile_object": {"SELECT"},
     # society_erase_rows deletes the asks of a society's recorded decisions (0216).
     "world_society_decision_ask": {"SELECT", "DELETE"},
     "world_project": {"SELECT", "UPDATE", "DELETE"},
@@ -304,6 +308,8 @@ DEFINERS = {
             "door_prune(integer)",
             "record_baked_tile_bake(uuid,integer,bytea,bytea,bytea,jsonb,bytea,bytea,integer,"
             "integer,integer,integer,integer,bytea,bigint,bytea,bigint,bytea,bytea,jsonb)",
+            "record_version_baked_tile(uuid,uuid,uuid,uuid,integer,bytea,bytea,bytea,integer,"
+            "integer,integer,bytea,bigint,bytea,bigint,bytea,bytea,jsonb)",
         ),
         "pg_catalog, {schema}, pg_temp": (
             "caption_vector_purge_is_authorized(uuid,uuid,uuid)",
@@ -365,6 +371,8 @@ DEFINERS = {
             "tg_web_picture_erasure_erases()",
             "tg_web_picture_erases_on_tombstone()",
             "web_picture_purge_is_authorized(uuid,uuid,text)",
+            "tg_world_erasure_takes_version_tiles()",
+            "version_tile_purge_is_authorized(uuid,uuid,text)",
         ),
     }.items()
     for signature in signatures
