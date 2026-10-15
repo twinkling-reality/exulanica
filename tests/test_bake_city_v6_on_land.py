@@ -51,7 +51,9 @@ def _town():  # type: ignore[no-untyped-def]
 def baked(tmp_path_factory) -> list[dict[str, Any]]:  # type: ignore[no-untyped-def]
     """Every tile of the town, baked: its header and its triangles by projection."""
     if not TSX.exists():
-        pytest.skip(f"the web toolchain is not installed ({TSX} is missing); run pnpm install")
+        pytest.skip(
+            f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/"
+        )
     if shutil.which("node") is None:
         pytest.skip("node is not on PATH")
     made = _town()
