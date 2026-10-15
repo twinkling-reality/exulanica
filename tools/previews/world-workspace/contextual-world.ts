@@ -468,7 +468,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     return {
       who: view.who, sub: pageSub(view.who.named ? view.facts?.kind ?? null : null, entry.title), assignable,
       model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null, local: served?.local === true } : null) : undefined,
-      connected,
+      connected, anyConnected: Boolean(subjectReads.models?.models.some(item => !item.refusal) && !subjectReads.models?.hostRefusal),
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId) })) : null,

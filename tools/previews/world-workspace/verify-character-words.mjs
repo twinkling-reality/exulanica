@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
+import { routineLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -63,4 +63,8 @@ for (const words of said) {
   assert.doesNotMatch(words, /_|\u2014|entity|session|provider/i, words);
   assert.doesNotMatch(words, /\b(he|she)\b/i, words);
 }
+// A character with no model (J2, J22): the line asks for nothing the page cannot do.
+assert.equal(routineLine(called({ name: 'Teo' }), { anyConnected: true, assignable: true }), 'Teo follows a routine. Choose a model to run.');
+assert.equal(routineLine(called({ kind: 'resident' }), { anyConnected: false, assignable: true }), 'No AI model is connected here, so the resident follows a routine.');
+assert.equal(routineLine(called({ kind: 'resident' }), { anyConnected: true, assignable: false }), 'The resident follows a routine.');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

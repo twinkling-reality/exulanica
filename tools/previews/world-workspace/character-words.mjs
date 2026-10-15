@@ -134,6 +134,19 @@ export function modelLine(model) {
 /** The page's Run section for a character with no model (DESIGN's J2). */
 export const routineRun = who => `${who.start} follows a routine. Choose a model to run.`;
 
+/** The same where this person cannot choose a model here (no [M] Model): no instruction it cannot follow. */
+export const followsRoutine = who => `${who.start} follows a routine.`;
+
+/**
+ * Which line the Run section of a character with no model says (DESIGN's J2 and J22): with no model
+ * connected here at all, that; where a model can be chosen, how to run; else only that it follows a
+ * routine.
+ */
+export function routineLine(who, { anyConnected, assignable }) {
+  if (!anyConnected) return notConnected(who);
+  return assignable ? routineRun(who) : followsRoutine(who);
+}
+
 /** The page's Run section where no AI model can be asked here (spec 7, empty). */
 export const notConnected = who => `No AI model is connected here, so ${who.within} follows a routine.`;
 
