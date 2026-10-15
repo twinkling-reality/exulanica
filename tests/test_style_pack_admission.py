@@ -205,6 +205,54 @@ def test_a_preview_that_hides_anything_is_refused():
     assert _refused(made) == ("style_pack_preview_refused", preview)
 
 
+# -- textures a pack carries -----------------------------------------------------------------------
+
+
+def _textured(colour: bytes, normal: bytes | None = None, normal_type: str = "image/png") -> Upload:
+    """The creator's pack with a ground texture of its own, its maps the given pictures."""
+    made = upload()
+    made.files["textures/ground-colour.jpg"] = colour
+    texture: dict[str, Any] = {
+        "colour": "textures/ground-colour.jpg",
+        "normal": None,
+        "roughness": None,
+        "extent_mm": [2000, 2000],
+    }
+    if normal is not None:
+        made.files["textures/ground-normal.png"] = normal
+        made.relist()
+        listed = {f["path"]: f for f in made.manifest["files"]}
+        listed["textures/ground-normal.png"]["media_type"] = normal_type
+        texture["normal"] = "textures/ground-normal.png"
+    made.manifest["textures"] = {"ground": texture}
+    made.manifest["surfaces"]["ground.default"] = {"texture": "ground", "up": None}
+    return made.relist()
+
+
+def test_a_pack_carrying_its_own_texture_is_admitted():
+    made = _textured(jpeg(128, 128), png(128, 128))
+    admitted = _admit(made)
+    assert {file.path for file in admitted.files} >= {
+        "textures/ground-colour.jpg",
+        "textures/ground-normal.png",
+    }
+
+
+def test_a_texture_image_that_hides_anything_is_refused_by_its_path():
+    made = _textured(jpeg(128, 128) + b"after the end")
+    assert _refused(made) == ("style_pack_texture_refused", "textures/ground-colour.jpg")
+
+
+def test_a_texture_whose_maps_are_not_one_size_is_refused():
+    made = _textured(jpeg(128, 128), png(64, 64))
+    assert _refused(made) == ("style_pack_texture_refused", "textures/ground-colour.jpg")
+
+
+def test_a_texture_image_past_the_walks_side_is_refused():
+    made = _textured(jpeg(2049, 8))
+    assert _refused(made) == ("style_pack_texture_refused", "textures/ground-colour.jpg")
+
+
 # -- the piece profile and colours ---------------------------------------------------------------
 
 

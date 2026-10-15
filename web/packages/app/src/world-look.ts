@@ -30,7 +30,7 @@
  * the page reads the chain down to the pack that names no base, at most four manifests.
  */
 
-import type { LookFamily, ResolvedStylePack } from '@exulanica/atlas-core';
+import type { LookFamily, ResolvedStylePack, StylePackFile } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile, RenderLook } from '@exulanica/atlas-react/generated-tile';
 import type { FetchedPieces, OpeningSlot, PackVehicleBodies, TownLookRoles } from '@exulanica/atlas-react/style-pack';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
@@ -175,6 +175,8 @@ export interface PreparedWorldLook {
   readonly families: ReadonlyMap<string, LookFamily>;
   readonly roles: TownLookRoles;
   readonly pieces: FetchedPieces;
+  /** One file of the pack, fetched as its pieces were and held to its digest: for its textures' pictures. */
+  readonly packFile: (file: StylePackFile) => Promise<Uint8Array<ArrayBuffer>>;
   /** The windows of the world's facades, which the pack's window pieces stand in. */
   readonly slots: readonly OpeningSlot[];
   readonly style: typeof import('@exulanica/atlas-react/style-pack');
@@ -415,13 +417,14 @@ export async function prepareWorldLook(
   const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge, 1, pack.water);
   const table = (JSON.parse(colourTableText) as { values: number[] }).values;
   const own = new Set(isOwn ? read.files.map((file) => file.sha256) : []);
-  const pieces = await fetchPackPieces(pack, Object.keys(pack.modules), table, (file) => (
+  const packFile = (file: StylePackFile): Promise<Uint8Array<ArrayBuffer>> => (
     own.has(file.sha256)
       ? ownLookContent(access, digest, file.sha256, `${packId} ${file.path}`)
       : stylePackContent(access, file.sha256, `${packId} ${file.path}`)
-  ));
+  );
+  const pieces = await fetchPackPieces(pack, Object.keys(pack.modules), table, packFile);
   const slots = style.containerOpeningSlots(containers);
-  return { packId, pack, look, families, roles: JSON.parse(townRolesText) as TownLookRoles, pieces, slots, style, attachTileInk, setting: drawnSetting };
+  return { packId, pack, look, families, roles: JSON.parse(townRolesText) as TownLookRoles, pieces, packFile, slots, style, attachTileInk, setting: drawnSetting };
 }
 
 /** A world's tile drawn in a prepared pack, and the vehicle bodies its traffic takes while attached. */

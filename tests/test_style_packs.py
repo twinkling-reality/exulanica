@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 from exulanica.world import style_packs
+from exulanica.world.style_pack_preview import PreviewRefused
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES: dict[str, Any] = json.loads(
@@ -149,3 +150,23 @@ def test_the_context_comes_from_the_family_catalog_and_the_texture_manifest(
     context = style_packs.load_context(tmp_path)
     assert context.families["window"] == style_packs.LookFamily("fill", "module", 800, 1250)
     assert context.texture_sets == frozenset({"cc0.slate"})
+
+
+def test_a_pack_picture_is_walked_from_its_bytes_and_a_webp_is_the_previews_alone() -> None:
+    from style_pack_upload_support import jpeg, png
+
+    assert style_packs.probe_pack_image(jpeg(32, 16), "image/jpeg") == style_packs.PackImage(
+        32, 16, "image/jpeg"
+    )
+    assert style_packs.probe_pack_image(png(8, 4), "image/png").width_px == 8
+    with pytest.raises(PreviewRefused) as refused:
+        style_packs.probe_pack_image(b"RIFF", "image/webp")
+    assert refused.value.reason == "media_type"
+
+
+def test_a_pack_draws_with_at_most_its_bound_of_pictures_textures_and_pieces_together() -> None:
+    style_packs.check_pack_images(style_packs.PACK_IMAGES_MAX)
+    style_packs.check_pack_images(40, style_packs.PACK_IMAGES_MAX - 40)
+    with pytest.raises(style_packs.StylePackRefused) as refused:
+        style_packs.check_pack_images(40, style_packs.PACK_IMAGES_MAX - 39)
+    assert (refused.value.reason, refused.value.path) == ("range", "files")

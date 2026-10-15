@@ -22,6 +22,8 @@ The order, so one upload always answers the same first refusal:
 5. Each piece's profile (:func:`exulanica.world.style_pack_pieces.check_piece_profile`) and its
    family's triangle and material budget, read from accessor counts.
 6. The preview, walked to its end (:func:`exulanica.world.style_pack_preview.walk_preview`).
+7. Each texture image, walked to its end the same way (:func:`style_packs.probe_pack_image`), a
+   texture's maps one size.
 """
 
 from __future__ import annotations
@@ -332,6 +334,27 @@ def admit(
             ) from None
         preview_sha256 = listed[preview]["sha256"]
         preview_size = [size.width_px, size.height_px]
+    # Every picture the pack's textures draw with, walked to its end; a texture's maps, one size.
+    for key, texture in manifest.get("textures", {}).items():
+        sizes: dict[str, tuple[int, int]] = {}
+        for map_name in ("colour", "normal", "roughness"):
+            path = texture[map_name]
+            if path is None:
+                continue
+            try:
+                image = style_packs.probe_pack_image(files[path], listed[path]["media_type"])
+            except PreviewRefused as refused:
+                raise StylePackAdmissionRefused(
+                    "style_pack_texture_refused", f"{refused.reason}: {refused}", path=path
+                ) from None
+            sizes[map_name] = (image.width_px, image.height_px)
+        if len(set(sizes.values())) > 1:
+            raise StylePackAdmissionRefused(
+                "style_pack_texture_refused",
+                f"texture {key}'s maps are not one size: "
+                + ", ".join(f"{name} {w} by {h}" for name, (w, h) in sizes.items()),
+                path=texture["colour"],
+            )
     ordered = tuple(
         PackFile(file["path"], file["sha256"], file["bytes"], file["media_type"])
         for file in manifest["files"]

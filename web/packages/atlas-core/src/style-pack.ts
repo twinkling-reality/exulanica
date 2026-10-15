@@ -37,6 +37,14 @@ export const STYLE_PACK_EXTENSION_MEDIA_TYPES: Readonly<Record<string, (typeof S
 });
 /** A pack's preview picture, at most. */
 export const STYLE_PACK_PREVIEW_MAX_BYTES = 512 * 1024;
+/** The pictures a pack may draw with: its own textures and the images its pieces embed. WebP stays the preview's alone. */
+export const STYLE_PACK_TEXTURE_IMAGE_MEDIA_TYPES = ['image/jpeg', 'image/png'] as const;
+/** One texture image, at most. Its side is held to the server's picture walk (2,048 pixels). */
+export const STYLE_PACK_TEXTURE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+/** The images one pack may draw with, its textures' and its pieces' together. */
+export const STYLE_PACK_IMAGES_MAX = 64;
+/** The textures one pack may carry. */
+export const STYLE_PACK_MAX_TEXTURES = 32;
 export const STYLE_PACK_TONE_MAPPINGS = ['aces', 'aces2', 'neutral', 'filmic', 'linear'] as const;
 /**
  * The sun shadow filters a pack may choose. PCSS soft shadows are not among them: measured at 26 to
@@ -165,7 +173,19 @@ export interface StylePackSwatch {
 
 export type StylePackSurface =
   | { readonly swatch: string; readonly up: string | null }
-  | { readonly texture_set: string; readonly up: string | null };
+  | { readonly texture_set: string; readonly up: string | null }
+  | { readonly texture: string; readonly up: string | null };
+
+/**
+ * A texture a pack carries for its surfaces: its colour map and, optionally, its normal and roughness
+ * maps (listed pictures of one size), and the width and height in millimetres one repeat covers.
+ */
+export interface StylePackTexture {
+  readonly colour: string;
+  readonly normal: string | null;
+  readonly roughness: string | null;
+  readonly extent_mm: readonly [number, number];
+}
 
 export interface StylePackVariant {
   readonly file: string;
@@ -222,6 +242,8 @@ export interface StylePackManifest {
   readonly palette: { readonly encoding: typeof STYLE_PACK_COLOUR_ENCODING; readonly swatches: readonly StylePackSwatch[] };
   readonly look_family_catalog?: { readonly version: number; readonly sha256: string };
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
+  /** Absent in a pack that carries no textures of its own. */
+  readonly textures?: Readonly<Record<string, StylePackTexture>>;
   readonly modules: Readonly<Record<string, { readonly variants: readonly StylePackVariant[] }>>;
   readonly files: readonly StylePackFile[];
 }
@@ -513,10 +535,24 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
     }),
     surfaces: record(lookRoleKey(['surface', 'both']), (v, p) => {
       const keys = v !== null && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v as object) : [];
+      if (keys.includes('texture')) return object(v, p, { texture: pattern(KEY, 'a texture key'), up: nullable(pattern(KEY, 'a swatch key')) });
       return keys.includes('texture_set')
         ? object(v, p, { texture_set: pattern(/^[a-z0-9][a-z0-9.-]{0,63}$/, 'a texture set id'), up: nullable(pattern(KEY, 'a swatch key')) })
         : object(v, p, { swatch: pattern(KEY, 'a swatch key'), up: nullable(pattern(KEY, 'a swatch key')) });
     }, 256),
+    // Added within the profile: a pack that carries no textures of its own names none.
+    textures: optional(record((key, path) => { if (!KEY.test(key)) fail('shape', path, 'must be a texture key'); }, (v, p) => {
+      const image = pattern(IMAGE_PATH, 'a lowercase relative path ending .jpg or .png');
+      return object(v, p, {
+        colour: image,
+        normal: nullable(image),
+        roughness: nullable(image),
+        extent_mm: (e, q) => {
+          if (!Array.isArray(e) || e.length !== 2) return fail('shape', q, 'must be a width and a height in millimetres');
+          return e.map((n, i) => integer(100, 50_000)(n, `${q}[${i}]`));
+        },
+      });
+    }, STYLE_PACK_MAX_TEXTURES)),
     modules: record(lookRoleKey(['module', 'both']), (v, p) => object(v, p, {
       variants: list((item, q) => object(item, q, {
         file: pattern(PATH, 'a lowercase relative path ending .glb'),
@@ -582,6 +618,7 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
   });
   for (const [role, surface] of Object.entries(manifest.surfaces)) {
     if ('swatch' in surface && !swatchKeys.has(surface.swatch)) fail('reference', `surfaces.${role}.swatch`, `names no swatch ${JSON.stringify(surface.swatch)}`);
+    if ('texture' in surface && manifest.textures?.[surface.texture] === undefined) fail('reference', `surfaces.${role}.texture`, `names no texture ${JSON.stringify(surface.texture)}`);
     if ('texture_set' in surface && !context.textureSets.has(surface.texture_set)) fail('reference', `surfaces.${role}.texture_set`, `names no texture set ${JSON.stringify(surface.texture_set)}`);
     if (surface.up !== null && !swatchKeys.has(surface.up)) fail('reference', `surfaces.${role}.up`, `names no swatch ${JSON.stringify(surface.up)}`);
   }
@@ -592,9 +629,6 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
     if (index > 0 && manifest.files[index - 1]!.path > file.path) fail('shape', `files[${index}].path`, 'files must be listed in path order');
     const stated = STYLE_PACK_EXTENSION_MEDIA_TYPES[file.path.slice(file.path.lastIndexOf('.') + 1)]!;
     if (file.media_type !== stated) fail('shape', `files[${index}].media_type`, `must be ${stated} for its extension`);
-    if ((STYLE_PACK_IMAGE_MEDIA_TYPES as readonly string[]).includes(file.media_type) && file.bytes > STYLE_PACK_PREVIEW_MAX_BYTES) {
-      fail('range', `files[${index}].bytes`, `a picture is at most ${STYLE_PACK_PREVIEW_MAX_BYTES} bytes`);
-    }
     listed.set(file.path, file);
     total += file.bytes;
   });
@@ -622,9 +656,36 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
   if (preview !== null) {
     if (!listed.has(preview)) fail('reference', 'preview', `names no listed file ${JSON.stringify(preview)}`);
     used.add(preview);
+    if (listed.get(preview)!.bytes > STYLE_PACK_PREVIEW_MAX_BYTES) {
+      fail('range', `files[${[...listed.keys()].indexOf(preview)}].bytes`, `a picture is at most ${STYLE_PACK_PREVIEW_MAX_BYTES} bytes`);
+    }
   }
+  const images = new Set<string>();
+  for (const [key, texture] of Object.entries(manifest.textures ?? {})) {
+    for (const map of ['colour', 'normal', 'roughness'] as const) {
+      const path = texture[map];
+      if (path === null) continue;
+      const where = `textures.${key}.${map}`;
+      const file = listed.get(path) ?? fail('reference', where, `names no listed file ${JSON.stringify(path)}`);
+      if (!(STYLE_PACK_TEXTURE_IMAGE_MEDIA_TYPES as readonly string[]).includes(file.media_type)) fail('shape', where, 'a texture image is a JPEG or a PNG');
+      if (file.bytes > STYLE_PACK_TEXTURE_IMAGE_MAX_BYTES) fail('range', where, `a texture image is at most ${STYLE_PACK_TEXTURE_IMAGE_MAX_BYTES} bytes`);
+      used.add(path);
+      images.add(path);
+    }
+  }
+  checkPackImages(images.size);
   for (const path of listed.keys()) if (!used.has(path)) fail('reference', 'files', `lists ${JSON.stringify(path)}, which nothing uses`);
   return manifest;
+}
+
+/**
+ * Refuse a pack that draws with more pictures than `STYLE_PACK_IMAGES_MAX`: its textures' distinct
+ * images and the images its pieces embed, counted together.
+ */
+export function checkPackImages(textureImages: number, embeddedImages = 0): void {
+  if (textureImages + embeddedImages > STYLE_PACK_IMAGES_MAX) {
+    fail('range', 'files', `draws with ${textureImages + embeddedImages} pictures; at most ${STYLE_PACK_IMAGES_MAX}`);
+  }
 }
 
 // ------------------------------------------------------------------------------ canonical bytes
@@ -664,7 +725,15 @@ export interface ResolvedStylePack {
   readonly water?: StylePackWater;
   readonly swatches: ReadonlyMap<string, StylePackSwatch>;
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
+  /** Each texture the chain carries, nearest first, with the files of the manifest that carries it. */
+  readonly textures: ReadonlyMap<string, ResolvedTexture>;
   readonly modules: Readonly<Record<string, ResolvedModule>>;
+}
+
+/** A texture as resolved: its maps, and the files of the manifest that carries it. */
+export interface ResolvedTexture {
+  readonly texture: StylePackTexture;
+  readonly files: ReadonlyMap<string, StylePackFile>;
 }
 
 /** A module as resolved: its variants and files, and the manifest of the chain that stated it. */
@@ -707,6 +776,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   }
   const swatches = new Map<string, StylePackSwatch>();
   const surfaces: Record<string, StylePackSurface> = {};
+  const textures = new Map<string, ResolvedTexture>();
   const modules: Record<string, ResolvedModule> = {};
   let light: StylePackManifest['light'] = null;
   let shading: StylePackManifest['shading'] = null;
@@ -717,13 +787,14 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     for (const swatch of manifest.palette.swatches) swatches.set(swatch.key, swatch);
     Object.assign(surfaces, manifest.surfaces);
     const files = new Map(manifest.files.map((file) => [file.path, file] as const));
+    for (const [key, texture] of Object.entries(manifest.textures ?? {})) textures.set(key, { texture, files });
     for (const [role, module] of Object.entries(manifest.modules)) modules[role] = { variants: module.variants, files, stated: index };
     if (manifest.light !== null) light = manifest.light;
     if (manifest.shading !== null) shading = manifest.shading;
     if (manifest.base === null || manifest.edge !== null) edge = manifest.edge;
     if (manifest.water !== undefined) water = manifest.water;
   }
-  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, modules };
+  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, textures, modules };
 }
 
 /** A slot as a world kind states it: millimetres, base centre, front +y, up +z. */

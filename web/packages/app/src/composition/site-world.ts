@@ -217,7 +217,7 @@ async function siteInLook(
   /** The mount in a resolved choice's pack, or in the tile look for none. Throws when the pack cannot be read. */
   const mounted = async (choice: WorldLookChoice): Promise<GeneratedSiteMount> => {
     if (choice.packId === null) return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
-    const [library, { packSiteDresser }, { prepareTextureSet }, { parseTextureSetManifest, resolveSurfaceLookRole }] = await Promise.all([
+    const [library, { packSiteDresser, packTextureSetId, preparePackTexture }, { prepareTextureSet }, { parseTextureSetManifest, resolveSurfaceLookRole }] = await Promise.all([
       import('../texture-library.js').then((module) => module.committedTextureLibrary()),
       import('@exulanica/atlas-react/style-pack'),
       import('@exulanica/atlas-react/generated-tile'),
@@ -226,13 +226,14 @@ async function siteInLook(
     const prepared = await worldLook.prepareWorldLook(access, choice.packId, library.textureManifest, [], choice.manifestSha256, choice.ownBase ?? null, choice.setting ?? null, choice.own ?? false);
     if (isTerrainSiteDrawing(drawing)) return siteMount(drawing, { ...measure, ...terrainOptions, servedBytes, look: prepared.look, renderBudget });
     const manifest = parseTextureSetManifest(library.textureManifest);
-    const setIds = new Set(drawing.slots.flatMap(slot => {
-      const surface = resolveSurfaceLookRole(prepared.pack, slot, prepared.families, slot.primitive === 'none' ? 'module' : 'either', materials);
-      return surface?.kind === 'surface' && 'texture_set' in surface.surface ? [surface.surface.texture_set] : [];
-    }));
-    const textures = new Map(await Promise.all([...setIds].map(async setId => [setId,
-      await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256)),
-    ] as const)));
+    const surfaces = drawing.slots.map(slot => resolveSurfaceLookRole(prepared.pack, slot, prepared.families, slot.primitive === 'none' ? 'module' : 'either', materials));
+    const setIds = new Set(surfaces.flatMap(surface => (surface?.kind === 'surface' && 'texture_set' in surface.surface ? [surface.surface.texture_set] : [])));
+    // The pack's own textures its slots name, drawn under their own ids beside the library's sets.
+    const packTextures = new Set(surfaces.flatMap(surface => (surface?.kind === 'surface' && 'texture' in surface.surface ? [surface.surface.texture] : [])));
+    const textures = new Map(await Promise.all([
+      ...[...setIds].map(async setId => [setId, await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256))] as const),
+      ...[...packTextures].map(async key => [packTextureSetId(key), await preparePackTexture(prepared.pack, key, prepared.packFile)] as const),
+    ]));
     const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish });
     return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
   };

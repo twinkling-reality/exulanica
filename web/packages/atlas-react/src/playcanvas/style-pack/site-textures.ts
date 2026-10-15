@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
-import type { StylePackSwatch } from '@exulanica/atlas-core';
+import { TEXTURE_SET_PROFILE_V2 } from '@exulanica/atlas-core';
+import type { DecodedTextureSet, ResolvedStylePack, StylePackFile, StylePackSwatch, TextureSetChannel, TextureSetManifestEntry } from '@exulanica/atlas-core';
 import type { SiteSlot } from '../generated-site/site-drawing.js';
 import type { TileLook } from '../generated-tile/look.js';
 import {
@@ -58,6 +59,108 @@ export function siteTextureMesh(device: pc.GraphicsDevice, original: pc.Mesh, sl
   mesh.setIndices(indices);
   mesh.update(pc.PRIMITIVE_TRIANGLES);
   return mesh;
+}
+
+/** A picture decoded to its size and its texels, four bytes each, row 0 first. */
+export interface DecodedPicture {
+  readonly width: number;
+  readonly height: number;
+  readonly rgba: Uint8Array;
+}
+
+/** Decodes one picture of a pack: its bytes and the media type its manifest states. */
+export type DecodePicture = (bytes: Uint8Array, mediaType: string) => Promise<DecodedPicture>;
+
+/**
+ * The browser's decode: no colour conversion and no premultiplied alpha, so a normal or roughness
+ * map keeps the bytes it was made with and a colour map its sRGB bytes.
+ */
+export const decodeBrowserPicture: DecodePicture = async (bytes, mediaType) => {
+  const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: mediaType }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('This browser cannot read a picture');
+    context.drawImage(bitmap, 0, 0);
+    const data = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    return { width: bitmap.width, height: bitmap.height, rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength) };
+  } finally {
+    bitmap.close();
+  }
+};
+
+/** The id a pack's own texture is drawn under, apart from every library set's. */
+export const packTextureSetId = (key: string): string => `pack:${key}`;
+
+const PACK_CHANNELS = {
+  base_color: { map: 'base_color', components: 3, holds: ['red', 'green', 'blue'], srgb: true },
+  normal: { map: 'normal', components: 3, holds: ['normal_x', 'normal_y', 'normal_z'], srgb: false },
+  orm: { map: 'orm', components: 3, holds: ['occlusion', 'roughness', 'metalness'], srgb: false },
+} as const satisfies Record<string, TextureSetChannel>;
+
+/**
+ * A texture a pack carries, fetched and decoded into the set the library's draw takes: its colour
+ * map, its normal map if it has one, and its roughness as an unoccluded, non-metal surface map
+ * (fully rough where it states no roughness map), repeating over its stated extent. The fetcher holds
+ * each picture to its digest; this holds it to its size and the maps to one size, else refuses.
+ */
+export async function preparePackTexture(
+  pack: ResolvedStylePack,
+  key: string,
+  bytesOf: (file: StylePackFile) => Promise<Uint8Array>,
+  decode: DecodePicture = decodeBrowserPicture,
+): Promise<PreparedTextureSet> {
+  const setId = packTextureSetId(key);
+  const resolved = pack.textures.get(key);
+  if (resolved === undefined) return { state: 'refused', setId, reason: `The pack carries no texture ${key}` };
+  try {
+    let transferredBytes = 0;
+    const read = async (path: string): Promise<DecodedPicture> => {
+      const file = resolved.files.get(path);
+      if (file === undefined) throw new Error(`${path} is not a file of its pack`);
+      const bytes = await bytesOf(file);
+      if (bytes.byteLength !== file.bytes) throw new Error(`${path} is ${String(bytes.byteLength)} bytes; its manifest states ${String(file.bytes)}`);
+      transferredBytes += bytes.byteLength;
+      return decode(bytes, file.media_type);
+    };
+    const { texture } = resolved;
+    const colour = await read(texture.colour);
+    const normal = texture.normal === null ? null : await read(texture.normal);
+    const roughness = texture.roughness === null ? null : await read(texture.roughness);
+    const { width, height } = colour;
+    for (const map of [normal, roughness]) {
+      if (map !== null && (map.width !== width || map.height !== height)) throw new Error(`its maps are not one size`);
+    }
+    const texels = width * height;
+    const rgb = (picture: DecodedPicture): Uint8Array => {
+      const out = new Uint8Array(texels * 3);
+      for (let i = 0; i < texels; i += 1) {
+        out[i * 3] = picture.rgba[i * 4]!; out[i * 3 + 1] = picture.rgba[i * 4 + 1]!; out[i * 3 + 2] = picture.rgba[i * 4 + 2]!;
+      }
+      return out;
+    };
+    const orm = new Uint8Array(texels * 3);
+    for (let i = 0; i < texels; i += 1) {
+      orm[i * 3] = 255;
+      orm[i * 3 + 1] = roughness === null ? 255 : roughness.rgba[i * 4]!;
+      orm[i * 3 + 2] = 0;
+    }
+    const channels: readonly TextureSetChannel[] = [PACK_CHANNELS.base_color, ...(normal === null ? [] : [PACK_CHANNELS.normal]), PACK_CHANNELS.orm];
+    const colourFile = resolved.files.get(texture.colour)!;
+    const entry: TextureSetManifestEntry = {
+      setId, version: 1, contentSha256: colourFile.sha256, byteSize: transferredBytes, width, height, channels,
+      extentUMm: texture.extent_mm[0], extentVMm: texture.extent_mm[1],
+      licenceId: pack.chain[0]!.licence.id, licenceSha256: '', containerProfile: TEXTURE_SET_PROFILE_V2, materialClass: 'opaque',
+    };
+    const set: DecodedTextureSet = {
+      entry, profile: TEXTURE_SET_PROFILE_V2, materialClass: 'opaque', makerKind: 'model', classParameters: { materialClass: 'opaque' },
+      surface: 'horizontal', title: key, heightRangeMm: null, channels,
+      maps: { base_color: rgb(colour), ...(normal === null ? {} : { normal: rgb(normal) }), orm },
+    };
+    return { state: 'decoded', setId, set, transferredBytes };
+  } catch (error) {
+    return { state: 'refused', setId, reason: `Texture ${key} could not be read: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export interface SiteTextureMetrics {

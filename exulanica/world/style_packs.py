@@ -34,24 +34,32 @@ from typing import Any, Final, NoReturn
 
 from exulanica_pieces.budgets import BUDGETS_PROFILE, PieceBudget, read_budgets
 
+from exulanica.world.style_pack_preview import PreviewRefused, walk_preview
+
 __all__ = [
     "BUDGETS_PROFILE",
     "COLOUR_ENCODING",
     "EXTENSION_MEDIA_TYPES",
     "IMAGE_MEDIA_TYPES",
     "OWN_WORK",
+    "PACK_IMAGES_MAX",
     "PREVIEW_MAX_BYTES",
     "PROFILE",
+    "TEXTURE_IMAGE_MAX_BYTES",
+    "TEXTURE_IMAGE_MEDIA_TYPES",
     "LookFamily",
     "LookFamilyCatalog",
+    "PackImage",
     "PieceBudget",
     "StylePackContext",
     "StylePackRefused",
     "canonical_json",
+    "check_pack_images",
     "context_for_manifest",
     "is_plain_text",
     "load_context",
     "manifest_sha256",
+    "probe_pack_image",
     "read_manifest",
     "read_piece_budgets",
     "require_chain_catalog",
@@ -78,6 +86,15 @@ EXTENSION_MEDIA_TYPES: Final = {
 }
 #: A pack's preview picture, at most.
 PREVIEW_MAX_BYTES: Final = 512 * 1024
+#: The pictures a pack may draw with: its own textures and the images its pieces embed. WebP stays
+#: the preview's alone.
+TEXTURE_IMAGE_MEDIA_TYPES: Final = ("image/jpeg", "image/png")
+#: One texture image, at most. Its side is held to the picture walk's own bound (2,048 pixels).
+TEXTURE_IMAGE_MAX_BYTES: Final = 4 * 1024 * 1024
+#: The images one pack may draw with, its textures' and its pieces' together.
+PACK_IMAGES_MAX: Final = 64
+#: The textures one pack may carry.
+MAX_TEXTURES: Final = 32
 TONE_MAPPINGS: Final = ("aces", "aces2", "neutral", "filmic", "linear")
 #: The sun shadow filters a pack may choose. PCSS soft shadows are not among them: measured at 26
 #: to 27 ms a frame on its own, it alone breaks the frame budget, so it stays a quality setting a
@@ -649,6 +666,10 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
 
     def surface(value: Any, path: str) -> dict[str, Any]:
         key = _pattern(_KEY, "a swatch key")
+        if isinstance(value, dict) and "texture" in value:
+            return _object(
+                value, path, {"texture": _pattern(_KEY, "a texture key"), "up": _nullable(key)}
+            )
         if isinstance(value, dict) and "texture_set" in value:
             return _object(
                 value,
@@ -659,6 +680,29 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                 },
             )
         return _object(value, path, {"swatch": key, "up": _nullable(key)})
+
+    def texture_key(key: str, path: str) -> None:
+        if _KEY.fullmatch(key) is None:
+            _fail("shape", path, "must be a texture key")
+
+    image = _pattern(_IMAGE_PATH, "a lowercase relative path ending .jpg or .png")
+
+    def extent(value: Any, path: str) -> list[int]:
+        if not isinstance(value, list) or len(value) != 2:
+            _fail("shape", path, "must be a width and a height in millimetres")
+        return [_integer(100, 50_000)(n, f"{path}[{i}]") for i, n in enumerate(value)]
+
+    def texture(value: Any, path: str) -> dict[str, Any]:
+        return _object(
+            value,
+            path,
+            {
+                "colour": image,
+                "normal": _nullable(image),
+                "roughness": _nullable(image),
+                "extent_mm": extent,
+            },
+        )
 
     def size(value: Any, path: str) -> list[int]:
         if not isinstance(value, list) or len(value) != 3:
@@ -785,6 +829,8 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             ),
             "look_family_catalog": _Optional(select_catalog),
             "surfaces": _record(look_role_key(("surface", "both")), surface, 256),
+            # Added within the profile: a pack that carries no textures of its own names none.
+            "textures": _Optional(_record(texture_key, texture, MAX_TEXTURES)),
             "modules": _record(
                 look_role_key(("module", "both")),
                 lambda v, p: _object(
@@ -887,6 +933,12 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
                 f"surfaces.{role}.swatch",
                 f"names no swatch {json.dumps(surface['swatch'])}",
             )
+        if "texture" in surface and surface["texture"] not in manifest.get("textures", {}):
+            _fail(
+                "reference",
+                f"surfaces.{role}.texture",
+                f"names no texture {json.dumps(surface['texture'])}",
+            )
         if "texture_set" in surface and surface["texture_set"] not in context.texture_sets:
             _fail(
                 "reference",
@@ -908,10 +960,6 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
         stated = EXTENSION_MEDIA_TYPES[file["path"].rsplit(".", 1)[1]]
         if file["media_type"] != stated:
             _fail("shape", f"files[{index}].media_type", f"must be {stated} for its extension")
-        if file["media_type"] in IMAGE_MEDIA_TYPES and file["bytes"] > PREVIEW_MAX_BYTES:
-            _fail(
-                "range", f"files[{index}].bytes", f"a picture is at most {PREVIEW_MAX_BYTES} bytes"
-            )
         previous = file["path"]
         listed[file["path"]] = file
         total += file["bytes"]
@@ -945,9 +993,61 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
         if preview not in listed:
             _fail("reference", "preview", f"names no listed file {json.dumps(preview)}")
         used.add(preview)
+        if listed[preview]["bytes"] > PREVIEW_MAX_BYTES:
+            _fail(
+                "range",
+                f"files[{list(listed).index(preview)}].bytes",
+                f"a picture is at most {PREVIEW_MAX_BYTES} bytes",
+            )
+    images: set[str] = set()
+    for key, texture in manifest.get("textures", {}).items():
+        for map_name in ("colour", "normal", "roughness"):
+            path = texture[map_name]
+            if path is None:
+                continue
+            where = f"textures.{key}.{map_name}"
+            if path not in listed:
+                _fail("reference", where, f"names no listed file {json.dumps(path)}")
+            if listed[path]["media_type"] not in TEXTURE_IMAGE_MEDIA_TYPES:
+                _fail("shape", where, "a texture image is a JPEG or a PNG")
+            if listed[path]["bytes"] > TEXTURE_IMAGE_MAX_BYTES:
+                _fail("range", where, f"a texture image is at most {TEXTURE_IMAGE_MAX_BYTES} bytes")
+            used.add(path)
+            images.add(path)
+    check_pack_images(len(images))
     for path in listed:
         if path not in used:
             _fail("reference", "files", f"lists {json.dumps(path)}, which nothing uses")
+
+
+@dataclass(frozen=True, slots=True)
+class PackImage:
+    """A picture a pack draws with, as the walk read it: its size and the media type it is."""
+
+    width_px: int
+    height_px: int
+    media_type: str
+
+
+def probe_pack_image(data: bytes, media_type: str) -> PackImage:
+    """Walk a picture a pack draws with to its end (a texture's map, or an image a piece embeds),
+    given as raw bytes and the media type it is stated to be. Refused by name: a type that is not
+    JPEG or PNG, and every reason the picture walk refuses (:class:`PreviewRefused`)."""
+    if media_type not in TEXTURE_IMAGE_MEDIA_TYPES:
+        raise PreviewRefused("media_type", "a picture a pack draws with is a JPEG or a PNG")
+    size = walk_preview(data, media_type)
+    return PackImage(size.width_px, size.height_px, media_type)
+
+
+def check_pack_images(texture_images: int, embedded_images: int = 0) -> None:
+    """Refuse a pack that draws with more pictures than :data:`PACK_IMAGES_MAX`: its textures'
+    distinct images and the images its pieces embed, counted together."""
+    if texture_images + embedded_images > PACK_IMAGES_MAX:
+        _fail(
+            "range",
+            "files",
+            f"draws with {texture_images + embedded_images} pictures; at most {PACK_IMAGES_MAX}",
+        )
 
 
 def _utf16_key(text: str) -> bytes:

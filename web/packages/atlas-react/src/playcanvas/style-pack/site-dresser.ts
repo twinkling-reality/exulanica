@@ -2,7 +2,7 @@ import type * as pc from 'playcanvas';
 import {
   materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
   type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type SurfaceMaterials,
-  type LandWater, type StyleSlot, type SurfacePattern, type SurfacePatterns,
+  type LandWater, type StyleSlot, type StylePackSurface, type SurfacePattern, type SurfacePatterns,
 } from '@exulanica/atlas-core';
 import type { StructuredSiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import { baseGroundSlot, type SiteDresser } from '../generated-site/site-mount.js';
@@ -17,7 +17,7 @@ import { dressSlots, type PieceSlot } from './dresser.js';
 import { applyPattern } from './pattern-material.js';
 import { uploadPackPieces, type FetchedPieces } from './pieces.js';
 import { swatchMaterial } from './swatch-material.js';
-import { SiteTextures } from './site-textures.js';
+import { SiteTextures, packTextureSetId } from './site-textures.js';
 import { WaterRipples } from './water-material.js';
 import type { PreparedTextureSet } from '../generated-tile/texture-materials.js';
 import { TILE_LOOK_V1, isRenderLook, type TileLook } from '../generated-tile/look.js';
@@ -59,6 +59,13 @@ import { seatGeometry, type SeatGeometry } from '../generated-site/site-seating.
  */
 
 /** A prepared pack, ready to dress any site. */
+
+/** The set a surface is drawn in: a library set by its id, a pack's own texture by its key, or none for a swatch. */
+function textureSetOf(surface: StylePackSurface): string | null {
+  if ('texture_set' in surface) return surface.texture_set;
+  return 'texture' in surface ? packTextureSetId(surface.texture) : null;
+}
+
 export interface SitePackDressing {
   readonly pack: ResolvedStylePack;
   readonly families: ReadonlyMap<string, LookFamily>;
@@ -255,10 +262,10 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         wear(entity, slot.identity, () => worn);
         materials += 1;
         if (pattern !== null) patterned += 1;
-       } else if (resolved?.kind === 'surface' && 'texture_set' in resolved.surface && entity !== undefined) {
+       } else if (resolved?.kind === 'surface' && textureSetOf(resolved.surface) !== null && entity !== undefined) {
         const shape = entity.findByName(`${slot.identity}:shape`) as pc.Entity | null;
         for (const instance of shape?.render?.meshInstances ?? []) {
-          if (textures.wear(instance, slot, resolved.surface.texture_set, resolved.up, drawn.root)) environment?.requestSceneColor();
+          if (textures.wear(instance, slot, textureSetOf(resolved.surface)!, resolved.up, drawn.root)) environment?.requestSceneColor();
         }
         texturedSlots.add(slot.identity);
         surfaces += 1;
@@ -516,8 +523,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         const resolved = catalog === null
           ? resolveLookRole(pack, slot, families, 'either')
           : resolveSurfaceLookRole(pack, slot, families, 'either', catalog);
-        if (resolved?.kind === 'surface' && 'texture_set' in resolved.surface) {
-          if (textures.wear(instance, slot, resolved.surface.texture_set, resolved.up, host.environmentRoot)) {
+        const set = resolved?.kind === 'surface' ? textureSetOf(resolved.surface) : null;
+        if (resolved?.kind === 'surface' && set !== null) {
+          if (textures.wear(instance, slot, set, resolved.up, host.environmentRoot)) {
             environment?.requestSceneColor();
           }
         }

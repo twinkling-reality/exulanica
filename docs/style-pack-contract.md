@@ -51,9 +51,10 @@ is the text as stored, in the order it is stored.
 | `water` | Optional: how the pack finishes water under physically based shading: a shallow and a deep colour, absorption per kilometre for each colour channel, the depth over which the colour turns from shallow to deep, the width of the foam where water meets what stands in it, and the strength of its reflection. Absent, as in every pack written before it, water is drawn as its surface states; nearer packs of a chain replace a base's finish whole |
 | `palette` | At most 64 swatches, each a distinct sRGB colour with roughness, metalness and emission |
 | `look_family_catalog` | Optional retained appearance catalog pin, `{version, sha256}`; the digest names the exact catalog file bytes. Absence retains version 1 and adds nothing to the manifest's canonical bytes |
-| `surfaces` | A look role of a surface family to a swatch or a texture set, with an optional swatch for upward faces |
+| `surfaces` | A look role of a surface family to a swatch, a texture set or one of the pack's own textures, with an optional swatch for upward faces |
+| `textures` | Optional: the pack's own textures, by key, at most 32. Each names a listed colour picture and, optionally, a normal and a roughness picture, all JPEG or PNG and of one size, and the width and height in millimetres one repeat covers (100 to 50,000). Absent, the pack carries none |
 | `modules` | A look role of a module family to one to eight variants, each a piece file, an optional second level of detail, the piece's own size and, for a fill family, where it stretches |
-| `files` | Every file the pack carries, in path order: path, SHA-256, size and the media type its extension states (`model/gltf-binary` for `.glb`, `image/jpeg`, `image/png` or `image/webp` for a picture); every file is a variant's piece or the preview |
+| `files` | Every file the pack carries, in path order: path, SHA-256, size and the media type its extension states (`model/gltf-binary` for `.glb`, `image/jpeg`, `image/png` or `image/webp` for a picture); every file is a variant's piece, a texture's picture or the preview |
 
 A pack with no base states its light and shading. A pack drawn on a base states only what it changes:
 its swatches, surfaces, modules, presets, shading and edge replace the base's, and anything it leaves
@@ -85,7 +86,7 @@ respect the roof envelope and usable openings; selecting a catalog is not a clea
 
 | Dressing | Families | What the pack supplies |
 | --- | --- | --- |
-| Surface | ground, path, road, water, wall | A swatch or a texture set |
+| Surface | ground, path, road, water, wall | A swatch, a texture set or the pack's own texture |
 | Both | roof | A surface, and optionally pieces |
 | Module | door, window, fixture, prop, plant, boundary, vehicle, structure | Pieces |
 | Catalog | character | Nothing: characters are the published character catalogs' |
@@ -187,9 +188,9 @@ it, then the rules across sections, and refuses with the first fault by reason a
 
 | Reason | What it refuses |
 | --- | --- |
-| `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, text holding a lone surrogate, a control character or a bidirectional control character, a file whose media type is not its extension's |
-| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a picture over 512 KiB |
-| `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill |
+| `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, text holding a lone surrogate, a control character or a bidirectional control character, a file whose media type is not its extension's, a texture's picture that is not a JPEG or a PNG |
+| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a preview over 512 KiB, a texture's picture over 4 MiB, a texture repeating over less than 100 mm, a pack drawing with more than 64 pictures (its textures' and its pieces' together) |
+| `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, texture, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill |
 | `duplicate` | Two swatches of one key or one colour, two files of one path |
 | `licence` | CC-BY-4.0 without attribution, attribution on CC0-1.0, the own-work id on a pack that is not uploaded or with an attribution |
 
@@ -630,6 +631,7 @@ first refusal:
 | The parts: exactly the manifest's files, each at its listed size and digest, a piece within its family's file size before it is opened | 422 `invalid_style_pack_body`, `content_digest_mismatch` or `over_budget` |
 | Each piece's profile (`exulanica/world/style_pack_pieces.py`): an `exulanica.static-glb/v1` container with one buffer, the binary chunk that buffer and at most three zero bytes, every buffer view packed tightly, used and read byte for byte by its accessors, no `extras`, no images, textures or samplers, names and `asset.generator` at most 64 plain characters, `asset` holding nothing else; and its family's triangles (a second level of detail a quarter of the first's) and materials, from accessor counts | 422 `style_pack_piece_refused` or `over_budget`, with the piece's `path` |
 | The preview, walked to its end without decoding (`exulanica/world/style_pack_preview.py`) | 422 `style_pack_preview_refused` |
+| Each texture's pictures, walked the same way (`style_packs.probe_pack_image`, JPEG and PNG only, at most 2,048 pixels a side), its maps one size | 422 `style_pack_texture_refused` |
 
 The preview walk allows only what a plain still picture needs. A JPEG is SOI, one JFIF APP0 of 16
 bytes (no thumbnail), DQT, DHT, DRI, one SOF0, SOF1 or SOF2, its scans, and EOI with nothing after
