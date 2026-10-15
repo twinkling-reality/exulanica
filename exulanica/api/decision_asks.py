@@ -263,8 +263,9 @@ def ask_again_offer(
     with reading() as connection:
         for held in found:
             answer = held.decision or {}
-            provider = answer.get("provider") if isinstance(answer.get("provider"), Mapping) else {}
-            proposal = answer.get("proposal") if isinstance(answer.get("proposal"), Mapping) else {}
+            said_provider, said_proposal = answer.get("provider"), answer.get("proposal")
+            provider = said_provider if isinstance(said_provider, Mapping) else {}
+            proposal = said_proposal if isinstance(said_proposal, Mapping) else {}
             own = {"provider": provider.get("provider"), "model_id": provider.get("model_id")}
             entry: dict[str, Any] = {
                 "request_id": str(held.request["request_id"]),
