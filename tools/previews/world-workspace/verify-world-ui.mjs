@@ -45,8 +45,18 @@ assert.deepEqual(placeBeside(union, card, viewport).connector.from, { x: 980, y:
 const wide = placeBeside({ left: 60, top: 300, right: 1860, bottom: 700 }, card, viewport);
 assert.equal(wide.side, 'right');
 assert.equal(wide.x, 1920 - 40 - 388);
-// A tall card near the top is held 40 px down.
-assert.equal(placeBeside({ left: 900, top: 0, right: 980, bottom: 200, headY: 10, waistY: 100 }, card, viewport).y, 40);
+// A card beside a subject high on the screen stops at the line under the top corners (120 px), its
+// connector still level with its title; lower down the line changes nothing.
+const high = placeBeside({ left: 900, top: 0, right: 980, bottom: 200, headY: 10, waistY: 100 }, card, viewport);
+assert.equal(high.y, 120);
+assert.equal(high.connector.to.y, 120 + 92);
+assert.equal(placeBeside({ left: 900, top: 0, right: 980, bottom: 200, headY: 10, waistY: 100 }, card, viewport, { top: 60 }).y, 60);
+// Beside a subject low on the screen its bottom stays 160 px above the viewport's foot, over the notes
+// and hints.
+assert.equal(placeBeside({ left: 900, top: 880, right: 980, bottom: 1060, headY: 900, waistY: 1000 }, card, viewport).y, 1080 - 160 - 300);
+assert.equal(placeBeside({ left: 900, top: 880, right: 980, bottom: 1060, headY: 900, waistY: 1000 }, card, viewport, { bottom: 40 }).y, 1080 - 40 - 300);
+// A card taller than the room between the lines keeps its top at the upper line.
+assert.equal(placeBeside({ left: 900, top: 300, right: 980, bottom: 700, headY: 320, waistY: 520 }, { width: 388, height: 1000 }, viewport).y, 120);
 
 // Hints show for ten seconds after the world opens, then only for six seconds after a hinted key
 // or while held (Tab).

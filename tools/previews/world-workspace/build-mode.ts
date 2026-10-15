@@ -21,12 +21,18 @@ import { pickSiteSlot } from '/src/composition/sight.ts';
 import { currentOpenSite } from '/src/composition/site-world.ts';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { buildHints, cardPrompts, createKindLabels, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
-import { cardWords, keyWord, nameTag, outline, path, promptColumn, promptRow, ring, scaleOf, sideCard } from './world-ui.ts';
+import { cardWords, keyWord, nameTag, outline, path, promptColumn, promptRow, scaleOf, sideCard } from './world-ui.ts';
 
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
 const ASK_AFTER_MS = 180;
-/** How much wider than the footprint's drawn extent the ring at a thing's foot is. */
+/** How much wider than the footprint's half diagonal the ring at a thing's foot is, so it encloses the outline's corners. */
 const RING_MARGIN = 1.18;
+/**
+ * The chosen thing's ground ring, quieter than a character's (DESIGN's ruling L22): the outline is
+ * the primary mark, so the ring is a thinner white line with no glow and no fill. Spread over the
+ * ground ring's look.
+ */
+export const THING_RING = Object.freeze({ linePx: 1.6, glowAlpha: 0, fillAlpha: 0 });
 /** What a refusal the server words for a person starts with, drawn in the refused colour. */
 const NOT_HERE = 'Not here:';
 /** How a made part is named where a placed thing's id would be: chosen, carried, pointed at. */
@@ -35,7 +41,7 @@ const PART = 'part:';
 const QUARTER_TURNS = [0, 1_570_796, 3_141_593, 4_712_389];
 const quarterOf = (yaw) => Math.max(0, QUARTER_TURNS.indexOf(yaw));
 
-export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting }) {
+export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null }) {
   const lifetime = new AbortController();
   const listen = (target, type, run, options = {}) => target.addEventListener(type, run, { ...options, signal: lifetime.signal });
   const node = (tag, words = '', cls = '') => { const item = document.createElement(tag); item.textContent = String(words); item.className = cls; return item; };
@@ -47,8 +53,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const card = sideCard({ build: true, scale });
   card.body.setAttribute('role', 'region'); card.body.setAttribute('aria-labelledby', 'bm-title');
   const chosen = outline(), copy = outline({ form: 'copy' }), origin = outline({ form: 'origin' }), trail = path();
-  const foot = ring();
-  root.append(origin.root, trail.root, chosen.root, copy.root, foot.root, tag.root, card.root);
+  root.append(origin.root, trail.root, chosen.root, copy.root, tag.root, card.root);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
   /** Whether the server refused removing what is chosen: its card then offers moving it only. */
@@ -239,7 +244,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     card.body.querySelector('.wu-card-title')?.setAttribute('id', 'bm-title');
   }
 
-  function hideMarks() { chosen.hide(); copy.hide(); origin.hide(); trail.hide(); foot.hide(); }
+  function hideMarks() { chosen.hide(); copy.hide(); origin.hide(); trail.hide(); groundRing?.hide(); }
   /** Whether the chosen thing's card and marks show: building, something chosen, nothing over them. */
   const cardShows = () => on && selected !== null && !inspecting();
 
@@ -533,11 +538,40 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     return { ground, bounds: { left, right, top, bottom, headY: top, waistY: (top + bottom) / 2 } };
   }
 
-  /** The ring at a footprint's foot: centred on it, a little wider than it is drawn. */
-  function ringAround(ground) {
-    const xs = ground.map(corner => corner.x), ys = ground.map(corner => corner.y);
-    const rx = (Math.max(...xs) - Math.min(...xs)) / 2 * RING_MARGIN, ry = (Math.max(...ys) - Math.min(...ys)) / 2 * RING_MARGIN;
-    foot.place((Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2, rx, ry);
+  /**
+   * The ring at a chosen thing's foot, on the ground in the world (the ground ring, ruling L20), so a
+   * wall or what stands in front covers it as it covers the thing: centred on its footprint and a
+   * little wider than its half diagonal, so it never crosses the outline.
+   */
+  function ringUnder(id) {
+    const corners = groundRing === null ? null : footprintInWorld(id);
+    if (corners === null) { groundRing?.hide(); return; }
+    const mean = (axis) => corners.reduce((sum, corner) => sum + corner[axis], 0) / corners.length;
+    const half = (a, c) => Math.hypot(a.x - c.x, a.z - c.z) / 2;
+    groundRing.place({ x: mean('x'), y: mean('y'), z: mean('z') }, Math.hypot(half(corners[0], corners[1]), half(corners[1], corners[2])) * RING_MARGIN);
+  }
+
+  /** A chosen thing's or made part's footprint as it stands: its four ground corners, world metres. */
+  function footprintInWorld(id) {
+    let frame, sides;
+    if (isPart(id)) {
+      const part = partOf(id), region = regionRoot();
+      if (part === null || region === null) return null;
+      const base = (slotOf(id)?.positionMm[2] ?? 0) / 1000, [width, depth] = part.size_mm, [east, north] = part.centre_mm;
+      frame = region.getWorldTransform();
+      sides = { x0: (east - width / 2) / 1000, x1: (east + width / 2) / 1000, z0: -(north - depth / 2) / 1000, z1: -(north + depth / 2) / 1000, y: base };
+    } else {
+      const figure = things()?.layer?.figureOf(id), volume = figure?.pickVolume;
+      if (!figure || !volume || !figure.root.enabled) return null;
+      frame = figure.root.getWorldTransform();
+      sides = volume.kind === 'box'
+        ? { x0: volume.min[0], x1: volume.max[0], z0: volume.min[2], z1: volume.max[2], y: 0 }
+        : { x0: volume.centre[0] - volume.radius, x1: volume.centre[0] + volume.radius, z0: volume.centre[2] - volume.radius, z1: volume.centre[2] + volume.radius, y: 0 };
+    }
+    return [[sides.x0, sides.z0], [sides.x1, sides.z0], [sides.x1, sides.z1], [sides.x0, sides.z1]].map(([x, z]) => {
+      frame.transformPoint(point.set(x, sides.y, z), point);
+      return { x: point.x, y: point.y, z: point.z };
+    });
   }
   /** The screen box around two subjects, the first's head and waist kept for the card's height. */
   const around = (first, second) => ({
@@ -643,13 +677,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
           else card.place((carried ?? standing).bounds);
           if (moving !== null) {
             // The copy where it would go, its spot dashed where it stands, and the way between.
-            chosen.hide(); foot.hide();
+            chosen.hide(); groundRing?.hide();
             if (carried) { copy.form(moving.verdict.state === 'refused' ? 'refused' : 'copy'); copy.place(carried.ground); } else copy.hide();
             if (standing && carried) { origin.place(standing.ground); trail.place(middle(standing.ground), middle(carried.ground)); }
             else { origin.hide(); trail.hide(); }
           } else {
             copy.hide(); origin.hide(); trail.hide();
-            if (standing) { chosen.place(standing.ground); ringAround(standing.ground); } else { chosen.hide(); foot.hide(); }
+            if (standing) { chosen.place(standing.ground); ringUnder(selected); } else { chosen.hide(); groundRing?.hide(); }
           }
         }
       }
@@ -660,7 +694,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       lifetime.abort();
       if (on) { on = false; renderCorners(); }
       canvas.style.cursor = '';
-      for (const part of [origin.root, trail.root, chosen.root, copy.root, foot.root, tag.root, card.root]) part.remove();
+      for (const part of [origin.root, trail.root, chosen.root, copy.root, tag.root, card.root]) part.remove();
+      groundRing?.dispose();
     },
   };
 }

@@ -1,7 +1,7 @@
 import { GROUND_RING, createGroundRing, pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { buildInventoryRows, inventoryDetailPath, rowForSceneSelection } from './inventory-records.ts';
 import { assertSelectedOffer } from './entity-inspection.mjs';
-import { mountBuildMode } from './build-mode.ts';
+import { THING_RING, mountBuildMode } from './build-mode.ts';
 import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { inspectionReach } from './discovery-policy.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
@@ -162,7 +162,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   };
   // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
   const build = send && binding && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1'
-    ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => pageShown() || held !== null }) : null;
+    ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => pageShown() || held !== null, groundRing: createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, ...THING_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } }) }) : null;
   worldHints();
   function notice(words) {
     if (words) corners.notes.show(words); else corners.notes.clear();

@@ -411,7 +411,7 @@ export function sideCard({ question = false, build = false, scale = () => 1 }: {
       root.hidden = false;
       const s = scale();
       const size = { width: card.offsetWidth, height: card.offsetHeight };
-      const at = placeBeside(bounds, size, { width: innerWidth, height: innerHeight }, { gap: BESIDE.gap * s, inset: BESIDE.inset * s, meet: BESIDE.meet * s, connect });
+      const at = placeBeside(bounds, size, { width: innerWidth, height: innerHeight }, { gap: BESIDE.gap * s, inset: BESIDE.inset * s, meet: BESIDE.meet * s, connect, top: BESIDE.top * s, bottom: BESIDE.bottom * s });
       card.style.transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`;
       const { from, elbow, to } = at.connector;
       line.setAttribute('d', `M${from.x.toFixed(1)} ${from.y.toFixed(1)}L${elbow.x.toFixed(1)} ${elbow.y.toFixed(1)}L${to.x.toFixed(1)} ${to.y.toFixed(1)}`);

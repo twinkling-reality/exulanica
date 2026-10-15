@@ -26,10 +26,12 @@ export function clampToView(point, size, viewport, inset = ANCHOR_INSET) {
 
 /**
  * The side card's placement beside its subject (section 5.6, frame 05), in reference pixels: the
- * gap from the subject's box, the inset from the viewport, and how far below the card's top the
- * connector meets it (level with the title).
+ * gap from the subject's box, the inset from the viewport, how far below the card's top the
+ * connector meets it (level with the title), the line under the top corners and the mode word that
+ * the card's top never rises above, and how far above the viewport's bottom its bottom stays, clear
+ * of the notes and hints.
  */
-export const BESIDE = Object.freeze({ gap: 80, inset: ANCHOR_INSET, meet: 92 });
+export const BESIDE = Object.freeze({ gap: 80, inset: ANCHOR_INSET, meet: 92, top: 120, bottom: 160 });
 
 /**
  * Where a card of `size` sits beside a subject whose screen box is `bounds` ({ left, top, right,
@@ -37,16 +39,20 @@ export const BESIDE = Object.freeze({ gap: 80, inset: ANCHOR_INSET, meet: 92 });
  * on the left when the right side would cross the margin. Returns the card's top left, its side,
  * and the connector: from the subject's shoulder, diagonally to the middle of the gap, then level
  * into the card's near edge. `connect` (default `bounds`) is the box the connector starts from: a
- * card beside a carried copy and its spot together points at the copy (DESIGN's ruling L11).
+ * card beside a carried copy and its spot together points at the copy (DESIGN's ruling L11). The
+ * card stays between `top` and `bottom` above the viewport's foot, so a subject high on the screen
+ * (a large part) never puts it over the top corners and a low one never over the notes and hints; a
+ * card taller than the room between keeps its top at `top`.
  */
-export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = BESIDE.inset, meet = BESIDE.meet, connect = bounds } = {}) {
+export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = BESIDE.inset, meet = BESIDE.meet, connect = bounds, top = BESIDE.top, bottom = BESIDE.bottom } = {}) {
   const head = Number.isFinite(bounds.headY) ? bounds.headY : bounds.top;
   const waist = Number.isFinite(bounds.waistY) ? bounds.waistY : (bounds.top + bounds.bottom) / 2;
   const fitsRight = bounds.right + gap + size.width <= viewport.width - inset;
   const fitsLeft = bounds.left - gap - size.width >= inset;
   const side = fitsRight || !fitsLeft ? 'right' : 'left';
   const x = side === 'right' ? bounds.right + gap : bounds.left - gap - size.width;
-  const at = clampToView({ x, y: (head + waist) / 2 - size.height / 2 }, size, viewport, inset);
+  const held = clampToView({ x, y: (head + waist) / 2 - size.height / 2 }, size, viewport, inset);
+  const at = { x: held.x, y: Math.max(top, Math.min(viewport.height - bottom - size.height, held.y)) };
   const towards = side === 'right' ? 1 : -1;
   const fromHead = Number.isFinite(connect.headY) ? connect.headY : connect.top;
   const fromWaist = Number.isFinite(connect.waistY) ? connect.waistY : (connect.top + connect.bottom) / 2;
