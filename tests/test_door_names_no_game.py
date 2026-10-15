@@ -9,6 +9,11 @@ branch would most likely arrive.
 The names are the games and engines the door's adapters are written for or were considered for,
 each matched as a whole word, ignoring case. A game may be named in documents, in ``bridges/``,
 in the deployment's bridge directory (configuration) and in tests' prose about the rule itself.
+
+Nor does the product name a game's characters or a franchise, the shipped assets included (the
+kinds, looks and authoring files a person's world is made from): :data:`CHARACTER_NAMES` are the
+ones a product file has carried, matched the same way. No list of names is complete; each holds the
+names it knows.
 """
 
 from __future__ import annotations
@@ -26,9 +31,13 @@ GAME_NAMES = re.compile(
     r")(?![A-Za-z0-9_])",
     re.IGNORECASE,
 )
+#: Characters and franchises of games, whole words, ignoring case.
+CHARACTER_NAMES = re.compile(
+    r"(?<![A-Za-z0-9_])(psyduck|pok[eé]mon)(?![A-Za-z0-9_])", re.IGNORECASE
+)
 #: Where the product's source lives: the backend, the piece formats, the web application's
-#: packages and the catalogs it ships.
-PRODUCT = ("exulanica", "exulanica_pieces", "assets/catalogs", "web/packages")
+#: packages and the catalogs and assets it ships.
+PRODUCT = ("exulanica", "exulanica_pieces", "assets", "web/packages")
 _SUFFIXES = {".py", ".sql", ".json", ".ts", ".tsx", ".js", ".mjs", ".css", ".html", ".toml"}
 _SKIPPED = {"node_modules", "dist", "build", ".turbo", "__pycache__"}
 
@@ -45,8 +54,8 @@ def _product_files() -> list[Path]:
     return found
 
 
-def _named(text: str) -> list[str]:
-    return sorted({match.group(1).lower() for match in GAME_NAMES.finditer(text)})
+def _named(text: str, names: re.Pattern[str] = GAME_NAMES) -> list[str]:
+    return sorted({match.group(1).lower() for match in names.finditer(text)})
 
 
 def test_the_search_finds_a_name_where_one_is_written():
@@ -64,6 +73,17 @@ def test_the_search_finds_a_name_where_one_is_written():
     assert _named("sha256 9c0ade1f, zero_adapter, minetests, 10ad") == []
 
 
+def test_the_search_finds_a_character_or_franchise_where_one_is_written():
+    """The guard on the guard for characters: a name is found in a label or a key, a duck is not."""
+    assert _named('"label": "psyduck inspired duck"', CHARACTER_NAMES) == ["psyduck"]
+    assert _named("Psyduck-like duck, from Pokémon or Pokemon", CHARACTER_NAMES) == [
+        "pokemon",
+        "pokémon",
+        "psyduck",
+    ]
+    assert _named("yellow pond duck, pond_duck, psyducks", CHARACTER_NAMES) == []
+
+
 def test_no_game_is_named_in_the_product():
     files = _product_files()
     assert len(files) > 500, "the search found too little of the product to mean anything"
@@ -75,6 +95,15 @@ def test_no_game_is_named_in_the_product():
     assert offenders == {}, (
         "the product names a game; a game belongs in bridges/ and its mapping file, which is data"
     )
+
+
+def test_no_game_character_or_franchise_is_named_in_the_product():
+    offenders = {
+        str(path.relative_to(ROOT)): names
+        for path in _product_files()
+        if (names := _named(path.read_text(encoding="utf-8", errors="replace"), CHARACTER_NAMES))
+    }
+    assert offenders == {}, "the product names a game's character or a franchise"
 
 
 def _imports(path: Path) -> set[str]:

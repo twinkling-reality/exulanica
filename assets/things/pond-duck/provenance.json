@@ -1,6 +1,6 @@
 {
   "origin": "authored reference-inspired geometry",
-  "reference_subject": "Psyduck-like duck, requested yellow and pink appearances",
+  "reference_subject": "Pond duck, requested yellow and pink appearances",
   "official_asset": false,
   "distribution": "private",
   "license": "LicenseRef-Pond-Duck-Preview",
@@ -8,22 +8,34 @@
   "model_receipts": [],
   "external_asset_downloads": [],
   "reference_image_sha256": {
-    "psyduck-yellow.png": "2b0f05f8fdb57b9a5e65bdcffdb8e7fe528f2ea1b17b26cb0de517bdbcad5572",
-    "psyduck-pink.png": "f60272ce4459f45c0c9e204831ac3f8a0b357d81ade0b3e881550292419f41fb"
+    "reference-yellow.png": "2b0f05f8fdb57b9a5e65bdcffdb8e7fe528f2ea1b17b26cb0de517bdbcad5572",
+    "reference-pink.png": "f60272ce4459f45c0c9e204831ac3f8a0b357d81ade0b3e881550292419f41fb"
   },
   "variants": [
     "yellow-v1",
     "pink-look-v1"
   ],
+  "kind": {
+    "key": "pond_duck",
+    "version": 2,
+    "sha256": "bdb5cf87f7d7f03001a3a1d765d4e1c2d725f4351d1083cdb0dc052333a05396",
+    "superseded": [
+      {
+        "version": 1,
+        "sha256": "e919c311c19b58ee5022cc3086bfa805401d20a5e907615dcea02f7f1941956c",
+        "why": "relabelled; worlds that placed version 1 keep reading it by its digest"
+      }
+    ]
+  },
   "files": {
     "LICENSE.txt": "d8d7f154ddd7ddfcab9cc6b3850a5af9ac26d0381556c3f88df92cc93d258482",
-    "authoring.json": "6f93524d251428c56e98dca33ab90de6219d73ef636fd19bce7cb743caa81929",
-    "pink-authoring.json": "959224218d64d46ab4b9c8ebd2f2767024a65ebcdf2c3879fe48e5fe26ab9b14",
+    "authoring.json": "af5ba27963efdfd919545dfb3e9aca150ad6906f52732113ade920b324322ed8",
+    "pink-authoring.json": "b0640f7f775e2c52463b366d2060c0b447ef85fc25dab3d0ba40fcc68cc0da4e",
     "pink-look-v1/body.glb": "39f15dcef90856d8886480df078662cc738cf7166af3c498ac620fe313efc960",
     "pink-look-v1/look.json": "1da8ea527dea1cfd2a6fc0c10700c829456eb604738b100267ea30b7f9ed1930",
     "pink-look-v1/receipt.json": "484e52486dbcb326bca6b8439ffc0789c728d25cf218292999c6c726107a21fb",
     "yellow-v1/body.glb": "fb16fa6a6caae375abc067b30b9652624ca9b291d392b99ba166ea14699c9b4b",
-    "yellow-v1/kind.json": "e919c311c19b58ee5022cc3086bfa805401d20a5e907615dcea02f7f1941956c",
+    "yellow-v1/kind.json": "bdb5cf87f7d7f03001a3a1d765d4e1c2d725f4351d1083cdb0dc052333a05396",
     "yellow-v1/look.json": "5df51c67521ee6238c7d341721f6f5b97fe9a76fbad49a4cd6fc040dfc2635c2",
     "yellow-v1/plan.json": "9e4b8d540565de3402d6b328f225d6694b89fdbda5d2bdf28b36fa4da4126d2a",
     "yellow-v1/receipt.json": "e78e88f7ed6740eaa9c41deaaf7860f77a577ad44b09a94e5cf6d28996ee725e",
