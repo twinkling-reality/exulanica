@@ -470,8 +470,11 @@ def test_one_rolling_pull_request_collects_saved_checkpoints(tmp_path):
     assert sorted(files) == ["README.md", "evidence/session-one.json", "world-project.json"]
     assert remote.branches["main"]["files"] == {"README.md": b"hello"}
     [pr] = remote.pulls
-    assert "not part of the world" in pr["body"]
-    assert "recorded 1 decision record from session session:one" in pr["body"]
+    assert "Kept beside the world, not part of it" in pr["body"]
+    # The fixture's record keeps no receipt, so what became of it is said to be unrecorded.
+    assert (
+        "- The knight, with synthetic-model: 1 decision; what the world did with it" in (pr["body"])
+    )
     assert "Co-authored" not in pr["body"] and "Generated" not in pr["body"]
 
     moved = deepcopy(world)
@@ -483,8 +486,9 @@ def test_one_rolling_pull_request_collects_saved_checkpoints(tmp_path):
     assert result["actions"] == ["commit", "update-pull-request"]
     assert [list(c["files"]) for c in review["commits"]] == [["world-project.json"]]
     assert review["commits"][0]["message"] == "Moved the knight 2 m east"
-    assert len(remote.pulls) == 1 and "moved the knight 2 m east" not in pr["body"]
-    assert "- started project" in pr["body"]  # Against the base branch, which has no project.
+    assert len(remote.pulls) == 1 and "Moved the knight 2 m east" not in pr["body"]
+    # Against the base branch, which has no project.
+    assert "- Started the project with 1 thing" in pr["body"]
 
     # Nothing new saved: no write at all.
     review = client.review(target, local, "Move the knight")
@@ -516,7 +520,7 @@ def test_a_pull_request_whose_changes_cancel_out_is_closed(tmp_path):
     local.save(moved)
     _, result = publish(client, target, local, "Move the knight")
     assert result["actions"] == ["commit", "open-pull-request"]
-    assert "- moved the knight 2 m east" in remote.pulls[1]["body"]
+    assert "- Moved the knight 2 m east" in remote.pulls[1]["body"]
     local.save(world)  # Moved back: nothing differs from main any more.
     review, result = publish(client, target, local, "Move the knight back")
     assert review["actions"] == ["close-pull-request"]
@@ -605,7 +609,7 @@ def test_each_unpublished_checkpoint_becomes_its_own_commit(tmp_path):
         local.save(moved)
     review, result = publish(client, target, local, None)
     assert [c["message"] for c in review["commits"]] == [
-        "Start project project:synthetic",
+        "Started the project",
         "Moved the knight 1 m east",
         "Moved the knight 2 m east",
     ]
@@ -739,7 +743,7 @@ def test_visibility_decides_whether_the_request_reads_labels_or_codes(tmp_path):
     private = client.review(target, reviews[True])
     assert private["text"] == "readable"
     assert "\u201crest by the well\u201d" in private["body"]
-    assert "What the beings did" in private["body"]
+    assert "## What the characters did" in private["body"]
     remote.visibility = "PUBLIC"
     # A project holding written words reaches no public repository at all
     # (test_world_project_rights); one without them is told in codes.
@@ -747,7 +751,8 @@ def test_visibility_decides_whether_the_request_reads_labels_or_codes(tmp_path):
         client.review(target, reviews[True])
     public = client.review(target, reviews[False])
     assert public["text"] == "codes"
-    assert "option 2 (go)" in public["body"]
+    assert "chose one of 2 choices" in public["body"]
+    assert "rest by the well" not in public["body"]
     assert public["review_sha256"] != private["review_sha256"]
     remote.visibility = "INTERNAL"
     assert client.review(target, reviews[False])["text"] == "codes"

@@ -733,6 +733,14 @@ semantics, transitive rendering dependencies and source-use authorization are no
 `dependencies_ready` describes the declared dependencies only; `runtime_loadable`,
 `source_binding_verified` and `model_availability_verified` remain false.
 
+A checkpoint may also keep who the world's owner wrote each selected being to be, in an optional
+`characters` list: each being's newest character record by its `revision`, and, only where the
+project keeps readable text, its `words` as written (`name` and `about`, both null where the
+newest record clears the character), held to the character module's own line rule and bounds.
+With readable text it also keeps the version's `title` as written. Without readable text only the
+revision is kept, so a change is still seen and no word is. A checkpoint without these optional
+fields keeps its digest.
+
 Every string in a checkpoint or evidence file is also scanned by value. A value shaped like a
 local filesystem path or a credential (token prefixes, bearer values, private key headers) is
 refused, naming the field and never echoing the value. The scan reduces accidental inclusion; it
@@ -752,7 +760,11 @@ hidden model reasoning, private conversations, raw logs or model weights.
 
 The evidence file format is specified field by field in the
 [world project evidence format](world-project-evidence-format.md). An evidence file holds one session's records with the model assignments they were made under, so
-a record stays bound after the checkpoint's assignment changes. Each file has its own digest,
+a record stays bound after the checkpoint's assignment changes. A living session's evidence keeps
+the decisions asked under an earlier model too, each under a binding to the model it was asked
+under, so one thing may hold a binding for each model in one file; a checkpoint keeps only the
+decisions of the model chosen now. A binding no saved record is held under may be left out of a
+later capture of the same session. Each file has its own digest,
 separate from the checkpoint's; evidence is what happened, never part of the world definition. A
 file holds at most 1024 records; `watch` continues a longer session in numbered files.
 `playback` orders the checkpoint's and the session files' records without provider calls. It
@@ -786,8 +798,14 @@ when none is given, the message is drawn from the plain-word summary. Evidence f
 append-only: a saved record cannot be changed or removed.
 
 Every comparison reports world changes and evidence apart, in plain words, with the raw field
-diff underneath: "moved the knight 2 m east", "assigned a model to the knight", "recorded 3 more
-decision records from session S". `history` returns the read a history panel uses, described
+diff underneath (`summary.py`, with the words of `words.py`): "Moved the knight 2 m east, turned
+15°", "Changed Sir Pip's model to Nemotron 3 Nano 30B", "Wrote Sir Pip's personality",
+"Recorded run 2: 5 decisions". A sentence starts with what was done and holds no identity, digest
+or code: a thing is called by the name its owner wrote, where the project keeps it, else by its
+kind ("the knight", "the second knight", "the creature made in this world"), and a model by the
+name the workspace gives it (`Manifest.model_name`). Living sessions are runs, numbered in the
+project in the order they opened. A commit message never quotes a personality, and a written name
+in it loses a character a commit message refuses. `history` returns the read a history panel uses, described
 below. `reopen` validates the last commit offline,
 reports missing, corrupt and unsupported dependencies, uncommitted edits, and a labelled warning
 for a session file of another project or one made under assignments no longer current. It
@@ -835,7 +853,11 @@ then marked published or not; without the read, `published` is null.
 builds the selection: the named placed things, each one's current model assignment, and the model
 decisions the society consumed for them, mapped back to placed things through the society's
 subject identity, at most the latest 256 consumed records per capture. `--session` puts the
-decisions in an evidence file; `--readable` adds the readable records. The bearer is read from a file into memory and sent only in the request header.
+decisions in an evidence file; `--readable` adds the readable records, the version's title and
+the words of each being's character. Where the version has a society, each selected being (a
+thing of a kind its workspace made, or of a shipped kind whose class is `being`) has its card read
+once per capture for its character (`GET /world/versions/{version}/society/things/{subject}`).
+The bearer is read from a file into memory and sent only in the request header.
 Every request passes through the egress check held to the one origin the caller names
 ([security floor](security-floor.md)); plain http is accepted only for `localhost`, and redirects
 are not followed. Errors name the route and status, never a value. Capture writes nothing to the
@@ -884,7 +906,9 @@ never the world and never a remote.
 For a new folder it reads the world once by GET and starts the project from every placed thing a
 checkpoint can hold (or the `--thing` list), then writes `project-follow.json` (profile
 `exulanica.world-project-follow/v1`) as one local commit: the world and version; the things,
-`every` or a list; whether readable text is kept (`--readable`); `sessions.since`, the instant from
+`every` or a list; whether readable text is kept (`--readable`; turning it on for a followed folder
+makes the next poll a pending change, as the project starts keeping the world's title and its
+characters' words); `sessions.since`, the instant from
 which living sessions are recorded, the command's own time unless `--sessions-since` names another,
 or null with `--no-sessions`; and optional `limits` in whole numbers (`--poll-seconds`,
 `--settle-seconds`, `--max-pending-seconds`, `--daily-cap`), each absent one at the watcher's
@@ -965,26 +989,33 @@ pull request or update its text. Each saved checkpoint not yet on the branch bec
 with its own plain-word message and only the `world-project.json` and `evidence/` files it
 changed, each chained by `expectedHeadOid`. The branch is matched to the newest saved checkpoint
 whose files it holds; a branch matching none, or more than 50 unpublished checkpoints, is
-published as one commit of the last saved state, using `--message` when given. The pull request text describes, against the base branch, the changes to the
-world and, separately, the decision evidence, which is never called part of the world. It then
-tells what the beings did in each session (each decision's offered option count, its answer and
-its verdict in the browser's choice account words, `assets/catalogs/roles/choice-account-words.v1.json`)
-and how each model did (the served measures of `exulanica/world/decision_measures.py`: counts out
-of totals, "not enough data yet" below a measure's minimum sample, latency, and cost as computed
-or bounded, never a bill). A living session's evidence is headed by its minutes, why it stopped
-in the society's own words (`SESSION_CLOSED_WORDS`, `exulanica/world/society_sessions.py`, the
-table the page reads), its limits and its spending as the spending authority read it, including
-the most that calls of unknown cost can have cost; a table by living session sets each session's
-models side by side, with timeouts only where every request of the session was read. It is
-regenerated from the committed files on every review and ends
-with their digests. What the files cannot support (requests no minute took up, receipts older
-files lack) is named as unavailable, never shown as zero. Labels, spoken lines and situations
-appear only when the repository's visibility reads `PRIVATE`; a public or internal repository gets
-option numbers and codes only, and the review digest binds which. The files follow the same rule
+published as one commit of the last saved state, using `--message` when given.
+
+The pull request is written for a person who has never seen the project's files, in the words
+above. Its title is "Changes to" the world's title where the repository is private and the
+project keeps it, else "Changes to this world". "The world" lists, against the base branch, what
+changed in the world, a personality quoted only where the repository is private. "What the
+characters did" is kept beside the world, never called part of it: each run under its number and
+the time it opened, how many minutes it ran, with whose model, its minutes, its decisions and what
+it spent of the most it could spend, then why it ended in the society's own words
+(`SESSION_CLOSED_WORDS`, `exulanica/world/society_sessions.py`); under it each character with
+each model it was asked under, and its decisions: the minute, what it chose of how many choices,
+and the verdict in the browser's choice account words
+(`assets/catalogs/roles/choice-account-words.v1.json`). "How each model did" is a table by model
+over every run of the request: characters, decisions, done, repeated choices, time to answer in
+seconds, and what it spent (`exulanica/world/decision_measures.py`: counts out of totals, "not
+enough yet" below a measure's minimum sample, spending computed from reported use, never a
+bill). What the files cannot support (requests no minute took up, receipts older files lack) is
+said as not recorded or not counted, never shown as zero. The files the text was made from are
+named with their digests in an HTML comment at its end, which GitHub does not show; no identity,
+digest, provider or action code appears in what it shows. It is regenerated from the committed
+files on every review. Chosen words, names, personalities and the world's title appear only when
+the repository's visibility reads `PRIVATE`; a public or internal repository is told what kind of
+choice each was, and the review digest binds which. The files follow the same rule
 (below, "What reaches a repository"). The generated text passes the
 value scan and stays within 60,000 characters, below the 65,536 GitHub is reported to accept
 (its pull request API page states no limit); it leaves out decision lines first, then older
-sessions' detail, and says so, never the counts or the model table. When the
+runs' detail, and says so, never the counts or the model table. When the
 saved project again equals the base branch, the open pull request is closed instead. Unchanged
 files make no commit and unchanged text is not rewritten. The review digest binds the target,
 both branch heads, the pull request, each commit's message and file digests, and the text; `publish-branch` recomputes
@@ -1012,7 +1043,9 @@ would change region, kind or origin, be restored after removal, or use a workspa
 workspace does not hold, since no route does those. A merge that changes only evidence applies
 nothing. Model assignments are listed as to assign after the world is started: a new version has
 no society until it is started, and recording an assignment authorizes later model spending.
-Evidence, the link and dependency files are never applied.
+Personalities are listed for the world's owner to write in the world: who a character is reaches
+its model's input, so a merge never writes one. Evidence, the link and dependency files are never
+applied.
 
 `apply` needs `--allow-world-write` and the review digest, which binds the merge commit, the edits,
 the refusals and the version state; it recomputes the review and refuses any difference. It
@@ -1048,10 +1081,11 @@ files included (`exulanica/world_package/projects/rights.py`), and refuse, writi
 
 - **Written words reach only a private repository.** A file carrying a `readable` record (what a
   decision was told, the labels it was offered, its choice and its line), in an evidence file or
-  in the checkpoint's own records, goes only to a repository whose visibility reads `PRIVATE`. A
-  public or internal repository, or one whose visibility GitHub does not state, receives none,
-  read again on every review, so a repository made public after linking is refused too. A project
-  kept without readable records reaches a public repository, told in option numbers and codes.
+  in the checkpoint's own records, or a checkpoint carrying the world's title or a character's
+  words, goes only to a repository whose visibility reads `PRIVATE`. A public or internal
+  repository, or one whose visibility GitHub does not state, receives none, read again on every
+  review, so a repository made public after linking is refused too. A project kept without
+  readable text reaches a public repository, its characters called by their kinds.
 - **A thing goes only where its origin allows.** Each thing kind the published checkpoint names is
   published only where its origin record lets it be shown ([things contract](things-contract.md)):
   `public` anywhere, `private` (its own workspace) and `restricted` (never in a public artefact)

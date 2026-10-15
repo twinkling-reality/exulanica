@@ -252,7 +252,7 @@ def test_a_merge_becomes_a_new_version_and_the_source_is_untouched():
             "add the lamp post",
         ]
         assert planned["not_applied"]["model_assignments"] == [
-            "assign synthetic-model to the knight after the world is started"
+            "change the knight's model to synthetic-model after the world is started"
         ]
         assert world.writes == []
         with pytest.raises(ProjectError, match="authorization"):
@@ -280,6 +280,49 @@ def test_a_merge_becomes_a_new_version_and_the_source_is_untouched():
             client, merged, "main", reviewed_sha256=again["review_sha256"], allow_world_write=True
         ) == {"applied": False, "mode": "already applied", "refused": []}
         assert len(world.writes) == writes
+
+
+def test_a_merged_personality_and_model_are_reported_and_never_applied():
+    # Who a character is reaches its model's input: a merge never writes it, or a model.
+    world = World()
+    project = edited(world)
+    project["characters"] = [
+        {
+            "thing_id": "knight:1",
+            "revision": 3,
+            "words": {"name": "Sir Pip", "about": "Guards the well at night."},
+        }
+    ]
+    merged = read_merged("learner/world", 7, GitHub(project).request)
+    with reader(world) as client:
+        planned = review(client, merged, "main")
+        assert planned["not_applied"]["personalities"] == [
+            "write Sir Pip's personality in the world"
+        ]
+        assert planned["not_applied"]["model_assignments"] == [
+            "change Sir Pip's model to synthetic-model after the world is started"
+        ]
+        assert planned["changes"] == [
+            "remove the bench",
+            "move Sir Pip 2 m east",
+            "add the lamp post",
+        ]
+        apply(
+            client,
+            merged,
+            "main",
+            reviewed_sha256=planned["review_sha256"],
+            allow_world_write=True,
+        )
+    # Only the version and its placed things are written: no character and no model route.
+    version = world.writes[1][0].split("/")[3]
+    assert [path for path, _ in world.writes] == [
+        "/world/versions",
+        f"/world/versions/{version}/things/bench:1/remove",
+        f"/world/versions/{version}/things/knight:1/move",
+        f"/world/versions/{version}/things",
+    ]
+    assert "Guards the well" not in repr(world.writes)
 
 
 def test_an_interrupted_apply_resumes_on_the_version_its_title_names():
@@ -405,7 +448,9 @@ def test_a_kind_this_workspace_does_not_hold_is_refused_before_any_write():
     with reader(world) as client:
         planned = review(client, merged, "main")
         assert planned["mode"] == "refused"
-        assert planned["refused"] == ["made:1: this workspace holds no such kind"]
+        assert planned["refused"] == [
+            "the creature made in this world: this workspace holds no such kind"
+        ]
         world.kinds.add("e" * 64)
-        assert review(client, merged, "main")["changes"] == ["add made:1"]
+        assert review(client, merged, "main")["changes"] == ["add the creature made in this world"]
     assert world.writes == []

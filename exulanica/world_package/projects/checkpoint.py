@@ -85,6 +85,15 @@ def document(value: Any) -> dict[str, Any]:
     ):
         result[section].sort(key=lambda item: item[key])
     _drop_absent_readable(result["decisions"])
+    # Optional additions: a checkpoint without them keeps its digest.
+    if result.get("characters") is not None:
+        result["characters"].sort(key=lambda item: item["thing_id"])
+        for character in result["characters"]:
+            if character.get("words") is None:
+                character.pop("words", None)
+    for key in ("title", "characters"):
+        if result.get(key) is None:
+            result.pop(key, None)
     return result
 
 
@@ -109,7 +118,10 @@ def validate_evidence(value: Any) -> Evidence:
 
 def evidence_document(value: Any) -> dict[str, Any]:
     result = validate_evidence(value).model_dump()
-    result["models"].sort(key=lambda item: item["thing_id"] + "\x00" + item["model_id"])
+    # One thing may hold a binding for each model it was asked under; its bytes break a tie.
+    result["models"].sort(
+        key=lambda item: (item["thing_id"], item["model_id"], canonical_json(item))
+    )
     result["decisions"].sort(key=lambda item: (item["tick"], item["record_id"]))
     _drop_absent_readable(result["decisions"])
     for key in ("coverage", "captured_at", "living_session"):

@@ -607,3 +607,109 @@ def test_a_session_of_exactly_the_listing_cap_is_complete(world):
         )
     assert result.evidence["coverage"] == {"decisions": "all"}
     assert "request:r9" in {d["record_id"] for d in result.evidence["decisions"]}
+
+
+def test_a_run_keeps_the_decisions_asked_under_an_earlier_model_under_that_model(world):
+    with_session(world)
+    # Minute 5 was asked of the knight's earlier model; the knight's model now is another.
+    earlier = record("r2", world.knight, 5, "wait here a minute", model="earlier-model")
+    earlier["decision"]["provider"]["served_model_id"] = "earlier-model-rev-7"
+    world.records["r2"] = earlier
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            living_session="latest",
+        )
+    evidence = result.evidence
+    bindings = {
+        digest(canonical_json(m)): (m["model_id"], m["revision"]) for m in evidence["models"]
+    }
+    held = {d["record_id"]: bindings[d["binding_sha256"]] for d in evidence["decisions"]}
+    assert held == {
+        "request:r1": ("synthetic-model", "synthetic-model-rev-1"),
+        "request:r2": ("earlier-model", "earlier-model-rev-7"),
+        "request:r3": ("synthetic-model", "synthetic-model-rev-1"),
+        "request:r9": ("synthetic-model", "synthetic-model-rev-1"),
+    }
+    assert result.report["skipped_decisions"] == {}
+    # The world keeps only the model chosen now, its revision from its own records alone.
+    assert [(m["model_id"], m["revision"]) for m in result.checkpoint["models"]] == [
+        ("synthetic-model", "synthetic-model-rev-1")
+    ]
+
+
+def card(world, character, revision=3):
+    world.routes[f"/world/versions/{VERSION}/society/things/{world.knight}"] = {
+        "profile": "exulanica.thing-card/v1",
+        "label": "Sir Pip",
+        "character": {
+            "revision": revision,
+            "character": character,
+            "written_at": "2026-10-14T01:00:00Z",
+            "shown": True,
+        },
+    }
+
+
+@pytest.mark.parametrize("readable", [True, False])
+def test_who_a_being_is_and_the_world_s_name_are_kept_only_with_readable_text(world, readable):
+    card(world, {"name": "Sir Pip", "about": "Guards the well at night."})
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=None,
+            include_decisions=False,
+            readable=readable,
+        )
+    project = result.checkpoint
+    if readable:
+        assert project["title"] == "PRIVATE TITLE"
+        assert project["characters"] == [
+            {
+                "thing_id": "knight:1",
+                "revision": 3,
+                "words": {"name": "Sir Pip", "about": "Guards the well at night."},
+            }
+        ]
+    else:
+        # The record's revision alone: a change is seen, and no word is kept.
+        assert "title" not in project
+        assert project["characters"] == [{"thing_id": "knight:1", "revision": 3}]
+        text = canonical_json(project).decode()
+        assert "Sir Pip" not in text and "Guards" not in text and "PRIVATE" not in text
+    # The bench is an object, which has no character: its card is never read.
+    cards = [p for _, p, _ in world.requests if "/society/things/" in p]
+    assert len(cards) == 1 and world.knight in cards[0]
+    assert {method for method, _, _ in world.requests} == {"GET"}
+
+
+def test_a_cleared_character_keeps_its_revision_and_a_being_without_one_keeps_none(world):
+    card(world, None, revision=4)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        cleared = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            include_decisions=False,
+            readable=True,
+        ).checkpoint
+    assert cleared["characters"] == [
+        {"thing_id": "knight:1", "revision": 4, "words": {"name": None, "about": None}}
+    ]
+    del world.routes[f"/world/versions/{VERSION}/society/things/{world.knight}"]
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        none = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            include_decisions=False,
+            readable=True,
+        ).checkpoint
+    assert "characters" not in none

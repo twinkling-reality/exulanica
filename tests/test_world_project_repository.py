@@ -17,7 +17,11 @@ from exulanica.world_package.projects.summary import summarize
 
 from test_world_project import sample
 
-START = "started project project:synthetic with 1 thing, 1 model assignment and 1 decision record"
+START = [
+    "Started the project with 1 thing",
+    "Changed the knight's model to synthetic-model",
+    "Recorded 1 decision",
+]
 AUTHOR = Author("Synthetic Student", "student@example.invalid")
 
 
@@ -51,11 +55,11 @@ def test_create_save_noop_and_plain_words(tmp_path):
     project, dependencies = sample()
     folder = tmp_path / "garden-project"
     first = create(folder, project, author=AUTHOR, dependencies=dependencies)
-    assert first["committed"] and first["message"] == "Start project project:synthetic"
-    assert first["summary"] == [START]
+    assert first["committed"] and first["message"] == "Started the project"
+    assert first["summary"] == START
     assert git(folder, "remote").strip() == ""
     assert [p.name for p in (folder / ".git" / "hooks").glob("*")] == []
-    assert git(folder, "log", "-1", "--format=%B").strip() == "Start project project:synthetic"
+    assert git(folder, "log", "-1", "--format=%B").strip() == "Started the project"
 
     local = Project(folder, author=AUTHOR)
     # Saving the same selection, however often the world runs, commits nothing.
@@ -69,13 +73,13 @@ def test_create_save_noop_and_plain_words(tmp_path):
     moved["things"][0]["transform"]["z_mm"] -= 500
     saved = local.save(moved)
     assert saved["committed"]
-    assert saved["summary"] == ["moved the knight 2 m east and 0.5 m north"]
+    assert saved["summary"] == ["Moved the knight 2 m east and 0.5 m north"]
     assert saved["message"] == "Moved the knight 2 m east and 0.5 m north"
     assert '"x_mm": 2000' in saved["diff"]
     assert commits(folder) == 2
     assert [entry["message"] for entry in local.history()] == [
         "Moved the knight 2 m east and 0.5 m north",
-        "Start project project:synthetic",
+        "Started the project",
     ]
     assert local.compare("HEAD~1")["summary"] == saved["summary"]
 
@@ -90,8 +94,8 @@ def test_edits_in_the_folder_save_with_an_own_message(tmp_path):
     edited["models"] = []
     (folder / "world-project.json").write_text(json.dumps(edited, indent=2), encoding="utf-8")
     assert local.reopen()["uncommitted_edits"] == [
-        "unassigned synthetic-model from the knight",
-        "dropped 1 decision record",
+        "Changed the knight's model to Routine",
+        "Dropped 1 decision",
     ]
     saved = local.save(message="Let the knight follow its routine")
     assert saved["committed"] and saved["message"] == "Let the knight follow its routine"
@@ -118,7 +122,7 @@ def test_fork_gets_a_new_identity_folder_and_lineage(tmp_path):
     create(parent, project, author=AUTHOR, dependencies=dependencies)
     child = tmp_path / "child"
     result = fork_project(parent, child, "project:my-fork", author=AUTHOR)
-    assert result["message"] == "Fork project:synthetic as project:my-fork"
+    assert result["message"] == "Started this project as a copy of another"
     forked = Project(child).at("HEAD")
     assert forked["project_id"] == "project:my-fork"
     assert forked["forked_from"] == {
@@ -140,15 +144,15 @@ def test_assignment_and_record_words():
     bare = deepcopy(project)
     bare["models"], bare["decisions"] = [], []
     assert summarize(bare, project) == [
-        "assigned synthetic-model to the knight",
-        "added 1 decision record",
+        "Changed the knight's model to synthetic-model",
+        "Recorded 1 decision",
     ]
     more = deepcopy(project)
     for n in range(2, 5):
         record = deepcopy(project["decisions"][0])
         record.update(record_id=f"record:{n}", tick=n)
         more["decisions"].append(record)
-    assert summarize(project, more) == ["added 3 decision records"]
+    assert summarize(project, more) == ["Recorded 3 decisions"]
     assert summarize(project, project) == []
 
 
@@ -207,10 +211,10 @@ def test_timeline_reads_pending_changes_and_checkpoints_newest_first(tmp_path):
     turned["things"][0]["transform"]["yaw_microradians"] = 1570796
     (folder / "world-project.json").write_text(json.dumps(turned), encoding="utf-8")
     view = local.timeline()
-    assert view["pending"] == ["turned the knight 90 degrees"]
+    assert view["pending"] == ["Turned the knight 90°"]
     assert [c["summary"] for c in view["checkpoints"]] == [
-        ["moved the knight 3 m east"],
-        [START],
+        ["Moved the knight 3 m east"],
+        START,
     ]
     assert view["more"] is False and view["head"] == view["checkpoints"][0]["commit"]
     assert local.timeline(limit=1)["more"] is True
@@ -245,14 +249,14 @@ def test_evidence_lives_beside_the_world_and_only_grows(tmp_path):
     world, evidence = evidence_from(project)
     folder = tmp_path / "project"
     first = create(folder, world, author=AUTHOR, evidence=[evidence])
-    assert first["evidence"] == ["recorded 1 decision record from session session:one"]
+    assert first["evidence"] == ["Recorded 1 decision"]
     assert (folder / "evidence" / "session-one.json").is_file()
     local = Project(folder, author=AUTHOR)
     grown = more_records(evidence, 3)
     saved = local.save(world, evidence=[grown])
     assert saved["summary"] == []  # The world did not change.
-    assert saved["evidence"] == ["recorded 3 more decision records from session session:one"]
-    assert saved["message"] == "Recorded 3 more decision records from session session:one"
+    assert saved["evidence"] == ["Recorded 3 more decisions"]
+    assert saved["message"] == "Recorded 3 more decisions"
     assert local.save(world, evidence=[grown])["committed"] is False
     rewritten = deepcopy(grown)
     rewritten["decisions"][0]["reason_code"] = "edited_later"
@@ -268,6 +272,27 @@ def test_evidence_lives_beside_the_world_and_only_grows(tmp_path):
     assert [s["records"] for s in view["sessions"]] == [4]
     assert view["sessions"][0]["warning"] is None
     assert len(view["sessions"][0]["evidence_sha256"]) == 64
+
+
+def test_an_assignment_no_saved_record_is_held_under_may_leave_a_session_file(tmp_path):
+    # A thing given another model before it decided anything leaves its first assignment behind;
+    # an assignment a saved record is held under never leaves.
+    project, _ = sample()
+    world, evidence = evidence_from(project)
+    unused = {**evidence["models"][0], "thing_id": "knight:2", "revision": "unused-v1"}
+    folder = tmp_path / "project"
+    create(
+        folder,
+        world,
+        author=AUTHOR,
+        evidence=[{**evidence, "models": [*evidence["models"], unused]}],
+    )
+    local = Project(folder, author=AUTHOR)
+    assert local.save(world, evidence=[more_records(evidence, 1)])["committed"]
+    used = deepcopy(evidence)
+    used["models"] = [unused]
+    with pytest.raises(ProjectError):  # every saved record keeps its assignment in its file
+        local.save(world, evidence=[used])
 
 
 def test_reopen_labels_evidence_that_no_longer_fits(tmp_path):
@@ -350,10 +375,10 @@ def test_project_commands_round_trip(tmp_path, capsys):
     ]
     assert main(["record", str(folder), *arguments, *who]) == 0
     recorded = json.loads(capsys.readouterr().out)
-    assert recorded["summary"] == ["moved the knight 2 m east"]
-    assert recorded["evidence"] == ["recorded 1 decision record from session session:one"]
+    assert recorded["summary"] == ["Moved the knight 2 m east"]
+    assert recorded["evidence"] == ["Recorded 1 decision"]
     assert main(["changes", str(folder)]) == 0
-    assert json.loads(capsys.readouterr().out)["summary"] == ["moved the knight 2 m east"]
+    assert json.loads(capsys.readouterr().out)["summary"] == ["Moved the knight 2 m east"]
     assert main(["history", str(folder)]) == 0
     assert len(json.loads(capsys.readouterr().out)["checkpoints"]) == 2
     assert main(["reopen", str(folder)]) == 0

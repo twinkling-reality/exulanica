@@ -3,7 +3,8 @@
 The new version is branched from the version the project was captured from, through the World
 API's own routes, and titled with the repository, merge commit and pull request it came from.
 Only placed things change: additions, moves and turns within a region, and removals. Model
-assignments are reported for after the world is started, and evidence is never applied. The
+assignments are reported for after the world is started, personalities are reported for the
+world's owner to write, and evidence is never applied. The
 source version is never edited, and nothing is written unless a bound review is allowed.
 """
 
@@ -16,7 +17,8 @@ from exulanica.canonical import canonical_json
 from exulanica.world_package.projects.capture import WorldReader, segment
 from exulanica.world_package.projects.checkpoint import Conflict, ProjectError, digest, document
 from exulanica.world_package.projects.github import MergedPullRequest
-from exulanica.world_package.projects.summary import movement, thing_names
+from exulanica.world_package.projects.summary import movement
+from exulanica.world_package.projects.words import model_name, names, possessive
 
 POSE = ("x_mm", "y_mm", "z_mm", "yaw_microradians")
 
@@ -46,10 +48,10 @@ def plan(world: dict[str, Any], version: dict[str, Any]) -> tuple[list[Edit], li
     edits: list[Edit] = []
     refused: list[str] = []
     notes: list[str] = []
-    names = thing_names(world["things"])
+    called = names([world])
     held = {thing["thing_id"]: thing for thing in version["things"]}
     for thing in sorted(world["things"], key=lambda t: t["thing_id"]):
-        thing_id, name = thing["thing_id"], names[thing["thing_id"]]
+        thing_id, name = thing["thing_id"], called[thing["thing_id"]]
         current = held.get(thing_id)
         if current is None:
             if thing["removed"]:
@@ -135,18 +137,24 @@ def review(reader: WorldReader, merged: MergedPullRequest, base: str) -> dict[st
                 "that instead"
             )
     edits, refused, notes = plan(world, target)
-    names = thing_names(world["things"])
+    called = names([world])
     for edit in edits:
         kind = edit.body.get("kind", {})
         if kind.get("source") == "workspace":
             try:
                 reader.raw("GET thing kind", f"/things/kinds/{segment(kind['sha256'])}")
             except ProjectError:
-                refused.append(f"{names[edit.thing_id]}: this workspace holds no such kind")
+                refused.append(f"{called[edit.thing_id]}: this workspace holds no such kind")
     pending = [
-        f"assign {model['model_id']} to {names.get(model['thing_id'], model['thing_id'])} "
-        "after the world is started"
+        f"change {possessive(called[model['thing_id']])} model to "
+        f"{model_name(model['model_id'])} after the world is started"
         for model in world["models"]
+    ]
+    # Who a character is reaches its model's input, so it is never taken from a merge: the
+    # world's owner writes it in the world.
+    personalities = [
+        f"write {possessive(called[character['thing_id']])} personality in the world"
+        for character in world.get("characters") or []
     ]
     if refused:
         mode = "refused"
@@ -167,6 +175,7 @@ def review(reader: WorldReader, merged: MergedPullRequest, base: str) -> dict[st
         "notes": notes,
         "not_applied": {
             "model_assignments": pending,
+            "personalities": personalities,
             "evidence_sessions": sorted(merged.sessions),
         },
         "running_world_edited": False,

@@ -11,17 +11,29 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from decimal import Decimal
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
-from exulanica.world.decision_measures import LATENCY_MINIMUM, measures
+from exulanica.world.decision_measures import measures
 from exulanica.world.society_sessions import closed_words
 from exulanica.world_package.projects.checkpoint import ProjectError
 from exulanica.world_package.projects.schema import ModelBinding, binding_sha256, scan_values
-from exulanica.world_package.projects.summary import thing_names
+from exulanica.world_package.projects.summary import run_numbers
+from exulanica.world_package.projects.words import (
+    capital,
+    listed,
+    model_name,
+    money,
+    names,
+    plural,
+    possessive,
+    quoted,
+    seconds,
+    without_words,
+)
 
 CATALOG: Final = (
     Path(__file__).resolve().parents[3] / "assets/catalogs/roles/choice-account-words.v1.json"
@@ -75,10 +87,6 @@ def _read_words(path: str) -> dict[str, Any]:
     return {"verdict_order": list(VERDICT_ORDER), **tables}
 
 
-def _decisions(count: int) -> str:
-    return f"{count} decision" if count == 1 else f"{count} decisions"
-
-
 def _sentence(text: str) -> str:
     trimmed = text.strip()
     capital = trimmed[:1].upper() + trimmed[1:]
@@ -118,244 +126,204 @@ def verdict(receipt: Mapping[str, Any] | None, words: Mapping[str, Any]) -> str:
     return _sentence(said["applied"].format(minute=minute))
 
 
-def _answer(decision: Mapping[str, Any], readable: bool) -> str:
-    chosen = decision["chosen_option_id"]
-    if chosen is None:
-        return "no offered option"
-    text = decision.get("readable")
-    if readable and text is not None and text.get("choice") is not None:
-        return f"“{text['choice']}”"
-    index = [o["option_id"] for o in decision["options"]].index(chosen)
-    return f"option {index + 1} ({decision['options'][index]['action']})"
-
-
 def _decision_line(decision: Mapping[str, Any], readable: bool, words: Mapping[str, Any]) -> str:
+    """ "Minute 6: chose “wait here a minute”, from 4 choices. Applied in minute 7." A public
+    repository gets no chosen words: "chose one of 4 choices"."""
+    count = len(decision["options"])
+    text = decision.get("readable") or {}
+    offered = "the one choice" if count == 1 else f"the {count} choices"
+    if decision["chosen_option_id"] is None:
+        told = f"chose none of {offered}"
+    elif readable and text.get("choice") is not None:
+        told = f"chose {quoted(text['choice'])}, from {plural(count, 'choice')}"
+    else:
+        told = f"chose one of {count} choices" if count > 1 else "chose the one choice"
     receipt = decision.get("receipt")
-    told = f"minute {decision['tick']}: of {len(decision['options'])} options, answered "
-    told += _answer(decision, readable) + ". "
-    if receipt is None:
-        return told + f"Recorded outcome {decision['outcome']}; its receipt was not recorded."
-    return told + verdict(receipt, words)
+    after = (
+        "What the world did with it was not recorded."
+        if receipt is None
+        else verdict(receipt, words)
+    )
+    return f"Minute {decision['tick']}: {told}. {after}"
+
+
+def _row(model: Mapping[str, Any], decision: Mapping[str, Any]) -> dict[str, Any]:
+    """One decision as the served measures read it."""
+    receipt = decision.get("receipt") or {}
+    text = decision.get("readable") or {}
+    return {
+        "subject_id": decision["thing_id"],
+        "provider": model["provider"],
+        "model_id": model["model_id"],
+        "has_receipt": bool(receipt),
+        "has_labels": bool(text),
+        "status": receipt.get("status"),
+        "disposition": receipt.get("disposition"),
+        "reason": receipt.get("reason"),
+        "chose": text.get("choice"),
+        "line": text.get("line"),
+        "asked_model": True,
+        "latency_ms": decision["elapsed_ms"],
+        "cost_usd": receipt.get("cost_usd") or "0",
+        "cost_known": receipt.get("cost_known", False),
+        "has_cost": receipt.get("cost_usd") is not None,
+    }
+
+
+def _bindings(session: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    return {binding_sha256(ModelBinding.model_validate(m)): m for m in session["models"]}
 
 
 def _rows(sessions: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
     rows = []
     for _, session in sorted(sessions.items()):
-        models = {binding_sha256(ModelBinding.model_validate(m)): m for m in session["models"]}
-        for decision in session["decisions"]:
-            model = models[decision["binding_sha256"]]
-            receipt = decision.get("receipt") or {}
-            text = decision.get("readable") or {}
-            rows.append(
-                {
-                    "subject_id": decision["thing_id"],
-                    "provider": model["provider"],
-                    "model_id": model["model_id"],
-                    "has_receipt": bool(receipt),
-                    "has_labels": bool(text),
-                    "status": receipt.get("status"),
-                    "disposition": receipt.get("disposition"),
-                    "reason": receipt.get("reason"),
-                    "chose": text.get("choice"),
-                    "line": text.get("line"),
-                    "asked_model": True,
-                    "latency_ms": decision["elapsed_ms"],
-                    "cost_usd": receipt.get("cost_usd") or "0",
-                    "cost_known": receipt.get("cost_known", False),
-                    "has_cost": receipt.get("cost_usd") is not None,
-                }
-            )
+        models = _bindings(session)
+        rows += [_row(models[d["binding_sha256"]], d) for d in session["decisions"]]
     return rows
 
 
-def _rate(rate: Mapping[str, Any], noun: str) -> str:
-    said = f"{noun} {rate['numerator']} of {rate['denominator']}"
-    if rate["value"] is None and rate["denominator"]:
-        said += f" (not enough data yet: {rate['minimum']} needed)"
-    return said
+def _rate(rate: Mapping[str, Any]) -> str:
+    """ "5 of 5"; "1 of 1, not enough yet" below the measure's minimum."""
+    if not rate["denominator"]:
+        return "not enough yet"
+    said = f"{rate['numerator']} of {rate['denominator']}"
+    return said if rate["value"] is not None else f"{said}, not enough yet"
 
 
-def _being_line(name: str, model: str, rows: Sequence[Mapping[str, Any]]) -> str:
-    head = f"- {name}, model {model}: {_decisions(len(rows))}"
+def _being_line(name: str, model_id: str, rows: Sequence[Mapping[str, Any]]) -> str:
+    head = f"- {capital(name)}, with {model_name(model_id)}: {plural(len(rows), 'decision')}"
     missing = sum(1 for row in rows if not row["has_receipt"])
     if missing:
-        return (
-            f"{head}; receipts were not recorded for {missing} of them, "
-            "so their measures are unavailable."
-        )
-    counted = measures(rows)
-    return f"{head}, {_rate(counted['rates']['applied'], 'applied')}."
+        which = "it" if len(rows) == 1 else "them" if missing == len(rows) else "some of them"
+        return f"{head}; what the world did with {which} was not recorded"
+    return f"{head}, {measures(rows)['counts']['applied']} done"
 
 
-def _model_table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
+#: The model table's one line under it, saying what its least plain column means.
+REPEATED_CHOICES: Final = (
+    "Repeated choices: how often a character chose the same as its last decision."
+)
+
+
+def _model_table(
+    rows: Sequence[Mapping[str, Any]], called: Mapping[str, str], readable: bool
+) -> list[str]:
+    """How each model did over every run of the pull request, never one combined score."""
     lines = [
-        "How each model did (all sessions in this pull request; never a combined score):",
+        "## How each model did",
         "",
-        "| model | decisions | applied | repeated answer | latency p50 / p95 | cost |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Model | Characters | Decisions | Done | Repeated choices | Time to answer | Spent |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
-    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for row in rows:
-        grouped.setdefault(f"{row['provider']}/{row['model_id']}", []).append(row)
-    for model, own in sorted(grouped.items()):
+        grouped.setdefault((row["model_id"], row["provider"]), []).append(row)
+    for (model_id, _), own in sorted(grouped.items()):
+        who = listed(sorted({capital(called.get(row["subject_id"], "a character")) for row in own}))
+        head = f"| {model_name(model_id)} | {who} | {len(own)} |"
         if not all(row["has_receipt"] for row in own):
-            unavailable = "unavailable: receipts were not recorded"
-            lines.append(f"| {model} | {len(own)} | {unavailable} | {unavailable} | | |")
+            lines.append(f"{head} not recorded | not recorded | not recorded | not recorded |")
             continue
         counted = measures(own)
-        repeated = (
-            _rate(counted["rates"]["repeated_choice"], "")
-            if all(row["has_labels"] for row in own)
-            else "unavailable without readable labels"
-        )
+        if not readable:
+            repeated = "not shown on a public repository"
+        elif all(row["has_labels"] for row in own):
+            repeated = _rate(counted["rates"]["repeated_choice"])
+        else:
+            repeated = "not recorded"
         latency = counted["latency_ms"]
         timing = (
-            f"{latency['p50']} / {latency['p95']} ms"
+            f"usually {seconds(latency['p50'])}, 19 in 20 within {seconds(latency['p95'])}"
             if latency["p50"] is not None
-            else f"not enough data yet ({latency['n']} of {LATENCY_MINIMUM} timed calls)"
+            else "not enough yet"
         )
         cost = counted["cost"]
         if not all(row["has_cost"] for row in own):
-            money = "unavailable: cost not recorded for every call"
+            spent = "not recorded"
         elif cost["basis"] == "computed":
-            money = f"${cost['usd']} computed from reported tokens (not a bill)"
+            spent = money(cost["usd"])
         else:
-            money = (
-                f"at most ${cost['usd']}, {cost['unknown_calls']} of {cost['calls']} calls "
-                "did not report tokens (not a bill)"
-            )
-        applied = _rate(counted["rates"]["applied"], "applied")
-        lines.append(
-            f"| {model} | {len(own)} | {applied} | {repeated.strip()} | {timing} | {money} |"
-        )
-    return lines
+            spent = f"at most {money(cost['usd'])}"
+        applied = _rate(counted["rates"]["applied"])
+        lines.append(f"{head} {applied} | {repeated} | {timing} | {spent} |")
+    return [
+        *lines,
+        "",
+        REPEATED_CHOICES,
+        "Spent is worked out from what each model reported, at its listed price. It is not a bill.",
+    ]
 
 
-def _session_header(session: Mapping[str, Any], count: str) -> list[str]:
-    """A living session's minutes, why it stopped in the society's own words, its limits and its
-    spending as the spending authority read it. Never a bill."""
+def _run_facts(session: Mapping[str, Any], whose: str, count: int) -> str:
+    """ "Ran 5 minutes with Puddle's model · minutes 6 to 11 · 5 decisions · spent $0.0004 of at
+    most $0.05. The run played all its minutes." Why it ended is the society's own sentence."""
     held = session["living_session"]
     opened, closed = held["opened"], held["closed"]
     limits, used = opened["limits"], held["spending"]["used"]
-    end = "now" if closed is None else closed["tick"]
-    why = "open when captured." if closed is None else closed_words(closed["reason"])
-    wall = limits["wall_seconds"]
-    wall_words = f"{wall // 60} minutes" if wall % 60 == 0 else f"{wall} seconds"
-    spent = f"Spending as found: ${used['usd']} committed for {used['calls']} calls"
+    spent = f"spent {money(used['usd'])} of at most {money(limits['usd'])}"
     if used["unresolved_count"]:
-        spent += (
-            f", of which at most ${used['unresolved_usd']} for {used['unresolved_count']} calls "
-            "is not known yet"
-        )
-    within = Decimal(used["usd"]) <= Decimal(limits["usd"])
-    spent += f", {'within' if within else 'over'} its ${limits['usd']} limit. Not a bill."
-    return [
-        f"Living session {held['session_id'][:8]}, minutes {opened['tick']} to {end}: {why} "
-        f"{count} ({_coverage(session)}).",
-        f"Limits: {limits['minutes']} minutes, {limits['decisions']} decisions, "
-        f"${limits['usd']}, {limits['calls']} calls, {wall_words} of wall time.",
-        spent,
-    ]
+        spent += f", and up to {money(used['unresolved_usd'])} more is not known yet"
+    if closed is None:
+        ran = f"Running when recorded: {plural(used['minutes'], 'minute')} so far"
+        minutes = f"from minute {opened['tick']}"
+        ending = ""
+    else:
+        ran = f"Ran {plural(used['minutes'], 'minute')}"
+        minutes = f"minutes {opened['tick']} to {closed['tick']}"
+        ending = f" {_sentence(closed_words(closed['reason']))}"
+    return f"{ran} with {whose} · {minutes} · {plural(count, 'decision')} · {spent}.{ending}"
 
 
-def _session_table(sessions: Mapping[str, Mapping[str, Any]]) -> list[str]:
-    """Each living session's models side by side; timeouts only where every request was read."""
-    living = [(name, s) for name, s in sorted(sessions.items()) if s.get("living_session")]
-    if not living:
-        return []
-    lines = [
-        "",
-        "By living session:",
-        "",
-        "| session | model | decisions | applied | timeouts | latency p50 / p95 | bound |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
-    ]
-    for name, session in living:
-        held = session["living_session"]
-        bounds = {b["provider"]: b for b in held["spending"]["bounds"]}
-        grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
-        for row in _rows({name: session}):
-            grouped.setdefault((row["provider"], row["model_id"]), []).append(row)
-        for (provider, model_id), own in sorted(grouped.items()):
-            label = f"| {held['session_id'][:8]} | {provider}/{model_id} | {len(own)} |"
-            if not all(row["has_receipt"] for row in own):
-                lines.append(f"{label} unavailable: receipts were not recorded | | | |")
-                continue
-            counted = measures(own)
-            timeouts = (
-                str(counted["counts"]["timeouts"])
-                if _coverage(session) == "every request of the session"
-                else "unavailable"
-            )
-            latency = counted["latency_ms"]
-            timing = (
-                f"{latency['p50']} / {latency['p95']} ms"
-                if latency["p50"] is not None
-                else "not enough data yet"
-            )
-            bound = bounds.get(provider)
-            limit = (
-                "no bound read"
-                if bound is None
-                else f"${bound['committed_usd']} of ${bound['ceiling_usd']}"
-            )
-            applied = _rate(counted["rates"]["applied"], "applied")
-            lines.append(f"{label} {applied} | {timeouts} | {timing} | {limit} |")
-    return lines
-
-
-def _coverage(session: Mapping[str, Any]) -> str:
-    held = (session.get("coverage") or {}).get("decisions")
-    return {
-        "consumed": "only decisions a minute took up",
-        "all": "every request of the session",
-    }.get(held, "coverage not recorded")
+def _heading(name: str, session: Mapping[str, Any], number: int | None) -> str:
+    held = session.get("living_session")
+    if held is not None and number is not None:
+        at = datetime.strptime(held["opened"]["at"], "%Y-%m-%dT%H:%M:%SZ")
+        return f"### Run {number} · {at.day} {at:%B}, {at:%H:%M} UTC"
+    ticks = [d["tick"] for d in session["decisions"]]
+    return f"### Decisions, minutes {min(ticks)} to {max(ticks)}"
 
 
 def _sessions_text(
-    world: Mapping[str, Any],
     sessions: Mapping[str, Mapping[str, Any]],
+    called: Mapping[str, str],
     readable: bool,
     words: Mapping[str, Any],
     level: int,
 ) -> list[str]:
-    names = thing_names(world["things"])
+    numbers = run_numbers(sessions)
     lines = [
-        "What the beings did, by session (from the evidence files; the records keep what each "
-        "was told and answered, not why):",
+        "## What the characters did",
+        "",
+        "Kept beside the world, not part of it: what each character was offered, what it chose "
+        "and what the world did with the choice.",
     ]
-    ordered = sorted(sessions.items(), key=lambda item: item[1]["session_id"])
+    ordered = sorted(sessions.items(), key=lambda item: (numbers.get(item[0], 0), item[0]))
     detailed = ordered if level < 2 else ordered[-3:]
     for name, session in ordered:
         decisions = sorted(session["decisions"], key=lambda d: (d["tick"], d["record_id"]))
-        ticks = [d["tick"] for d in decisions]
-        count = _decisions(len(decisions))
+        number = numbers.get(name)
         if (name, session) not in detailed:
-            lines.append(f"- {session['session_id']}: {count}, see its file evidence/{name}.")
+            what = f"Run {number}" if number is not None else "A record of decisions"
+            lines += ["", f"{what}: {plural(len(decisions), 'decision')}, in its file."]
             continue
-        lines += [
-            "",
-            *(
-                _session_header(session, count)
-                if session.get("living_session")
-                else [
-                    f"{session['session_id']}, minutes {min(ticks)} to {max(ticks)}, {count} "
-                    f"({_coverage(session)})"
-                ]
-            ),
-        ]
-        rows = _rows({name: session})
-        models = {
-            binding_sha256(ModelBinding.model_validate(m)): m["model_id"] for m in session["models"]
-        }
-        by_being: dict[str, list[Mapping[str, Any]]] = {}
+        models = _bindings(session)
+        by_being: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
         for decision in decisions:
-            by_being.setdefault(decision["thing_id"], []).append(decision)
-        for thing_id, own in sorted(by_being.items()):
-            label = names.get(thing_id, thing_id)
-            model = models[own[0]["binding_sha256"]]
-            own_rows = [row for row in rows if row["subject_id"] == thing_id]
-            lines.append(_being_line(label, model, own_rows))
+            model_id = models[decision["binding_sha256"]]["model_id"]
+            by_being.setdefault((decision["thing_id"], model_id), []).append(decision)
+        beings = sorted({thing_id for thing_id, _ in by_being})
+        whose = (
+            f"{possessive(called.get(beings[0], 'a character'))} model"
+            if len(beings) == 1
+            else f"{len(beings)} characters' models"
+        )
+        lines += ["", _heading(name, session, number), ""]
+        if session.get("living_session"):
+            lines += [_run_facts(session, whose, len(decisions)), ""]
+        for (thing_id, model_id), own in sorted(by_being.items()):
+            label = called.get(thing_id, "a character")
+            own_rows = [_row(models[d["binding_sha256"]], d) for d in own]
+            lines.append(_being_line(label, model_id, own_rows))
             if level >= 1:
                 continue
             marked = [
@@ -367,8 +335,15 @@ def _sessions_text(
             keep = {id(own[0]), id(own[-1]), *(id(d) for d in marked[-(LINES_PER_BEING - 2) :])}
             shown = [d for d in own if id(d) in keep]
             lines += [f"  - {_decision_line(d, readable, words)}" for d in shown]
-            if len(own) > len(shown):
-                lines.append(f"  - {len(own) - len(shown)} more in evidence/{name}")
+            rest = len(own) - len(shown)
+            if rest:
+                lines.append(
+                    f"  - {plural(rest, 'more decision')} {'is' if rest == 1 else 'are'} in "
+                    "this run's file."
+                    if number is not None
+                    else f"  - {plural(rest, 'more decision')} {'is' if rest == 1 else 'are'} "
+                    "in its file."
+                )
     return lines
 
 
@@ -379,27 +354,29 @@ def insight(
     readable: bool,
     words: Mapping[str, Any] | None = None,
 ) -> list[str]:
-    """The pull request's insight sections, within the budget, value-scanned. Empty without
-    evidence."""
+    """The pull request's sections on what the characters did and how each model did, within
+    the budget, value-scanned. Empty without evidence. Without `readable` no written word
+    appears, whatever the files hold."""
     if not sessions:
         return []
     said = words or choice_words()
-    table = _model_table(_rows(sessions)) + _session_table(sessions)
+    called = names([world if readable else without_words(world)])
+    table = _model_table(_rows(sessions), called, readable)
     unavailable = []
     if any(_coverage(s) != "every request of the session" for s in sessions.values()):
         unavailable = [
             "",
-            "Unavailable here: unanswered and timed-out requests, acceptance and timeout streaks. "
-            "These files hold only the decisions a minute took up, or do not say.",
+            "Some of these records hold only the decisions the world acted on, so ones that got "
+            "no usable answer are not counted there.",
         ]
     notes = (
         [],
-        ["", "Shortened to fit: decision lines are left out; each file has them all."],
-        ["", "Shortened to fit: decision lines and older sessions' detail are left out."],
+        ["", "Shortened to fit: each run's file has every decision."],
+        ["", "Shortened to fit: older runs are counted only; each run's file has every decision."],
     )
     for level in range(3):
         lines = [
-            *_sessions_text(world, sessions, readable, said, level),
+            *_sessions_text(sessions, called, readable, said, level),
             *notes[level],
             "",
             *table,
@@ -414,3 +391,11 @@ def insight(
     except ValueError as exc:
         raise ProjectError("the generated description failed the value scan") from exc
     return lines
+
+
+def _coverage(session: Mapping[str, Any]) -> str:
+    held = (session.get("coverage") or {}).get("decisions")
+    return {
+        "consumed": "only decisions a minute took up",
+        "all": "every request of the session",
+    }.get(held, "coverage not recorded")

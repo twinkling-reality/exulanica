@@ -26,8 +26,9 @@ continues in files named `<session>-2.json`, `<session>-3.json` and so on, whose
 in `:2`, `:3`.
 
 The file's digest is the SHA-256 of its canonical form: Exulanica canonical JSON of the object
-with `models` sorted by thing and model, `decisions` sorted by `tick` then `record_id`, and absent
-optional fields left out rather than written as null.
+with `models` sorted by thing and model (two assignments of one thing to one model, which differ
+only in what they record, by their canonical bytes), `decisions` sorted by `tick` then
+`record_id`, and absent optional fields left out rather than written as null.
 
 ## The file
 
@@ -115,7 +116,12 @@ each request and its status, but a decision in this format also needs what only 
 | `model_id` | identifier | The model asked. |
 | `revision` | identifier | The model the provider reported serving, or `unrecorded`. |
 
-A decision binds to its assignment by `binding_sha256`, the digest of the assignment object.
+A decision binds to its assignment by `binding_sha256`, the digest of the assignment object. A
+living session's file holds the assignment chosen for each thing when it was captured and, for a
+decision asked under an earlier model, an assignment to the model it was asked under (its
+request's provider and model, its revision what the provider reported serving for those
+decisions), so one thing may have several assignments in one file and every decision of the
+session keeps the model that made it.
 
 ### `decisions[]`: one recorded decision
 

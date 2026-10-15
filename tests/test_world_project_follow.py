@@ -300,7 +300,7 @@ def test_a_followed_world_is_kept_current_with_nobody_calling_anything(world, fo
     assert poll(follower, clock, 0)["demo"]["state"] == "clean"
     move(world, 2000)
     assert poll(follower, clock)["demo"]["state"] == "settling"
-    assert Project(folder).timeline()["pending"] == ["moved the knight 2 m east"]
+    assert Project(folder).timeline()["pending"] == ["Moved the knight 2 m east"]
     for _ in range(7):
         assert poll(follower, clock).get("demo", {"state": "settling"})["state"] == "settling"
     recorded = poll(follower, clock)["demo"]
@@ -326,7 +326,8 @@ def test_folders_are_followed_as_they_gain_change_and_lose_their_follow_file(
         # The same command again with other settings: followed by its new settings.
         assert main(["follow", str(projects / "demo"), "--readable"]) == 0
         assert read_follow(projects / "demo")["readable"] is True
-        assert poll(follower, clock)["demo"]["state"] in ("following", "clean")
+        # With readable text the project now keeps the world's name: a change to record.
+        assert poll(follower, clock)["demo"]["state"] == "settling"
         assert main(["unfollow", str(projects / "demo")]) == 0
         assert read_follow(projects / "demo") is None
         assert poll(follower, clock)["demo"]["state"] == "left"
@@ -366,10 +367,11 @@ def test_each_living_session_is_its_own_file_and_a_closed_one_is_recorded_at_onc
 
 def test_a_closed_session_with_nothing_to_keep_is_passed_over_for_the_next(world, followed):
     _projects, folder, clock, follower = followed
-    # A's one decision was asked under an earlier model, so it leaves no evidence today.
+    # A's one decision got no answer, so it leaves no evidence.
+    world.records["silent"] = {**world.records["old"], "decision": None}
     serve(
         world,
-        session(world, A, opened_at="2026-10-14T01:00:00+00:00", start=1, end=3, asked=["old"]),
+        session(world, A, opened_at="2026-10-14T01:00:00+00:00", start=1, end=3, asked=["silent"]),
         session(world, B, opened_at="2026-10-14T01:10:00+00:00", start=3, end=5, asked=["r1"]),
     )
     poll(follower, clock, 0)

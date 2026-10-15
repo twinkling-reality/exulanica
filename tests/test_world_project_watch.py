@@ -68,10 +68,10 @@ def test_settles_before_recording_and_restarts_when_the_selection_moves_again(se
     assert watcher.step() == {"state": "clean"}
     move(world, 1000)
     assert watcher.step()["state"] == "settling"
-    assert Project(folder).timeline()["pending"] == ["moved the knight 1 m east"]
+    assert Project(folder).timeline()["pending"] == ["Moved the knight 1 m east"]
     clock.now += 100
     move(world, 2000)  # Still changing: the settle period starts again.
-    assert watcher.step()["pending"] == ["moved the knight 2 m east"]
+    assert watcher.step()["pending"] == ["Moved the knight 2 m east"]
     clock.now += 100
     assert watcher.step()["state"] == "settling"
     clock.now += 20
@@ -86,8 +86,8 @@ def test_edits_that_cancel_out_record_nothing(setup):
     project, folder, world, clock, watcher = setup
     world.checkpoint["models"], world.checkpoint["decisions"] = [], []
     assert watcher.step()["pending"] == [
-        "unassigned synthetic-model from the knight",
-        "dropped 1 decision record",
+        "Changed the knight's model to Routine",
+        "Dropped 1 decision",
     ]
     clock.now += 60
     world.checkpoint = deepcopy(project)

@@ -110,29 +110,46 @@ def test_the_words_come_from_the_shared_catalog(tmp_path):
     ]
 
 
-def test_private_repositories_read_labels_and_public_ones_codes_only():
+def test_private_repositories_read_the_chosen_words_and_public_ones_none():
     world, evidence = session()
     private = "\n".join(insight(world, {"session-one.json": evidence}, readable=True))
     public = "\n".join(insight(world, {"session-one.json": evidence}, readable=False))
-    assert "“rest by the well”" in private
-    for text in ("rest by the well", "Time to sit", "plain armour"):
+    assert "Minute 1: chose \u201crest by the well\u201d, from 2 choices. Applied in minute 2." in (
+        private
+    )
+    for text in ("rest by the well", "Time to sit", "plain armour", "(go)", "option 2"):
         assert text not in public
-    assert "option 2 (go)" in public
+    assert "Minute 1: chose one of 2 choices. Applied in minute 2." in public
     for text in (private, public):
-        assert "6 decisions" in text and "applied 6 of 6" in text
-        assert "not a bill" in text
+        assert "- The knight, with synthetic-model: 6 decisions, 6 done" in text
+        assert "| synthetic-model | The knight | 6 | 6 of 6 |" in text
+        assert "It is not a bill." in text
+    assert "| not shown on a public repository |" in public
+
+
+def test_a_public_repository_s_text_names_no_character_whatever_the_files_hold():
+    world, evidence = session()
+    world["characters"] = [
+        {"thing_id": "knight:1", "revision": 1, "words": {"name": "Sir Pip", "about": None}}
+    ]
+    public = "\n".join(insight(world, {"session-one.json": evidence}, readable=False))
+    assert "Sir Pip" not in public and "- The knight, with synthetic-model" in public
+    private = "\n".join(insight(world, {"session-one.json": evidence}, readable=True))
+    assert "- Sir Pip, with synthetic-model" in private
 
 
 def test_what_the_files_cannot_support_is_named_never_zero():
     world, evidence = session(count=3)
     text = "\n".join(insight(world, {"session-one.json": evidence}, readable=True))
-    assert "not enough data yet" in text  # 3 latencies, 5 needed.
-    assert "Unavailable here" in text and "took up" in text
-    assert "0 timeouts" not in text
+    assert "| 3 of 3, not enough yet |" in text  # 3 decisions, 5 needed.
+    assert "| not enough yet |" in text  # 3 latencies, 5 needed.
+    assert "only the decisions the world acted on" in text
+    assert "timeout" not in text
     world, old = session(count=6, receipts=False, coverage=None)
     text = "\n".join(insight(world, {"session-one.json": old}, readable=True))
-    assert "receipts were not recorded" in text
-    assert "applied 6 of 6" not in text
+    assert "6 decisions; what the world did with them was not recorded" in text
+    assert "| not recorded | not recorded | not recorded | not recorded |" in text
+    assert "6 of 6" not in text
 
 
 def test_the_generated_text_passes_the_value_scan(tmp_path):
@@ -157,49 +174,55 @@ def test_a_long_history_stays_within_the_budget_and_keeps_its_counts():
     assert len(text) <= BUDGET
     assert "1024 decisions" in text
     # Unshortened it would not fit; the text says what was left out.
-    assert "Shortened to fit: decision lines are left out" in text
+    assert "Shortened to fit: each run's file has every decision." in text
     # The model table is never cut.
-    assert "How each model did" in text and "applied 102400 of 102400" in text
+    assert "## How each model did" in text
+    assert "| synthetic-model | The knight | 102400 | 102400 of 102400 |" in text
 
 
 def test_many_sessions_collapse_older_ones_to_a_line_each():
     world, evidence = session(count=1)
     sessions = {}
-    for n in range(500):
+    for n in range(800):
         copy = deepcopy(evidence)
         copy["session_id"] = f"session:s{n:03d}"
         sessions[f"session-s{n:03d}.json"] = copy
     text = "\n".join(insight(world, sessions, readable=True))
     assert len(text) <= BUDGET
-    assert "older sessions' detail are left out" in text
-    assert "- session:s000: 1 decision, see its file evidence/session-s000.json." in text
-    assert "session:s499, minutes 1 to 1" in text
-    assert "applied 500 of 500" in text
+    assert "older runs are counted only" in text
+    assert text.count("A record of decisions: 1 decision, in its file.") == 797
+    assert text.count("### Decisions, minutes 1 to 1") == 3
+    assert "| 800 | 800 of 800 |" in text
+    assert "s000" not in text and "s799" not in text
 
 
-def living_evidence(state="closed", reason="session_minutes", coverage="all", unresolved=0):
-    from test_world_project_evidence_format import SESSION, living
+def living_evidence(
+    state="closed", reason="session_minutes", coverage="all", unresolved=0, session_id=None
+):
+    from test_world_project_evidence_format import living
 
     world, evidence = session(coverage=coverage)
-    evidence["session_id"] = f"session:{SESSION}"
     block = living(state=state, reason=reason)
+    if session_id is not None:
+        block["session_id"] = session_id
+    evidence["session_id"] = f"session:{block['session_id']}"
     if unresolved:
         block["spending"]["used"].update(unresolved_count=unresolved, unresolved_usd="0.004")
     evidence["living_session"] = block
-    return world, {f"session-{SESSION}.json": evidence}
+    return world, {f"session-{block['session_id']}.json": evidence}
 
 
-def test_a_living_session_is_headed_with_its_stop_its_limits_and_its_spending():
+def test_a_run_says_how_long_it_ran_what_it_spent_and_why_it_ended():
     world, sessions = living_evidence()
     text = "\n".join(insight(world, sessions, readable=True))
-    assert "Living session 0190a1b2, minutes 4 to 61:" in text
-    assert "The run played all its minutes." in text
-    assert "6 decisions (every request of the session)" in text
-    assert "Limits: 60 minutes, 500 decisions, $0.5, 600 calls, 60 minutes of wall time." in text
-    assert "Spending as found: $0.0411 committed for 415 calls, within its $0.5 limit." in text
-    assert "Not a bill." in text
-    # Every session read every request, so nothing is unavailable for that reason.
-    assert "Unavailable here" not in text
+    assert "### Run 1 \u00b7 14 October, 01:00 UTC" in text
+    assert (
+        "Ran 57 minutes with the knight's model \u00b7 minutes 4 to 61 \u00b7 6 decisions "
+        "\u00b7 spent $0.04 of at most $0.50. The run played all its minutes."
+    ) in text
+    # Every request of the run was read, so nothing is left uncounted.
+    assert "acted on" not in text
+    assert "0190a1b2" not in text and "session" not in text.lower()
 
 
 def test_the_stop_words_are_the_society_s_own(monkeypatch):
@@ -212,21 +235,40 @@ def test_the_stop_words_are_the_society_s_own(monkeypatch):
     assert "It ran out of minutes." in "\n".join(insight(world, sessions, readable=True))
 
 
-def test_an_open_session_and_an_unknown_cost_are_said_as_they_are():
+def test_an_open_run_and_an_unknown_cost_are_said_as_they_are():
     world, sessions = living_evidence(state="open", unresolved=3)
     text = "\n".join(insight(world, sessions, readable=False))
-    assert "Living session 0190a1b2, minutes 4 to now: open when captured." in text
-    assert "of which at most $0.004 for 3 calls is not known yet" in text
-
-
-def test_each_session_has_its_row_and_timeouts_only_where_every_request_was_read():
-    world, complete = living_evidence(coverage="all")
-    _, partial = living_evidence(coverage="consumed")
-    text = "\n".join(insight(world, complete, readable=True))
     assert (
-        "| session | model | decisions | applied | timeouts | latency p50 / p95 | bound |" in text
+        "Running when recorded: 57 minutes so far with the knight's model \u00b7 from minute 4 "
+        "\u00b7 6 decisions \u00b7 spent $0.04 of at most $0.50, and up to $0.0040 more is not "
+        "known yet."
+    ) in text
+
+
+def test_runs_are_numbered_by_when_they_opened():
+    world, later = living_evidence(session_id="0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a50")
+    _, earlier = living_evidence(session_id="0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5f")
+    [(name, run)] = earlier.items()
+    run["living_session"]["opened"]["at"] = "2026-10-13T22:30:00Z"
+    text = "\n".join(insight(world, {**later, name: run}, readable=True))
+    assert text.index("### Run 1 \u00b7 13 October, 22:30 UTC") < text.index(
+        "### Run 2 \u00b7 14 October, 01:00 UTC"
     )
-    assert "| 0190a1b2 | synthetic/synthetic-model | 6 | applied 6 of 6 | 0 |" in text
-    assert "$0.0411 of $0.5" in text
-    text = "\n".join(insight(world, partial, readable=True))
-    assert "| 0190a1b2 | synthetic/synthetic-model | 6 | applied 6 of 6 | unavailable |" in text
+    assert "| synthetic-model | The knight | 12 | 12 of 12 |" in text
+
+
+def test_decisions_asked_under_an_earlier_model_stay_under_that_model():
+    from exulanica.canonical import canonical_json
+    from exulanica.world_package.projects.checkpoint import digest
+
+    world, sessions = living_evidence()
+    [evidence] = sessions.values()
+    earlier = {**evidence["models"][0], "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"}
+    evidence["models"].append(earlier)
+    for decision in evidence["decisions"][:2]:
+        decision["binding_sha256"] = digest(canonical_json(earlier))
+    text = "\n".join(insight(world, sessions, readable=True))
+    assert "- The knight, with Nemotron 3 Nano 30B: 2 decisions, 2 done" in text
+    assert "- The knight, with synthetic-model: 4 decisions, 4 done" in text
+    assert "| Nemotron 3 Nano 30B | The knight | 2 |" in text
+    assert "NVIDIA-Nemotron" not in text

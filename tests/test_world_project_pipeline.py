@@ -75,7 +75,7 @@ def test_two_runs_a_new_private_repository_a_link_and_one_rolling_pull_request(
         world, tmp_path, folder, "session:run-1", capsys, "--project-id", "project:knight"
     )
     assert code == 0 and first["committed"]
-    assert first["evidence"] == ["recorded 3 decision records from session session:run-1"]
+    assert first["evidence"] == ["Recorded 3 decisions"]
 
     # Run 2: the knight was moved and decided once more.
     view = world.routes[f"/world/versions/{VERSION}"]
@@ -86,15 +86,15 @@ def test_two_runs_a_new_private_repository_a_link_and_one_rolling_pull_request(
     )
     code, second = record_run(world, tmp_path, folder, "session:run-2", capsys)
     assert code == 0
-    assert second["summary"] == ["moved the knight 2 m east"]
+    assert second["summary"] == ["Moved the knight 2 m east"]
     # The new session keeps only what run 1 did not already record; run 1's file is untouched.
-    assert second["evidence"] == ["recorded 1 decision record from session session:run-2"]
+    assert second["evidence"] == ["Recorded 1 decision"]
 
     # A third run from the same start reuses a request identity for a different decision: kept.
     world.records["r5"] = record("r5", world.knight, 9, "wait here a minute")
     world.records["r5"]["decision"]["document_sha256"] = "9" * 64
     code, third = record_run(world, tmp_path, folder, "session:run-3", capsys)
-    assert third["evidence"] == ["recorded 1 decision record from session session:run-3"]
+    assert third["evidence"] == ["Recorded 1 decision"]
 
     # Recording the same run again changes nothing.
     code, again = record_run(world, tmp_path, folder, "session:run-3", capsys)
@@ -152,9 +152,9 @@ def test_two_runs_a_new_private_repository_a_link_and_one_rolling_pull_request(
     assert code == 1 and "differs from the project's link" in refused["error"]
     code, branch_review = run(["review-branch", str(folder)], capsys)
     assert [c["message"] for c in branch_review["commits"]] == [
-        "Start project project:knight",
-        "Moved the knight 2 m east, recorded 1 decision record from session session:run-2",
-        "Recorded 1 decision record from session session:run-3",
+        "Started the project",
+        "Moved the knight 2 m east, recorded 1 decision",
+        "Recorded 1 decision",
     ]
     assert account.writes == []
     code, published = run(
@@ -184,8 +184,10 @@ def test_two_runs_a_new_private_repository_a_link_and_one_rolling_pull_request(
     ]
     assert "project-link.json" not in files
     [pull] = account.pulls
-    assert "- recorded 3 decision records from session session:run-1" in pull["body"]
-    assert "- recorded 1 decision record from session session:run-2" in pull["body"]
+    # Each recorded file has its own part, in plain words; none is named by its identity.
+    assert pull["body"].count("### Decisions, minutes ") == 3
+    assert "- The knight, with synthetic-model: 3 decisions" in pull["body"]
+    assert "run-1" not in pull["body"].split("<!--")[0]
 
 
 def test_the_link_is_closed_and_holds_no_credentials(tmp_path):

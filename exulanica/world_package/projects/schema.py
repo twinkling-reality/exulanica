@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -16,12 +16,19 @@ from exulanica.world.placed_things import (
     WorkspaceKindReference,
     validate_placed_thing,
 )
+from exulanica.world.society_thing_inputs import (
+    CHARACTER_ABOUT_MAXIMUM,
+    CHARACTER_NAME_MAXIMUM,
+    check_character,
+)
 from exulanica.world_package.package import scan_payload
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Name = Annotated[str, Field(min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9:._/-]+$")]
 Natural = Annotated[int, Field(ge=0)]
 Label = Annotated[str, Field(min_length=1, max_length=500)]
+#: The longest world title a checkpoint keeps; capture leaves a longer one out.
+TITLE_MAXIMUM: Final = 200
 
 # Values that would publish where a file lives on someone's machine or a credential. Field names
 # are checked by the WMP scan; these are checked by value, in every string of a project file.
@@ -128,6 +135,36 @@ class ModelBinding(Closed):
     provider: Name
     model_id: Name
     revision: Name
+
+
+class CharacterWords(Closed):
+    """A character's words as its world's owner wrote them, each held to the character module's
+    own line rule and bounds. Both absent: the newest record clears the character."""
+
+    name: str | None
+    about: str | None
+
+    @model_validator(mode="after")
+    def lines(self) -> Self:
+        stated = {key: value for key, value in self.model_dump().items() if value is not None}
+        if stated:
+            check_character(
+                stated,
+                name_maximum=CHARACTER_NAME_MAXIMUM,
+                about_maximum=CHARACTER_ABOUT_MAXIMUM,
+            )
+        return self
+
+
+class Character(Closed):
+    """Who the world's owner wrote a placed being to be: the newest record's revision always, its
+    words only where the project keeps readable text. Written words never reach a repository that
+    is not private (:mod:`exulanica.world_package.projects.rights`), and a merged pull request
+    never applies them."""
+
+    thing_id: Name
+    revision: Annotated[int, Field(ge=1)]
+    words: CharacterWords | None = None
 
 
 class Option(Closed):
@@ -327,6 +364,11 @@ class Checkpoint(Closed):
     dependencies: Annotated[list[Dependency], Field(min_length=1, max_length=1024)]
     models: Annotated[list[ModelBinding], Field(max_length=256)]
     decisions: Annotated[list[Decision], Field(max_length=1024)]
+    # Optional additions; a checkpoint without them keeps its digest (see checkpoint.document).
+    #: The world version's title as written, kept only with readable text.
+    title: Annotated[str, Field(min_length=1, max_length=TITLE_MAXIMUM)] | None = None
+    #: The selected beings whose owner wrote who they are.
+    characters: Annotated[list[Character], Field(max_length=256)] | None = None
 
     @model_validator(mode="after")
     def references(self) -> Self:
@@ -335,6 +377,7 @@ class Checkpoint(Closed):
         validate_object_id(self.project_id)
         unique(self.region_ids, "region")
         unique([t.thing_id for t in self.things], "thing")
+        unique([c.thing_id for c in self.characters or []], "character")
         unique([m.thing_id for m in self.models], "model assignment")
         unique([d.record_id for d in self.decisions], "decision")
         unique([d.sha256 for d in self.dependencies], "dependency")
@@ -360,6 +403,9 @@ class Checkpoint(Closed):
         for decision in self.decisions:
             if bindings.get(decision.thing_id) != decision.binding_sha256:
                 raise ValueError("decision evidence must match its selected model binding")
+        for character in self.characters or []:
+            if character.thing_id not in things:
+                raise ValueError("a character names a selected thing")
         if self.forked_from and self.forked_from.project_id == self.project_id:
             raise ValueError("a fork must have a distinct project identity")
         document = self.model_dump()

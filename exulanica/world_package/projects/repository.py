@@ -479,9 +479,16 @@ def append_only(saved: Sessions, sessions: Sessions) -> None:
         if new is None:
             raise Conflict(f"evidence file {name} is saved and cannot be removed")
         records = {d["record_id"]: d for d in new["decisions"]}
+        # A binding no saved record is held under carries no evidence: a later capture may leave
+        # it out (its thing was given another model before deciding anything).
+        held = {d["binding_sha256"] for d in old["decisions"]}
         if (
             any(records.get(d["record_id"]) != d for d in old["decisions"])
-            or any(model not in new["models"] for model in old["models"])
+            or any(
+                model not in new["models"]
+                for model in old["models"]
+                if binding_sha256(ModelBinding.model_validate(model)) in held
+            )
             or (old["project_id"], old["session_id"], old["source"])
             != (new["project_id"], new["session_id"], new["source"])
             or not _session_may_follow(old.get("living_session"), new.get("living_session"))
@@ -514,7 +521,7 @@ def create(
         # An empty template directory keeps git's sample hooks and templates out of the folder.
         with tempfile.TemporaryDirectory() as template:
             project.git("init", "--quiet", f"--template={template}", "--initial-branch=main")
-        text = message or f"Start project {selected['project_id']}"
+        text = message or "Started the project"
         paths = project._write(selected, dependencies or {}, sessions)
         commit = project._commit(paths, text)
     except BaseException:
@@ -549,7 +556,7 @@ def fork_project(
         destination,
         child,
         author=author,
-        message=f"Fork {committed['project_id']} as {project_id}",
+        message="Started this project as a copy of another",
         dependencies=parent.dependencies(),
     )
 

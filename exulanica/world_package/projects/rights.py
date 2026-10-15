@@ -5,7 +5,9 @@ over every file each commit would publish, and refuses before anything is writte
 
 - **Written words reach only a private repository.** A project holds written words in the
   `readable` blocks capture adds when asked (what a decision was told, the labels it was offered,
-  its choice and its spoken line), in an evidence file or in a checkpoint's own records. A
+  its choice and its spoken line), in an evidence file or in a checkpoint's own records, and, in
+  a checkpoint kept with readable text, in the world's title and each character's name and
+  personality (a character kept without them holds only its record's revision). A
   repository whose visibility does not read `PRIVATE` (public, internal, or not stated) receives
   none: the pull request's text switching to codes is not enough while the files still carry them.
 - **A thing goes only where its origin allows.** Each thing kind a published checkpoint names is
@@ -74,6 +76,15 @@ def check(files: Mapping[str, bytes], visibility: str, kinds: Mapping[str, bytes
             )
         if path != PROJECT_FILE:
             continue
+        if not private and (
+            document.get("title") is not None
+            or any(c.get("words") is not None for c in document.get("characters") or [])
+        ):
+            raise Conflict(
+                f"{path} carries written words (the world's title, a character's name or "
+                f"personality), which reach only a private repository; this repository reads "
+                f"{seen}"
+            )
         for thing in document.get("things") or []:
             distribution = _origin_distribution(thing["kind"], kinds)
             if distribution is None:

@@ -93,7 +93,7 @@ def test_words_reach_a_private_repository_and_a_project_without_them_a_public_on
     )
     assert result["published"] and review["text"] == "codes"
     assert not any(word in received(public) for word in WORDS)
-    assert "option 2 (go)" in public.pulls[0]["body"]
+    assert "chose one of 2 choices" in public.pulls[0]["body"]
 
 
 def test_an_earlier_checkpoint_s_words_are_refused_though_the_last_holds_none(tmp_path):
@@ -108,6 +108,57 @@ def test_an_earlier_checkpoint_s_words_are_refused_though_the_last_holds_none(tm
     with pytest.raises(Conflict, match=r"world-project\.json carries written words"):
         RollingPullRequests(repository.request).review(TARGET, local)
     assert repository.writes == []
+
+
+#: Words a world's owner wrote: the world's title, a character's name and its personality.
+OWNER_WORDS = ("Terraces on the bay", "Puddle", "A worried yellow duck")
+
+
+def written(project, *, words=True):
+    """The sample checkpoint with its world's title and its knight's character: the words kept,
+    or only the record's revision as a project without readable text keeps it."""
+    character = {"thing_id": "knight:1", "revision": 2}
+    if words:
+        character["words"] = {"name": "Puddle", "about": "A worried yellow duck who loves water."}
+        return {**project, "title": "Terraces on the bay", "characters": [character]}
+    return {**project, "characters": [character]}
+
+
+@pytest.mark.parametrize("visibility", ["PUBLIC", "INTERNAL", None])
+def test_a_world_s_title_and_a_character_s_words_reach_only_a_private_repository(
+    tmp_path, visibility
+):
+    project, _ = sample()
+    create(tmp_path / "project", written(project), author=AUTHOR)
+    local = Project(tmp_path / "project", author=AUTHOR)
+    repository = remote(visibility)
+    with pytest.raises(Conflict, match=r"world-project\.json carries written words"):
+        RollingPullRequests(repository.request).review(TARGET, local)
+    server = Server()
+    server.visibility = visibility
+    with pytest.raises(Conflict, match=r"world-project\.json carries written words"):
+        GitHubProjects(server.request).review(FILE_TARGET, local.at("HEAD"), "Publish")
+    assert repository.writes == [] and server.writes == []
+    assert not any(word in received(repository) for word in OWNER_WORDS)
+
+
+def test_a_character_kept_without_its_words_reaches_a_public_repository_unnamed(tmp_path):
+    project, _ = sample()
+    create(tmp_path / "a", written(project, words=False), author=AUTHOR)
+    public = remote("PUBLIC")
+    _, result = publish(
+        RollingPullRequests(public.request), TARGET, Project(tmp_path / "a", author=AUTHOR), None
+    )
+    assert result["published"]
+    assert "- Wrote the knight's personality\n" in public.pulls[0]["body"]
+    assert public.pulls[0]["title"] == "Changes to this world"
+    create(tmp_path / "b", written(project), author=AUTHOR)
+    private = remote("PRIVATE")
+    _, result = publish(
+        RollingPullRequests(private.request), TARGET, Project(tmp_path / "b", author=AUTHOR), None
+    )
+    assert result["published"] and private.pulls[0]["title"] == "Changes to Terraces on the bay"
+    assert all(word in received(private) for word in OWNER_WORDS)
 
 
 # Things, by their origin record

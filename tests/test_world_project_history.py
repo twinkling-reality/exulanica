@@ -101,9 +101,9 @@ def test_local_history_is_exact_and_names_what_each_checkpoint_changed(tmp_path)
     ]
     by_message = {c["message"]: c for c in view["checkpoints"]}
     moved = by_message["Moved the knight 2 m east"]
-    assert moved["world_changes"] == ["moved the knight 2 m east"]
+    assert moved["world_changes"] == ["Moved the knight 2 m east"]
     assert moved["evidence_changes"] == []
-    grown = by_message["Recorded 2 more decision records from session session:one"]
+    grown = by_message["Recorded 2 more decisions"]
     assert grown["world_changes"] == []
     assert [(s["records"], s["records_added"]) for s in grown["sessions"]] == [(3, 2)]
     # The application belongs to the newest content checkpoint holding exactly its content.
@@ -203,7 +203,7 @@ def test_pending_changes_and_closed_application_records(tmp_path):
     turned = deepcopy(moved)
     turned["things"][0]["transform"]["yaw_microradians"] = 1570796
     (local.folder / "world-project.json").write_text(json.dumps(turned), encoding="utf-8")
-    assert history_read(local)["pending"]["world"] == ["turned the knight 90 degrees"]
+    assert history_read(local)["pending"]["world"] == ["Turned the knight 90°"]
     record = application(local, "HEAD")
     for broken in (
         {**record, "token": "x"},
@@ -258,7 +258,7 @@ def test_the_apply_command_records_which_version_a_merge_became(tmp_path, monkey
     view = history_read(local)
     assert view["checkpoints"][0]["kind"] == "application"
     [start] = [c for c in view["checkpoints"] if c["applied_as"]]
-    assert start["message"] == "Start project project:synthetic"
+    assert start["message"] == "Started the project"
     assert start["applied_as"][0]["version_id"] == applied["version_id"]
     # Applying again finds the version already applied and records nothing new.
     assert cli.main(["review-apply", *common]) == 0

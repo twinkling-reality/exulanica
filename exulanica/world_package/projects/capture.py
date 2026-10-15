@@ -28,6 +28,8 @@ from exulanica.models.egress import (
 )
 from exulanica.models.transport import allowlisted_transport
 from exulanica.world.decision_roles import decision_roles
+from exulanica.world.errors import InvalidThingPlacement
+from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_decision_contract import situation
 from exulanica.world.society_things import THING_NAMESPACE
 from exulanica.world_package.projects.checkpoint import (
@@ -36,6 +38,7 @@ from exulanica.world_package.projects.checkpoint import (
     document,
     evidence_document,
 )
+from exulanica.world_package.projects.schema import TITLE_MAXIMUM, scan_values
 
 _SEGMENT = re.compile(r"^[A-Za-z0-9:._-]{1,200}$")
 _NAME = re.compile(r"^[a-zA-Z0-9:._/-]{1,200}$")
@@ -302,6 +305,76 @@ def read_session(reader: WorldReader, version: str, which: str) -> dict[str, Any
     return reader.json("GET living session", f"{base}/{segment(which)}")
 
 
+def _asked_under(record: Mapping[str, Any]) -> tuple[Any, Any]:
+    """The provider and model a decision record was asked under, as its request states them."""
+    config = record["request"].get("provider_config") or {}
+    return config.get("provider"), config.get("model_id")
+
+
+def _written(value: Any) -> Any:
+    """Words a person wrote, or None where they are absent or look like a local path or a
+    credential (the project's value scan would refuse the whole file for them)."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        scan_values(value)
+    except ValueError:
+        return None
+    return value
+
+
+def _title(view: Mapping[str, Any], readable: bool) -> str | None:
+    """The version's title as written, kept only with readable text; a longer one than a
+    checkpoint holds is left out."""
+    title = _written(view.get("title")) if readable else None
+    return title if title is not None and len(title) <= TITLE_MAXIMUM else None
+
+
+def _being(thing: Mapping[str, Any]) -> bool:
+    """Whether a placed thing is a being, as the character module decides: a kind its workspace
+    keeps always is; a shipped kind is where its document says so."""
+    kind = thing["kind"]
+    if kind.get("source") == "workspace":
+        return True
+    try:
+        reference = ThingKindReference(kind["kind"], kind["version"], kind["sha256"])
+        return shipped_kind(reference).document["class"] == "being"
+    except (InvalidThingPlacement, KeyError, TypeError):
+        return False
+
+
+def _characters(
+    reader: WorldReader, version: str, things: Sequence[Mapping[str, Any]], readable: bool
+) -> list[dict[str, Any]]:
+    """Who the world's owner wrote each selected being to be, read from its card (one read a
+    being): the newest record's revision always, its words only with readable text. A being with
+    no record, or that its society does not hold, has none."""
+    found = []
+    for thing in things:
+        if thing.get("removed") or not _being(thing):
+            continue
+        card = reader.json_if_found(
+            "GET society thing",
+            f"/world/versions/{version}/society/things/"
+            f"{subject_id(reader.world_id, thing['thing_id'])}",
+        )
+        held = card.get("character") if isinstance(card, dict) else None
+        if not isinstance(held, dict):
+            continue
+        revision = held.get("revision")
+        if type(revision) is not int or revision < 1:
+            continue
+        entry: dict[str, Any] = {"thing_id": thing["thing_id"], "revision": revision}
+        if readable:
+            written = held.get("character") or {}
+            entry["words"] = {
+                "name": _written(written.get("name")),
+                "about": _written(written.get("about")),
+            }
+        found.append(entry)
+    return found
+
+
 def _instant(value: str) -> str:
     """A UTC instant to the second, in the evidence format's one spelling."""
     return datetime.fromisoformat(value).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -384,7 +457,14 @@ def capture(
 
     A model assignment's revision is the model the provider served its latest read record; a
     capture that reads no record for it takes the one `revisions` names for that thing, provider
-    and model (what the project holds for it), so reading no record never changes it.
+    and model (what the project holds for it), so reading no record never changes it. A session's
+    evidence keeps the decisions asked under an earlier model too, each under a binding to the
+    model it was asked under; a checkpoint keeps only those of the model chosen now.
+
+    With readable text the checkpoint also keeps the version's title and what the world's owner
+    wrote for each selected being (its name and the words about it); without it, only each such
+    record's revision, so a change is still seen. Those are read from each being's card where
+    the version has a society.
     """
     note = progress or (lambda _: None)
     version = segment(version_id)
@@ -470,6 +550,9 @@ def capture(
     models: list[dict[str, Any]] = []
     decisions: list[dict[str, Any]] = []
     skipped: dict[str, int] = {}
+    # Every binding a decision of this capture is held under, by its digest.
+    bindings_used: dict[str, dict[str, Any]] = {}
+    characters: list[dict[str, Any]] = []
     if include_models:
         society = reader.json("GET society models", f"/world/versions/{version}/society/models")
         contract = {
@@ -484,7 +567,10 @@ def capture(
                 held = latest.get(choice["subject_id"])
                 if held is None or choice["choice_seq"] > held["choice_seq"]:
                     latest[choice["subject_id"]] = choice
-        events = _events(reader, version, set(latest)) if include_decisions and latest else []
+        # A session's evidence keeps every model decision of a selected thing, each under the
+        # model it was asked under; a checkpoint keeps only those of the model chosen now.
+        asking = set(subjects) if session is not None else set(latest)
+        events = _events(reader, version, asking) if include_decisions and asking else []
         consumed = {event["document"]["request_id"]: event for event in events}
         # Each entry: (the minute's event or None, the record, the subject it was asked for).
         records: dict[str, tuple[dict[str, Any] | None, dict[str, Any], str]] = {}
@@ -500,7 +586,7 @@ def capture(
             asked = [
                 (entry["request_id"], entry["subject_id"])
                 for entry in session["decisions"]
-                if entry.get("decider") == "model" and entry["subject_id"] in latest
+                if entry.get("decider") == "model" and entry["subject_id"] in asking
             ]
         else:
             asked = [(event["document"]["request_id"], event["subject_id"]) for event in events]
@@ -516,19 +602,21 @@ def capture(
                 continue
             records[request_id] = (consumed.get(request_id), record, subject)
         note(f"read {len(records)} decision records")
-        for subject, choice in sorted(latest.items()):
-            decider = choice["decider"]
+
+        def bind(subject: str, provider: Any, model_id: Any) -> dict[str, Any]:
+            """The binding of one thing to one model: its revision is the model the provider
+            served the latest record asked under it, else what the project holds for it."""
             served = [
                 record["decision"]["provider"].get("served_model_id")
                 for _, record, asked_for in records.values()
-                if asked_for == subject and record.get("decision")
+                if asked_for == subject
+                and record.get("decision")
+                and _asked_under(record) == (provider, model_id)
             ]
-            known = (revisions or {}).get(
-                (subjects[subject], decider.get("provider"), decider.get("model_id"))
-            )
+            known = (revisions or {}).get((subjects[subject], provider, model_id))
             manifest = {
-                "provider": _name(decider.get("provider")),
-                "model_id": _name(decider.get("model_id")),
+                "provider": _name(provider),
+                "model_id": _name(model_id),
                 "revision": _name(served[-1] if served else known),
             }
             manifest_bytes = canonical_json(manifest)
@@ -540,74 +628,90 @@ def capture(
                 digest(manifest_bytes),
                 f"model:{manifest['provider']}",
             )
-            binding = {
+            return {
                 "thing_id": subjects[subject],
                 "role": role.key,
                 "contract_sha256": digest(contract_bytes),
                 "model_manifest_sha256": digest(manifest_bytes),
                 **manifest,
             }
-            models.append(binding)
-            binding_sha256 = sha256_of_canonical(binding).hex()
-            for event, record, asked_for in records.values():
-                if asked_for != subject:
-                    continue
-                request, receipt = record["request"], record.get("decision")
-                config = request.get("provider_config") or {}
-                if receipt is None or (config.get("provider"), config.get("model_id")) != (
-                    decider.get("provider"),
-                    decider.get("model_id"),
-                ):
-                    skipped["asked under another assignment or unanswered"] = (
-                        skipped.get("asked under another assignment or unanswered", 0) + 1
-                    )
-                    continue
-                options = request["context"]["options"]
-                labels = [option["label"] for option in options]
-                chosen = (receipt.get("proposal") or {}).get("label")
-                disposition = None if event is None else event["document"].get("disposition")
-                outcome = _OUTCOMES.get(disposition, "not-applied")
-                provider = receipt.get("provider") or {}
-                decision = {
-                    "record_id": f"request:{request['request_id']}",
-                    "thing_id": subjects[subject],
-                    "tick": request["base_tick"],
-                    "binding_sha256": binding_sha256,
-                    "source_record_sha256": receipt["document_sha256"],
-                    "observation_sha256": request["context_sha256"],
-                    "options": [
-                        {
-                            "option_id": f"option:{index + 1}",
-                            "action": _name(option.get("action") or option.get("action_key")),
-                            "target_id": option.get("target_id")
-                            if isinstance(option.get("target_id"), str)
-                            else None,
-                        }
-                        for index, option in enumerate(options)
-                    ],
-                    "chosen_option_id": f"option:{labels.index(chosen) + 1}"
-                    if chosen in labels
-                    else None,
-                    "outcome": outcome,
-                    "reason_code": _name(
-                        receipt.get("reason")
-                        if outcome == "applied" or event is None
-                        else event["document"].get("reason")
-                    ),
-                    "elapsed_ms": _natural(provider.get("latency_ms")),
-                    "input_tokens": _natural(provider.get("prompt_tokens")),
-                    "output_tokens": _natural(provider.get("completion_tokens")),
-                }
-                if outcome == "applied" and decision["chosen_option_id"] is None:
-                    skipped["applied without a recorded choice"] = (
-                        skipped.get("applied without a recorded choice", 0) + 1
-                    )
-                    continue
-                decision["receipt"] = _receipt(receipt, event)
-                # A request no minute took up has no consumed minute or disposition to read.
-                if readable and event is not None:
-                    decision["readable"] = _readable(request, receipt, event)
-                decisions.append(decision)
+
+        current = {
+            subject: bind(
+                subject, choice["decider"].get("provider"), choice["decider"].get("model_id")
+            )
+            for subject, choice in sorted(latest.items())
+        }
+        models.extend(current.values())
+        for event, record, subject in records.values():
+            request, receipt = record["request"], record.get("decision")
+            choice = latest.get(subject)
+            under = _asked_under(record)
+            if (
+                receipt is not None
+                and choice is not None
+                and under
+                == (
+                    choice["decider"].get("provider"),
+                    choice["decider"].get("model_id"),
+                )
+            ):
+                binding = current[subject]
+            elif receipt is not None and session is not None:
+                binding = bind(subject, *under)
+            else:
+                skipped["asked under another assignment or unanswered"] = (
+                    skipped.get("asked under another assignment or unanswered", 0) + 1
+                )
+                continue
+            options = request["context"]["options"]
+            labels = [option["label"] for option in options]
+            chosen = (receipt.get("proposal") or {}).get("label")
+            disposition = None if event is None else event["document"].get("disposition")
+            outcome = _OUTCOMES.get(disposition, "not-applied")
+            provider = receipt.get("provider") or {}
+            decision = {
+                "record_id": f"request:{request['request_id']}",
+                "thing_id": subjects[subject],
+                "tick": request["base_tick"],
+                "binding_sha256": sha256_of_canonical(binding).hex(),
+                "source_record_sha256": receipt["document_sha256"],
+                "observation_sha256": request["context_sha256"],
+                "options": [
+                    {
+                        "option_id": f"option:{index + 1}",
+                        "action": _name(option.get("action") or option.get("action_key")),
+                        "target_id": option.get("target_id")
+                        if isinstance(option.get("target_id"), str)
+                        else None,
+                    }
+                    for index, option in enumerate(options)
+                ],
+                "chosen_option_id": f"option:{labels.index(chosen) + 1}"
+                if chosen in labels
+                else None,
+                "outcome": outcome,
+                "reason_code": _name(
+                    receipt.get("reason")
+                    if outcome == "applied" or event is None
+                    else event["document"].get("reason")
+                ),
+                "elapsed_ms": _natural(provider.get("latency_ms")),
+                "input_tokens": _natural(provider.get("prompt_tokens")),
+                "output_tokens": _natural(provider.get("completion_tokens")),
+            }
+            if outcome == "applied" and decision["chosen_option_id"] is None:
+                skipped["applied without a recorded choice"] = (
+                    skipped.get("applied without a recorded choice", 0) + 1
+                )
+                continue
+            decision["receipt"] = _receipt(receipt, event)
+            # A request no minute took up has no consumed minute or disposition to read.
+            if readable and event is not None:
+                decision["readable"] = _readable(request, receipt, event)
+            decisions.append(decision)
+            bindings_used[decision["binding_sha256"]] = binding
+        characters = _characters(reader, version, things, readable)
 
     source = {
         "world_id": reader.world_id,
@@ -624,7 +728,11 @@ def capture(
                 "project_id": project_id,
                 "session_id": session_id,
                 "source": source,
-                "models": models,
+                # The models chosen now, and each earlier one a decision here was asked under.
+                "models": [
+                    *models,
+                    *(binding for binding in bindings_used.values() if binding not in models),
+                ],
                 "decisions": decisions,
                 # Only decisions a minute took up are enumerated (decision_applied events): a
                 # request that never got a usable answer and was never consumed is absent.
@@ -645,6 +753,8 @@ def capture(
             "dependencies": declared,
             "models": models,
             "decisions": decisions,
+            **({"title": title} if (title := _title(view, readable)) is not None else {}),
+            **({"characters": characters} if characters else {}),
         }
     )
     return Capture(

@@ -39,7 +39,8 @@ from exulanica.world_package.projects.repository import (
     published_through,
 )
 from exulanica.world_package.projects.rights import check as check_rights
-from exulanica.world_package.projects.summary import evidence_summary, summarize
+from exulanica.world_package.projects.summary import summarize
+from exulanica.world_package.projects.words import without_words
 
 PROJECT_PATH = "world-project.json"
 _QUERY = """query($owner:String!, $name:String!, $ref:String!) {
@@ -560,8 +561,13 @@ class RollingPullRequests:
         for files in (local, *(changed for _, changed in steps)):
             check_rights(files, remote.visibility, kinds)
         base_world = _world(remote.base_files)
-        words = summarize(base_world, world)
-        evidence = evidence_summary(_sessions(remote.base_files), sessions)
+        # Written words only to a private repository; the files' rights were checked above.
+        readable = remote.visibility == "PRIVATE"
+        words = summarize(
+            base_world if readable or base_world is None else without_words(base_world),
+            world if readable else without_words(world),
+            quote=readable,
+        )
         net_zero = all(remote.base_files.get(path) == data for path, data in local.items())
         if net_zero:
             actions = ["close-pull-request"] if remote.pull_request else []
@@ -571,20 +577,29 @@ class RollingPullRequests:
                 *(["commit"] * len(steps)),
                 *(["open-pull-request"] if remote.pull_request is None else []),
             ]
-        title = f"World changes for {world['project_id']}"
-        text = "readable" if remote.visibility == "PRIVATE" else "codes"
+        named = world.get("title") if readable else None
+        title = f"Changes to {named or 'this world'}"
+        text = "readable" if readable else "codes"
         body = "\n".join(
             [
-                "Changes to the world:",
-                *(f"- {line}" for line in words or ["none"]),
+                f"Exulanica kept these changes to {named or 'this world'}. Merging them makes a "
+                "new version of the world; the version you have stays as it is.",
                 "",
-                "Decision evidence (what happened while models played; not part of the world):",
-                *(f"- {line}" for line in evidence or ["none"]),
-                *(["", *insight(world, sessions, readable=text == "readable")] if sessions else []),
+                "## The world",
                 "",
-                "Recorded from a local Exulanica project. Review every value before merging.",
-                "From the committed files: "
-                + ", ".join(f"{path} {digest(data)}" for path, data in sorted(local.items())),
+                *(f"- {line}" for line in words or ["Nothing in the world changed"]),
+                *(["", *insight(world, sessions, readable=readable)] if sessions else []),
+                "",
+                "This repository is private, so it shows names, personalities and what was chosen."
+                if readable
+                else "This repository is public, so it shows no names, personalities or chosen "
+                "words.",
+                "",
+                # The files this text was made from, by digest, for a reader who checks; GitHub
+                # does not show an HTML comment.
+                "<!-- exulanica files: "
+                + ", ".join(f"{path} {digest(data)}" for path, data in sorted(local.items()))
+                + " -->",
             ]
         )
         if (
