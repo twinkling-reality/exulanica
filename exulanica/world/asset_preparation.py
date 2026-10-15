@@ -57,7 +57,7 @@ from exulanica.db.session import Database
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.namespaces import WorkspaceStores, workspace_asset_lock_key
-from exulanica.world import asset_import, static_glb
+from exulanica.world import asset_import, static_glb, static_glb_checks, static_glb_format
 from exulanica.world.character_preparation import CharacterBodyPreparer
 from exulanica.world.workspace_preparations import (
     DEFAULT_RETAINED_BYTES,
@@ -197,7 +197,9 @@ class StaticGlbPreparer:
         self._limits = limits
 
     def source_sha256(self) -> str:
-        return preparer_source_sha256(static_glb, asset_import)
+        return preparer_source_sha256(
+            static_glb, static_glb_format, static_glb_checks, asset_import
+        )
 
     def available(self) -> bool:
         # Pure Python and the one image decode site: nothing outside this process.

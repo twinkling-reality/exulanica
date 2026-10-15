@@ -304,7 +304,9 @@ without asset namespaces serves no descriptor; every asset route answers it 503
 
 | Concern | Code | Tests |
 | --- | --- | --- |
-| Profile and preparation steps | [static_glb.py](../exulanica/world/static_glb.py) | `tests/test_static_glb.py` |
+| Profile, bounds and refusals | [static_glb_format.py](../exulanica/world/static_glb_format.py) | `tests/test_static_glb.py` |
+| Admission checks | [static_glb_checks.py](../exulanica/world/static_glb_checks.py) | `tests/test_static_glb.py` |
+| Admission and preparation steps | [static_glb.py](../exulanica/world/static_glb.py) | `tests/test_static_glb.py` |
 | Declaration, admission, withdrawal, authority | [workspace_assets.py](../exulanica/world/workspace_assets.py) | `tests/test_workspace_assets_postgres.py` |
 | Shared preparation queue | [workspace_preparations.py](../exulanica/world/workspace_preparations.py), [asset_preparation.py](../exulanica/world/asset_preparation.py), [asset_preparation_command.py](../exulanica/world/asset_preparation_command.py), [preparation.py](../exulanica/orchestration/installation/preparation.py) (the preparers an installation's profile installs) | `tests/test_workspace_assets_postgres.py` |
 | Schema, guards, binding, erasure | [0126](../exulanica/migrations/0126_a_workspace_admits_and_prepares_its_own_assets.sql), [deletion worker](../exulanica/deletion/worker.py) | `tests/test_workspace_asset_erasure_postgres.py` |

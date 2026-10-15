@@ -11,7 +11,13 @@ from pathlib import Path
 import pytest
 from exulanica.api.services import describe_configuration
 from exulanica.store.namespaces import LocalWorkspaceStores
-from exulanica.world.asset_preparation import PREPARERS, AssetPreparationWorker, StaticGlbPreparer
+from exulanica.world import asset_import, asset_preparation
+from exulanica.world.asset_preparation import (
+    PREPARERS,
+    AssetPreparationWorker,
+    StaticGlbPreparer,
+    preparer_source_sha256,
+)
 from exulanica.world.workspace_preparations import (
     DEFAULT_RETAINED_BYTES,
     RETAINED_BYTES_BOUNDS,
@@ -77,3 +83,21 @@ def test_the_retained_bytes_limit_is_a_declared_setting_with_bounds():
             retained_bytes_limit({name: refused})
     # The configuration report names it, and never its value.
     assert describe_configuration({name: "123"})[name] == "set"
+
+
+def test_the_static_glb_preparer_s_source_digest_names_every_file_of_its_profile():
+    """A file of the profile left out of the receipt's source digest could change what runs while
+    every receipt still named the same source."""
+    import importlib
+
+    world = Path(asset_preparation.__file__).parent
+    profile = [
+        importlib.import_module(f"exulanica.world.{path.stem}")
+        for path in sorted(world.glob("static_glb*.py"))
+    ]
+    assert [module.__name__.rsplit(".", 1)[1] for module in profile] == [
+        "static_glb",
+        "static_glb_checks",
+        "static_glb_format",
+    ]
+    assert StaticGlbPreparer().source_sha256() == preparer_source_sha256(*profile, asset_import)
