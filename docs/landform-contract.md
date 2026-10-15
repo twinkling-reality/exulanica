@@ -84,8 +84,9 @@ the [land a place made from a sentence stands on](#land-for-a-world-made-from-a-
   feature `land` bounds the document: `ground_mm` and how many `features` it lists.
 
 Both change only by a new version, and a version keeps every entry of the one before it unchanged
-and adds to it: version 2 adds the `cascade`. New land is read against the newest version, and a
-world's land against the version its [land rules](#a-worlds-land-rules) name.
+and adds to it: version 2 adds the `cascade`, version 3 its `course` and `least_fall_mm`. New land
+is read against the newest version, and a world's land against the version its
+[land rules](#a-worlds-land-rules) name.
 
 | Kind | What it makes |
 | --- | --- |
@@ -97,7 +98,7 @@ world's land against the version its [land rules](#a-worlds-land-rules) name.
 | `shore` | The land falling to a beach and a sea floor below the datum, rising behind the beach no faster than its coast grade |
 | `basin` | A bowl; filled, a lake whose level is its rim less a freeboard |
 | `terraces` | Level benches stepping up a slope, each joined to the next by a bank, fading at their ends |
-| `cascade` | Water stepping down a straight channel toward a main side, from level pool to level pool over falls no higher than its step, into the sea or onto level land (version 2) |
+| `cascade` | Water stepping down a straight channel toward a main side, from level pool to level pool over falls no higher than its step, into the sea or onto level land (version 2); in equal falls, or falling where the land falls (version 3) |
 
 ## Realizing a land
 
@@ -119,15 +120,29 @@ functions of each point alone, so the near land and the backdrop agree wherever 
 
 A cascade runs toward north, east, south or west, `offset_mm` across from the world's middle, from
 `from_mm` to `to_mm` beyond the world's edge on that side (negative reaches in). Its top is the
-land's height at its source, before the cascade, less its freeboard; its bottom is the sea's level
-where its end lies in the sea, else the land's height at its end less the freeboard. The drop is
-split into the fewest equal falls no higher than `step_mm`, and the channel into as many equal
-pools (one more where it ends on land), each at least 4 m long. Within the channel the land is cut
-to each pool's level less its `depth_mm`; each pool ends in a 2 m sill at its own level, over which
-the water falls to the next; a lip of `wall_mm` (at least 1 m, the lattice) beside the channel and
-at its head is raised to the water's level and the freeboard where the land is lower, and closes
-the last pool of a cascade that ends on land. Both levels are read once per land and world, so
-every point is then computed alone. A cascade lies within the near land.
+land's height at its source, before the cascade, less its freeboard. Its `course` says where its
+water falls:
+
+- `equal` (the default, and every cascade written before courses existed): its bottom is the sea's
+  level where its end lies in the sea, else the land's height at its end less the freeboard; the
+  drop is split into the fewest equal falls no higher than `step_mm`, and the channel into as many
+  equal pools (one more where it ends on land), each at least 4 m long. On sloping land a pool is
+  level for a long stretch, so its lip may stand metres above the ground.
+- `follow`: the cascade reads the land before it along its middle, cell by cell, and falls where the
+  land falls. A pool ends where the land ahead lies `least_fall_mm` (1 m by default) or more below
+  its water, at least 4 m from where it began and from the channel's end; the next pool lies at the
+  land there less the freeboard, never more than `step_mm` below. Where the land meets the sea the
+  channel stops at the waterline and its last fall pours into the sea, never more than a step high.
+  Along the channel's middle a pool stands at most its least fall above the land, past the
+  freeboard, except within 4 m of where the pool began; the course reads the land there only, so
+  on land that also slopes across the channel a lip's far edge may stand higher.
+
+Within the channel the land is cut to each pool's level less its `depth_mm`; each pool ends in a 2 m
+sill at its own level, over which the water falls to the next; a lip of `wall_mm` (at least 1 m, the
+lattice) beside the channel and at its head is raised to the water's level and the freeboard where
+the land is lower, and closes the last pool of a cascade that ends on land. Its levels and where its
+pools end are read once per land and world, so every point is then computed alone. A cascade lies
+within the near land.
 
 ## Near land in chunks
 
@@ -310,13 +325,13 @@ land, so the receipt also names the rules that made it, `land_rules`
 ([`rules.py`](../exulanica/grammar/landform/rules.py)):
 
 ```json
-{"version": 2, "catalogs": {"landform-feature.v2": "<sha256>", "landform-value.v2": "<sha256>"}}
+{"version": 3, "catalogs": {"landform-feature.v3": "<sha256>", "landform-value.v3": "<sha256>"}}
 ```
 
 - `version` stands for the realizer, its grading and the grading plan a site's layout asks of its
   land. A change to any of them that moves land is the next version.
 - `catalogs` names each catalog that shapes land by the digest of its canonical entries. A catalog
-  changes by a new file (`landform-value.v2.json`), never by an edit of a shipped one.
+  changes by a new file (`landform-value.v3.json`), never by an edit of a shipped one.
 
 A receipt that names other rules than the server's is refused by name before its layout is
 generated again (`generated_world_land_rules_changed`, saying both rules); its world is never drawn
@@ -324,10 +339,11 @@ as other land, and its saved entry is listed unavailable by the same name
 ([saved world entry](saved-world-entry.md)). A level world's receipt names no land rules, and one
 that does is refused the same way.
 
-Every rules version this code makes the same land by is served: versions 1 and 2, each reading its
-own catalog version (`SERVED_LAND_RULES`). The realizer and grading are one code for both; version
-2 only adds the `cascade`, so land version 1 admits is the same land under it, and a world made
-under version 1 regenerates byte for byte. New worlds name version 2. The tests pin every shipped
+Every rules version this code makes the same land by is served: versions 1, 2 and 3, each reading
+its own catalog version (`SERVED_LAND_RULES`). The realizer and grading are one code for all;
+version 2 only adds the `cascade` and version 3 its `follow` course, so land an earlier version
+admits is the same land under a later one, and a world made under an earlier version regenerates
+byte for byte. New worlds name version 3. The tests pin every shipped
 landform catalog byte for byte, and each served version with the catalogs it names and the graded
 land of its own golden site ([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a
 change that would move a served version's land fails until that version is no longer served.
@@ -395,8 +411,8 @@ as walls up to about 4 m.
 | `landform_rules_changed` | A receipt names other land rules than the server's; the world is refused as `generated_world_land_rules_changed` |
 | `landform_not_served` | Land asked of the town, or with a support declaration |
 | `landform_cascade_beyond_near` | A cascade, its lips included, would reach beyond the near land |
-| `landform_cascade_rises` | A cascade's end lies as high as its source or higher |
-| `landform_cascade_too_steep` | A cascade's pools would be shorter than 4 m for its drop and length |
+| `landform_cascade_rises` | A cascade's end lies as high as its source or higher; a following cascade's land never falls its least fall, or its source stands at or below the sea |
+| `landform_cascade_too_steep` | A cascade's pools would be shorter than 4 m for its drop and length; a following cascade would fall more than a step into the sea with no room for another pool |
 | `landform_cascade_crossed` | A layout's pad or corridor would cross a cascade's pool or fall |
 
 ## Limits
@@ -424,7 +440,7 @@ as walls up to about 4 m.
 - A corridor steeper than its grade is refused rather than given stairs.
 - Below the datum a shore's sea covers everything; a valley carved below it floods.
 - Performance is measured only on the development machine's tests; no drawing cost is stated here.
-- The server serves land rules versions 1 and 2. A world made under any other is refused, not
+- The server serves land rules versions 1, 2 and 3. A world made under any other is refused, not
   realized by the rules it names.
 - A world does not name the land surface catalog it wears: a newer land look reaches every world on
   land. Naming it by the world's look is planned.

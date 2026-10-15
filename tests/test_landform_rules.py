@@ -33,11 +33,13 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "landform"
 SHIPPED = {
     "landform-feature.v1.json": "5da02f1b42b263f9d54981f34baedcd56a62af2df81c2878a94cb1f5977fbc50",
     "landform-feature.v2.json": "1cc522bbccff9650e92d7f5fd46fc7d2300318c3da5496ab4cc3eb64bb385110",
+    "landform-feature.v3.json": "e320f5e8642aa57b5dfedbe3f2a24a7d8691321017a3776c9e95bfbfd58e131f",
     "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
     "landform-recipe.v2.json": "8e805cc75d229af096aa458d34b4d98e2db2e8e08ee62972dd55eecb483ffb97",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
     "landform-value.v1.json": "328c2b0f98b5fa7621a048916d774ef5de6b81cd68042bd58d4e0c77aeb9a9e6",
     "landform-value.v2.json": "9898e222ad0b12d8832b6a93da4a4c0146888cfd398e3b6a62ab09ba7b44512b",
+    "landform-value.v3.json": "d2c98e8572f3a9dfca18799fe47257cb37fb0f8085842e523a3c6a50f935a715",
 }
 
 #: Each rules version: the catalogs it names, and its golden land's graded site under the code as
@@ -61,6 +63,15 @@ RULES = {
             "landform-value.v2": "e0d4f3442a8085922f2eea15680ae3118952767461f23d6872614f2aaf545630",
         },
         "golden_site": "2bac1f2a82cbfaa5a367420d7e33c5ef586122db39987b3e9d39b553d4781452",
+    },
+    3: {
+        "catalogs": {
+            "landform-feature.v3": (
+                "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08"
+            ),
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+        },
+        "golden_site": "a7074e8d82c7ce85efd87b7ad87bbf38955451558efc81a222b32bd4258b6120",
     },
 }
 
@@ -140,8 +151,9 @@ def test_land_made_by_other_rules_is_refused_saying_both(other: object) -> None:
     assert f"this server makes land by land rules version {LAND_RULES_VERSION}" in str(caught.value)
 
 
-#: Each served version's golden land: version 1's as it was pinned, and version 2's the same with a
-#: cascade from the terraced hill, past the site's west side, into the sea.
+#: Each served version's golden land: version 1's as it was pinned, version 2's the same with a
+#: cascade from the terraced hill, past the site's west side, into the sea, and version 3's with
+#: that cascade following the land.
 GOLDEN_LANDS = {
     1: GOLDEN_LAND,
     2: {
@@ -152,8 +164,20 @@ GOLDEN_LANDS = {
              "from_mm": -110000, "to_mm": 120000},
         ],
     },
+    3: {
+        **GOLDEN_LAND,
+        "features": [
+            *GOLDEN_LAND["features"],
+            {"id": "falls", "kind": "cascade", "side": "south", "offset_mm": -40000,
+             "from_mm": -110000, "to_mm": 120000, "course": "follow"},
+        ],
+    },
 }  # fmt: skip
-WATER = {1: {"sea", "lake", "pond"}, 2: {"sea", "lake", "pond", "pool", "fall"}}
+WATER = {
+    1: {"sea", "lake", "pond"},
+    2: {"sea", "lake", "pond", "pool", "fall"},
+    3: {"sea", "lake", "pond", "pool", "fall"},
+}
 
 
 def test_every_served_version_and_only_those_are_pinned() -> None:

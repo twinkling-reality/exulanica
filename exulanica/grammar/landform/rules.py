@@ -15,10 +15,11 @@ A change to any of those rules is a new version, and a change to a catalog is a 
 
 **Every version this code can make the same land by is served.** The realizer and its grading are
 one code for every served version: a later version only adds what an earlier one could not state
-(version 2 adds the ``cascade``), so a document an earlier version admits is the same land under
-this code. A receipt's land is read against the catalog version its rules name, and the tests pin
-each served version's golden site, so a change that would move an earlier version's land fails
-until that version is no longer served. New worlds name :data:`LAND_RULES_VERSION`.
+(version 2 adds the ``cascade``, version 3 its ``follow`` course), so a document an earlier
+version admits is the same land under this code. A receipt's land is read against the catalog
+version its rules name, and the tests pin each served version's golden site, so a change that would
+move an earlier version's land fails until that version is no longer served. New worlds name
+:data:`LAND_RULES_VERSION`.
 """
 
 from __future__ import annotations
@@ -35,9 +36,9 @@ __all__ = ["LAND_RULES_VERSION", "SERVED_LAND_RULES", "check_land_rules", "land_
 
 #: The rules new land is made by. A change to the realizer, its grading or a site's grading plan
 #: that moves land is a new version.
-LAND_RULES_VERSION: Final = 2
+LAND_RULES_VERSION: Final = 3
 #: Every rules version this code makes land by, and the landform catalog version each reads.
-SERVED_LAND_RULES: Final = {1: 1, 2: 2}
+SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3}
 
 
 @functools.cache

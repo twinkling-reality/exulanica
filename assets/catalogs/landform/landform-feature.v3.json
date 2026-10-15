@@ -1,0 +1,142 @@
+{
+ "schema_version": 1,
+ "catalog_id": "landform-feature",
+ "catalog_version": 3,
+ "entries": [
+  {
+   "key": "tilt",
+   "words": "the whole land rising toward one side, gently",
+   "domain": "near_and_far",
+   "composition": "additive",
+   "most": 2,
+   "reason": "Authored: a slope across a whole world is the simplest land that is not flat; it is bounded to the land near the world so a grade never runs on to the horizon.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise",
+   "words": "a hill: a rounded rise of the land, round or long, smooth or rough",
+   "domain": "near_and_far",
+   "composition": "additive",
+   "most": 8,
+   "reason": "Authored: hills are what most worlds stand among; one feature with a width, a depth and a roughness makes round hills, long ridges and rough knolls.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley",
+   "words": "a long hollow between higher ground, with a flat floor",
+   "domain": "near_and_far",
+   "composition": "additive",
+   "most": 4,
+   "reason": "Authored: a valley gives a world two sides that rise and a floor a path or a stream can follow.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "undulation",
+   "words": "small, gentle unevenness over all the ground",
+   "domain": "near_and_far",
+   "composition": "additive",
+   "most": 3,
+   "reason": "Authored: real ground is never a plane; a seeded unevenness of a stated size keeps open ground from reading as a floor.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range",
+   "words": "mountains or hills on the horizon, far beyond the world",
+   "domain": "far",
+   "composition": "additive",
+   "most": 4,
+   "reason": "Authored: a skyline gives a world depth to the horizon; a range is drawn only, never walked, so its heights are not held to the near land's bound.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore",
+   "words": "the land falling to the sea along one side, with a beach",
+   "domain": "near_and_far",
+   "composition": "shaping",
+   "most": 2,
+   "reason": "Authored: the sea is the datum every height is measured from; a shore carves the land down to a beach and a sea floor with real depth beyond it.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin",
+   "words": "a bowl in the ground; filled, a lake or a pond",
+   "domain": "near_and_far",
+   "composition": "shaping",
+   "most": 6,
+   "reason": "Authored: water needs a bed for its depth to be seen; a basin carves one, and when filled its level is its lowest rim less a freeboard.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces",
+   "words": "steps cut into a slope, each a level bench above the land it covers",
+   "domain": "near_and_far",
+   "composition": "shaping",
+   "most": 3,
+   "reason": "Authored: terraced hillsides are how people have long built and farmed on slopes; benches follow the land and fade out at their ends.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade",
+   "words": "water falling in steps down a channel cut into the land, from pool to pool, to the sea or onto level land",
+   "domain": "near_and_far",
+   "composition": "shaping",
+   "most": 4,
+   "reason": "Authored: a stepped watercourse is how terraced gardens and hillside towns carry water to the sea; each step is a level pool, so falling water reads from any distance.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  }
+ ]
+}

@@ -24,20 +24,26 @@ world's edge on that side (negative reaches in), ``offset_mm`` along it from its
 is the world's middle, offset east and north.
 
 **A cascade** cuts a straight channel toward one of the four main sides, from ``from_mm`` to
-``to_mm`` beyond the world's edge on that side, ``offset_mm`` across from the middle. Its water
-steps down in equal falls no higher than ``step_mm``, from the land's height at its source less a
-freeboard to the sea's level (where its end lies in the sea) or to the land's height at its end
-less the freeboard. Each pool spans an equal share of the length and ends in a sill at its own
-level, over which the water falls to the next; the land within the channel is cut to each pool's
-level less its depth, and a lip beside it is raised to the level and the freeboard where the land
-is lower, so every pool is held. Both levels are read once per land and world, so each point is
-then computed alone. A cascade lies within the near land.
+``to_mm`` beyond the world's edge on that side, ``offset_mm`` across from the middle. On its
+``equal`` course its water steps down in equal falls no higher than ``step_mm``, from the land's
+height at its source less a freeboard to the sea's level (where its end lies in the sea) or to the
+land's height at its end less the freeboard, and each pool spans an equal share of the length. On
+its ``follow`` course it reads the land along its middle and falls where the land falls: a pool
+ends where the land ahead lies ``least_fall_mm`` below its water, the next pool lies at the land
+there less the freeboard (never more than a step below), and where it reaches the sea its last
+pool stops at the waterline, so its last fall pours off the shore. Either way each pool ends in a
+sill at its own level, over which the water falls to the next; the land within the channel is
+cut to each pool's level less its depth, and a lip beside it is raised to the level and the
+freeboard where the land is lower, so every pool is held. Its levels and where its pools end are
+read once per land and world, so each point is then computed alone. A cascade lies within the
+near land.
 """
 
 from __future__ import annotations
 
 import functools
 import hashlib
+from bisect import bisect_right
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
@@ -412,65 +418,154 @@ def _cascade_axes(frame: WorldFrame, f: LandFeature) -> tuple[str, int, int, int
     )
 
 
-_CASCADES: dict[tuple[str, WorldFrame, str], tuple[tuple[int, ...], bool]] = {}
+@dataclass(frozen=True, slots=True)
+class _Course:
+    """A cascade as its water runs: each pool's level, highest first; where each pool begins along
+    the channel from its start (the first at 0); how long the channel runs; whether its last fall
+    drops into the sea; and whether its pools are equal shares of its length."""
+
+    levels: tuple[int, ...]
+    cuts: tuple[int, ...]
+    length: int
+    sea: bool
+    equal: bool
+
+    def pool_at(self, u: int) -> int:
+        """The pool a point ``u`` along the channel lies in."""
+        pools = len(self.levels)
+        if self.equal:
+            return min(pools - 1, max(0, u) * pools // self.length)
+        return max(0, bisect_right(self.cuts, max(0, u)) - 1)
+
+    def end_of(self, pool: int) -> int:
+        """Where a pool ends: where the next begins, or the channel's end."""
+        return self.cuts[pool + 1] if pool + 1 < len(self.cuts) else self.length
 
 
-def _cascade_levels(
-    frame: WorldFrame, land: LandDocument, f: LandFeature
-) -> tuple[tuple[int, ...], bool]:
-    """Each pool's water level, highest first, and whether its last fall drops into the sea. Read
-    from the land before the cascade at its source and its end, and kept per land, world and
+_CASCADES: dict[tuple[str, WorldFrame, str], _Course] = {}
+
+
+def _cascade_course(frame: WorldFrame, land: LandDocument, f: LandFeature) -> _Course:
+    """A cascade's pools, read from the land before the cascade and kept per land, world and
     cascade for the process, as a basin's level is."""
     key = (land.sha256, frame, f.id)
     if key not in _CASCADES:
         if len(_CASCADES) > 4096:
             _CASCADES.clear()
-        side, start, end, offset, _half = _cascade_axes(frame, f)
-        v = f.values
-        freeboard, step = int(v["freeboard_mm"]), int(v["step_mm"])
-        source, mouth = (
-            _heights(land, frame, [x], [y], until=f.id)[0]
-            for x, y in (_at(frame, side, start, offset), _at(frame, side, end, offset))
-        )
-        top = source - freeboard
-        sea = mouth <= 0
-        bottom = 0 if sea else mouth - freeboard
-        if top <= bottom:
-            raise LandformRefused(
-                f"cascade {f.id} would run from {top} mm up to {bottom} mm; water runs down",
-                code="landform_cascade_rises",
-            )
-        falls = -(-(top - bottom) // step)
-        pools = falls if sea else falls + 1
-        if (end - start) // pools < CASCADE_POOL_LEAST_MM:
-            raise LandformRefused(
-                f"cascade {f.id} drops {top - bottom} mm in {pools} pools over {end - start} mm; "
-                f"a pool is at least {CASCADE_POOL_LEAST_MM} mm long",
-                code="landform_cascade_too_steep",
-            )
-        _CASCADES[key] = (tuple(top - (top - bottom) * i // falls for i in range(pools)), sea)
+        if str(f.values.get("course", "equal")) == "follow":
+            _CASCADES[key] = _followed(frame, land, f)
+        else:
+            _CASCADES[key] = _equal(frame, land, f)
     return _CASCADES[key]
+
+
+def _equal(frame: WorldFrame, land: LandDocument, f: LandFeature) -> _Course:
+    """Equal falls no higher than the step, and the channel in as many equal pools."""
+    side, start, end, offset, _half = _cascade_axes(frame, f)
+    v = f.values
+    freeboard, step = int(v["freeboard_mm"]), int(v["step_mm"])
+    source, mouth = (
+        _heights(land, frame, [x], [y], until=f.id)[0]
+        for x, y in (_at(frame, side, start, offset), _at(frame, side, end, offset))
+    )
+    top = source - freeboard
+    sea = mouth <= 0
+    bottom = 0 if sea else mouth - freeboard
+    if top <= bottom:
+        raise LandformRefused(
+            f"cascade {f.id} would run from {top} mm up to {bottom} mm; water runs down",
+            code="landform_cascade_rises",
+        )
+    falls = -(-(top - bottom) // step)
+    pools = falls if sea else falls + 1
+    length = end - start
+    if length // pools < CASCADE_POOL_LEAST_MM:
+        raise LandformRefused(
+            f"cascade {f.id} drops {top - bottom} mm in {pools} pools over {length} mm; "
+            f"a pool is at least {CASCADE_POOL_LEAST_MM} mm long",
+            code="landform_cascade_too_steep",
+        )
+    return _Course(
+        levels=tuple(top - (top - bottom) * i // falls for i in range(pools)),
+        cuts=tuple(length * i // pools for i in range(pools)),
+        length=length,
+        sea=sea,
+        equal=True,
+    )
+
+
+def _followed(frame: WorldFrame, land: LandDocument, f: LandFeature) -> _Course:
+    """Pools that follow the land along the channel's middle: each ends where the land ahead lies
+    ``least_fall_mm`` below its water and at least a pool's least length from where it began and
+    from the channel's end; the next lies at the land there less the freeboard, never more than a
+    step below. Where the land meets the sea the channel stops, its last fall pouring into it."""
+    side, start, end, offset, _half = _cascade_axes(frame, f)
+    v = f.values
+    freeboard, step = int(v["freeboard_mm"]), int(v["step_mm"])
+    least_fall = int(v["least_fall_mm"])
+    along = list(range(start, end + 1, CELL_MM))
+    points = [_at(frame, side, u, offset) for u in along]
+    if side in ("north", "south"):
+        ground = _heights(land, frame, [points[0][0]], [y for _x, y in points], until=f.id)
+    else:
+        ground = _heights(land, frame, [x for x, _y in points], [points[0][1]], until=f.id)
+    shore = next((i for i, height in enumerate(ground) if height <= 0), None)
+    sea = shore is not None
+    last = len(along) - 1 if shore is None else shore
+    length = along[last] - start
+    top = ground[0] - freeboard
+    if top <= 0 or length < CASCADE_POOL_LEAST_MM:
+        raise LandformRefused(
+            f"cascade {f.id} has no land to fall down: its source stands {ground[0]} mm high and "
+            f"it runs {length} mm before the sea",
+            code="landform_cascade_rises",
+        )
+    levels, cuts, began = [top], [0], 0
+    for i in range(1, last):
+        u = along[i] - start
+        water = ground[i] - freeboard
+        if (
+            levels[-1] - water >= least_fall
+            and u - began >= CASCADE_POOL_LEAST_MM
+            and length - u >= CASCADE_POOL_LEAST_MM
+        ):
+            levels.append(max(water, levels[-1] - step))
+            cuts.append(u)
+            began = u
+    if sea and levels[-1] > step:
+        raise LandformRefused(
+            f"cascade {f.id} would fall {levels[-1]} mm into the sea in one fall; its step is "
+            f"{step} mm and its land falls too fast for another pool before the shore",
+            code="landform_cascade_too_steep",
+        )
+    if not sea and len(levels) < 2:
+        raise LandformRefused(
+            f"cascade {f.id} follows land that never falls {least_fall} mm below its water",
+            code="landform_cascade_rises",
+        )
+    return _Course(tuple(levels), tuple(cuts), length, sea, equal=False)
 
 
 def _cascade(
     frame: WorldFrame, land: LandDocument, f: LandFeature, grid: _Grid, h: list[int]
 ) -> None:
-    side, start, end, offset, half = _cascade_axes(frame, f)
-    levels, sea = _cascade_levels(frame, land, f)
+    side, start, _end, offset, half = _cascade_axes(frame, f)
+    course = _cascade_course(frame, land, f)
+    levels, sea = course.levels, course.sea
     v = f.values
     depth, wall, freeboard = int(v["depth_mm"]), int(v["wall_mm"]), int(v["freeboard_mm"])
-    length, pools, c = end - start, len(levels), frame.centre
+    length, pools, c = course.length, len(levels), frame.centre
     for k, (x, y) in enumerate(grid.points):
         u = _along(side, x, y, c) - start
         w = abs(_across(side, x, y, c) - offset)
         if u < -wall or u >= length or w > half + wall:
             continue
-        pool = min(pools - 1, max(0, u) * pools // length)
+        pool = course.pool_at(u)
         level = levels[pool]
         if u < 0 or w > half:
             # The lip: held at the water's level and the freeboard where the land is lower.
             h[k] = max(h[k], level + freeboard)
-        elif u > length * (pool + 1) // pools - CASCADE_SILL_MM:
+        elif u > course.end_of(pool) - CASCADE_SILL_MM:
             # The sill the pool's water falls over, or the closed end of a last pool on land.
             h[k] = level if sea or pool < pools - 1 else max(h[k], level + freeboard)
         else:
@@ -480,9 +575,9 @@ def _cascade(
 def _cascade_water(frame: WorldFrame, land: LandDocument, f: LandFeature) -> list[WaterBody]:
     """A cascade's pools and the falls between them, the last falling into the sea where it
     reaches it."""
-    side, start, end, offset, half = _cascade_axes(frame, f)
-    levels, sea = _cascade_levels(frame, land, f)
-    length, pools = end - start, len(levels)
+    side, start, _end, offset, half = _cascade_axes(frame, f)
+    course = _cascade_course(frame, land, f)
+    levels, sea, pools = course.levels, course.sea, len(course.levels)
 
     def rect(u0: int, u1: int) -> tuple[int, int, int, int]:
         (ax, ay), (bx, by) = (
@@ -493,7 +588,7 @@ def _cascade_water(frame: WorldFrame, land: LandDocument, f: LandFeature) -> lis
 
     out = []
     for i, level in enumerate(levels):
-        u0, u1 = start + length * i // pools, start + length * (i + 1) // pools
+        u0, u1 = start + course.cuts[i], start + course.end_of(i)
         out.append(
             WaterBody(
                 id=f"{f.id} pool {i}",

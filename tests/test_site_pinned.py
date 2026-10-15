@@ -61,13 +61,16 @@ PINNED: dict[tuple[str, str], dict[str, str]] = {
         "plan": "153718fb014e38e00721e6984459f96515b5baaa0914b1a309e63f0cb7e4648d",
         "output": "90059b2af17ea92b31edf39f0927c9064c6f7462afc669f9fc4cb6f530ee9102",
         "place": "6a0bced1012db3290df2817f0132e458479bc0af31f3b0e452a900e7d60799b8",
-        "drawing": "29ecf665d7de770c85117bee811d25c375f940d402da28c20759a605e086d9a7",
+        # Moved when new worlds came to name land rules 3, whose land documents state the
+        # cascade's course: the drawing names the receipt, which names the rules; no land moved.
+        "drawing": "f3166796a4ff929eedaeb8b531038ef5354ad45a1003277daa0aa331c94829a4",
     },
     ("site", "land"): {
         "plan": "9d32eb168ac33646f636965b512cb711a3a0db9a04073e6265c93871e3f84c64",
         "output": "7feb099103fe9f3d14f1bd684b4ae766dbae0bc58332aeb75956d9b2e9891647",
         "place": "fd6c4c4930ce53df8f68f0d42c12a32a212f2efa655a392d56ec87a4d927530f",
-        "drawing": "d5ad33aceed229ec1eca14ded8dc24ae4c650d240c486945d4b4b3184045dfd0",
+        # Moved with land rules 3, as the farm's on land: the receipt the drawing names.
+        "drawing": "5e818276b8d19ac718fcb02be9c16294cc71fbeef798fc8a158411a697031927",
     },
 }
 

@@ -1,0 +1,1182 @@
+{
+ "schema_version": 1,
+ "catalog_id": "landform-value",
+ "catalog_version": 3,
+ "entries": [
+  {
+   "key": "land_ground_mm",
+   "feature": "land",
+   "value": "ground_mm",
+   "minimum": 0,
+   "maximum": 40000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the height of the world's level ground above the sea's level; at most 40 m, so features above it stay within the near land's 64 m bound.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "land_features",
+   "feature": "land",
+   "value": "features",
+   "minimum": 0,
+   "maximum": 16,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the most features one land document lists, a budget for the realizer's work per sample, not a limit on what land can be.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "tilt_side",
+   "feature": "tilt",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west"
+   ],
+   "reason": "Authored: where a feature lies, as a compass side of the world or its centre, so a person or a model can place it in words.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "tilt_grade_permille",
+   "feature": "tilt",
+   "value": "grade_permille",
+   "minimum": 1,
+   "maximum": 120,
+   "default": 30,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: at most 120 per mille, under the 1 in 4 that open ground is walked at, so a tilt alone never makes ground unwalkable.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "tilt_reach_mm",
+   "feature": "tilt",
+   "value": "reach_mm",
+   "minimum": 20000,
+   "maximum": 500000,
+   "default": 200000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far from the world's centre the land keeps rising; beyond it the tilt holds its height, so a grade never runs on to the horizon.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_side",
+   "feature": "rise",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west",
+    "centre"
+   ],
+   "reason": "Authored: where a feature lies, as a compass side of the world or its centre, so a person or a model can place it in words.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_distance_mm",
+   "feature": "rise",
+   "value": "distance_mm",
+   "minimum": -500000,
+   "maximum": 3000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far beyond the world's edge on its side the feature begins; negative reaches into the world.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_offset_mm",
+   "feature": "rise",
+   "value": "offset_mm",
+   "minimum": -3000000,
+   "maximum": 3000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far along its side the feature's middle lies from the middle of that side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_side",
+   "feature": "terraces",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west",
+    "centre"
+   ],
+   "reason": "Authored: where a feature lies, as a compass side of the world or its centre, so a person or a model can place it in words.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_distance_mm",
+   "feature": "terraces",
+   "value": "distance_mm",
+   "minimum": -500000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far beyond the world's edge on its side the feature begins; negative reaches into the world.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_offset_mm",
+   "feature": "terraces",
+   "value": "offset_mm",
+   "minimum": -3000000,
+   "maximum": 3000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far along its side the feature's middle lies from the middle of that side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_width_mm",
+   "feature": "rise",
+   "value": "width_mm",
+   "minimum": 20000,
+   "maximum": 4000000,
+   "default": 200000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the hill's extent along its side; a long width with a short depth makes a ridge.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_depth_mm",
+   "feature": "rise",
+   "value": "depth_mm",
+   "minimum": 20000,
+   "maximum": 4000000,
+   "default": 150000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the hill's extent away from the world, outward from where it begins.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_height_mm",
+   "feature": "rise",
+   "value": "height_mm",
+   "minimum": 500,
+   "maximum": 600000,
+   "default": 20000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the hill's top above the land around it; near hills are held to the near land's 64 m bound after the land is made, far ones are drawn only.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rise_roughness_permille",
+   "feature": "rise",
+   "value": "roughness_permille",
+   "minimum": 0,
+   "maximum": 800,
+   "default": 300,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how much of the hill's height is carved by seeded ridged noise; none is a smooth dome, most a rough knoll.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley_side",
+   "feature": "valley",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west"
+   ],
+   "reason": "Authored: the compass side the valley runs toward, through the world; its floor follows that line.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley_offset_mm",
+   "feature": "valley",
+   "value": "offset_mm",
+   "minimum": -1000000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far across its line the valley's floor lies from the world's middle.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley_width_mm",
+   "feature": "valley",
+   "value": "width_mm",
+   "minimum": 20000,
+   "maximum": 2000000,
+   "default": 120000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: from one rim of the valley to the other.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley_floor_mm",
+   "feature": "valley",
+   "value": "floor_mm",
+   "minimum": 0,
+   "maximum": 1000000,
+   "default": 20000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the width of the valley's flat floor, where a path or a stream can run.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley_depth_mm",
+   "feature": "valley",
+   "value": "depth_mm",
+   "minimum": 500,
+   "maximum": 40000,
+   "default": 6000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far the floor lies below the land at the rims; at most 40 m in the near land's bound.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "undulation_amplitude_mm",
+   "feature": "undulation",
+   "value": "amplitude_mm",
+   "minimum": 100,
+   "maximum": 6000,
+   "default": 800,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the largest rise or fall of the unevenness either way; at most 6 m so it shapes ground without making hills.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "undulation_wavelength_mm",
+   "feature": "undulation",
+   "value": "wavelength_mm",
+   "minimum": 8000,
+   "maximum": 400000,
+   "default": 40000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the size of one swell of the unevenness; finer than 8 m would be lost between the 1 m samples' neighbours.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_side",
+   "feature": "range",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west"
+   ],
+   "reason": "Authored: where a feature lies, as a compass side of the world or its centre, so a person or a model can place it in words.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_distance_mm",
+   "feature": "range",
+   "value": "distance_mm",
+   "minimum": 400000,
+   "maximum": 6000000,
+   "default": 2000000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far from the world's middle the range's crest lies; at least 400 m so it is beyond any walkable land, within the 8 km horizon.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_band_mm",
+   "feature": "range",
+   "value": "band_mm",
+   "minimum": 100000,
+   "maximum": 3000000,
+   "default": 800000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far before its crest the range begins to rise from the land.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_height_mm",
+   "feature": "range",
+   "value": "height_mm",
+   "minimum": 20000,
+   "maximum": 1500000,
+   "default": 300000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the crests' height; up to 1.5 km, which a range 6 km away still shows above the haze.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_ruggedness_permille",
+   "feature": "range",
+   "value": "ruggedness_permille",
+   "minimum": 0,
+   "maximum": 1000,
+   "default": 650,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how much the crests vary along the range; none is an even wall, most a jagged skyline.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_wavelength_mm",
+   "feature": "range",
+   "value": "wavelength_mm",
+   "minimum": 100000,
+   "maximum": 3000000,
+   "default": 900000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the spacing of the range's peaks.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_width_mm",
+   "feature": "range",
+   "value": "width_mm",
+   "minimum": 0,
+   "maximum": 20000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far along its side the range runs, fading at its ends; 0 is along the whole side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "range_offset_mm",
+   "feature": "range",
+   "value": "offset_mm",
+   "minimum": -10000000,
+   "maximum": 10000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: where along its side the range's middle lies, when it has a width.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_side",
+   "feature": "shore",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west"
+   ],
+   "reason": "Authored: where a feature lies, as a compass side of the world or its centre, so a person or a model can place it in words.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_distance_mm",
+   "feature": "shore",
+   "value": "distance_mm",
+   "minimum": -100000,
+   "maximum": 1000000,
+   "default": 40000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far beyond the world's edge the water's edge lies; negative brings the sea into the world.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_beach_mm",
+   "feature": "shore",
+   "value": "beach_mm",
+   "minimum": 0,
+   "maximum": 200000,
+   "default": 20000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the beach's width from the water's edge up to where the land begins.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_beach_top_mm",
+   "feature": "shore",
+   "value": "beach_top_mm",
+   "minimum": 500,
+   "maximum": 10000,
+   "default": 2500,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the beach's height at its landward edge above the sea's level; the dry rule asks at least 350 mm.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_sea_depth_mm",
+   "feature": "shore",
+   "value": "sea_depth_mm",
+   "minimum": 2000,
+   "maximum": 60000,
+   "default": 14000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the sea floor's depth far out; at least 2 m so water reads as water, within the near bound of 64 m.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_wander_mm",
+   "feature": "shore",
+   "value": "wander_mm",
+   "minimum": 0,
+   "maximum": 60000,
+   "default": 12000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far the water's edge wanders either side of a straight line.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "shore_coast_grade_permille",
+   "feature": "shore",
+   "value": "coast_grade_permille",
+   "minimum": 100,
+   "maximum": 2000,
+   "default": 350,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how fast the land may rise behind the beach; high land meets the sea as a slope, never a wall. The default is 350 per mille (about 19 degrees), since where the water's edge wanders the slope behind it steepens: at 600 a level coast reached 41 degrees. Changed inside version 1 only because no world was yet made on land through a product path; from the next change these catalogs change only by new versions.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_side",
+   "feature": "basin",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west",
+    "centre"
+   ],
+   "reason": "Authored: where a feature lies, as a compass side of the world or its centre, so a person or a model can place it in words.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_distance_mm",
+   "feature": "basin",
+   "value": "distance_mm",
+   "minimum": -1000000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far beyond the world's edge the basin's middle lies; negative is inside the world.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_offset_mm",
+   "feature": "basin",
+   "value": "offset_mm",
+   "minimum": -1000000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far along its side the basin's middle lies from the middle of that side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_radius_mm",
+   "feature": "basin",
+   "value": "radius_mm",
+   "minimum": 4000,
+   "maximum": 400000,
+   "default": 20000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the basin's radius; at least 4 m, a small pond.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_depth_mm",
+   "feature": "basin",
+   "value": "depth_mm",
+   "minimum": 500,
+   "maximum": 30000,
+   "default": 3000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the floor's depth below the water's level at the middle.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_shelf_mm",
+   "feature": "basin",
+   "value": "shelf_mm",
+   "minimum": 0,
+   "maximum": 20000,
+   "default": 2500,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the shallow shelf round the edge before the bed falls away.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_freeboard_mm",
+   "feature": "basin",
+   "value": "freeboard_mm",
+   "minimum": 100,
+   "maximum": 2000,
+   "default": 300,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far below the lowest point of the rim the water stands, so it never spills.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "basin_water",
+   "feature": "basin",
+   "value": "water",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "words": [
+    "fill",
+    "dry"
+   ],
+   "reason": "Authored: whether the basin is filled with water (a lake or a pond) or left dry.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_width_mm",
+   "feature": "terraces",
+   "value": "width_mm",
+   "minimum": 20000,
+   "maximum": 1000000,
+   "default": 200000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the terraced band's extent along its side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_depth_mm",
+   "feature": "terraces",
+   "value": "depth_mm",
+   "minimum": 10000,
+   "maximum": 600000,
+   "default": 100000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the terraced band's extent away from the world.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_tier_height_mm",
+   "feature": "terraces",
+   "value": "tier_height_mm",
+   "minimum": 1000,
+   "maximum": 12000,
+   "default": 4000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the rise from one bench to the next; at least 1 m, so a bench is a step a person sees.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_fade_mm",
+   "feature": "terraces",
+   "value": "fade_mm",
+   "minimum": 5000,
+   "maximum": 100000,
+   "default": 30000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far the benches take to fade into the natural slope at the band's ends.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "terraces_riser_share_permille",
+   "feature": "terraces",
+   "value": "riser_share_permille",
+   "minimum": 100,
+   "maximum": 1000,
+   "default": 800,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how much of each tier's natural rise its bank takes, the rest being a level bench, so a bank is no steeper than the slope beneath divided by this share and on gentle land the steps are grassed banks, not walls. Added inside version 1 only because no world was yet made on land through a product path.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_side",
+   "feature": "cascade",
+   "value": "side",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 1,
+   "words": [
+    "north",
+    "east",
+    "south",
+    "west"
+   ],
+   "reason": "Authored: the side the water runs toward, one of the four main sides only, so each pool and fall lies square to the world.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_offset_mm",
+   "feature": "cascade",
+   "value": "offset_mm",
+   "minimum": -1000000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far across that side's axis the channel runs from the world's middle.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_from_mm",
+   "feature": "cascade",
+   "value": "from_mm",
+   "minimum": -500000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 1,
+   "words": [],
+   "reason": "Authored: where the water begins, along that side's axis, measured from the world's edge on that side; negative is inside or behind it.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_to_mm",
+   "feature": "cascade",
+   "value": "to_mm",
+   "minimum": -500000,
+   "maximum": 1000000,
+   "default": 0,
+   "required": 1,
+   "words": [],
+   "reason": "Authored: where the water ends, measured as its beginning is: in the sea, or on land where its last pool stands.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_width_mm",
+   "feature": "cascade",
+   "value": "width_mm",
+   "minimum": 2000,
+   "maximum": 20000,
+   "default": 6000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the channel's width, from a narrow rill to a broad stepped canal.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_step_mm",
+   "feature": "cascade",
+   "value": "step_mm",
+   "minimum": 500,
+   "maximum": 12000,
+   "default": 3000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the most one fall drops; the drop is split into the fewest equal falls no higher than this.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_depth_mm",
+   "feature": "cascade",
+   "value": "depth_mm",
+   "minimum": 300,
+   "maximum": 3000,
+   "default": 1200,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how deep each pool stands below its water, deep enough to read as water and shallow enough to keep its floor in view.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_wall_mm",
+   "feature": "cascade",
+   "value": "wall_mm",
+   "minimum": 1000,
+   "maximum": 3000,
+   "default": 1000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: the lip raised beside the channel where the land is lower than the water, so each pool is held; at least one metre, the lattice the land is read on.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_freeboard_mm",
+   "feature": "cascade",
+   "value": "freeboard_mm",
+   "minimum": 100,
+   "maximum": 1000,
+   "default": 300,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: how far the water stands below the land at its source and below the lip on each side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_course",
+   "feature": "cascade",
+   "value": "course",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "words": [
+    "equal",
+    "follow"
+   ],
+   "reason": "Authored: how the water steps down. Equal: the fewest equal falls no higher than the step, each pool an equal share of the channel, as a cascade was before it could choose. Follow: the falls stand where the land falls, each pool level with the land ahead until it lies the least fall below, so no pool stands far above the land along its middle, and the last fall pours off the shore where the channel reaches the sea.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cascade_least_fall_mm",
+   "feature": "cascade",
+   "value": "least_fall_mm",
+   "minimum": 500,
+   "maximum": 12000,
+   "default": 1000,
+   "required": 0,
+   "words": [],
+   "reason": "Authored: on a following course, how far the land ahead along the channel's middle must lie below a pool's water before the pool ends in a fall; it is also the most a pool stands above the land along its middle, past the freeboard. One metre by default: a fall a person sees, and a lip there no higher than a low wall.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  }
+ ]
+}

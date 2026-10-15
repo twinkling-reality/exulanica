@@ -274,7 +274,9 @@ PINNED: dict[str, dict[str, str]] = {
         "plan": "ba01fce05eed5c5c2ba86f5672f25980cb4edaa85fc1f9874c3212d8ed8e2e34",
         "output": "060c77f88889a93e9bfe5e3060d675b08c9a3a54832dc915807f2bfb90f712f8",
         "place": "ab9923ddc1feae298db3515733b361f69a31b29f2ef6b79047751b3d900196c5",
-        "drawing": "ea7367442c1e782ecaa08cc169ccc9c24ba58ff3d49d297347b47bca61cdd345",
+        # Moved when new worlds came to name land rules 3: the drawing names the receipt, which
+        # names the rules; no land moved.
+        "drawing": "0eee773a141fc49fdca247755631d41bda492adf42e936a094bb2db5f093fefa",
     },
 }
 

@@ -17,7 +17,8 @@ Each version is a pair of files (``landform-feature.vN.json``, ``landform-value.
 catalog changes only by a new version. A later version keeps every entry of the one before it
 unchanged and adds to it, so a document an earlier version admits reads the same under a later
 one; a world is read against the version its receipt's land rules name
-(:mod:`exulanica.grammar.landform.rules`). Version 2 adds the ``cascade``.
+(:mod:`exulanica.grammar.landform.rules`). Version 2 adds the ``cascade``; version 3 adds its
+``course`` and ``least_fall_mm``.
 
 Read on first use, never at import, and kept for the process: a catalog is authored data and
 changes only with a release.
@@ -58,8 +59,8 @@ CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[3].joinpath("assets", "catalogs", "landform")
 )
 #: Every version of the landform catalogs this code reads, and the newest, which reads new land.
-CATALOG_VERSIONS: Final = (1, 2)
-CATALOG_VERSION: Final = 2
+CATALOG_VERSIONS: Final = (1, 2, 3)
+CATALOG_VERSION: Final = 3
 DOMAINS: Final = ("near_and_far", "far")
 COMPOSITIONS: Final = ("additive", "shaping")
 #: Wider than any bound a value states, so the file, not this schema, says what a value may be.
