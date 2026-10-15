@@ -35,12 +35,14 @@
 -- DELETE on the two tables is this migration's grant (0161's rule for every definer), used by these
 -- two bodies alone. A run that later finds its row gone keeps nothing for it.
 --
--- THE GUARDS. creature_look refuses a row inserted in any status but queued, every delete but the
--- definer's, any change to who asked, for which creature and when, any move but queued to staged or
--- cancelled and staged to an end, and any change to a staged row's run
--- (tg_creature_look_moves_forward), so every job is asked, staged and ended in that order, once. kind_look refuses every update
--- and every delete but the definer's (0172's tg_thing_store_append_only). The runtime may not update
--- kind_look (provisioning's INSERT_ONLY_TABLES).
+-- THE GUARDS. creature_look refuses a row inserted in any status but queued, and dates every row by
+-- the statement that inserts it (a requester's limits count those dates); it refuses every delete
+-- but the definer's, any change to who asked, for which creature and when, any move but queued to
+-- staged or cancelled and staged to an end, and any change to a staged row's run
+-- (tg_creature_look_moves_forward), so every job is asked, staged and ended in that order, once.
+-- kind_look refuses every update and every delete but the definer's (0172's
+-- tg_thing_store_append_only). The runtime may not update kind_look (provisioning's
+-- INSERT_ONLY_TABLES).
 --
 -- At most one unfinished look job per creature: a second ask while one waits is answered with the
 -- one already asked (a unique index on the unfinished rows).
@@ -78,7 +80,8 @@ create table creature_look (
     (status <> 'queued' or (run_id is null and request_sha256 is null and staged_at is null))
     is true),
   constraint creature_look_run_named_whole check (
-    ((run_id is null) = (request_sha256 is null) and (run_id is null) = (staged_at is null)) is true),
+    ((run_id is null) = (request_sha256 is null)
+     and (run_id is null) = (staged_at is null)) is true),
   constraint creature_look_made_by_a_run check (
     (status not in ('staged', 'made', 'refused') or run_id is not null) is true),
   constraint creature_look_finished check (
@@ -121,8 +124,8 @@ create table kind_look (
 create index kind_look_newest on kind_look (workspace_id, kind_sha256, choice_id desc);
 
 comment on table kind_look is
-  'The look a workspace''s creature wears wherever it is placed: appended, the newest per kind worn, '
-  'a thing''s own choice still first (exulanica/world/thing_looks.py).';
+  'The look a workspace''s creature wears wherever it is placed: appended, the newest per kind '
+  'worn, a thing''s own choice still first (exulanica/world/thing_looks.py).';
 
 create function tg_creature_look_moves_forward() returns trigger
 language plpgsql as $fn$
@@ -132,6 +135,8 @@ begin
       raise exception 'a creature look is asked queued (not %)', new.status
         using errcode = 'integrity_constraint_violation';
     end if;
+    -- Dated by the statement that asks it, whatever the row says: the limits count these dates.
+    new.created_at := statement_timestamp();
     return new;
   end if;
   if tg_op = 'DELETE' then
@@ -148,7 +153,8 @@ begin
       using errcode = 'integrity_constraint_violation';
   end if;
   if not ((old.status = 'queued' and new.status in ('staged', 'cancelled'))
-          or (old.status = 'staged' and new.status in ('made', 'refused', 'failed', 'cancelled'))) then
+          or (old.status = 'staged'
+              and new.status in ('made', 'refused', 'failed', 'cancelled'))) then
     raise exception 'a creature look moves from queued to staged to an end, once (% to %)',
       old.status, new.status
       using errcode = 'integrity_constraint_violation';
@@ -194,7 +200,8 @@ language plpgsql security definer as $fn$
 begin
   perform assert_workspace_context(new.workspace_id);
   delete from kind_look k where k.workspace_id = new.workspace_id and k.kind_sha256 = new.sha256;
-  delete from creature_look l where l.workspace_id = new.workspace_id and l.kind_sha256 = new.sha256;
+  delete from creature_look l
+   where l.workspace_id = new.workspace_id and l.kind_sha256 = new.sha256;
   return null;
 end $fn$;
 

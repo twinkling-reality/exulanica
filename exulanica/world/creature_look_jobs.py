@@ -231,11 +231,15 @@ def end_look(
 ) -> CreatureLook | None:
     """End a look job staged under ``run_id``: made with the look's digest, refused with the fit's
     code, failed or cancelled with why, with its share of the run's cost. Run inside the caller's
-    transaction, so a made look is admitted and its job ended together. None, with nothing changed,
-    when the job is not staged under this run (erased since, or ended already): the caller then
-    keeps nothing for it."""
+    transaction, so a made look is admitted and its job ended together; the workspace's lock is
+    taken first and held to the caller's commit. None, with nothing changed, when the job is not
+    staged under this run (erased since, or ended already): the caller then keeps nothing for it."""
     if status not in END_STATUSES:
         raise ValueError(f"a look job ends {', '.join(END_STATUSES)}")
+    # The workspace's lock before the job's row, the order a creature's erasure takes them (its
+    # lock, then its trigger's delete of the row), so the two never wait on each other in a cycle;
+    # wear_by_kind taking it again in the same transaction costs nothing.
+    lock_workspace(connection, workspace_id)
     with connection.cursor(row_factory=dict_row) as cursor:
         row = cursor.execute(
             "update creature_look set status=%s, look_sha256=%s, refusal_code=%s, failure=%s, "

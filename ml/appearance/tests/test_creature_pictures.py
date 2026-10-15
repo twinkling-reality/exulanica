@@ -18,13 +18,14 @@ from exulanica_pieces.geometry.mesh import cluster_simplify
 from PIL import Image
 from test_creature_fit import _request
 
-from exulanica_appearance.creatures.fit import fit_look, model_from_npz
+from exulanica_appearance.creatures.fit import FIT_RUN_PROFILE, fit_look, fit_run, model_from_npz
 from exulanica_appearance.creatures.pictures import (
     CATALOG_PATH,
     JOB_PROFILE,
     StandIn,
     framed_prompt,
     load_framings,
+    make_job,
     prepare_picture_job,
     read_framings,
     run_picture_job,
@@ -221,3 +222,65 @@ def test_the_run_stops_before_an_item_it_could_not_finish_inside_the_stop(reposi
     assert len(results["items"]) == 2
     assert results["stopped"].startswith("before item 2:")
     assert list(tmp_path.glob(f"results-{prepared.job_sha256}-*.json"))
+
+
+def test_a_job_record_draws_every_request_once_a_seed_and_is_checked(repository):
+    words, stick = _words(), _request()
+    job = json.loads(
+        make_job([words, stick], repository=repository, framing="whole-body", seeds=[11, 23])
+    )
+    digests = [hashlib.sha256(raw).hexdigest() for raw in (words, stick)]
+    # Seed-major: a stop still leaves every request drawn once.
+    assert [(item["seed"], item["request_sha256"]) for item in job["items"]] == [
+        (11, digests[0]),
+        (11, digests[1]),
+        (23, digests[0]),
+        (23, digests[1]),
+    ]
+    assert job["stop"]["stop_at_seconds"] >= job["stop"]["estimate_seconds"] > 4 * 25
+    with pytest.raises(Refused, match="needs a framing"):
+        make_job([words], repository=repository, framing="side-on", seeds=[11])
+    with pytest.raises(Refused, match="each seed once"):
+        make_job([words], repository=repository, framing="whole-body", seeds=[11, 11])
+
+
+def test_the_fit_of_a_run_keeps_each_request_s_first_passing_model(repository, tmp_path):
+    words, stick, absent = _words(), _request(), _with_picture(_png())
+    job = make_job([words, stick], repository=repository, framing="whole-body", seeds=[11, 23])
+    pictures = tmp_path / "pictures"
+    prepared = prepare_picture_job(
+        job_raw=job, requests=[words, stick], pictures={}, repository=repository
+    )
+    results = run_picture_job(prepared, StandIn(), pictures)
+    table, _ = read_table(repository)
+    requests = {hashlib.sha256(raw).hexdigest(): raw for raw in (words, stick, absent)}
+    out = tmp_path / "fits"
+    document = fit_run(
+        results=results,
+        requests=requests,
+        pictures=pictures,
+        out=out,
+        table=table,
+        simplifier=cluster_simplify,
+        made_by={"provider": "stand-in", "model_id": "stand-in"},
+    )
+    assert json.loads((out / "fits.json").read_bytes()) == document
+    assert document["profile"] == FIT_RUN_PROFILE
+    passed = document["requests"][hashlib.sha256(words).hexdigest()]
+    # The first seed's model passed, so the second was never fitted.
+    assert (passed["outcome"], passed["seed"]) == ("passed", 11)
+    container = (out / "looks" / f"{passed['container_sha256']}.glb").read_bytes()
+    assert hashlib.sha256(container).hexdigest() == passed["container_sha256"]
+    receipt = json.loads((out / "receipts" / f"{passed['receipt_sha256']}.json").read_bytes())
+    assert receipt["outcome"] == "passed" and receipt["output"]["height_mm"] == passed["height_mm"]
+    # A body of one thickness everywhere is refused by the fit, by code, on both seeds.
+    refused = document["requests"][hashlib.sha256(stick).hexdigest()]
+    assert (refused["outcome"], refused["refusal"], refused["seed"]) == (
+        "refused",
+        "rig_chain_not_found",
+        11,
+    )
+    assert document["requests"][hashlib.sha256(absent).hexdigest()] == {
+        "outcome": "failed",
+        "failure": "not_made",
+    }

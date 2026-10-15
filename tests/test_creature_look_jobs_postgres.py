@@ -15,7 +15,10 @@ What is shown, against PostgreSQL, as the deployed writer (the runtime role) unl
     back to queued, an ended one never changes, who asked and for which creature never change, a
     staged job keeps its run, and a kind look is never updated;
 *   a kind look is appended under the workspace's lock, so a creature's erasure asked meanwhile
-    waits for it and then deletes it: no kind look names an erased creature;
+    waits for it and then deletes it: no kind look names an erased creature; a run ending a job and
+    wearing its look in one transaction takes that lock before the job's row, as an erasure does,
+    so the two wait for each other in turn and never in a cycle;
+*   a job is dated by the statement that asks it, whatever the row says;
 *   the rows go only through an erasure: the runtime holds no delete, the table owner is refused by
     the guards, and only the definer owner deletes; row-level security is forced on both tables;
 *   a creature's erasure deletes its look jobs and kind looks and nothing of another creature; a
@@ -309,6 +312,20 @@ def test_the_rows_change_only_forward(provisioned, spine_schema, tmp_path):
                     f"status, {columns}) values (%s, gen_random_uuid(), %s, %s, %s, {values})",
                     (workspace_id, ACTOR, "8" * 64, status),
                 )
+        # A row dated back is dated by the statement that asks it: the limits count these dates.
+        with connection.transaction():
+            connection.execute(
+                "insert into creature_look (workspace_id, look_id, requested_by, kind_sha256, "
+                "created_at) values (%s, gen_random_uuid(), %s, %s, '2000-01-01')",
+                (workspace_id, ACTOR, "a" * 64),
+            )
+            dated = connection.execute(
+                "select created_at > now() - interval '1 hour' as now from creature_look "
+                "where kind_sha256 = %s",
+                ("a" * 64,),
+            ).fetchone()
+            assert dated["now"]
+            raise psycopg.Rollback()
         # A cost belongs to a run's end.
         with pytest.raises(psycopg.errors.CheckViolation), connection.transaction():
             connection.execute(
@@ -492,3 +509,74 @@ def test_a_kind_look_and_its_creature_s_erasure_never_interleave(
         assert (
             ThingStore(connection, workspace_id, None).kind_by_digest(creature.kind.sha256) is None
         )
+
+
+def test_a_run_s_end_and_wear_and_a_creature_s_erasure_never_close_a_cycle(
+    provisioned, spine_schema, tmp_path
+):
+    """A run ends a job and wears its look in one transaction; a creature's erasure takes the
+    workspace's lock and then its trigger deletes the job's row. The end takes the workspace's lock
+    before the job's row, so an erasure asked between the end and the wear waits for the run's
+    commit and then deletes what it made; were the end to lock the row first, the two would wait
+    on each other and the database would end one of them."""
+    creature = _creature()
+    workspace_id = provisioned.workspace_id
+    with _runtime(spine_schema, workspace_id) as connection:
+        _kept(connection, workspace_id, tmp_path, creature)
+        asked = look_jobs.ask_look(
+            connection, workspace_id, kind_sha256=creature.kind.sha256, requested_by=ACTOR
+        )
+        look_jobs.stage_look(
+            connection, workspace_id, asked.look_id, run_id=RUN, request_sha256=REQUEST
+        )
+    ended, proceed = threading.Event(), threading.Event()
+    failures: list[BaseException] = []
+
+    def end_and_wear() -> None:
+        try:
+            with _runtime(spine_schema, workspace_id) as connection, connection.transaction():
+                look_jobs.end_look(
+                    connection,
+                    workspace_id,
+                    asked.look_id,
+                    run_id=RUN,
+                    status="made",
+                    look_sha256=creature.sketch.sha256,
+                )
+                ended.set()
+                proceed.wait(10)
+                look_jobs.wear_by_kind(
+                    connection,
+                    workspace_id,
+                    kind_sha256=creature.kind.sha256,
+                    look_sha256=creature.sketch.sha256,
+                    chosen_by=ACTOR,
+                    look_id=asked.look_id,
+                )
+        except BaseException as error:  # reported below
+            failures.append(error)
+
+    def erase() -> None:
+        try:
+            with _runtime(spine_schema, workspace_id) as connection:
+                ThingStore(connection, workspace_id, None).erase_creature(
+                    creature.kind.sha256, erased_by=ACTOR
+                )
+        except BaseException as error:  # reported below
+            failures.append(error)
+
+    run = threading.Thread(target=end_and_wear)
+    run.start()
+    assert ended.wait(10), "the run ended its job"
+    eraser = threading.Thread(target=erase)
+    eraser.start()
+    # The erasure now waits for the run's lock; were the run holding the row alone, the erasure
+    # would take the lock, wait on the row, and the run's wear would close the cycle.
+    eraser.join(2)
+    proceed.set()
+    run.join(15)
+    eraser.join(15)
+    assert not run.is_alive() and not eraser.is_alive()
+    assert failures == []
+    with _runtime(spine_schema, workspace_id) as connection:
+        assert [_count(connection, table) for table in ("creature_look", "kind_look")] == [0, 0]

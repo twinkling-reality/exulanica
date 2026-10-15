@@ -317,7 +317,7 @@ def test_a_requester_lists_their_own_drafts_newest_first(served):
     assert _get(client, "/things/creatures/drafts", _OTHER).json()["drafts"] == []
 
 
-def test_a_kept_creature_s_look_is_asked_once_and_read_by_its_requester(served):
+def test_a_kept_creature_s_look_is_asked_once_and_read_by_any_member(served):
     from exulanica.world.thing_store import ThingStore
 
     from test_thing_store_postgres import _creature

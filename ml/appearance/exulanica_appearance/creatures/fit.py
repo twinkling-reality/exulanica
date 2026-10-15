@@ -28,12 +28,13 @@ from __future__ import annotations
 
 import io
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
-from exulanica_pieces.canonical import Refused, sha256_hex
+from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
 from exulanica_pieces.geometry.mesh import Mesh, Simplifier, orient, simplify_to
 from exulanica_pieces.geometry.skinned import write_skinned_glb
 from exulanica_pieces.skinned import read_skinned_glb
@@ -45,17 +46,19 @@ from exulanica_appearance.creatures.embed import (
     EmbedSettings,
     embed,
 )
-from exulanica_appearance.creatures.job import _main_parts, _slot, _without_slivers
+from exulanica_appearance.creatures.job import _main_parts, _slot, _without_slivers, _write_once
 from exulanica_appearance.creatures.likeness import likeness, match_to_picture
-from exulanica_appearance.creatures.request import CreatureRequest
+from exulanica_appearance.creatures.request import CreatureRequest, read_request
 from exulanica_appearance.creatures.rig import Inside, RigRefused, bone_heat, check_rig
 
 __all__ = [
     "DEFAULT_FIT",
+    "FIT_RUN_PROFILE",
     "RECEIPT_PROFILE",
     "FitSettings",
     "Fitted",
     "fit_look",
+    "fit_run",
     "model_from_npz",
 ]
 
@@ -333,3 +336,83 @@ def model_from_npz(data: bytes) -> Mesh:
         arrays["triangles"].astype(np.int64),
         arrays["colours"].astype(np.uint8),
     )
+
+
+FIT_RUN_PROFILE: Final = "exulanica.creature-fit-run/v1"
+
+
+def fit_run(
+    *,
+    results: Mapping[str, Any],
+    requests: Mapping[str, bytes],
+    pictures: Path,
+    out: Path,
+    table: Sequence[int],
+    simplifier: Simplifier,
+    made_by: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The fit of every model a route P job made (``results``, its pictures and models under
+    ``pictures``), on this machine's CPU: for each request, its items in seed order until one
+    passes. Each fit's receipt is written once to ``out/receipts/<sha256>.json`` and a passed fit's
+    container to ``out/looks/<sha256>.glb``; ``out/fits.json`` (``exulanica.creature-fit-run/v1``)
+    states each request's outcome: passed, with the container, the receipt, the measured height
+    and the cut-out it was fitted to; refused, with the first refusal's code and receipt; or
+    failed, ``not_made`` when the job made no model for it. ``made_by`` (provider and model id) is
+    what the made look's origin will name."""
+    by_request: dict[str, list[Mapping[str, Any]]] = {}
+    for item in results["items"]:
+        by_request.setdefault(item["request_sha256"], []).append(item)
+    outcomes: dict[str, dict[str, Any]] = {}
+    for request_sha256, raw in sorted(requests.items()):
+        request = read_request(raw)
+        first_refusal: dict[str, Any] | None = None
+        outcome: dict[str, Any] | None = None
+        for item in sorted(by_request.get(request_sha256, []), key=lambda item: item["seed"]):
+            if item["outcome"] != "made":
+                continue
+            model = model_from_npz(
+                (pictures / "meshes" / f"{item['mesh']['sha256']}.npz").read_bytes()
+            )
+            cutout_sha256 = item["inputs"]["cutout"]
+            fitted = fit_look(
+                request,
+                model,
+                up=item["mesh"]["frame"]["up"],
+                front=item["mesh"]["frame"]["front"],
+                cutout_png=(pictures / "inputs" / f"{cutout_sha256}.png").read_bytes(),
+                simplifier=simplifier,
+                table=table,
+            )
+            receipt = canonical_bytes(fitted.receipt)
+            receipt_sha256 = sha256_hex(receipt)
+            _write_once(out / "receipts" / f"{receipt_sha256}.json", receipt)
+            if fitted.container is not None and fitted.receipt["outcome"] == "passed":
+                container_sha256 = sha256_hex(fitted.container)
+                _write_once(out / "looks" / f"{container_sha256}.glb", fitted.container)
+                outcome = {
+                    "outcome": "passed",
+                    "seed": item["seed"],
+                    "receipt_sha256": receipt_sha256,
+                    "container_sha256": container_sha256,
+                    "height_mm": fitted.receipt["output"]["height_mm"],
+                    "cutout_sha256": cutout_sha256,
+                }
+                break
+            if first_refusal is None:
+                first_refusal = {
+                    "outcome": "refused",
+                    "seed": item["seed"],
+                    "receipt_sha256": receipt_sha256,
+                    "refusal": (fitted.receipt.get("refusal") or {}).get("code", "fit_refused"),
+                }
+        outcomes[request_sha256] = (
+            outcome
+            or first_refusal
+            or {
+                "outcome": "failed",
+                "failure": "not_made",
+            }
+        )
+    document = {"profile": FIT_RUN_PROFILE, "made_by": dict(made_by), "requests": outcomes}
+    _write_once(out / "fits.json", canonical_bytes(document))
+    return document

@@ -60,6 +60,7 @@ __all__ = [
     "StandIn",
     "framed_prompt",
     "load_framings",
+    "make_job",
     "prepare_picture_job",
     "read_framings",
     "read_picture_job",
@@ -290,6 +291,56 @@ def prepare_picture_job(
         prompt = framed_prompt(framing, request.appearance)
         planned.append(Planned(item, request, prompt, None))
     return Prepared(job, sha256_hex(job_raw), catalog_sha256, tuple(planned))
+
+
+#: The job's setup before its first item, in seconds: weights, wheels and models loaded (J1 took
+#: about ten to twelve minutes on Nebius AI Cloud's RTX PRO 6000; fifteen covers a slow mirror).
+SETUP_SECONDS: Final = 900
+
+
+def make_job(
+    requests: Sequence[bytes],
+    *,
+    repository: Path,
+    framing: str,
+    seeds: Sequence[int],
+    item_seconds: int = 25,
+) -> bytes:
+    """A route P job record for ``requests``, each drawn once per seed in ``framing``, seed-major so
+    a stop still leaves every request drawn once: the code archive's, the components' and the
+    catalog's digests from ``repository``, the image this tooling runs, and the stops (the job's
+    estimate its setup and every item; its stop half as much again). Every item is checked by
+    :func:`prepare_picture_job` before the record is returned."""
+    from exulanica_appearance.assets.nebius import IMAGE, code_archive
+    from exulanica_appearance.assets.remote import components_sha256
+
+    if not requests or not seeds or len(set(seeds)) != len(seeds):
+        raise Refused("a job draws at least one request, each seed once")
+    _framings, catalog_sha256 = load_framings(repository)
+    items = [
+        {"request_sha256": sha256_hex(raw), "seed": seed, "variant": variant, "framing": framing}
+        for variant, seed in enumerate(seeds)
+        for raw in requests
+    ]
+    estimate = SETUP_SECONDS + item_seconds * len(items)
+    job = canonical_bytes(
+        {
+            "profile": JOB_PROFILE,
+            "route": "P",
+            "code_sha256": sha256_hex(code_archive(repository)),
+            "components_sha256": components_sha256(repository, "P"),
+            "container": IMAGE.split("@", 1)[1],
+            "catalog_sha256": catalog_sha256,
+            "items": items,
+            "stop": {
+                "estimate_seconds": estimate,
+                "item_seconds": item_seconds,
+                "stop_at_seconds": -(-estimate * 3 // 2),
+            },
+        }
+    )
+    prepare_picture_job(job_raw=job, requests=requests, pictures={}, repository=repository)
+    return job
 
 
 def _write_once(path: Path, data: bytes) -> None:

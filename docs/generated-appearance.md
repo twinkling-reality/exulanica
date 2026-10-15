@@ -702,9 +702,9 @@ as not looking like its words.
 **Route P's open parts:** a picture showing a person must be refused before a request names it, and
 no local detector does that yet, so only concepts drawn from words, or a picture the person kept
 with the right to send it to a model, may be named. A person asks for a made look as a look job,
-which a creature's kind then wears ([things contract](things-contract.md#a-creatures-made-look));
-the operator's run that stages queued jobs and admits what the fit made, and the page wearing a
-kind's made look, are planned.
+which an operator's run stages, makes with route P and admits, and which the creature's kind then
+wears ([things contract](things-contract.md#a-creatures-made-look)); no run has spent yet, and the
+page wearing a kind's made look is planned.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (benches, seating planters, and lamp posts,

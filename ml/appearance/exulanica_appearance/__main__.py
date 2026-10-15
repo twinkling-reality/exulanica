@@ -22,6 +22,10 @@
     creatures run ...   on the rented machine, from container/assets/job.sh (route C)
     creatures pictures --code DIR --job FILE --requests DIR --pictures DIR --out DIR
                   (--weights DIR | --stand-in) [--started-at EPOCH]   route P's pictures and models
+    creatures make-job --code DIR --requests DIR --framing KEY --seeds 11,23 --out FILE
+                  the route P job record for a folder of requests
+    creatures fit-run --code DIR --requests DIR --pictures DIR --out DIR --provider NAME
+                  --simplifier quadric|stand-in   route P's fit of every model a job made
     creatures fit --repository ROOT --request FILE --cutout FILE --model FILE --up=+Z --front=-Y
                   --simplifier quadric|stand-in --out DIR   route P's fit of one model, on a CPU
 
@@ -31,6 +35,7 @@ Every command reads and writes files only. None downloads a model, and none need
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -648,6 +653,58 @@ def _creatures_pictures(args: argparse.Namespace) -> int:
     return 0 if made and results["stopped"] is None else REFUSED
 
 
+def _creatures_make_job(args: argparse.Namespace) -> int:
+    from exulanica_appearance.creatures.pictures import make_job
+
+    job = make_job(
+        [path.read_bytes() for path in sorted(Path(args.requests).glob("*.json"))],
+        repository=Path(args.code),
+        framing=args.framing,
+        seeds=[int(seed) for seed in args.seeds.split(",")],
+    )
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(job)
+    print(json.dumps({"job_sha256": hashlib.sha256(job).hexdigest(), "out": str(out)}))
+    return 0
+
+
+def _creatures_fit_run(args: argparse.Namespace) -> int:
+    from exulanica_pieces.colour import read_table
+    from exulanica_pieces.geometry.mesh import cluster_simplify
+
+    from exulanica_appearance.assets.remote import ROUTE_WEIGHTS
+    from exulanica_appearance.creatures.fit import fit_run
+
+    if args.simplifier == "quadric":
+        from exulanica_appearance.assets.backends.shared import quadric_simplify as simplifier
+    else:
+        simplifier = cluster_simplify
+    code = Path(args.code)
+    pictures = Path(args.pictures)
+    ended = sorted(pictures.glob("results-*.json"))
+    if len(ended) != 1:
+        print(f"{pictures} holds {len(ended)} results files, not one")
+        return REFUSED
+    # The made look's origin names the 3D model by the repository its pinned weights came from.
+    manifest = json.loads((code / "ml/appearance/weights" / ROUTE_WEIGHTS["P"][-1]).read_bytes())
+    table, _ = read_table(code)
+    document = fit_run(
+        results=json.loads(ended[0].read_bytes()),
+        requests={
+            hashlib.sha256(raw).hexdigest(): raw
+            for raw in (path.read_bytes() for path in sorted(Path(args.requests).glob("*.json")))
+        },
+        pictures=pictures,
+        out=Path(args.out),
+        table=table,
+        simplifier=simplifier,
+        made_by={"provider": args.provider, "model_id": manifest["repository"]},
+    )
+    print(json.dumps({sha: item["outcome"] for sha, item in document["requests"].items()}))
+    return 0
+
+
 def _creatures_fit(args: argparse.Namespace) -> int:
     from exulanica_pieces.canonical import canonical_bytes, sha256_hex
     from exulanica_pieces.colour import read_table
@@ -903,6 +960,15 @@ def main(argv: list[str] | None = None) -> int:
     drawn_by.add_argument("--stand-in", action="store_true")
     creatures_pictures.add_argument("--started-at", type=int, default=None)
     creatures_pictures.set_defaults(run=_creatures_pictures)
+    creatures_make_job = creatures.add_parser("make-job")
+    for name in ("--code", "--requests", "--framing", "--seeds", "--out"):
+        creatures_make_job.add_argument(name, required=True)
+    creatures_make_job.set_defaults(run=_creatures_make_job)
+    creatures_fit_run = creatures.add_parser("fit-run")
+    for name in ("--code", "--requests", "--pictures", "--out", "--provider"):
+        creatures_fit_run.add_argument(name, required=True)
+    creatures_fit_run.add_argument("--simplifier", required=True, choices=("quadric", "stand-in"))
+    creatures_fit_run.set_defaults(run=_creatures_fit_run)
     creatures_fit = creatures.add_parser("fit")
     for name in ("--repository", "--request", "--cutout", "--model", "--up", "--front", "--out"):
         creatures_fit.add_argument(name, required=True)
