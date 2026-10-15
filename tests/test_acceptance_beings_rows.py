@@ -16,7 +16,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
-from exulanica.selection.action_plan import DRAFT_OPERATIONS, MAX_CANDIDATES, MAX_STEPS
+from exulanica.selection.action_vocabulary import DRAFT_OPERATIONS, MAX_CANDIDATES, MAX_STEPS
 
 ROOT = Path(__file__).resolve().parents[1]
 DRIVER = ROOT / "scripts" / "acceptance" / "beings_rows.py"

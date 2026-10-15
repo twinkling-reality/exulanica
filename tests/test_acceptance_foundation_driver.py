@@ -138,11 +138,12 @@ def test_the_companion_plans_drafts_fill_the_form_the_product_builds():
     (A-55: the old slots were refused on every draft)."""
     import json
 
+    from exulanica.selection import action_drafting as drafting
     from exulanica.selection import action_plan as plan
 
     from test_companion_action_plan import _world
 
-    step = plan._world_edit_form(_world()).model_json_schema()["$defs"]["WorldEditStep"]
+    step = drafting._world_edit_form(_world()).model_json_schema()["$defs"]["WorldEditStep"]
     offered = set(step["properties"])
     drafts = [
         json.loads(rule["content"])

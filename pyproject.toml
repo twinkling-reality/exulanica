@@ -768,6 +768,7 @@ source_modules = [
     "exulanica.ingest.vision",
     "exulanica.references.drafting",
     "exulanica.references.pictures",
+    "exulanica.selection.action_drafting",
     "exulanica.selection.action_plan",
     "exulanica.selection.creature_drafting",
     "exulanica.selection.embeddings",
@@ -1022,9 +1023,11 @@ layers = [
 name = "The Companion's proposal features do not import its answer path"
 type = "forbidden"
 source_modules = [
+  "exulanica.selection.action_drafting",
   "exulanica.selection.action_outcome",
   "exulanica.selection.action_plan",
   "exulanica.selection.action_vocabulary",
+  "exulanica.selection.action_world",
   "exulanica.selection.environment_proposal",
   "exulanica.selection.proposal",
 ]

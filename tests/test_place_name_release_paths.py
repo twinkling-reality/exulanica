@@ -946,9 +946,9 @@ def _plan_time(_instance: Instance, _client: ModelClient, http: TestClient) -> N
 #: does not fails below, so a use cannot be offered until a run shows its paths honouring it.
 HONOURING_RUNS: Mapping[str, Callable[[Instance, ModelClient, TestClient], None]] = {
     "exulanica.epistemics.caption_embeddings:embed_capture": _send_a_caption,
-    "exulanica.selection.action_plan:_draft_simulation": _plan_time,
-    "exulanica.selection.action_plan:_draft_world_edit": _plan_an_action,
-    "exulanica.selection.action_plan:classify_action": _plan_an_action,
+    "exulanica.selection.action_drafting:_draft_simulation": _plan_time,
+    "exulanica.selection.action_drafting:_draft_world_edit": _plan_an_action,
+    "exulanica.selection.action_drafting:classify_action": _plan_an_action,
     "exulanica.selection.embeddings:embed_query": _send_a_query,
     "exulanica.selection.environment_proposal:draft_environment_operation": _draft_environment,
     "exulanica.selection.proposal:classify_request": _classify,

@@ -23,6 +23,7 @@ from exulanica.api.routes.selection import _execution
 from exulanica.api.routes.selection_actions import ActionPlanView, PrepareRequest
 from exulanica.api.routes.world_models import MindsBudgetBody
 from exulanica.selection import action_budget as budgets
+from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_plan as plan
 from exulanica.selection.action_plan import BUDGET, TAKE_IN
 
@@ -97,7 +98,7 @@ def test_the_drafter_is_listed_the_amounts_of_the_sentence_and_the_two_budgets_w
     # Each amount is shown with the person's own words for it, and every label is on the form.
     assert "50 cents" in world.amounts[0].detail and "2000 decisions" in world.amounts[1].detail
     assert {choice.label for choice in world.amounts} <= set(plan.iter_labels(world))
-    assert "AMOUNTS THE REQUEST STATES" in plan._render_options(world)
+    assert "AMOUNTS THE REQUEST STATES" in drafting._render_options(world)
     assert "set_minds_budget" in plan.DRAFT_OPERATIONS
     # A sentence that states no amount lists the two fixed budgets alone.
     assert [choice.label for choice in _world("Put a bench here").amounts] == [

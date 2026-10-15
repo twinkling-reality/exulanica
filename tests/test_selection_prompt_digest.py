@@ -14,7 +14,7 @@ import hashlib
 
 import pytest
 from exulanica.canonical import canonical_json
-from exulanica.selection import action_plan, environment_proposal, prompts, proposal
+from exulanica.selection import action_drafting, environment_proposal, prompts, proposal
 
 #: version -> SHA-256 of the canonical JSON of that family's prompt texts, as ``_texts`` reads them.
 PINNED = {
@@ -98,11 +98,11 @@ def _texts() -> dict[str, tuple[str, dict[str, str]]]:
             {"system": environment_proposal._SYSTEM},
         ),
         "action-plan": (
-            action_plan.ACTION_PROMPT_VERSION,
+            action_drafting.ACTION_PROMPT_VERSION,
             {
-                "classifier_system": action_plan._CLASSIFIER_SYSTEM,
-                "world_edit_system": action_plan._WORLD_EDIT_SYSTEM,
-                "simulation_system": action_plan._SIMULATION_SYSTEM,
+                "classifier_system": action_drafting._CLASSIFIER_SYSTEM,
+                "world_edit_system": action_drafting._WORLD_EDIT_SYSTEM,
+                "simulation_system": action_drafting._SIMULATION_SYSTEM,
             },
         ),
         "proposal-authored": (

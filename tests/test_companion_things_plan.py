@@ -15,8 +15,10 @@ import uuid
 from pathlib import Path
 
 import pytest
+from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_plan as plan
 from exulanica.selection import action_things as things
+from exulanica.selection import action_world
 from exulanica.selection.action_plan import WorldEditOperation as Op
 from exulanica.world.authored_delta import delta_sha256
 from exulanica.world.objects import ObjectOrigin, Transform
@@ -329,7 +331,7 @@ def _world(read: things.ThingsRead | None = None) -> plan._World:
         }
         for row in plan._MATRIX.values()
     }
-    kinds, placed, beings, places = plan._thing_choices(read)
+    kinds, placed, beings, places = action_world._thing_choices(read)
     return plan._World(
         world_id="world:authored:test",
         version_id=VERSION,
@@ -660,7 +662,7 @@ def test_a_typed_thing_step_a_client_sends_back_is_checked_against_the_reads(raw
 
 
 def test_a_being_from_outside_reaches_the_drafter_by_kind_and_number_only():
-    rendered = plan._render_options(_world())
+    rendered = drafting._render_options(_world())
     assert "being-3: Visitor (a visitor from outside)" in rendered
     assert "being-1: Traveller (kind: traveller; looks like: blocky traveller)" in rendered
     assert "THINGS THAT CAN BE ADDED" in rendered and "knight: knight." in rendered
@@ -668,11 +670,11 @@ def test_a_being_from_outside_reaches_the_drafter_by_kind_and_number_only():
 
 
 def test_the_form_offers_every_option_the_reads_listed_and_no_other_field():
-    schema = plan._world_edit_form(_world()).model_json_schema()
+    schema = drafting._world_edit_form(_world()).model_json_schema()
     step = schema["$defs"]["WorldEditStep"]["properties"]
     assert set(step) == {"operation", "options"}
     assert step["options"]["items"]["enum"] == list(plan.iter_labels(_world()))
-    assert step["options"]["maxItems"] == plan.MAX_CANDIDATES
+    assert step["options"]["maxItems"] == drafting.MAX_CANDIDATES
     assert schema["properties"]["steps"]["maxItems"] == plan.MAX_STEPS
 
 

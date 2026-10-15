@@ -14,6 +14,7 @@ import uuid
 
 import pytest
 from exulanica.models.manifest import Role
+from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_outcome
 from exulanica.selection import action_plan as plan
 from exulanica.selection.action_plan import WorldEditOperation as Op
@@ -91,7 +92,7 @@ def _values(schema: dict) -> list:
 
 
 def test_the_form_offers_exactly_the_options_the_reads_listed():
-    schema = plan._world_edit_form(_world()).model_json_schema()
+    schema = drafting._world_edit_form(_world()).model_json_schema()
     step = schema["$defs"]["WorldEditStep"]["properties"]
     assert _values(step["operation"]) == list(plan.DRAFT_OPERATIONS)
     assert _values(step["options"]["items"]) == [
@@ -100,22 +101,22 @@ def test_the_form_offers_exactly_the_options_the_reads_listed():
         "object-1",
         "small_square",
     ]
-    assert step["options"]["maxItems"] == plan.MAX_CANDIDATES
+    assert step["options"]["maxItems"] == drafting.MAX_CANDIDATES
     # No field could carry a position, an identifier, a permission or a route.
     assert set(step) == {"operation", "options"}
 
 
 def test_an_option_list_with_nothing_listed_is_left_off_the_form():
     world = dataclasses.replace(_world(objects=False), assets=(), arrangements=())
-    schema = plan._world_edit_form(world).model_json_schema()
+    schema = drafting._world_edit_form(world).model_json_schema()
     assert set(schema["$defs"]["WorldEditStep"]["properties"]) == {"operation"}
-    without_objects = plan._world_edit_form(_world(objects=False)).model_json_schema()
+    without_objects = drafting._world_edit_form(_world(objects=False)).model_json_schema()
     items = without_objects["$defs"]["WorldEditStep"]["properties"]["options"]["items"]
     assert "object-1" not in _values(items)
 
 
 def test_objects_reach_the_model_by_label_and_title_only():
-    rendered = plan._render_options(_world())
+    rendered = drafting._render_options(_world())
     assert "object-1: Bench (selected)" in rendered
     assert "ada" not in rendered
 
@@ -358,7 +359,7 @@ def _simulate(action, *, clock=None, world=None, spending=None, **context):
 
 
 def test_the_simulation_form_offers_an_action_a_listed_speed_and_one_to_ten_minutes():
-    schema = plan._SimulationDraft.model_json_schema()
+    schema = drafting._SimulationDraft.model_json_schema()
     properties = schema["properties"]
     assert set(properties) == {"action", "speed", "minutes"}
     assert schema["$defs"]["SimulationAction"]["enum"] == [action.value for action in SIM]
@@ -618,7 +619,7 @@ def test_a_request_the_controls_cannot_express_is_refused_by_name():
 
 
 def test_the_drafter_is_told_the_state_and_the_speeds_and_nothing_else():
-    rendered = plan._render_simulation(_clock(mode="playing", speed=2))
+    rendered = drafting._render_simulation(_clock(mode="playing", speed=2))
     assert "Time is running at speed 2." in rendered
     assert "4 (4 times the normal pace)" in rendered
     assert str(SOCIETY) not in rendered and "b" * 64 not in rendered

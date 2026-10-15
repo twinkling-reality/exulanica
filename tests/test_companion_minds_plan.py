@@ -20,6 +20,7 @@ import pytest
 from exulanica.api.routes.selection import _execution
 from exulanica.api.routes.selection_actions import ActionPlanView, PrepareRequest
 from exulanica.api.routes.world_models import RoleChoiceBody
+from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_minds as minds
 from exulanica.selection import action_plan as plan
 from exulanica.selection.action_plan import MIND
@@ -308,7 +309,7 @@ def test_the_drafter_is_shown_this_world_s_groups_with_their_numbers_and_the_min
         ("model:nebius_token_factory/example/nano", "Nano"),
         ("model:nebius_token_factory/example/ultra", "Ultra"),
     ]
-    shown = plan._render_options(world)
+    shown = drafting._render_options(world)
     assert "GROUPS OF BEINGS IN THIS WORLD\n  group-1: everyone here (5)" in shown
     assert "MINDS A BEING CAN BE GIVEN\n  mind-routine: their own routine." in shown
     # Every label a mind step may name is on the form, and nothing else of the world's is lost.

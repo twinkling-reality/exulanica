@@ -36,7 +36,7 @@
       "role": "structured_extraction",
       "purpose": "read what you type to the Companion: plan a search of your photographs from a question, tell a question from a request to change your world, and draft the change you ask for",
       "used_by": [
-        "exulanica/selection/action_plan.py",
+        "exulanica/selection/action_drafting.py",
         "exulanica/selection/action_vocabulary.py",
         "exulanica/selection/environment_proposal.py",
         "exulanica/selection/planner.py",
@@ -45,9 +45,9 @@
         "exulanica/selection/society_question.py"
       ],
       "honoured_by": [
-        "exulanica.selection.action_plan:_draft_simulation",
-        "exulanica.selection.action_plan:_draft_world_edit",
-        "exulanica.selection.action_plan:classify_action",
+        "exulanica.selection.action_drafting:_draft_simulation",
+        "exulanica.selection.action_drafting:_draft_world_edit",
+        "exulanica.selection.action_drafting:classify_action",
         "exulanica.selection.environment_proposal:draft_environment_operation",
         "exulanica.selection.planner:propose_plan",
         "exulanica.selection.proposal:classify_request",

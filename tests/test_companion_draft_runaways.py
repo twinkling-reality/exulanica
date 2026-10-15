@@ -29,6 +29,7 @@ from exulanica.models.response import (
 )
 from exulanica.models.schema import response_format_for
 from exulanica.models.transport import HttpResponse
+from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_plan as plan
 from exulanica.selection.calls import CallLog
 
@@ -124,7 +125,7 @@ def _draft(endpoint: _Endpoint):
 
 
 def test_no_list_on_the_world_edit_form_is_followed_by_a_field():
-    schema = response_format_for(plan._world_edit_form(_world()))["json_schema"]["schema"]
+    schema = response_format_for(drafting._world_edit_form(_world()))["json_schema"]["schema"]
     assert arrays_followed_by_a_property(schema) == []
     step = schema["$defs"]["WorldEditStep"]["properties"]
     assert list(step) == ["operation", "options"]
@@ -176,7 +177,7 @@ def test_an_option_is_read_in_the_list_its_operation_takes_options_from():
 def test_a_reply_that_runs_on_ends_at_the_drafters_ceiling_not_the_roles():
     manifest = load_manifest()
     binding = manifest[Role.STRUCTURED_EXTRACTION]
-    assert binding.min_max_tokens <= plan.DRAFT_MAX_TOKENS < binding.default_max_tokens
+    assert binding.min_max_tokens <= drafting.DRAFT_MAX_TOKENS < binding.default_max_tokens
 
     endpoint = _Endpoint(
         _ran_on(_WHITESPACE_OPENING, "\n   "), _ran_on(_WHITESPACE_OPENING, "\n   ")
@@ -184,9 +185,9 @@ def test_a_reply_that_runs_on_ends_at_the_drafters_ceiling_not_the_roles():
     drafted, budget = _draft(endpoint)
 
     assert drafted is None
-    assert [r["max_tokens"] for r in endpoint.requests] == [plan.DRAFT_MAX_TOKENS] * 2
+    assert [r["max_tokens"] for r in endpoint.requests] == [drafting.DRAFT_MAX_TOKENS] * 2
     spent = sum(call.completion_tokens for call in budget.ledger.calls)
-    assert spent == 2 * plan.DRAFT_MAX_TOKENS
+    assert spent == 2 * drafting.DRAFT_MAX_TOKENS
 
 
 def test_the_simulation_drafter_has_the_same_ceiling():
@@ -199,7 +200,7 @@ def test_the_simulation_drafter_has_the_same_ceiling():
         client, "Play.", {"society": None}, log=CallLog(), placeholders=None
     )
     assert drafted == {"action": "play", "speed": None, "minutes": None}
-    assert [r["max_tokens"] for r in endpoint.requests] == [plan.DRAFT_MAX_TOKENS] * 2
+    assert [r["max_tokens"] for r in endpoint.requests] == [drafting.DRAFT_MAX_TOKENS] * 2
 
 
 # -- the repair ------------------------------------------------------------------------------------
@@ -222,7 +223,7 @@ def test_the_repair_says_how_the_reply_ran_on_and_never_repeats_it(reply, shape)
     first, second = (r["messages"] for r in endpoint.requests)
     assert second[: len(first)] == first
     (repair,) = second[len(first) :]
-    assert repair == {"role": "user", "content": plan._RUNAWAY_REPAIRS[shape]}
+    assert repair == {"role": "user", "content": drafting._RUNAWAY_REPAIRS[shape]}
     # The model is told what went wrong, never shown what it wrote.
     assert all(message["role"] != "assistant" for message in second)
     for opening in (_WHITESPACE_OPENING, _REPEATING_OPENING):
@@ -230,7 +231,7 @@ def test_the_repair_says_how_the_reply_ran_on_and_never_repeats_it(reply, shape)
 
 
 def test_each_shape_has_its_own_repair():
-    repairs = plan._RUNAWAY_REPAIRS
+    repairs = drafting._RUNAWAY_REPAIRS
     assert set(repairs) == {Runaway.WHITESPACE, Runaway.REPETITION, None}
     assert len(set(repairs.values())) == 3
     assert "line break" in repairs[Runaway.WHITESPACE]
@@ -243,9 +244,9 @@ def test_the_cut_reply_reaches_the_drafter_with_its_shape():
         client.structured(
             Role.STRUCTURED_EXTRACTION,
             [{"role": "user", "content": "x"}],
-            plan._world_edit_form(_world()),
+            drafting._world_edit_form(_world()),
             prompt_version=plan.ACTION_PROMPT_VERSION,
-            max_tokens=plan.DRAFT_MAX_TOKENS,
+            max_tokens=drafting.DRAFT_MAX_TOKENS,
         )
     assert cut.value.runaway == Runaway.WHITESPACE
     assert "\n   \n" not in str(cut.value)
@@ -260,10 +261,10 @@ def test_the_drafter_is_asked_to_name_each_option_once_and_not_to_write_one_line
     # as it chooses, the same requests were one step. With the list last, how the form is laid out
     # no longer decides whether a comma can be missed, so the layout is left to the model. A repair
     # after a reply that ran on in whitespace still asks for one line.
-    system = plan._WORLD_EDIT_SYSTEM
+    system = drafting._WORLD_EDIT_SYSTEM
     assert "Name each option once." in system
     assert "one line" not in system
-    assert "one line" in plan._RUNAWAY_REPAIRS[Runaway.WHITESPACE]
+    assert "one line" in drafting._RUNAWAY_REPAIRS[Runaway.WHITESPACE]
 
 
 def test_a_step_of_other_beside_one_that_can_be_prepared_refuses_the_plan():

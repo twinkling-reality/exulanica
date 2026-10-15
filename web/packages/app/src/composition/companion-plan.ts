@@ -6,8 +6,8 @@
  * not decide what a sentence asks for (`companion-runtime`'s parse knows names, relations and
  * whether words ask, nothing about world actions); the server's classifier does, in one call,
  * choosing among a question, an appearance change, a world edit, simulated time and "what can I do
- * here" (`classify_action` in `exulanica/selection/action_plan.py`, where any classifier failure is
- * a question). So:
+ * here" (`classify_action` in `exulanica/selection/action_drafting.py`, where any classifier failure
+ * is a question). So:
  *
  * - a question goes on to `/selection/ask`, as before;
  * - an appearance change is the proposal the plan's first step carries, read by the same function

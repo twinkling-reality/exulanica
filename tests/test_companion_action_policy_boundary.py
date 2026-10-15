@@ -23,6 +23,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 _ACTION_SOURCES = (
     _ROOT / "exulanica" / "selection" / "action_plan.py",
     _ROOT / "exulanica" / "selection" / "action_vocabulary.py",
+    _ROOT / "exulanica" / "selection" / "action_world.py",
+    _ROOT / "exulanica" / "selection" / "action_drafting.py",
     _ROOT / "exulanica" / "selection" / "action_outcome.py",
     _ROOT / "exulanica" / "api" / "routes" / "selection_actions.py",
 )
