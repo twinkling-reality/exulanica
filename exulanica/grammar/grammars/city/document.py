@@ -127,6 +127,7 @@ from exulanica.grammar.grammars.city.streets import (
     StreetRecord,
     StreetSegmentRecord,
 )
+from exulanica.grammar.grammars.city.support import support_top_under
 from exulanica.grammar.grammars.city.terrain import TerrainRecord
 from exulanica.grammar.grammars.city.tile import (
     HALO,
@@ -1633,22 +1634,16 @@ class _Checker:
 
     def _check_canopy_clearance(self, tree: StreetTreeRecord) -> None:
         """A canopy part whose plan box meets a support record stands at least the capsule height
-        above that record's support surface."""
+        above that record's support surface under the canopy (:mod:`.support`)."""
         supports = [
             record for record in self.records if _SHAPES_BY_TYPE[type(record)].kind in SUPPORT_KINDS
         ]
         for index, part in enumerate(tree.parts):
             if part.surface_role != "canopy":
                 continue
+            x, y = tree.x_mm + part.offset_x_mm, tree.y_mm + part.offset_y_mm
             half_x, half_y = (part.size_x_mm + 1) // 2, (part.size_y_mm + 1) // 2
-            low_x, high_x = (
-                tree.x_mm + part.offset_x_mm - half_x,
-                tree.x_mm + part.offset_x_mm + half_x,
-            )
-            low_y, high_y = (
-                tree.y_mm + part.offset_y_mm - half_y,
-                tree.y_mm + part.offset_y_mm + half_y,
-            )
+            low_x, high_x, low_y, high_y = x - half_x, x + half_x, y - half_y, y + half_y
             bottom = tree.z_mm + part.offset_z_mm
             for support in supports:
                 extent = support.extent
@@ -1657,7 +1652,9 @@ class _Checker:
                     and low_x <= extent.max_x_mm
                     and extent.min_y_mm <= high_y
                     and low_y <= extent.max_y_mm
-                    and bottom < support_top_mm(support) + _CAPSULE_HEIGHT_MM
+                    and bottom
+                    < support_top_under(support, low_x, low_y, high_x, high_y, support_top_mm)
+                    + _CAPSULE_HEIGHT_MM
                 ):
                     raise _fail(
                         "canopy_clearance",

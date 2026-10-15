@@ -69,9 +69,10 @@ DOCUMENT_SHA256 = "c380ee5b40f8b5b6b7e5ab31a84a007f87cba4038383012992167d1ff3eaa
 DOCUMENT_BYTES = 132_778
 #: The live shape table. Version 3's, frozen when version 4 arrived, is
 #: ``exulanica/grammar/grammars/city/city-shapes.v3.json`` (SHA-256 35603f3d...), and version 4's,
-#: frozen when version 5 arrived, is ``city-shapes.v4.json`` (SHA-256 aa316f1f...); each differs
+#: frozen when version 5 arrived, is ``city-shapes.v4.json`` (SHA-256 aa316f1f...), and version 5's,
+#: frozen when version 6 arrived, is ``city-shapes.v5.json`` (SHA-256 aaa1e153...); each differs
 #: from the live one in the facade's own ``grammar_version`` bound alone.
-SHAPES_SHA256 = "aaa1e15380b3c33054d744086cdd5afde24875183ee31709daefd17060f68fef"
+SHAPES_SHA256 = "ffc4f9a97d08f0dfa9340319949664721853cdc55f46d4b4a6e2ffd48a095d62"
 SHAPES_BYTES = 62_167
 
 #: Every city record kind but the tile record, which is the envelope rather than a record in it.

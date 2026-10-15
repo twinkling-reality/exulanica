@@ -32,13 +32,18 @@ the kerb face leaves room behind it for the least crown the declared range admit
 radius is narrowed to that room. A face whose footway holds no such room carries no tree, and a
 tree whose crown would still leave the extent near the end of its curb is skipped, as a crowded
 position is.
+
+**Stage version 4** (:data:`STAGE_V4`, which city grammar version 6 runs on a town laid on its land)
+stands each lamp, piece of furniture and tree on its kerb line's height where it stands, not its
+kerb line's first point, and clears a crown above the ground under it rather than the ground's
+highest point anywhere (:func:`~exulanica.grammar.grammars.city.support.support_top_under`).
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from functools import partial
-from typing import Final
+from typing import Any, Final
 
 from exulanica.grammar.contract import StageContext
 from exulanica.grammar.geometry import Extent
@@ -55,8 +60,10 @@ from exulanica.grammar.grammars.city.generation.stage import (
     prior_records,
 )
 from exulanica.grammar.grammars.city.generation.terrain import DATUM_MM
+from exulanica.grammar.grammars.city.land import kerb_height_at
+from exulanica.grammar.grammars.city.support import support_top_under
 
-__all__ = ["STAGE", "STAGE_V3", "STAGE_VERSION_3"]
+__all__ = ["STAGE", "STAGE_V3", "STAGE_V4", "STAGE_VERSION_3", "STAGE_VERSION_4"]
 
 _LAMP: Final = "street_lamp"
 #: A pit never touches the kerb or the frontage: this is what it keeps clear of each.
@@ -70,6 +77,8 @@ _CLASS_STRIDE: Final = 100
 #: The stage version that places no tree reaching outside its segment's extent (the docstring's
 #: last section). Version 2 is :data:`~exulanica.grammar.grammars.city.streetlife.STAGE_VERSION`.
 STAGE_VERSION_3: Final = 3
+#: The stage version that stands street life on land (the docstring's last section).
+STAGE_VERSION_4: Final = 4
 
 
 def _inside_plan(inner: Extent, outer: Extent) -> bool:
@@ -115,8 +124,11 @@ def _even(value: int) -> int:
     return value - value % 2
 
 
-def _support_top_near(records: list, low_x: int, low_y: int, high_x: int, high_y: int) -> int:
-    """The highest drawn ground under a plan box: what a canopy must clear the capsule above."""
+def _support_top_near(
+    records: list, low_x: int, low_y: int, high_x: int, high_y: int, on_land: bool = False
+) -> int:
+    """The highest drawn ground under a plan box: what a canopy must clear the capsule above. On
+    land, a curb's ground is read under the box, not at its highest point anywhere."""
     top = None
     for record in records:
         extent = record.extent
@@ -126,8 +138,15 @@ def _support_top_near(records: list, low_x: int, low_y: int, high_x: int, high_y
             and extent.min_y_mm <= high_y
             and low_y <= extent.max_y_mm
         ):
-            top = extent.max_z_mm if top is None else max(top, extent.max_z_mm)
+            here = extent.max_z_mm
+            if on_land:
+                here = support_top_under(record, low_x, low_y, high_x, high_y, _extent_top)
+            top = here if top is None else max(top, here)
     return DATUM_MM if top is None else top
+
+
+def _extent_top(record: Any) -> int:
+    return record.extent.max_z_mm
 
 
 def _trees(
@@ -138,6 +157,7 @@ def _trees(
     grounds: list,
     taken: list[tuple[int, int, int]],
     fit_owner: bool = False,
+    on_land: bool = False,
 ) -> Iterator[streetlife.StreetTreeRecord]:
     """Street trees along one curb, at the block's spacing, wherever one does not crowd its
     neighbours.
@@ -208,13 +228,15 @@ def _trees(
             for other_x, other_y, other_keep in taken
         ):
             continue
-        line_z = curb.kerb_line_mm[0][2]
+        line_z = kerb_height_at(curb, base) if on_land else curb.kerb_line_mm[0][2]
         z = (
             line_z
             + curb.kerb_height_mm
             + (offset - curb.kerb_width_mm) * curb.footway_crossfall_millionths // MILLIONTHS  # type: ignore[operator]
         )
-        highest = _support_top_near(grounds, x - radius, y - radius, x + radius, y + radius)  # type: ignore[operator]
+        highest = _support_top_near(
+            grounds, x - radius, y - radius, x + radius, y + radius, on_land
+        )  # type: ignore[operator]
         clear = derived(
             context,
             "tree_trunk_clear_height_mm",
@@ -273,7 +295,9 @@ def _trees(
         ordinal += 1
 
 
-def _generate(context: StageContext, fit_owner: bool = False) -> Iterator[object]:
+def _generate(
+    context: StageContext, fit_owner: bool = False, on_land: bool = False
+) -> Iterator[object]:
     curbs = prior_records(context, streets.STAGE_ID, streets.CurbEdgeRecord)
     blocks = {
         record.identity: record
@@ -301,10 +325,12 @@ def _generate(context: StageContext, fit_owner: bool = False) -> Iterator[object
         taken: list[tuple[int, int, int]] = []
         ordinal = 0
         for index, key in enumerate(classes):
-            for record in _furniture(context, curb, face, segment, key, index, taken, ordinal):
+            for record in _furniture(
+                context, curb, face, segment, key, index, taken, ordinal, on_land
+            ):
                 ordinal += 1
                 yield record
-        yield from _trees(context, curb, face, segment, grounds, taken, fit_owner)
+        yield from _trees(context, curb, face, segment, grounds, taken, fit_owner, on_land)
 
 
 def _furniture(
@@ -316,6 +342,7 @@ def _furniture(
     index: int,
     taken: list[tuple[int, int, int]],
     first_ordinal: int,
+    on_land: bool = False,
 ) -> Iterator[streetlife.StreetFurnitureRecord]:
     """One class of street furniture along one curb, at that class's own spacing.
 
@@ -400,6 +427,8 @@ def _furniture(
                 for other_x, other_y, other_radius in taken
             ):
                 continue
+            if on_land:
+                line_z = kerb_height_at(curb, base)
             z = (
                 line_z
                 + curb.kerb_height_mm
@@ -440,4 +469,12 @@ STAGE_V3: Final = GeneratorStage(
     STAGE_VERSION_3,
     STAGE.shapes,
     partial(_generate, fit_owner=True),
+)
+#: Stage version 4: stage version 3's records on a town laid on its land, each standing on its
+#: kerb line's height where it stands and a canopy clearing the ground under it.
+STAGE_V4: Final = GeneratorStage(
+    streetlife.STAGE_ID,
+    STAGE_VERSION_4,
+    STAGE.shapes,
+    partial(_generate, fit_owner=True, on_land=True),
 )

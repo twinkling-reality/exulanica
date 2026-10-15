@@ -2,7 +2,7 @@
  * THE CITY GRAMMAR, VERSION 5, AS DATA. GENERATED: do not edit by hand.
  *
  * Written by `test/write-grammar-table.ts` from the grammar's own record shape table
- * (`tests/fixtures/city-v2/record-shapes.json`) and the frame, contract measures and navigation table of
+ * (`exulanica/grammar/grammars/city/city-shapes.v5.json`) and the frame, contract measures and navigation table of
  * `exulanica/grammar/grammars/city/city.v5.json`.
  * `test/grammar-table.test.ts` and `tests/test_bake_determinism.py` hold it equal to both.
  *

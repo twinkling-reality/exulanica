@@ -11,6 +11,12 @@ parking lanes) and the two parameters it adds, 93 in all; ``city.v5.json`` reads
 street mix and use mix (streets stage version 4, massing, premises and vitrine version 3) and
 dresses every ground band and the bare ground (material version 3), with the fifteen parameters
 it adds, 108 in all. A caller names the version it generates (:func:`city_grammar`).
+``city.v6.json`` lays a town on its land (:data:`CITY_LAND_VERSIONS`): districts version 2 read the
+city's extent, streets version 5, parcels version 3, terrain version 3 (after the parcels, graded
+for them), facade version 3 and street life version 4 stand on the land, with the four grading
+figures it adds and the relief bound it drops, 111 in all. It is generated only with its land
+(:func:`city_grammar_with`) and is not a registered grammar: :func:`city_grammar` gives it on level
+land, for what reads a version 6 tile.
 Ten stages have generators under :mod:`exulanica.grammar.grammars.city.generation`. The
 registered ``tile`` stage remains a record-shape and ownership contract
 (:data:`~exulanica.grammar.grammars.city.tile.STAGE` is an
@@ -38,7 +44,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Final
 
-from exulanica.grammar.contract import Grammar
+from exulanica.grammar.contract import Grammar, Stage
 from exulanica.grammar.errors import GrammarError
 from exulanica.grammar.grammars.city import (
     districts,
@@ -57,8 +63,10 @@ from exulanica.grammar.grammars.city import (
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
     CITY_GENERATING_VERSIONS,
+    CITY_LAND_VERSIONS,
     CITY_V4_DESCRIPTOR_PATH,
     CITY_V5_DESCRIPTOR_PATH,
+    CITY_V6_DESCRIPTOR_PATH,
 )
 from exulanica.grammar.grammars.city.generation import districts as districts_generator
 from exulanica.grammar.grammars.city.generation import facade as facade_generator
@@ -70,6 +78,7 @@ from exulanica.grammar.grammars.city.generation import streetlife as streetlife_
 from exulanica.grammar.grammars.city.generation import streets as streets_generator
 from exulanica.grammar.grammars.city.generation import terrain as terrain_generator
 from exulanica.grammar.grammars.city.generation import vitrine as vitrine_generator
+from exulanica.grammar.landform import LandDocument, level_land
 from exulanica.grammar.shapes import RecordShape
 
 __all__ = [
@@ -83,6 +92,7 @@ __all__ = [
     "CITY_V4_STAGES",
     "CITY_V5_STAGES",
     "city_grammar",
+    "city_grammar_with",
 ]
 
 CITY_STAGES: Final = (
@@ -154,19 +164,61 @@ CITY_V5_STAGES: Final = (
 CITY_GRAMMAR_V5: Final = Grammar.from_descriptor(CITY_V5_DESCRIPTOR_PATH, stages=CITY_V5_STAGES)
 #: Every city grammar version this package generates, by version.
 CITY_GRAMMARS: Final = MappingProxyType({3: CITY_GRAMMAR, 4: CITY_GRAMMAR_V4, 5: CITY_GRAMMAR_V5})
-if tuple(CITY_GRAMMARS) != CITY_GENERATING_VERSIONS:
+if tuple(CITY_GRAMMARS) + CITY_LAND_VERSIONS != CITY_GENERATING_VERSIONS:
     raise GrammarError(
-        f"the city generates versions {tuple(CITY_GRAMMARS)} and states {CITY_GENERATING_VERSIONS}"
+        f"the city generates versions {tuple(CITY_GRAMMARS)} and {CITY_LAND_VERSIONS} on land, "
+        f"and states {CITY_GENERATING_VERSIONS}"
     )
+
+
+def _v6_stages(land: LandDocument) -> tuple[Stage, ...]:
+    """Version 6's stages, laid on ``land``: the terrain after the parcels, graded for them."""
+    return (
+        districts_generator.STAGE_V2,
+        streets_generator.on_land(land),
+        parcels_generator.STAGE_V3,
+        terrain_generator.on_land(land),
+        massing_generator.STAGE_V3,
+        facade_generator.STAGE_V3,
+        streetlife_generator.STAGE_V4,
+        premises_generator.STAGE_V3,
+        vitrine_generator.STAGE_V3,
+        material_generator.STAGE_V3,
+        tile.STAGE,
+    )
+
+
+#: Version 6 on level land at the datum: what reads a version 6 tile pins, never a made town.
+_CITY_GRAMMAR_V6_LEVEL: Final = Grammar.from_descriptor(
+    CITY_V6_DESCRIPTOR_PATH, stages=_v6_stages(level_land())
+)
 
 
 def city_grammar(grammar_version: int) -> Grammar:
     """The city grammar at ``grammar_version``; a version this package does not generate is
     refused by name."""
     grammar = CITY_GRAMMARS.get(grammar_version)
+    if grammar_version in CITY_LAND_VERSIONS:
+        grammar = _CITY_GRAMMAR_V6_LEVEL
     if grammar is None:
         raise GrammarError(
             f"city grammar version {grammar_version} is not one this package generates, "
             f"which are {CITY_GENERATING_VERSIONS}"
         )
     return grammar
+
+
+def city_grammar_with(grammar_version: int, *, land: LandDocument | None = None) -> Grammar:
+    """The city grammar at ``grammar_version``, laid on ``land``: a version that lays a town on its
+    land (:data:`CITY_LAND_VERSIONS`) takes it, on level land when none is given, and every other
+    version refuses it by name. With no land, the grammar itself."""
+    if grammar_version in CITY_LAND_VERSIONS:
+        if land is None:
+            return city_grammar(grammar_version)
+        return Grammar.from_descriptor(CITY_V6_DESCRIPTOR_PATH, stages=_v6_stages(land))
+    if land is not None:
+        raise GrammarError(
+            f"city grammar version {grammar_version} stands on level ground; a town on land is "
+            f"version {', '.join(map(str, CITY_LAND_VERSIONS))}"
+        )
+    return city_grammar(grammar_version)

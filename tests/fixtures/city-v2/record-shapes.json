@@ -901,7 +901,7 @@
         },
         {
           "kind": "integer",
-          "maximum": 5,
+          "maximum": 6,
           "minimum": 3,
           "name": "grammar_version"
         },

@@ -612,11 +612,15 @@ export interface GeneratedDressing {
  * lay (a district's street mix and use mix, every ground band and the bare ground dressed), with
  * the same record kinds and versions, identity rule, surface roles and dressing references, so this
  * contract reads it as version 3 too.
+ * Version 6 differs from 5 only in where those records stand (a town laid on its land: every height
+ * a record carries is read from the land, and a facade's own `grammar_version` bound reaches 6),
+ * with the same record kinds and versions, identity rule, surface roles and dressing references, so
+ * this contract reads it as version 3 too.
  * `packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts`
  * holds this list to the versions the tessellator reads, so it cannot quietly fall behind: this
  * package does not depend on loom-tess, and that test does.
  */
-export const GENERATED_CITY_GRAMMAR_VERSIONS: readonly number[] = [2, 3, 4, 5];
+export const GENERATED_CITY_GRAMMAR_VERSIONS: readonly number[] = [2, 3, 4, 5, 6];
 
 const ENTRY_NEED = /^[a-z][a-z0-9_]*$/;
 const EXTENT_KEYS = ['max_x_mm', 'max_y_mm', 'max_z_mm', 'min_x_mm', 'min_y_mm', 'min_z_mm'];

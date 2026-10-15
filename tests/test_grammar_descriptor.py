@@ -44,6 +44,7 @@ from exulanica.grammar.grammars.city import (
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
     CITY_GENERATING_VERSIONS,
+    CITY_LAND_VERSIONS,
     CITY_SURFACE,
     CITY_V1_DESCRIPTOR_PATH,
     CITY_V1_SURFACE,
@@ -53,6 +54,8 @@ from exulanica.grammar.grammars.city.descriptor import (
     CITY_V4_DESCRIPTOR_PATH,
     CITY_V4_SHAPES_PATH,
     CITY_V5_DESCRIPTOR_PATH,
+    CITY_V5_SHAPES_PATH,
+    CITY_V6_DESCRIPTOR_PATH,
 )
 from exulanica.grammar.grammars.city.tile import COORDINATE_UNITS
 from exulanica.grammar.shapes import describe_shapes
@@ -69,6 +72,7 @@ DESCRIPTOR_SHA256 = {
     ("city", 3): "e771deef96b49ba35f8a145acbd67dda4d939f93f7730a2b50da78e1727ab41f",
     ("city", 4): "a11af93a79d33d13dc656e66dd8e38215061920e2fce4f751c0df1e1db7bcf20",
     ("city", 5): "2d998b59e93cfd256e42b89d7be519693c67ae1c344ace3cfa7e75ba357a0922",
+    ("city", 6): "4813a5be7e40b1c3ee39d3f2009814b80e0d53f261ae2d757013e41bff451f8d",
     ("site", 1): "7a00bd9134de33307e551fc90f23c5a1fb14350d6d84f6510ce4b251892cc346",
 }
 
@@ -110,6 +114,7 @@ def test_every_shipped_descriptor_is_pinned_by_its_digest():
     assert set(files) == set(DESCRIPTOR_SHA256)
     for key, path in files.items():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == DESCRIPTOR_SHA256[key], key
+    assert files[("city", 6)] == CITY_V6_DESCRIPTOR_PATH
     assert files[("city", 5)] == CITY_V5_DESCRIPTOR_PATH
     assert files[("city", 4)] == CITY_V4_DESCRIPTOR_PATH
     assert files[("city", 3)] == CITY_DESCRIPTOR_PATH
@@ -118,9 +123,13 @@ def test_every_shipped_descriptor_is_pinned_by_its_digest():
 
 
 def test_the_registered_grammars_are_exactly_the_pinned_generating_versions():
+    """Version 6 is generated and read, but generated only with the land a town stands on, so it
+    is not registered: no request names it, and the grammar listing does not offer it."""
     keys = {(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()}
     assert keys == {("box", 1), ("city", 3), ("city", 4), ("city", 5)}
-    assert tuple(CITY_GRAMMARS) == CITY_GENERATING_VERSIONS == (3, 4, 5)
+    assert tuple(CITY_GRAMMARS) == (3, 4, 5)
+    assert CITY_GENERATING_VERSIONS == (3, 4, 5, 6)
+    assert CITY_LAND_VERSIONS == (6,)
     assert (BOX_GRAMMAR.descriptor_schema, CITY_GRAMMAR.descriptor_schema) == (1, 2)
     assert CITY_GRAMMAR_V4.descriptor_schema == 2
     assert CITY_GRAMMAR_V5.descriptor_schema == 2
@@ -232,7 +241,32 @@ def test_the_frozen_version_4_shapes_differ_from_the_live_ones_in_the_facade_bou
     [(before, after)] = differing
     assert before["name"] == after["name"] == "grammar_version"
     assert (before["minimum"], before["maximum"]) == (3, 4)
-    assert (after["minimum"], after["maximum"]) == (3, 5)
+    assert (after["minimum"], after["maximum"]) == (3, 6)
+
+
+def test_the_frozen_version_5_shapes_differ_from_the_live_ones_in_the_facade_bound_alone():
+    """Version 5's shape table is frozen beside its descriptor so the tessellator's version 5
+    table stays what it was when version 6 arrived. Version 6 changes no record shape: the one
+    difference is the facade's own ``grammar_version`` bound, which the live code widens to every
+    version it generates."""
+    frozen = json.loads(CITY_V5_SHAPES_PATH.read_text(encoding="utf-8"))
+    live = json.loads(json.dumps(describe_shapes(CITY_SHAPES)))
+    assert frozen["nested"] == live["nested"]
+    by_kind = {shape["kind"]: shape for shape in frozen["records"]}
+    live_by_kind = {shape["kind"]: shape for shape in live["records"]}
+    assert set(by_kind) == set(live_by_kind)
+    moved = sorted(kind for kind in by_kind if by_kind[kind] != live_by_kind[kind])
+    assert moved == ["city.facade"]
+    was, now = by_kind["city.facade"], live_by_kind["city.facade"]
+    differing = [
+        (before, after)
+        for before, after in zip(was["fields"], now["fields"], strict=True)
+        if before != after
+    ]
+    [(before, after)] = differing
+    assert before["name"] == after["name"] == "grammar_version"
+    assert (before["minimum"], before["maximum"]) == (3, 5)
+    assert (after["minimum"], after["maximum"]) == (3, 6)
 
 
 def test_the_grammar_and_the_parameter_surface_read_the_descriptor_alike():

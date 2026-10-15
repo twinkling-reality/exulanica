@@ -8,7 +8,9 @@ realized near land, in a fixed order:
    own, brought within the corridor's grade by the midpoint of its largest and smallest
    grade-limited envelopes (so it cuts and fills by the least it must), then held to every level
    already fixed under its centre line (a pad, or a corridor it crosses, which keeps the crossing).
-   A corridor is level across, except where it crosses a corridor graded before it.
+   A corridor is level across, except where it crosses a corridor graded before it. A **ramp** (a
+   corridor with stated end levels) is the straight line between them instead, over its length;
+   the layout has already said where it stands, and cells fixed before it keep their levels.
 3. **Pads with a door** are set flat at the height of the ground at their door after the corridors;
    a pad with neither a level nor a door takes the land's height at its middle.
 4. **Banks**: every cell not fixed above is held between the cones of the fixed cells at the bank
@@ -73,12 +75,14 @@ _FAR: Final = 1 << 60
 
 @dataclass(frozen=True, slots=True)
 class Corridor:
-    """A path or a street: a rectangle graded along ``axis`` (``x`` east or ``y`` north)."""
+    """A path or a street: a rectangle graded along ``axis`` (``x`` east or ``y`` north). With
+    ``levels_mm`` it is a ramp: its levels at its low and high ends along ``axis``, stated."""
 
     id: str
     rect_mm: tuple[int, int, int, int]
     axis: str
     grade_permille: int
+    levels_mm: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,8 +202,14 @@ def _corridor(work: _Work, corridor: Corridor) -> int:
         return 0
     middle = [work.cell(centre, s) if along_y else work.cell(s, centre) for s in stations]
     step = corridor.grade_permille * CELL_MM // 1000
-    profile = _lipschitz_midpoint([work.h[i] for i in middle], step)
-    pins = [(k, work.h[i], work.owner[i]) for k, i in enumerate(middle) if work.locked[i]]
+    pins: list[tuple[int, int, str]]
+    if corridor.levels_mm is not None:
+        first, last = corridor.levels_mm
+        profile = [first + (last - first) * (s - low) // max(1, high - low) for s in stations]
+        pins = []
+    else:
+        profile = _lipschitz_midpoint([work.h[i] for i in middle], step)
+        pins = [(k, work.h[i], work.owner[i]) for k, i in enumerate(middle) if work.locked[i]]
     if pins:
         floor = [-_FAR] * len(stations)
         ceiling = [_FAR] * len(stations)

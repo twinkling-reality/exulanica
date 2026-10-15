@@ -30,10 +30,17 @@ A precinct is a lot like any other: kerb, frontage, threshold and address.
 **Extent.** A lot's extent is its ring's box, grown in plan by the largest projection any facade
 parameter declares, so the building standing on it, and everything its faces project beyond its
 walls, lie inside it, as a record anchored to its lot must.
+
+**Grade.** A lot stands at its block's grade. In **stage version 3** (city version 6, a town on its
+land, whose footways climb along their streets) a lot stands instead at the highest its footway
+reaches along its primary frontage, at the footway's back edge
+(:func:`~exulanica.grammar.grammars.city.land.frontage_top`), so no door on that frontage stands
+below the footway in front of it and each states its own step up.
 """
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Iterator
 from dataclasses import dataclass
 from itertools import pairwise
@@ -51,8 +58,9 @@ from exulanica.grammar.grammars.city.generation.stage import (
     entry,
     prior_records,
 )
+from exulanica.grammar.grammars.city.land import frontage_top
 
-__all__ = ["LOT_TARGET_MM", "PROJECTION_REACH_MM", "STAGE"]
+__all__ = ["LOT_TARGET_MM", "PROJECTION_REACH_MM", "STAGE", "STAGE_V3"]
 
 #: The range a block's lot frontage target is narrowed to, so every lot is 4.5 to 30 m wide.
 LOT_TARGET_MM: Final = (9_000, 20_000)
@@ -63,6 +71,8 @@ PROJECTION_REACH_MM: Final = max(
     if spec.name.endswith("_projection_mm")
 )
 _DISTRICT: Final = 0
+#: The version that stands each lot at the highest its footway reaches along its frontage.
+STAGE_VERSION_3: Final = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,4 +270,19 @@ def _sign(value: int) -> int:
     return (value > 0) - (value < 0)
 
 
+def _at_frontage(context: StageContext) -> Iterator[parcels.ParcelRecord]:
+    curbs = {
+        curb.identity: curb
+        for curb in prior_records(context, streets.STAGE_ID, streets.CurbEdgeRecord)
+    }
+    for lot in _generate(context):
+        ring, edge = lot.boundary_mm, lot.frontages[0].edge_ordinal
+        frontage = (ring[edge], ring[(edge + 1) % len(ring)])
+        grade = frontage_top(curbs[lot.frontages[0].curb_identity], frontage)
+        extent = dataclasses.replace(lot.extent, min_z_mm=grade, max_z_mm=grade)
+        yield dataclasses.replace(lot, grade_elevation_mm=grade, extent=extent)
+
+
 STAGE: Final = GeneratorStage(parcels.STAGE_ID, parcels.STAGE_VERSION, (parcels.SHAPE,), _generate)
+#: Stage version 3: the same lots, each at the highest its footway reaches along its frontage.
+STAGE_V3: Final = GeneratorStage(parcels.STAGE_ID, STAGE_VERSION_3, STAGE.shapes, _at_frontage)

@@ -14,7 +14,8 @@ the tessellator's. A generator cannot construct a citation. Three city descripto
 choice), four projection contracts, licensed catalogs, and one identity rule; `city.v4.json` states
 the same with the streets stage at its version 3 and 93 parameters; `city.v5.json` states the same
 with a district's street mix and use mix and every surface dressed, and 108 parameters (section
-7).
+7). `city.v6.json` lays a town on its land; it is generated and read, never registered, since only
+a town's land makes one (section 7).
 [generated-corridor-street](generated-corridor-street.md) records the street those stages make
 together and what it measures. `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered.
@@ -259,7 +260,10 @@ other rule, refuses (`tests/test_grammar_city_records.py`).
 
 City grammar versions 3, 4 and 5 are registered (`city.v3.json`, `city.v4.json`, `city.v5.json`),
 and a caller names the version it generates; one that names none generates version 3, which every
-specification written before version 4 states. `city.v1.json` and `city.v2.json` remain as pinned migration
+specification written before version 4 states. Version 6 (`city.v6.json`) is generated only with the
+land a town stands on (`city_grammar_with(6, land=...)`), so it is not registered: no specification
+or request names it, and the grammar listing does not offer it (`CITY_GENERATING_VERSIONS` lists 3
+to 6 for reading and validating records; `CITY_GRAMMARS` and the registry hold 3, 4 and 5). `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered. Stage versions below are the `stage_version` values on
 `city.v3.json`, not the grammar version. Ten stages emit records
 through `exulanica.grammar.grammars.city.generation`. The registered `tile` stage is an
@@ -338,10 +342,45 @@ Measured on a town two tiles long with cross streets 140 m apart, its two tiles 
 1,124 drawn surfaces, none undressed, where a version 4 town's first tile left 33 of 571 undressed:
 32 party wall ground bands and its terrain (`tests/test_city_grammar_v5.py`).
 
+**Version 6** lays a town on its land, a land document (`exulanica.landform/v1`, the
+[landform contract](landform-contract.md#towns-on-land)) given with the grammar, and every height a
+record carries is read from that land:
+
+- the terrain stage runs after the parcels, at stage version 3, because the graded heights need the
+  streets and lots; the districts stage, at stage version 2, reads the city's extent from
+  `city_extent_x_mm` and `city_extent_y_mm` instead of the terrain's patches;
+- the streets stage on land sets each node at a level read over the whole street network, each
+  junction level out to its legs' mouths (the kerb end nearer each segment's middle), and each
+  segment a straight climb between its mouths no steeper than one walking step
+  (`walking_step_mm`, 180 mm) over the footway station spacing (`footway_station_spacing_mm`,
+  4,000 mm) less a 2 mm rounding margin; a centreline is four points, node, mouth, mouth, node, and
+  a kerb line bends where its segment's crown bends;
+- the parcels stage, at stage version 3, stands each lot at the highest its footway reaches along
+  its primary frontage, at the footway's back edge, so no door on that frontage stands below the
+  footway in front of it;
+- the terrain stage grades the land for those records (junctions and lots level, streets as ramps,
+  banks at `bank_grade_permille`, cut and fill within `cut_fill_most_mm`) and samples it at a 1 m
+  cell; a grading refusal is the candidate's refusal, by the landform's code;
+- the massing stage stands each building on its lot's grade as before; the facade stage, at stage
+  version 3, reads a door's step at the footway under it, so each entrance's `step_height_mm` is its
+  threshold above that footway, and `threshold_height_mm` may reach 600 mm, the entrance record's
+  own bound, because a level ground floor meets a climbing footway at a different height at each
+  door; street life, at stage version 4, stands lamps, furniture and trees on the kerb line's
+  height where they stand, and a canopy clears the ground under it rather than its support's
+  highest point anywhere.
+
+The four grading figures are fixed parameters whose ranges are their sources' values: the town
+routine's station spacing, the place contract's step, and the land grading's bank grade and cut and
+fill bound; `terrain_relief_mm` is gone, since the land is the town's relief. A small town on level,
+coast and upland land generates, its tiles validate and close, and its walking place reads nothing
+on the land that it does not read on level ground (`tests/test_city_grammar_v6.py`).
+
 The record shapes are in `exulanica/grammar/grammars/city/` (`common.py` holds what every record
 shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data. Every version
 declares the same record kinds at the same versions; a facade's own `grammar_version` states the
-version that generated it, and the document check holds it to the tile's pin.
+version that generated it, and the document check holds it to the tile's pin; its parameters are
+checked against that version's descriptor, which for versions 3 to 5 declares the same facade
+parameters.
 
 **Records carry integer geometry sufficient for a deterministic tessellation.** Everything a
 tessellator would otherwise guess is a field: rings, centrelines and kerb lines with elevations,
@@ -396,7 +435,10 @@ unchanged and introduces `parking_lane_width_mm` and `stop_line_setback_mm`; its
 narrower block holds other lots under the same ordinals (`city-migration.v4.json`). The version 4
 to 5 migration carries or maps every version 4 parameter unchanged and introduces the fifteen
 version 5 adds; its identity policy is `rekeyed`, because a high or narrow cross street's other
-widths leave a block other lots under the same ordinals (`city-migration.v5.json`).
+widths leave a block other lots under the same ordinals (`city-migration.v5.json`). The version 5
+to 6 migration carries every version 5 parameter but `terrain_relief_mm`, which it drops with its
+reason, and introduces the four grading figures; its identity policy is `rekeyed`
+(`city-migration.v6.json`).
 
 **The tile document** (`exulanica.tile-document/v2`, `document.py`) is one tile's records as a bake
 reads them: canonical JSON of the tile record, and per grammar its descriptor digest, declared
@@ -643,6 +685,10 @@ Each of these is known and not built.
   corridor's counts, including the facade ground bands its tile leaves undressed, are in
   [generated-corridor-street](generated-corridor-street.md). Version 5 dresses terrain with the tree
   pit soil, the one bare earth set the texture package publishes.
+- **A town on land is not drawn or made.** The tessellator draws straight two-point kerb lines and
+  centrelines, so a version 6 street, which bends in height at its mouths, draws nothing, and
+  nothing draws the faces where surfaces step (lot to lot, lot to footway, a building's plinth on a
+  slope). No route, recipe or sentence makes a version 6 town, and a town's receipt names no land.
 - **Tree roles.** A street tree's parts take surface roles 25 `canopy` and 26 `trunk`, appended
   so foliage and bark are dressed apart; every other object's parts take object roles, and a
   catalog part may take only an object role.

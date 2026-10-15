@@ -19,6 +19,7 @@ import { CITY_V2 } from '../src/core/city-v2.js';
 import { CITY_V3 } from '../src/core/city-v3.js';
 import { CITY_V4 } from '../src/core/city-v4.js';
 import { CITY_V5 } from '../src/core/city-v5.js';
+import { CITY_V6 } from '../src/core/city-v6.js';
 import {
   checkEveryVersionStatesItsUnit,
   coordinateUnitOf,
@@ -75,10 +76,11 @@ describe('the grammar table', () => {
     expect(JSON.parse(JSON.stringify(CITY_V3))).toEqual(grammarTableFromSources(3));
     expect(JSON.parse(JSON.stringify(CITY_V4))).toEqual(grammarTableFromSources(4));
     expect(JSON.parse(JSON.stringify(CITY_V5))).toEqual(grammarTableFromSources(5));
+    expect(JSON.parse(JSON.stringify(CITY_V6))).toEqual(grammarTableFromSources(6));
     // The list's CONTENTS, which says nothing about whether its readers address a table by what it
     // carries. The tests below are what say that.
-    expect(GRAMMAR_TABLES).toEqual([CITY_V2, CITY_V3, CITY_V4, CITY_V5]);
-    expect(GRAMMAR_TABLES.map((table) => table.grammar_version)).toEqual([2, 3, 4, 5]);
+    expect(GRAMMAR_TABLES).toEqual([CITY_V2, CITY_V3, CITY_V4, CITY_V5, CITY_V6]);
+    expect(GRAMMAR_TABLES.map((table) => table.grammar_version)).toEqual([2, 3, 4, 5, 6]);
   });
 
   it('gives the projections, the plane and each version\u2019s own tile shape from the table itself', () => {

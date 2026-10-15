@@ -60,6 +60,7 @@ from exulanica.grammar.grammars.city.descriptor import (
     CITY_GENERATING_VERSIONS,
     CITY_GRAMMAR_ID,
     CITY_GRAMMAR_VERSION,
+    CITY_LAND_VERSIONS,
 )
 from exulanica.grammar.grammars.city.facade import FACADE_RECORD_FIELDS, FacadeRecord
 from exulanica.grammar.grammars.city.material import require_texture_set
@@ -639,14 +640,16 @@ def test_the_city_declares_the_eleven_stages_in_order_each_versioned():
 
 
 def test_only_the_generating_city_versions_are_registered():
-    """The city versions REGISTERED are the ones this code generates, whatever versions it READS.
+    """The city versions REGISTERED are the ones this code generates, whatever versions it READS,
+    less those it generates only with a town's land, which no request names.
 
     The registry is what a generator runs; the tessellator reads a superseded version too
     (ADR-0024), and these are different questions. Named for the versions rather than naming the
     numbers, so it does not go stale at the next bump.
     """
     keys = [(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()]
-    assert keys == [("box", 1), *((CITY_GRAMMAR_ID, v) for v in CITY_GENERATING_VERSIONS)]
+    requested = [v for v in CITY_GENERATING_VERSIONS if v not in CITY_LAND_VERSIONS]
+    assert keys == [("box", 1), *((CITY_GRAMMAR_ID, v) for v in requested)]
 
 
 def test_a_city_stage_with_a_generator_emits_records_and_every_other_says_it_has_none():

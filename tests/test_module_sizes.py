@@ -126,6 +126,7 @@ GENERATED: dict[str, str] = {
     "web/packages/loom-tess/src/core/city-v3.ts": GRAMMAR_TABLES,
     "web/packages/loom-tess/src/core/city-v4.ts": GRAMMAR_TABLES,
     "web/packages/loom-tess/src/core/city-v5.ts": GRAMMAR_TABLES,
+    "web/packages/loom-tess/src/core/city-v6.ts": GRAMMAR_TABLES,
 }
 
 

@@ -89,6 +89,13 @@ version 3 lays and reads the district's street mix:
   priority.
 * A line's own widest section, at its hierarchy, must fit the district, or the district is refused
   by name.
+
+**Stage version 5** (:func:`on_land`, which city grammar version 6 runs) lays stage version 4's
+streets on the land a town stands on (:mod:`exulanica.grammar.grammars.city.land`): each node at
+its level over the natural land, a segment level from each node to its mouth and climbing straight
+between its mouths, so junctions and the corners round them are level and a footway climbs at most
+one step (``walking_step_mm``) per station (``footway_station_spacing_mm``). Land it cannot lay a
+town on is refused by name.
 """
 
 from __future__ import annotations
@@ -123,6 +130,13 @@ from exulanica.grammar.grammars.city.generation.stage import (
     prior_records,
 )
 from exulanica.grammar.grammars.city.generation.terrain import DATUM_MM
+from exulanica.grammar.grammars.city.land import (
+    near_land,
+    node_levels,
+    streets_on_land,
+    town_frame,
+)
+from exulanica.grammar.landform import LandDocument, LandformRefused
 
 __all__ = [
     "DIMENSION_MODULE_MM",
@@ -131,7 +145,9 @@ __all__ = [
     "STAGE_V4",
     "STAGE_VERSION_3",
     "STAGE_VERSION_4",
+    "STAGE_VERSION_5",
     "narrowest_reach",
+    "on_land",
     "street_hierarchies",
     "street_name_demand",
     "street_name_shortfall",
@@ -144,8 +160,10 @@ DIMENSION_MODULE_MM: Final = 50
 #: The stage version that sets stop lines back and lays kerbside parking (the docstring's stage
 #: version 3 section). Version 2 is :data:`~exulanica.grammar.grammars.city.streets.STAGE_VERSION`.
 STAGE_VERSION_3: Final = 3
-#: The stage version that reads the district's street mix (the docstring's last section).
+#: The stage version that reads the district's street mix (the docstring's stage version 4 section).
 STAGE_VERSION_4: Final = 4
+#: The stage version that lays the streets on the land (the docstring's last section).
+STAGE_VERSION_5: Final = 5
 #: The lane-use keys this stage lays: every traffic lane is general, every kerbside lane parking.
 _GENERAL_USE: Final = "general"
 _PARKING_USE: Final = "parking"
@@ -174,6 +192,9 @@ class _Rules:
     #: cross streets are, two-way lanes on every street, a speed limit per hierarchy and priority
     #: by through street, rank and axis (the docstring's stage version 4 section).
     street_mix: bool
+    #: Whether the streets are laid on the terrain's patches, which must be level; a town laid on
+    #: its land is laid before its terrain, which is graded for it (stage version 5).
+    on_terrain: bool = True
 
 
 _VERSION_2_RULES: Final = _Rules(
@@ -633,8 +654,10 @@ def _faces(
 
 def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterator[object]:
     [district] = prior_records(context, districts.STAGE_ID, districts.DistrictRecord)
-    patches = prior_records(context, terrain.STAGE_ID, terrain.TerrainRecord)
-    if any(set(patch.height_mm) != {DATUM_MM} for patch in patches):
+    if rules.on_terrain and any(
+        set(patch.height_mm) != {DATUM_MM}
+        for patch in prior_records(context, terrain.STAGE_ID, terrain.TerrainRecord)
+    ):
         raise InvalidRecordError("this streets stage version lays streets on level ground only")
     ring = district.boundary_mm
     min_x, min_y = min(x for x, _y in ring), min(y for _x, y in ring)
@@ -1417,3 +1440,23 @@ STAGE_V4: Final = GeneratorStage(
     STAGE.shapes,
     partial(_generate, rules=_VERSION_4_RULES),
 )
+
+
+def _on_land(context: StageContext, land: LandDocument) -> Iterator[object]:
+    level = list(_generate(context, rules=dataclasses.replace(_VERSION_4_RULES, on_terrain=False)))
+    [district] = prior_records(context, districts.STAGE_ID, districts.DistrictRecord)
+    station = derived(context, "footway_station_spacing_mm", _DISTRICT)
+    step = derived(context, "walking_step_mm", _DISTRICT)
+    try:
+        near = near_land(land, town_frame([district], context.seed))
+        levels = node_levels(level, near, station, step)  # type: ignore[arg-type]
+    except LandformRefused as exc:
+        raise InvalidRecordError(f"[{exc.code}] {exc}") from exc
+    yield from streets_on_land(level, levels)
+
+
+def on_land(land: LandDocument) -> GeneratorStage:
+    """Stage version 5: stage version 4's records laid on ``land``."""
+    return GeneratorStage(
+        streets.STAGE_ID, STAGE_VERSION_5, STAGE.shapes, partial(_on_land, land=land)
+    )

@@ -50,7 +50,7 @@ from exulanica.grammar.grammars.city.common import extent_field, require_point_i
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_ADMISSIBLE_USES,
     CITY_GENERATING_VERSIONS,
-    CITY_SURFACE,
+    CITY_SURFACES,
 )
 from exulanica.grammar.parameters import ParameterBinding, require_parameter_bindings
 from exulanica.grammar.records import record_payload
@@ -249,11 +249,16 @@ def _ordered(name: str, mouldings: tuple[Moulding, ...]) -> None:
 
 
 def _facade_rules(record: FacadeRecord) -> None:
+    # A facade states the parameters its grammar version declares: versions 3 to 5 declare the
+    # same facade parameters, and version 6 lets a door on land stand further above its footway.
+    surface = CITY_SURFACES.get(record.grammar_version)
+    if surface is None:
+        raise InvalidRecordError(f"no city grammar version {record.grammar_version} is known")
     require_parameter_bindings(
         "parameters",
         record.parameters,
-        CITY_SURFACE.parameters,
-        CITY_SURFACE.cascade,
+        surface.parameters,
+        surface.cascade,
         stage=STAGE_ID,
     )
     if record.declared_semantics != DeclaredSemantics(STAGE_ID, CITY_ADMISSIBLE_USES):

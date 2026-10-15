@@ -25,13 +25,20 @@ a version in it is version 3's, which is what every specification written before
 a caller that names no version generates exactly what it did. :data:`CITY_DESCRIPTOR_PATHS` and
 :data:`CITY_SURFACES` hold every version by number.
 
-``city-shapes.v2.json``, ``city-shapes.v3.json`` and ``city-shapes.v4.json`` are here for the
+**Version 6 lays a town on its land** (:data:`CITY_LAND_VERSIONS`): its streets, lots, street life
+and terrain stand on the land it is generated with, and it is generated only with that land, through
+:func:`exulanica.grammar.grammars.city.city_grammar_with`. It is read and validated as every
+version is, and no request names it: :data:`CITY_GENERATING_VERSIONS` holds it and the registered
+grammars do not.
+
+``city-shapes.v2.json`` to ``city-shapes.v5.json`` are here for the
 same reason, and are worth their own sentence because they are the files in this package with no
 live producer. A descriptor states parameters; RECORD SHAPES come from
 :func:`exulanica.grammar.shapes.describe_shapes` over the grammar's code. ``city-shapes.v2.json``
 is frozen so the tessellator can read documents written against that descriptor (ADR-0024),
 ``city-shapes.v3.json`` so its version 3 table stays what it was when version 4 arrived, and
-``city-shapes.v4.json`` so version 4's stays what it was when version 5 arrived. None is an
+``city-shapes.v4.json`` so version 4's stays what it was when version 5 arrived, and
+``city-shapes.v5.json`` so version 5's stays what it was when version 6 arrived. None is an
 unchecked copy: ``tests/test_grammar_descriptor.py`` holds each against the live table and states
 each difference, ``city.tile`` gaining ``coordinate_unit`` and a record version at version 3, and
 the facade's own ``grammar_version`` bound, which the live code widens to every version it
@@ -54,6 +61,7 @@ __all__ = [
     "CITY_GENERATING_VERSIONS",
     "CITY_GRAMMAR_ID",
     "CITY_GRAMMAR_VERSION",
+    "CITY_LAND_VERSIONS",
     "CITY_MIGRATION_PATHS",
     "CITY_SURFACE",
     "CITY_SURFACES",
@@ -67,7 +75,10 @@ __all__ = [
     "CITY_V4_SHAPES_PATH",
     "CITY_V4_SURFACE",
     "CITY_V5_DESCRIPTOR_PATH",
+    "CITY_V5_SHAPES_PATH",
     "CITY_V5_SURFACE",
+    "CITY_V6_DESCRIPTOR_PATH",
+    "CITY_V6_SURFACE",
 ]
 
 CITY_GRAMMAR_ID: Final = "city"
@@ -79,18 +90,22 @@ CITY_V1_DESCRIPTOR_PATH: Final = _HERE.joinpath("city.v1.json")
 CITY_V2_DESCRIPTOR_PATH: Final = _HERE.joinpath("city.v2.json")
 CITY_V4_DESCRIPTOR_PATH: Final = _HERE.joinpath("city.v4.json")
 CITY_V5_DESCRIPTOR_PATH: Final = _HERE.joinpath("city.v5.json")
+CITY_V6_DESCRIPTOR_PATH: Final = _HERE.joinpath("city.v6.json")
 #: Version 2's record shape table, frozen. The module docstring says why it has no producer.
 CITY_V2_SHAPES_PATH: Final = _HERE.joinpath("city-shapes.v2.json")
 #: Version 3's record shape table, frozen when version 4 arrived, for the same reason.
 CITY_V3_SHAPES_PATH: Final = _HERE.joinpath("city-shapes.v3.json")
 #: Version 4's record shape table, frozen when version 5 arrived, for the same reason.
 CITY_V4_SHAPES_PATH: Final = _HERE.joinpath("city-shapes.v4.json")
+#: Version 5's record shape table, frozen when version 6 arrived, for the same reason.
+CITY_V5_SHAPES_PATH: Final = _HERE.joinpath("city-shapes.v5.json")
 #: Every migration the city ships, by the version it migrates to.
 CITY_MIGRATION_PATHS: Final = {
     2: _HERE.joinpath("city-migration.v2.json"),
     3: _HERE.joinpath("city-migration.v3.json"),
     4: _HERE.joinpath("city-migration.v4.json"),
     5: _HERE.joinpath("city-migration.v5.json"),
+    6: _HERE.joinpath("city-migration.v6.json"),
 }
 
 CITY_SURFACE: Final = ParameterSurface.read(CITY_DESCRIPTOR_PATH)
@@ -98,6 +113,7 @@ CITY_V1_SURFACE: Final = ParameterSurface.read(CITY_V1_DESCRIPTOR_PATH)
 CITY_V2_SURFACE: Final = ParameterSurface.read(CITY_V2_DESCRIPTOR_PATH)
 CITY_V4_SURFACE: Final = ParameterSurface.read(CITY_V4_DESCRIPTOR_PATH)
 CITY_V5_SURFACE: Final = ParameterSurface.read(CITY_V5_DESCRIPTOR_PATH)
+CITY_V6_SURFACE: Final = ParameterSurface.read(CITY_V6_DESCRIPTOR_PATH)
 #: Every city descriptor this package ships, by version.
 CITY_DESCRIPTOR_PATHS: Final = MappingProxyType(
     {
@@ -106,6 +122,7 @@ CITY_DESCRIPTOR_PATHS: Final = MappingProxyType(
         3: CITY_DESCRIPTOR_PATH,
         4: CITY_V4_DESCRIPTOR_PATH,
         5: CITY_V5_DESCRIPTOR_PATH,
+        6: CITY_V6_DESCRIPTOR_PATH,
     }
 )
 CITY_SURFACES: Final = MappingProxyType(
@@ -115,8 +132,12 @@ CITY_SURFACES: Final = MappingProxyType(
         3: CITY_SURFACE,
         4: CITY_V4_SURFACE,
         5: CITY_V5_SURFACE,
+        6: CITY_V6_SURFACE,
     }
 )
 #: The versions this package generates and reads records at, oldest first.
-CITY_GENERATING_VERSIONS: Final = (3, 4, 5)
+CITY_GENERATING_VERSIONS: Final = (3, 4, 5, 6)
+#: The versions that lay a town on its land, generated only with the land they stand on and named
+#: by no request (the module docstring).
+CITY_LAND_VERSIONS: Final = (6,)
 CITY_ADMISSIBLE_USES: Final = tuple(read_json(CITY_DESCRIPTOR_PATH)["admissible_uses"])

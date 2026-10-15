@@ -62,6 +62,14 @@ own range, since presence is no longer carried by a reach of 0 that an awning re
 **Extents.** A face's extent is its edge's plan box grown outward by its largest projection and
 inward by its deepest recess, from its first storey's floor to its tier's top; a ground bay's and
 an entrance's lie inside it.
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 6 runs on a town laid on its
+land, whose footways climb along their streets) measures ``threshold_height_mm`` above the footway
+at the lot's threshold, not above its curb's highest back edge anywhere along the street, and each
+door states its own step, its threshold above the footway under it
+(:func:`~exulanica.grammar.grammars.city.land.footway_surface_at`), since a level ground floor
+meets a climbing footway at a different height at each door. A building below its footway at its
+threshold is refused as before.
 """
 
 from __future__ import annotations
@@ -69,6 +77,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Final
 
 from exulanica.grammar.contract import DeclaredSemantics, StageContext
@@ -87,9 +96,21 @@ from exulanica.grammar.grammars.city.generation.stage import (
     entry,
     prior_records,
 )
+from exulanica.grammar.grammars.city.land import door_of, footway_surface_at
 from exulanica.grammar.parameters import ParameterBinding
 
-__all__ = ["PITCH_BAND_MM", "STAGE", "building_shop_units", "is_shop_bay", "shop_units"]
+__all__ = [
+    "PITCH_BAND_MM",
+    "STAGE",
+    "STAGE_V3",
+    "building_shop_units",
+    "is_shop_bay",
+    "shop_units",
+]
+
+#: The version that reads a threshold's height at its lot's threshold (the docstring's last
+#: section). Version 2 is :data:`~exulanica.grammar.grammars.city.facade.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
 
 #: The target architecture's bay pitch band.
 PITCH_BAND_MM: Final = (2_400, 3_500)
@@ -343,7 +364,7 @@ def _derive_values(
     return _Values(values)
 
 
-def _generate(context: StageContext) -> Iterator[object]:
+def _generate(context: StageContext, at_threshold: bool = False) -> Iterator[object]:
     buildings = prior_records(context, massing.STAGE_ID, massing.MassingRecord)
     lots = {
         record.identity: record
@@ -370,7 +391,10 @@ def _generate(context: StageContext) -> Iterator[object]:
         frontage_curbs = {row.edge_ordinal: curbs[row.curb_identity] for row in lot.frontages}
         primary = lot.frontages[0]
         primary_curb = curbs[primary.curb_identity]
-        step = building.base_elevation_mm - strip_box(primary_curb).max_z_mm
+        if at_threshold:
+            step = building.base_elevation_mm - footway_surface_at(primary_curb, door_of(lot))
+        else:
+            step = building.base_elevation_mm - strip_box(primary_curb).max_z_mm
         if step < 0:
             raise InvalidRecordError(f"building {building.identity} stands below its footway")
         hierarchy = segments[primary_curb.segment_identity].hierarchy
@@ -560,7 +584,11 @@ def _generate(context: StageContext) -> Iterator[object]:
                                 width_mm=door_width,
                                 height_mm=door_top,
                                 recess_mm=recess,
-                                step_height_mm=values["threshold_height_mm"],
+                                step_height_mm=(
+                                    base - footway_surface_at(curb, (x, y))
+                                    if at_threshold and curb is not None
+                                    else values["threshold_height_mm"]
+                                ),
                                 threshold_x_mm=x,
                                 threshold_y_mm=y,
                                 threshold_z_mm=base,
@@ -702,4 +730,8 @@ STAGE: Final = GeneratorStage(
     facade.STAGE_VERSION,
     (facade.FACADE_SHAPE, facade.BAY_SHAPE, facade.ENTRANCE_SHAPE),
     _generate,
+)
+#: Stage version 3: the same faces, each threshold's height read at its lot's threshold.
+STAGE_V3: Final = GeneratorStage(
+    facade.STAGE_ID, STAGE_VERSION_3, STAGE.shapes, partial(_generate, at_threshold=True)
 )

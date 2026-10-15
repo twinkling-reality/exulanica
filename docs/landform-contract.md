@@ -29,6 +29,7 @@ documents a reader receives. The exact contact predicates a chunk is read with b
 - [Readers in the browser](#readers-in-the-browser)
 - [The land's look](#the-lands-look)
 - [Sites on land](#sites-on-land)
+- [Towns on land](#towns-on-land)
 - [A world's land rules](#a-worlds-land-rules)
 - [Land for a world made from a sentence](#land-for-a-world-made-from-a-sentence)
 - [Refusals](#refusals)
@@ -180,7 +181,8 @@ backdrop and a site's drawing list them with the land's other water.
    brought within their grade at the least cut and fill (the midpoint of the largest and smallest
    grade-limited envelopes), held to every level already fixed under their centre line. A
    corridor is level across, except where it crosses one graded before it, which keeps the
-   crossing.
+   crossing. A corridor that states its levels at its two ends (a ramp) takes the straight line
+   between them instead, along its axis.
 3. Pads with a door are set flat at the ground's height at the door; a pad with neither takes the
    land's height at its middle.
 4. Every other sample is held between the cones of the fixed samples at the bank grade (1 in 2).
@@ -256,6 +258,30 @@ read). In the drawing the site's ground, zones, paths, dry areas and boundary wa
 its base's centre), since a terrace is level only inside its edges, where it meets sloping paths and
 terraces at other levels; a building and its rooms stand level on their terrace, and water at its
 level. A world made without land is the level world it always was, byte for byte.
+
+## Towns on land
+
+City grammar version 6 ([the generator system](grammar-package.md#7-the-city-stages)) lays a town
+on a land document and grades the land for it
+([`city/land.py`](../exulanica/grammar/grammars/city/land.py), `town_land_plan`):
+
+- each street node stands at a level read over the whole network from the natural land (the
+  midpoint of the highest and lowest levels the network's climbs allow), so no street climbs more
+  than one walking step over its footway station spacing, less a 2 mm rounding margin;
+- each junction is level at its node's level: a pad for each leg, from the node out to that leg's
+  mouth and across its street's carriageway and footways, but only as far across as the mouths of
+  the legs leaving the node the other way, so no junction holds level ground where a crossing
+  street has begun to climb;
+- each segment is a ramp between its mouths, its end levels its nodes' levels;
+- each lot is a pad level at its grade, the highest its footway reaches along its frontage, and its
+  door stands on its street's centre line opposite its threshold;
+- the entry is the first street node; every door must be reached from it over ground no steeper
+  than the steepest street.
+
+The graded land is sampled at a 1 m cell in the town's terrain records. A layout the land cannot
+take is refused with the grading's code, and the next candidate is tried. The town's walking place
+reads the street records the land raised, and a door's step is its threshold above the footway under
+it. No route, recipe or sentence makes a town on land, and the tessellator does not draw one.
 
 ## A world's land rules
 
@@ -355,7 +381,8 @@ as walls up to about 4 m.
 ## Limits
 
 - Only a place drafted from words stands on land, and only where the deployment turns it on; no
-  page asks for land otherwise. Towns stay level.
+  page asks for land otherwise. Every town made stands on level ground: the city grammar lays a
+  town on land, but nothing makes or draws one.
 - Walkable land stays within 64 m above or below the sea, so "high ground" cannot be high: an
   upland is a place among peaks, not a place on a high plateau. Raising the bound is a change to
   the land rules.
@@ -382,5 +409,3 @@ as walls up to about 4 m.
   land. Naming it by the world's look is planned.
 - A cascade is straight, along one of the four main sides, and its water stands still: level pools
   and fixed falls. No stream meanders, and nobody walks in the water or behind a fall.
-- The browser's land reader does not read a cascade's pools and falls yet, so a world whose land
-  lists a cascade is not drawn; no world, recipe or showcase lists one.
