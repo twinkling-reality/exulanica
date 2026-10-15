@@ -2067,13 +2067,13 @@ class WorldObjectRepository:
         transform = override.transform
         self.connection.execute(
             "insert into world_alternate_element_override (workspace_id,world_id,version_id,"
-            "element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,last_edit_id,"
-            "addition_undone) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false) "
+            "element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,storeys,"
+            "last_edit_id,addition_undone) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false) "
             "on conflict (workspace_id,world_id,version_id,element_id) do update set "
             "suppressed=excluded.suppressed,x_mm=excluded.x_mm,y_mm=excluded.y_mm,"
             "z_mm=excluded.z_mm,yaw_microradians=excluded.yaw_microradians,"
-            "scale_milli=excluded.scale_milli,last_edit_id=excluded.last_edit_id,"
-            "addition_undone=false",
+            "scale_milli=excluded.scale_milli,storeys=excluded.storeys,"
+            "last_edit_id=excluded.last_edit_id,addition_undone=false",
             (
                 self.workspace_id,
                 self.world_id,
@@ -2085,6 +2085,7 @@ class WorldObjectRepository:
                 None if transform is None else transform.z_mm,
                 None if transform is None else transform.yaw_microradians,
                 None if transform is None else transform.scale_milli,
+                override.storeys,
                 edit_id,
             ),
         )
@@ -3151,7 +3152,7 @@ class WorldObjectRepository:
 
     def _overrides(self, version_id: uuid.UUID) -> tuple[ElementOverride, ...]:
         rows = self.connection.execute(
-            "select element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli "
+            "select element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,storeys "
             "from world_alternate_element_override "
             "where workspace_id=%s and world_id=%s and version_id=%s "
             "and not addition_undone order by element_id",
@@ -3172,6 +3173,7 @@ class WorldObjectRepository:
                         r["scale_milli"],
                     )
                 ),
+                storeys=r["storeys"],
             )
             for r in rows
         )
@@ -3605,6 +3607,7 @@ def _override_from_document(document: Mapping[str, Any]) -> ElementOverride:
                 transform["scale_milli"],
             )
         ),
+        storeys=document.get("storeys"),
     )
 
 

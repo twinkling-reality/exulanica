@@ -3711,6 +3711,17 @@ export const API_SCHEMA: ApiSpec = {
               "type": "null"
             }
           ]
+        },
+        "storeys": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Storeys"
         }
       },
       "additionalProperties": false,

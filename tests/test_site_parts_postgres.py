@@ -153,6 +153,11 @@ def test_a_society_keeps_stepping_after_a_made_building_moves(made, profile):
 
     moved = _move(api, entry, barn, east - 3_000, north)
     assert moved.status_code == 200, moved.text
+    # An override stating no storeys reads as it always did.
+    (override,) = (
+        o for o in moved.json()["element_overrides"] if o["element_id"] == f"part:{barn['part_id']}"
+    )
+    assert "storeys" not in override
 
     # The world as it stands draws the barn three metres west of where it was made.
     slot = _drawn(api, entry, barn["part_id"])
@@ -335,3 +340,84 @@ def test_on_land_a_moved_building_is_drawn_on_the_land_graded_for_the_changed_la
         assert served.headers["etag"] == f'"{chunk["sha256"]}"'
     backdrop = api.get(_path(entry, "/land/backdrop"))
     assert backdrop.headers["etag"] == f'"{drawing["land"]["backdrop_sha256"]}"'
+
+
+def _storeys(api, entry: dict, part: dict, storeys: int, *, preview: bool = False):
+    tail = f"/parts/{part['part_id']}/storeys" + ("/preview" if preview else "")
+    return api.post(
+        _path(entry, tail), {"base_state_sha256": _base(api, entry), "storeys": storeys}
+    )
+
+
+def test_a_building_stands_taller_and_lower_within_its_bound_and_a_move_keeps_it(made):
+    api = made
+    entry = _farm(api)
+    created = api.post(
+        _path(entry, "/society"), {"region_id": "region:generated", "profile": THINGS}
+    )
+    assert created.status_code in (200, 201), created.text
+    before = _step(api, entry)
+    read = api.get(_path(entry, "/parts")).json()
+    most = read["storeys_most"]
+    barn = next(part for part in read["parts"] if part["part_key"] == "barn")
+    made_slot = _drawn(api, entry, barn["part_id"])
+    made_height = made_slot["boxMm"][2]
+    taller = barn["storeys"] + 1
+
+    ready = _storeys(api, entry, barn, taller, preview=True)
+    assert ready.json()["availability"] == "ready", ready.text
+    assert ready.json()["would_change"]["kind"] == "part_storeys"
+    kept = _storeys(api, entry, barn, taller)
+    assert kept.status_code == 200, kept.text
+    (override,) = (
+        o for o in kept.json()["element_overrides"] if o["element_id"] == f"part:{barn['part_id']}"
+    )
+    assert override["storeys"] == taller and override["transform"] is None
+    assert _parts(api, entry)["barn"]["storeys"] == taller
+    slot = _drawn(api, entry, barn["part_id"])
+    assert slot["boxMm"][2] == made_height * taller // barn["storeys"]
+    assert slot["positionMm"] == made_slot["positionMm"]
+
+    over = _storeys(api, entry, barn, most + 1)
+    assert over.status_code == 422, over.text
+    assert over.json()["code"] == "part_storeys_refused"
+    assert over.json()["detail"] == (
+        f"Not taller: buildings in this world have at most {most} storeys."
+    )
+    # A move keeps the storeys the version states for the building.
+    east, north = barn["centre_mm"]
+    moved = _move(api, entry, barn, east - 3_000, north)
+    assert moved.status_code == 200, moved.text
+    assert _parts(api, entry)["barn"]["storeys"] == taller
+    # The society keeps stepping, its input available.
+    after = _step(api, entry)
+    assert after["current_tick"] == before["current_tick"] + 1
+    assert _consumed_input(api, entry)["availability"] == "available"
+
+    for _change in range(2):
+        undone = api.post(_path(entry, "/things/undo"), {"base_state_sha256": _base(api, entry)})
+        assert undone.status_code == 200, undone.text
+    assert _parts(api, entry)["barn"]["storeys"] == barn["storeys"]
+    assert _drawn(api, entry, barn["part_id"]) == made_slot
+
+
+def test_a_storeys_change_alone_gives_the_society_the_same_walking_place(made):
+    api = made
+    entry = _farm(api)
+    created = api.post(
+        _path(entry, "/society"), {"region_id": "region:generated", "profile": THINGS}
+    )
+    assert created.status_code in (200, 201), created.text
+    _step(api, entry)
+    made_input = _consumed_input(api, entry)
+    barn = _parts(api, entry)["barn"]
+    kept = _storeys(api, entry, barn, barn["storeys"] + 1)
+    assert kept.status_code == 200, kept.text
+    _step(api, entry)
+    taken = _consumed_input(api, entry)
+    assert taken["availability"] == "available"
+    # The change is taken in as the next input (the records the place digests changed) ...
+    assert taken["authored_state"]["edit_seq"] == kept.json()["edit_seq"]
+    # ... and only the ground storey is walked: the people's nodes and edges are the made ones.
+    assert taken["navigation"]["nodes"] == made_input["navigation"]["nodes"]
+    assert taken["navigation"]["edges"] == made_input["navigation"]["edges"]

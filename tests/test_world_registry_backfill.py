@@ -120,6 +120,12 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
                 "null::text as support_surface_id where false"
             )
             admin.execute("alter table world_alternate_version_edit add column thing_id text")
+            # A made building's storeys, which migration 0217 adds and the current version read
+            # and override writes name. Before 0099 no override stated storeys, so a null column
+            # stands in, dropped before 0099 runs.
+            admin.execute(
+                "alter table world_alternate_element_override add column storeys smallint"
+            )
             # A workspace's own kinds and their erasures, which 0159 and 0172 add and the current
             # version read names when it asks whether a placed thing's kind is gone. Before 0099
             # no thing was placed, so empty views stand in, dropped before 0099 runs.
@@ -213,6 +219,7 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
             admin.execute("drop view thing_kind_version")
             admin.execute("drop view thing_erasure")
             admin.execute("alter table world_alternate_version_edit drop column thing_id")
+            admin.execute("alter table world_alternate_element_override drop column storeys")
             admin.commit()
 
             before = _world_tables(admin, scratch)

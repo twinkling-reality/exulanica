@@ -4,8 +4,9 @@
 building, each fixture of a garden area, each area), as it stands with the version's changes, with
 its words and its garden area (:mod:`exulanica.world.site_parts`). ``POST .../parts/{part_id}/move``
 stands a part at a new centre, turned a whole number of quarter turns from how it was made;
-``POST .../parts/{part_id}/remove`` removes it. Each has a preview that writes nothing and answers
-what the write would.
+``POST .../parts/{part_id}/remove`` removes it; ``POST .../parts/{part_id}/storeys`` stands a
+building taller or lower, within the storeys the kind bounds catalog its world was made under
+allows. Each has a preview that writes nothing and answers what the write would.
 
 A change is held, before anything is kept, to the records alone (inside its own garden area, clear
 of every other part, path and pond), then to the place its people walk, made again from the changed
@@ -23,7 +24,9 @@ code. A world whose things stand on its parts and one made of terrain are refuse
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
+from collections.abc import Callable
 from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Path, Request, Response
@@ -145,6 +148,25 @@ class _Site:
     def with_change(self, change: PartChange) -> tuple[PartChange, ...]:
         return (*(c for c in self.changes if c.identity != change.identity), change)
 
+    def current(self, part_id: str) -> PartChange | None:
+        """The change the version holds for this part, or None."""
+        return next((c for c in self.changes if c.identity == part_id), None)
+
+
+def _moved_change(site: _Site, part_id: str, pose: PartPoseBody) -> PartChange:
+    """A move or turn of ``part_id``, keeping the storeys the version states for it."""
+    current = site.current(part_id)
+    return dataclasses.replace(
+        pose.change(part_id), storeys=None if current is None else current.storeys
+    )
+
+
+def _storeys_change(site: _Site, part_id: str, storeys: int) -> PartChange:
+    """``part_id`` standing ``storeys`` high, keeping where the version stands it."""
+    current = site.current(part_id)
+    kept = PartChange(part_id, False) if current is None or current.removed else current
+    return dataclasses.replace(kept, storeys=storeys)
+
 
 def _check(site: _Site, change: PartChange) -> dict[str, Any]:
     """The kind worker's verdict on ``change`` made to ``site``: the place its people would walk,
@@ -249,6 +271,7 @@ def read_parts(
             "world_id": world_id,
             "version_id": str(version_id),
             "parts": outcome.value["parts"],
+            "storeys_most": outcome.value.get("storeys_most"),
             "changes": changes,
         }
 
@@ -258,8 +281,9 @@ def read_parts(
 def _move(
     repository: WorldObjectRepository, version_id: uuid.UUID, part_id: str, pose: PartPoseBody
 ) -> tuple[PartChange, dict[str, Any]]:
-    change = pose.change(part_id)
-    return change, _check(_Site(repository, version_id), change)
+    site = _Site(repository, version_id)
+    change = _moved_change(site, part_id, pose)
+    return change, _check(site, change)
 
 
 @router.post(
@@ -303,7 +327,14 @@ def move_part_preview(
     version_id: uuid.UUID, part_id: PartId, body: MovePartPreviewBody, repository: WriteObjects
 ) -> Response | dict[str, object]:
     return _answered(
-        lambda: _preview(repository, version_id, part_id, body.base_state_sha256, body.pose)
+        lambda: _preview(
+            repository,
+            version_id,
+            part_id,
+            body.base_state_sha256,
+            "move_part",
+            lambda site: _moved_change(site, part_id, body.pose),
+        )
     )
 
 
@@ -371,8 +402,80 @@ def remove_part_preview(
             version_id,
             part_id,
             body.base_state_sha256,
-            None,
+            "remove_part",
+            lambda _site: PartChange(part_id, True),
             people=lambda label: _people(request, repository, session, version_id, part_id, label),
+        )
+    )
+
+
+class PartStoreysBody(EntryBoundEditBody):
+    storeys: StrictInt = Field(ge=1, le=64)
+
+
+class PartStoreysPreviewBody(ThingEditPreviewBody):
+    storeys: StrictInt = Field(ge=1, le=64)
+
+
+def _storeys(
+    repository: WorldObjectRepository, version_id: uuid.UUID, part_id: str, storeys: int
+) -> tuple[PartChange, dict[str, Any]]:
+    site = _Site(repository, version_id)
+    change = _storeys_change(site, part_id, storeys)
+    return change, _check(site, change)
+
+
+@router.post(
+    "/versions/{version_id}/parts/{part_id}/storeys",
+    response_model=AlternateVersionView,
+    summary="Stand a made building taller or lower, within the storeys its world's kind allows.",
+)
+def part_storeys(
+    version_id: uuid.UUID,
+    part_id: PartId,
+    body: PartStoreysBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    checked = _answered(lambda: _storeys(repository, version_id, part_id, body.storeys))
+    if isinstance(checked, Response):
+        return checked
+    change, answer = checked
+    return commit_edit(
+        request,
+        repository,
+        version_id,
+        body,
+        lambda: repository.set_part_change(
+            version_id,
+            part_override(change),
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
+            part_ids=frozenset(answer["part_ids"]),
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/parts/{part_id}/storeys/preview",
+    response_model=dict[str, object],
+    summary="What standing a made building taller or lower would record. Writes nothing.",
+)
+def part_storeys_preview(
+    version_id: uuid.UUID,
+    part_id: PartId,
+    body: PartStoreysPreviewBody,
+    repository: WriteObjects,
+) -> Response | dict[str, object]:
+    return _answered(
+        lambda: _preview(
+            repository,
+            version_id,
+            part_id,
+            body.base_state_sha256,
+            "part_storeys",
+            lambda site: _storeys_change(site, part_id, body.storeys),
         )
     )
 
@@ -382,18 +485,21 @@ def _preview(
     version_id: uuid.UUID,
     part_id: str,
     base_state_sha256: str,
-    pose: PartPoseBody | None,
+    kind: Literal["move_part", "remove_part", "part_storeys"],
+    make: Callable[[_Site], PartChange],
     *,
     people: Any = None,
 ) -> dict[str, object]:
-    """A move's or a removal's preview: the worker's verdict, then the repository's read-only
-    checks; a refusal of either is the preview's ``blocked_reason`` with its words and ``where``."""
-    kind: Literal["move_part", "remove_part"] = "remove_part" if pose is None else "move_part"
-    change = PartChange(part_id, True) if pose is None else pose.change(part_id)
+    """A move's, a removal's or a storeys change's preview: the worker's verdict, then the
+    repository's read-only checks; a refusal of either is the preview's ``blocked_reason`` with its
+    words and ``where``."""
+    change = PartChange(part_id, True)
     refusal: PartChangeRefused | None = None
     part_ids: frozenset[str] = frozenset()
     try:
-        answer = _check(_Site(repository, version_id), change)
+        site = _Site(repository, version_id)
+        change = make(site)
+        answer = _check(site, change)
         part_ids = frozenset(answer["part_ids"])
         if people is not None:
             people(answer["label"])

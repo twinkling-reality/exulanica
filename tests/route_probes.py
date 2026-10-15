@@ -554,6 +554,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/parts/{part_id}/storeys": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "storeys": 2},
+    },
+    "POST /world/versions/{version_id}/parts/{part_id}/storeys/preview": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "storeys": 2},
+    },
     "POST /world/versions/{version_id}/society": {
         **_IN_WORLD,
         "json": {"place_id": str(uuid.uuid4()), "region_id": "region-a"},
@@ -1091,6 +1099,10 @@ EXISTENCE_REQUESTS: Final[Mapping[str, Callable[[Any], dict[str, Any]]]] = {
     "POST /world/versions/{version_id}/parts/{part_id}/move/preview": build.made_part_move_request,
     "POST /world/versions/{version_id}/parts/{part_id}/remove": build.made_part_request,
     "POST /world/versions/{version_id}/parts/{part_id}/remove/preview": build.made_part_request,
+    "POST /world/versions/{version_id}/parts/{part_id}/storeys": build.made_part_storeys_request,
+    "POST /world/versions/{version_id}/parts/{part_id}/storeys/preview": (
+        build.made_part_storeys_request
+    ),
     "POST /world/versions/{version_id}/things/on-support": build.support_placement_request,
     "POST /world/versions/{version_id}/things/on-support/preview": build.support_placement_request,
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": build.generated_tile_request,

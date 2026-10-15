@@ -68,6 +68,7 @@ EditKind = Literal[
     "remove_thing",
     "move_part",
     "remove_part",
+    "part_storeys",
     "undo",
     "redo",
 ]
@@ -250,7 +251,7 @@ def preview_thing_move(
 def preview_part_change(
     repository: WorldObjectRepository,
     version_id: uuid.UUID,
-    kind: Literal["move_part", "remove_part"],
+    kind: Literal["move_part", "remove_part", "part_storeys"],
     override: ElementOverride,
     *,
     base_state_sha256: str,

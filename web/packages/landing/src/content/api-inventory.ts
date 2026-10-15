@@ -16670,6 +16670,200 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/parts/{part_id}/storeys",
+    "method": "post",
+    "id": "part_storeys_world_versions__version_id__parts__part_id__storeys_post",
+    "title": "Stand a made building taller or lower, within the storeys its world's kind allows.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "part_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36,
+          "pattern": "^[0-9a-f-]{36}$",
+          "title": "Part Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/PartStoreysBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AlternateVersionView"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/parts/{part_id}/storeys/preview",
+    "method": "post",
+    "id": "part_storeys_preview_world_versions__version_id__parts__part_id__storeys_preview_post",
+    "title": "What standing a made building taller or lower would record. Writes nothing.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "part_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36,
+          "pattern": "^[0-9a-f-]{36}$",
+          "title": "Part Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/PartStoreysPreviewBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true,
+              "title": "Response Part Storeys Preview World Versions  Version Id  Parts  Part Id  Storeys Preview Post"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/things/{thing_id}/character",
     "method": "post",
     "id": "thing_character_write_world_versions__version_id__things__thing_id__character_post",

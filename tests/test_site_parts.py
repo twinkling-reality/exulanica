@@ -15,9 +15,11 @@ from exulanica.grammar.grammars.site.records import (
     SiteStructureRecord,
     SiteWallRecord,
 )
+from exulanica.world.authored_delta import canonical_delta_document
 from exulanica.world.composers.site_plan import society_place
+from exulanica.world.kinds.catalogs import BOUNDS_VERSIONS, load_kind_catalogs
 from exulanica.world.kinds.samples import first_unreached
-from exulanica.world.objects import ElementOverride, Transform
+from exulanica.world.objects import ElementOverride, Transform, override_document
 from exulanica.world.site_parts import (
     LAND_WORDS,
     PART_CODES,
@@ -31,8 +33,10 @@ from exulanica.world.site_parts import (
     changes_of,
     changes_sha256,
     check_change,
+    check_storeys,
     part_override,
     people_of_part,
+    receipt_storeys_bound,
     refused_people_words,
 )
 from exulanica.world.society_site_place import SiteSociety
@@ -341,3 +345,90 @@ def test_a_change_the_layout_cannot_take_is_refused_in_plain_words(farm):
     assert refused.value.code == "part_records_refused"
     assert str(refused.value) == "Not here: the world's layout cannot take it there."
     assert "access_y_mm" in refused.value.where["detail"]
+
+
+def test_a_building_stands_taller_with_its_own_walls_and_nothing_else_changes(farm):
+    barn = _part(farm, "barn")
+    made = _record(farm.records, barn.identity)
+    taller = made.storeys + 1
+    changed = apply_changes(farm.records, [PartChange(barn.identity, False, storeys=taller)])
+    assert _record(changed, barn.identity).storeys == taller
+    height = taller * made.storey_height_mm
+    walls = [
+        r for r in changed if isinstance(r, SiteWallRecord) and r.owner_identity == barn.identity
+    ]
+    assert walls and all(wall.height_mm == height for wall in walls)
+    assert all(o.height_mm <= height for wall in walls for o in wall.openings)
+    kept = {barn.identity} | {wall.identity for wall in walls}
+    for before, after in zip(farm.records, changed, strict=True):
+        if getattr(before, "identity", None) not in kept:
+            assert before == after
+    check_site_records(changed, root_identity=farm.receipt["subject_identity"])
+
+
+def test_only_a_building_has_storeys(farm):
+    bench = _part(farm, "bench")
+    with pytest.raises(PartChangeRefused) as refused:
+        apply_changes(farm.records, [PartChange(bench.identity, False, storeys=2)])
+    assert refused.value.code == "part_storeys_refused"
+    assert str(refused.value) == "Only a building has storeys."
+
+
+def test_storeys_are_held_to_the_bounds_the_world_was_made_under(farm):
+    fewest, most = receipt_storeys_bound(farm.receipt)
+    assert 1 <= fewest <= most
+    check_storeys(most, (fewest, most), "barn")
+    with pytest.raises(PartChangeRefused) as taller:
+        check_storeys(most + 1, (fewest, most), "barn")
+    assert str(taller.value) == f"Not taller: buildings in this world have at most {most} storeys."
+    unknown = {**farm.receipt, "catalogs": {**farm.receipt["catalogs"], "kind-bound": "0" * 64}}
+    with pytest.raises(PartChangeRefused) as refused:
+        receipt_storeys_bound(unknown)
+    assert refused.value.code == "parts_not_served"
+
+
+@pytest.mark.parametrize("bounds_version", BOUNDS_VERSIONS)
+def test_a_world_reads_the_storeys_bound_of_the_bounds_version_its_receipt_names(
+    farm, bounds_version
+):
+    catalogs = load_kind_catalogs(bounds_version=bounds_version)
+    receipt = {
+        **farm.receipt,
+        "catalogs": {**farm.receipt["catalogs"], "kind-bound": catalogs.sha256["kind-bound"]},
+    }
+    assert receipt_storeys_bound(receipt) == catalogs.bound("storeys")
+
+
+def test_a_storeys_change_is_stored_alone_or_with_a_move_and_read_back(farm):
+    barn = _part(farm, "barn")
+    alone = PartChange(barn.identity, False, storeys=3)
+    stored = part_override(alone)
+    assert stored.transform is None and stored.storeys == 3
+    assert changes_of([stored]) == (alone,)
+    moved = PartChange(barn.identity, False, barn.centre_mm, 2, storeys=4)
+    assert changes_of([part_override(moved)]) == (moved,)
+    assert changes_from_document(changes_document([alone, moved])) == (alone, moved)
+    # A change stating no storeys keeps the document and the digest it always had.
+    plain = PartChange(barn.identity, False, barn.centre_mm, 1)
+    assert "storeys" not in changes_document([plain])[0]
+    assert "storeys" not in override_document(part_override(plain))
+
+
+def test_a_delta_holding_storeys_selects_its_own_schema_version_and_one_without_keeps_its_own(farm):
+    barn = _part(farm, "barn")
+    sections = {
+        "objects": (),
+        "environment_instances": (),
+        "point_map_instances": (),
+        "things": (),
+    }
+    plain = canonical_delta_document(
+        element_overrides=(part_override(PartChange(barn.identity, True)),), **sections
+    )
+    storeyed = canonical_delta_document(
+        element_overrides=(part_override(PartChange(barn.identity, False, storeys=3)),),
+        **sections,
+    )
+    assert plain["schema_version"] == 1
+    assert storeyed["schema_version"] == 6
+    assert storeyed["element_overrides"][0]["storeys"] == 3

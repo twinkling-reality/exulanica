@@ -192,4 +192,6 @@ def _compose(sections: Mapping[str, Sequence[Any]]) -> dict[str, Any]:
         ]
     if any(thing.support is not None for thing in sections["things"]):
         document["schema_version"] = 5
+    if any(override.storeys is not None for override in sections["element_overrides"]):
+        document["schema_version"] = max(document["schema_version"], 6)
     return document

@@ -1811,6 +1811,14 @@ def made_part_request(owner) -> dict[str, Any]:
     }
 
 
+def made_part_storeys_request(owner) -> dict[str, Any]:
+    """The barn standing the storeys it was made with (or its preview), as
+    :func:`made_part_request`."""
+    request = made_part_request(owner)
+    request["json"]["storeys"] = _made_farm(owner)["barn"]["storeys"]
+    return request
+
+
 def made_part_move_request(owner) -> dict[str, Any]:
     """A move (or its preview) of the barn to where it stands, as :func:`made_part_request`."""
     farm = _made_farm(owner)

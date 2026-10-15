@@ -195,12 +195,19 @@ class AuthoredObjectView(BaseModel):
     removed: bool
 
 
+def _absent(value: object) -> bool:
+    return value is None
+
+
 class ElementOverrideView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     element_id: str
     suppressed: bool
     transform: TransformView | None
+    #: How many storeys a made building stands as a person changed it (``part:`` overrides only);
+    #: left out where the change states none, so an override's bytes are as they always were.
+    storeys: int | None = Field(default=None, exclude_if=_absent)
 
 
 class VersionEditView(BaseModel):
@@ -427,6 +434,7 @@ def alternate_version_view(
                 transform=(
                     None if override.transform is None else transform_view(override.transform)
                 ),
+                storeys=override.storeys,
             )
             for override in version.element_overrides
         ],

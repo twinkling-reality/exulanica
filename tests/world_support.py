@@ -69,12 +69,15 @@ def fixture_workspace(connection, workspace_id):
 
 
 @contextmanager
-def historical_world_fixture_schema(connection, *, support=False, erasure=True, kinds=False):
+def historical_world_fixture_schema(
+    connection, *, support=False, erasure=True, kinds=False, storeys=True
+):
     """Let current fixture builders read empty future state, restoring the historical schema.
 
     Use only around fixture construction or a post-upgrade read, never across the migration
-    being proved. These views hold no erasures and support fields are null: historical worlds
-    had neither. The exit checks ensure no compatibility relation or column reaches a migration.
+    being proved. These views hold no erasures, support fields are null and no override states a
+    building's storeys (0217): historical worlds had none of them. The exit checks ensure no
+    compatibility relation or column reaches a migration.
     """
     views = []
     columns = []
@@ -99,46 +102,46 @@ def historical_world_fixture_schema(connection, *, support=False, erasure=True, 
         for name, fields in views:
             assert cursor.execute("select to_regclass(%s)", (name,)).fetchone()[0] is None
             cursor.execute(f"create view {name} as select {fields} where false")
+        wanted = []
         if support:
-            for name, type_ in (
-                ("support_snapshot_id", "uuid"),
-                ("support_receipt_sha256", "bytea"),
-                ("support_network_sha256", "bytea"),
-                ("support_surface_id", "text"),
-            ):
-                assert (
-                    cursor.execute(
-                        "select 1 from information_schema.columns "
-                        "where table_schema=current_schema() "
-                        "and table_name='world_alternate_thing' and column_name=%s",
-                        (name,),
-                    ).fetchone()
-                    is None
-                )
-                cursor.execute(f"alter table world_alternate_thing add column {name} {type_}")
-                columns.append(name)
+            wanted += [
+                ("world_alternate_thing", "support_snapshot_id", "uuid"),
+                ("world_alternate_thing", "support_receipt_sha256", "bytea"),
+                ("world_alternate_thing", "support_network_sha256", "bytea"),
+                ("world_alternate_thing", "support_surface_id", "text"),
+            ]
+        if storeys:
+            wanted.append(("world_alternate_element_override", "storeys", "smallint"))
+        for table, name, type_ in wanted:
+            assert (
+                cursor.execute(
+                    "select 1 from information_schema.columns "
+                    "where table_schema=current_schema() and table_name=%s and column_name=%s",
+                    (table, name),
+                ).fetchone()
+                is None
+            )
+            cursor.execute(f"alter table {table} add column {name} {type_}")
+            columns.append((table, name))
         connection.commit()
         try:
             yield
         finally:
-            for name in columns:
+            for table, name in columns:
                 assert (
-                    cursor.execute(
-                        f"select 1 from world_alternate_thing where {name} is not null"
-                    ).fetchone()
+                    cursor.execute(f"select 1 from {table} where {name} is not null").fetchone()
                     is None
                 )
-                cursor.execute(f"alter table world_alternate_thing drop column {name}")
+                cursor.execute(f"alter table {table} drop column {name}")
             for name, _ in views:
                 cursor.execute(f"drop view {name}")
                 assert cursor.execute("select to_regclass(%s)", (name,)).fetchone()[0] is None
-            for name in columns:
+            for table, name in columns:
                 assert (
                     cursor.execute(
                         "select 1 from information_schema.columns "
-                        "where table_schema=current_schema() "
-                        "and table_name='world_alternate_thing' and column_name=%s",
-                        (name,),
+                        "where table_schema=current_schema() and table_name=%s and column_name=%s",
+                        (table, name),
                     ).fetchone()
                     is None
                 )

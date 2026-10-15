@@ -507,6 +507,8 @@ def part_job(
         changeable_parts,
         changes_from_document,
         check_change,
+        check_storeys,
+        receipt_storeys_bound,
     )
 
     found = _records_of(workspace, receipt, receipt_sha256)
@@ -515,7 +517,11 @@ def part_job(
     uses = _part_uses(receipt)
     made = changeable_parts(found, uses)
     try:
-        changed = apply_changes(found, changes_from_document(changes))
+        stated = changes_from_document(changes)
+        storeys = next((c.storeys for c in stated if c.identity == part_id), None)
+        if storeys is not None:
+            check_storeys(storeys, receipt_storeys_bound(receipt), part_id)
+        changed = apply_changes(found, stated)
         check_change(
             changed,
             part_id,
@@ -590,14 +596,20 @@ def parts_job(
     """The parts of a site world a person may change, as they stand with ``changes`` applied
     (:func:`~exulanica.world.site_parts.changeable_parts`), or the reason its records do not
     read."""
-    from exulanica.world.site_parts import changeable_parts
+    from exulanica.world.errors import ThingLandingRefused
+    from exulanica.world.site_parts import changeable_parts, receipt_storeys_bound
 
     found = _records_of(workspace, receipt, receipt_sha256, changes)
     if isinstance(found, str):
         return {"status": "refused", "detail": found}
+    try:
+        most: int | None = receipt_storeys_bound(receipt)[1]
+    except ThingLandingRefused:
+        most = None
     return {
         "status": "done",
         "parts": [part.document() for part in changeable_parts(found, _part_uses(receipt))],
+        "storeys_most": most,
     }
 
 

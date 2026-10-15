@@ -1205,12 +1205,17 @@ carries its walls, rooms and room fixtures with it.
 | `GET /world/versions/{version_id}/parts` | Every changeable part as it stands with the version's changes (`exulanica.site-parts/v1`): identity, kind (`building`, `fixture`, `area`), words, garden area, centre and size (east, north), and the version's changes. |
 | `POST .../parts/{part_id}/move` and `/move/preview` | Stand the part at a new centre (`pose`: `x_mm` east, `z_mm` south, `y_mm` 0) turned a whole number of quarter turns from how it was made (`yaw_microradians` 0, 1570796, 3141593 or 4712389): every part is an axis-aligned rectangle. |
 | `POST .../parts/{part_id}/remove` and `/remove/preview` | Remove the part. |
+| `POST .../parts/{part_id}/storeys` and `/storeys/preview` | Stand a building taller or lower (`storeys`), within the `storeys` bound of the kind bounds catalog the world was made under, found by the digest its receipt records. The parts read states `storeys` for each building and `storeys_most` for the world. |
 
 **Stored as an element override that names the part.** A change is a row of
 `world_alternate_element_override` whose `element_id` is `part:<identity>`: a move its new pose, a
-removal `suppressed`. It is written with the `transform_element` and `suppress_element` edit kinds,
-in the version's edit log, so `POST .../things/undo` and `.../things/redo` undo and redo it as any
-edit. No migration was needed: the table names no snapshot element by key. The receipt is never
+removal `suppressed`, a building's storeys its `storeys` (migration 0217, null where a change states
+none, and stated in the override's document only when set, so no other digest moves; a delta holding
+one selects schema version 6). A move keeps the storeys the version states, and a storeys change
+keeps where the version stands the building. It is written with the `transform_element` and
+`suppress_element` edit kinds, in the version's edit log, so `POST .../things/undo` and
+`.../things/redo` undo and redo it as any edit. Moves and removals needed no migration: the table
+names no snapshot element by key. The receipt is never
 changed, so the world as made still reads from it alone, its people stay on the same version, and a
 version with no part changes keeps its digest.
 
@@ -1230,6 +1235,12 @@ grader's own code (`landform_cut_too_deep`, `landform_corridor_too_steep`,
 `landform_near_out_of_bounds`, `landform_cascade_crossed`, or `landform_invalid` for any other),
 with a plain sentence and the grader's detail in `where`. The previews answer the same verdicts and
 write nothing.
+
+**Storeys.** Only a building's ground storey is walked, so a storeys change raises or lowers the
+building and its own walls (their openings no taller than the wall) and nothing else: the place its
+people walk keeps its nodes and edges, and the change reaches the society as its next input like
+any other. Refused in words outside the bound ("Not taller: buildings in this world have at most 6
+storeys.") or for a part that is not a building (`part_storeys_refused`).
 
 **What follows a kept change.** The world as it stands is the receipt's records with the version's
 changes applied, named by the digest of those changes, which keys the worker's drawing and place

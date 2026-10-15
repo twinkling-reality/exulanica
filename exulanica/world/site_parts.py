@@ -65,9 +65,11 @@ __all__ = [
     "changes_of",
     "changes_sha256",
     "check_change",
+    "check_storeys",
     "part_identity",
     "part_override",
     "people_of_part",
+    "receipt_storeys_bound",
     "refused_people_words",
 ]
 
@@ -89,6 +91,7 @@ PART_CODES: Final = frozenset(
         "part_strands_people",
         "part_houses_people",
         "parts_not_served",
+        "part_storeys_refused",
         # A world on land: the land grader's own codes (LAND_WORDS).
         "landform_cut_too_deep",
         "landform_corridor_too_steep",
@@ -132,20 +135,25 @@ class PartChangeRefused(ThingLandingRefused):
 @dataclass(frozen=True, slots=True)
 class PartChange:
     """One part's change: removed, or standing with its centre at ``centre_mm`` (east, north in
-    the site's frame) turned ``quarter_turns`` from how it was made."""
+    the site's frame; None where it stays where it was made) turned ``quarter_turns`` from how it
+    was made, and for a building ``storeys`` (None where it keeps the storeys it was made with)."""
 
     identity: str
     removed: bool
     centre_mm: tuple[int, int] | None = None
     quarter_turns: int = 0
+    storeys: int | None = None
 
     def document(self) -> dict[str, Any]:
-        return {
+        document: dict[str, Any] = {
             "identity": self.identity,
             "removed": self.removed,
             "centre_mm": None if self.centre_mm is None else list(self.centre_mm),
             "quarter_turns": self.quarter_turns,
         }
+        if self.storeys is not None:
+            document["storeys"] = self.storeys
+        return document
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +170,8 @@ class MadePart:
     centre_mm: tuple[int, int]
     size_mm: tuple[int, int]
     quarter_turns: int
+    #: How many storeys a building stands; None for a fixture or an area.
+    storeys: int | None = None
 
     def document(self) -> dict[str, Any]:
         return {
@@ -174,6 +184,7 @@ class MadePart:
             "centre_mm": list(self.centre_mm),
             "size_mm": list(self.size_mm),
             "quarter_turns": self.quarter_turns,
+            "storeys": self.storeys,
         }
 
 
@@ -191,19 +202,20 @@ def part_override(change: PartChange) -> ElementOverride:
     element_id = f"{PART_PREFIX}{change.identity}"
     if change.removed:
         return ElementOverride(element_id=element_id, suppressed=True)
-    if change.centre_mm is None:
-        raise ValueError("a part that stays needs its centre")
-    east, north = change.centre_mm
-    return ElementOverride(
-        element_id=element_id,
-        suppressed=False,
-        transform=Transform(
+    if change.centre_mm is None and change.storeys is None:
+        raise ValueError("a change to a part moves it, turns it or states its storeys")
+    transform = None
+    if change.centre_mm is not None:
+        east, north = change.centre_mm
+        transform = Transform(
             x_mm=east,
             y_mm=0,
             z_mm=-north,
             yaw_microradians=QUARTER_TURNS[change.quarter_turns % 4],
             scale_milli=1_000,
-        ),
+        )
+    return ElementOverride(
+        element_id=element_id, suppressed=False, transform=transform, storeys=change.storeys
     )
 
 
@@ -220,9 +232,13 @@ def changes_of(overrides: Iterable[ElementOverride]) -> tuple[PartChange, ...]:
             changes.append(PartChange(identity, True))
             continue
         transform = override.transform
+        if transform is None:
+            if override.storeys is None:
+                raise ValueError(f"part {identity} is changed in a way no part can stand")
+            changes.append(PartChange(identity, False, storeys=override.storeys))
+            continue
         if (
-            transform is None
-            or transform.yaw_microradians not in QUARTER_TURNS
+            transform.yaw_microradians not in QUARTER_TURNS
             or transform.scale_milli != 1_000
             or transform.y_mm != 0
         ):
@@ -233,6 +249,7 @@ def changes_of(overrides: Iterable[ElementOverride]) -> tuple[PartChange, ...]:
                 False,
                 (transform.x_mm, -transform.z_mm),
                 QUARTER_TURNS.index(transform.yaw_microradians),
+                override.storeys,
             )
         )
     return tuple(sorted(changes, key=lambda change: change.identity))
@@ -253,6 +270,7 @@ def changes_from_document(document: Sequence[Mapping[str, Any]]) -> tuple[PartCh
             if item["centre_mm"] is None
             else (int(item["centre_mm"][0]), int(item["centre_mm"][1])),
             int(item["quarter_turns"]),
+            None if item.get("storeys") is None else int(item["storeys"]),
         )
         for item in document
     )
@@ -342,6 +360,7 @@ def changeable_parts(
                 quarter_turns=record.yaw_quarter_turns
                 if isinstance(record, SiteFixtureRecord)
                 else 0,
+                storeys=record.storeys if isinstance(record, SiteStructureRecord) else None,
             )
         )
     return tuple(parts)
@@ -463,9 +482,50 @@ def _apply(records: Sequence[object], change: PartChange) -> list[object]:
     carried = _carried(part, records) | {change.identity}
     if change.removed:
         return [r for r in records if getattr(r, "identity", None) not in carried]
-    if change.centre_mm is None:
-        raise ValueError("a part that stays needs its centre")
-    pose = _Pose(_centre(part), change.centre_mm, change.quarter_turns)
+    if change.centre_mm is None and change.storeys is None:
+        raise ValueError("a change to a part moves it, turns it or states its storeys")
+    changed = list(records)
+    if change.centre_mm is not None:
+        changed = _moved(records, part, carried, change.centre_mm, change.quarter_turns)
+    if change.storeys is not None:
+        changed = _storeyed(changed, part, change.storeys)
+    return changed
+
+
+def _storeyed(records: Sequence[object], part: object, storeys: int) -> list[object]:
+    """A building standing ``storeys`` high: its own walls rise or fall with it, their openings no
+    taller than the wall. Only its ground storey is walked, so nothing else changes."""
+    if not isinstance(part, SiteStructureRecord):
+        raise PartChangeRefused(
+            "part_storeys_refused",
+            {"part_id": getattr(part, "identity", "")},
+            "Only a building has storeys.",
+        )
+    height = storeys * part.storey_height_mm
+    changed: list[object] = []
+    for record in records:
+        if isinstance(record, SiteStructureRecord) and record.identity == part.identity:
+            changed.append(dataclasses.replace(record, storeys=storeys))
+        elif isinstance(record, SiteWallRecord) and record.owner_identity == part.identity:
+            openings = tuple(
+                dataclasses.replace(opening, height_mm=min(opening.height_mm, height))
+                for opening in record.openings
+            )
+            changed.append(dataclasses.replace(record, height_mm=height, openings=openings))
+        else:
+            changed.append(record)
+    return changed
+
+
+def _moved(
+    records: Sequence[object],
+    part: object,
+    carried: set[str],
+    centre_mm: tuple[int, int],
+    quarter_turns: int,
+) -> list[object]:
+    """The records with ``part`` and what it carries standing at ``centre_mm``, turned."""
+    pose = _Pose(_centre(part), centre_mm, quarter_turns)
     changed: list[object] = []
     for record in records:
         if getattr(record, "identity", None) not in carried:
@@ -505,6 +565,47 @@ def apply_changes(records: Sequence[object], changes: Sequence[PartChange]) -> t
 
 
 # -- checking a change ---------------------------------------------------------------------------
+
+
+def receipt_storeys_bound(receipt: Mapping[str, Any]) -> tuple[int, int]:
+    """The fewest and most storeys a building of this world may stand: the ``storeys`` bound of the
+    kind bounds catalog its receipt names, found by the digest the receipt records of it among the
+    catalog's versions this server holds, so the bound is the one the world was made under."""
+    from exulanica.grammar.errors import CatalogError
+    from exulanica.world.kinds.catalogs import CATALOG_DIRECTORY, load_kind_catalogs
+
+    stated = receipt.get("catalogs", {}).get("kind-bound")
+    for path in sorted(CATALOG_DIRECTORY.glob("kind-bound.v*.json")):
+        try:
+            catalogs = load_kind_catalogs(bounds_version=int(path.stem.rsplit(".v", 1)[1]))
+        except (CatalogError, ValueError):
+            continue
+        if catalogs.sha256["kind-bound"] == stated:
+            return catalogs.bound("storeys")
+    raise PartChangeRefused(
+        "parts_not_served",
+        {"kind_bound": stated},
+        "This world was made under building bounds this server does not hold.",
+    )
+
+
+def check_storeys(storeys: int, bound: tuple[int, int], part_id: str) -> None:
+    """Refuse a building's storeys outside its world's bound, in words."""
+    fewest, most = bound
+    where = {"part_id": part_id, "storeys": storeys, "fewest": fewest, "most": most}
+    if storeys > most:
+        raise PartChangeRefused(
+            "part_storeys_refused",
+            where,
+            f"Not taller: buildings in this world have at most {most} storeys.",
+        )
+    if storeys < fewest:
+        raise PartChangeRefused(
+            "part_storeys_refused",
+            where,
+            f"Not lower: a building here has at least {fewest} "
+            f"{'storey' if fewest == 1 else 'storeys'}.",
+        )
 
 
 def _overlaps(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:

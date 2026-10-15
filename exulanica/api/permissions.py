@@ -879,6 +879,8 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/parts/{part_id}/move/preview",
     "POST /world/versions/{version_id}/parts/{part_id}/remove",
     "POST /world/versions/{version_id}/parts/{part_id}/remove/preview",
+    "POST /world/versions/{version_id}/parts/{part_id}/storeys",
+    "POST /world/versions/{version_id}/parts/{part_id}/storeys/preview",
     "POST /world/versions/{version_id}/society",
     "POST /world/versions/{version_id}/society/actions",
     "PUT /world/versions/{version_id}/society/control",

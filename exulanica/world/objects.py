@@ -134,11 +134,14 @@ class AuthoredObject:
 
 @dataclass(frozen=True, slots=True)
 class ElementOverride:
-    """A suppression or a replacement transform for one element of the source snapshot."""
+    """A suppression or a replacement transform for one element of the source snapshot, or a
+    person's change to a made part of a site world (``part:<identity>``), which may also state how
+    many storeys a building stands."""
 
     element_id: str
     suppressed: bool
     transform: Transform | None = None
+    storeys: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,11 +190,16 @@ def object_document(obj: AuthoredObject) -> dict[str, Any]:
 
 
 def override_document(override: ElementOverride) -> dict[str, Any]:
-    return {
+    """The override as its digest and its edits read it; ``storeys`` stated only when set, so an
+    override that states none keeps the document it always had."""
+    document: dict[str, Any] = {
         "element_id": override.element_id,
         "suppressed": override.suppressed,
         "transform": None if override.transform is None else override.transform.document(),
     }
+    if override.storeys is not None:
+        document["storeys"] = override.storeys
+    return document
 
 
 def validate_object_id(object_id: str) -> str:

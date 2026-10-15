@@ -695,6 +695,14 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "a read-only preview of a made part's removal for the workspace's build mode; no "
             "Companion plan step prepares through it"
         ),
+        ("POST", "/world/versions/{version_id}/parts/{part_id}/storeys"): (
+            "stands a made building of a site world taller or lower from the workspace's build "
+            "mode, within its world's bounds; no Companion plan step makes it yet"
+        ),
+        ("POST", "/world/versions/{version_id}/parts/{part_id}/storeys/preview"): (
+            "a read-only preview of a made building's storeys for the workspace's build mode; no "
+            "Companion plan step prepares through it"
+        ),
         ("POST", "/world/versions/{version_id}/society/decisions/{request_id}/asks"): (
             "asks another model a recorded decision again and keeps its answer beside the "
             "original, never applied; it changes nothing a version action reads"

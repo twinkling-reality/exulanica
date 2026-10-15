@@ -33,9 +33,10 @@ SUFFIXES = (".py", ".ts", ".tsx", ".mjs")
 #: Each listed module, the most lines it may have, and what it holds.
 LIMITS: dict[str, tuple[int, str]] = {
     "exulanica/world/object_repository.py": (
-        3_690,
+        3_693,
         "alternate world versions and the objects, environments, point maps and things "
-        "authored in them, and the changes made to a site world's made parts",
+        "authored in them, and the changes made to a site world's made parts, their "
+        "buildings' storeys among them",
     ),
     "web/packages/app/src/composition/environment-selection.ts": (
         3_335,
