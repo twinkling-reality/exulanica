@@ -8,6 +8,11 @@ optional width and a seed: the tree is grown to that box as a textured piece wit
 (``<file stem>-far.glb``), from the scans in the folder ``--sources`` names. Rows of one role become
 that role's variants, at most eight, in the document's order. What made each tree is written beside
 the packs as ``<pack id>.trees.json``.
+
+A kit pinned to appearance catalog version 3 makes its ``arcade_block``, ``tower`` and ``hall`` rows
+as modules that repeat their bays and storeys to meet a building's box
+(``assembled_architecture.py``): each variant states the module's own size and its zones. A kit
+pinned to version 1 or 2 makes every row whole, at its size, as before.
 """
 
 from __future__ import annotations
@@ -26,6 +31,10 @@ from scripts.style_packs.architecture import (  # noqa: E402, standalone CLI boo
     ARCHITECTURE_RECIPES,
     ARCHITECTURE_SWATCHES,
     validate_architecture_row,
+)
+from scripts.style_packs.assembled_architecture import (  # noqa: E402, standalone CLI bootstrap
+    ASSEMBLED_RECIPES,
+    validate_assembled_row,
 )
 from scripts.style_packs import tree_maker  # noqa: E402, standalone CLI bootstrap
 from exulanica.world import style_packs  # noqa: E402, standalone CLI bootstrap
@@ -208,7 +217,7 @@ def validate_document(document):
         raise ValueError("unknown kit profile")
     if type(document.get("look_family_catalog_version")) is not int or document[
         "look_family_catalog_version"
-    ] not in (1, 2):
+    ] not in (1, 2, 3):
         raise ValueError("the kit selects a retained appearance catalog")
     if (
         not 1 <= len(document.get("pieces", [])) <= 128
@@ -278,9 +287,17 @@ def validate_document(document):
             raise ValueError("bloom count is bounded")
         if row["recipe"] in ARCHITECTURE_RECIPES:
             validate_architecture_row(row)
+            if _assembled(document, row):
+                validate_assembled_row(row)
         path = Path(row["file"])
         if path.is_absolute() or ".." in path.parts:
             raise ValueError("a module is written inside its pack")
+
+
+def _assembled(document, row) -> bool:
+    """Whether a row is made as a module that repeats its bays and storeys: an assembled recipe in
+    a kit pinned to appearance catalog version 3, whose structure family meets its box."""
+    return document["look_family_catalog_version"] >= 3 and row["recipe"] in ASSEMBLED_RECIPES
 
 
 def _far(file: str) -> str:
@@ -412,7 +429,9 @@ def build(document, output, sources=None):
                 )
                 receipts.append({"file": row["file"], "role": row["role"], **made.receipt})
                 continue
-            piece = RECIPES[row["recipe"]](row)
+            module = ASSEMBLED_RECIPES[row["recipe"]](row) if _assembled(document, row) else None
+            piece = RECIPES[row["recipe"]](row) if module is None else module.piece
+            size_mm = row["size_mm"] if module is None else list(module.size_mm)
             # Tapered ends meet at one point. Omit their zero-area fan triangles before writing.
             corners = []
             keys = []
@@ -427,7 +446,7 @@ def build(document, output, sources=None):
             piece.corners = corners
             piece.keys = keys
             points = np.asarray(piece.corners)
-            w, d, h = [value / 1000 for value in row["size_mm"]]
+            w, d, h = [value / 1000 for value in size_mm]
             minimum = points.min(axis=0)
             maximum = points.max(axis=0)
             if np.any(minimum < np.asarray([-w / 2, 0, -d / 2]) - 0.0001) or np.any(
@@ -437,14 +456,18 @@ def build(document, output, sources=None):
             payload = piece.bytes(palette, table)
             read_palette_piece(payload, table)
             (folder / row["file"]).write_bytes(payload)
-            variants.append(
-                dict(
-                    file=row["file"],
-                    lod1=None,
-                    size_mm=row["size_mm"],
-                    stretch_mm=[None, None, None],
-                )
+            stated = dict(
+                file=row["file"],
+                lod1=None,
+                size_mm=size_mm,
+                stretch_mm=[None, None, None],
             )
+            if module is not None:
+                stated.update(
+                    stretch_mm=[None if z is None else list(z) for z in module.stretch_mm],
+                    repeat_mm=[None if z is None else list(z) for z in module.repeat_mm],
+                )
+            variants.append(stated)
             manifest["files"].append(
                 dict(
                     path=row["file"],

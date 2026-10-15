@@ -429,6 +429,22 @@ variants, at most eight; what made each tree is written beside the packs (`<pack
 `tests/test_tree_maker.py` makes trees from synthetic scans and holds them to the plant budget,
 both readers' rules and their boxes.
 
+A kit pinned to appearance catalog version 3 makes its arcade blocks, towers and halls as modules
+that repeat to meet a building's box (`scripts/style_packs/assembled_architecture.py`): an arcade
+block is its end walls about one bay of an arch on piers before the loggia, with an arched window
+over it on one upper storey, its ground storey and cornice below and its eaves and balustrade
+above; a tower is one stage under its belfry and roof; a hall is its gable ends about one bay of an
+aisle arch and a clerestory window. The bay repeats across and the storey or stage up
+(`repeat_mm`), an arcade block's plain body between its back wall and its loggia stretches in depth
+(`stretch_mm`), and an axis with neither is scaled within the family's bounds, so a tower's roof and
+a hall's section keep their shape. The row's fields are the same as for a whole piece, and its
+size, bays and storeys give the bay width and storey height the module is drawn at; every face is
+cut at the zone edges, so the check passes it. A row whose bay would be under 2,000 mm or whose
+upper storey under 2,500 mm is refused before anything is made. A kit pinned to version 1 or 2 makes
+the same rows whole at their size, byte for byte as before. `tests/test_assembled_architecture.py`
+holds each module to its size, its zones, the structure budget and its row's size when drawn with
+the row's bays and storeys.
+
 Every version a pack has published stays servable, so a world keeps the look it was given. Writing a
 new version first retires the committed one: the script copies its folder whole to
 `assets/style-packs/published/<pack id>/<version>/` and appends the version to the ledger
