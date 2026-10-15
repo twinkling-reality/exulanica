@@ -459,6 +459,25 @@ the same rows whole at their size, byte for byte as before. `tests/test_assemble
 holds each module to its size, its zones, the structure budget and its row's size when drawn with
 the row's bays and storeys.
 
+A kit document may also name climbing plants (a `creeper` row: a species, a width, a height and a
+seed). The creeper maker (`scripts/style_packs/creeper_maker.py`) grows each over a wall patch of that
+size as a textured piece with its second level: stems rise from roots spaced along the patch's foot,
+wander and branch as they climb and stay inside the patch, and leaf cards (`leaf_cards.py`, from the
+scans the tree species catalog names) hug the wall along them, leaning a little out of it, fewer
+toward a stem's growing end. The patch's wall is the plane z = 0 behind it and its leaves face +Z,
+as section 7.1's climbing plants are set against a face. The species is data
+(`assets/style-packs/makers/creeper-species.v1.json`, profile `exulanica.creeper-species/v1`: how
+the stems grow, the card and how densely and how far out it stands, the stem's bark, how the second
+level thins it, and the share of a look's wind the plant takes), every figure held to its range when
+the catalog is read; it names the tree species catalog version whose scans it reads, so no digest is
+stated twice. A patch is held to the plant budget: past it every other card is dropped and the rest
+grown larger to cover the same wall, and its receipt says how many were kept; its second level keeps
+a share of the cards on stems of fewer points, within the share of the first level's triangles a
+second level may hold. Rows of one role become its variants, each with its species' `sway_permille`,
+and what made each is written beside the packs (`<pack id>.creepers.json`). A kit variant may state
+`climb`, copied to its manifest. `tests/test_creeper_maker.py` makes patches from synthetic scans and
+holds them to the plant budget, the product's readers, their patch and the catalog's ranges.
+
 Every version a pack has published stays servable, so a world keeps the look it was given. Writing a
 new version first retires the committed one: the script copies its folder whole to
 `assets/style-packs/published/<pack id>/<version>/` and appends the version to the ledger

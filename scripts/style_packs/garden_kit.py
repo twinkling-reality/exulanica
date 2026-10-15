@@ -9,6 +9,13 @@ optional width and a seed: the tree is grown to that box as a textured piece wit
 that role's variants, at most eight, in the document's order. What made each tree is written beside
 the packs as ``<pack id>.trees.json``.
 
+A ``creeper`` row names a species of the creeper maker's catalog (``creeper_maker.py``), a width, a
+height and a seed: the climbing plant is grown over a wall patch of that size as a textured piece
+with its second level, from the same scans, held to the plant budget, and its variant takes its
+species' share of the wind. What made each is written beside the packs as ``<pack id>.creepers.json``.
+A variant may state ``climb`` (the pack's rule for what climbs its buildings' walls), copied to its
+manifest as written.
+
 A kit pinned to appearance catalog version 3 makes its ``arcade_block``, ``tower`` and ``hall`` rows
 as modules that repeat their bays and storeys to meet a building's box
 (``assembled_architecture.py``): each variant states the module's own size and its zones. A kit
@@ -36,12 +43,15 @@ from scripts.style_packs.assembled_architecture import (  # noqa: E402, standalo
     ASSEMBLED_RECIPES,
     validate_assembled_row,
 )
-from scripts.style_packs import tree_maker  # noqa: E402, standalone CLI bootstrap
+from scripts.style_packs import creeper_maker, tree_maker  # noqa: E402, standalone CLI bootstrap
+from exulanica_pieces.budgets import read_budgets  # noqa: E402, standalone CLI bootstrap
 from exulanica.world import style_packs  # noqa: E402, standalone CLI bootstrap
 from exulanica.world.style_pack_pieces import read_palette_piece  # noqa: E402, standalone CLI bootstrap
 
 #: The fields a ``tree`` row states, the width optional.
 TREE_ROW = frozenset({"recipe", "role", "file", "species", "height_mm", "seed"})
+#: The fields a ``creeper`` row states.
+CREEPER_ROW = frozenset({"recipe", "role", "file", "species", "width_mm", "height_mm", "seed"})
 
 
 def rounded_slab(piece, width, depth, bottom, top, radius, segments, key):
@@ -257,6 +267,19 @@ def validate_document(document):
             if path.is_absolute() or ".." in path.parts or path.suffix != ".glb":
                 raise ValueError("a module is written inside its pack")
             continue
+        if row.get("recipe") == "creeper":
+            if set(row) != CREEPER_ROW:
+                raise ValueError(
+                    "a creeper row states its role, file, species, width, height and seed"
+                )
+            if not isinstance(row["species"], str) or not isinstance(row["role"], str):
+                raise ValueError("a creeper row names its species and role")
+            if any(type(row[key]) is not int for key in ("width_mm", "height_mm", "seed")):
+                raise ValueError("a creeper row's numbers are whole")
+            path = Path(row["file"])
+            if path.is_absolute() or ".." in path.parts or path.suffix != ".glb":
+                raise ValueError("a module is written inside its pack")
+            continue
         if row.get("recipe") not in RECIPES:
             raise ValueError("unknown module recipe")
         if len(row.get("size_mm", [])) != 3 or any(
@@ -322,9 +345,42 @@ def _trees(document, sources):
     }
 
 
+def _creepers(document, sources):
+    """Every creeper row made once, by its index: the maker's MadeCreeper, held to the plant budget."""
+    rows = [(i, row) for i, row in enumerate(document["pieces"]) if row["recipe"] == "creeper"]
+    if not rows:
+        return {}
+    if sources is None:
+        raise ValueError("a kit with creepers names the folder of its scans (--sources)")
+    document_text = (ROOT / creeper_maker.CATALOG).read_text()
+    stated = json.loads(document_text)
+    tree_path = creeper_maker.SOURCES.get(stated.get("sources"))
+    if tree_path is None:
+        raise ValueError("the creeper catalog names no tree species catalog this maker reads")
+    trees = tree_maker.read_catalog(json.loads((ROOT / tree_path).read_text()))
+    catalog = creeper_maker.read_catalog(stated, trees)
+    found = tree_maker.Sources(trees, sources)
+    budgets = read_budgets(ROOT)
+    plant = budgets.families["plant"]
+    return {
+        index: creeper_maker.make_creeper(
+            catalog,
+            row["species"],
+            row["width_mm"],
+            row["height_mm"],
+            row["seed"],
+            found,
+            plant.triangles,
+            budgets.lod1_share_permille,
+        )
+        for index, row in rows
+    }
+
+
 def build(document, output, sources=None):
     validate_document(document)
     trees = _trees(document, sources)
+    creepers = _creepers(document, sources)
     table = json.loads((ROOT / "assets/colour/srgb8-linear16.v1.json").read_text())["values"]
     base = json.loads(
         (ROOT / "assets/style-packs/published/exulanica.finished-town/2/manifest.json").read_text()
@@ -405,6 +461,7 @@ def build(document, output, sources=None):
         }
         # A roof leaf takes its module before the family's surface default.
         receipts = []
+        creeper_receipts = []
         for index, row in enumerate(document["pieces"]):
             variants = manifest["modules"].setdefault(row["role"], {"variants": []})["variants"]
             if index in trees:
@@ -428,6 +485,29 @@ def build(document, output, sources=None):
                     )
                 )
                 receipts.append({"file": row["file"], "role": row["role"], **made.receipt})
+                continue
+            if index in creepers:
+                grown = creepers[index]
+                for path, payload in ((row["file"], grown.lod0), (_far(row["file"]), grown.lod1)):
+                    (folder / path).write_bytes(payload)
+                    manifest["files"].append(
+                        dict(
+                            path=path,
+                            sha256=hashlib.sha256(payload).hexdigest(),
+                            bytes=len(payload),
+                            media_type="model/gltf-binary",
+                        )
+                    )
+                variants.append(
+                    dict(
+                        file=row["file"],
+                        lod1=_far(row["file"]),
+                        size_mm=list(grown.size_mm),
+                        stretch_mm=[None, None, None],
+                        sway_permille=grown.sway_permille,
+                    )
+                )
+                creeper_receipts.append({"file": row["file"], "role": row["role"], **grown.receipt})
                 continue
             module = ASSEMBLED_RECIPES[row["recipe"]](row) if _assembled(document, row) else None
             piece = RECIPES[row["recipe"]](row) if module is None else module.piece
@@ -513,11 +593,18 @@ def build(document, output, sources=None):
                 day["haze"] = finish["haze"]
             if "water" in finish:
                 manifest["water"] = finish["water"]
+        # What climbs the buildings' walls, as the variant states it; the reader below holds it.
+        if "climb" in variant:
+            manifest["climb"] = variant["climb"]
         checked = style_packs.read_manifest(manifest, style_packs.load_context(ROOT))
         (folder / "manifest.json").write_text(style_packs.canonical_json(checked) + "\n")
         if receipts:
             (output / f"{variant['pack_id']}.trees.json").write_text(
                 json.dumps(receipts, indent=1, sort_keys=True) + "\n"
+            )
+        if creeper_receipts:
+            (output / f"{variant['pack_id']}.creepers.json").write_text(
+                json.dumps(creeper_receipts, indent=1, sort_keys=True) + "\n"
             )
         print(
             variant["pack_id"],

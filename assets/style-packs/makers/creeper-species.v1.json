@@ -1,0 +1,152 @@
+{
+  "about": "Species the creeper maker (scripts/style_packs/creeper_maker.py) grows climbing plants from, as textured pieces over a wall patch: how the stems rise from roots along the patch's foot, wander and branch, the leaf card they carry and how densely, their bark, how far the cards lean out of the wall, how the second level of detail thins them, and the share of a look's wind the plant takes. Every figure is a species' own and is held to its range when the catalog is read. The scans are the tree species catalog's it names.",
+  "profile": "exulanica.creeper-species/v1",
+  "sources": "tree-species.v1",
+  "species": {
+    "bougainvillea": {
+      "card": {
+        "blossom": {
+          "count": 22,
+          "radius": 0.06,
+          "srgb8": [
+            [
+              214,
+              52,
+              140
+            ],
+            [
+              232,
+              86,
+              168
+            ],
+            [
+              196,
+              40,
+              120
+            ]
+          ]
+        },
+        "form": "twig",
+        "leaf_length": 0.28,
+        "leaf_width": 1.6,
+        "leaves": 10,
+        "recolour_srgb8": [
+          86,
+          120,
+          60
+        ],
+        "source": "oval",
+        "spread_deg": 60
+      },
+      "cards": {
+        "density": 0.95,
+        "out_m": [
+          0.04,
+          0.18
+        ],
+        "per_step": 3,
+        "size_m": 1.0,
+        "tilt_deg": [
+          15,
+          45
+        ]
+      },
+      "growth": {
+        "branching": 0.24,
+        "depth": 2,
+        "pull": 0.12,
+        "reach": [
+          0.6,
+          1.0
+        ],
+        "root_spacing_m": 0.8,
+        "step_m": 0.45,
+        "wander_deg": 26
+      },
+      "lod1": {
+        "card_scale": 1.8,
+        "card_share": 0.3
+      },
+      "stem": {
+        "bark": "fissured",
+        "radius_m": 0.025,
+        "tint": [
+          0.6,
+          0.5,
+          0.4
+        ]
+      },
+      "sway_permille": 250
+    },
+    "ivy": {
+      "card": {
+        "form": "twig",
+        "leaf_length": 0.3,
+        "leaves": 12,
+        "recolour_srgb8": [
+          72,
+          112,
+          50
+        ],
+        "source": "lobed",
+        "spread_deg": 70
+      },
+      "cards": {
+        "density": 1.0,
+        "out_m": [
+          0.02,
+          0.1
+        ],
+        "per_step": 3,
+        "size_m": 0.95,
+        "tilt_deg": [
+          10,
+          40
+        ]
+      },
+      "growth": {
+        "branching": 0.22,
+        "depth": 2,
+        "pull": 0.15,
+        "reach": [
+          0.7,
+          1.0
+        ],
+        "root_spacing_m": 0.8,
+        "step_m": 0.4,
+        "wander_deg": 24
+      },
+      "lod1": {
+        "card_scale": 1.8,
+        "card_share": 0.3
+      },
+      "stem": {
+        "bark": "smooth",
+        "radius_m": 0.015,
+        "tint": [
+          0.55,
+          0.48,
+          0.38
+        ]
+      },
+      "sway_permille": 150
+    }
+  },
+  "textures": {
+    "jpeg_quality": 84,
+    "lod0": {
+      "sheet_px": 512,
+      "stem_px": [
+        64,
+        128
+      ]
+    },
+    "lod1": {
+      "sheet_px": 256,
+      "stem_px": [
+        32,
+        64
+      ]
+    }
+  }
+}
