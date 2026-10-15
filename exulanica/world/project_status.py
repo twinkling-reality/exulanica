@@ -70,6 +70,9 @@ class GitHub(_Closed):
     visibility: Literal["PRIVATE", "PUBLIC", "INTERNAL", "unstated"]
     #: Saved checkpoints the repository does not hold yet.
     not_sent: Annotated[int, Field(ge=0)]
+    #: When the newest saved checkpoint the repository holds was saved, if it holds one: what was
+    #: saved by then has reached GitHub, what was saved after it has not.
+    sent_through_at: _Instant | None = None
     #: The open rolling pull request, if there is one.
     pull_request: PullRequest | None
     #: Why sending on its own is paused, where it is.
@@ -88,6 +91,9 @@ class ProjectStatus(_Closed):
     last_checkpoint_at: _Instant | None
     #: Whether changes are waiting to be saved (the world has not settled yet).
     pending: bool
+    #: How long the world stays unchanged before its changes are saved (the follow's settle
+    #: period), in whole seconds; absent in a status written before the follower stated it.
+    settle_seconds: Annotated[int, Field(ge=1, le=86_400)] | None = None
     link: Link | None
     github: GitHub | None
 

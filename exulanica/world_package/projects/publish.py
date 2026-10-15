@@ -34,6 +34,7 @@ from pydantic import Field, ValidationError
 from exulanica.canonical import canonical_json
 from exulanica.world_package.projects.checkpoint import MAX_BYTES, ProjectError, decode
 from exulanica.world_package.projects.github import BranchTarget, RollingPullRequests
+from exulanica.world_package.projects.repository import published_through
 from exulanica.world_package.projects.schema import Closed, Instant, scan_values
 
 PUBLISH_FILE: Final = "project-publish.json"
@@ -189,12 +190,19 @@ def github_view(
         current = remote.branch_files if remote.branch_files is not None else remote.base_files
         # The commits a publication would make: what the repository does not hold yet.
         not_sent = len(client._steps(project, current, None))
+        history, start = published_through(project, current)
+        sent_through = (
+            None
+            if start is None or start < 0
+            else int(project.git("log", "-1", "--format=%ct", history[start]["commit"]).strip())
+        )
     except ProjectError:
         held = dict(previous or {})
         return {
             "read_at": _instant(now),
             "visibility": held.get("visibility", "unstated"),
             "not_sent": held.get("not_sent", 0),
+            "sent_through_at": held.get("sent_through_at"),
             "pull_request": held.get("pull_request"),
             "paused": paused,
             "reached": False,
@@ -205,6 +213,7 @@ def github_view(
         "read_at": _instant(now),
         "visibility": visibility if visibility in ("PRIVATE", "PUBLIC", "INTERNAL") else "unstated",
         "not_sent": not_sent,
+        "sent_through_at": None if sent_through is None else _instant(sent_through),
         "pull_request": None
         if pull is None
         else {"number": int(pull["number"]), "title": str(pull["title"])[:256] or "Changes"},

@@ -324,7 +324,7 @@ def test_a_removal_undone_reads_as_build_mode_s_note_says_it():
     notes = (
         Path(__file__).resolve().parents[1] / "tools/previews/world-workspace/build-words.mjs"
     ).read_text(encoding="utf-8")
-    assert "return `Brought back the ${name}.`;" in notes
+    assert "return `Brought back ${what}`;" in notes
     project, _ = sample()
     removed = deepcopy(project)
     removed["things"][0]["removed"] = True

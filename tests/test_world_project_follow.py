@@ -751,6 +751,8 @@ def test_the_follower_writes_where_the_project_is_kept_beside_it_and_never_sends
         follower.round()
         [held] = read_statuses(projects, WORLD)
         assert (held["pending"], held["link"], held["github"]) == (True, None, None)
+        # How long the world must stay unchanged, as History says it: the follow's settle period.
+        assert held["settle_seconds"] == 120
         # Linked by hand: after its next checkpoint the follower reads GitHub once and says
         # what the repository does not hold yet; it sends nothing.
         Project(folder).link("learner/world", "main", "exulanica/world")
@@ -761,6 +763,7 @@ def test_the_follower_writes_where_the_project_is_kept_beside_it_and_never_sends
         assert held["link"] == {"repository": "learner/world", "publish": "by hand"}
         assert held["github"]["reached"] and held["github"]["visibility"] == "PRIVATE"
         assert held["github"]["not_sent"] >= 1 and held["github"]["pull_request"] is None
+        assert held["github"]["sent_through_at"] is None  # GitHub holds none of it yet
         assert remote.writes == []
         # Published on its own: nothing left to send, and the pull request is named.
         Project(folder).link("learner/world", "main", "exulanica/world", "automatic")
@@ -769,6 +772,8 @@ def test_the_follower_writes_where_the_project_is_kept_beside_it_and_never_sends
         [held] = read_statuses(projects, WORLD)
         assert held["github"]["not_sent"] == 0
         assert held["github"]["pull_request"] == {"number": 1, "title": "Changes to this world"}
+        # Everything saved has reached GitHub: the newest checkpoint it holds is the newest saved.
+        assert held["github"]["sent_through_at"] == held["last_checkpoint_at"]
         assert STATUS_FILE not in Project(folder).git("ls-files")
         assert all(STATUS_FILE not in b["files"] for b in remote.branches.values())
     finally:

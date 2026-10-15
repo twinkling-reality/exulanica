@@ -950,10 +950,11 @@ change between sessions. One project's fault never stops another, one worker hol
 directory at a time, and it follows at most 64 folders unless `EXULANICA_PROJECTS_MAXIMUM` states
 another number. Beside each project it follows it writes `project-status.json` (profile
 `exulanica.world-project-status/v1`, [`project_status.py`](../exulanica/world/project_status.py)),
-never committed and never published: the world and version, its saved checkpoints and whether
-changes wait, its link, and what GitHub last said (the repository's visibility, how many saved
-checkpoints it does not hold yet, the open rolling pull request and a pause), read once after each
-checkpoint of a linked project. The API reads these from the same directory
+never committed and never published: the world and version, its saved checkpoints, whether
+changes wait and how long the world stays unchanged before they are saved (its settle period), its
+link, and what GitHub last said (the repository's visibility, how many saved checkpoints it does
+not hold yet and when the newest one it holds was saved, the open rolling pull request and a
+pause), read once after each checkpoint of a linked project. The API reads these from the same directory
 (`EXULANICA_PROJECTS_DIRECTORY`) and answers them as `GET /world/github-projects` (`world.write`, so
 a guest with a world read does not see where it is kept), the read a world's History page shows; no
 value a caller sends becomes a path, and a folder that is a link is never followed. The three

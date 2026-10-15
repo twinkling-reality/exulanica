@@ -44,6 +44,12 @@ assert.equal(worldKey(key('KeyP', { repeat: true }), ground), 'silence');
 assert.equal(worldKey(key('Tab'), ground), 'pass');
 assert.equal(worldKey(key('Enter'), ground, true), 'pass');
 assert.equal(worldKey(key('Enter'), ground), 'silence');
+// H opens History where it opens, once a press (MOTION's 1); elsewhere it stays silent (K8).
+const remembered = { ...ground, history: true };
+assert.equal(worldKey(key('KeyH'), remembered), 'history');
+assert.equal(worldKey(key('KeyH', { repeat: true }), remembered), 'silence');
+assert.equal(worldKey(key('KeyH', { metaKey: true }), remembered), 'quiet');
+assert.equal(worldKey(key('KeyH'), { ...ground, history: false }), 'silence');
 // The old shell's keys never reach it: silenced, or for a combination stopped with the browser's own
 // shortcut kept (K8).
 for (const code of ['KeyH', 'KeyK', 'KeyI', 'KeyM', 'KeyO', 'KeyR', 'KeyG', 'Backspace', 'Slash']) assert.equal(worldKey(key(code), ground), 'silence', code);
@@ -53,6 +59,7 @@ assert.equal(worldKey(key('KeyK', { ctrlKey: true }), ground), 'quiet');
 assert.equal(worldKey(key('KeyW', { altKey: true }), ground), 'quiet');
 assert.equal(wakesHints(key('KeyF')), true);
 assert.equal(wakesHints(key('KeyB')), true);
+assert.equal(wakesHints(key('KeyH')), true);
 assert.equal(wakesHints(key('KeyK')), false);
 assert.equal(wakesHints(key('KeyW', { metaKey: true })), false);
 

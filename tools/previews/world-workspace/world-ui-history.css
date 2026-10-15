@@ -1,0 +1,45 @@
+/* History's own parts (DESIGN's specification, 5.12 and 8.19; frame 23): the timeline and the
+   one-line rows. Built from world-ui.css's tokens alone; sizes are CSS pixels at 1920 by 1080
+   multiplied by --ui-scale. A part a second lane needs moves into world-ui.css. */
+
+.wu-history-head { position: absolute; left: calc(120 * var(--u)); top: calc(92 * var(--u)); width: calc(1400 * var(--u)); }
+
+.wu-timeline { position: absolute; left: calc(120 * var(--u)); top: calc(300 * var(--u)); width: calc(1680 * var(--u)); height: calc(170 * var(--u)); overflow: visible; }
+.wu-timeline .wu-tl-line { stroke-width: 2; }
+.wu-timeline .wu-tl-node { fill: var(--glass-fill); stroke: var(--ink); stroke-width: 2; }
+.wu-timeline .wu-tl-node[data-chosen="true"] { fill: var(--ink); }
+.wu-timeline .wu-tl-glow { fill: var(--live); opacity: .35; }
+.wu-timeline .wu-tl-label { fill: var(--ink-2); font: 400 15px var(--font-sans); text-anchor: middle; }
+.wu-timeline .wu-tl-label[data-chosen="true"] { fill: var(--ink); font-weight: 500; }
+.wu-timeline .wu-tl-time { fill: var(--ink-3); font: 400 12.5px var(--font-mono); text-anchor: middle; }
+.wu-timeline .wu-tl-branch { fill: none; stroke: var(--live); stroke-opacity: .8; stroke-width: 1.8; }
+.wu-timeline .wu-tl-end { fill: var(--glass-fill); stroke: var(--live); stroke-width: 1.8; }
+.wu-timeline .wu-tl-model { fill: var(--ink-2); font: 400 13.5px var(--font-sans); }
+.wu-timeline .wu-tl-now-ring { fill: none; stroke: var(--live); stroke-width: 1.4; opacity: .6; animation: wu-pulse var(--t-pulse) var(--ease) infinite; }
+.wu-timeline .wu-tl-now { fill: var(--ink); }
+.wu-timeline .wu-tl-now-label { fill: var(--ink); font: 400 15px var(--font-sans); text-anchor: middle; }
+.wu-timeline .wu-tl-mark { cursor: pointer; }
+.wu-timeline .wu-tl-mark:focus-visible { outline: none; }
+.wu-timeline .wu-tl-mark:focus-visible .wu-tl-node { stroke: var(--live); }
+
+.wu-history-list { position: absolute; left: calc(120 * var(--u)); top: calc(540 * var(--u)); width: calc(620 * var(--u)); bottom: calc(120 * var(--u)); overflow: hidden auto; scrollbar-width: none; }
+.wu-history-list::-webkit-scrollbar { display: none; }
+.wu-history-row { position: relative; display: grid; grid-template-columns: calc(64 * var(--u)) 1fr auto; gap: 0 calc(18 * var(--u)); align-items: baseline;
+  width: 100%; padding: calc(13 * var(--u)) 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.wu-history-row + .wu-history-row { border-top: 1px solid rgba(255, 255, 255, .08); }
+.wu-history-row .wu-time { font: 400 max(12px, calc(14.5 * var(--u)))/1.5 var(--font-mono); color: var(--ink-3); }
+.wu-history-row .wu-what { font: 400 calc(18 * var(--u))/1.4 var(--font-sans); }
+.wu-history-row .wu-cost { font: 400 max(12px, calc(14 * var(--u)))/1.4 var(--font-sans); color: var(--ink-3); }
+.wu-history-row[aria-current="true"]::before { content: ''; position: absolute; left: calc(-22 * var(--u)); top: calc(17 * var(--u)); width: 3px; height: calc(22 * var(--u)); border-radius: 1px; background: var(--wash); box-shadow: 0 0 10px rgba(168, 203, 210, .8); }
+.wu-history-row:focus-visible { outline: 1px solid rgba(191, 233, 240, .45); outline-offset: 2px; }
+.wu-history-day + .wu-history-day { margin-top: calc(26 * var(--u)); }
+
+.wu-history-chosen { position: absolute; left: calc(860 * var(--u)); top: calc(540 * var(--u)); width: calc(940 * var(--u)); }
+.wu-history-chosen .wu-quote-title { margin: 0; font: 200 calc(46 * var(--u))/1.15 var(--font-sans); letter-spacing: -.02em; }
+.wu-history-chosen .wu-facts { display: flex; align-items: center; flex-wrap: wrap; gap: calc(14 * var(--u)); margin-top: calc(18 * var(--u)); }
+.wu-history-chosen .wu-hairline { margin: calc(28 * var(--u)) 0 calc(24 * var(--u)); }
+.wu-history-chosen .wu-body { max-width: calc(860 * var(--u)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wu-timeline .wu-tl-now-ring { animation: none; }
+}

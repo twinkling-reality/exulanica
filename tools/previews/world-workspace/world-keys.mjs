@@ -3,18 +3,19 @@
 // so every key's fate is checked (verify-world-corners.mjs):
 // - 'move': the renderer's own movement keys go on to it (W A S D, arrows, Shift, F; Space and C only
 //   while flying);
-// - 'inspect', 'leave', 'play': the workspace's own keys;
+// - 'inspect', 'leave', 'play', 'history': the workspace's own keys;
 // - 'pass': Tab moves the focus, and Enter presses a focused corner prompt, as anywhere;
 // - 'quiet': a combination with Cmd, Ctrl or Alt the workspace does not use goes no further (the old
 //   shell's Cmd+K palette included) but keeps the browser's own shortcut (no preventDefault);
-// - 'silence': any other key goes no further and does nothing (the old shell's H, K, I, M, O, R, G,
-//   P, Backspace and ? among them).
+// - 'silence': any other key goes no further and does nothing (the old shell's K, I, M, O, R, G,
+//   Backspace and ? among them, and H and P where History or the clock is not there).
 
 const MOVING = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 
 /**
- * `state`: { flying, clock } where clock says whether the world has a clock to play (people live
- * there); `onPrompt` whether the key's target is a corner prompt (a button).
+ * `state`: { flying, clock, history } where clock says whether the world has a clock to play (people
+ * live there) and history whether H opens History here; `onPrompt` whether the key's target is a
+ * corner prompt (a button).
  */
 export function worldKey(event, state, onPrompt = false) {
   if (event.metaKey || event.ctrlKey || event.altKey) return 'quiet';
@@ -23,6 +24,7 @@ export function worldKey(event, state, onPrompt = false) {
   if (event.code === 'KeyE') return event.repeat ? 'silence' : 'inspect';
   if (event.code === 'Escape') return event.repeat ? 'silence' : 'leave';
   if (event.code === 'KeyP') return state.clock && !event.repeat ? 'play' : 'silence';
+  if (event.code === 'KeyH') return state.history && !event.repeat ? 'history' : 'silence';
   if (event.code === 'Tab' || (event.code === 'Enter' && onPrompt)) return 'pass';
   return 'silence';
 }
@@ -30,5 +32,5 @@ export function worldKey(event, state, onPrompt = false) {
 /** Keys whose hint, when pressed, brings the faded hints back for a while (section 5.2). */
 export function wakesHints(event) {
   return !event.metaKey && !event.ctrlKey && !event.altKey
-    && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'KeyF', 'KeyE', 'KeyB', 'KeyP', 'Space', 'KeyC'].includes(event.code);
+    && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'KeyF', 'KeyE', 'KeyB', 'KeyP', 'KeyH', 'Space', 'KeyC'].includes(event.code);
 }

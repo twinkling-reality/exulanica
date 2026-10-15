@@ -33,6 +33,7 @@ def status(world_id=WORLD, written_at="2026-10-15T01:00:00Z", **changes):
             "read_at": "2026-10-15T00:51:00Z",
             "visibility": "PRIVATE",
             "not_sent": 1,
+            "sent_through_at": "2026-10-15T00:40:00Z",
             "pull_request": {"number": 3, "title": "Changes to Terraces on the bay"},
             "paused": None,
             "reached": True,
@@ -59,9 +60,13 @@ def test_the_state_is_closed_and_holds_no_path_or_credential():
         },
         {**status(), "checkpoints": -1},
         {**status(), "written_at": "yesterday"},
+        {**status(), "settle_seconds": 0},
     ):
         with pytest.raises(StatusRefused):
             status_document(broken)
+    # The settle period History states: whole seconds, absent from a status written before it.
+    assert status_document(status(settle_seconds=120))["settle_seconds"] == 120
+    assert status_document(status())["settle_seconds"] is None
 
 
 def test_only_the_configured_directory_s_own_folders_are_read(tmp_path):

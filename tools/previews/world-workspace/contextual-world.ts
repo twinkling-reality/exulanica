@@ -11,8 +11,9 @@ import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
-import { CHARACTER_WORDS, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub } from './character-words.mjs';
+import { CHARACTER_WORDS, called, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
+import { mountHistory } from './history.ts';
 import { mountRunWatch } from './run-watch.ts';
 import { runLength, runRefusalWords, runningLine, whoDecides } from './run-words.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
@@ -93,7 +94,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const $ = (selector) => root.querySelector(selector);
   // A character's page (character-page.ts) while one is open, with what it shows and the camera's pose before it.
   let pageView = null;
-  const pageShown = () => pageView !== null;
+  // A page that is not a character's (History) while one is open: it takes the keys (`key(event)`)
+  // until it closes (`close()`, or `dispose()` with the world). Either page hides the corners and
+  // holds the world still.
+  let otherPage = null;
+  const pageShown = () => pageView !== null || otherPage !== null;
   // Your worlds: back to the front door with this world chosen, after keeping a picture of it for
   // its card, as the app does when a person leaves a world.
   let leaving = false;
@@ -123,7 +128,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   b.controls.onSummon = null;
   b.controls.onCameraToggle = null;
   // Flying (F): the mode word at the top with its key, and the hints for flying while it lasts.
-  const worldHints = () => corners.worldHints(availableHints({ flying: Boolean(b.controls.flying), build: Boolean(build), history: false }));
+  // History opens in every world, a read-only copy's too: it only reads (history.ts). One flag for
+  // its hint and its key, so the two never disagree.
+  const historyHere = true;
+  const worldHints = () => corners.worldHints(availableHints({ flying: Boolean(b.controls.flying), build: Boolean(build), history: historyHere }));
   b.controls.onFlyChange = (flying) => {
     corners.mode(flying ? CORNER_WORDS.flying : null, flying ? keyWord({ keys: ['F'], word: CORNER_WORDS.land }) : null);
     worldHints();
@@ -700,6 +708,44 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
   }
 
+  // History (H, from the world and from build mode): every change of this world version over the
+  // dimmed world, read from the server alone. Undo and redo there are build mode's own.
+  const history = mountHistory({
+    root, worldId: entry.worldId, versionId: entry.authoredVersionId, title: entry.title, read,
+    async names() {
+      if (!subjectReads.society) {
+        subjectReads.society = await societyClient.read(entry.authoredVersionId, { places: true }).catch(() => null);
+        subjectReads.societyAt = performance.now();
+      }
+      const society = subjectReads.society;
+      // A character by name, else by kind ("the resident"); a personality is kept by its placed being.
+      const who = (id) => called({ name: personName(id), kind: characterFacts(society, id)?.kind ?? null }).within;
+      const placedBeing = (placedId) => rows.find(row => row.reference?.source === 'authored-thing' && row.reference.id === placedId)?.scene.id ?? null;
+      return { subject: who, placed: (placedId) => { const id = placedBeing(placedId); return id ? who(id) : called({ name: null, kind: null }).within; } };
+    },
+    build: build ? { undo: () => build.undo(), redo: () => build.redo() } : null,
+    worldTime(tick) {
+      // The society's own first minute, as characterFacts reads it; with no society there is no clock (K5).
+      const state = subjectReads.society?.state;
+      return worldTime(tick, state?.start_minute_of_day ?? state?.clock?.start_minute_of_day ?? null)?.hhmm ?? null;
+    },
+    open: (url) => { window.open(url, '_blank', 'noopener'); },
+    closed() {
+      otherPage = null;
+      canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
+      guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
+    },
+  });
+  function openHistory() {
+    if (pageShown()) return;
+    stopFollowing();
+    otherPage = history;
+    presence.setCovered(true); notice('');
+    b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
+    guidance.hidden = true; worlds.hidden = true;
+    void history.open();
+  }
+
   // Drag-to-look keeps the ordinary cursor and also works where pointer lock is unavailable.
   window.addEventListener('mousedown', event => {
     if (event.target !== canvas || pageShown() || ![0, 2].includes(event.button)) return;
@@ -737,6 +783,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!pageShown() && wakesHints(event)) corners.wake();
     if (!pageShown() && event.code === 'Tab') corners.hold(true);
     if (!pageShown() && !asking && build?.key(event)) { event.stopImmediatePropagation(); return; }
+    // History takes its keys; what it leaves (Tab, Enter on a focused button) keeps the browser's own
+    // default, and no key reaches the old shell's listeners while it is open (K8).
+    if (otherPage) { otherPage.key(event); event.stopImmediatePropagation(); return; }
     if ((pageShown() || asking) && (event.metaKey || event.ctrlKey || event.altKey)) { event.stopImmediatePropagation(); return; }
     if (pageShown()) {
       // A page: Esc back, M model, N personality, R run or stop; while choosing a model, arrows and
@@ -809,12 +858,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (event.code === 'KeyR' && being) { event.preventDefault(); if (!event.repeat) act(runWatch.run ? 'stop' : 'run'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
     }
-    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock() }, Boolean(event.target?.closest?.('.cw-beside button,.wu-prompt')));
+    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere }, Boolean(event.target?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
     if (fate === 'inspect') void choose();
     else if (fate === 'leave') leaveWorld();
     else if (fate === 'play') corners.togglePlay();
+    else if (fate === 'history') openHistory();
     event.stopImmediatePropagation();
   }, { capture: true, signal: lifetime.signal });
   function frame(now) {
@@ -895,6 +945,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     runWatch.dispose();
     corners.dispose();
     if (pageView) { pageView.page.close(); pageView.decision?.page.close(); pageView = null; }
+    otherPage?.dispose(); otherPage = null;
     lifetime.abort(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
     b.controls.onPointerPick = priorCallbacks.pick; b.controls.onInteract = priorCallbacks.interact;
     b.controls.onSummon = priorCallbacks.summon; b.controls.onCameraToggle = priorCallbacks.camera; b.controls.onFlyChange = priorCallbacks.fly;
