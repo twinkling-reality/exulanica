@@ -19,7 +19,10 @@ Nothing derives one from a photograph, a kind's description or a person.
     :func:`newest_characters` the character of every placed being of a version that has one, as
     a society's next input carries them;
 *   :func:`version_characters` answers ``exulanica.thing-characters/v1``: every placed thing's
-    newest record in one read, what a reader following a world takes in place of a card a being.
+    newest record in one read, what a reader following a world takes in place of a card a being;
+*   :func:`character_history` answers ``exulanica.thing-character-history/v1``: every record of a
+    version, newest first and bounded, saying what each wrote (a name, words about the being, or
+    a clear) and when, never the words themselves, which the newest read holds.
 
 Records are appended and never changed; a record holding neither part clears the character.
 """
@@ -47,6 +50,7 @@ __all__ = [
     "THING_CHARACTER_CODES",
     "CharacterRecord",
     "ThingCharacterRefused",
+    "character_history",
     "character_of",
     "newest_characters",
     "newest_records",
@@ -59,6 +63,8 @@ __all__ = [
 CHARACTER_PROFILE: Final = "exulanica.thing-character/v1"
 #: Every placed thing's newest record of one version, in one read.
 CHARACTERS_PROFILE: Final = "exulanica.thing-characters/v1"
+#: Every record of one version, newest first: when each was written and what it stated.
+HISTORY_PROFILE: Final = "exulanica.thing-character-history/v1"
 #: Why a character is not written, each answered by name.
 THING_CHARACTER_CODES: Final = (
     "character_out_of_bounds",
@@ -210,6 +216,50 @@ def version_characters(
             for record in newest_records(connection, workspace_id, world_id, version_id)
         ],
         "society": society_reads_characters(connection, workspace_id, world_id, version_id),
+    }
+
+
+def character_history(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version_id: uuid.UUID,
+    *,
+    limit: int,
+) -> dict[str, Any]:
+    """``exulanica.thing-character-history/v1``: the version's records, newest first, at most
+    `limit`, each with the placed thing it is written for, its revision, whether it states a name
+    and words about the being (both false: it clears them) and when it was written; ``more`` says
+    whether older ones were left out. An absent version, or another workspace's, is
+    :class:`~exulanica.world.errors.UnknownWorldResource`."""
+    held = connection.execute(
+        "select 1 from world_alternate_version where workspace_id=%s and world_id=%s "
+        "and version_id=%s",
+        (workspace_id, world_id, version_id),
+    ).fetchone()
+    if held is None:
+        raise UnknownWorldResource("no such alternate version")
+    rows = connection.execute(
+        "select placed_id,revision,name is not null as named,about is not null as described,"
+        "written_at from world_thing_character "
+        "where workspace_id=%s and world_id=%s and version_id=%s "
+        "order by written_at desc, revision desc limit %s",
+        (workspace_id, world_id, version_id, limit + 1),
+    ).fetchall()
+    return {
+        "profile": HISTORY_PROFILE,
+        "version_id": str(version_id),
+        "records": [
+            {
+                "placed_id": row["placed_id"],
+                "revision": int(row["revision"]),
+                "states_name": bool(row["named"]),
+                "states_about": bool(row["described"]),
+                "written_at": row["written_at"].astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            }
+            for row in rows[:limit]
+        ],
+        "more": len(rows) > limit,
     }
 
 

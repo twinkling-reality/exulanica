@@ -7,10 +7,13 @@ person's current choice, with why its model is not asked here when it is not; ea
 latest decision and what its minute did; per model, how many decisions were asked, accepted and
 applied, why the rest were not, and what they took and cost, over the society's latest
 ``DECISIONS_READ`` decisions; and who an outside program decides for, each with its latest
-decision under its grant among those. ``POST`` at the same path records one choice, for one
-person or a group, of a model the manifest offers a person's decisions or of their own routine (no
-model). A choice is world data: append-only, with who made it; this host asking the model is the
-host's own business, stated in the read, never a reason to refuse the choice.
+decision under its grant among those. ``GET .../models/history`` answers every choice made for the
+version's people (``exulanica.society-model-history/v1``), newest first and bounded, each with
+when it was recorded, whom it decides for and what (a model by its name, the routine, a person
+playing, a program from outside), never who chose. ``POST`` at the same path records one choice,
+for one person or a group, of a model the manifest offers a person's decisions or of their own
+routine (no model). A choice is world data: append-only, with who made it; this host asking the
+model is the host's own business, stated in the read, never a reason to refuse the choice.
 
 Both serve the decision role that decides for a society's people, as the role registry states it
 (:mod:`exulanica.world.decision_roles`): its offered models, its contract and its receipts. Neither
@@ -25,7 +28,7 @@ from collections import Counter
 from decimal import Decimal
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -218,6 +221,64 @@ def _played(choice: dict[str, Any], session: CurrentSession) -> dict[str, Any]:
         "chosen_by": None,
         "played_by_you": choice["decider"]["account_id"] == str(session.actor),
     }
+
+
+#: The most choices one history read answers, and how many it answers unless asked.
+HISTORY_MAXIMUM: Final = 500
+HISTORY_DEFAULT: Final = 200
+
+
+@router.get(
+    "/history",
+    summary="Every model choice made for the version's people, newest first, with when.",
+)
+def society_model_history(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+    limit: Annotated[int, Query(ge=1, le=HISTORY_MAXIMUM)] = HISTORY_DEFAULT,
+    before: Annotated[int | None, Query(ge=1)] = None,
+) -> Any:
+    try:
+        role = _people_role()
+    except RoleRefused as exc:
+        return _role_refused(exc)
+    repository = SocietyModelChoiceRepository(connection, session.workspace_id, world_id=world_id)
+    manifest = load_manifest()
+    views = [
+        view
+        for view in reversed(repository.history(version_id, role))
+        if before is None or view["choice_seq"] < before
+    ]
+    shown = views[:limit]
+    return JSONResponse(
+        content={
+            "profile": "exulanica.society-model-history/v1",
+            "version_id": str(version_id),
+            "choices": [
+                {
+                    "choice_seq": view["choice_seq"],
+                    "recorded_at": view["recorded_at"].isoformat(),
+                    "subjects": list(view.get(role.choice_subjects) or []),
+                    # What decides, never which account or grant chose or plays.
+                    "decider": {"kind": view["decider"]["kind"]},
+                    "model": None
+                    if view["model"] is None
+                    else {
+                        "provider": view["model"]["provider"],
+                        "model_id": view["model"]["model_id"],
+                        "name": manifest.model_name(view["model"]["model_id"]),
+                    },
+                    "ended": bool(view.get("ended", False)),
+                }
+                for view in shown
+            ],
+            "more": len(views) > len(shown),
+        },
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 @router.get("")

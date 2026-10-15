@@ -402,6 +402,11 @@ clears it, and `written_at`), in placed id order, and `society` as the write ans
 read for a reader that follows a whole world, such as a world's project
 ([world memory package](world-memory-package.md#capture-and-automatic-tracking)), where a being's
 card would be one read a being. A version the world does not hold is 404 `unknown_reference`.
+`GET /world/versions/{version_id}/things/characters/history` (`world.read`) answers
+`exulanica.thing-character-history/v1`: every record of the version, newest first and bounded
+(`limit`, at most 500), with its `placed_id`, `revision`, whether it states a name and words about the
+being (`states_name`, `states_about`; both false, it clears them) and `written_at`, never the words,
+which the newest read holds.
 
 Records are appended to `world_thing_character` (migration 0213) with the actor who wrote each and
 the record it replaced, never changed, and only the newest may be replaced: the database holds

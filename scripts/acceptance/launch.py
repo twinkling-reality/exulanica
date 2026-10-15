@@ -853,6 +853,7 @@ def api_environment(
     references: Mapping[str, str] | None = None,
     creatures: Sequence[str] | None = None,
     worlds_held: int | None = None,
+    projects: Path | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     # The stack states the generated worlds its workspaces may hold, as a deployment does: the
@@ -877,6 +878,9 @@ def api_environment(
         environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
     if society_of_things:
         environment["EXULANICA_SOCIETY_OF_THINGS"] = "on"
+    if projects is not None:
+        # The API reads where each world is kept on GitHub from the directory its worker follows.
+        environment["EXULANICA_PROJECTS_DIRECTORY"] = str(projects)
     # An acceptance stack takes kinds of place from a person (a world's draft, a kind's draft, an
     # uploaded kind): its database is this run's own and is destroyed with it. A public
     # composition leaves the setting off.
@@ -1930,6 +1934,7 @@ def up(arguments: argparse.Namespace) -> None:
         creatures=state.get("creatures"),
         workspace_style_packs=bool(state.get("workspace_style_packs")),
         worlds_held=arguments.worlds_held,
+        projects=projects,
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -2281,6 +2286,9 @@ def restart_api(arguments: argparse.Namespace) -> None:
         creatures=state.get("creatures"),
         workspace_style_packs=bool(state.get("workspace_style_packs")),
         worlds_held=state.get("worlds_held"),
+        projects=None
+        if not isinstance(state.get("project_worker"), Mapping)
+        else Path(str(state["project_worker"]["projects"])),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")

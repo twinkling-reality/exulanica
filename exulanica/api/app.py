@@ -152,6 +152,7 @@ from exulanica.api.routes import (
     world_environments,
     world_flight,
     world_generation,
+    world_github_projects,
     world_inventory,
     world_kinds,
     world_making,
@@ -600,6 +601,7 @@ def create_app(
     app.include_router(world_things.router)
     app.include_router(world_parts.router)
     app.include_router(thing_characters.router)
+    app.include_router(world_github_projects.router)
     app.include_router(world_support_placement.router)
     app.include_router(world_objects.router)
     app.include_router(world_compositions.router)

@@ -1,5 +1,6 @@
 """Who a placed being is, as its world's owner writes it: one route that writes or clears it,
-and one that reads every placed thing's newest record.
+one that reads every placed thing's newest record, and one that reads every record by when it was
+written.
 
 ``POST /world/versions/{version_id}/things/{thing_id}/character`` appends a record for the being
 the author placed under ``thing_id`` (the placed id the move and remove routes take), over the
@@ -23,15 +24,20 @@ included (``placed_id``, ``revision``, ``character`` and ``written_at``), and ``
 write answers it, never cached. It is one read where a being's card would be one read a being, for
 a reader that follows a world (``exulanica/world_package/projects/capture.py``). A version the
 world does not hold is 404 ``unknown_reference``.
+
+``GET /world/versions/{version_id}/things/characters/history`` answers
+``exulanica.thing-character-history/v1``: every record of the version, newest first and bounded
+(``limit``), with what it stated (a name, words about the being, or a clear) and when, never the
+words; a page saying what changed in a world reads it.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 
 import psycopg
-from fastapi import APIRouter, Path, Request
+from fastapi import APIRouter, Path, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
 
@@ -43,6 +49,7 @@ from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.thing_characters import (
     CHARACTER_PROFILE,
     ThingCharacterRefused,
+    character_history,
     screened_character,
     society_reads_characters,
     version_characters,
@@ -170,5 +177,30 @@ def thing_characters_read(
     require_world(connection, session.workspace_id, world_id)
     return JSONResponse(
         content=version_characters(connection, session.workspace_id, world_id, version_id),
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+#: The most records one history read answers, and how many it answers unless asked.
+HISTORY_MAXIMUM: Final = 500
+HISTORY_DEFAULT: Final = 200
+
+
+@router.get(
+    "/versions/{version_id}/things/characters/history",
+    summary="Every character record of a version, newest first, with what it stated and when.",
+)
+def thing_character_history(
+    version_id: Annotated[uuid.UUID, Path()],
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+    limit: Annotated[int, Query(ge=1, le=HISTORY_MAXIMUM)] = HISTORY_DEFAULT,
+) -> JSONResponse:
+    require_world(connection, session.workspace_id, world_id)
+    return JSONResponse(
+        content=character_history(
+            connection, session.workspace_id, world_id, version_id, limit=limit
+        ),
         headers={"Cache-Control": "private, no-store"},
     )

@@ -720,3 +720,56 @@ def test_a_made_world_with_nothing_placed_is_followed_for_its_parts(world, token
         assert Project(folder).timeline()["pending"] == ["Moved the building 3 m south"]
     finally:
         follower.close()
+
+
+def test_the_follower_writes_where_the_project_is_kept_beside_it_and_never_sends_it(
+    world, token, tmp_path
+):
+    from exulanica.world.project_status import STATUS_FILE, read_statuses
+
+    from test_world_project_github import Repository
+
+    remote = Repository()
+    projects = tmp_path / "projects"
+    folder = follow(world, token, projects / "demo", "--no-sessions")
+    clock = Clock()
+    follower = Follower(
+        projects, base_url=world.url, token=TOKEN, clock=clock, github=remote.request
+    )
+
+    def settle():
+        for _ in range(12):
+            clock.now += 15
+            if any(t.get("state") == "checkpointed" for t in follower.round()):
+                return
+        raise AssertionError("no checkpoint")
+
+    try:
+        follower.round()
+        move(world, 2000)
+        clock.now += 15
+        follower.round()
+        [held] = read_statuses(projects, WORLD)
+        assert (held["pending"], held["link"], held["github"]) == (True, None, None)
+        # Linked by hand: after its next checkpoint the follower reads GitHub once and says
+        # what the repository does not hold yet; it sends nothing.
+        Project(folder).link("learner/world", "main", "exulanica/world")
+        settle()
+        move(world, 4000)
+        settle()
+        [held] = read_statuses(projects, WORLD)
+        assert held["link"] == {"repository": "learner/world", "publish": "by hand"}
+        assert held["github"]["reached"] and held["github"]["visibility"] == "PRIVATE"
+        assert held["github"]["not_sent"] >= 1 and held["github"]["pull_request"] is None
+        assert remote.writes == []
+        # Published on its own: nothing left to send, and the pull request is named.
+        Project(folder).link("learner/world", "main", "exulanica/world", "automatic")
+        move(world, 6000)
+        settle()
+        [held] = read_statuses(projects, WORLD)
+        assert held["github"]["not_sent"] == 0
+        assert held["github"]["pull_request"] == {"number": 1, "title": "Changes to this world"}
+        assert STATUS_FILE not in Project(folder).git("ls-files")
+        assert all(STATUS_FILE not in b["files"] for b in remote.branches.values())
+    finally:
+        follower.close()

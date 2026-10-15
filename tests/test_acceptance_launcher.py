@@ -1170,6 +1170,29 @@ def test_projects_is_off_unless_given_and_then_mints_the_read_only_token():
     )
 
 
+def test_the_api_reads_where_worlds_are_kept_from_the_worker_s_directory_only_when_given():
+    exports = {
+        "EXULANICA_DATABASE_URL": "postgresql://exulanica_app@localhost:19200/exulanica",
+        "EXULANICA_READONLY_DATABASE_URL": "postgresql://exulanica_ro@localhost:19200/exulanica",
+        "EXULANICA_PURGE_DATABASE_URL": "postgresql://exulanica_purge@localhost:19200/exulanica",
+    }
+
+    def environment(**extra):
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={"token": {"permissions": []}},
+            data_dir=Path("run/data"),
+            model=False,
+            derivative_worker=False,
+            society_playback={},
+            environ={},
+            **extra,
+        )
+
+    assert "EXULANICA_PROJECTS_DIRECTORY" not in environment()
+    assert environment(projects=Path("/p"))["EXULANICA_PROJECTS_DIRECTORY"] == "/p"
+
+
 def test_the_project_worker_reads_the_slot_api_at_localhost_with_the_read_only_token():
     command = LAUNCH.project_worker_command(
         Path("/w/.venv/bin/python"), Path("/p"), 19431, Path("/r/token-read")

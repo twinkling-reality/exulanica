@@ -194,6 +194,13 @@ profile names `model`, a model or none, and is still read as the model it names 
 the `model` it names, none for the routine and for an outside program, so whatever asks which model
 runs somebody, spending among it, reads the answer it always did.
 
+`GET /world/versions/{version_id}/society/models/history?world_id=W` (`world.read`) answers every
+choice made for the version's people, `exulanica.society-model-history/v1`, newest first and bounded
+(`limit`, at most 500, and `before` a `choice_seq`): each with its `choice_seq`, `recorded_at`, the
+`subjects` it decides for, what decides (`decider.kind`; a model with its `name`) and whether it
+ended a person's play, never who chose or which account or grant plays. A page saying what changed
+in a world reads it.
+
 `POST /world/versions/{version_id}/society/models?world_id=W` records one choice,
 `{idempotency_key, people: [subject_id, ...], model: {provider, model_id} | null}`, for one person or
 a group: a model, or with a null model their own routine. It requires `world.write` and

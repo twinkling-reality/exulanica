@@ -42,6 +42,15 @@ from pydantic import Field, ValidationError, model_validator
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
+from exulanica.world.project_status import (
+    PROFILE as STATUS_PROFILE,
+)
+from exulanica.world.project_status import (
+    STATUS_FILE,
+    StatusRefused,
+    status_document,
+    write_status,
+)
 from exulanica.world_package.projects.capture import (
     Capture,
     NothingSelectable,
@@ -52,8 +61,17 @@ from exulanica.world_package.projects.capture import (
 )
 from exulanica.world_package.projects.checkpoint import MAX_BYTES, Conflict, ProjectError, decode
 from exulanica.world_package.projects.link import read_link
-from exulanica.world_package.projects.publish import PUBLICATIONS_PER_DAY, publish_automatically
-from exulanica.world_package.projects.repository import Author, Project
+from exulanica.world_package.projects.publish import (
+    PUBLICATIONS_PER_DAY,
+    github_view,
+    publish_automatically,
+)
+from exulanica.world_package.projects.repository import (
+    EVIDENCE_DIR,
+    PROJECT_FILE,
+    Author,
+    Project,
+)
 from exulanica.world_package.projects.schema import Closed, Instant, Name, scan_values, unique
 from exulanica.world_package.projects.watch import Policy, Watcher
 
@@ -116,6 +134,22 @@ class FollowSettings(Closed):
         policy_of(self.model_dump())
         scan_values(self.model_dump())
         return self
+
+
+def _held_status(folder: Path) -> dict[str, Any] | None:
+    """The state the follower last wrote beside a project, or None."""
+    try:
+        path = folder / STATUS_FILE
+        if path.is_file() and not path.is_symlink():
+            return status_document(json.loads(path.read_bytes()))
+    except (OSError, ValueError, StatusRefused):
+        return None
+    return None
+
+
+def _stamp(seconds: float) -> str:
+    """An instant in the project files' one spelling."""
+    return datetime.fromtimestamp(seconds, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def policy_of(settings: Mapping[str, Any]) -> Policy:
@@ -516,17 +550,61 @@ class Follower:
                 continue
             item.due = now + item.watcher.policy.poll_seconds
             outcome = self._attempt(item.watcher.step)
-            told += self._told(item, outcome)
+            said = self._told(item, outcome)
+            told += said
             if outcome.get("state") == "checkpointed":
                 told += self._publish(item)
+            elif said:
+                self._report(item)
         return told
 
+    def _report(self, item: _Followed, github: Mapping[str, Any] | None = None) -> None:
+        """Write the project's state beside it, where the server reads it
+        (:mod:`exulanica.world.project_status`): its checkpoints, whether changes wait, its link
+        and what GitHub last said, kept from the last write unless `github` is new. Never
+        committed, never published; a state that cannot be written stops nothing."""
+        folder = Path(item.project.folder)
+        previous = _held_status(folder)
+        try:
+            saved = item.project.git(
+                "log", "--format=%ct", "--", PROJECT_FILE, EVIDENCE_DIR
+            ).split()
+            link = read_link(folder)
+            held = None if previous is None else previous["github"]
+            document = {
+                "profile": STATUS_PROFILE,
+                "world_id": item.settings["world_id"],
+                "version_id": item.settings["version_id"],
+                "written_at": _stamp(self.clock()),
+                "checkpoints": len(saved),
+                "last_checkpoint_at": _stamp(float(saved[0])) if saved else None,
+                "pending": item.state in _PENDING,
+                "link": None
+                if link is None
+                else {
+                    "repository": link["repository"],
+                    "publish": "automatic" if link.get("publish") == "automatic" else "by hand",
+                },
+                "github": None if link is None else (github if github is not None else held),
+            }
+            if previous is not None and {**previous, "written_at": ""} == {
+                **status_document(document),
+                "written_at": "",
+            }:
+                return
+            write_status(folder, document)
+        except (ProjectError, OSError, ValueError, StatusRefused):
+            return
+
     def _publish(self, item: _Followed) -> list[dict[str, Any]]:
-        """After a checkpoint, publish the project on its own where its link says so. A pause or
-        hold is told once; every publication is told."""
+        """After a checkpoint, publish the project on its own where its link says so, then read
+        once what its repository holds of it, for the server's read of the project's state. A
+        pause or hold is told once; every publication is told."""
+        link = None
         try:
             link = read_link(item.project.folder)
             if link is None:
+                self._report(item)
                 return []
             limits = item.settings.get("limits") or {}
             outcome = publish_automatically(
@@ -540,6 +618,19 @@ class Follower:
             outcome = {"state": "refused", "error": str(exc)}
         except Exception as exc:
             outcome = {"state": "refused", "error": type(exc).__name__}
+        if link is not None:
+            held = _held_status(Path(item.project.folder))
+            try:
+                view = github_view(
+                    item.project,
+                    link,
+                    request=self.github,
+                    now=self.clock(),
+                    previous=None if held is None else held["github"],
+                )
+            except Exception:
+                view = None
+            self._report(item, view)
         if outcome is None:
             return []
         said = (outcome["state"], outcome.get("error"))

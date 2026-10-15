@@ -168,3 +168,46 @@ def publish_automatically(
         reason = f"publication stopped on {type(exc).__name__}; its outcome is unknown"
         return {"state": "paused", "error": pause(folder, reason, now)["paused"]["reason"]}
     return {"state": "published", "actions": result["actions"]}
+
+
+def github_view(
+    project: Any,
+    link: Mapping[str, Any],
+    *,
+    request: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+    now: float,
+    previous: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """What a project's repository holds of it, read once (GitHub reads only): its visibility,
+    how many saved checkpoints it does not hold yet, the open rolling pull request, and a pause of
+    sending on its own. Where GitHub cannot be read, the last view is kept and said unreached."""
+    client = RollingPullRequests(request)
+    target = BranchTarget(link["repository"], link["base"], link["branch"])
+    paused = read_state(Path(project.folder))["paused"]
+    try:
+        remote = client.read(target)
+        current = remote.branch_files if remote.branch_files is not None else remote.base_files
+        # The commits a publication would make: what the repository does not hold yet.
+        not_sent = len(client._steps(project, current, None))
+    except ProjectError:
+        held = dict(previous or {})
+        return {
+            "read_at": _instant(now),
+            "visibility": held.get("visibility", "unstated"),
+            "not_sent": held.get("not_sent", 0),
+            "pull_request": held.get("pull_request"),
+            "paused": paused,
+            "reached": False,
+        }
+    visibility = remote.visibility
+    pull = remote.pull_request
+    return {
+        "read_at": _instant(now),
+        "visibility": visibility if visibility in ("PRIVATE", "PUBLIC", "INTERNAL") else "unstated",
+        "not_sent": not_sent,
+        "pull_request": None
+        if pull is None
+        else {"number": int(pull["number"]), "title": str(pull["title"])[:256] or "Changes"},
+        "paused": paused,
+        "reached": True,
+    }
