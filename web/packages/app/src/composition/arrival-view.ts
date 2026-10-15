@@ -21,9 +21,9 @@
  * town's own first view, as for a town with nothing placed. Everything is in the region's plan frame:
  * millimetres east and south.
  */
-import type { LifeViewRule, OpenViewRule } from '../town-first-view.js';
+import { FIRST_VIEW_DEFAULTS, type LifeViewRule, type OpenViewRule, type PlacedViewRule } from '../town-first-view.js';
 
-export type { LifeViewRule, OpenViewRule };
+export type { LifeViewRule, OpenViewRule, PlacedViewRule };
 
 /** A vehicle's footprint on the plan: its middle, half its length and width, and its heading. */
 export interface PlanFootprint {
@@ -44,20 +44,13 @@ export interface ArrivalView {
   readonly moved: boolean;
 }
 
-/** How far a step along the footway or back from the kerb goes, and the most steps each way. */
-export const ARRIVAL_STEP_MM = 1500;
-export const ARRIVAL_STEPS = 8;
-/** Room kept round a parked vehicle's footprint so the sight line does not graze it. */
-const CLEARANCE_MM = 300;
-/** Where to look with nothing placed: this far ahead the way a person arriving faces. */
-const AHEAD_MM = 10_000;
-
 const yawToward = (fromEast: number, fromSouth: number, toEast: number, toSouth: number): number =>
   Math.atan2(-(toEast - fromEast), -(toSouth - fromSouth));
 
-/** Whether the segment from a to b passes through the footprint, grown by the clearance. */
+/** Whether the segment from a to b passes through the footprint, grown by `clearanceMm` all round. */
 export function crosses(
   a: readonly [number, number], b: readonly [number, number], footprint: PlanFootprint,
+  clearanceMm: number = FIRST_VIEW_DEFAULTS.placed.parkedClearanceMm,
 ): boolean {
   // Carry the segment into the footprint's own frame, where it is an axis-aligned box.
   const cos = Math.cos(-footprint.heading);
@@ -69,8 +62,8 @@ export function crosses(
   };
   const [ax, ay] = local(a);
   const [bx, by] = local(b);
-  const hx = footprint.halfLengthMm + CLEARANCE_MM;
-  const hy = footprint.halfWidthMm + CLEARANCE_MM;
+  const hx = footprint.halfLengthMm + clearanceMm;
+  const hy = footprint.halfWidthMm + clearanceMm;
   // Slab test: the part of the segment inside each pair of sides must overlap.
   let low = 0;
   let high = 1;
@@ -113,12 +106,12 @@ export function openDistance(
   return nearest;
 }
 
-/** A parked vehicle's footprint, grown by the clearance, as a plan ring. */
-function footprintRing(footprint: PlanFootprint): SightBlocker {
+/** A parked vehicle's footprint, grown by `clearanceMm` all round, as a plan ring. */
+function footprintRing(footprint: PlanFootprint, clearanceMm: number): SightBlocker {
   const cos = Math.cos(footprint.heading);
   const sin = Math.sin(footprint.heading);
-  const hx = footprint.halfLengthMm + CLEARANCE_MM;
-  const hy = footprint.halfWidthMm + CLEARANCE_MM;
+  const hx = footprint.halfLengthMm + clearanceMm;
+  const hy = footprint.halfWidthMm + clearanceMm;
   return ([[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]] as const).map(([x, y]) => [
     footprint.eastMm + x * cos - y * sin, footprint.southMm + x * sin + y * cos,
   ] as const);
@@ -336,7 +329,7 @@ function openView(
         for (const way of [1, -1]) {
           const toward = turned(way * rule.slant);
           // Off the line people walk is worth a little: walkers then cross the view, not the viewer.
-          const score = viewOpenness([east, south], toward, rings, rule) + (back > 0 ? 0.05 : 0);
+          const score = viewOpenness([east, south], toward, rings, rule) + (back > 0 ? rule.offLineBonus ?? FIRST_VIEW_DEFAULTS.offLineBonus : 0);
           const moved = Math.hypot(along, behind);
           if (best === null || score > best.score + rule.tie || (Math.abs(score - best.score) <= rule.tie && moved < best.moved)) {
             best = {
@@ -434,7 +427,7 @@ function liveliestView(
             clear: room >= 1,
             life: lifeInFan(seen, toward, rule.fanHalf),
             // Off the line people walk is worth a little: walkers then cross the view, not the viewer.
-            open: viewOpenness(spot, toward, rings, rule) + (back > 0 ? 0.05 : 0),
+            open: viewOpenness(spot, toward, rings, rule) + (back > 0 ? rule.offLineBonus ?? FIRST_VIEW_DEFAULTS.offLineBonus : 0),
             moved: Math.hypot(along, behind),
           };
           if (best === null || better(judged, best)) best = judged;
@@ -474,19 +467,22 @@ export function arrivalView(input: {
   const townView = (rule: OpenViewRule): ArrivalView => {
     // A rule that judges by life reads the town's own records alone: what is parked is the traffic's
     // state at the second of opening, read with a limit, and would make two openings differ.
+    const clearance = (rule.placed ?? FIRST_VIEW_DEFAULTS.placed).parkedClearanceMm;
     const rings = rule.life === undefined
-      ? [...(input.blockers ?? []), ...input.parked.map(footprintRing)] : input.blockers ?? [];
+      ? [...(input.blockers ?? []), ...input.parked.map((one) => footprintRing(one, clearance))] : input.blockers ?? [];
     return openView(input, ahead, rings, rule, input.life ?? { seats: [], doors: [] });
   };
   if (input.targets.length === 0 && input.open !== undefined) return townView(input.open);
+  // How the view steps to a spot that sees the placed things: the rule's figures, else the defaults.
+  const placed = input.open?.placed ?? FIRST_VIEW_DEFAULTS.placed;
   const aim: [number, number] = input.targets.length === 0
-    ? [eastMm + ahead[0] * AHEAD_MM, southMm + ahead[1] * AHEAD_MM]
+    ? [eastMm + ahead[0] * FIRST_VIEW_DEFAULTS.aimAheadMm, southMm + ahead[1] * FIRST_VIEW_DEFAULTS.aimAheadMm]
     : [
       input.targets.reduce((sum, [east]) => sum + east, 0) / input.targets.length,
       input.targets.reduce((sum, [, south]) => sum + south, 0) / input.targets.length,
     ];
   const blocking = (east: number, south: number): PlanFootprint[] =>
-    input.parked.filter((footprint) => crosses([east, south], aim, footprint));
+    input.parked.filter((footprint) => crosses([east, south], aim, footprint, placed.parkedClearanceMm));
   /**
    * Whether a spot sees the placed things by the town's own records: nothing else at eye height stands
    * between them and, where the rule states how near something may stand dead ahead (version 2 of the
@@ -515,11 +511,11 @@ export function arrivalView(input: {
   // Along the footway (across the way a person faces) first, nearest first, then back from the kerb.
   const across: [number, number] = [-ahead[1], ahead[0]];
   const candidates: [number, number, number][] = [];
-  for (let back = 0; back <= 3; back += 1) {
-    for (let step = 1; step <= ARRIVAL_STEPS; step += 1) {
+  for (let back = 0; back <= placed.stepsBack; back += 1) {
+    for (let step = 1; step <= placed.stepsAlong; step += 1) {
       for (const side of [1, -1]) {
-        const along = side * step * ARRIVAL_STEP_MM;
-        const behind = back * ARRIVAL_STEP_MM;
+        const along = side * step * placed.stepMm;
+        const behind = back * placed.stepMm;
         candidates.push([
           eastMm + across[0] * along - ahead[0] * behind,
           southMm + across[1] * along - ahead[1] * behind,
@@ -527,7 +523,7 @@ export function arrivalView(input: {
         ]);
       }
     }
-    if (back > 0) candidates.push([eastMm - ahead[0] * back * ARRIVAL_STEP_MM, southMm - ahead[1] * back * ARRIVAL_STEP_MM, back * ARRIVAL_STEP_MM]);
+    if (back > 0) candidates.push([eastMm - ahead[0] * back * placed.stepMm, southMm - ahead[1] * back * placed.stepMm, back * placed.stepMm]);
   }
   candidates.sort((a, b) => a[2] - b[2]);
   const standing = candidates.filter(([east, south]) => input.ground(east, south));
@@ -541,11 +537,10 @@ export function arrivalView(input: {
     // spot that sees them past every parked car; where none does, the town's own first view, so the
     // first look is always at the town and never at a wall.
     const out: [number, number, number][] = [];
-    for (let forward = 1; forward <= ARRIVAL_STEPS; forward += 1) {
-      for (let step = 0; step <= ARRIVAL_STEPS; step += 1) {
+    for (let outward = placed.stepMm; outward <= placed.outReachMm; outward += placed.stepMm) {
+      for (let step = 0; step <= placed.stepsAlong; step += 1) {
         for (const side of step === 0 ? [1] : [1, -1]) {
-          const along = side * step * ARRIVAL_STEP_MM;
-          const outward = forward * ARRIVAL_STEP_MM;
+          const along = side * step * placed.stepMm;
           out.push([eastMm + across[0] * along + ahead[0] * outward, southMm + across[1] * along + ahead[1] * outward, Math.hypot(along, outward)]);
         }
       }
@@ -561,7 +556,7 @@ export function arrivalView(input: {
   let best: [number, number, number] | null = sees(eastMm, southMm) ? [eastMm, southMm, nearestBlock(eastMm, southMm)] : null;
   for (const [east, south] of seeing) {
     const distance = nearestBlock(east, south);
-    if (best === null || distance > best[2] + 500) best = [east, south, distance];
+    if (best === null || distance > best[2] + placed.parkedFartherMm) best = [east, south, distance];
   }
   if (best === null || (best[0] === eastMm && best[1] === southMm)) return served;
   return moved(best);

@@ -3,6 +3,7 @@ import {
   arrivalView, crosses, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
   type LifeViewRule, type OpenViewRule, type SightBlocker,
 } from '../src/composition/arrival-view.js';
+import { FIRST_VIEW_DEFAULTS } from '../src/town-first-view.js';
 
 /*
  * A guest's first look at a dressed town (SERVER's first frame): the scene stands across the street
@@ -46,6 +47,17 @@ describe('the first view of a dressed town', () => {
   it('keeps the served spot where no clear spot is near', () => {
     const view = arrivalView({ eastMm: 0, southMm: 0, facing: [0, -1], targets: scene, parked: [car], ground: () => false });
     expect(view).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
+  });
+
+  it('keeps the served spot over one whose car in the way is only a little farther off', () => {
+    // One spot a step east to stand on; the same car is in the way from both, 376 mm farther from it.
+    const two = (east: number, south: number) => south === 0 && (east === 0 || east === 1_500);
+    const kept = arrivalView({ eastMm: 0, southMm: 0, facing: [0, -1], targets: scene, parked: [car], ground: two });
+    expect(kept).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
+    // A rule that takes any farther car takes the step.
+    const anyFarther = { ...RULE, placed: { ...FIRST_VIEW_DEFAULTS.placed, parkedFartherMm: 0 } };
+    expect(arrivalView({ eastMm: 0, southMm: 0, facing: [0, -1], targets: scene, parked: [car], ground: two, open: anyFarther }))
+      .toMatchObject({ eastMm: 1_500, southMm: 0, moved: true });
   });
 
   it('stands back from a kerb lined with parked cars, where no spot near sees past them, so the nearest stands smaller', () => {
@@ -140,6 +152,8 @@ describe('the first view of a town with nothing placed', () => {
     // Where there is no ground behind the line, it stays on it.
     const kerbOnly = arrivalView({ ...town, ground: (_east, south) => south <= 0 && south >= -2_500, blockers: [opposite, behind], open: RULE });
     expect(kerbOnly.southMm).toBeLessThanOrEqual(0);
+    // With no worth stated for standing off the line, nothing takes it off the line.
+    expect(arrivalView({ ...town, blockers: [opposite, behind], open: { ...RULE, offLineBonus: 0 } })).toMatchObject({ southMm: 0, moved: false });
   });
 
   it('turns the other way along the street from a lamp post in its face', () => {
@@ -496,6 +510,16 @@ describe('the first view of a town with things placed, by what its records stand
     expect(view).toMatchObject({ eastMm: 0, southMm: -7_500, moved: true });
     expect(looks(view.yaw)[1]).toBeCloseTo(1, 9);
     expect(nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), LIFE.centreHalf, street)).toBeGreaterThanOrEqual(LIFE.centreFloorMm);
+  });
+
+  it('steps by the figures its rule states', () => {
+    const against: [number, number][] = [[0, 2_500]];
+    const placed = { stepMm: 2_000, stepsAlong: 8, stepsBack: 3, outReachMm: 12_000, parkedClearanceMm: 300, parkedFartherMm: 500 };
+    // Steps of 2 m: the first spot out with the wall at least 10 m off is 8 m out, not 7.5.
+    expect(arrivalView({ ...dressed, targets: against, open: { ...LIVELY, placed } })).toMatchObject({ eastMm: 0, southMm: -8_000, moved: true });
+    // A reach of one step out finds no such spot, however far along: the town's own first view.
+    const short = { ...LIVELY, placed: { ...placed, stepMm: 1_500, outReachMm: 1_500 } };
+    expect(arrivalView({ ...dressed, targets: against, open: short })).toEqual(arrivalView({ ...dressed, targets: [], open: short }));
   });
 
   it('takes the town\'s own first view where what is placed stands inside a building', () => {

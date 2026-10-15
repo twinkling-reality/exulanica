@@ -203,7 +203,7 @@ the kerb, to the nearest spot on drawn ground that sees it past every parked veh
 (`composition/arrival-view.ts`); where a parked vehicle is in the way from every such spot, it takes
 the one whose nearest vehicle in the way is farthest. Where no spot near the footway sees it at all,
 because it stands inside or close against a building, the view steps out toward and across the
-street, at most 12 m, to the nearest spot that does, and where none does, the town opens as one with
+street, at most the reach the rule states (12 m), to the nearest spot that does, and where none does, the town opens as one with
 nothing placed in it. A town with nothing placed in it is not looked at straight across the road, at the wall
 opposite: the first view looks along the street at a slant, one way or the other, from the served spot
 or a few steps from it on drawn ground (back from the kerb, off the line people walk, or along the
@@ -219,10 +219,13 @@ the served spot. That choice reads the town's own tiles and
 its served arrival and nothing that arrives later: parked vehicles do not enter it, so a town opens the
 same way when it is made and each time it is opened again. Whether anything is placed is read from the
 world's version and waited for; only a town with things placed asks what is parked, with a time limit,
-so a dressed town's standpoint can still differ by what is parked when it opens. Each figure of the rule
-is a chosen default stated with its reason in `assets/catalogs/arrival/town-first-view.v3.json`; versions
-1 and 2 of that catalog (by openness alone; by life with no least distance) stay beside it and are read by
-the same reader. A world
+so a dressed town's standpoint can still differ by what is parked when it opens. Each figure of the rule,
+for a town with things placed in it as for one with none, is a chosen default stated with its reason in
+`assets/catalogs/arrival/town-first-view.v4.json`: the steps tried and how far, the room kept round a
+parked vehicle, how much farther a vehicle in the way must be for another spot to be taken, and what
+standing off the walking line is worth. Versions 1 to 3 of that catalog (by openness alone; by life with no
+least distance; with one) stay beside it and are read by the same reader, with those figures at the
+values version 4 states, so a town opens as it did under them. A world
 with people in it that opens paused keeps "The world is paused. Press Play to let it
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
 not said for it again; the world never plays by itself. Where nothing is placed in it and none of its

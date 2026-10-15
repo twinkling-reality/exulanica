@@ -1,15 +1,17 @@
 /**
- * How the first view of a generated town is chosen where nothing is placed in it, read from the
- * data files that state each value with its reason, `assets/catalogs/arrival/town-first-view.v3.json`
- * and the versions before it. Presentation only.
+ * How the first view of a generated town is chosen, read from the data files that state each value
+ * with its reason, `assets/catalogs/arrival/town-first-view.v4.json` and the versions before it.
+ * Presentation only.
  *
  * Version 1 chooses the most open view. Version 2 chooses by what of the town's life lies in view
  * (its seats and doors), with openness to break a tie and nothing at eye height dead ahead. Version
  * 3 is version 2 with a least distance under which a seat or a door does not count, so the view
- * does not walk up to a bench to stand behind it; it is the version the page opens a town by. All
- * stay readable: `firstViewRule` reads any of the three files.
+ * does not walk up to a bench to stand behind it. Version 4 is version 3 with the figures the view
+ * of placed things and the preference for standing off the walking line were chosen by; it is the
+ * version the page opens a town by. All stay readable: `firstViewRule` reads any of the four files,
+ * and an earlier one with those figures as `FIRST_VIEW_DEFAULTS` states them.
  */
-import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v3.json?raw';
+import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v4.json?raw';
 
 /**
  * How a view is judged by the town's life, as version 2 of the catalog states it: angles in
@@ -37,8 +39,26 @@ export interface LifeViewRule {
 }
 
 /**
- * How the first view is chosen where nothing is placed, as a town first-view catalog states it:
- * angles in radians, lengths in millimetres.
+ * How the first view of a town with things placed in it steps to a spot that sees them, as version 4
+ * of the catalog states it, in millimetres.
+ */
+export interface PlacedViewRule {
+  /** The step between the spots tried, along the footway, back from the kerb and out toward the street. */
+  readonly stepMm: number;
+  /** How many steps along the footway either way, and back from the kerb. */
+  readonly stepsAlong: number;
+  readonly stepsBack: number;
+  /** How far out toward and across the street, where no spot near the footway sees them. */
+  readonly outReachMm: number;
+  /** Room kept round a parked vehicle's footprint. */
+  readonly parkedClearanceMm: number;
+  /** How much farther a spot's nearest vehicle in the way must be for that spot to be taken instead. */
+  readonly parkedFartherMm: number;
+}
+
+/**
+ * How the first view is chosen, as a town first-view catalog states it: angles in radians, lengths
+ * in millimetres.
  */
 export interface OpenViewRule {
   /** How far the view is turned from straight across the road toward each way along it. */
@@ -60,7 +80,24 @@ export interface OpenViewRule {
   readonly tie: number;
   /** Version 2: the view is chosen by the town's life first. Absent in version 1. */
   readonly life?: LifeViewRule;
+  /** What standing back from the kerb, off the line people walk, adds to a view's openness. */
+  readonly offLineBonus?: number;
+  /** How a view of placed things steps to a spot that sees them. */
+  readonly placed?: PlacedViewRule;
 }
+
+/**
+ * The figures versions 1 to 3 of the catalog do not state, as the page chose by them before version 4
+ * stated them, and as a caller that hands no rule is answered by. `aimAheadMm` is where a town with
+ * nothing placed is looked at when no rule is handed at all: that far ahead the way its entry says.
+ */
+export const FIRST_VIEW_DEFAULTS = Object.freeze({
+  offLineBonus: 0.05,
+  placed: Object.freeze({
+    stepMm: 1_500, stepsAlong: 8, stepsBack: 3, outReachMm: 12_000, parkedClearanceMm: 300, parkedFartherMm: 500,
+  } satisfies PlacedViewRule),
+  aimAheadMm: 10_000,
+});
 
 interface FirstViewEntry {
   readonly key: string;
@@ -69,9 +106,31 @@ interface FirstViewEntry {
   readonly reason: string;
 }
 
-const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3> = new Map([
+const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4> = new Map([
   ['exulanica.town-first-view/v1', 1], ['exulanica.town-first-view/v2', 2], ['exulanica.town-first-view/v3', 3],
+  ['exulanica.town-first-view/v4', 4],
 ]);
+
+/** The figures of version 4 an earlier version is read with. */
+const FIRST_VIEW_DEFAULTS_STATED = Object.freeze({ offLineBonus: FIRST_VIEW_DEFAULTS.offLineBonus, placed: FIRST_VIEW_DEFAULTS.placed });
+
+/** Version 4's figures for the view of placed things, refused where they cannot be stepped by. */
+function statedPlaced(
+  stated: (key: string, unit: string) => number, millimetres: (key: string) => number, thousandths: (key: string) => number,
+): { readonly offLineBonus: number; readonly placed: PlacedViewRule } {
+  const placed: PlacedViewRule = Object.freeze({
+    stepMm: millimetres('placed_step_mm'),
+    stepsAlong: stated('placed_steps_along', 'count'),
+    stepsBack: stated('placed_steps_back', 'count'),
+    outReachMm: millimetres('placed_out_reach_mm'),
+    parkedClearanceMm: millimetres('parked_clearance_mm'),
+    parkedFartherMm: millimetres('parked_farther_mm'),
+  });
+  if (!(placed.stepMm > 0) || !Number.isInteger(placed.stepsAlong) || !Number.isInteger(placed.stepsBack)) {
+    throw new Error('the town first-view catalog states a step of nothing, or a part of a step');
+  }
+  return { offLineBonus: thousandths('off_line_bonus_milli'), placed };
+}
 
 /** The rule a town first-view catalog file states, of any version; a file of none of them is refused. */
 export function firstViewRule(text: string): OpenViewRule {
@@ -106,6 +165,7 @@ export function firstViewRule(text: string): OpenViewRule {
     alongStepMm: millimetres('along_step_mm'),
     alongMaximumMm: millimetres('along_maximum_mm'),
     tie: thousandths('tie_milli'),
+    ...(version < 4 ? FIRST_VIEW_DEFAULTS_STATED : statedPlaced(stated, millimetres, thousandths)),
   };
   if (version === 1) return Object.freeze(rule);
   const life: LifeViewRule = Object.freeze({
