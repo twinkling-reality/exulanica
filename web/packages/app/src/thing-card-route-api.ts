@@ -56,6 +56,21 @@ export interface ThingCardRoute {
   readonly draftedBy: { readonly provider: string; readonly modelId: string; readonly name: string } | null;
   /** The society's minute and the digest of its record as the card was read. */
   readonly society: { readonly tick: number; readonly stateSha256: string };
+  /**
+   * Who the world's owner wrote a being they placed to be (`exulanica.thing-character/v1`), with
+   * the revision the next write names; null for anything that is not a placed being.
+   */
+  readonly character?: ThingCharacter | null;
+}
+
+/** An owner-written character: the newest record's revision and words, and whether its society reads it. */
+export interface ThingCharacter {
+  /** The newest record's revision, or null where none was ever written. */
+  readonly revision: number | null;
+  /** The name and words, or null where none is written or the last write cleared it. */
+  readonly character: { readonly name: string | null; readonly about: string | null } | null;
+  /** Whether this society shows it to the being's model: it recorded the character module. */
+  readonly shown: boolean;
 }
 
 const DIGEST = /^[0-9a-f]{64}$/u;
@@ -134,6 +149,20 @@ export function readThingCardRoute(value: unknown): ThingCardRoute {
       tick: count(society['tick'], 'society minute', 0),
       stateSha256: digest(society['state_sha256'], 'society record digest'),
     },
+    ...(held['character'] === undefined ? {} : { character: held['character'] === null ? null : readCharacter(held['character']) }),
+  };
+}
+
+/** A character as the card and the write route state it. */
+function readCharacter(value: unknown): ThingCharacter {
+  const held = object(value, 'character');
+  const revision = held['revision'] === null ? null : count(held['revision'], 'character revision', 1);
+  const words = held['character'] === null ? null : object(held['character'], 'character words');
+  const either = (field: unknown, what: string): string | null => (field === undefined || field === null ? null : text(field, what));
+  return {
+    revision,
+    character: words === null ? null : { name: either(words['name'], 'character name'), about: either(words['about'], 'character words') },
+    shown: held['shown'] === true,
   };
 }
 
@@ -191,4 +220,33 @@ export async function chooseThingLook(
   const body = await response.json().then((read: unknown) => read, () => null) as { code?: unknown } | null;
   const code = typeof body?.code === 'string' ? body.code : `http_${response.status}`;
   return { chosen: false, code };
+}
+
+/** What came of writing a character: the record as the server answers it, or why it was refused, by code. */
+export type CharacterWriteOutcome =
+  | { readonly written: true; readonly revision: number; readonly character: ThingCharacter['character'] }
+  | { readonly written: false; readonly code: string };
+
+/**
+ * Write who a being its owner placed is (`POST /world/versions/{id}/things/{placed_id}/character`),
+ * against the revision the card was read at; null clears it. The server refuses by code
+ * (`character_out_of_bounds`, `character_carries_a_saved_name`, `character_for_beings_only`,
+ * `character_changed`, `no_change`).
+ */
+export async function writeThingCharacter(
+  access: Credentials, worldId: string, versionId: string, placedId: string, baseRevision: number | null,
+  character: { readonly name: string | null; readonly about: string | null } | null, fetcher: typeof fetch = fetch,
+): Promise<CharacterWriteOutcome> {
+  const response = await fetcher(`${access.baseUrl}/world/versions/${encodeURIComponent(versionId)}/things/${encodeURIComponent(placedId)}/character?world_id=${encodeURIComponent(worldId)}`, {
+    method: 'POST',
+    headers: { ...accessHeaders(access, 'POST'), 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ base_revision: baseRevision, character }),
+  });
+  const body = await response.json().then((read: unknown) => read, () => null) as Record<string, unknown> | null;
+  if (!response.ok) return { written: false, code: typeof body?.['code'] === 'string' ? body['code'] as string : `http_${response.status}` };
+  // The write answers whether the society reads it as a word: runs_characters, began_before_characters or none.
+  const held = object(body, 'character record');
+  const record = readCharacter({ ...held, shown: held['society'] === 'runs_characters' });
+  return { written: true, revision: record.revision ?? invalid('character revision'), character: record.character };
 }

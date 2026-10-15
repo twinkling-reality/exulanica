@@ -20,7 +20,23 @@ function assertExecutionBinding(models, control, entry) {
   if (control.versionId !== entry.authoredVersionId || models.societyId !== control.societyId) throw Error('The world’s running state could not be verified.');
 }
 
-export async function runSelectedModel({ modelsClient, controlClient, entry, subjectId, expectedModel, current, refresh }) {
+/** The run (living session) the control read states is open, or null. */
+export function openRun(control) {
+  return control?.livingSession?.state === 'open' ? control.livingSession : null;
+}
+
+/** How many characters a run would ask a model for: those whose current choice is a model. */
+export function modelAskers(models) {
+  return models?.choices.filter(choice => choice.model).length ?? 0;
+}
+
+/**
+ * Start a run for the world this character lives in: the same checks as before (the entity, its
+ * model, the world's readiness), then one living session with `limits`, opened on the paused read
+ * and verified open. A world already in a run answers that run; a world playing without one is
+ * refused by the server (`society_not_paused`), never paused here on the person's behalf.
+ */
+export async function startRun({ modelsClient, controlClient, entry, subjectId, expectedModel, current, refresh, limitsFor, requestId }) {
   const fresh = await refresh();
   if (!current() || fresh.row.scene?.id !== subjectId || fresh.inventory.world_id !== entry.worldId || fresh.inventory.version_id !== entry.authoredVersionId) throw Error('The selected entity changed. Open it again.');
   if (assignmentSubject(fresh.inventory, fresh.row, fresh.offer)?.subjectId !== subjectId) throw Error('Model control is no longer available for this entity.');
@@ -31,11 +47,21 @@ export async function runSelectedModel({ modelsClient, controlClient, entry, sub
   const readiness = modelRunState(models, control, subjectId);
   if (!readiness.ready) throw Error(readiness.reason);
   if (!current()) throw Error('The world changed. Open it again.');
-  if (control.mode === 'playing') return control;
-  await controlClient.configure(control, 'playing', control.speed);
+  if (openRun(control)) return control;
+  const opened = await controlClient.openSession(control, limitsFor(control, models), requestId);
   const verified = await controlClient.read(entry.authoredVersionId);
-  if (verified.versionId !== entry.authoredVersionId || verified.societyId !== control.societyId || verified.mode !== 'playing') throw Error('The model is assigned, but world playback could not be confirmed. Refresh its activity.');
+  if (verified.versionId !== entry.authoredVersionId || verified.societyId !== control.societyId || openRun(verified)?.sessionId !== opened.sessionId) throw Error('The run started, but it could not be confirmed. Look again in a moment.');
   return verified;
+}
+
+/** Stop the open run: the world pauses and the run closes, as the server answers it. */
+export async function stopRun({ controlClient, entry, current }) {
+  const control = await controlClient.read(entry.authoredVersionId);
+  if (control.versionId !== entry.authoredVersionId || !current()) throw Error('The world changed. Open it again.');
+  const run = openRun(control);
+  if (!run) return control;
+  await controlClient.stopSession(entry.authoredVersionId, run.sessionId);
+  return controlClient.read(entry.authoredVersionId);
 }
 
 /**
@@ -47,16 +73,27 @@ function newestEvents(events, subjectId, count) {
     .sort((a, b) => b.event.tick - a.event.tick || b.index - a.index).slice(0, count).map(item => item.event);
 }
 
-/** Observe through existing authenticated clients; never advance a tick or ask a provider. */
-export async function readEntityActivity({ modelsClient, controlClient, societyClient, entry, subjectId, current }) {
+/** How many of the society's newest applied decisions one read takes, for a being's newest choices. */
+const CHOICES_READ = 64;
+
+/**
+ * Observe through existing authenticated clients; never advance a tick or ask a provider. With
+ * `read` (an authenticated GET of a path), `choices` holds the being's applied decisions from the
+ * events read kept to that kind, so a world of many people still shows its own; without it, from
+ * the newest events.
+ */
+export async function readEntityActivity({ modelsClient, controlClient, societyClient, entry, subjectId, current, read = null }) {
   const [models, control, society] = await Promise.all([modelsClient.read(entry.authoredVersionId), controlClient.read(entry.authoredVersionId), societyClient.read(entry.authoredVersionId)]);
   assertExecutionBinding(models, control, entry);
   if (society.versionId !== entry.authoredVersionId || society.societyId !== models.societyId || !current()) throw Error('The selected world changed.');
   const person = society.state.inhabitants.find(item => item.id === subjectId);
   if (!person) throw Error('This character is no longer in the world.');
-  const events = await societyClient.events(society);
+  const [events, applied] = await Promise.all([societyClient.events(society), read
+    ? read(`/world/versions/${encodeURIComponent(entry.authoredVersionId)}/society/events?world_id=${encodeURIComponent(entry.worldId)}&kinds=decision_applied&limit=${CHOICES_READ}`)
+    : null]);
   if (!current()) throw Error('The activity view is no longer open.');
-  return { models, control, person, events: newestEvents(events, subjectId, 6), latest: models.latest.find(item => item.subjectId === subjectId) || null, tick: society.currentTick };
+  const choices = (Array.isArray(applied?.events) ? applied.events : events).filter(event => event.subject_id === subjectId && event.event_kind === 'decision_applied');
+  return { models, control, person, events: newestEvents(events, subjectId, 6), choices, latest: models.latest.find(item => item.subjectId === subjectId) || null, tick: society.currentTick };
 }
 
 export function decisionView(data, entry, subjectId) {

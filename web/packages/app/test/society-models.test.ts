@@ -146,7 +146,7 @@ describe('reading who decides', () => {
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'rejected', dispositionReason: 'place_taken_this_minute' }))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but someone else took that place first, so their routine decided.');
     expect(latestDecisionWords({ ...view.latest[0]!, status: 'unavailable', reason: 'model_timed_out', disposition: 'unavailable', chose: null }))
-      .toBe('At simulated minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because it did not answer in time.');
+      .toBe('At simulated minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because their model did not answer in time.');
     // A request closed after its minute is told by the minute the routine decided, not the later
     // minute that took up its receipt.
     expect(latestDecisionWords({ ...view.latest[0]!, baseTick: 6, consumedTick: 9, status: 'unavailable',
@@ -160,7 +160,7 @@ describe('reading who decides', () => {
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but something else already decided for them this minute, and that came first.');
     // Every decision not acted on is counted once, under why.
     expect(summaryWords(view.byModel[0]!)).toBe(
-      'Nemotron 3 Nano 30B: 5 decisions, 3 acted on, 2 not acted on (1 because it did not answer in time; '
+      'Nemotron 3 Nano 30B: 5 decisions, 3 acted on, 2 not acted on (1 because their model did not answer in time; '
       + '1 because someone else took that place first). Half its answers came within 1.2 s, 95 in 100 within 2.9 s. '
       + 'Cost $0.000420.',
     );

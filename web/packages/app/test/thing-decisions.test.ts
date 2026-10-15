@@ -31,7 +31,7 @@ describe('what a decision line says', () => {
     expect(unfollowed).toMatch(/^Not followed: .+\. Its routine decided\.$/u);
     // Before a minute takes it up, no minute has run without it: nothing is said to have decided.
     const unconsumed = decisionLineWords(decided('knight', 1, { status: 'unavailable', reason: 'model_timed_out' }))!;
-    expect(unconsumed).toBe('Not followed: it did not answer in time. Nothing was applied from it; no minute has taken it up yet.');
+    expect(unconsumed).toBe('Not followed: their model did not answer in time. Nothing was applied from it; no minute has taken it up yet.');
     // It never says why the decider chose as it did: a decision records no reason of its decider\'s.
     for (const words of [late, refused, unfollowed, unconsumed]) expect(words).not.toMatch(/because it|it said|reason:/iu);
   });

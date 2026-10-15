@@ -3,8 +3,9 @@
  *
  * Speaks `/world/versions/{id}/society/control` (`exulanica/api/routes/society_control.py`).
  * Importing this client never starts a worker. `configure` writes mode and speed;
- * `step` advances one leased tick bound to the displayed snapshot. Every request names the open
- * world, as the society client's do.
+ * `step` advances one leased tick bound to the displayed snapshot; `openSession` and `stopSession`
+ * open and stop a living session, the only stretch of playback in which models are asked. Every
+ * request names the open world, as the society client's do.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -257,6 +258,36 @@ export function parseLivingSession(value: unknown, sessionId: string): LivingSes
   });
 }
 
+/**
+ * What opening or stopping a living session answers (`exulanica.society-session/v1`): the session
+ * as its opening and closing receipts state it. What it has used is the control read's to state.
+ */
+export interface LivingSessionAnswer {
+  readonly sessionId: string;
+  readonly state: 'open' | 'closed';
+  readonly limits: LivingSessionLimits;
+  readonly startTick: number;
+  readonly endsBy: string;
+  readonly closedReason: string | null;
+  /** Why it closed, in the server's one wording (`SESSION_CLOSED_WORDS`); null while open. */
+  readonly closedReasonWords: string | null;
+}
+
+export function parseSessionAnswer(value: unknown): LivingSessionAnswer {
+  const row = object(value);
+  if (row['profile'] !== 'exulanica.society-session/v1') invalid();
+  const opened = object(row['opened']);
+  const closed = row['closed'] === null ? null : object(row['closed']);
+  const answer: LivingSessionAnswer = {
+    sessionId: word(row['session_id']), state: state(row['state']), limits: limits(opened['limits']),
+    startTick: count(opened['start_tick']), endsBy: word(opened['ends_by']),
+    closedReason: closed === null ? null : word(closed['reason']),
+    closedReasonWords: closed === null ? null : word(closed['words']),
+  };
+  if ((answer.state === 'open') !== (closed === null)) invalid();
+  return Object.freeze(answer);
+}
+
 /** The host's statement, exactly: a reason when and only when it does not play. */
 function parseHostPlayback(value: unknown, code: unknown): HostPlayback | null {
   if (value === undefined) return null;
@@ -351,6 +382,31 @@ export class SocietyControlClient {
         society: parseSociety(row['society']),
       });
     });
+  }
+
+  /**
+   * Open a living session on the paused society the caller read, within `limits`: the one write
+   * that asks the models chosen for its beings. `requestId` is the caller's key for this opening;
+   * the same key answers the session it opened. Refused by code (`session_already_open`,
+   * `society_not_paused`, `stale_society_state`, `session_request_reused`, `invalid_session_limits`).
+   */
+  async openSession(
+    control: SocietyPlaybackControl, limits: LivingSessionLimits, requestId: string,
+  ): Promise<LivingSessionAnswer> {
+    return this.#transport.postJson<unknown>(this.#path(control.versionId, '/sessions'), {
+      request_id: requestId, base_revision: control.revision, base_tick: control.currentTick,
+      base_state_sha256: control.stateSha256, speed: control.speed,
+      limits: {
+        wall_seconds: limits.wallSeconds, minutes: limits.minutes, decisions: limits.decisions,
+        usd: limits.usd, calls: limits.calls,
+      },
+    }).then(parseSessionAnswer);
+  }
+
+  /** Stop a living session: the society pauses and it closes; one already closed answers as it closed. */
+  async stopSession(versionId: string, sessionId: string): Promise<LivingSessionAnswer> {
+    return this.#transport.postJson<unknown>(this.#path(versionId, `/sessions/${encodeURIComponent(sessionId)}/stop`), {})
+      .then(parseSessionAnswer);
   }
 
   /** One living session of the society and what it came to; reading it asks no model. */

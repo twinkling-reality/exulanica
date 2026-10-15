@@ -78,7 +78,7 @@ describe('a recorded decision, explained', () => {
     const view = explainDecisionRecord(answered('go', 'resting, 60 m away (1)'), null, walk);
     expect(view.chosen).toBe('resting, 60 m away (1)');
     expect(view.options.filter((option) => option.chosen).map((option) => option.label)).toEqual(['resting, 60 m away (1)']);
-    expect(view.answer).toBe('The engine accepted the answer: it chose one of the things they could do.');
+    expect(view.answer).toBe('The engine accepted the answer: their model chose one of the things they could do.');
     expect(view.applied).toBe('Done in minute 4.');
     expect(view.appliedAt).toBe(4);
     expect(view.changed).toEqual([
@@ -106,7 +106,7 @@ describe('a recorded decision, explained', () => {
     };
     const view = explainDecisionRecord(detail, latest({}), []);
     expect(view.chosen).toBeNull();
-    expect(view.answer).toBe('There was no usable answer: it did not answer in time. This is not a decision by the model or by the routine.');
+    expect(view.answer).toBe('There was no usable answer: their model did not answer in time. This is not a decision by the model or by the routine.');
     expect(view.applied).toBe('Nothing was applied from it. No minute has taken it up yet.');
     expect(view.changed).toEqual(['Nothing changed in the world from this answer.']);
     // The requested model never stands in for the served one, and unreported tokens are not zero.
@@ -209,13 +209,13 @@ describe('a choice told in four parts with one verdict', () => {
     const verdict = (detail: SocietyDecisionDetail, events: readonly DecisionEvent[] = []) => choiceAccount(detail, null, events).verdict;
     expect(verdict({ ...stored('a', null, 1), status: 'in_progress', decision: null }).kind).toBe('awaiting_answer');
     expect(verdict(stored('a', null, 1, { status: 'rejected', reason: 'answer_not_offered' }))).toEqual({
-      kind: 'refused', reason: 'answer_not_offered', words: 'Refused: it did not answer with one of the things they could do.',
+      kind: 'refused', reason: 'answer_not_offered', words: 'Refused: their model did not answer with one of the things they could do.',
     });
     // A timeout is nobody's decision; the routine is named only once a minute has run without it.
     expect(verdict(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' })).words)
-      .toBe('No usable answer: it did not answer in time. No minute has taken it up yet.');
+      .toBe('No usable answer: their model did not answer in time. No minute has taken it up yet.');
     expect(verdict(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' }), page([closed(4, 'a', 1, 'unavailable', 'model_timed_out')])).words)
-      .toBe('No usable answer: it did not answer in time. The routine acted in minute 4.');
+      .toBe('No usable answer: their model did not answer in time. The routine acted in minute 4.');
     expect(verdict(stored('a', 'wait here a minute', 1), page([closed(4, 'a', 1, 'stale', 'decision_context_changed')])).kind).toBe('stale');
     expect(verdict(stored('a', 'wait here a minute', 1), page([closed(4, 'a', 1, 'rejected', 'place_taken_this_minute')]))).toEqual({
       kind: 'not_applied', reason: 'place_taken_this_minute', words: 'Chosen but not done in minute 4: someone else took that place first.',

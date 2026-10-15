@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SocietyControlClient, parseLivingSession, parseSocietyControl } from '../src/society-control-api.js';
+import { SocietyControlClient, parseLivingSession, parseSessionAnswer, parseSocietyControl } from '../src/society-control-api.js';
 
 const version = 'version';
 const control = {
@@ -84,6 +84,56 @@ describe('society playback client', () => {
     expect(() => parseLivingSession({ ...sessionRead, decisions: [...sessionRead.decisions].reverse() }, 'session-1'))
       .toThrow('playback response');
   });
+
+  it('opens a run on the read it was shown, within the limits stated, under the caller\'s key', async () => {
+    const fetcher = vi.fn(async (_url, _init) => new Response(JSON.stringify(openAnswer), {
+      status: 201, headers: { 'content-type': 'application/json' },
+    }));
+    const client = new SocietyControlClient({
+      baseUrl: 'https://example.test', token: 'token', worldId: 'world:personal:control', fetch: fetcher as typeof fetch,
+    });
+    const answer = await client.openSession(parseSocietyControl(control, version), {
+      wallSeconds: 600, minutes: 10, decisions: 20, usd: '0.05000000', calls: 30,
+    }, 'opening');
+    expect(fetcher.mock.calls[0]![1]?.method).toBe('POST');
+    expect(String(fetcher.mock.calls[0]![0])).toContain('/world/versions/version/society/control/sessions?');
+    expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toEqual({
+      request_id: 'opening', base_revision: 2, base_tick: 4, base_state_sha256: 'a'.repeat(64), speed: 2,
+      limits: { wall_seconds: 600, minutes: 10, decisions: 20, usd: '0.05000000', calls: 30 },
+    });
+    expect(answer).toEqual({
+      sessionId: 'session-1', state: 'open', startTick: 4, endsBy: openSession.ends_by,
+      limits: { wallSeconds: 3600, minutes: 60, decisions: 10, usd: '1.00000000', calls: 100 },
+      closedReason: null, closedReasonWords: null,
+    });
+  });
+
+  it('stops a run and reads why it closed in the server\'s words', async () => {
+    const fetcher = vi.fn(async (_url, _init) => new Response(JSON.stringify(stoppedAnswer), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }));
+    const client = new SocietyControlClient({
+      baseUrl: 'https://example.test', token: 'token', worldId: 'world:personal:control', fetch: fetcher as typeof fetch,
+    });
+    const answer = await client.stopSession(version, 'session-1');
+    expect(fetcher.mock.calls[0]![1]?.method).toBe('POST');
+    expect(String(fetcher.mock.calls[0]![0])).toContain('/world/versions/version/society/control/sessions/session-1/stop?');
+    expect(answer).toMatchObject({ state: 'closed', closedReason: 'stopped_by_person', closedReasonWords: 'Someone stopped the run.' });
+    expect(() => parseSessionAnswer({ ...stoppedAnswer, state: 'open' })).toThrow('playback response');
+    expect(() => parseSessionAnswer({ ...openAnswer, state: 'closed' })).toThrow('playback response');
+  });
+
+  it('passes a refused opening on by its code', async () => {
+    const fetcher = vi.fn(async (_url, _init) => new Response(JSON.stringify({
+      code: 'session_already_open', detail: 'a session is open; stop it first',
+    }), { status: 409, headers: { 'content-type': 'application/json' } }));
+    const client = new SocietyControlClient({
+      baseUrl: 'https://example.test', token: 'token', worldId: 'world:personal:control', fetch: fetcher as typeof fetch,
+    });
+    await expect(client.openSession(parseSocietyControl(control, version), {
+      wallSeconds: 600, minutes: 10, decisions: 20, usd: '0.05000000', calls: 30,
+    }, 'opening')).rejects.toMatchObject({ code: 'session_already_open' });
+  });
 });
 
 const limits = { wall_seconds: 3600, minutes: 60, decisions: 10, usd: '1.00000000', calls: 100 };
@@ -130,4 +180,15 @@ const sessionRead = {
   decisions_read: { counted: 2, maximum: 2000, total: 2 },
   measures,
   by_model: [{ provider: 'nebius', model_id: 'open/model', measures }],
+};
+const openAnswer = {
+  profile: 'exulanica.society-session/v1', session_id: 'session-1', state: 'open',
+  opened: sessionRead.opened, closed: null,
+};
+const stoppedAnswer = {
+  ...openAnswer, state: 'closed',
+  closed: {
+    event_seq: 9, reason: 'stopped_by_person', closed_by: 'account', end_tick: 5,
+    end_state_sha256: 'b'.repeat(64), closed_at: closing.closed_at, words: 'Someone stopped the run.',
+  },
 };

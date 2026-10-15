@@ -2,7 +2,7 @@
 
 The inspector (``web/packages/app/src/society-inhabitant-words.ts``) and the Companion
 (``exulanica/selection/inhabitant_words.py``) read
-``assets/catalogs/society-words/society-inhabitant-words.v3.json`` and choose among its words by
+``assets/catalogs/society-words/society-inhabitant-words.v4.json`` and choose among its words by
 the same rule. Both run ``tests/fixtures/society-inhabitant-words/cases.json``; this file runs it
 for the server, and ``web/packages/app/test/society-inhabitant-words.test.ts`` for the page. A
 change to either side's choice, or to the words, fails one of them.
@@ -122,11 +122,9 @@ def test_the_under_way_reason_of_an_activity_in_the_open_is_the_one_the_planner_
         assert reason in recorded[kind], (kind, sorted(recorded[kind]))
 
 
-def test_a_reason_with_no_words_is_named_rather_than_guessed():
+def test_a_reason_with_no_words_points_at_the_record_rather_than_guessing():
     catalog = inhabitant_words_catalog()
-    assert catalog.reason("nobody_wrote_this") == (
-        "of a reason this page has no words for (nobody_wrote_this)"
-    )
+    assert catalog.reason("nobody_wrote_this") == "the reason is only in the record"
     assert catalog.reason("sent_away") == "the world's owner sent everyone away"
 
 

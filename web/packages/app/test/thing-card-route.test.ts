@@ -12,7 +12,7 @@ import { mountThingCard } from '../src/composition/thing-card-mount.js';
 import { THING_LOOK_CHOSEN_EVENT } from '../src/composition/things.js';
 import type { SelectedBeing, SelectedPerson, SelectedThing } from '../src/composition/environment-selection.js';
 import {
-  chooseThingLook, fetchThingCardRoute, readThingCardRoute,
+  chooseThingLook, fetchThingCardRoute, readThingCardRoute, writeThingCharacter,
   type CardLookReference, type LookChoiceOutcome, type ThingCardRoute,
 } from '../src/thing-card-route-api.js';
 
@@ -322,5 +322,36 @@ describe('a placed object\'s card from the served card', () => {
     await settle();
     expect(asked).toEqual([]);
     expect(rowOf(root, 'Looks like')?.textContent).toContain('Well');
+  });
+});
+
+describe('a placed being\'s character on its card', () => {
+  const written = { revision: 2, character: { name: 'Bramble', about: 'A careful knight who guards the well.' }, written_at: '2026-10-14T17:20:55Z', shown: true };
+
+  it('is read with the revision the next write names, and is absent from a card that states none', () => {
+    expect(readThingCardRoute({ ...knightCard('kaykit-knight'), character: written }).character).toEqual({
+      revision: 2, character: { name: 'Bramble', about: 'A careful knight who guards the well.' }, shown: true,
+    });
+    expect(readThingCardRoute({ ...knightCard('kaykit-knight'), character: { revision: null, character: null, written_at: null, shown: false } }).character)
+      .toEqual({ revision: null, character: null, shown: false });
+    expect(readThingCardRoute({ ...knightCard('kaykit-knight'), character: null }).character).toBeNull();
+    expect('character' in readThingCardRoute(knightCard('kaykit-knight'))).toBe(false);
+    expect(() => readThingCardRoute({ ...knightCard('kaykit-knight'), character: { ...written, revision: 0 } })).toThrow('character revision');
+  });
+
+  it('is written by the placed id against the revision read, and a refusal comes back by code', async () => {
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({
+      profile: 'exulanica.thing-character/v1', version_id: 'version', placed_id: 'knight-1', revision: 3,
+      character: { name: 'Bramble', about: 'Guards the well.' }, written_at: '2026-10-14T17:21:00Z', society: 'runs_characters',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const outcome = await writeThingCharacter({ baseUrl: 'https://example.test', token: 't' }, 'world:authored:saved', 'version', 'knight-1', 2,
+      { name: 'Bramble', about: 'Guards the well.' }, fetcher as unknown as typeof fetch);
+    expect(String(fetcher.mock.calls[0]![0])).toBe('https://example.test/world/versions/version/things/knight-1/character?world_id=world%3Aauthored%3Asaved');
+    expect(fetcher.mock.calls[0]![1]?.method).toBe('POST');
+    expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toEqual({ base_revision: 2, character: { name: 'Bramble', about: 'Guards the well.' } });
+    expect(outcome).toEqual({ written: true, revision: 3, character: { name: 'Bramble', about: 'Guards the well.' } });
+    const refused = vi.fn(async () => new Response(JSON.stringify({ code: 'character_changed', detail: 'another revision was written' }), { status: 409, headers: { 'content-type': 'application/json' } }));
+    expect(await writeThingCharacter({ baseUrl: 'https://example.test', token: 't' }, 'w', 'version', 'knight-1', 2, null, refused as unknown as typeof fetch))
+      .toEqual({ written: false, code: 'character_changed' });
   });
 });

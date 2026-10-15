@@ -90,7 +90,8 @@ def test_verdict_words_follow_the_choice_account():
     # A reason with words in the society words catalog reads in those words.
     timed_out = verdict({**receipt(status="unavailable", reason="model_timed_out")}, words)
     assert (
-        timed_out == "No usable answer: it did not answer in time. The routine acted in minute 2."
+        timed_out
+        == "No usable answer: their model did not answer in time. The routine acted in minute 2."
     )
 
 

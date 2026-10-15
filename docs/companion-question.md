@@ -347,7 +347,7 @@ scene](../exulanica/selection/society_scene.py)), and a society Selection that r
 searched.
 
 Who someone is, what they are doing and why are the inspector's own words, from one data file both
-read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v2.json)), cited
+read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v4.json)), cited
 to the society's state and to the event that explains it, read by its id however long ago it was
 recorded, with no model call. The page and the server choose among those words by one rule, held by
 cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). A person who

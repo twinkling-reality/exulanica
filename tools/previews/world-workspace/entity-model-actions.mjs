@@ -6,7 +6,8 @@ export async function recordEntityModel({ entry, subjectId, selected, key, refre
   let submitted = false;
   try {
     const fresh = await refresh();
-    assertSelectedOffer(fresh.offer, entry, fresh.row);
+    // A being with an offer is held to it; one without (a town's resident) to its row's role link.
+    if (fresh.offer) assertSelectedOffer(fresh.offer, entry, fresh.row);
     const target = assignmentSubject(fresh.inventory, fresh.row, fresh.offer);
     const available = await client.read(entry.authoredVersionId);
     if (!current()) throw Error('This inspection is closed. Nothing was sent.');
