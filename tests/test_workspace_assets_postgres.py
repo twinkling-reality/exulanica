@@ -499,15 +499,20 @@ def test_withdrawal_is_final_hides_everything_and_destroys_nothing(api: AssetsAp
         api.sql("delete from workspace_asset_withdrawal")
 
 
-def _sessions_opened(monkeypatch: pytest.MonkeyPatch) -> list[psycopg.Connection]:
-    """Every connection the application opens through ``Database.session``, as it opens them."""
+def _sessions_opened(
+    monkeypatch: pytest.MonkeyPatch, database: Database
+) -> list[psycopg.Connection]:
+    """Every connection the application opens through its own ``database``, as it opens them.
+    A session another database opens in this process, such as an earlier test's background
+    worker still running, is not the application's and is not recorded."""
     opened: list[psycopg.Connection] = []
     session = Database.session
 
     @contextmanager
     def recording(self: Database, workspace_id: uuid.UUID) -> Iterator[psycopg.Connection]:
         with session(self, workspace_id) as connection:
-            opened.append(connection)
+            if self is database:
+                opened.append(connection)
             yield connection
 
     monkeypatch.setattr(Database, "session", recording)
@@ -522,7 +527,7 @@ def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
     held every prepared output in memory, is not used."""
     view = api.admitted(cube(offset=(0.0, 0.0, 0.0), texture=png(64, 64)).build())
     asset, output = view["asset_id"], view["preparation"]["output"]
-    opened = _sessions_opened(monkeypatch)
+    opened = _sessions_opened(monkeypatch, api.database)
     closed_at_first_chunk: list[bool] = []
     chunks = AuthorizedOutput.chunks
 
