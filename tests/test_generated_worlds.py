@@ -33,7 +33,7 @@ from exulanica.ingest.stages import STAGES
 from exulanica.store.namespaces import tile_store
 from exulanica.world import generated_worlds as generated_worlds_module
 from exulanica.world import saved_entries as saved_entries_module
-from exulanica.world import society_authored_ground as ground_builder
+from exulanica.world import society_authored_ground_area as ground_builder
 from exulanica.world import society_grounds
 from exulanica.world import society_walking_surfaces as walking_surfaces_module
 from exulanica.world import world_recipes as recipe_catalog

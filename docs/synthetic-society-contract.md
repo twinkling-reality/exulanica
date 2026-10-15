@@ -661,9 +661,9 @@ profile gives every destination room (below).
 #### One object at a time
 
 The second profile decides every object on its own
-(`exulanica/world/society_authored_ground.py`, `_objects_one_by_one`). An object the society cannot
-use loses its own activity to `unavailable_affordances`, with the reason, and takes nothing else
-with it; the rest of the world stays usable.
+(`exulanica/world/society_authored_ground_uses.py`, `_objects_one_by_one`). An object the society
+cannot use loses its own activity to `unavailable_affordances`, with the reason, and takes nothing
+else with it; the rest of the world stays usable.
 
 | An object that | Blocks walking | Offers its activity | Recorded as |
 | --- | --- | --- | --- |
