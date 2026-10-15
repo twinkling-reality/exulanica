@@ -416,8 +416,8 @@ def make_world(
 ) -> None:
     """Choose the tool for ``sent`` (the words as sent, every saved name replaced), draft with it
     and make the world, leaving the draft ``ready`` with its saved entry or ``refused`` by name,
-    with every call it made either way. With ``on_land`` a place stands on land chosen from what
-    was said (a town stays level).
+    with every call it made either way. With ``on_land`` a place or a town stands on land chosen
+    from what was said, or on level ground when none of its layouts fits that land.
 
     ``opened`` opens a connection scoped to the draft's workspace that may write; none is held
     while a model runs. ``fixed_world_id`` fixes the world's identity instead of drawing one: the
@@ -470,7 +470,17 @@ def make_world(
             )
         else:
             _make_town(
-                draft, drafts, log, client, opened, actor, sent, store, guest, fixed_world_id
+                draft,
+                drafts,
+                log,
+                client,
+                opened,
+                actor,
+                sent,
+                store,
+                guest,
+                fixed_world_id,
+                on_land,
             )
     except Exception as failed:  # anything unnamed, after paid calls, still shows what it cost
         _LOG.warning("a world draft failed: %s", type(failed).__qualname__)
@@ -667,6 +677,7 @@ def _make_town(
     store: Any,
     guest: bool,
     fixed_world_id: str | None,
+    on_land: bool,
 ) -> None:
     def refused(refusal: Mapping[str, Any]) -> None:
         drafts.finish(draft, state="refused", refusal=dict(refusal), calls=log.calls)
@@ -717,13 +728,22 @@ def _make_town(
     # Said before the making, so a world that was made is never then reported as not made.
     made = town_parts()
     taken = _take(client, sent, log)
-    left_out = _left_out(sent, outcome.not_supported_at, taken.spans)
     if drafts.closing:
         refused(_FAILED)
         return
     drafts.advance(draft, stage="making")
+    land = (
+        choose_land(
+            sent.text,
+            taken.parts.get("ground"),
+            names=[(start, end) for start, end, _, _ in sent.replaced],
+        )
+        if on_land
+        else None
+    )
+    fell_back = False
 
-    def make() -> Any:
+    def make(on: LandChoice | None) -> Any:
         with opened() as connection:
             entries = SavedWorldEntryRepository(connection, draft.workspace_id, store, guest=guest)
             return entries.create_generated(
@@ -732,19 +752,39 @@ def _make_town(
                 created_by=actor,
                 values=town.values,
                 fixed_world_id=fixed_world_id,
+                land=None if on is None else on.recipe.land,
             )
 
-    created = _saved(draft, drafts, log, make)
+    def made_on_its_land() -> Any:
+        nonlocal fell_back
+        if land is None:
+            return make(None)
+        try:
+            return make(land)
+        except (GeneratedWorldRefused, LandformRefused):
+            # No candidate of the town stands on its land: it is made on level ground, and said so.
+            fell_back = True
+            return make(None)
+
+    created = _saved(draft, drafts, log, made_on_its_land)
     if created is None:
         return
     worn = _worn(opened, draft, store, guest, actor, created, taken)
+    # A phrase the drafter could not make that names only the land the town stands on is said by
+    # that land, as for a place.
+    omitted = tuple(
+        span
+        for span in outcome.not_supported_at
+        if land is None or fell_back or not said_by_land(sent.text[span[0] : span[1]], land.recipe)
+    )
     drafts.made(
         draft,
         entry_id=created.entry_id,
         made=made,
-        left_out=left_out,
+        left_out=_left_out(sent, omitted, taken.spans),
         look=worn.look,
         setting=worn.setting,
+        land=None if land is None else _land_taken(sent, land, fell_back=fell_back),
         calls=log.calls,
         model_id=outcome.model_id,
     )

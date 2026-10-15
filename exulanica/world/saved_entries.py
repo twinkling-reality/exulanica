@@ -441,6 +441,7 @@ class SavedWorldEntryRepository:
         created_by: uuid.UUID,
         values: Mapping[str, object] | None = None,
         fixed_world_id: str | None = None,
+        land: object | None = None,
     ) -> SavedWorldEntry:
         """Generate a world from a preset, with ``values`` in place of its own, and save its entry,
         in one transaction.
@@ -464,11 +465,15 @@ class SavedWorldEntryRepository:
         allows are each refused by name, and nothing is written. The count is asked before
         generating, so a workspace at its limit costs no generation, and again under the workspace
         lock, where its answer holds.
+
+        With ``land`` the town is laid on it (``city_grammar_town.on_land``, a refused document
+        refused by name before anything is generated), trying one identity only.
         """
         from exulanica.world.composers import (
             GeneratedWorldIdentitiesRefused,
             GeneratedWorldRefused,
         )
+        from exulanica.world.composers.city_grammar_town import on_land
         from exulanica.world.generated_worlds import (
             compose_generated_world,
             create_generated_authorities,
@@ -477,12 +482,14 @@ class SavedWorldEntryRepository:
 
         clean_title = _clean_title(title)
         recipe = town_recipe(recipe_key, values)
+        if land is not None:
+            recipe = on_land(recipe, land)
         refuse_past_limit(
             self.connection, self.workspace_id, GENERATED, guest=self.guest, tiles=len(recipe.tiles)
         )
         refused: dict[str, GeneratedWorldRefused] = {}
         fixed = fixed_world_id
-        for _ in range(1 if fixed is not None else GENERATED_WORLD_DRAWS):
+        for _ in range(1 if fixed is not None or land is not None else GENERATED_WORLD_DRAWS):
             world_id = fixed if fixed is not None else new_world_id(GENERATED)
             try:
                 composed = compose_generated_world(recipe, world_id)

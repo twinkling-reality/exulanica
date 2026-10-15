@@ -464,6 +464,74 @@ def test_a_sentence_that_asks_for_a_town_is_made_by_the_town_tool(drafts, fixed_
         assert _count(client, "world_kind_version") == 0
 
 
+def test_on_land_a_town_stands_on_the_land_its_words_name_and_says_so(drafts, fixed_identities):
+    from exulanica.grammar.landform import land_recipes
+
+    coast = next(recipe for recipe in land_recipes() if recipe.key == "coast")
+    app, transport = drafts
+    transport.responses.extend(
+        [
+            _tool("town", "a quiet town"),
+            _json(_town_form()),
+            _look(None),
+            _setting("sea", ground="sea"),
+        ]
+    )
+    with app(on_land=True) as client:
+        ended = _ended(client, _start(client, "a quiet town by the sea").json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["land"] == {
+            "recipe": "coast",
+            "title": coast.title,
+            "chosen_by": "words",
+            "words": ["sea"],
+            "fell_back": False,
+        }
+        receipt = _receipt(client, ended["entry"])
+        assert receipt["composer"] == {"key": "city-grammar-town", "version": 3}
+        assert receipt["land_sha256"] == coast.land_sha256
+
+
+def test_on_land_a_town_no_candidate_of_which_fits_its_land_is_made_level_and_says_so(
+    drafts, fixed_identities, monkeypatch
+):
+    from exulanica.grammar.landform import LandRecipe, read_land_document
+    from exulanica.world.land_choice import LandChoice
+
+    # Land tilting across the town faster than its streets and banks can take: every candidate
+    # is refused on it.
+    land = read_land_document(
+        {
+            "profile": "exulanica.landform/v1",
+            "ground_mm": 20000,
+            "features": [{"id": "tilt", "kind": "tilt", "side": "east", "grade_permille": 120}],
+        }
+    )
+    steep = LandRecipe(
+        key="steep",
+        title="a steep test slope",
+        words=(),
+        for_ground=(),
+        default=False,
+        land=land.canonical(),
+        land_sha256=land.sha256,
+    )
+    monkeypatch.setattr(
+        world_making,
+        "choose_land",
+        lambda *args, **kwargs: LandChoice(recipe=steep, chosen_by="default", spans=()),
+    )
+    app, transport = drafts
+    transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form()), *_plain()])
+    with app(on_land=True) as client:
+        ended = _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert (ended["land"]["recipe"], ended["land"]["fell_back"]) == ("steep", True)
+        receipt = _receipt(client, ended["entry"])
+        assert receipt["composer"] == {"key": "city-grammar-town", "version": 2}
+        assert "land" not in receipt
+
+
 def test_a_draft_no_brief_makes_a_place_of_is_refused_by_name_and_writes_nothing(drafts):
     app, transport = drafts
     broken = _farm()

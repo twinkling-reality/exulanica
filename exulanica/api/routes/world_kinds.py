@@ -914,10 +914,11 @@ def create_kind_world(
     kind the workspace holds or the product ships (the latest version unless one is named). An
     unknown kind or preset answers 404; a value the kind does not offer 422, naming the key, the
     value and the range; a title empty once trimmed 422; a land document the landform catalog
-    refuses 422, naming its path (``landform_*``), and land asked of the town or with a support
-    declaration 422 ``landform_not_served``; a kind none of whose candidates makes a world people
-    can live in, for any identity drawn (on land: none whose layout the land can take), 409 with
-    every refusal; a workspace already
+    refuses 422, naming its path (``landform_*``), and land asked with a support declaration, or of
+    the town where the deployment makes no worlds on land (``EXULANICA_WORLDS_ON_LAND``), 422
+    ``landform_not_served``; a kind none of whose candidates makes a world people can live in, for
+    any identity drawn (on land: none whose layout the land can take; a town on land tries one
+    identity), 409 with every refusal; a workspace already
     holding as many generated worlds as the count policy allows 409; a deployment whose database
     role cannot register a world 403 ``worlds_read_only``. Nothing is written when any is refused.
 
@@ -943,11 +944,11 @@ def create_kind_world(
                 return _problem(
                     422, "support_network_invalid", "Support authoring is served for site worlds."
                 )
-            if body.land is not None:
+            if body.land is not None and not services.worlds_on_land:
                 return _problem(
                     422,
                     "landform_not_served",
-                    "Land is served for site worlds; a town is laid out on level ground.",
+                    "Land is served for a town where the deployment makes worlds on land.",
                     path="land",
                 )
             created = entries.create_generated(
@@ -955,6 +956,7 @@ def create_kind_world(
                 recipe_key=body.preset,
                 created_by=session.actor,
                 values=body.values,
+                land=body.land,
             )
         else:
             if (

@@ -291,8 +291,12 @@ on the graded footway as version 2 arrives. The receipt keeps the land document,
 land rules. The recipe's reference names the land's digest and rules, so a town's seeds, the land's
 noise drawn from them and each tile's bake key are that land's own. A stored town is generated
 again only after its land reads again under the rules its receipt names and to the digest it names
-(`generated_world_land_changed`, `generated_world_land_rules_changed`). No route or sentence asks
-for a town on land, and the tessellator does not draw one.
+(`generated_world_land_changed`, `generated_world_land_rules_changed`). Where the deployment makes
+worlds on land, a town drafted from a sentence ([below](#land-for-a-world-made-from-a-sentence)) and
+`POST /worlds/kinds/town/worlds` with `land` make one, trying one identity; elsewhere the route
+answers 422 `landform_not_served`. The tessellator reads straight two-point street lines only, so a
+town on land's tiles do not bake and the town does not open: the setting stays off until the
+tessellator reads a street that bends in height.
 
 ## A world's land rules
 
@@ -332,7 +336,7 @@ appearance are; that naming is planned, not built (see [Limits](#limits)).
 ## Land for a world made from a sentence
 
 Where the deployment turns it on (`EXULANICA_WORLDS_ON_LAND=on`, [deployment](deployment.md)), a
-place drafted from a person's words (`POST /worlds/drafts`,
+place or a town drafted from a person's words (`POST /worlds/drafts`,
 [world kinds](world-kinds-contract.md#a-world-made-from-a-sentence)) stands on one of the land
 recipes in [`landform-recipe.v2.json`](../assets/catalogs/landform/landform-recipe.v2.json), read by
 [`recipes.py`](../exulanica/grammar/landform/recipes.py). Each recipe is a whole land document, read
@@ -352,13 +356,15 @@ recipe a word of the sentence names, in the catalog's order (a word right after 
 "without", "far from" or "away from", an article between them aside, is not taken, nor a word inside
 a saved name), then the recipe the setting chooser's ground part brings, then the default. The
 place is composed on that land as `POST /worlds/kinds/{kind}/worlds` composes one, its receipt
-keeping the recipe's land document and naming the land rules. Where no layout candidate of the
-place fits the land, it is composed once more on level ground. The draft states the land either
+keeping the recipe's land document and naming the land rules; a town is laid on it by the town
+composer's version 3 ([towns on land](#towns-on-land)). Where no layout candidate of the place or
+the town fits the land, it is composed once more on level ground. The draft states the land either
 way (`land`: the recipe, what chose it, the person's own words that did, and `fell_back` where the
-place was made level). A phrase the drafter reported it could not make is answered by the land only
+world was made level). A phrase the drafter reported it could not make is answered by the land only
 where every word of it but the small joining words is one of the recipe's ("in a valley"; never
 "sea with flying boats"). A draft's making waits up to 60 s for a place on land, since no request
-waits on it.
+waits on it; a town on land tries one identity's seed candidates, each about 8 to 11 s on the
+development machine, before it is made level.
 
 The recipes are data: a new or changed recipe is a new catalog version, and a world keeps the land
 document it was made with, so a later recipe never moves it. New worlds read the newest version.
@@ -392,8 +398,8 @@ as walls up to about 4 m.
 ## Limits
 
 - Only a place drafted from words stands on land, and only where the deployment turns it on; no
-  page asks for land otherwise. Every town made stands on level ground: the city grammar and the
-  town composer lay a town on land, but no route or sentence asks for one and nothing draws one.
+  page asks for land otherwise. A town is made on land only there too, and its tiles do not bake
+  (the tessellator reads straight two-point street lines only), so it does not open.
 - Walkable land stays within 64 m above or below the sea, so "high ground" cannot be high: an
   upland is a place among peaks, not a place on a high plateau. Raising the bound is a change to
   the land rules.

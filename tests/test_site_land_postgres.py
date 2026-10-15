@@ -3,13 +3,14 @@ backdrop served by the digests its drawing names, regenerated from its receipt, 
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import uuid
 
 import pytest
 from exulanica.canonical import canonical_json
-from exulanica.grammar.landform import read_land_chunk
+from exulanica.grammar.landform import land_recipes, read_land_chunk, read_land_document
 from exulanica.world.composers import site_plan
 from exulanica.world.generated_worlds import generation_receipt
 
@@ -111,6 +112,31 @@ def test_land_the_catalog_refuses_or_the_route_does_not_serve_is_refused_by_name
         "/worlds/kinds/town/worlds", {"preset": "small_town", "title": "Hill town", "land": LAND}
     )
     assert (town.status_code, town.json()["code"]) == (422, "landform_not_served")
+
+
+def test_a_town_is_made_on_land_only_where_the_deployment_makes_worlds_on_land(made):
+    api = made
+    [rolling] = [recipe for recipe in land_recipes() if recipe.key == "rolling"]
+    asked = {"preset": "small_town", "title": "Town on the hills", "land": dict(rolling.land)}
+    off = api.post("/worlds/kinds/town/worlds", asked)
+    assert (off.status_code, off.json()["code"]) == (422, "landform_not_served")
+    services = api.client.app.state.services
+    api.client.app.state.services = dataclasses.replace(services, worlds_on_land=True)
+    try:
+        on = api.post("/worlds/kinds/town/worlds", asked)
+    finally:
+        api.client.app.state.services = services
+    assert on.status_code == 201, on.text
+    entry = on.json()
+    with api.database.session(api.repository.workspace_id) as connection:
+        _, receipt = generation_receipt(
+            connection,
+            api.repository.workspace_id,
+            entry["world_id"],
+            uuid.UUID(entry["source_snapshot_id"]),
+        )
+    assert receipt["composer"] == {"key": "city-grammar-town", "version": 3}
+    assert receipt["land_sha256"] == read_land_document(dict(rolling.land)).sha256
 
 
 def test_a_world_whose_land_rules_the_server_does_not_serve_is_listed_unavailable_by_name(
