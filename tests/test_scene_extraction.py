@@ -7,7 +7,7 @@ import json
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.environment import scene_extraction as extraction
-from exulanica.ingest.scene_segments import _opm_positions, _placed, _voxels
+from exulanica.ingest.scene_segments_lift import _opm_positions, _placed, _voxels
 
 from test_reconstruction_placement import _maps, _receipt, _record
 

@@ -26,13 +26,8 @@ from exulanica.graph.asset_read_policy import (
     scene_allowed,
     scene_inputs,
 )
-from exulanica.ingest.scene_segments import (
-    _evenly,
-    _opm_positions,
-    _placed,
-    _voxels,
-    validate_scene_segments,
-)
+from exulanica.ingest.scene_segments import validate_scene_segments
+from exulanica.ingest.scene_segments_lift import _evenly, _opm_positions, _placed, _voxels
 from exulanica.reconstruction.placement import PointMapInput, validate_placement_record
 from exulanica.reconstruction.validation import validate_opm
 from exulanica.store.base import ContentAddressedStore

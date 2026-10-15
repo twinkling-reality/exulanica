@@ -24,7 +24,7 @@ consent are [person-presentation-consent.md](person-presentation-consent.md).
 | Half | Module | What it writes |
 | --- | --- | --- |
 | Per photograph | `exulanica/ingest/stages/segmentation.py`, stage `segmentation` | one `object_mask_list` artifact per photograph, one `frame_region` span and one `object_present` inference per mask |
-| Per scene | `exulanica/ingest/scene_segments.py`, stage `scene_segments` | one `scene_segments` artifact per scene build, bound to everything it used |
+| Per scene | `exulanica/ingest/scene_segments.py`, stage `scene_segments`, and its arithmetic in `exulanica/ingest/scene_segments_lift.py` | one `scene_segments` artifact per scene build, bound to everything it used |
 | Read | `exulanica/graph/reconstruction_scenes.py`, route `GET /scene-segments/{scene_id}` | the segments this reader can stand behind under the geometry asset-read policy |
 
 ## 2. No migration, and why

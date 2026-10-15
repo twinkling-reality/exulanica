@@ -25,6 +25,7 @@ from exulanica.graph import reconstruction_scenes as reader
 from exulanica.graph.asset_read_policy import clear_scene_inputs_memo
 from exulanica.graph.reconstruction_scenes import clear_placement_memo, scene_segments_read
 from exulanica.ingest import scene_segments as lift
+from exulanica.ingest import scene_segments_lift as lifting
 from exulanica.ingest.masked_geometry import GaussianView, camera_point, image_point, ppm_point
 from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -112,7 +113,7 @@ def test_the_raster_agrees_with_the_outline_containment_it_stands_in_for():
     box = Silhouette.from_rect(Rect(250_000, 300_000, 300_000, 200_000))
     for outline in (concave, box):
         width, height = 97, 61
-        raster = lift._raster(outline, width, height)
+        raster = lifting._raster(outline, width, height)
         for row in range(height):
             y = (2 * row + 1) * PPM // (2 * height)
             for column in range(width):
@@ -190,7 +191,7 @@ def _region(capture, outline, *, label="box", subject=None):
 
 def _samples(*clouds):
     points = np.concatenate(clouds)
-    return lift._Samples(points, np.zeros(len(points), dtype=np.int64), (("m", "a", "0" * 64),))
+    return lifting._Samples(points, np.zeros(len(points), dtype=np.int64), (("m", "a", "0" * 64),))
 
 
 def _wall_in_front_of(view, distance=3.0):
@@ -214,7 +215,7 @@ def _wall_in_front_of(view, distance=3.0):
 def _walled(views, names):
     """The occlusion grid of each named view, whose own map is a wall in front of the cube."""
     return {
-        name: lift._depth_buffer(
+        name: lifting._depth_buffer(
             views[name], _wall_in_front_of(views[name]), PARAMS["occlusion_grid_cells"]
         )
         for name in names
@@ -250,9 +251,9 @@ def test_each_view_keeps_a_coarse_occlusion_grid_and_not_its_whole_map():
 
     assert set(occlusion) == {names[0], names[1]}
     for name in names[:2]:
-        whole = lift._placed(identity, lift._opm_positions(maps[name]))
+        whole = lifting._placed(identity, lifting._opm_positions(maps[name]))
         grid, width, height = occlusion[name]
-        expected, expected_width, expected_height = lift._depth_buffer(
+        expected, expected_width, expected_height = lifting._depth_buffer(
             views[name], whole, PARAMS["occlusion_grid_cells"]
         )
         assert (width, height) == (expected_width, expected_height)
