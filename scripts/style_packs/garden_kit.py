@@ -2,6 +2,12 @@
 
 No world layout or simulation is generated here. Output is admitted through workspace style-pack
 uploads; the repository's default library is unaffected. Dimensions and roles are declared data.
+
+A ``tree`` row names a species of the tree maker's catalog (``tree_maker.py``), a height, an
+optional width and a seed: the tree is grown to that box as a textured piece with its second level
+(``<file stem>-far.glb``), from the scans in the folder ``--sources`` names. Rows of one role become
+that role's variants, at most eight, in the document's order. What made each tree is written beside
+the packs as ``<pack id>.trees.json``.
 """
 
 from __future__ import annotations
@@ -21,8 +27,12 @@ from scripts.style_packs.architecture import (  # noqa: E402, standalone CLI boo
     ARCHITECTURE_SWATCHES,
     validate_architecture_row,
 )
+from scripts.style_packs import tree_maker  # noqa: E402, standalone CLI bootstrap
 from exulanica.world import style_packs  # noqa: E402, standalone CLI bootstrap
 from exulanica.world.style_pack_pieces import read_palette_piece  # noqa: E402, standalone CLI bootstrap
+
+#: The fields a ``tree`` row states, the width optional.
+TREE_ROW = frozenset({"recipe", "role", "file", "species", "height_mm", "seed"})
 
 
 def rounded_slab(piece, width, depth, bottom, top, radius, segments, key):
@@ -219,7 +229,25 @@ def validate_document(document):
             )
         ):
             raise ValueError("architecture colours name its swatches with three 8-bit channels")
+    roles: dict[str, int] = {}
     for row in document["pieces"]:
+        roles[row.get("role")] = roles.get(row.get("role"), 0) + 1
+        if roles[row.get("role")] > 8:
+            raise ValueError("a role takes at most eight variants")
+        if row.get("recipe") == "tree":
+            if not TREE_ROW <= set(row) <= TREE_ROW | {"width_mm"}:
+                raise ValueError(
+                    "a tree row states its role, file, species, height, seed and width"
+                )
+            if not isinstance(row["species"], str) or not isinstance(row["role"], str):
+                raise ValueError("a tree row names its species and role")
+            for key in ("height_mm", "seed", "width_mm"):
+                if key in row and type(row[key]) is not int:
+                    raise ValueError("a tree row's numbers are whole")
+            path = Path(row["file"])
+            if path.is_absolute() or ".." in path.parts or path.suffix != ".glb":
+                raise ValueError("a module is written inside its pack")
+            continue
         if row.get("recipe") not in RECIPES:
             raise ValueError("unknown module recipe")
         if len(row.get("size_mm", [])) != 3 or any(
@@ -255,8 +283,31 @@ def validate_document(document):
             raise ValueError("a module is written inside its pack")
 
 
-def build(document, output):
+def _far(file: str) -> str:
+    """A tree's second level beside its first: ``pieces/pine.glb`` to ``pieces/pine-far.glb``."""
+    return file[: -len(".glb")] + "-far.glb"
+
+
+def _trees(document, sources):
+    """Every tree row made once, by its index: the maker's MadeTree."""
+    rows = [(index, row) for index, row in enumerate(document["pieces"]) if row["recipe"] == "tree"]
+    if not rows:
+        return {}
+    if sources is None:
+        raise ValueError("a kit with trees names the folder of its scans (--sources)")
+    catalog = tree_maker.read_catalog(json.loads((ROOT / tree_maker.CATALOG).read_text()))
+    found = tree_maker.Sources(catalog, sources)
+    return {
+        index: tree_maker.make_tree(
+            catalog, row["species"], row["height_mm"], row["seed"], found, row.get("width_mm")
+        )
+        for index, row in rows
+    }
+
+
+def build(document, output, sources=None):
     validate_document(document)
+    trees = _trees(document, sources)
     table = json.loads((ROOT / "assets/colour/srgb8-linear16.v1.json").read_text())["values"]
     base = json.loads(
         (ROOT / "assets/style-packs/published/exulanica.finished-town/2/manifest.json").read_text()
@@ -336,7 +387,31 @@ def build(document, output):
             "wall.default": {"swatch": "porcelain", "up": None},
         }
         # A roof leaf takes its module before the family's surface default.
-        for row in document["pieces"]:
+        receipts = []
+        for index, row in enumerate(document["pieces"]):
+            variants = manifest["modules"].setdefault(row["role"], {"variants": []})["variants"]
+            if index in trees:
+                made = trees[index]
+                for path, payload in ((row["file"], made.lod0), (_far(row["file"]), made.lod1)):
+                    (folder / path).write_bytes(payload)
+                    manifest["files"].append(
+                        dict(
+                            path=path,
+                            sha256=hashlib.sha256(payload).hexdigest(),
+                            bytes=len(payload),
+                            media_type="model/gltf-binary",
+                        )
+                    )
+                variants.append(
+                    dict(
+                        file=row["file"],
+                        lod1=_far(row["file"]),
+                        size_mm=list(made.size_mm),
+                        stretch_mm=[None, None, None],
+                    )
+                )
+                receipts.append({"file": row["file"], "role": row["role"], **made.receipt})
+                continue
             piece = RECIPES[row["recipe"]](row)
             # Tapered ends meet at one point. Omit their zero-area fan triangles before writing.
             corners = []
@@ -362,16 +437,14 @@ def build(document, output):
             payload = piece.bytes(palette, table)
             read_palette_piece(payload, table)
             (folder / row["file"]).write_bytes(payload)
-            manifest["modules"][row["role"]] = {
-                "variants": [
-                    dict(
-                        file=row["file"],
-                        lod1=None,
-                        size_mm=row["size_mm"],
-                        stretch_mm=[None, None, None],
-                    )
-                ]
-            }
+            variants.append(
+                dict(
+                    file=row["file"],
+                    lod1=None,
+                    size_mm=row["size_mm"],
+                    stretch_mm=[None, None, None],
+                )
+            )
             manifest["files"].append(
                 dict(
                     path=row["file"],
@@ -419,6 +492,10 @@ def build(document, output):
                 manifest["water"] = finish["water"]
         checked = style_packs.read_manifest(manifest, style_packs.load_context(ROOT))
         (folder / "manifest.json").write_text(style_packs.canonical_json(checked) + "\n")
+        if receipts:
+            (output / f"{variant['pack_id']}.trees.json").write_text(
+                json.dumps(receipts, indent=1, sort_keys=True) + "\n"
+            )
         print(
             variant["pack_id"],
             hashlib.sha256(style_packs.canonical_json(checked).encode()).hexdigest(),
@@ -430,5 +507,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("document", type=Path)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--sources", type=Path, help="the folder of the unpacked scans trees read")
     args = parser.parse_args()
-    build(json.loads(args.document.read_text()), args.out)
+    build(json.loads(args.document.read_text()), args.out, args.sources)

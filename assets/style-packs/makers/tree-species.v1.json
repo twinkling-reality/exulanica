@@ -1,0 +1,980 @@
+{
+ "about": "Species the tree maker (scripts/style_packs/tree_maker.py) grows textured tree pieces from: how each trunk and its branches grow (after ez-tree, MIT), the leaf card it carries, its bark, and how its second level of detail thins it. Every figure is a species' own and is held to its range when the catalog is read. Sources are CC0 scans from ambientCG, named by the path of each file in the unpacked scans and its SHA-256, with the archive it came from; they are not in this repository.",
+ "profile": "exulanica.tree-species/v1",
+ "sources": {
+  "barks": {
+   "fissured": {
+    "archive": {
+     "licence": "CC0-1.0 (ambientCG licence page)",
+     "sha256": "a1dbd08cb545b27f42e7208caca06488460de42e27fe34860619d32556e10f60",
+     "source": "https://ambientcg.com/get?file=Bark001_1K-JPG.zip"
+    },
+    "colour": {
+     "path": "ambientcg/Bark001/extracted/Bark001_1K-JPG_Color.jpg",
+     "sha256": "2a7e8c742aa0110057d7a3ff0e8ec193c26ef23b77bc778fb9258c0e41b29474"
+    },
+    "normal": {
+     "path": "ambientcg/Bark001/extracted/Bark001_1K-JPG_NormalGL.jpg",
+     "sha256": "d7a275aa573a701d8814d7378abd8ea227f651ae6da33f8c57a6b862419e621e"
+    }
+   },
+   "smooth": {
+    "archive": {
+     "licence": "CC0-1.0 (ambientCG licence page)",
+     "sha256": "9d7e34b7882b292f13975b2c4b4f792e6dfc71e5b8a0200de2f8ccb17c2fa420",
+     "source": "https://ambientcg.com/get?file=Bark008_1K-JPG.zip"
+    },
+    "colour": {
+     "path": "ambientcg/Bark008/extracted/Bark008_1K-JPG_Color.jpg",
+     "sha256": "d4ad43dcbbed91df21f5929b094dc185bfd519cac0b2a30ee5f9844fc9abee23"
+    },
+    "normal": {
+     "path": "ambientcg/Bark008/extracted/Bark008_1K-JPG_NormalGL.jpg",
+     "sha256": "59a354e1617eb075bc3e0dc1a627f472d364b1a2141c3cc90f14c924860334bc"
+    }
+   }
+  },
+  "leaves": {
+   "blade": {
+    "archive": {
+     "licence": "CC0-1.0 (ambientCG licence page)",
+     "sha256": "11cfa6b7420b91a7fc9d68e4f0eea9d8dce102b3e1364b38d94df8dbffb24839",
+     "source": "https://ambientcg.com/get?file=Foliage005_1K-JPG.zip"
+    },
+    "colour": {
+     "path": "ambientcg/Foliage005/extracted/Foliage005_1K-JPG_Color.jpg",
+     "sha256": "fe48a486740e93495f1b79ea646765641913f6744c54a1d73dea88ecd57b55e5"
+    },
+    "opacity": {
+     "path": "ambientcg/Foliage005/extracted/Foliage005_1K-JPG_Opacity.jpg",
+     "sha256": "678a80953ebf7105f49f10f317c7f2da537aeec59c58d1e5c1591ed269aee4e2"
+    },
+    "points_deg": 0
+   },
+   "lobed": {
+    "archive": {
+     "licence": "CC0-1.0 (ambientCG licence page)",
+     "sha256": "b72dbfeac10c42cbe17d34b4d744c19acdc818c064159ee9258e7e77648f3792",
+     "source": "https://ambientcg.com/get?file=LeafSet010_1K-JPG.zip"
+    },
+    "colour": {
+     "path": "ambientcg/LeafSet010/extracted/LeafSet010_1K-JPG_Color.jpg",
+     "sha256": "562b5ebfd28c6c1f16bbeab73e34b13266a43199ede4a0ebc4bd42b3a8116de0"
+    },
+    "opacity": {
+     "path": "ambientcg/LeafSet010/extracted/LeafSet010_1K-JPG_Opacity.jpg",
+     "sha256": "b20118efddeb54595ab642a5ec3e7288bf0277f9b361fb5819340197797c8afe"
+    },
+    "points_deg": 90
+   },
+   "needle": {
+    "archive": {
+     "licence": "CC0-1.0 (ambientCG licence page)",
+     "sha256": "dd79d67b8d5f9491c60d6611c44f160af76a3e6823bf1b3b2e3df6d483ee829b",
+     "source": "https://ambientcg.com/get?file=PineNeedles001_1K-JPG.zip"
+    },
+    "colour": {
+     "path": "ambientcg/PineNeedles001/extracted/PineNeedles001_1K-JPG_Color.jpg",
+     "sha256": "3cd538496fd9ab6fdaf060ea5f2fd8cf11004be35222a2d5bcbfc27654c8fdef"
+    },
+    "opacity": {
+     "path": "ambientcg/PineNeedles001/extracted/PineNeedles001_1K-JPG_Opacity.jpg",
+     "sha256": "dba12cacef137bc641d13ed987cef356492800f82edaad19c522a8c6b029ef3d"
+    },
+    "points_deg": 0
+   },
+   "oval": {
+    "archive": {
+     "licence": "CC0-1.0 (ambientCG licence page)",
+     "sha256": "3de484d3b44366611751526eb5c69c52b260dc54f45b581272ac05e748721d2f",
+     "source": "https://ambientcg.com/get?file=LeafSet009_1K-JPG.zip"
+    },
+    "colour": {
+     "path": "ambientcg/LeafSet009/extracted/LeafSet009_1K-JPG_Color.jpg",
+     "sha256": "864b0e5cbd8e238b8f707138da1b4c05a4ca82b43c8cd637996d9f7538eba136"
+    },
+    "opacity": {
+     "path": "ambientcg/LeafSet009/extracted/LeafSet009_1K-JPG_Opacity.jpg",
+     "sha256": "4455b65952a8e1547bb2fe0b3be995c3b1182f65771d29c52604fbdf0afd242c"
+    },
+    "points_deg": 90
+   }
+  }
+ },
+ "species": {
+  "broad_canopy": {
+   "bark": "fissured",
+   "bark_scale": [
+    1,
+    1
+   ],
+   "bark_tint": [
+    0.9,
+    0.88,
+    0.84
+   ],
+   "branch": {
+    "angle": [
+     0,
+     52,
+     42
+    ],
+    "children": [
+     7,
+     5
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": 0.01
+    },
+    "gnarliness": [
+     0.02,
+     0.12,
+     0.1
+    ],
+    "length": [
+     16,
+     13,
+     7
+    ],
+    "levels": 2,
+    "radius": [
+     1.4,
+     0.55,
+     0.6
+    ],
+    "sections": [
+     8,
+     6,
+     3
+    ],
+    "segments": [
+     8,
+     4,
+     3
+    ],
+    "start": [
+     0,
+     0.38,
+     0.2
+    ],
+    "taper": [
+     0.7,
+     0.6,
+     0.7
+    ],
+    "twist": [
+     0,
+     0.25,
+     0
+    ]
+   },
+   "card": {
+    "form": "twig",
+    "leaf_length": 0.3,
+    "leaves": 13,
+    "recolour_srgb8": [
+     84,
+     108,
+     60
+    ],
+    "source": "lobed",
+    "spread_deg": 60
+   },
+   "leaves": {
+    "alpha_cutoff": 0.45,
+    "angle": 40,
+    "billboard": "double",
+    "count": 5,
+    "size": 5.0,
+    "size_variance": 0.3,
+    "start": 0.25
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.6,
+    "leaf_stride": 3,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "type": "deciduous"
+  },
+  "fan_palm": {
+   "bark": "fissured",
+   "bark_scale": [
+    1,
+    0.6
+   ],
+   "bark_tint": [
+    0.78,
+    0.72,
+    0.64
+   ],
+   "branch": {
+    "angle": [
+     0,
+     78
+    ],
+    "children": [
+     26
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": [
+      0.0,
+      -0.0002
+     ]
+    },
+    "gnarliness": [
+     0.025,
+     0.05
+    ],
+    "length": [
+     30,
+     3
+    ],
+    "levels": 1,
+    "radius": [
+     1.1,
+     0.07
+    ],
+    "sections": [
+     10,
+     3
+    ],
+    "segments": [
+     8,
+     3
+    ],
+    "start": [
+     0,
+     0.97
+    ],
+    "taper": [
+     0.3,
+     0.5
+    ],
+    "twist": [
+     0,
+     0
+    ]
+   },
+   "card": {
+    "form": "fan",
+    "leaf_length": 0.62,
+    "leaf_width": 1.8,
+    "leaves": 52,
+    "recolour_srgb8": [
+     88,
+     116,
+     62
+    ],
+    "source": "blade",
+    "spread_deg": 230
+   },
+   "leaves": {
+    "alpha_cutoff": 0.4,
+    "angle": 0,
+    "billboard": "double",
+    "count": 0,
+    "size": 8,
+    "size_variance": 0.15,
+    "start": 0
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.0,
+    "leaf_stride": 1,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "spread_scales": [
+    "length",
+    "leaves"
+   ],
+   "type": "deciduous"
+  },
+  "flower_bed": {
+   "bark": "smooth",
+   "bark_tint": [
+    0.5,
+    0.6,
+    0.4
+   ],
+   "branch": {
+    "angle": [
+     0,
+     70
+    ],
+    "children": [
+     28
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": 0.01
+    },
+    "gnarliness": [
+     0.0,
+     0.1
+    ],
+    "length": [
+     0.3,
+     5
+    ],
+    "levels": 1,
+    "radius": [
+     0.3,
+     0.3
+    ],
+    "sections": [
+     1,
+     2
+    ],
+    "segments": [
+     3,
+     3
+    ],
+    "start": [
+     0,
+     0.0
+    ],
+    "taper": [
+     0.5,
+     0.6
+    ],
+    "twist": [
+     0,
+     0
+    ]
+   },
+   "card": {
+    "blossom": {
+     "count": 18,
+     "radius": 0.055,
+     "srgb8": [
+      [
+       240,
+       200,
+       70
+      ],
+      [
+       236,
+       110,
+       90
+      ],
+      [
+       250,
+       245,
+       235
+      ],
+      [
+       170,
+       120,
+       210
+      ]
+     ]
+    },
+    "form": "twig",
+    "leaf_length": 0.3,
+    "leaf_width": 2.4,
+    "leaves": 12,
+    "recolour_srgb8": [
+     76,
+     110,
+     60
+    ],
+    "source": "blade",
+    "spread_deg": 40
+   },
+   "leaves": {
+    "alpha_cutoff": 0.45,
+    "angle": 30,
+    "billboard": "double",
+    "count": 4,
+    "size": 3.0,
+    "size_variance": 0.25,
+    "start": 0.3
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.6,
+    "leaf_stride": 3,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "spread_scales": [
+    "length",
+    "leaves"
+   ],
+   "type": "deciduous"
+  },
+  "italian_cypress": {
+   "bark": "fissured",
+   "bark_tint": [
+    0.75,
+    0.62,
+    0.52
+   ],
+   "branch": {
+    "angle": [
+     0,
+     11,
+     22
+    ],
+    "children": [
+     32,
+     3
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": [
+      0.0,
+      0.03,
+      0.02
+     ]
+    },
+    "gnarliness": [
+     0.01,
+     0.05,
+     0.1
+    ],
+    "length": [
+     30,
+     4.5,
+     2.2
+    ],
+    "length_profile": [
+     0.55,
+     1.0,
+     1.0,
+     0.92,
+     0.75,
+     0.5,
+     0.22
+    ],
+    "levels": 2,
+    "radius": [
+     1.0,
+     0.4,
+     0.5
+    ],
+    "sections": [
+     10,
+     3,
+     1
+    ],
+    "segments": [
+     6,
+     4,
+     3
+    ],
+    "start": [
+     0,
+     0.04,
+     0.15
+    ],
+    "taper": [
+     0.8,
+     0.8,
+     0.8
+    ],
+    "twist": [
+     0,
+     0,
+     0
+    ]
+   },
+   "card": {
+    "form": "spray",
+    "leaf_length": 0.09,
+    "leaves": 18,
+    "recolour_srgb8": [
+     44,
+     62,
+     38
+    ],
+    "shoots": 8,
+    "source": "oval",
+    "spread_deg": 60
+   },
+   "leaves": {
+    "alpha_cutoff": 0.45,
+    "angle": 15,
+    "billboard": "double",
+    "count": 4,
+    "size": 3.4,
+    "size_variance": 0.2,
+    "start": 0.0
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.8,
+    "leaf_stride": 5,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "spread_scales": [
+    "length",
+    "leaves"
+   ],
+   "type": "evergreen"
+  },
+  "oleander": {
+   "bark": "smooth",
+   "bark_tint": [
+    0.6,
+    0.55,
+    0.5
+   ],
+   "branch": {
+    "angle": [
+     0,
+     40,
+     35
+    ],
+    "children": [
+     9,
+     3
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": 0.012
+    },
+    "gnarliness": [
+     0.05,
+     0.12,
+     0.12
+    ],
+    "length": [
+     1,
+     8,
+     4
+    ],
+    "levels": 2,
+    "radius": [
+     0.6,
+     0.6,
+     0.6
+    ],
+    "sections": [
+     2,
+     4,
+     3
+    ],
+    "segments": [
+     5,
+     4,
+     3
+    ],
+    "start": [
+     0,
+     0.0,
+     0.3
+    ],
+    "taper": [
+     0.5,
+     0.6,
+     0.7
+    ],
+    "twist": [
+     0,
+     0.2,
+     0
+    ]
+   },
+   "card": {
+    "blossom": {
+     "count": 10,
+     "radius": 0.05,
+     "srgb8": [
+      [
+       236,
+       120,
+       170
+      ],
+      [
+       244,
+       160,
+       196
+      ],
+      [
+       250,
+       236,
+       240
+      ]
+     ]
+    },
+    "form": "twig",
+    "leaf_length": 0.28,
+    "leaf_width": 3.0,
+    "leaves": 16,
+    "recolour_srgb8": [
+     70,
+     104,
+     60
+    ],
+    "source": "blade",
+    "spread_deg": 50
+   },
+   "leaves": {
+    "alpha_cutoff": 0.45,
+    "angle": 35,
+    "billboard": "double",
+    "count": 5,
+    "size": 4.2,
+    "size_variance": 0.3,
+    "start": 0.2
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.6,
+    "leaf_stride": 3,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "spread_scales": [
+    "length",
+    "leaves"
+   ],
+   "type": "deciduous"
+  },
+  "olive": {
+   "bark": "fissured",
+   "bark_tint": [
+    0.82,
+    0.8,
+    0.76
+   ],
+   "branch": {
+    "angle": [
+     0,
+     42,
+     45
+    ],
+    "children": [
+     5,
+     6
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": 0.008
+    },
+    "gnarliness": [
+     0.12,
+     0.2,
+     0.15
+    ],
+    "length": [
+     8,
+     12,
+     6
+    ],
+    "levels": 2,
+    "radius": [
+     1.8,
+     0.6,
+     0.6
+    ],
+    "sections": [
+     6,
+     6,
+     4
+    ],
+    "segments": [
+     8,
+     5,
+     3
+    ],
+    "start": [
+     0,
+     0.4,
+     0.2
+    ],
+    "taper": [
+     0.5,
+     0.6,
+     0.7
+    ],
+    "twist": [
+     0.4,
+     0.3,
+     0
+    ]
+   },
+   "card": {
+    "form": "twig",
+    "leaf_length": 0.22,
+    "leaf_width": 4.5,
+    "leaves": 26,
+    "recolour_srgb8": [
+     116,
+     132,
+     102
+    ],
+    "source": "blade",
+    "spread_deg": 50
+   },
+   "leaves": {
+    "alpha_cutoff": 0.4,
+    "angle": 50,
+    "billboard": "double",
+    "count": 6,
+    "size": 4.0,
+    "size_variance": 0.3,
+    "start": 0.2
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.6,
+    "leaf_stride": 3,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "type": "deciduous"
+  },
+  "round_shrub": {
+   "bark": "smooth",
+   "bark_tint": [
+    0.6,
+    0.55,
+    0.5
+   ],
+   "branch": {
+    "angle": [
+     0,
+     58,
+     40
+    ],
+    "children": [
+     9,
+     3
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": 0.01
+    },
+    "gnarliness": [
+     0.05,
+     0.15,
+     0.15
+    ],
+    "length": [
+     1,
+     7,
+     4
+    ],
+    "levels": 2,
+    "radius": [
+     0.6,
+     0.6,
+     0.6
+    ],
+    "sections": [
+     2,
+     4,
+     3
+    ],
+    "segments": [
+     5,
+     4,
+     3
+    ],
+    "start": [
+     0,
+     0.0,
+     0.3
+    ],
+    "taper": [
+     0.5,
+     0.6,
+     0.7
+    ],
+    "twist": [
+     0,
+     0.3,
+     0
+    ]
+   },
+   "card": {
+    "form": "twig",
+    "leaf_length": 0.26,
+    "leaves": 14,
+    "recolour_srgb8": [
+     72,
+     102,
+     58
+    ],
+    "source": "oval",
+    "spread_deg": 60
+   },
+   "leaves": {
+    "alpha_cutoff": 0.45,
+    "angle": 45,
+    "billboard": "double",
+    "count": 5,
+    "size": 4.0,
+    "size_variance": 0.3,
+    "start": 0.2
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.6,
+    "leaf_stride": 3,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "spread_scales": [
+    "length",
+    "leaves"
+   ],
+   "type": "deciduous"
+  },
+  "stone_pine": {
+   "bark": "fissured",
+   "bark_tint": [
+    0.85,
+    0.72,
+    0.62
+   ],
+   "branch": {
+    "angle": [
+     0,
+     68,
+     28
+    ],
+    "children": [
+     8,
+     5
+    ],
+    "force": {
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "strength": [
+      0.0,
+      0.018,
+      0.03
+     ]
+    },
+    "gnarliness": [
+     0.05,
+     0.06,
+     0.08
+    ],
+    "length": [
+     30,
+     15,
+     6
+    ],
+    "levels": 2,
+    "radius": [
+     1.2,
+     0.5,
+     0.6
+    ],
+    "sections": [
+     10,
+     5,
+     3
+    ],
+    "segments": [
+     7,
+     4,
+     3
+    ],
+    "start": [
+     0,
+     0.62,
+     0.45
+    ],
+    "taper": [
+     0.6,
+     0.6,
+     0.7
+    ],
+    "twist": [
+     0,
+     0.2,
+     0
+    ]
+   },
+   "card": {
+    "form": "tuft",
+    "leaf_length": 0.42,
+    "leaf_width": 2.0,
+    "leaves": 60,
+    "recolour_srgb8": [
+     62,
+     88,
+     48
+    ],
+    "source": "needle",
+    "spread_deg": 85
+   },
+   "leaves": {
+    "alpha_cutoff": 0.4,
+    "angle": 8,
+    "billboard": "double",
+    "count": 4,
+    "size": 6.5,
+    "size_variance": 0.25,
+    "start": 0.5
+   },
+   "lod1": {
+    "drop_levels": 1,
+    "leaf_scale": 1.6,
+    "leaf_stride": 3,
+    "section_stride": 2,
+    "segment_factor": 0.5
+   },
+   "type": "deciduous"
+  }
+ },
+ "textures": {
+  "jpeg_quality": 84,
+  "lod0": {
+   "bark_px": [
+    256,
+    512
+   ],
+   "sheet_px": 512
+  },
+  "lod1": {
+   "bark_px": [
+    128,
+    256
+   ],
+   "sheet_px": 256
+  }
+ }
+}

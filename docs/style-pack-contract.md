@@ -391,6 +391,21 @@ would stand as a miniature, and is left out of the pack for that (a roofed well,
 box). `tests/test_kit_style_pack.py` holds the committed pack to the script, the library, its own
 swatches, its family budgets and its records, and `tests/test_kit_models.py` holds the reader.
 
+A kit document may also name trees (`scripts/style_packs/garden_kit.py`, a `tree` row: a species,
+a height, an optional width and a seed). The tree maker (`scripts/style_packs/tree_maker.py`)
+grows each as a textured piece (section 4.1) with its second level: the species is data, every
+figure held to its range when the catalog is read (`assets/style-packs/makers/tree-species.v1.json`,
+profile `exulanica.tree-species/v1`: how the trunk and branches grow, the leaf card it carries, its
+bark, how its second level thins it, and the sides of its pictures). Given a width, the crown is
+grown to the box's proportions, never stretched to them; a crown that cannot be narrower than its
+cards is made at its narrowest and its receipt says how wide. Leaf cards are composed from scanned
+single leaves (`leaf_cards.py`) and the bark is a scanned bark; the scans are not in this repository,
+and the maker reads them from the folder `--sources` names, each held to the digest the catalog
+states, so a catalog, its scans and a row make the same bytes. Rows of one role become that role's
+variants, at most eight; what made each tree is written beside the packs (`<pack id>.trees.json`).
+`tests/test_tree_maker.py` makes trees from synthetic scans and holds them to the plant budget,
+both readers' rules and their boxes.
+
 Every version a pack has published stays servable, so a world keeps the look it was given. Writing a
 new version first retires the committed one: the script copies its folder whole to
 `assets/style-packs/published/<pack id>/<version>/` and appends the version to the ledger

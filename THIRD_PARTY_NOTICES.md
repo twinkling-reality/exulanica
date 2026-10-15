@@ -641,3 +641,41 @@ The required notice:
 > NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
 > DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
 > OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Derived code: the tree maker (2026-10-14)
+
+`scripts/style_packs/tree_maker.py` grows trees the way ez-tree does: a branch grown in sections,
+each turned by a gnarliness, twisted and bent toward a force; children spread stratified along and
+around their parent; leaf cards on the last level, double-billboarded with rounded normals; a skeleton
+grown once and meshed at two levels of detail. `scripts/style_packs/leaf_cards.py` uses the same
+multiply-with-carry random generator, with its constants. Both were written here in Python after
+reading ez-tree's `src/lib/tree.js`, `branch.js`, `options.js` and `rng.js` at commit
+`dcf309bd86bd521083d9c70f01f2de45fdc7c457` (`https://github.com/dgreenheck/ez-tree`); no file was
+copied, and ez-tree's code is not run by the maker.
+
+**Licence: MIT.** Read on 2026-10-14 from that commit's `LICENSE`. The required notice:
+
+> MIT License
+>
+> Copyright (c) 2024 Daniel Greenheck
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+> associated documentation files (the "Software"), to deal in the Software without restriction,
+> including without limitation the rights to use, copy, modify, merge, publish, distribute,
+> sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or
+> substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+> NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+> DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+> OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The trees it makes are drawn from scans by ambientCG (`https://ambientcg.com`): leaf sets
+LeafSet009, LeafSet010, PineNeedles001 and Foliage005, and barks Bark001 and Bark008, each under
+CC0 1.0 per ambientCG's licence page. The scans are not in this repository; the species catalog
+(`assets/style-packs/makers/tree-species.v1.json`) names each file it reads by path and SHA-256 and
+the archive it came from, and each tree's receipt records the files it read.
