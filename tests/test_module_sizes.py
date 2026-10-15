@@ -32,6 +32,11 @@ SUFFIXES = (".py", ".ts", ".tsx", ".mjs")
 
 #: Each listed module, the most lines it may have, and what it holds.
 LIMITS: dict[str, tuple[int, str]] = {
+    "exulanica/world/kinds/document.py": (
+        1_575,
+        "a world kind's document: its parts, rooms, walls, arcades and values, written with their "
+        "defaults and refused by path",
+    ),
     "exulanica/world/object_repository.py": (
         3_693,
         "alternate world versions and the objects, environments, point maps and things "
@@ -70,7 +75,11 @@ LIMITS: dict[str, tuple[int, str]] = {
         2_163,
         "photographs from one standpoint, joined by the rotation between them",
     ),
-    "web/packages/app/src/main.ts": (2_012, "the legacy app shell's boot and world mount"),
+    "web/packages/app/src/main.ts": (
+        2_022,
+        "the legacy app shell's boot and world mount, and the picture of a saved world it keeps "
+        "on the server",
+    ),
     "exulanica/orchestration/judge_seed.py": (
         2_021,
         "a workspace sealed into a verified archive; its refusals include a workspace that keeps "
