@@ -296,3 +296,85 @@ def test_a_hollow_shell_with_an_opening_is_filled_and_a_narrow_gap_is_not():
     assert not held((0.0, 0.0, 0.70))
     assert held((0.9, 0.0, 0.1)) and held((1.14, 0.0, 0.1))
     assert not held((1.02, 0.0, 0.1))
+
+
+#: A long low body: a spine from the tail's root to the neck, a head and a jaw, as a drafted
+#: legless body states it (millimetres; three metres long, twenty centimetres tall).
+LONG_BONES = {
+    "hips": (None, (0, -1600, 100), (0, -1200, 110)),
+    **{
+        f"spine{k}": (
+            "hips" if k == 1 else f"spine{k - 1}",
+            (0, -1200 + 400 * (k - 1), 110),
+            (0, -1200 + 400 * k, 110),
+        )
+        for k in range(1, 6)
+    },
+    "head1": ("spine5", (0, 800, 120), (0, 1150, 150)),
+    "head1Jaw": ("head1", (0, 1150, 110), (0, 1400, 90)),
+}
+LONG_CHAINS = [
+    {
+        "key": "spine",
+        "role": "spine",
+        "side": "centre",
+        "order": 0,
+        "bones": [f"spine{k}" for k in range(1, 6)],
+    },
+    {"key": "head1Jaw", "role": "jaw", "side": "centre", "order": 0, "bones": ["head1Jaw"]},
+]
+
+
+def _long_model() -> tuple[np.ndarray, np.ndarray]:
+    """The long body at half its plan's size, as a model made from a picture comes back at any size:
+    a body, a head at its front and a tapering tail."""
+    voxel = 0.01
+    origin = np.array([-0.2, -0.95, -0.02])
+    shape = (40, 190, 30)
+    centres = origin + (np.indices(shape).reshape(3, -1).T + 0.5) * voxel
+    filled = np.zeros(len(centres), dtype=bool)
+    for start, end, radius in (
+        ((0.0, -0.6, 0.06), (0.0, 0.5, 0.06), 0.05),
+        ((0.0, -0.9, 0.04), (0.0, -0.6, 0.06), 0.025),
+    ):
+        start, end = np.asarray(start), np.asarray(end)
+        t = np.clip((centres - start) @ (end - start) / ((end - start) @ (end - start)), 0.0, 1.0)
+        filled |= np.linalg.norm(centres - (start + t[:, None] * (end - start)), axis=1) <= radius
+    filled |= (((centres - [0.0, 0.62, 0.07]) / [0.07, 0.11, 0.065]) ** 2).sum(axis=1) <= 1.0
+    return voxel_surface(filled.reshape(shape), origin, voxel)
+
+
+def test_a_long_low_body_is_scaled_by_its_length_and_its_whole_spine_moves():
+    positions, faces = _long_model()
+    fitted = embed(
+        positions,
+        faces,
+        bones=tuple(LONG_BONES),
+        parents={bone: spec[0] for bone, spec in LONG_BONES.items()},
+        chains=LONG_CHAINS,
+        joints={bone: np.array(spec[1]) / 1000 for bone, spec in LONG_BONES.items()},
+        ends={bone: np.array(spec[2]) / 1000 for bone, spec in LONG_BONES.items()},
+        settings=SETTINGS,
+    )
+    assert fitted.measures["scaled_by"] == "length"
+    # Scaled to the plan's three metres, and laid head to tail.
+    assert 2.7 < float(np.ptp(fitted.positions[:, 1])) < 3.3
+    assert fitted.matched["head1Jaw"] is not None and fitted.still == ()
+    tail, head = fitted.joints["hips"], fitted.ends["head1Jaw"]
+    assert np.linalg.norm(head - tail) > 2.2
+
+
+def test_an_upright_body_is_still_scaled_by_its_height(model):
+    positions, faces = model
+    fitted = embed(
+        positions,
+        faces,
+        bones=NAMES,
+        parents=PARENTS,
+        chains=CHAINS,
+        joints=JOINTS,
+        ends=ENDS,
+        settings=SETTINGS,
+    )
+    assert fitted.measures["scaled_by"] == "height"
+    assert abs(float(np.ptp(fitted.positions[:, 2])) - HEIGHT) < 0.01

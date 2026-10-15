@@ -57,7 +57,6 @@ __all__ = [
     "Fitted",
     "fit_look",
     "model_from_npz",
-    "plan_height",
 ]
 
 RECEIPT_PROFILE: Final = "exulanica.creature-fit-receipt/v1"
@@ -85,11 +84,6 @@ class Fitted:
 
     container: bytes | None
     receipt: dict[str, Any] = field(default_factory=dict)
-
-
-def plan_height(request: CreatureRequest) -> float:
-    """The height the plan's rest skeleton stands to, metres: its highest joint or end."""
-    return max(float(max(request.joints[bone][2], request.ends[bone][2])) for bone in request.bones)
 
 
 def _mm(value: float) -> int:
@@ -149,7 +143,6 @@ def fit_look(
                 chains=request.chains,
                 joints=request.joints,
                 ends=request.ends,
-                height=plan_height(request),
                 settings=settings.embed,
             )
         except EmbedRefused as refusal:

@@ -5,8 +5,9 @@ limbs. A model made from a picture has the picture's shape: its legs may be shor
 its body rounder, its arms elsewhere. This module reads where the model's limbs are and lays the
 plan's chains along them. No learned model, numpy only:
 
-*   **size and stance.** The model is scaled uniformly to the plan's height (never per axis, which
-    would change its shape) and stood on the ground, centred over the plan's origin.
+*   **size and stance.** The model is scaled uniformly (never per axis, which would change its
+    shape): to the plan's height, or, for a plan many times longer than tall, along its main
+    horizontal axis to the plan's length; then stood on the ground, centred over the plan's origin.
 *   **inside.** The model's inside on a grid, its hollows filled (``solid_inside``), from the
     model as given, never a simplified copy (simplifying can tear a closed model open), and each
     inside voxel's distance through the inside (a 3-4-5 chamfer geodesic) from the deepest point.
@@ -97,6 +98,12 @@ class EmbedSettings:
 
     #: Voxels along the model's largest extent.
     grid: int = 128
+    #: A plan at least this many times longer than tall (a long low body with no legs to set its
+    #: height) has its model scaled by length; any other by height. Measured on development models
+    #: made from pictures: two long low bodies (plans fifty times longer than tall) scaled by height
+    #: never reached their heads, and two four-legged bodies (plans two and a half to three times
+    #: longer than tall) fitted by height but not by length.
+    long_body_ratio: float = 8.0
     #: A shell's thickness, voxels; at least 5/3, so neighbouring voxels lie in neighbouring shells.
     shell_voxels: float = 2.0
     #: A branch shorter than this share of the largest extent is a bump, not a limb.
@@ -672,6 +679,24 @@ def _mirror_planes(inside_points: np.ndarray, holds, settings: EmbedSettings) ->
     return facings
 
 
+def _scale(plan: _Plan, positions: np.ndarray, settings: EmbedSettings) -> tuple[float, str]:
+    """How much to scale a model to its plan, and by what. A plan many times longer than tall (a long
+    low body: ``long_body_ratio``) scales the model's longest horizontal extent, read along its main
+    axis so no facing is assumed, to the plan's length: scaled by height, a long low body comes out
+    far shorter than its plan and its far end is never reached. Any other plan, one whose legs set
+    its height, scales the model to its height."""
+    points = np.vstack([np.stack(list(plan.joints.values())), np.stack(list(plan.ends.values()))])
+    plan_height = float(points[:, 2].max())
+    plan_length = float(np.ptp(points[:, 1]))
+    model_height = float(np.ptp(positions[:, 2]))
+    if plan_length < settings.long_body_ratio * plan_height:
+        return plan_height / model_height, "height"
+    flat = positions[:, :2] - positions[:, :2].mean(axis=0)
+    _values, vectors = np.linalg.eigh(flat.T @ flat)
+    along = flat @ vectors[:, -1]
+    return plan_length / float(np.ptp(along)), "length"
+
+
 def embed(
     positions: np.ndarray,
     triangles: np.ndarray,
@@ -681,24 +706,29 @@ def embed(
     chains: Sequence[Mapping[str, Any]],
     joints: Mapping[str, np.ndarray],
     ends: Mapping[str, np.ndarray],
-    height: float,
+    height: float | None = None,
     settings: EmbedSettings = DEFAULT_SETTINGS,
 ) -> Embedded:
     """The plan's skeleton laid in a model (``positions`` in the slot frame, z up, any size and any
-    turn about z), the model scaled to ``height`` metres; or :class:`EmbedRefused`."""
+    turn about z), the model scaled to ``height`` metres, or by the plan's posture when ``height``
+    is None (:func:`_scale`); or :class:`EmbedRefused`."""
     plan = _plan(bones, parents, chains, joints, ends)
     positions = np.asarray(positions, dtype=np.float64)
     triangles = np.asarray(triangles, dtype=np.int64)
     low, high = positions.min(axis=0), positions.max(axis=0)
     if (high - low <= 0).any():
         raise EmbedRefused("embed_mesh_unfit", "the model has no extent along an axis")
-    scale = height / float(high[2] - low[2])
+    if height is not None:
+        scale, scaled_by = height / float(high[2] - low[2]), "height"
+    else:
+        scale, scaled_by = _scale(plan, positions, settings)
     base = np.array([(low[0] + high[0]) / 2, (low[1] + high[1]) / 2, low[2]])
     stood = (positions - base) * scale
     skeleton = curve_skeleton(stood, triangles, settings)
     size = float(np.ptp(stood, axis=0).max())
     measures: dict[str, Any] = {
         "scale_per_mille": round(scale * 1000),
+        "scaled_by": scaled_by,
         "limb_ends": len(skeleton.leaves) - 1,
         "voxel_mm": round(skeleton.voxel * 1000),
     }
