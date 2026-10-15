@@ -74,3 +74,39 @@ def test_an_empty_cutout_has_no_outline_and_no_colour():
     found = likeness(positions, triangles, colours, np.zeros((64, 64, 4), dtype=np.uint8))
     assert found.outline_overlap_per_mille == 0
     assert found.colour_difference_milli is None and found.model_mean_srgb is None
+
+
+def test_oklab_to_srgb_inverts_the_shared_oklab_reading():
+    from exulanica_pieces.geometry.palette import _oklab
+
+    from exulanica_appearance.creatures.likeness import oklab_to_srgb
+
+    colours = np.array(
+        [[0, 0, 0], [255, 255, 255], [200, 40, 40], [40, 60, 200], [234, 198, 120], [13, 250, 77]],
+        dtype=np.uint8,
+    )
+    assert np.abs(oklab_to_srgb(_oklab(colours)).astype(int) - colours.astype(int)).max() <= 1
+
+
+def test_a_model_paler_than_its_picture_is_moved_toward_it_within_the_bound():
+    from exulanica_appearance.creatures.likeness import MATCH_BOUND, match_to_picture
+
+    positions, triangles, colours = _model()
+    # The picture's colours richer than the model's, as a model made from a picture comes back.
+    rich = np.array([(230, 30, 20)] * 12 + [(20, 50, 235)] * 12, dtype=np.uint8)
+    picture = _picture(positions, triangles, rich, Camera(37.0, 15.0))
+    moved, match, before, after = match_to_picture(positions, triangles, colours, picture)
+    assert match is not None
+    assert after.colour_difference_milli < before.colour_difference_milli
+    assert all(abs(shift) <= bound for shift, bound in zip(match.shift, MATCH_BOUND, strict=True))
+    assert moved.shape == colours.shape and not np.array_equal(moved, colours)
+
+
+def test_with_no_pixel_in_common_the_colours_stay_as_they_are():
+    from exulanica_appearance.creatures.likeness import match_to_picture
+
+    positions, triangles, colours = _model()
+    empty = np.zeros((64, 64, 4), dtype=np.uint8)
+    moved, match, before, after = match_to_picture(positions, triangles, colours, empty)
+    assert match is None and before == after
+    assert np.array_equal(moved, colours)

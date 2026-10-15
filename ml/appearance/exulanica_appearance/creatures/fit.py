@@ -15,7 +15,8 @@ triangles and vertex colours in the model's own frame, with its up and front nam
 4.  turns every triangle of the copy to face out of the body (judged by the full model's inside),
     colours each triangle with its own swatch, skins it by bone heat with the still bones left out,
     and holds the rig to its checks for a fitted skeleton;
-5.  measures how closely the model keeps its picture (:mod:`likeness`), recorded, never judged here;
+5.  measures how closely the model keeps its picture (:mod:`likeness`), moves its colours toward
+    the picture's within a bound, and measures again; both recorded, never judged here;
 6.  writes the skinned container (every plan bone a joint at its laid place, the still ones holding
     no vertex) and reads it back with the product's reader.
 
@@ -45,7 +46,7 @@ from exulanica_appearance.creatures.embed import (
     embed,
 )
 from exulanica_appearance.creatures.job import _main_parts, _slot, _without_slivers
-from exulanica_appearance.creatures.likeness import likeness
+from exulanica_appearance.creatures.likeness import likeness, match_to_picture
 from exulanica_appearance.creatures.request import CreatureRequest
 from exulanica_appearance.creatures.rig import Inside, RigRefused, bone_heat, check_rig
 
@@ -69,6 +70,10 @@ class FitSettings:
     #: The skin's triangle budget, as route C's job settings state theirs.
     triangles: int = 20_000
     embed: EmbedSettings = DEFAULT_SETTINGS
+    #: Move the model's colours toward its picture's (``likeness.match_to_picture``): a model made
+    #: from a picture comes back paler than the picture, and the match is bounded so it never
+    #: paints the picture's light into the model.
+    match_colours: bool = True
 
 
 DEFAULT_FIT: Final = FitSettings()
@@ -177,9 +182,13 @@ def fit_look(
         stage = "rig"
         start = time.monotonic()
         moving = [bone for bone in request.bones if bone not in fitted.still]
+        if not any(chain["bones"][0] in moving for chain in request.chains):
+            # Every chain kept still: only the root would move, a figure that cannot walk.
+            raise RigRefused("rig_nothing_moves", "no chain of the plan was laid in the model")
         local, weights = bone_heat(
             positions, triangles, moving, fitted.joints, fitted.ends, fitted.inside
         )
+        local, weights = _four(local, weights)
         to_plan = np.array([request.bones.index(bone) for bone in moving], dtype=np.int64)
         indices = to_plan[local]
         chains = [chain for chain in request.chains if not set(chain["bones"]) & set(fitted.still)]
@@ -207,19 +216,20 @@ def fit_look(
         seconds["rig"] = round(time.monotonic() - start)
         stage = "likeness"
         start = time.monotonic()
-        measured = likeness(positions, triangles, colours, _png_rgba(cutout_png))
-        receipt["likeness"] = {
-            "yaw_degrees": measured.yaw_degrees,
-            "pitch_degrees": measured.pitch_degrees,
-            "outline_overlap_per_mille": measured.outline_overlap_per_mille,
-            "colour_difference_milli": measured.colour_difference_milli,
-            "picture_mean_srgb": None
-            if measured.picture_mean_srgb is None
-            else list(measured.picture_mean_srgb),
-            "model_mean_srgb": None
-            if measured.model_mean_srgb is None
-            else list(measured.model_mean_srgb),
-        }
+        if settings.match_colours:
+            colours, match, measured, matched = match_to_picture(
+                positions, triangles, colours, _png_rgba(cutout_png)
+            )
+        else:
+            match, matched = None, None
+            measured = likeness(positions, triangles, colours, _png_rgba(cutout_png))
+        receipt["likeness"] = _likeness_record(measured)
+        if matched is not None and match is not None:
+            receipt["likeness_matched"] = {
+                **_likeness_record(matched),
+                "shift_milli": [round(1000 * value) for value in match.shift],
+                "scale_per_mille": [round(1000 * value) for value in match.scale],
+            }
         seconds["likeness"] = round(time.monotonic() - start)
         stage = "container"
         start = time.monotonic()
@@ -259,6 +269,16 @@ def fit_look(
     return Fitted(container, receipt)
 
 
+def _four(indices: np.ndarray, weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Influences padded to the four a vertex holds in the container: a skin of fewer than four
+    moving bones gives fewer columns, padded with the first bone at no weight."""
+    missing = 4 - indices.shape[1]
+    if missing <= 0:
+        return indices, weights
+    pad = np.repeat(indices[:, :1], missing, axis=1)
+    return np.hstack([indices, pad]), np.hstack([weights, np.zeros((len(weights), missing))])
+
+
 def _outward(
     positions: np.ndarray, triangles: np.ndarray, inside: Inside
 ) -> tuple[np.ndarray, int]:
@@ -280,6 +300,21 @@ def _outward(
     turned = triangles.copy()
     turned[over] = turned[over][:, ::-1]
     return turned, int(over.sum())
+
+
+def _likeness_record(measured: Any) -> dict[str, Any]:
+    return {
+        "yaw_degrees": measured.yaw_degrees,
+        "pitch_degrees": measured.pitch_degrees,
+        "outline_overlap_per_mille": measured.outline_overlap_per_mille,
+        "colour_difference_milli": measured.colour_difference_milli,
+        "picture_mean_srgb": None
+        if measured.picture_mean_srgb is None
+        else list(measured.picture_mean_srgb),
+        "model_mean_srgb": None
+        if measured.model_mean_srgb is None
+        else list(measured.model_mean_srgb),
+    }
 
 
 def _rig_record(checks: Any, voxel: float) -> dict[str, Any]:

@@ -102,8 +102,9 @@ def _request() -> bytes:
     ).encode()
 
 
-def _model(capsules=CAPSULES) -> tuple[Mesh, bytes]:
-    """The model in a 3D model's frame (+Z up, front -Y), two colours, and its cut-out."""
+def _model(capsules=CAPSULES, picture_colours=None) -> tuple[Mesh, bytes]:
+    """The model in a 3D model's frame (+Z up, front -Y), two colours, and its cut-out: its own
+    view, drawn in ``picture_colours`` (body, head) where they are given."""
     voxel = 0.01
     origin = np.array([-0.5, -0.6, -0.05])
     shape = (100, 110, 100)
@@ -118,7 +119,11 @@ def _model(capsules=CAPSULES) -> tuple[Mesh, bytes]:
     positions, triangles = voxel_surface(filled.reshape(shape), origin, voxel)
     colours = np.where((positions[:, 2] > 0.66)[:, None], HEAD, BODY).astype(np.uint8)
     drawn = rasterise(positions[triangles], Camera(145.0, 15.0), 256, margin=0.1)
-    face = np.rint(colours[triangles].mean(axis=1)).astype(np.uint8)
+    drawn_colours = colours
+    if picture_colours is not None:
+        body, head = picture_colours
+        drawn_colours = np.where((positions[:, 2] > 0.66)[:, None], head, body).astype(np.uint8)
+    face = np.rint(drawn_colours[triangles].mean(axis=1)).astype(np.uint8)
     rgba = np.zeros((256, 256, 4), dtype=np.uint8)
     rgba[drawn.mask, :3] = face[drawn.triangle[drawn.mask]]
     rgba[drawn.mask, 3] = 255
@@ -128,8 +133,8 @@ def _model(capsules=CAPSULES) -> tuple[Mesh, bytes]:
     return Mesh(frame, triangles, colours), buffer.getvalue()
 
 
-def _fit(repository, capsules=CAPSULES):
-    model, cutout = _model(capsules)
+def _fit(repository, capsules=CAPSULES, picture_colours=None):
+    model, cutout = _model(capsules, picture_colours)
     table, _ = read_table(repository)
     return fit_look(
         read_request(_request()),
@@ -159,6 +164,9 @@ def test_a_model_from_a_picture_becomes_a_skinned_look_the_product_reads(reposit
     assert abs(receipt["output"]["height_mm"] - 900) <= 20
     # Its likeness to its own view is measured, and high.
     assert receipt["likeness"]["outline_overlap_per_mille"] >= 800
+    # Its picture is its own view, so the colour match brings it no closer and is not kept.
+    assert receipt["likeness"]["colour_difference_milli"] <= 5
+    assert "likeness_matched" not in receipt
     # The receipt is a record: canonical, every number a whole one in a stated unit.
     assert json.loads(canonical_bytes(receipt)) == receipt
 
@@ -208,3 +216,24 @@ def test_triangles_turned_over_are_turned_back_to_face_out():
     agree = (fixed == triangles).all(axis=1) | (fixed == np.roll(triangles, 1, axis=1)).all(axis=1)
     agree |= (fixed == np.roll(triangles, 2, axis=1)).all(axis=1)
     assert agree.mean() >= 0.95
+
+
+def test_a_model_paler_than_its_picture_is_coloured_toward_it(repository):
+    # The picture richer than the model it became, as a 3D model made from a picture comes back.
+    fitted = _fit(repository, picture_colours=((250, 110, 10), (255, 225, 30)))
+    receipt = fitted.receipt
+    assert receipt["outcome"] == "passed", receipt.get("refusal")
+    before, after = receipt["likeness"], receipt["likeness_matched"]
+    assert after["colour_difference_milli"] < before["colour_difference_milli"]
+    assert after["outline_overlap_per_mille"] == before["outline_overlap_per_mille"]
+    assert len(after["shift_milli"]) == len(after["scale_per_mille"]) == 3
+
+
+def test_a_skin_of_fewer_than_four_bones_is_padded_to_four_influences():
+    from exulanica_appearance.creatures.fit import _four
+
+    indices = np.array([[0, 1], [1, 0]])
+    weights = np.array([[0.75, 0.25], [1.0, 0.0]])
+    padded, padded_weights = _four(indices, weights)
+    assert padded.shape == padded_weights.shape == (2, 4)
+    assert np.allclose(padded_weights.sum(axis=1), 1.0) and (padded_weights[:, 2:] == 0).all()
