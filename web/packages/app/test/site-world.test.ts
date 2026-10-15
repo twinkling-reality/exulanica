@@ -401,12 +401,45 @@ function landBackdrop(): string {
   });
 }
 
-/** A host serving the yard on a slope and its land; `tampered` serves that path's document changed. */
-function landHost(tampered: string | null = null) {
+/**
+ * The yard's landscape: the server's own landscape fixture (one small floating island at 4 m), its
+ * drawing restated for the yard's world, drawing and land. `otherDrawing` names another site drawing.
+ */
+const LANDSCAPE_FIXTURE = JSON.parse(readFileSync('packages/atlas-react/test/fixtures/landscape.v1.json', 'utf8')) as {
+  drawing: Record<string, unknown>; chunks: Record<string, unknown>;
+};
+function landscapeOfYard(otherDrawing = false): string {
+  const site = JSON.parse(LAND_DRAWING) as { land: { land_sha256: string } };
+  return canonical({
+    ...LANDSCAPE_FIXTURE.drawing,
+    world_id: 'world:generated:land-fixture',
+    site_drawing_sha256: otherDrawing ? '0'.repeat(64) : sha256(new TextEncoder().encode(LAND_DRAWING)),
+    land_sha256: site.land.land_sha256,
+  });
+}
+type Landscape = 'none' | 'served' | 'other-drawing' | 'tampered-chunk';
+
+/** A host serving the yard on a slope and its land; `tampered` serves that path's document changed; `landscape` what its landscape route answers. */
+function landHost(tampered: string | null = null, landscape: Landscape = 'none') {
   const level = host(200, LAND_DRAWING);
   const documents = new Map([['land/chunks/-1/0', landChunk(-1, 0)], ['land/chunks/0/0', landChunk(0, 0)], ['land/backdrop', landBackdrop()]]);
   const fetched = vi.fn(async (input: string): Promise<Response> => {
-    const at = /^\/world\/versions\/version\/(land\/[^?]+)\?world_id=world%3Agenerated%3Aland-fixture$/.exec(input.slice(access.baseUrl.length));
+    const path = input.slice(access.baseUrl.length);
+    if (/^\/world\/versions\/version\/landscape\?world_id=world%3Agenerated%3Aland-fixture$/.test(path)) {
+      level.asked.push(path);
+      if (landscape === 'none') return refused(404, 'landscape_unavailable');
+      const body = landscapeOfYard(landscape === 'other-drawing');
+      return new Response(body, { status: 200, headers: { ETag: `"${sha256(new TextEncoder().encode(body))}"` } });
+    }
+    const chunk = /^\/world\/versions\/version\/landscape\/chunk\?sha256=([0-9a-f]{64})&world_id=world%3Agenerated%3Aland-fixture$/.exec(path);
+    if (chunk !== null) {
+      level.asked.push(path);
+      const found = LANDSCAPE_FIXTURE.chunks[chunk[1]!];
+      if (found === undefined) return refused(404, 'landscape_document_unavailable');
+      const body = canonical(found);
+      return new Response(landscape === 'tampered-chunk' ? body.replace('"vertex_looks":[0', '"vertex_looks":[1') : body, { status: 200, headers: { ETag: `"${chunk[1]}"` } });
+    }
+    const at = /^\/world\/versions\/version\/(land\/[^?]+)\?world_id=world%3Agenerated%3Aland-fixture$/.exec(path);
     if (at === null) return level.fetched(input);
     level.asked.push(input.slice(access.baseUrl.length));
     const body = documents.get(at[1]!);
@@ -459,6 +492,42 @@ describe('a site made on land', () => {
     // The fence stands 1.2 m on land 7 m up: across a 1.1 m eye above the land, under it above the datum.
     expect(siteSightRings(drawing, 1100, world.mount.land!.groundMm)).toHaveLength(1);
     expect(siteSightRings(drawing, 1100)).toHaveLength(0);
+  });
+});
+
+describe('a site on a landscape', () => {
+  it('reads its landscape and each volume\'s chunks by digest, and mounts the site with them', async () => {
+    const { fetched, asked } = landHost(null, 'served');
+    vi.stubGlobal('fetch', fetched);
+    const world = (await loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null))!;
+    expect(world.landscape).toEqual({ volumes: 1, reason: null });
+    const handed = (mounts.asked.at(-1) as { landscape?: { volumes: readonly { volume: { id: string }; chunks: readonly unknown[] }[] } }).landscape!;
+    expect(handed.volumes.map((one) => [one.volume.id, one.chunks.length])).toEqual([['small_island', Object.keys(LANDSCAPE_FIXTURE.chunks).length]]);
+    expect(asked.filter((path) => path.includes('/landscape/chunk?')).length).toBe(Object.keys(LANDSCAPE_FIXTURE.chunks).length);
+    // Redrawn in another look with the same volumes, read once.
+    const before = asked.length;
+    await world.relook({ packId: null, source: 'address' } as unknown as WorldLookChoice);
+    expect((mounts.asked.at(-1) as { landscape?: unknown }).landscape).toBe(handed);
+    expect(asked.slice(before).some((path) => path.includes('/landscape'))).toBe(false);
+  });
+
+  it('has none where the server says the site stands on no landscape', async () => {
+    vi.stubGlobal('fetch', landHost().fetched);
+    const world = (await loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null))!;
+    expect(world.landscape).toBeUndefined();
+    expect((mounts.asked.at(-1) as { landscape?: unknown }).landscape).toBeUndefined();
+  });
+
+  it.each([
+    ['other-drawing', 'names another drawing, world or land'],
+    ['tampered-chunk', 'is the document its digest names'],
+  ] as const)('is drawn without its volumes, saying why, when its landscape is %s', async (landscape, said) => {
+    vi.stubGlobal('fetch', landHost(null, landscape).fetched);
+    const world = (await loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null))!;
+    expect(world.mount.land).toBeDefined();
+    expect(world.landscape?.volumes).toBe(0);
+    expect(world.landscape?.reason).toContain(said);
+    expect((mounts.asked.at(-1) as { landscape?: unknown }).landscape).toBeUndefined();
   });
 });
 

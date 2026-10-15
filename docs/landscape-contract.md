@@ -1,13 +1,13 @@
 # Landscape and volumes
 
-Status: **IMPLEMENTED BOUNDARY: DATA, REALIZATION AND A SITE WORLD ON A LANDSCAPE THROUGH ITS
-ROUTE; NOT DRAWN OR WALKED YET**. A volume (rock that overhangs, a sea stack, an arch, a spire) can
+Status: **IMPLEMENTED BOUNDARY: DATA, REALIZATION, A SITE WORLD ON A LANDSCAPE THROUGH ITS ROUTE,
+AND ITS VOLUMES DRAWN IN ROCK; NOT WALKED YET**. A volume (rock that overhangs, a sea stack, an arch, a spire) can
 be stated as data, read against its catalogs, evaluated as an exact integer field, meshed by chunk
 and searched for walkable tops in Python; a landscape places volumes on an unchanged land and
 realizes each under a seed of its own. A site world can be laid out on a landscape through its
 route, kept under the receipt check every site world meets, and its landscape's drawing, chunks and
-tops are served by digest. The application does not draw volumes yet, people do not walk on them,
-and a world made from a person's words never stands on a landscape.
+tops are served by digest. The application draws a site's volumes round it in rock; people do not
+walk on them, and a world made from a person's words never stands on a landscape.
 
 This document owns the volume document (`exulanica.volume/v1`), the landscape document
 (`exulanica.landscape/v1`), their catalogs, the volume field, the chunk (`exulanica.volume-chunk/v1`)
@@ -28,6 +28,7 @@ belongs to the [world kinds contract](world-kinds-contract.md).
 - [Realizing a landscape's volumes](#realizing-a-landscapes-volumes)
 - [Volume rules and landscape rules](#volume-rules-and-landscape-rules)
 - [A site on a landscape](#a-site-on-a-landscape)
+- [Readers in the browser](#readers-in-the-browser)
 - [Refusals](#refusals)
 - [Limits](#limits)
 
@@ -178,6 +179,22 @@ counterclockwise seen from above. The drawing, each chunk and each top are serve
 `.../landscape/top?sha256=`, world read). A receipt whose landscape no longer reads under the rules it
 names, or is not the one its digest and land name, is refused by name and listed unavailable.
 
+## Readers in the browser
+
+`readLandscapeDrawing` and `readVolumeChunk` (`web/packages/atlas-core/src/landscape.ts`) read the
+landscape drawing and a volume chunk with the server's bounds, each held to the digest its route and
+its drawing name. The page asks every site on land for its landscape; a 404 `landscape_unavailable`
+means it has none. The landscape drawing must name the site's own drawing, world and land. Each
+placed volume is drawn at one level: the finest it names that is not finer than 2 m (the
+landscape's default finest cell), else the coarsest it names (`volumeDrawnCellMm`), and only that
+level's chunks are fetched (`readSiteVolumes`, `web/packages/atlas-react/src/playcanvas/generated-site/site-volumes.ts`).
+A volume's chunks are placed at its origin and turned about the renderer's up axis; a point
+`(x, y, z)` of its own frame is the renderer's `(x, z, -y) / 1000` metres, which keeps every face
+turned from solid toward air. They are drawn in the look's `ground.rock` (the surface material
+catalog's rock and its grain pattern, or the pack's own surface), else the engine's rock colour;
+volumes cast and receive shadows and are counted in the site's triangles and draws. A landscape that
+cannot be read does not stop the site: it opens without its volumes and the page keeps the reason.
+
 ## Refusals
 
 | Code | When |
@@ -209,7 +226,8 @@ names, or is not the one its digest and land name, is refused by name and listed
   touch in one cell border four triangles.
 - A solid thinner than 250 mm can be stepped over by the top search; tops are of one volume alone,
   and where placed volumes meet, which top is walked is not decided yet.
-- Volumes are not drawn by the application and not walked by people yet, and stand only off a site;
+- Volumes are drawn at one level each, in one rock, with no texture yet, and are not walked by
+  people; they stand only off a site;
   sky islands, spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
 - Realized chunks and tops are kept in the kind worker's memory with the site's drawing, as a site's
   land chunks are, not in a store; a world read again later realizes them again.

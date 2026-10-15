@@ -768,3 +768,9 @@ export {
   landChunkGeometry, landChunkLocal, landNoiseShift, readLandBackdrop, readLandChunk, readLandSurfaces, valueNoise,
 } from './landform.js';
 export type { BackdropBlock, LandBackdrop, LandChunk, LandSurfaceBand, LandSurfaces, LandWater } from './landform.js';
+
+export {
+  LANDSCAPE_DRAWING_PROFILE, LandscapeError, VOLUME_CHUNK_MM, VOLUME_CHUNK_PROFILE, VOLUME_DRAWN_FINEST_MM, VOLUME_LEVELS_MM,
+  VOLUME_LOOKS, VOLUME_NORMAL_ONE, VOLUME_RULES_VERSION, placedPointMm, readLandscapeDrawing, readVolumeChunk, volumeDrawnCellMm,
+} from './landscape.js';
+export type { LandscapeDrawing, PlacedVolume, VolumeChunk, VolumeChunkRef, VolumeTopRef } from './landscape.js';

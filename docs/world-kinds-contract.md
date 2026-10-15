@@ -412,7 +412,8 @@ A site made on a landscape (composer version 6, [landscape contract](landscape-c
 is laid out on the landscape's land exactly as version 5 lays it out and serves the same
 `exulanica.site-drawing/v5`; its land routes serve as version 5's do. Its landscape's volumes stand
 off the site and are named by their own drawing, `exulanica.landscape-drawing/v1`, served beside
-the site's. The application does not draw volumes yet.
+the site's. The application draws them round the site in rock
+([landscape contract](landscape-contract.md#readers-in-the-browser)).
 
 A style pack dresses a slot by its look role and never changes it. Nothing in the drawing decides a
 look.

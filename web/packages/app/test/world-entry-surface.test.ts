@@ -164,8 +164,8 @@ describe('choosing between saved worlds', () => {
     expect(text).not.toContain('22222222');
   });
 
-  it('says a world made on land by rules this server does not serve cannot be opened', () => {
-    for (const reason of ['generated_world_land_rules_changed', 'generated_world_land_changed']) {
+  it('says a world made on land or a landscape by rules this server does not serve cannot be opened', () => {
+    for (const reason of ['generated_world_land_rules_changed', 'generated_world_land_changed', 'generated_world_landscape_rules_changed', 'generated_world_landscape_changed']) {
       const text = surface([entry({ availability: 'unavailable', unavailableReason: reason })])
         .textContent ?? '';
       expect(text).toContain('no longer holds, so it cannot be opened');

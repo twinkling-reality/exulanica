@@ -32,9 +32,17 @@ import type { TerrainOccupancyProof } from '@exulanica/atlas-core';
  * held to the digest its drawing names (`readSiteLand`) before the site is mounted, and the same
  * land serves every look it is redrawn in. Land that cannot be read, or is not the land named, is
  * not drawn and is not stood in for: the site is not drawn, and the page says so.
+ *
+ * A site on land may stand on a landscape (`docs/landscape-contract.md`): volumes placed round it,
+ * such as sea stacks and floating islands. Its saved entry does not say so, so the page asks for the
+ * landscape (`GET .../landscape`) of every site on land, and a 404 means it has none. The landscape
+ * drawing is held to its route's digest and to this site's drawing, receipt and land, and each chunk
+ * of the level a volume is drawn at to the digest the landscape names (`readSiteVolumes`). Volumes
+ * stand off the site and are never walked, so a landscape that cannot be read does not stop the
+ * site: it is drawn without them, and `landscape.reason` says why.
  */
 
-import type { GeneratedSiteMount, SiteDrawing, SiteLand, StructuredSiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
+import type { GeneratedSiteMount, SiteDrawing, SiteLand, SiteVolumes, StructuredSiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
 import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
@@ -89,6 +97,8 @@ export interface SiteWorld {
   readonly look: WorldLookState;
   /** The same drawing in another look: nothing is read or checked again. Throws, changing nothing, when the pack cannot be read. */
   readonly relook: (choice: WorldLookChoice) => Promise<{ readonly mount: GeneratedSiteMount; readonly look: WorldLookState }>;
+  /** The volumes a site on a landscape places round it: how many are drawn, or why none are; absent for a site on no landscape. */
+  readonly landscape?: { readonly volumes: number; readonly reason: string | null };
 }
 
 /**
@@ -140,7 +150,74 @@ export async function loadSiteWorld(
         || terrain.arrivalFacingMm.some((v, i) => v !== drawing.arrival.facingMm[i])) throw new Error("This world's terrain drawing differs from its saved entry.");
   } else if (entry.generatedSite == null) throw new Error("This world's drawing is not its declared terrain.");
   const land = isTerrainSiteDrawing(drawing) || drawing.land === undefined ? null : await loadSiteLand(access, entry, drawing);
-  return { ...await siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry, land), drawingSha256: actual };
+  const landscape = land === null || isTerrainSiteDrawing(drawing) ? null : await loadSiteLandscape(access, entry, drawing, actual, waiting, wait);
+  const world = { ...await siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry, land, landscape?.volumes ?? null), drawingSha256: actual };
+  return landscape === null || landscape.state === null ? world : { ...world, landscape: landscape.state };
+}
+
+/**
+ * The volumes a site on land's landscape places round it, read through its world's version: the
+ * landscape drawing, held to its route's digest and to this site's drawing (`drawingSha256`),
+ * world and land, then every chunk of the level each volume is drawn at, held to the digest the
+ * landscape names. None, with no state, for a site on no landscape (404); none, with the reason,
+ * for a landscape that cannot be read, since the site is drawn without its volumes.
+ */
+async function loadSiteLandscape(
+  access: Credentials,
+  entry: SavedWorldEntry,
+  drawing: StructuredSiteDrawing,
+  drawingSha256: string,
+  waiting: () => void,
+  wait: (ms: number) => Promise<void>,
+): Promise<{ readonly volumes: SiteVolumes | null; readonly state: { readonly volumes: number; readonly reason: string | null } | null }> {
+  const query = new URLSearchParams({ world_id: entry.worldId });
+  const version = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`;
+  const ask = async (path: string): Promise<Response> => {
+    let response: Response;
+    for (let asked = 1; ; asked += 1) {
+      response = await fetch(`${version}/${path}`, {
+        headers: { ...accessHeaders(access), Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      if (asked >= DRAWING_ASKS || !(await stillMaking(response))) return response;
+      waiting();
+      await wait(waitMs(response));
+    }
+  };
+  try {
+    const response = await ask(`landscape?${query.toString()}`);
+    if (response.status === 404) {
+      const problem = await response.json().catch(() => null) as { code?: unknown } | null;
+      if (problem?.code === 'landscape_unavailable') return { volumes: null, state: null };
+    }
+    if (!response.ok) throw new Error(`This world's landscape could not be read: HTTP ${response.status}.`);
+    const [{ readSiteVolumes, siteVolumeChunks }, { sha256Hex }, { readLandscapeDrawing }] = await Promise.all([
+      import('@exulanica/atlas-react/generated-site'),
+      import('@exulanica/atlas-react/playcanvas'),
+      import('@exulanica/atlas-core'),
+    ]);
+    const text = await response.text();
+    let bytes = new TextEncoder().encode(text).byteLength;
+    const stated = response.headers.get('ETag')?.replaceAll('"', '') ?? undefined;
+    if (stated === undefined) throw new Error("This world's landscape arrived with no digest.");
+    const landscape = readLandscapeDrawing(JSON.parse(text), sha256Hex, stated);
+    if (landscape.worldId !== entry.worldId || landscape.siteDrawingSha256 !== drawingSha256 || landscape.landSha256 !== drawing.land!.landSha256) {
+      throw new Error("This world's landscape names another drawing, world or land than its site's.");
+    }
+    const refs = siteVolumeChunks(landscape);
+    const bodies = new Map(await Promise.all(refs.map(async (ref) => {
+      const chunk = await ask(`landscape/chunk?${new URLSearchParams({ sha256: ref.sha256, world_id: entry.worldId }).toString()}`);
+      if (!chunk.ok) throw new Error(`This world's landscape chunk could not be read: HTTP ${chunk.status}.`);
+      if (chunk.headers.get('ETag')?.replaceAll('"', '') !== ref.sha256) throw new Error("This world's landscape chunk arrived as a document its landscape does not name.");
+      const body = await chunk.text();
+      bytes += new TextEncoder().encode(body).byteLength;
+      return [ref.sha256, JSON.parse(body) as unknown] as const;
+    })));
+    const volumes = readSiteVolumes(landscape, bodies, sha256Hex, bytes);
+    return { volumes, state: { volumes: volumes.volumes.length, reason: null } };
+  } catch (error) {
+    return { volumes: null, state: { volumes: 0, reason: error instanceof Error ? error.message : String(error) } };
+  }
 }
 
 /**
@@ -187,6 +264,7 @@ async function siteInLook(
   entry: SavedWorldEntry,
   currentEntry?: () => SavedWorldEntry | null,
   land: SiteLand | null = null,
+  landscape: SiteVolumes | null = null,
 ): Promise<SiteWorld> {
   const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
@@ -206,7 +284,7 @@ async function siteInLook(
   const terrainOccupancy = terrainLease.read;
   const terrainOptions = isTerrainSiteDrawing(drawing) ? {terrainOccupancy, dressingReadiness, ...(preparedDressing === undefined ? {} : {preparedDressing})} : {};
   // A site on land is mounted on its land in every look it is drawn in.
-  const landOptions = land === null ? {} : { land, landSurfaces: (await import('../land-surfaces.js')).LAND_SURFACES };
+  const landOptions = land === null ? {} : { land, landSurfaces: (await import('../land-surfaces.js')).LAND_SURFACES, ...(landscape === null ? {} : { landscape }) };
   const measure = new URLSearchParams(search).has('measure') ? { measure: true } : {};
   const seated = (seats: Parameters<typeof rememberSiteSeats>[2]): (() => void) => rememberSiteSeats(entry.entryId, entry.authoredVersionId!, seats);
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */

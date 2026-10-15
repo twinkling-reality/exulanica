@@ -11,6 +11,7 @@ import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, typ
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, slotColour, type DrawnSiteSlots } from './site-primitives.js';
 import { drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
+import { VOLUME_ROCK_RGB, drawSiteVolumes, type SiteVolumes } from './site-volumes.js';
 import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
 import { measureSite } from './site-measurements.js';
@@ -51,7 +52,7 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * disposer, which runs before the slots are taken away and puts back everything it changed. It
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
-export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null };
+export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null; readonly volumeLook?: () => pc.Material | null };
 export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment, land?: SiteLand) => SiteUndress;
 
 export interface SiteMountOptions {
@@ -105,6 +106,12 @@ export interface SiteMountOptions {
    * rock and the far hills' bands laid over the ground. None draws the land in its ground alone.
    */
   readonly landSurfaces?: LandSurfaces;
+  /**
+   * The volumes a site on a landscape places round it, read and held to the digests its landscape
+   * drawing names (`readSiteVolumes`): drawn on the land, off the site, in the engine's rock or the
+   * rock the dresser makes (`volumeLook`). None draws none; they are never walked.
+   */
+  readonly landscape?: SiteVolumes;
 }
 
 /**
@@ -185,6 +192,17 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         const camera = host.camera.camera;
         if (camera != null) camera.farClip = Math.max(camera.farClip, drawnLand.reachM);
       }
+      // The volumes a landscape places round the site, in the engine's rock until the dressing says.
+      const volumes = options.landscape ?? null;
+      if (volumes !== null && volumes.drawing.worldId !== drawing.worldId) throw new TypeError("A site's landscape is its own world's.");
+      const rockPlain = volumes === null ? null : new pc.StandardMaterial();
+      if (rockPlain !== null) {
+        rockPlain.name = 'site-volumes:rock';
+        rockPlain.diffuse = new pc.Color(...VOLUME_ROCK_RGB);
+        rockPlain.update();
+      }
+      const drawnVolumes = volumes === null ? null : drawSiteVolumes(host.app.graphicsDevice, volumes, rockPlain!);
+      if (drawnVolumes !== null) host.environmentRoot.addChild(drawnVolumes.root);
       // What stands beyond the place: scenery, beside the site's slots in the same frame and none of
       // them, so nothing that reads or outlines the slots meets it. The dresser is handed it to
       // shade, or to stand its own trees in.
@@ -210,6 +228,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       }
       // The land's sea and lakes in the look's water, as the dresser makes it; plain where it makes none.
       if (drawnLand !== null && undress?.landWater !== undefined) drawnLand.wearWater(undress.landWater);
+      // The volumes in the look's rock, as the dresser makes it; the engine's rock where it makes none.
+      const dressedRock = drawnVolumes === null ? null : undress?.volumeLook?.() ?? null;
+      if (drawnVolumes !== null && dressedRock !== null) drawnVolumes.wear(dressedRock);
       const withdrawSeats = options.seated === undefined ? undefined : options.seated(drawnSiteSeats(drawing, slots, undress?.seatTriangles));
       // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn
       // in once dressed, and the look's sun turned into the light under it.
@@ -246,6 +267,16 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       if (drawnLand !== null && canvas?.dataset !== undefined) {
         canvas.dataset['siteLand'] = JSON.stringify({ land: land!.section.landSha256, chunks: land!.chunks.length, draped: draped!.draped, draws: drawnLand.draws, triangles: drawnLand.triangles });
       }
+      // The landscape, said on the canvas: its volumes, the chunks drawn, and whether the dressing dressed them.
+      if (drawnVolumes !== null && canvas?.dataset !== undefined) {
+        canvas.dataset['siteLandscape'] = JSON.stringify({
+          landscape: volumes!.drawing.landscapeSha256,
+          volumes: volumes!.volumes.map((one) => ({ id: one.volume.id, cellMm: one.cellMm, chunks: one.chunks.length })),
+          dressed: dressedRock !== null,
+          draws: drawnVolumes.draws,
+          triangles: drawnVolumes.triangles,
+        });
+      }
       const said = options.dress === undefined && materials !== null && canvas?.dataset !== undefined;
       if (said) {
         const drawn = drawing.slots.filter((slot) => slots.entities.has(slot.identity));
@@ -262,9 +293,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         animating: undress?.animating ?? false,
         metrics: Object.freeze({
           tileName: `site:${drawing.worldId}`,
-          triangles: slots.triangles + (drawnLand?.triangles ?? 0),
-          drawBatches: slots.drawn + (drawnLand?.draws ?? 0),
-          transferredBytes: options.servedBytes + (land?.servedBytes ?? 0) + (undress?.textureMetrics?.transferredBytes ?? 0),
+          triangles: slots.triangles + (drawnLand?.triangles ?? 0) + (drawnVolumes?.triangles ?? 0),
+          drawBatches: slots.drawn + (drawnLand?.draws ?? 0) + (drawnVolumes?.draws ?? 0),
+          transferredBytes: options.servedBytes + (land?.servedBytes ?? 0) + (volumes?.servedBytes ?? 0) + (undress?.textureMetrics?.transferredBytes ?? 0),
           decodedTextureBytes: undress?.textureMetrics?.decodedTextureBytes ?? 0,
           unavailableSurfaces: undress?.textureMetrics?.unavailableSurfaces ?? 0,
           neighbours: Object.freeze([]),
@@ -285,6 +316,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
           if (scenery !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteScenery'];
           if (ceiling !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCeiling'];
           if (drawnLand !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteLand'];
+          if (drawnVolumes !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteLandscape'];
           // The ceiling goes before the dressing is undone: it wears a material the dressing made.
           ceiling?.destroy();
           undress?.();
@@ -295,6 +327,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
           draped?.destroy();
           drawnLand?.destroy();
           landPlain?.destroy();
+          drawnVolumes?.destroy();
+          rockPlain?.destroy();
           environment.dispose();
         },
       };
