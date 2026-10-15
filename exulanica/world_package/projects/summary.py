@@ -77,7 +77,7 @@ def parts_changed(
     old: Mapping[str, Any] | None, new: Mapping[str, Any], *, kept: bool = True
 ) -> list[str]:
     """Build mode's words for a made world's parts: moved, turned, raised or lowered, removed and
-    put back. With
+    brought back (a removal undone reads as build mode's note says it). With
     `kept`, a checkpoint that keeps its parts for the first time says so in one sentence."""
     after = {p["part_id"]: p for p in new.get("parts") or []}
     if not after:
@@ -94,7 +94,7 @@ def parts_changed(
             continue
         name = called[part_id]
         if now["removed"] != was["removed"]:
-            lines.append(f"Removed {name}" if now["removed"] else f"Put {name} back")
+            lines.append(f"Removed {name}" if now["removed"] else f"Brought back {name}")
             continue
         if now["removed"]:
             continue
@@ -235,7 +235,7 @@ def summarize(before: Any | None, after: Any, *, quote: bool = False) -> list[st
         was, now = before_things[thing_id], after_things[thing_id]
         name = called[thing_id]
         if was["removed"] != now["removed"]:
-            lines.append(f"Removed {name}" if now["removed"] else f"Put {name} back")
+            lines.append(f"Removed {name}" if now["removed"] else f"Brought back {name}")
         if was["region_id"] != now["region_id"]:
             lines.append(f"Moved {name} to another part of the world")
         else:

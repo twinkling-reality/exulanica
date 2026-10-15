@@ -693,8 +693,6 @@ def test_a_made_world_s_parts_are_read_again_only_when_its_version_changes(world
         world.routes[f"/world/versions/{VERSION}"]["state_sha256"] = "c" * 64
         assert poll(follower, clock)["demo"]["state"] == "settling"
         assert reads() == before + 1
-        assert Project(folder).timeline()["pending"] == [
-            "Moved the thing made with this world 2 m east"
-        ]
+        assert Project(folder).timeline()["pending"] == ["Moved the part 2 m east"]
     finally:
         follower.close()

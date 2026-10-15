@@ -25,10 +25,11 @@ from exulanica.world.placed_things import ThingKindReference, shipped_kind
 
 #: What a being of a kind its workspace made is called where no name is kept.
 MADE_BEING: Final = "creature made in this world"
-#: What a part a world was made with is called where its label is not kept, by its kind.
+#: What a part a world was made with is called where its label is not kept, by its kind: a Part
+#: is made with the world, as a Thing is placed by a person (WORDS.md).
 PART_NOUNS: Final = {
     "building": "building",
-    "fixture": "thing made with this world",
+    "fixture": "part",
     "area": "area",
 }
 #: The smallest amount said in dollars and cents to four places.
@@ -142,9 +143,7 @@ def part_names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
         part = parts[part_id]
         label = part.get("label")
         noun = (
-            label[:1].lower() + label[1:]
-            if label
-            else PART_NOUNS.get(part["kind"] or "", "part made with this world")
+            label[:1].lower() + label[1:] if label else PART_NOUNS.get(part["kind"] or "", "part")
         )
         by_noun.setdefault(noun, []).append(part_id)
     for noun, ids in by_noun.items():

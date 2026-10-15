@@ -277,7 +277,7 @@ def test_a_made_world_s_parts_read_in_build_mode_s_words():
     assert summarize(before, turned) == ["Turned the bench round"]
     gone = parted(project, bench, part(2, "area", removed=True))
     assert summarize(before, gone) == ["Removed the pond"]
-    assert summarize(gone, before) == ["Put the pond back"]
+    assert summarize(gone, before) == ["Brought back the pond"]
 
 
 def test_a_public_repository_calls_a_made_part_by_its_kind():
@@ -314,3 +314,31 @@ def test_a_made_building_raised_or_lowered_says_its_storeys():
     assert summarize(before, parted(project, {**hall, "storeys": 1})) == [
         "Lowered the tea house to 1 storey"
     ]
+
+
+def test_a_removal_undone_reads_as_build_mode_s_note_says_it():
+    # One sentence for one change, in the note, in History and in a pull request: build mode's
+    # shipped words, as a row without the full stop.
+    from pathlib import Path
+
+    notes = (
+        Path(__file__).resolve().parents[1] / "tools/previews/world-workspace/build-words.mjs"
+    ).read_text(encoding="utf-8")
+    assert "return `Brought back the ${name}.`;" in notes
+    project, _ = sample()
+    removed = deepcopy(project)
+    removed["things"][0]["removed"] = True
+    removed["models"], removed["decisions"] = [], []
+    unmodelled = edited(project, models=[], decisions=[])
+    assert summarize(removed, unmodelled) == ["Brought back the knight"]
+    pond = part(2, "area", (9_000, 1_000), label="Pond")
+    assert summarize(parted(project, part(2, "area", removed=True)), parted(project, pond)) == [
+        "Brought back the pond"
+    ]
+
+
+def test_a_public_repository_calls_a_garden_fixture_a_part():
+    from exulanica.world_package.projects.words import part_names
+
+    fixtures = [part(n, "fixture", (n * 1_000, 0)) for n in (1, 2)]
+    assert sorted(part_names([{"parts": fixtures}]).values()) == ["the part", "the second part"]
