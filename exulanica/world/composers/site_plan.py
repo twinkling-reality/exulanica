@@ -381,8 +381,11 @@ def compose_kind(
         "arrival": arrival,
     }
     if kind.arcaded:
-        # Named only for a kind that reads it, so a world without an arcade names what it did.
-        receipt["catalogs"]["structure-arcade"] = load_arcade_catalog().sha256
+        # Named only for a kind that reads it, so a world without an arcade names what it did:
+        # the version its arcades are laid out by.
+        receipt["catalogs"]["structure-arcade"] = load_arcade_catalog(
+            version=kind.arcade_version
+        ).sha256
     supported_place = world.place
     composer_version = 1
     up_mm = 0

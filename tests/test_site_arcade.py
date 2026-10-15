@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar.grammars.site import check_site_records
 from exulanica.grammar.grammars.site.records import (
     SiteLoggiaRecord,
@@ -32,8 +33,10 @@ from exulanica.world.composers.site_plan import (
 from exulanica.world.kinds.catalogs import CATALOG_DIRECTORY, load_arcade_catalog
 from exulanica.world.kinds.document import KindRefused, read_kind
 from exulanica.world.kinds.samples import SiteRefused, first_unreached
-from exulanica.world.site_drawing import site_drawing
+from exulanica.world.site_drawing import site_drawing, site_drawing_sha256
 from exulanica.world.site_parts import PartChange, apply_changes
+
+from test_site_pinned import LAND
 
 FIXTURES = Path(__file__).parent / "fixtures" / "world-kinds"
 #: The arcades stated on the farm fixture's two buildings. The farmhouse is made deeper than the
@@ -257,6 +260,50 @@ def test_a_moved_or_removed_arcaded_building_takes_its_covered_walk_with_it(
     assert first_unreached(society_place("place:test", farm.receipt, removed)) is None
 
 
+#: The arcaded farm's plan, output, walking place and drawing digests, level and on the pinned
+#: land, as an arcade of bays and depth alone makes them. A change meant to leave such an arcade
+#: as it was leaves these as they are.
+PINNED: dict[str, dict[str, str]] = {
+    "level": {
+        "plan": "ba01fce05eed5c5c2ba86f5672f25980cb4edaa85fc1f9874c3212d8ed8e2e34",
+        "output": "b448e0a70e4b6bf7c6ccff8531ed0798a89adbaec6580521cf949434964645bb",
+        "place": "47731e2d0fb2c9db7435bb3e09243a0f0cffed896269062fb25619535660e12c",
+        "drawing": "4421682ce66d0496282ed371441207d2b40ca1a5a9627884de038e4754b7227a",
+    },
+    "land": {
+        "plan": "ba01fce05eed5c5c2ba86f5672f25980cb4edaa85fc1f9874c3212d8ed8e2e34",
+        "output": "060c77f88889a93e9bfe5e3060d675b08c9a3a54832dc915807f2bfb90f712f8",
+        "place": "ab9923ddc1feae298db3515733b361f69a31b29f2ef6b79047751b3d900196c5",
+        "drawing": "ea7367442c1e782ecaa08cc169ccc9c24ba58ff3d49d297347b47bca61cdd345",
+    },
+}
+
+
+@pytest.mark.parametrize("ground", ["level", "land"])
+def test_an_arcade_of_bays_and_depth_is_made_drawn_and_walked_as_pinned(ground: str) -> None:
+    kind = read_kind(_farm())
+    world_id = f"world:generated:arcade-pinned-{ground}"
+    world = compose_kind(
+        kind,
+        kind.values(kind.presets[0][0]),
+        world_id,
+        place_id="place:pinned",
+        land=LAND if ground == "land" else None,
+    )
+    drawing = site_drawing(
+        world_id=world_id,
+        receipt=world.receipt,
+        receipt_sha256=world.receipt_sha256,
+        records=world.records,
+    )
+    assert {
+        "plan": world.receipt["plan_sha256"],
+        "output": world.receipt["output_digest"],
+        "place": sha256_of_canonical(world.place).hex(),
+        "drawing": site_drawing_sha256(drawing),
+    } == PINNED[ground]
+
+
 def _set(**figures: Any) -> Callable[[dict[str, Any]], None]:
     def change(part: dict[str, Any]) -> None:
         for key, value in figures.items():
@@ -275,6 +322,7 @@ def _set(**figures: Any) -> Callable[[dict[str, Any]], None]:
         (_set(storey_height_mm=2600), "kind_out_of_bounds"),
         (_set(arcade={"bays": 3, "depth_mm": 2250}), "kind_out_of_bounds"),
         (_set(arcade={"bays": 25, "depth_mm": 2000}), "kind_out_of_bounds"),
+        (_set(arcade={"bays": 3, "depth_mm": 2000, "sides": 3}), "kind_out_of_bounds"),
         (_set(arcade={"bays": 3, "depth_mm": 2000, "height_mm": 3000}), "kind_document_invalid"),
     ],
     ids=[
@@ -282,6 +330,7 @@ def _set(**figures: Any) -> Callable[[dict[str, Any]], None]:
         "storey under an arch",
         "depth off the module",
         "too many bays",
+        "three sides",
         "an unknown key",
     ],
 )
@@ -299,3 +348,67 @@ def test_a_front_too_short_for_its_bays_is_refused_with_its_figures() -> None:
     least = load_arcade_catalog().bound("least_opening_mm")[0]
     assert "8 arches would each be" in str(refused.value)
     assert f"under {least} mm" in str(refused.value)
+
+
+def _both_sides(part: dict[str, Any]) -> None:
+    part["arcade"] = {"bays": 4, "depth_mm": 3000, "sides": 2}
+
+
+@pytest.fixture(scope="module", name="open_barn")
+def _open_barn() -> ComposedWorld:
+    return _compose(_farm(barn=_both_sides), "world:generated:open-barn-test")
+
+
+def test_an_arcade_on_both_sides_opens_the_back_with_its_own_walk_and_door(
+    open_barn: ComposedWorld,
+) -> None:
+    barn = next(s for s in _structures(open_barn) if s.part_key == "barn")
+    owned = [
+        r
+        for r in open_barn.records
+        if isinstance(r, SiteWallRecord) and r.owner_identity == barn.identity
+    ]
+    arched = [wall for wall in owned if any(o.kind == "arch" for o in wall.openings)]
+    assert [len(_arches(wall)) for wall in arched] == [4, 4]
+    walks = sorted(
+        (
+            r
+            for r in open_barn.records
+            if isinstance(r, SiteLoggiaRecord) and r.structure_identity == barn.identity
+        ),
+        key=lambda walk: walk.ordinal,
+    )
+    assert [walk.ordinal for walk in walks] == [0, 1]
+    assert all(_inside(_rect(walk), _rect(barn)) for walk in walks)
+    along_x = arched[0].start_y_mm == arched[0].end_y_mm
+    doors = [
+        wall
+        for wall in owned
+        if (wall.start_y_mm == wall.end_y_mm) == along_x
+        and any(o.kind == "door" for o in wall.openings)
+    ]
+    assert len(doors) == 2
+    place = open_barn.place
+    assert place is not None
+    assert first_unreached(place) is None
+    for wall in arched:
+        arches, crossings = _arches(wall), _crossings(place, wall)
+        assert all(any(a <= c <= b for a, b in arches) for c in crossings)
+        assert all(any(a <= c <= b for c in crossings) for a, b in arches)
+    drawing = site_drawing(
+        world_id="world:generated:open-barn-test",
+        receipt=open_barn.receipt,
+        receipt_sha256=open_barn.receipt_sha256,
+        records=open_barn.records,
+    )
+    own = next(slot for slot in drawing["slots"] if slot["identity"] == barn.identity)
+    assert (own["arcadeBays"], own["arcadeSides"]) == (4, 2)
+    assert records(open_barn.receipt) == open_barn.records
+    stated = (CATALOG_DIRECTORY / "structure-arcade.v2.json").read_bytes()
+    assert open_barn.receipt["catalogs"]["structure-arcade"] == hashlib.sha256(stated).hexdigest()
+
+
+def test_arcade_catalog_version_2_keeps_every_figure_version_1_states() -> None:
+    first, second = load_arcade_catalog(version=1), load_arcade_catalog(version=2)
+    assert {key: second.bound(key) for key in first.bounds} == dict(first.bounds)
+    assert set(second.bounds) - set(first.bounds) == {"sides"}

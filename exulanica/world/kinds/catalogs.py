@@ -148,20 +148,29 @@ _SCHEMAS: Final = {
 
 #: The structure arcade catalog: an arcade's bounds and the figures every arch is drawn with. It is
 #: read only for a kind whose structure states an arcade, so it is none of the four catalogs a
-#: kind is always read with and no world without an arcade names it.
+#: kind is always read with and no world without an arcade names it. Each version keeps every entry
+#: of the one before unchanged and adds to it: version 2 adds ``sides``, read only for a kind whose
+#: arcade states it, so a kind written for version 1 reads as it did.
 _ARCADE_SCHEMA: Final = CatalogSchema(
     "structure-arcade",
     1,
     (("minimum", _FIGURE), ("maximum", _FIGURE), ("reason", text_field)),
     entry_check=_bound,
 )
-ARCADE_FIGURES: Final = ("bays", "depth_mm", "pier_mm", "lintel_mm", "least_opening_mm")
+ARCADE_FIGURES: Final[Mapping[int, tuple[str, ...]]] = MappingProxyType(
+    {
+        1: ("bays", "depth_mm", "pier_mm", "lintel_mm", "least_opening_mm"),
+        2: ("bays", "depth_mm", "pier_mm", "lintel_mm", "least_opening_mm", "sides"),
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ArcadeCatalog:
-    """The arcade catalog as read: each figure's least and greatest value, and the file's digest."""
+    """The arcade catalog as read: its version, each figure's least and greatest value, and the
+    file's digest."""
 
+    version: int
     bounds: Mapping[str, tuple[int, int]]
     sha256: str
 
@@ -170,23 +179,28 @@ class ArcadeCatalog:
 
 
 @functools.cache
-def load_arcade_catalog(directory: Path = CATALOG_DIRECTORY) -> ArcadeCatalog:
-    """Read ``structure-arcade.v1.json`` and hold it to the figures an arcade is laid out by."""
+def load_arcade_catalog(directory: Path = CATALOG_DIRECTORY, version: int = 1) -> ArcadeCatalog:
+    """Read ``structure-arcade.v<version>.json`` and hold it to the figures an arcade of that
+    version is laid out by."""
     import hashlib
 
-    path = directory.joinpath("structure-arcade.v1.json")
-    catalog = load_catalog(path, _ARCADE_SCHEMA)
+    if version not in ARCADE_FIGURES:
+        raise CatalogError(f"no arcade catalog version {version}")
+    path = directory.joinpath(f"structure-arcade.v{version}.json")
+    catalog = load_catalog(path, replace(_ARCADE_SCHEMA, catalog_version=version))
     read = {entry.key: dict(entry.values) for entry in catalog.entries}
     bounds = {
         key: (cast(int, values["minimum"]), cast(int, values["maximum"]))
         for key, values in read.items()
     }
-    if tuple(sorted(bounds)) != tuple(sorted(ARCADE_FIGURES)):
+    if tuple(sorted(bounds)) != tuple(sorted(ARCADE_FIGURES[version])):
         raise CatalogError(
-            f"the arcade catalog states {sorted(bounds)}, not {list(ARCADE_FIGURES)}"
+            f"the arcade catalog states {sorted(bounds)}, not {list(ARCADE_FIGURES[version])}"
         )
     return ArcadeCatalog(
-        bounds=MappingProxyType(bounds), sha256=hashlib.sha256(path.read_bytes()).hexdigest()
+        version=version,
+        bounds=MappingProxyType(bounds),
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
     )
 
 

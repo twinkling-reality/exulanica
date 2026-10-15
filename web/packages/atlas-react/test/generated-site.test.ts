@@ -99,7 +99,9 @@ describe('reading a site drawing', () => {
     const document = built();
     Object.assign((document['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 3, loggiaDepthMm: 2000 });
     const shed = parseStructuredSiteDrawing(document).slots.find((one) => one.identity === 'shed')!;
-    expect([shed.arcadeBays, shed.loggiaDepthMm]).toEqual([3, 2000]);
+    expect([shed.arcadeBays, shed.loggiaDepthMm, shed.arcadeSides]).toEqual([3, 2000, undefined]);
+    Object.assign((document['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeSides: 2 });
+    expect(parseStructuredSiteDrawing(document).slots.find((one) => one.identity === 'shed')!.arcadeSides).toBe(2);
     expect(parseStructuredSiteDrawing(built()).slots.some((one) => 'arcadeBays' in one || 'loggiaDepthMm' in one)).toBe(false);
   });
 
@@ -120,6 +122,8 @@ describe('reading a site drawing', () => {
     ['an arcade on a slot that is no building', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[])[1]!, { arcadeBays: 3, loggiaDepthMm: 2000 }); }, "states an arcade, and only a building's own slot does"],
     ["an arcade's bays without its covered walk", (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['arcadeBays'] = 3; }, "states an arcade's bays and its covered walk's depth together"],
     ['an arcade of no bay', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 0, loggiaDepthMm: 2000 }); }, 'arcade has no bay'],
+    ["an arcade's sides without its bays", (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['arcadeSides'] = 2; }, "states an arcade's sides only as 2, beside its bays"],
+    ['an arcade on one side stated as its sides', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 3, loggiaDepthMm: 1000, arcadeSides: 1 }); }, "states an arcade's sides only as 2, beside its bays"],
     ['a covered walk as deep as its building', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 3, loggiaDepthMm: 3000 }); }, 'covered walk is not inside its 3000 mm depth'],
   ])('refuses %s by name', (_name, change, words) => {
     const document = built();

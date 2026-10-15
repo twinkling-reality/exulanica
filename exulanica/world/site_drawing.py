@@ -15,11 +15,11 @@ millimetres from the site's south-west corner; the region's east is x and its so
   at physical scale; a building's own slot also states its storey height (``storeyHeightMm``), of
   which its height is a whole number, and a building with an arcade how many bays its front has
   (``arcadeBays``) and how deep the covered walk behind the arches is (``loggiaDepthMm``), both
-  absent for every other building. Grounds, paths, areas and floors are planes stacked a few
-  millimetres apart so none fights another for the same pixels (a covered walk shows its zone's
-  ground); walls are boxes between their openings, with a lintel over each door and each arch; a
-  door is a fill slot drawn by a pack or left open, and an arch is open; a roof is a slab or a
-  gable over its structure;
+  absent for every other building, and ``arcadeSides`` 2 for one whose back is an arcade too.
+  Grounds, paths, areas and floors are planes stacked a few millimetres apart so none fights
+  another for the same pixels (a covered walk shows its zone's ground); walls are boxes between
+  their openings, with a lintel over each door and each arch; a door is a fill slot drawn by a
+  pack or left open, and an arch is open; a roof is a slab or a gable over its structure;
 * **walk**: the level floor a person exploring stands on and the boxes they keep out of (wall
   pieces, blocking fixtures and water), so a person walks into a structure through its door and
   round its furniture, never through a wall;
@@ -242,7 +242,10 @@ def _site_drawing_v1(
     blocks: list[list[int]] = []
     keep_out: list[list[int]] = []
     seats: list[dict[str, Any]] = []
-    walks = {r.structure_identity: r for r in records if isinstance(r, SiteLoggiaRecord)}
+    walks: dict[str, list[SiteLoggiaRecord]] = {}
+    for walk_record in records:
+        if isinstance(walk_record, SiteLoggiaRecord):
+            walks.setdefault(walk_record.structure_identity, []).append(walk_record)
     slots.append(
         _plane(
             f"{extent.identity}:ground",
@@ -331,15 +334,19 @@ def _site_drawing_v1(
             # The building's own storey height, so what dresses its walls (a facade's rows of
             # windows) follows its storeys; its height is a whole number of them.
             building["storeyHeightMm"] = record.storey_height_mm
-            walk = walks.get(record.identity)
-            if walk is not None:
-                # Its arcade, so what dresses it draws its arches where people walk through them.
+            arcade = walks.get(record.identity)
+            if arcade:
+                # Its arcade, so what dresses it draws its arches where people walk through them;
+                # its sides only where it runs along its back too.
+                walk = arcade[0]
                 building["arcadeBays"] = walk.bays
                 building["loggiaDepthMm"] = (
                     walk.max_y_mm - walk.min_y_mm
                     if record.door_facing in ("north", "south")
                     else walk.max_x_mm - walk.min_x_mm
                 )
+                if len(arcade) == 2:
+                    building["arcadeSides"] = 2
             slots.append(building)
             span = min(width, depth)
             rise = (

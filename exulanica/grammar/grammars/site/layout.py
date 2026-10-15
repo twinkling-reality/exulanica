@@ -366,15 +366,16 @@ def _ring_walls(
     look: Look,
     front_openings: Sequence[tuple[int, int, int, str]],
     skip: frozenset[str] = frozenset(),
+    back_openings: Sequence[tuple[int, int, int, str]] = (),
 ) -> None:
     """Four walls on the inside of a frame's edges, the front one with its openings (offsets from
-    its u = 0 end). ``skip`` names the local edges (``front``, ``back``, ``low``, ``high``) that
-    another wall already stands on."""
+    its u = 0 end), and the back one with its own where it has any. ``skip`` names the local edges
+    (``front``, ``back``, ``low``, ``high``) that another wall already stands on."""
     half = thickness // 2
     length, depth = frame.length, frame.depth
     edges = {
         "front": ((0, half), (length, half), front_openings),
-        "back": ((0, depth - half), (length, depth - half), ()),
+        "back": ((0, depth - half), (length, depth - half), back_openings),
         "low": ((half, 0), (half, depth), ()),
         "high": ((length - half, 0), (length - half, depth), ()),
     }
@@ -776,8 +777,9 @@ def _structure(
     height = storeys * part.storey_height_mm
     arcade = plan.arcade_of(part.key)
     # Without an arcade the rooms start behind the front wall; with one, behind the covered walk
-    # and the wall at its back.
+    # and the wall at its back, and with an arcade on both sides they end before the back's walk.
     loggia = 0 if arcade is None else arcade.depth_mm + OUTER_WALL_MM
+    walks = 0 if arcade is None else arcade.sides
     rooms: list[RoomPart] = []
     for holding in part.rooms:
         room = parts[holding.part]
@@ -803,10 +805,13 @@ def _structure(
             raise _refuse(f"{where}: {part.key} is {depth} mm deep, too shallow for a room")
     arches: list[tuple[int, int, int, str]] = []
     if arcade is not None:
-        if depth - 2 * OUTER_WALL_MM - loggia < spacing.minimum_room:
+        if depth - 2 * OUTER_WALL_MM - walks * loggia < spacing.minimum_room:
             raise _refuse(
-                f"{where}: {part.key} is {depth} mm deep and its {arcade.depth_mm} mm covered walk "
-                f"leaves under {spacing.minimum_room} mm behind it"
+                f"{where}: {part.key} is {depth} mm deep and its {walks} covered walks of "
+                f"{arcade.depth_mm} mm leave under {spacing.minimum_room} mm between them"
+                if walks == 2
+                else f"{where}: {part.key} is {depth} mm deep and its {arcade.depth_mm} mm covered "
+                f"walk leaves under {spacing.minimum_room} mm behind it"
             )
         # The front's inside divided into equal bays, an arch centred in each, a pier between
         # two arches and half a pier against each end wall.
@@ -872,45 +877,52 @@ def _structure(
         height,
         part.wall_look,
         arches if arcade is not None else entrance,
+        back_openings=arches if walks == 2 else (),
     )
     way_in = door_u
     if arcade is not None:
-        # The wall at the covered walk's back, between the end walls, with the door; then the
-        # walk itself. Nothing is drawn from the seed for either.
-        back = OUTER_WALL_MM + arcade.depth_mm
-        _wall(
-            emitter,
-            identity,
-            part.key,
-            frame,
-            (OUTER_WALL_MM, back + OUTER_WALL_MM // 2),
-            (length - OUTER_WALL_MM, back + OUTER_WALL_MM // 2),
-            OUTER_WALL_MM,
-            height,
-            part.wall_look,
-            [(at - OUTER_WALL_MM, wide, top, kind) for at, wide, top, kind in entrance],
-        )
-        walk = frame.rect(_Rect(OUTER_WALL_MM, OUTER_WALL_MM, length - OUTER_WALL_MM, back))
-        loggia_identity, loggia_ordinal = emitter.next("site_loggia", identity)
-        emitter.records.append(
-            SiteLoggiaRecord(
-                identity=loggia_identity,
-                structure_identity=identity,
-                ordinal=loggia_ordinal,
-                min_x_mm=walk.a0,
-                min_y_mm=walk.b0,
-                max_x_mm=walk.a1,
-                max_y_mm=walk.b1,
-                bays=arcade.bays,
+        # For each side with an arcade, front first: the wall across the covered walk's inner
+        # edge, between the end walls, with a door; then the walk itself. Nothing is drawn from
+        # the seed for either.
+        sides = [(OUTER_WALL_MM, OUTER_WALL_MM + arcade.depth_mm, OUTER_WALL_MM // 2)]
+        if walks == 2:
+            far = depth - OUTER_WALL_MM
+            sides.append((far - arcade.depth_mm, far, -OUTER_WALL_MM // 2))
+        for v0_walk, v1_walk, toward in sides:
+            inner = v1_walk if toward > 0 else v0_walk
+            _wall(
+                emitter,
+                identity,
+                part.key,
+                frame,
+                (OUTER_WALL_MM, inner + toward),
+                (length - OUTER_WALL_MM, inner + toward),
+                OUTER_WALL_MM,
+                height,
+                part.wall_look,
+                [(at - OUTER_WALL_MM, wide, top, kind) for at, wide, top, kind in entrance],
             )
-        )
+            walk = frame.rect(_Rect(OUTER_WALL_MM, v0_walk, length - OUTER_WALL_MM, v1_walk))
+            loggia_identity, loggia_ordinal = emitter.next("site_loggia", identity)
+            emitter.records.append(
+                SiteLoggiaRecord(
+                    identity=loggia_identity,
+                    structure_identity=identity,
+                    ordinal=loggia_ordinal,
+                    min_x_mm=walk.a0,
+                    min_y_mm=walk.b0,
+                    max_x_mm=walk.a1,
+                    max_y_mm=walk.b1,
+                    bays=arcade.bays,
+                )
+            )
         way_in = min(
             (at + wide // 2 for at, wide, _, _ in arches),
             key=lambda centre: (abs(centre - door_u), centre),
         )
     if not rooms:
         return way_in
-    v0, v1 = OUTER_WALL_MM + loggia, depth - OUTER_WALL_MM
+    v0, v1 = OUTER_WALL_MM + loggia, depth - OUTER_WALL_MM - (loggia if walks == 2 else 0)
     for split in bounds[1:-1]:
         u = OUTER_WALL_MM + split
         middle = (v0 + v1) // 2
@@ -1081,6 +1093,15 @@ def _zone(
             # The way from its door to the zone's front stays clear.
             reach = part.door_width_mm // 2 + spacing.clearance
             occupied.append(_Rect(door_u - reach, 0, door_u + reach, front))
+            arcade = plan.arcade_of(part.key)
+            if arcade is not None and arcade.sides == 2:
+                # An arcade on its back opens onto a lane kept clear behind it.
+                if front + d + spacing.lane > depth - spacing.back_margin:
+                    raise _refuse(
+                        f"{where} is {depth} mm deep and {part.key}, {d} mm deep and open on its "
+                        f"back, needs a {spacing.lane} mm lane behind it"
+                    )
+                occupied.append(_Rect(u, front + d, u + w, front + d + spacing.lane))
             u += w + spacing.structure_gap
         behind = front + deepest
     yard_end = depth - spacing.back_margin

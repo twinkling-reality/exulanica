@@ -474,19 +474,26 @@ def place_residents(place: Mapping[str, Any]) -> int:
     return sum(int(dest["resident_capacity"]) for dest in place["destinations"])
 
 
-def _body(structure: SiteStructureRecord, walk: SiteLoggiaRecord | None) -> _Box:
-    """What a walker keeps out of a structure: its footprint, or behind an arcade the part of it
-    behind the covered walk (the arcade's piers and the end walls beside the walk are walls)."""
+_OPPOSITE: Final = {"north": "south", "south": "north", "east": "west", "west": "east"}
+
+
+def _body(structure: SiteStructureRecord, walks: Sequence[SiteLoggiaRecord]) -> _Box:
+    """What a walker keeps out of a structure: its footprint, or with an arcade the part of it
+    between its covered walks, front (ordinal 0) and back (ordinal 1) (the arcades' piers and the
+    end walls beside the walks are walls)."""
     s = structure
-    if walk is None:
-        return _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
-    if s.door_facing == "south":
-        return _Box(s.min_x_mm, walk.max_y_mm, s.max_x_mm, s.max_y_mm)
-    if s.door_facing == "north":
-        return _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, walk.min_y_mm)
-    if s.door_facing == "west":
-        return _Box(walk.max_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
-    return _Box(s.min_x_mm, s.min_y_mm, walk.min_x_mm, s.max_y_mm)
+    box = _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
+    for walk in walks:
+        side = s.door_facing if walk.ordinal == 0 else _OPPOSITE[s.door_facing]
+        if side == "south":
+            box = _Box(box.x0, walk.max_y_mm, box.x1, box.y1)
+        elif side == "north":
+            box = _Box(box.x0, box.y0, box.x1, walk.min_y_mm)
+        elif side == "west":
+            box = _Box(walk.max_x_mm, box.y0, box.x1, box.y1)
+        else:
+            box = _Box(box.x0, box.y0, walk.min_x_mm, box.y1)
+    return box
 
 
 def _blocked_parts(
@@ -499,14 +506,17 @@ def _blocked_parts(
     key's."""
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
     zone_ids = {zone.identity for zone in zones}
-    walks = {r.structure_identity: r for r in records if isinstance(r, SiteLoggiaRecord)}
+    walks: dict[str, list[SiteLoggiaRecord]] = {}
+    for walk in records:
+        if isinstance(walk, SiteLoggiaRecord):
+            walks.setdefault(walk.structure_identity, []).append(walk)
 
     def words(key: str) -> str:
         use = None if uses is None else uses.get(key)
         return use.label if use is not None and use.label else key.replace("_", " ")
 
     parts = [
-        ("structure", words(s.part_key), _body(s, walks.get(s.identity)))
+        ("structure", words(s.part_key), _body(s, walks.get(s.identity, ())))
         for s in records
         if isinstance(s, SiteStructureRecord)
     ]
@@ -597,19 +607,33 @@ def _arcades(
     walls: Sequence[SiteWallRecord],
     walks: Sequence[SiteLoggiaRecord],
 ) -> dict[str, list[_Arcade]]:
-    """Each zone's covered walks, by zone identity, in the order of their identities."""
+    """Each zone's covered walks, by zone identity, in the order of their identities. A walk faces
+    its structure's front (ordinal 0) or its back (ordinal 1), and its arches are those of the
+    arcaded wall on that side."""
     by_identity = {s.identity: s for s in structures}
     found: dict[str, list[_Arcade]] = {}
     for walk in sorted(walks, key=lambda w: w.identity):
         structure = by_identity[walk.structure_identity]
-        front = next(
-            wall
-            for wall in walls
-            if wall.owner_identity == structure.identity
-            and any(opening.kind == "arch" for opening in wall.openings)
+        side = structure.door_facing if walk.ordinal == 0 else _OPPOSITE[structure.door_facing]
+        edge = {
+            "south": walk.min_y_mm,
+            "north": walk.max_y_mm,
+            "west": walk.min_x_mm,
+            "east": walk.max_x_mm,
+        }[side]
+        front = min(
+            (
+                wall
+                for wall in walls
+                if wall.owner_identity == structure.identity
+                and any(opening.kind == "arch" for opening in wall.openings)
+            ),
+            key=lambda wall: abs(
+                (wall.start_y_mm if side in ("north", "south") else wall.start_x_mm) - edge
+            ),
         )
-        dx, dy = _FACING[structure.door_facing]
-        along_x = structure.door_facing in ("north", "south")
+        dx, dy = _FACING[side]
+        along_x = side in ("north", "south")
         middle_at = (
             (walk.min_y_mm + walk.max_y_mm) // 2
             if along_x

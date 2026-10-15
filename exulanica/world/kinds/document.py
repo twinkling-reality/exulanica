@@ -569,12 +569,14 @@ def _read_use_classes(reader: _Reader, raw: object) -> dict[str, dict[str, Any]]
     return found
 
 
-def _arcade(where: str, raw: object, module: int) -> tuple[int, int]:
-    """A structure's arcade: how many bays its front has, and how deep its covered walk is, each
-    held to the arcade catalog (``structure-arcade.v1.json``); the depth a whole number of the
-    site's module."""
-    stated = _keys(where, raw, frozenset({"bays", "depth_mm"}))
-    catalog = load_arcade_catalog()
+def _arcade(where: str, raw: object, module: int) -> tuple[int, int, int | None]:
+    """A structure's arcade: how many bays its front has, how deep its covered walk is and,
+    optionally, on how many sides it runs (its front, or its front and its back), each held to the
+    arcade catalog (``structure-arcade.v1.json``, or version 2 where the sides are stated); the
+    depth a whole number of the site's module."""
+    keys = {"bays", "depth_mm"} | ({"sides"} if isinstance(raw, dict) and "sides" in raw else set())
+    stated = _keys(where, raw, frozenset(keys))
+    catalog = load_arcade_catalog(version=2 if "sides" in stated else 1)
     bays = _int(f"{where}.bays", stated["bays"], catalog.bound("bays"))
     depth = _int(f"{where}.depth_mm", stated["depth_mm"], catalog.bound("depth_mm"))
     if depth % module:
@@ -583,7 +585,12 @@ def _arcade(where: str, raw: object, module: int) -> tuple[int, int]:
             f"{depth} mm is not whole {module} mm modules",
             f"{where}.depth_mm",
         )
-    return bays, depth
+    sides = (
+        _int(f"{where}.sides", stated["sides"], catalog.bound("sides"))
+        if "sides" in stated
+        else None
+    )
+    return bays, depth, sides
 
 
 @dataclass(frozen=True, slots=True)
@@ -1064,8 +1071,16 @@ class KindDocument:
     @property
     def arcaded(self) -> bool:
         """Whether a structure of this kind states an arcade, so its worlds read the arcade
-        catalog (``structure-arcade.v1.json``)."""
+        catalog."""
         return any("arcade" in part.fields for part in self.parts.values())
+
+    @property
+    def arcade_version(self) -> int:
+        """The arcade catalog version this kind's arcades are laid out by: 2 where an arcade states
+        its sides, else 1 (every figure version 1 states, version 2 states unchanged); 0 for a
+        kind with no arcade."""
+        stated = [part.fields["arcade"] for part in self.parts.values() if "arcade" in part.fields]
+        return 0 if not stated else 2 if any(arcade[2] is not None for arcade in stated) else 1
 
     def plan(self, values: Mapping[str, int]) -> SitePlan:
         """The site plan these values make: every figure resolved, every span kept for the seed."""
@@ -1137,7 +1152,7 @@ class KindDocument:
                     )
                 )
         site = self._site
-        arcade = load_arcade_catalog() if self.arcaded else None
+        arcade = load_arcade_catalog(version=self.arcade_version) if self.arcaded else None
         arcades = tuple(
             Arcade(
                 part.key,
@@ -1146,6 +1161,7 @@ class KindDocument:
                 arcade.bound("pier_mm")[0],
                 part.fields["storey_height_mm"] - arcade.bound("lintel_mm")[0],
                 arcade.bound("least_opening_mm")[0],
+                part.fields["arcade"][2] or 1,
             )
             for part in self.parts.values()
             if arcade is not None and "arcade" in part.fields

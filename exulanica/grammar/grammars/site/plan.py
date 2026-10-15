@@ -242,7 +242,8 @@ class Arcade:
     """A structure's arcade: its front divided into ``bays`` equal bays, each an arch between two
     piers ``pier_mm`` wide and ``opening_height_mm`` high, opening onto a covered walk
     ``depth_mm`` deep behind the front wall, at whose back stands the wall with the door. A front
-    too short for its bays, leaving an arch under ``least_opening_mm``, is refused by the layout."""
+    too short for its bays, leaving an arch under ``least_opening_mm``, is refused by the layout.
+    With ``sides`` 2 its back is an arcade too, with its own covered walk and door."""
 
     part: str
     bays: int
@@ -250,6 +251,7 @@ class Arcade:
     pier_mm: int
     opening_height_mm: int
     least_opening_mm: int
+    sides: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,6 +421,9 @@ class SitePlan:
             )
             for name in ("bays", "depth_mm", "pier_mm", "opening_height_mm", "least_opening_mm"):
                 _figure(f"structure {arcade.part}'s arcade {name}", getattr(arcade, name), 1)
+            _require(
+                arcade.sides in (1, 2), f"structure {arcade.part}'s arcade runs on 1 or 2 sides"
+            )
         for part in self.parts:
             if isinstance(part, StructurePart):
                 for room in part.rooms:
@@ -445,6 +450,15 @@ class SitePlan:
         return next((arcade for arcade in self.arcades if arcade.part == part), None)
 
 
+def _arcade_payload(arcade: Arcade) -> dict[str, object]:
+    """An arcade as canonical data: every field, its sides only where it runs on both, so an
+    arcade along its front alone has the bytes it had before sides existed."""
+    payload = dict(record_payload(arcade))
+    if arcade.sides == 1:
+        del payload["sides"]
+    return payload
+
+
 def plan_payload(plan: SitePlan) -> dict[str, object]:
     """The plan as canonical data: every field of every part and zone, with each part's form, and
     the structures' arcades when any states one."""
@@ -469,7 +483,9 @@ def plan_payload(plan: SitePlan) -> dict[str, object]:
         "zones": [record_payload(zone) for zone in plan.zones],
         # Stated only when a structure has an arcade, so a plan with none has its old bytes.
         **(
-            {"arcades": [record_payload(arcade) for arcade in plan.arcades]} if plan.arcades else {}
+            {"arcades": [_arcade_payload(arcade) for arcade in plan.arcades]}
+            if plan.arcades
+            else {}
         ),
     }
 

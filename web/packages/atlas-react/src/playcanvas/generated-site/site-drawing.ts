@@ -80,6 +80,8 @@ export interface SiteSlot {
    */
   readonly arcadeBays?: number;
   readonly loggiaDepthMm?: number;
+  /** 2 for a building whose back is an arcade too, with its own covered walk; absent otherwise. */
+  readonly arcadeSides?: 2;
 }
 
 /** What a site on land states of its land: each chunk's place and digest, the backdrop's and the water's. */
@@ -211,6 +213,8 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
     if (bays < 1) fail(`The site drawing's slot ${index} arcade has no bay.`);
     if (loggia <= 0 || loggia >= box[1]) fail(`The site drawing's slot ${index} covered walk is not inside its ${box[1]} mm depth.`);
   }
+  const sides = row['arcadeSides'];
+  if (sides !== undefined && (sides !== 2 || bays === undefined)) fail(`The site drawing's slot ${index} states an arcade's sides only as 2, beside its bays.`);
   return Object.freeze({
     identity: text(row['identity'], `slot ${index} identity`),
     part: text(row['part'], `slot ${index} part`),
@@ -237,6 +241,7 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
     ...(structure === undefined ? {} : { structure }),
     ...(storeyHeight === undefined ? {} : { storeyHeightMm: storeyHeight }),
     ...(bays === undefined || loggia === undefined ? {} : { arcadeBays: bays, loggiaDepthMm: loggia }),
+    ...(sides === 2 ? { arcadeSides: 2 as const } : {}),
   });
 }
 
