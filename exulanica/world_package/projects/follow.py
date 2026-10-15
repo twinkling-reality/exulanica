@@ -15,9 +15,10 @@ open until it is held closed (a closed session is recorded at once), else the ol
 since `sessions.since` that the project does not hold, so a session that opened and closed
 between two polls, or while no follower ran, is still recorded. A closed session that leaves no
 evidence of a followed thing is passed over. A world with no society is followed for its edits
-alone, and a version with nothing placed waits. It writes only the project folders, never the
-world, and a remote only where the project's link says to publish on its own: after each
-checkpoint it records, such a project's rolling pull request follows it
+alone, a world made from a world kind with nothing placed for its made parts alone, and a version
+with neither waits. It writes only the project folders, never the world, and a remote only where
+the project's link says to publish on its own: after each checkpoint it records, such a project's
+rolling pull request follows it
 (:mod:`exulanica.world_package.projects.publish`, at most `limits.publications_per_day` attempts a
 day). One follower holds a projects directory at a time; one project's fault never stops the
 others. When it stops, each project with pending changes records them once, and nothing more is

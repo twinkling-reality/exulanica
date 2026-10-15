@@ -943,7 +943,8 @@ with at most one living session as its own evidence file: one the project holds 
 is held closed, else the oldest one opened since `sessions.since` that the project does not hold,
 so a session that opened and closed between two polls, or while no worker ran, is still recorded.
 A closed session that leaves no evidence of a followed thing is passed over. A version with no
-society is followed for its edits alone, and one with nothing placed waits. A capture that reads
+society is followed for its edits alone, a world made from a world kind with nothing placed for its
+made parts alone (its checkpoint then holds no region), and one with neither waits. A capture that reads
 no decision record for a model keeps the revision the project holds for it, so a binding does not
 change between sessions. One project's fault never stops another, one worker holds a projects
 directory at a time, and it follows at most 64 folders unless `EXULANICA_PROJECTS_MAXIMUM` states

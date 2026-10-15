@@ -386,7 +386,8 @@ class Checkpoint(Closed):
     source: Source
     forked_from: Lineage | None
     # This is an explicit selection, not the full authored delta or a runtime backup.
-    region_ids: Annotated[list[Name], Field(min_length=1, max_length=256)]
+    #: The regions of its things; none only for a made world kept for its parts alone.
+    region_ids: Annotated[list[Name], Field(max_length=256)]
     things: Annotated[list[Thing], Field(max_length=256)]
     dependencies: Annotated[list[Dependency], Field(min_length=1, max_length=1024)]
     models: Annotated[list[ModelBinding], Field(max_length=256)]
@@ -408,6 +409,10 @@ class Checkpoint(Closed):
         unique([t.thing_id for t in self.things], "thing")
         unique([c.thing_id for c in self.characters or []], "character")
         unique([p.part_id for p in self.parts or []], "part")
+        if not self.region_ids and (self.things or not self.parts):
+            raise ValueError(
+                "a checkpoint holds a region, unless it keeps a made world's parts alone"
+            )
         unique([m.thing_id for m in self.models], "model assignment")
         unique([d.record_id for d in self.decisions], "decision")
         unique([d.sha256 for d in self.dependencies], "dependency")

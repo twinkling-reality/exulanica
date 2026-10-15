@@ -551,7 +551,8 @@ def capture(
     """Read one version and build the explicitly selected checkpoint and its dependency bytes.
 
     Only placed things named in `thing_ids` are read into the selection, or, with None, every
-    placed thing a checkpoint can hold (none at all is `NothingSelectable`), with their current
+    placed thing a checkpoint can hold (none at all is `NothingSelectable`, unless the world was
+    made from a world kind and its made parts are kept alone), with their current
     model assignment and the model decisions the society consumed for them. Readable decision
     text is added only when `readable` is set. Shipped kind bytes stay in the installed catalog.
     With `session_id`, decisions go into that session's evidence file instead of the
@@ -610,8 +611,6 @@ def capture(
             if not thing.get("gone") and "support" not in thing
         )
         unheld = len(placed) - len(wanted)
-        if not wanted:
-            raise NothingSelectable("this version holds no placed thing a project can hold yet")
     else:
         wanted = sorted(set(thing_ids))
         if not wanted or not set(wanted) <= placed.keys():
@@ -820,6 +819,10 @@ def capture(
 
     characters = _characters(reader, version, things, readable, cards=include_models)
     parts = _parts(reader, version, view["state_sha256"], readable, parts_known)
+    if not things and not parts:
+        raise NothingSelectable(
+            "this version holds no placed thing and no made part a project can hold yet"
+        )
     source = {
         "world_id": reader.world_id,
         "version_id": version_id,

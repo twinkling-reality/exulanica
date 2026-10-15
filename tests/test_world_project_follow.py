@@ -696,3 +696,27 @@ def test_a_made_world_s_parts_are_read_again_only_when_its_version_changes(world
         assert Project(folder).timeline()["pending"] == ["Moved the part 2 m east"]
     finally:
         follower.close()
+
+
+def test_a_made_world_with_nothing_placed_is_followed_for_its_parts(world, token, tmp_path):
+    from test_world_project_capture import PARTS, made
+
+    world.routes[f"/world/versions/{VERSION}"]["things"] = []
+    del world.routes[SESSIONS]
+    del world.routes[f"/world/versions/{VERSION}/society/models"]
+    made(world)
+    projects = tmp_path / "projects"
+    folder = follow(world, token, projects / "demo", "--no-sessions")
+    started = Project(folder).at("HEAD")
+    assert (started["things"], len(started["parts"])) == ([], 3)
+    assert Project(folder).history()[-1]["message"] == "Start the project"
+    clock = Clock()
+    follower = Follower(projects, base_url=world.url, token=TOKEN, clock=clock)
+    try:
+        poll(follower, clock, 0)
+        world.routes[PARTS]["parts"][0]["centre_mm"] = [12_000, 5_000]
+        world.routes[f"/world/versions/{VERSION}"]["state_sha256"] = "d" * 64
+        assert poll(follower, clock)["demo"]["state"] == "settling"
+        assert Project(folder).timeline()["pending"] == ["Moved the building 3 m south"]
+    finally:
+        follower.close()

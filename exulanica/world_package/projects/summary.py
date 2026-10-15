@@ -199,7 +199,10 @@ def summarize(before: Any | None, after: Any, *, quote: bool = False) -> list[st
     called = names([old, new])
     if old is None:
         return [
-            f"Started the project with {plural(len(new['things']), 'thing')}",
+            # A made world kept for its parts alone holds no placed thing to count.
+            f"Started the project with {plural(len(new['things']), 'thing')}"
+            if new["things"]
+            else "Started the project",
             *parts_changed(None, new),
             *_characters(None, new, called, quote),
             *_models(None, new, called),

@@ -863,3 +863,19 @@ def test_parts_are_read_again_only_when_the_version_changed(world):
     captured(world, known={**known, "state_sha256": "b" * 64})
     captured(world, readable=False, known=known)
     assert len(parts_read(world)) == reads + 2
+
+
+def test_a_made_world_with_nothing_placed_is_kept_for_its_parts_alone(world):
+    from exulanica.world_package.projects.capture import NothingSelectable
+
+    world.routes[f"/world/versions/{VERSION}"]["things"] = []
+    made(world)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        project = capture(
+            reader, version_id=VERSION, project_id="project:demo", thing_ids=None, readable=True
+        ).checkpoint
+    assert (project["things"], project["region_ids"], len(project["parts"])) == ([], [], 3)
+    # Nothing placed and nothing made: nothing for a project to hold yet.
+    world.refusals[PARTS] = (422, {"code": "parts_not_served", "detail": "not made from a kind"})
+    with WorldReader(world.url, TOKEN, WORLD) as reader, pytest.raises(NothingSelectable):
+        capture(reader, version_id=VERSION, project_id="project:demo", thing_ids=None)
