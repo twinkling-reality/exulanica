@@ -1,8 +1,9 @@
 // Beside a character or thing in the world (DESIGN's frames 04, 05 and 08): the name tag and the
-// [E] Inspect prompt while it is looked at, the ring at its feet and the card beside it once it is
-// chosen, and the question before a run. It only draws; character-view.mjs decides what it says and
-// contextual-world.ts places it each frame from the projected points.
-import { chip, keyWord, nameTag, promptColumn, promptRow, ring, rule, scaleOf, sideCard, cardWords, orb, type NameTagWords, type SubjectBounds } from './world-ui.ts';
+// [E] Inspect prompt while it is looked at, the card beside it once it is chosen, and the question
+// before a run. It only draws; character-view.mjs decides what it says and contextual-world.ts places
+// it each frame from the projected points. The ring at a chosen character's feet is drawn in the
+// world (atlas-react ground-ring.ts), so walls cover it as they cover the feet.
+import { chip, keyWord, nameTag, promptColumn, promptRow, rule, scaleOf, sideCard, cardWords, orb, type NameTagWords, type SubjectBounds } from './world-ui.ts';
 import { promptPlace } from './character-view.mjs';
 import { CHARACTER_WORDS } from './character-words.mjs';
 import type { SocietySnapshot } from '/src/society-api.ts';
@@ -45,13 +46,13 @@ export interface QuestionContent {
 export interface CharacterPresence {
   /** The tag and prompt over the looked-at subject's head point; null hides them. */
   look(words: NameTagWords | null, head?: { readonly x: number; readonly y: number }, inspectable?: boolean): void;
-  /** What the chosen subject's card says; null hides the ring and card. */
+  /** What the chosen subject's card says; null hides the card. */
   choose(content: CardContent | null): void;
   /** What the question card says; null puts it away. */
   ask(content: QuestionContent | null): void;
-  /** Places the ring and whichever card is up, each frame; null for a subject out of view. */
-  place(at: { readonly ring: { x: number; y: number; rx: number; ry: number }; readonly bounds: SubjectBounds } | null): void;
-  /** Hides the tag and cards while a page is up (the ring stays), and brings them back after. */
+  /** Places whichever card is up beside the subject, each frame; null for a subject out of view. */
+  place(at: { readonly bounds: SubjectBounds } | null): void;
+  /** Hides the tag and cards while a page is up, and brings them back after. */
   setCovered(covered: boolean): void;
   readonly asking: boolean;
   /** The top of the name tag on screen while it shows, or null: a pop sits 12 px over it. */
@@ -68,10 +69,9 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
   const inspect = keyWord({ keys: ['E'], word: CHARACTER_WORDS.inspect, shortcut: 'E', onPress: onInspect }) as HTMLButtonElement;
   inspect.classList.add('wu-anchored', 'wu-reveal');
   inspect.hidden = true;
-  const feet = ring();
   const card = sideCard({ scale });
   const question = sideCard({ question: true, scale });
-  for (const part of [feet.root, card.root, question.root, tag.root, inspect]) host.append(part);
+  for (const part of [card.root, question.root, tag.root, inspect]) host.append(part);
   let shown: string | null = null, asked: string | null = null, covered = false, chosen = false;
   const prompt = (item: CardPrompt): HTMLElement => keyWord({ keys: item.keys, word: item.word, shortcut: item.shortcut, onPress: () => onAction(item.action) });
 
@@ -97,7 +97,7 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
     },
     choose(content) {
       chosen = content !== null;
-      if (!content) { shown = null; card.hide(); feet.hide(); card.body.replaceChildren(); return; }
+      if (!content) { shown = null; card.hide(); card.body.replaceChildren(); return; }
       const key = JSON.stringify(content);
       if (key === shown) return;
       shown = key;
@@ -135,9 +135,8 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       body.append(promptRow(content.answers.map(prompt)));
     },
     place(at) {
-      if (!at) { feet.hide(); card.hide(); question.hide(); return; }
-      if (chosen || asked) feet.place(at.ring.x, at.ring.y, at.ring.rx, at.ring.ry);
-      // Under a page the ring stays at the character's feet (spec 5.7); the cards wait.
+      if (!at) { card.hide(); question.hide(); return; }
+      // Under a page the cards wait.
       if (covered) { card.hide(); question.hide(); return; }
       if (asked) { card.hide(); question.place(at.bounds); }
       else if (chosen) { question.hide(); card.place(at.bounds); }
@@ -146,7 +145,7 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       covered = on;
       if (on) { tag.hide(); inspect.hidden = true; card.hide(); question.hide(); }
     },
-    dispose() { for (const part of [feet.root, card.root, question.root, tag.root, inspect]) part.remove(); },
+    dispose() { for (const part of [card.root, question.root, tag.root, inspect]) part.remove(); },
   };
 }
 

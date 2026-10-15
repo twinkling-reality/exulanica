@@ -257,5 +257,7 @@ export {
   fetchAuthenticatedAsset,
 } from './physical-residency.js';
 
+export type { GroundRing } from './ground-ring.js';
+export { GROUND_RING, createGroundRing } from './ground-ring.js';
 export type { BakeoffResult, HarnessConfig, HarnessHandle, PathMode } from './harness.js';
 export { POINT_LADDER, fixtureName, parseConfig, runBakeoff } from './harness.js';

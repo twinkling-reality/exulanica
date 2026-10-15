@@ -12,6 +12,7 @@ DEFAULT_CONTROLS
 DEFAULT_PLACEMENT_DISTANCE_MM
 FirstPersonControls
 FirstPersonGesture
+GROUND_RING
 INHABITANT_DRAW_DOMAIN
 KIND_SIDES
 LayeredCharacterRenderable
@@ -47,6 +48,7 @@ canonicalJson
 createAnchorMotes
 createAuthoredPointMaps
 createComposedWorld
+createGroundRing
 createObjectContainerAsset
 createPointCloud
 createRegionRelief

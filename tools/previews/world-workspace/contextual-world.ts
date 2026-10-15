@@ -1,4 +1,4 @@
-import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
+import { GROUND_RING, createGroundRing, pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { buildInventoryRows, inventoryDetailPath, rowForSceneSelection } from './inventory-records.ts';
 import { assertSelectedOffer } from './entity-inspection.mjs';
 import { mountBuildMode } from './build-mode.ts';
@@ -55,6 +55,18 @@ const DID_PAGES = 4;
 /** How often the reads behind a tag or card are refreshed while one shows, in milliseconds. */
 const SUBJECT_READ_MS = Object.freeze({ society: 3000, models: 5000 });
 
+/** A design token's colour (`#rgb`, `#rrggbb` or `rgb()`) as sRGB 0 to 1, or null where it is not one. */
+function tokenRgb(element: Element, name: string): readonly [number, number, number] | null {
+  const text = getComputedStyle(element).getPropertyValue(name).trim();
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text)?.[1];
+  if (hex) {
+    const full = hex.length === 3 ? [...hex].map((digit) => digit + digit).join('') : hex;
+    return [0, 2, 4].map((at) => Number.parseInt(full.slice(at, at + 2), 16) / 255) as unknown as readonly [number, number, number];
+  }
+  const parts = /^rgba?\(([^)]*)\)$/i.exec(text)?.[1]?.split(/[\s,/]+/).filter(Boolean).slice(0, 3).map(Number);
+  return parts?.length === 3 && parts.every((part) => part >= 0 && part <= 255) ? parts.map((part) => part / 255) as unknown as readonly [number, number, number] : null;
+}
+
 /** Targeting and inspection use real native hits and authorized inventory identities. */
 export async function mountContextualWorld({ state, renderer, selection, objects, send, binding }) {
   disposePrior();
@@ -90,7 +102,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   root.className = 'wu-root';
   document.body.append(root);
   mountUiScale(root, lifetime.signal);
-  // Beside a character or thing (character-presence.ts): the name tag, ring and cards.
+  // Beside a character or thing (character-presence.ts): the name tag and cards.
   const beside = document.createElement('div'); beside.className = 'cw-beside'; root.prepend(beside);
   root.dataset.navigation = JSON.stringify({ ground: b.worldKind.ground.form, centre: b.navigationWorld.centre,
     fieldRadius: b.navigationWorld.fieldRadius, blockers: b.navigationWorld.polygonObstacles });
@@ -341,6 +353,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     root.dataset.target = row?.key || '';
     if (row && changed && readBackoff.ready(row.key, performance.now())) void entityOffer(row).catch(() => {});
   }
+  // The ring at a chosen subject's feet, on the ground in the world (atlas-react ground-ring.ts), in
+  // the design's --live.
+  const groundRing = createGroundRing(b.app, { invalidate: () => b.invalidate(), look: { ...GROUND_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } });
   const presence = mountCharacterPresence(beside, {
     onInspect: () => { void choose(); },
     onAction: (action) => questionAct(action),
@@ -1144,22 +1159,24 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (!view.offer && !offers.has(target.key) && readBackoff.ready(target.key, performance.now())) void entityOffer(target).catch(() => {});
       presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.model, live: Boolean(runWatch.run), popping: Boolean(pops.get(target.scene.id)?.showing) }), { x: targetFrame.overhead.x, y: targetFrame.overhead.y }, true);
     } else presence.look(null);
-    // Chosen: the ring at its feet and the card beside it; both follow it as the world moves.
+    // Chosen: the ring at its feet, drawn in the world so walls cover it as they cover the feet (J21),
+    // and the card beside it while it is seen, placed from the ring's projected ellipse; both follow it.
     if (held) {
       const view = subjectView(held), { connected } = modelOf(held);
       presence.choose(chosenCard({ who: view.who, being: view.being, doing: view.doing, decision: view.decision, model: view.model ?? null,
         running: Boolean(runWatch.run), connected, following: followView.active(), reading: view.reading && view.being, thingLine: view.thingLine ?? null }));
       const heldFrame = screenFrame(held);
-      const ring = heldFrame && seen(held, heldFrame) ? ringAt(heldFrame) : null;
-      if (ring) {
+      const ring = heldFrame ? ringAt(heldFrame) : null;
+      if (ring) groundRing.place(heldFrame.ground, PERSON_RING_METRES); else groundRing.hide();
+      if (ring && seen(held, heldFrame)) {
         const headY = heldFrame.headInView ? heldFrame.overhead.y : heldFrame.top;
         // The projected points run down the character's middle; its body reaches about 0.4 of the
         // ring's radius either side, so the card keeps clear of the shoulder as frame 05 does.
         const half = ring.rx * BODY_HALF_WIDTH;
-        presence.place({ ring, bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
+        presence.place({ bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
           headY, waistY: headY + (ring.y - headY) * CARD_WAIST } });
       } else presence.place(null);
-    }
+    } else groundRing.hide();
     // Pops over the characters whose model acted, 12 px over the head, while they show.
     for (const [subjectId, made] of pops) {
       if (!made.showing) continue;
@@ -1182,6 +1199,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     disposeFrameMeasurement();
     build?.dispose();
     presence.dispose();
+    groundRing.dispose();
     runWatch.dispose();
     corners.dispose();
     if (pageView) { pageView.page.close(); pageView.decision?.page.close(); pageView.comparison?.page.close(); pageView = null; }
