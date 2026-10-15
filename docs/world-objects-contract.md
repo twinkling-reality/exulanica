@@ -1241,7 +1241,10 @@ write nothing.
 building and its own walls (their openings no taller than the wall) and nothing else: the place its
 people walk keeps its nodes and edges, and the change reaches the society as its next input like
 any other. Refused in words outside the bound ("Not taller: buildings in this world have at most 6
-storeys.") or for a part that is not a building (`part_storeys_refused`).
+storeys.") or for a part that is not a building (`part_storeys_refused`). A storeys change and a move
+are both `transform_element` edits; the version read (`GET /world/versions/{version_id}`) states on an
+edit that changed a building's storeys `storeys: {"before": n | null, "after": n}` (null before where
+the building stood as the world was made), and states it on no other edit.
 
 **What follows a kept change.** The world as it stands is the receipt's records with the version's
 changes applied, named by the digest of those changes, which keys the worker's drawing and place

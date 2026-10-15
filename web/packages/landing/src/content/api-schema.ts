@@ -3908,6 +3908,16 @@ export const API_SCHEMA: ApiSpec = {
         "recorded_at": {
           "type": "string",
           "title": "Recorded At"
+        },
+        "storeys": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/PartStoreysView"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -3928,6 +3938,40 @@ export const API_SCHEMA: ApiSpec = {
         "recorded_at"
       ],
       "title": "VersionEditView"
+    },
+    "PartStoreysView": {
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Before"
+        },
+        "after": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "before",
+        "after"
+      ],
+      "title": "PartStoreysView",
+      "description": "How many storeys a made building stood before and after an edit that changed them."
     },
     "AddObjectBody": {
       "properties": {

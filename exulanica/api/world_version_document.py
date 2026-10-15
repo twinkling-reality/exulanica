@@ -29,6 +29,7 @@ from exulanica.world import (
 )
 from exulanica.world.object_catalog import NO_ACTIVITY, world_object_catalog
 from exulanica.world.placed_things import PlacedThing, placed_thing_document
+from exulanica.world.site_parts import PART_PREFIX
 from exulanica.world.society_catalogs import purposeful_routine
 
 
@@ -210,6 +211,16 @@ class ElementOverrideView(BaseModel):
     storeys: int | None = Field(default=None, exclude_if=_absent)
 
 
+class PartStoreysView(BaseModel):
+    """How many storeys a made building stood before and after an edit that changed them."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: None where the building stood as the world was made.
+    before: int | None
+    after: int | None
+
+
 class VersionEditView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -226,6 +237,10 @@ class VersionEditView(BaseModel):
     result_state_sha256: str
     actor: uuid.UUID
     recorded_at: str
+    #: A made building's storeys before and after, on the edit that changed them: a storeys change
+    #: and a move are both ``transform_element`` edits. Stated by the version read alone
+    #: (:func:`rendered_version`), and left out of every other edit, whose bytes are as they were.
+    storeys: PartStoreysView | None = Field(default=None, exclude_if=_absent)
 
 
 class AlternateVersionView(BaseModel):
@@ -372,10 +387,14 @@ def alternate_version_view(
     version: AlternateVersion,
     assets: dict[str, ReviewedAssetRow],
     workspace_assets: Mapping[str, WorkspaceAssetObjectView] | None = None,
+    part_storeys: Mapping[uuid.UUID, tuple[int | None, int | None]] | None = None,
 ) -> AlternateVersionView:
     """``assets`` is keyed by content digest, which is how an object names one;
-    ``workspace_assets`` by object id, for the objects that pin a workspace asset."""
+    ``workspace_assets`` by object id, for the objects that pin a workspace asset;
+    ``part_storeys`` by edit id, for the edits that changed a made building's storeys
+    (:func:`part_storeys_changes`)."""
     pinned = workspace_assets or {}
+    storeys = part_storeys or {}
     return AlternateVersionView(
         schema_version=(
             6
@@ -482,6 +501,13 @@ def alternate_version_view(
                 result_state_sha256=edit.result_state_sha256,
                 actor=edit.actor,
                 recorded_at=edit.recorded_at,
+                storeys=(
+                    None
+                    if edit.edit_id not in storeys
+                    else PartStoreysView(
+                        before=storeys[edit.edit_id][0], after=storeys[edit.edit_id][1]
+                    )
+                ),
             )
             for edit in version.edits
         ],
@@ -503,4 +529,24 @@ def rendered_version(
         repository.with_availability(version),
         {asset.content_sha256: asset for asset in repository.reviewed_assets(store)},
         workspace_asset_views(repository, version),
+        part_storeys_changes(repository, version.version_id),
     )
+
+
+def part_storeys_changes(
+    repository: WorldObjectRepository, version_id: uuid.UUID
+) -> Mapping[uuid.UUID, tuple[int | None, int | None]]:
+    """The storeys a made part stood before and after each edit of the version that changed them,
+    by edit id, read from the documents the edit log stores: a storeys change is a
+    ``transform_element`` edit, as a move is, and only its documents tell the two apart. None before
+    is the storeys the world was made with (the part had no change). A move keeps the storeys the
+    version states, so it is not here; an undo is read through the edit it takes back."""
+    rows = repository.connection.execute(
+        "select edit_id, before_document->'storeys' as before, "
+        "after_document->'storeys' as after from world_alternate_version_edit "
+        "where workspace_id=%s and world_id=%s and version_id=%s "
+        "and kind='transform_element' and element_id like %s "
+        "and (before_document->'storeys') is distinct from (after_document->'storeys')",
+        (repository.workspace_id, repository.world_id, version_id, f"{PART_PREFIX}%"),
+    ).fetchall()
+    return {row["edit_id"]: (row["before"], row["after"]) for row in rows}
