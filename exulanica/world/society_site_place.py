@@ -13,10 +13,13 @@ module is its second producer from generated records, beside the city's
   people may walk into, at that spacing outdoors and at :data:`INDOOR_LATTICE_MM` inside; a node at
   each zone's gate, in front of each structure's door, at each area's access point and in front of
   each fixture people use; and the entry, where a kind whose people come in from homes off the
-  site has their home.
+  site has their home. Behind a structure's arcade, a line of nodes along the middle of its covered
+  walk (``site.loggia``) at :data:`INDOOR_LATTICE_MM`, and a node on each side of each arch, so
+  people walk along the walk and in and out through any arch to the door at its back.
 * **Edges** between nodes whose straight way is clear of everything a walker keeps clear of, by
-  the walking capsule's radius: structures, areas, blocking fixtures, closed zones and walls (a
-  wall's gates and doors are gaps in it). On land, no walking edge climbs more than one kerb step
+  the walking capsule's radius: structures (less a covered walk behind an arcade), areas, blocking
+  fixtures, closed zones and walls (a wall's gates, doors and arches are gaps in it). On land, no
+  walking edge climbs more than one kerb step
   (:data:`~exulanica.world.society_place.STEP_LIMIT_MM`): a join that would is not made. Paths
   and yards are ``footway``; the way to a door is ``premises_access``; to a fixture,
   ``furniture_access``.
@@ -48,6 +51,7 @@ from exulanica.grammar.grammars.site.records import (
     SiteAreaRecord,
     SiteExtentRecord,
     SiteFixtureRecord,
+    SiteLoggiaRecord,
     SitePathRecord,
     SiteRoomRecord,
     SiteStructureRecord,
@@ -470,22 +474,39 @@ def place_residents(place: Mapping[str, Any]) -> int:
     return sum(int(dest["resident_capacity"]) for dest in place["destinations"])
 
 
+def _body(structure: SiteStructureRecord, walk: SiteLoggiaRecord | None) -> _Box:
+    """What a walker keeps out of a structure: its footprint, or behind an arcade the part of it
+    behind the covered walk (the arcade's piers and the end walls beside the walk are walls)."""
+    s = structure
+    if walk is None:
+        return _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
+    if s.door_facing == "south":
+        return _Box(s.min_x_mm, walk.max_y_mm, s.max_x_mm, s.max_y_mm)
+    if s.door_facing == "north":
+        return _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, walk.min_y_mm)
+    if s.door_facing == "west":
+        return _Box(walk.max_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
+    return _Box(s.min_x_mm, s.min_y_mm, walk.min_x_mm, s.max_y_mm)
+
+
 def _blocked_parts(
     records: Sequence[object], uses: Mapping[str, PartUse] | None = None
 ) -> list[tuple[str, str, _Box]]:
     """What a walker keeps out of on a site, from its records, each with what it is and the words
-    that name it: every structure, every area (water where its roles say so), every fixture that
-    blocks inside a zone, every closed zone and every wall's pieces, in that order. A part's words
-    are its kind's (``uses``) where they are given, else its key's."""
+    that name it: every structure (less a covered walk behind its arcade), every area (water where
+    its roles say so), every fixture that blocks inside a zone, every closed zone and every wall's
+    pieces, in that order. A part's words are its kind's (``uses``) where they are given, else its
+    key's."""
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
     zone_ids = {zone.identity for zone in zones}
+    walks = {r.structure_identity: r for r in records if isinstance(r, SiteLoggiaRecord)}
 
     def words(key: str) -> str:
         use = None if uses is None else uses.get(key)
         return use.label if use is not None and use.label else key.replace("_", " ")
 
     parts = [
-        ("structure", words(s.part_key), _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm))
+        ("structure", words(s.part_key), _body(s, walks.get(s.identity)))
         for s in records
         if isinstance(s, SiteStructureRecord)
     ]
@@ -561,6 +582,62 @@ def site_obstructions(boxes: Iterable[Sequence[int]]) -> CityObstructions:
     return CityObstructions(stands=stands, steps=steps)
 
 
+@dataclass(frozen=True, slots=True)
+class _Arcade:
+    """A covered walk as it is walked: the points along its middle and, for each arch, the point
+    in front of it outside and the point on the walk's middle behind it."""
+
+    walk: SiteLoggiaRecord
+    middle: tuple[Point, ...]
+    arches: tuple[tuple[Point, Point], ...]
+
+
+def _arcades(
+    structures: Sequence[SiteStructureRecord],
+    walls: Sequence[SiteWallRecord],
+    walks: Sequence[SiteLoggiaRecord],
+) -> dict[str, list[_Arcade]]:
+    """Each zone's covered walks, by zone identity, in the order of their identities."""
+    by_identity = {s.identity: s for s in structures}
+    found: dict[str, list[_Arcade]] = {}
+    for walk in sorted(walks, key=lambda w: w.identity):
+        structure = by_identity[walk.structure_identity]
+        front = next(
+            wall
+            for wall in walls
+            if wall.owner_identity == structure.identity
+            and any(opening.kind == "arch" for opening in wall.openings)
+        )
+        dx, dy = _FACING[structure.door_facing]
+        along_x = structure.door_facing in ("north", "south")
+        middle_at = (
+            (walk.min_y_mm + walk.max_y_mm) // 2
+            if along_x
+            else (walk.min_x_mm + walk.max_x_mm) // 2
+        )
+        low, high = (walk.min_x_mm, walk.max_x_mm) if along_x else (walk.min_y_mm, walk.max_y_mm)
+        out = front.thickness_mm // 2 + APPROACH_MM
+        arches = []
+        for opening in front.openings:
+            if opening.kind != "arch":
+                continue
+            centre = opening.offset_mm + opening.width_mm // 2
+            if along_x:
+                at = (front.start_x_mm + centre, front.start_y_mm)
+                inside = (at[0], middle_at)
+            else:
+                at = (front.start_x_mm, front.start_y_mm + centre)
+                inside = (middle_at, at[1])
+            arches.append(((at[0] + dx * out, at[1] + dy * out), inside))
+        figures = set(_steps(low + APPROACH_MM, high - APPROACH_MM, INDOOR_LATTICE_MM))
+        figures |= {inside[0] if along_x else inside[1] for _, inside in arches}
+        middle = tuple(
+            (figure, middle_at) if along_x else (middle_at, figure) for figure in sorted(figures)
+        )
+        found.setdefault(structure.zone_identity, []).append(_Arcade(walk, middle, tuple(arches)))
+    return found
+
+
 def place_from_site_records(
     *,
     place_id: str,
@@ -586,6 +663,11 @@ def place_from_site_records(
     fixtures = [r for r in records if isinstance(r, SiteFixtureRecord)]
     rooms = [r for r in records if isinstance(r, SiteRoomRecord)]
     zone_ids = {zone.identity for zone in zones}
+    arcades = _arcades(
+        structures,
+        [r for r in records if isinstance(r, SiteWallRecord)],
+        [r for r in records if isinstance(r, SiteLoggiaRecord)],
+    )
     policy = routine.policy
     spacing = policy["standing_spacing_mm"]
     station = policy["footway_station_spacing_mm"]
@@ -659,10 +741,30 @@ def place_from_site_records(
                 f"lane{index}",
                 [frame.point(u, lane_v) for u in _steps(half_side, last_u, corridor_step)],
             )
+        # Each covered walk: a line along its middle, and a node in front of each arch joined
+        # through it to the point behind it on that line.
+        walks = arcades.get(zone.identity, [])
+        open_ground = len(corridor)
+        outside: list[str] = []
+        for index, arcade in enumerate(walks):
+            line(f"loggia{index}", arcade.middle)
+            for arch, (out, inside) in enumerate(arcade.arches):
+                if not graph.free(out):
+                    continue
+                name = f"{prefix}:loggia{index}:arch{arch:02d}"
+                graph.add(name, out)
+                walkable.append(name)
+                outside.append(name)
+                graph.join(name, at_point[inside], "footway")
+        covered = [
+            _Box(a.walk.min_x_mm, a.walk.min_y_mm, a.walk.max_x_mm, a.walk.max_y_mm) for a in walks
+        ]
         box = _Box(zone.min_x_mm, zone.min_y_mm, zone.max_x_mm, zone.max_y_mm)
         yard = []
         for point in _lattice(box, lattice):
             if not graph.free(point) or point in at_point:
+                continue
+            if any(walk.contains(point) for walk in covered):
                 continue
             name = f"{prefix}:yard:{point[0]:07d}:{point[1]:07d}"
             graph.add(name, point)
@@ -694,7 +796,10 @@ def place_from_site_records(
         graph.join(gate, threshold, "footway")
         graph.join_nearest(threshold, every_station, "footway")
         graph.join_nearest(gate, corridor, "footway")
-        lattice_of[zone.identity] = corridor + yard + [gate]
+        # The node in front of each arch joins the zone's ground, as a lattice node does.
+        for name in outside:
+            graph.join_nearest(name, corridor[:open_ground] + yard, "footway")
+        lattice_of[zone.identity] = corridor + outside + yard + [gate]
 
     def join_into_zone(name: str, zone_identity: str, kind: str) -> None:
         among = lattice_of.get(zone_identity, [])

@@ -52,6 +52,7 @@ __all__ = [
     "KindCatalogs",
     "LookFamily",
     "SocietyDefault",
+    "load_arcade_catalog",
     "load_kind_catalogs",
 ]
 
@@ -143,6 +144,50 @@ _SCHEMAS: Final = {
         (("use_class", _words), ("words", _words), ("reason", text_field)),
     ),
 }
+
+
+#: The structure arcade catalog: an arcade's bounds and the figures every arch is drawn with. It is
+#: read only for a kind whose structure states an arcade, so it is none of the four catalogs a
+#: kind is always read with and no world without an arcade names it.
+_ARCADE_SCHEMA: Final = CatalogSchema(
+    "structure-arcade",
+    1,
+    (("minimum", _FIGURE), ("maximum", _FIGURE), ("reason", text_field)),
+    entry_check=_bound,
+)
+ARCADE_FIGURES: Final = ("bays", "depth_mm", "pier_mm", "lintel_mm", "least_opening_mm")
+
+
+@dataclass(frozen=True, slots=True)
+class ArcadeCatalog:
+    """The arcade catalog as read: each figure's least and greatest value, and the file's digest."""
+
+    bounds: Mapping[str, tuple[int, int]]
+    sha256: str
+
+    def bound(self, key: str) -> tuple[int, int]:
+        return self.bounds[key]
+
+
+@functools.cache
+def load_arcade_catalog(directory: Path = CATALOG_DIRECTORY) -> ArcadeCatalog:
+    """Read ``structure-arcade.v1.json`` and hold it to the figures an arcade is laid out by."""
+    import hashlib
+
+    path = directory.joinpath("structure-arcade.v1.json")
+    catalog = load_catalog(path, _ARCADE_SCHEMA)
+    read = {entry.key: dict(entry.values) for entry in catalog.entries}
+    bounds = {
+        key: (cast(int, values["minimum"]), cast(int, values["maximum"]))
+        for key, values in read.items()
+    }
+    if tuple(sorted(bounds)) != tuple(sorted(ARCADE_FIGURES)):
+        raise CatalogError(
+            f"the arcade catalog states {sorted(bounds)}, not {list(ARCADE_FIGURES)}"
+        )
+    return ArcadeCatalog(
+        bounds=MappingProxyType(bounds), sha256=hashlib.sha256(path.read_bytes()).hexdigest()
+    )
 
 
 @dataclass(frozen=True, slots=True)

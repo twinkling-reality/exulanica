@@ -48,6 +48,7 @@ __all__ = [
     "SiteAreaRecord",
     "SiteExtentRecord",
     "SiteFixtureRecord",
+    "SiteLoggiaRecord",
     "SiteOpening",
     "SitePathRecord",
     "SiteRoomRecord",
@@ -60,8 +61,9 @@ __all__ = [
 
 #: The side of a rectangle a door, a gate or a zone's front faces.
 FACINGS: Final = ("north", "east", "south", "west")
-#: What a gap in a wall is: a door into a structure or a room, or a gate in a boundary.
-OPENING_KINDS: Final = ("door", "gate")
+#: What a gap in a wall is: a door into a structure or a room, a gate in a boundary, or an arch of
+#: a structure's arcade, open between its piers onto the covered walk behind it.
+OPENING_KINDS: Final = ("door", "gate", "arch")
 #: The largest coordinate a record states: a site is at most a few hundred metres a side, and the
 #: bound keeps every product of two coordinates inside an exact double.
 _COORDINATE_MAXIMUM: Final = 10_000_000
@@ -226,6 +228,24 @@ class SiteRoomRecord:
     roles: tuple[str, ...]
     floor_family: str
     floor_leaf: str
+
+
+@dataclass(frozen=True, slots=True)
+class SiteLoggiaRecord:
+    """The covered walk behind a structure's arcade: open ground under the building, between the
+    arcade's piers and the wall that holds its door, that people walk along and cross."""
+
+    RECORD_KIND: ClassVar[str] = "site.loggia"
+    RECORD_VERSION: ClassVar[int] = 1
+
+    identity: str
+    structure_identity: str
+    ordinal: int
+    min_x_mm: int
+    min_y_mm: int
+    max_x_mm: int
+    max_y_mm: int
+    bays: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -399,6 +419,20 @@ RECORD_SHAPES: Final = (
         rules=(RecordRule("site_room_rectangle", _ordered),),
         identity=IdentityRule(
             "site_room", owner_field="structure_identity", ordinal_field="ordinal"
+        ),
+    ),
+    RecordShape(
+        SiteLoggiaRecord,
+        (
+            identity("identity"),
+            identity("structure_identity", "site.structure"),
+            integer("ordinal", 0, _COORDINATE_MAXIMUM),
+            *_rectangle(),
+            integer("bays", 1, 64),
+        ),
+        rules=(RecordRule("site_loggia_rectangle", _ordered),),
+        identity=IdentityRule(
+            "site_loggia", owner_field="structure_identity", ordinal_field="ordinal"
         ),
     ),
     RecordShape(

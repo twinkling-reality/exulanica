@@ -49,6 +49,7 @@ __all__ = [
     "PLACEMENTS",
     "ROLES",
     "ROOF_FORMS",
+    "Arcade",
     "AreaPart",
     "BoundaryPart",
     "FixturePart",
@@ -237,6 +238,21 @@ class StructurePart:
 
 
 @dataclass(frozen=True, slots=True)
+class Arcade:
+    """A structure's arcade: its front divided into ``bays`` equal bays, each an arch between two
+    piers ``pier_mm`` wide and ``opening_height_mm`` high, opening onto a covered walk
+    ``depth_mm`` deep behind the front wall, at whose back stands the wall with the door. A front
+    too short for its bays, leaving an arch under ``least_opening_mm``, is refused by the layout."""
+
+    part: str
+    bays: int
+    depth_mm: int
+    pier_mm: int
+    opening_height_mm: int
+    least_opening_mm: int
+
+
+@dataclass(frozen=True, slots=True)
 class RoomPart:
     """A room of a structure: its share of the inside, its floor and what it holds."""
 
@@ -333,6 +349,9 @@ class SitePlan:
     entry_width_mm: int
     parts: tuple[Part, ...]
     zones: tuple[ZonePlan, ...]
+    #: The arcades of the structures that state one, by part; none for every site written before
+    #: arcades existed, whose plan reads exactly as it did (:func:`plan_payload`).
+    arcades: tuple[Arcade, ...] = ()
 
     def __post_init__(self) -> None:
         _key("a site's kind", self.kind)
@@ -388,6 +407,18 @@ class SitePlan:
                     f"zone {zone.key}: structures stand in a row along its front",
                 )
                 _require(holding.pattern != "back_wall", "a zone has no back wall; a room has")
+        arcaded = [arcade.part for arcade in self.arcades]
+        _require(len(set(arcaded)) == len(arcaded), "a structure states at most one arcade")
+        for arcade in self.arcades:
+            held = by_key.get(arcade.part)
+            _require(isinstance(held, StructurePart), f"an arcade's {arcade.part!r} is a structure")
+            assert isinstance(held, StructurePart)
+            _require(
+                bool(held.roles) or bool(held.rooms),
+                f"structure {arcade.part}: an arcade leads to a door, so it has a role or rooms",
+            )
+            for name in ("bays", "depth_mm", "pier_mm", "opening_height_mm", "least_opening_mm"):
+                _figure(f"structure {arcade.part}'s arcade {name}", getattr(arcade, name), 1)
         for part in self.parts:
             if isinstance(part, StructurePart):
                 for room in part.rooms:
@@ -409,9 +440,14 @@ class SitePlan:
     def by_key(self) -> Mapping[str, Part]:
         return {part.key: part for part in self.parts}
 
+    def arcade_of(self, part: str) -> Arcade | None:
+        """The arcade the structure part ``part`` states, or None."""
+        return next((arcade for arcade in self.arcades if arcade.part == part), None)
+
 
 def plan_payload(plan: SitePlan) -> dict[str, object]:
-    """The plan as canonical data: every field of every part and zone, with each part's form."""
+    """The plan as canonical data: every field of every part and zone, with each part's form, and
+    the structures' arcades when any states one."""
     return {
         "site": record_payload(
             _SiteFields(
@@ -431,6 +467,10 @@ def plan_payload(plan: SitePlan) -> dict[str, object]:
             for part in sorted(plan.parts, key=lambda part: part.key)
         ],
         "zones": [record_payload(zone) for zone in plan.zones],
+        # Stated only when a structure has an arcade, so a plan with none has its old bytes.
+        **(
+            {"arcades": [record_payload(arcade) for arcade in plan.arcades]} if plan.arcades else {}
+        ),
     }
 
 

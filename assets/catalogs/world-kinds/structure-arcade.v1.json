@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "catalog_id": "structure-arcade",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bays",
+      "minimum": 1,
+      "maximum": 24,
+      "reason": "An arcade divides a structure's front into one to twenty-four equal bays; more would leave piers too close for an opening a person passes. The least opening below refuses a front too short for its bays.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "depth_mm",
+      "minimum": 2000,
+      "maximum": 12000,
+      "reason": "The covered walk behind the arches is from 2 m, room for two people to pass under it clear of the piers and the door, to 12 m, the deepest loggia the style kit's arcade piece draws.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "pier_mm",
+      "minimum": 800,
+      "maximum": 800,
+      "reason": "Authored: each pier between two arches is 800 mm wide, a stout masonry pier for a ground storey carrying the storeys above; half a pier stands against each end wall, so every bay is the same.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "lintel_mm",
+      "minimum": 600,
+      "maximum": 600,
+      "reason": "Authored: an arch's opening stops 600 mm under the ground storey's ceiling, for the arch's head and the floor above it; the opening is never lower than a door's 2,100 mm, so a storey under 2,700 mm takes no arcade.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "least_opening_mm",
+      "minimum": 1500,
+      "maximum": 1500,
+      "reason": "An arch is at least 1,500 mm wide: a walker is 680 mm across (a 340 mm radius), so a way through stays clear of both piers with room to spare, and two people can pass in one arch.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

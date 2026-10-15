@@ -72,6 +72,14 @@ export interface SiteSlot {
    * was stated.
    */
   readonly storeyHeightMm?: number;
+  /**
+   * A building's arcade: how many equal bays its front is divided into, an arch in each, and how
+   * deep the covered walk behind the arches is, in millimetres. Stated together and only on a
+   * building's own slot, so what dresses it draws its arches where people walk through them.
+   * Absent on every building without an arcade, and in a drawing served before arcades.
+   */
+  readonly arcadeBays?: number;
+  readonly loggiaDepthMm?: number;
 }
 
 /** What a site on land states of its land: each chunk's place and digest, the backdrop's and the water's. */
@@ -195,6 +203,14 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
     if (parts[1] !== 'structure') fail(`The site drawing's slot ${index} states a storey height, and only a building's own slot does.`);
     if (storeyHeight <= 0 || box[2] % storeyHeight !== 0) fail(`The site drawing's slot ${index} storey height does not divide its ${box[2]} mm height.`);
   }
+  const bays = row['arcadeBays'] === undefined ? undefined : integer(row['arcadeBays'], `slot ${index} arcade bays`);
+  const loggia = row['loggiaDepthMm'] === undefined ? undefined : integer(row['loggiaDepthMm'], `slot ${index} covered walk depth`);
+  if ((bays === undefined) !== (loggia === undefined)) fail(`The site drawing's slot ${index} states an arcade's bays and its covered walk's depth together.`);
+  if (bays !== undefined && loggia !== undefined) {
+    if (parts[1] !== 'structure') fail(`The site drawing's slot ${index} states an arcade, and only a building's own slot does.`);
+    if (bays < 1) fail(`The site drawing's slot ${index} arcade has no bay.`);
+    if (loggia <= 0 || loggia >= box[1]) fail(`The site drawing's slot ${index} covered walk is not inside its ${box[1]} mm depth.`);
+  }
   return Object.freeze({
     identity: text(row['identity'], `slot ${index} identity`),
     part: text(row['part'], `slot ${index} part`),
@@ -220,6 +236,7 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
     ...(drape === true ? { drape: true as const } : {}),
     ...(structure === undefined ? {} : { structure }),
     ...(storeyHeight === undefined ? {} : { storeyHeightMm: storeyHeight }),
+    ...(bays === undefined || loggia === undefined ? {} : { arcadeBays: bays, loggiaDepthMm: loggia }),
   });
 }
 

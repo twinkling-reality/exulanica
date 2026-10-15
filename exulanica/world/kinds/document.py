@@ -45,6 +45,7 @@ from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.errors import CanonicalisationError
 from exulanica.grammar.catalogs import FieldValue
 from exulanica.grammar.errors import CatalogError, InvalidParameterError
+from exulanica.grammar.grammars.site.layout import DOOR_HEIGHT_MM
 from exulanica.grammar.grammars.site.plan import (
     ACCESS,
     ENCLOSURES,
@@ -52,6 +53,7 @@ from exulanica.grammar.grammars.site.plan import (
     PATTERNS,
     PLACEMENTS,
     ROOF_FORMS,
+    Arcade,
     AreaPart,
     BoundaryPart,
     FixturePart,
@@ -65,7 +67,7 @@ from exulanica.grammar.grammars.site.plan import (
     ZonePlan,
 )
 from exulanica.grammar.records import KEY_PATTERN
-from exulanica.world.kinds.catalogs import KindCatalogs, load_kind_catalogs
+from exulanica.world.kinds.catalogs import KindCatalogs, load_arcade_catalog, load_kind_catalogs
 from exulanica.world.society_catalogs import SCHEMAS, RoutineModel
 from exulanica.world.society_site_place import PartUse, SiteSociety
 
@@ -567,6 +569,23 @@ def _read_use_classes(reader: _Reader, raw: object) -> dict[str, dict[str, Any]]
     return found
 
 
+def _arcade(where: str, raw: object, module: int) -> tuple[int, int]:
+    """A structure's arcade: how many bays its front has, and how deep its covered walk is, each
+    held to the arcade catalog (``structure-arcade.v1.json``); the depth a whole number of the
+    site's module."""
+    stated = _keys(where, raw, frozenset({"bays", "depth_mm"}))
+    catalog = load_arcade_catalog()
+    bays = _int(f"{where}.bays", stated["bays"], catalog.bound("bays"))
+    depth = _int(f"{where}.depth_mm", stated["depth_mm"], catalog.bound("depth_mm"))
+    if depth % module:
+        raise KindRefused(
+            "kind_out_of_bounds",
+            f"{depth} mm is not whole {module} mm modules",
+            f"{where}.depth_mm",
+        )
+    return bays, depth
+
+
 @dataclass(frozen=True, slots=True)
 class _ReadPart:
     key: str
@@ -594,8 +613,15 @@ def _read_part(
         raise _invalid(where, f"states a form, one of {list(FORMS)}")
     form = str(raw["form"])
     shaped = reader.raw["profile"] == REQUIREMENTS_PROFILE and "shape_class" in raw
+    # A structure's arcade is optional in both profiles: absent, the structure reads as before.
+    arcaded = form == "structure" and "arcade" in raw
     entry = _keys(
-        where, raw, _PART_COMMON | _PART_KEYS[form] | ({"shape_class"} if shaped else set())
+        where,
+        raw,
+        _PART_COMMON
+        | _PART_KEYS[form]
+        | ({"shape_class"} if shaped else set())
+        | ({"arcade"} if arcaded else set()),
     )
     key = _key(f"{where}.key", entry["key"])
     roles_raw = entry["roles"]
@@ -665,6 +691,8 @@ def _read_part(
                 )
             )
         fields["rooms"] = tuple(rooms)
+        if arcaded:
+            fields["arcade"] = _arcade(f"{where}.arcade", entry["arcade"], module)
     elif form == "room":
         fields["share"] = _int(f"{where}.share", entry["share"], reader.bound("room_share"))
         fields["holds"] = _holdings(reader, f"{where}.holds", entry["holds"], allow_empty=True)
@@ -700,6 +728,22 @@ def _read_part(
             f"{where}.gate_width_mm", entry["gate_width_mm"], reader.bound("gate_width_mm")
         )
     _check_roles(reader, where, form, roles, use_class, fields, use_classes)
+    if arcaded:
+        if not roles and not fields["rooms"]:
+            raise KindRefused(
+                "kind_role_unmet",
+                "an arcade leads to the structure's door, so the structure takes a role or rooms",
+                f"{where}.arcade",
+            )
+        least = DOOR_HEIGHT_MM + load_arcade_catalog().bound("lintel_mm")[0]
+        if fields["storey_height_mm"] < least:
+            raise KindRefused(
+                "kind_out_of_bounds",
+                f"an arch is at least a door's {DOOR_HEIGHT_MM} mm high under its head, so an "
+                f"arcaded structure's storey is at least {least} mm, not "
+                f"{fields['storey_height_mm']}",
+                f"{where}.arcade",
+            )
     if shaped:
         from exulanica.world.kinds.shape_classes import (
             ShapeRefused,
@@ -1017,6 +1061,12 @@ class KindDocument:
             around=self._place_words[1],
         )
 
+    @property
+    def arcaded(self) -> bool:
+        """Whether a structure of this kind states an arcade, so its worlds read the arcade
+        catalog (``structure-arcade.v1.json``)."""
+        return any("arcade" in part.fields for part in self.parts.values())
+
     def plan(self, values: Mapping[str, int]) -> SitePlan:
         """The site plan these values make: every figure resolved, every span kept for the seed."""
         module = self.module_mm
@@ -1087,6 +1137,19 @@ class KindDocument:
                     )
                 )
         site = self._site
+        arcade = load_arcade_catalog() if self.arcaded else None
+        arcades = tuple(
+            Arcade(
+                part.key,
+                part.fields["arcade"][0],
+                part.fields["arcade"][1],
+                arcade.bound("pier_mm")[0],
+                part.fields["storey_height_mm"] - arcade.bound("lintel_mm")[0],
+                arcade.bound("least_opening_mm")[0],
+            )
+            for part in self.parts.values()
+            if arcade is not None and "arcade" in part.fields
+        )
         return SitePlan(
             kind=self.kind,
             enclosure=self.enclosure,
@@ -1113,6 +1176,7 @@ class KindDocument:
                 )
                 for zone in self.zones
             ),
+            arcades=arcades,
         )
 
 

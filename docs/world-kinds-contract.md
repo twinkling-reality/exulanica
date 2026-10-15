@@ -63,6 +63,18 @@ path. A **pattern** says how a zone or a room lays out what it holds: `fill`, `r
 `scatter`, `perimeter`, `cluster`, `centre` or `back_wall`. A zone with `closed` access is one
 people never enter, such as a crane's reach.
 
+**An arcade.** A structure part may state `arcade`, `{"bays": n, "depth_mm": d}`, in both
+profiles: its front divided into `n` equal bays with an open arch in each, and a covered walk `d`
+deep behind the arches that people walk along and through, with the structure's door in the wall
+at its back. Absent, a structure reads and is laid out exactly as before. The
+[arcade catalog](../assets/catalogs/world-kinds/structure-arcade.v1.json) bounds both figures and
+states the ones every arch is laid out with, each with its reason: 1 to 24 bays, a walk 2 m to
+12 m deep in whole modules, 800 mm piers, an arch's head 600 mm under the ground storey's ceiling
+and an arch at least 1,500 mm wide. A structure with an arcade takes a role or rooms, since its
+walk leads to a door (`kind_role_unmet`), and a ground storey high enough for a door's 2,100 mm
+under an arch's head (`kind_out_of_bounds`). The catalog is read only for a kind that states an
+arcade.
+
 **Values.** A person, a model choosing values for them and an API client ask for a world the same
 way: a preset and, optionally, values for its parameters. `KindDocument.values` holds each value to
 its parameter's range and step and refuses by name with the specification's codes
@@ -210,11 +222,21 @@ holding draws its cells one at a time as it tries them, and a search for free gr
 points a band at a time, so the work a layout does follows what it places, not the size of the
 site, and a layout over its budget is refused before it does the work. A structure
 is four walls with its door in the front one; its rooms stand in a row along its front with a door
-in each wall between two rooms. What does not fit is refused by name, never shrunk.
+in each wall between two rooms. A structure with an arcade has an arch in each bay of its front
+wall instead of the door (each arch its bay less a pier, centred in the bay, so a pier stands
+between two arches and half a pier against each end wall), the covered walk behind the arches,
+and its door in a wall across the walk's back; its rooms stand behind that wall. An arch narrower
+than the catalog's least opening, or a walk that leaves less than a room's depth behind it, is
+refused by name. Nothing is drawn from the seed for an arcade. What does not fit is refused by
+name, never shrunk.
 
 It writes `site.extent`, `site.path`, `site.zone`, `site.area`, `site.structure`, `site.room`,
-`site.wall` and `site.fixture` records, every figure in integer millimetres in the site's frame
-(x east, y north, from the south-west corner).
+`site.wall` and `site.fixture` records and, for a structure with an arcade, `site.loggia` (the
+covered walk's rectangle and its bays, owned by the structure), every figure in integer
+millimetres in the site's frame (x east, y north, from the south-west corner). A wall's openings
+are doors, gates and arches. A structure without an arcade has exactly the records it had before
+arcades existed, so every world made before them regenerates to its plan and output digests
+(`tests/test_site_pinned.py`).
 
 ## People in a site world
 
@@ -223,7 +245,10 @@ The site place producer
 a society place (`society-place` version 2): a walking lattice over open ground and corridors that
 stays clear of every blocker, doors into structures, rooms, fields reached at their access point,
 fixtures with places along their fronts, and the kind's homes, workplaces and shops as
-destinations. A fixture is approached from its front; where something the layout set within its
+destinations. A structure with an arcade is walked through: its covered walk is open ground, a
+line of places runs along its middle, each arch joins the zone's ground to that line through the
+arch, and the structure's door, at the walk's back, is reached from the walk. A fixture is
+approached from its front; where something the layout set within its
 clearance stands on that approach, from its back, and its places then face its back. People the
 kind states as off-site residents live in one home at the entry (`home:offsite`) and come in
 through it.
@@ -301,7 +326,8 @@ The receipt (`world_generation_receipt`, the same profile a town's uses) names t
 - the site grammar and its descriptor digest, the plan digest and the generation's output digest,
   which hold the world;
 - the kind catalogs' digests, as provenance: an edit to a catalog that leaves the plan and records
-  as they were does not unmake the world;
+  as they were does not unmake the world; a world of a kind that states an arcade also names the
+  arcade catalog's (`structure-arcade`);
 - the routine binding with its overlay, what each part is for, the candidate kept and every
   earlier refusal, the seed, the subject identity and the arrival;
 - no tiles: a site world is drawn from its records and never baked.
@@ -333,7 +359,11 @@ the records its receipt generates again ([`site_drawing.py`](../exulanica/world/
   can show or hide the building's own pieces together; a slot of no building states none. A
   building's own slot also states its storey height (`storeyHeightMm`), of which its height is a
   whole number, so what dresses its walls, such as a facade's rows of windows, follows its
-  storeys; no other slot states it, and a reader given a drawing without it uses its own default;
+  storeys; no other slot states it, and a reader given a drawing without it uses its own default.
+  A building with an arcade states on its own slot how many bays its front has (`arcadeBays`) and
+  how deep its covered walk is (`loggiaDepthMm`), together, so what dresses it draws its arches
+  where people walk through them; every other building states neither. An arch is open under its
+  lintel, with no door slot, and the covered walk shows its zone's ground;
 - **walk**: the floor a person exploring stands on and the boxes they keep out of (wall pieces,
   blocking fixtures and water);
 - **seats**: each seat's height;

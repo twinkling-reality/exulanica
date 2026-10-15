@@ -1841,7 +1841,9 @@ its activities may name, `record_subjects`), and the
 town's routine binding with the kind's overlay, `exulanica.routine-overlay/v1`, which adds the
 kind's own use classes and employment share and is named by its own digest. The
 [world kinds contract](world-kinds-contract.md#people-in-a-site-world) owns the site place and
-the overlay.
+the overlay. A building with an arcade is walked through: people walk the covered walk behind its
+arches and in and out through any arch, and enter the building from the walk; a site without one
+makes the place it made before arcades existed.
 
 A person's change to a part the world was made with (moved, turned or removed in build mode,
 [world objects contract](world-objects-contract.md#15-a-site-worlds-made-parts)) is the society's

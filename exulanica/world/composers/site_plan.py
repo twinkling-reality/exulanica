@@ -56,7 +56,7 @@ from exulanica.world.composers import (
     receipt_sha256,
 )
 from exulanica.world.errors import InvalidStructuralData
-from exulanica.world.kinds.catalogs import load_kind_catalogs
+from exulanica.world.kinds.catalogs import load_arcade_catalog, load_kind_catalogs
 from exulanica.world.kinds.document import (
     KindDocument,
     KindRefused,
@@ -380,6 +380,9 @@ def compose_kind(
         "record_count": len(world.records),
         "arrival": arrival,
     }
+    if kind.arcaded:
+        # Named only for a kind that reads it, so a world without an arcade names what it did.
+        receipt["catalogs"]["structure-arcade"] = load_arcade_catalog().sha256
     supported_place = world.place
     composer_version = 1
     up_mm = 0

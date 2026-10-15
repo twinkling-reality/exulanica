@@ -95,6 +95,14 @@ describe('reading a site drawing', () => {
     expect(parseStructuredSiteDrawing(built()).slots.some((one) => 'storeyHeightMm' in one)).toBe(false);
   });
 
+  it("reads a building's arcade, and states none where the drawing states none", () => {
+    const document = built();
+    Object.assign((document['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 3, loggiaDepthMm: 2000 });
+    const shed = parseStructuredSiteDrawing(document).slots.find((one) => one.identity === 'shed')!;
+    expect([shed.arcadeBays, shed.loggiaDepthMm]).toEqual([3, 2000]);
+    expect(parseStructuredSiteDrawing(built()).slots.some((one) => 'arcadeBays' in one || 'loggiaDepthMm' in one)).toBe(false);
+  });
+
   it.each([
     ['another profile', (d: Record<string, unknown>) => { d['profile'] = 'exulanica.site-drawing/unsupported'; }, 'is not exulanica.site-drawing/v1'],
     ['a float', (d: Record<string, unknown>) => { (d['arrival'] as { positionMm: number[] }).positionMm[0] = 0.5; }, 'not a whole number'],
@@ -109,6 +117,10 @@ describe('reading a site drawing', () => {
     ['a storey height that is not a whole number', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 1200.5; }, 'storey height is not a whole number'],
     ["a storey height that does not divide the building's height", (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 1000; }, 'storey height does not divide its 2400 mm height'],
     ['a storey height of nothing', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 0; }, 'storey height does not divide its 2400 mm height'],
+    ['an arcade on a slot that is no building', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[])[1]!, { arcadeBays: 3, loggiaDepthMm: 2000 }); }, "states an arcade, and only a building's own slot does"],
+    ["an arcade's bays without its covered walk", (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['arcadeBays'] = 3; }, "states an arcade's bays and its covered walk's depth together"],
+    ['an arcade of no bay', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 0, loggiaDepthMm: 2000 }); }, 'arcade has no bay'],
+    ['a covered walk as deep as its building', (d: Record<string, unknown>) => { Object.assign((d['slots'] as Record<string, unknown>[]).at(-1)!, { arcadeBays: 3, loggiaDepthMm: 3000 }); }, 'covered walk is not inside its 3000 mm depth'],
   ])('refuses %s by name', (_name, change, words) => {
     const document = built();
     change(document);

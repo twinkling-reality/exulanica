@@ -133,9 +133,9 @@ def test_published_generation_contract_versions_ship_in_the_api_image():
         "from exulanica.world.kinds.thing_leaves import load_thing_leaves\n"
         "from exulanica.world.kinds.shape_classes import load_shape_classes\n"
         "from exulanica.selection.kind_drafting import kind_drafting_prompt, PROMPT_PATH\n"
-        "from exulanica.world.kinds.catalogs import load_kind_catalogs\n"
+        "from exulanica.world.kinds.catalogs import load_arcade_catalog, load_kind_catalogs\n"
         "load_thing_leaves(version=1)\nload_thing_leaves(version=2)\nload_shape_classes()\n"
-        "load_kind_catalogs(bounds_version=3)\n"
+        "load_kind_catalogs(bounds_version=3)\nload_arcade_catalog()\n"
         "for version in (5, 6, 7):\n"
         "    kind_drafting_prompt(PROMPT_PATH.with_name(f'kind-drafting.v{version}.json'))"
     )
@@ -146,6 +146,7 @@ def test_published_generation_contract_versions_ship_in_the_api_image():
         "assets/catalogs/world-kinds/thing-leaf.v1.json",
         "assets/catalogs/world-kinds/thing-leaf.v2.json",
         "assets/catalogs/world-kinds/shape-class.v1.json",
+        "assets/catalogs/world-kinds/structure-arcade.v1.json",
     } <= set(read)
     assert all(image.allowlisted(path) and image.shipped(path) for path in read)
     # The startup audit excludes package files, so verify these published prompt reads directly.

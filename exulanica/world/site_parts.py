@@ -38,6 +38,7 @@ from exulanica.grammar.grammars.site import check_site_records
 from exulanica.grammar.grammars.site.records import (
     SiteAreaRecord,
     SiteFixtureRecord,
+    SiteLoggiaRecord,
     SiteOpening,
     SitePathRecord,
     SiteRoomRecord,
@@ -434,13 +435,15 @@ def _moved_fixture(fixture: SiteFixtureRecord, pose: _Pose) -> SiteFixtureRecord
 
 
 def _carried(record: object, records: Sequence[object]) -> set[str]:
-    """The identities a part carries with it: a building's walls, rooms and the fixtures in them."""
+    """The identities a part carries with it: a building's walls, rooms (and the covered walk
+    behind its arcade) and the fixtures in its rooms."""
     if not isinstance(record, SiteStructureRecord):
         return set()
     rooms = {
         r.identity
         for r in records
-        if isinstance(r, SiteRoomRecord) and r.structure_identity == record.identity
+        if isinstance(r, SiteRoomRecord | SiteLoggiaRecord)
+        and r.structure_identity == record.identity
     }
     walls = {
         r.identity
