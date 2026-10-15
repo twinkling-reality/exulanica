@@ -137,6 +137,71 @@ def test_a_module_stays_inside_its_size_and_no_triangle_crosses_a_zone(name):
     assert profile.triangles <= BUDGET.triangles and len(data) <= BUDGET.glb_bytes
 
 
+def _same_plane_overlaps(piece: Piece) -> list[tuple[int, int]]:
+    """Pairs of triangles of two swatches, facing the same way in one plane, where one's middle
+    lies inside the other: two colours drawn over each other, which fight in the depth buffer and
+    speckle. (Faces of one swatch drawn over each other inside a solid show nothing.)"""
+    corners = np.asarray(piece.corners).reshape(-1, 3, 3)
+    normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    lengths = np.linalg.norm(normals, axis=1)
+    keep = lengths > 1e-9
+    units = np.zeros_like(normals)
+    units[keep] = normals[keep] / lengths[keep, None]
+    planes: dict[tuple, list[int]] = {}
+    for index in np.nonzero(keep)[0]:
+        unit = units[index]
+        key = (*np.round(unit, 4), round(float(unit @ corners[index, 0]), 4))
+        planes.setdefault(key, []).append(int(index))
+    found = []
+    for members in planes.values():
+        if len(members) < 2:
+            continue
+        drop = int(np.argmax(np.abs(units[members[0]])))
+        axes = [axis for axis in range(3) if axis != drop]
+        flat = corners[members][:, :, axes]
+        middles = flat.mean(axis=1)
+        for i, middle in enumerate(middles):
+            for j, triangle in enumerate(flat):
+                if i == j or piece.keys[members[i]] == piece.keys[members[j]]:
+                    continue
+                a, b, c = triangle
+                signs = [
+                    (q[0] - middle[0]) * (r[1] - middle[1])
+                    - (q[1] - middle[1]) * (r[0] - middle[0])
+                    for q, r in ((a, b), (b, c), (c, a))
+                ]
+                if all(sign > 1e-9 for sign in signs) or all(sign < -1e-9 for sign in signs):
+                    found.append((members[i], members[j]))
+    return found
+
+
+@pytest.mark.parametrize("name", sorted(ROWS))
+def test_no_two_colours_of_a_module_are_drawn_over_each_other(name):
+    row = ROWS[name]
+    module = ASSEMBLED_RECIPES[row["recipe"]](row)
+    overlaps = _same_plane_overlaps(module.piece)
+    assert overlaps == [], (
+        f"{len(overlaps)} triangles lie over another's colour facing the same way"
+    )
+
+
+@pytest.mark.parametrize("name", sorted(ROWS))
+def test_a_modules_outermost_faces_face_out(name):
+    # A wall mirrored to the far side with its winding kept would face in, and be lit inside out:
+    # of the faces square to each side, the outermost face out.
+    row = ROWS[name]
+    corners = np.asarray(ASSEMBLED_RECIPES[row["recipe"]](row).piece.corners).reshape(-1, 3, 3)
+    normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    lengths = np.linalg.norm(normals, axis=1)
+    for axis in (0, 2):
+        square = np.abs(normals[:, axis]) > 0.999 * lengths
+        for side in (-1, 1):
+            where = corners[square, 0, axis]
+            extreme = where.min() if side < 0 else where.max()
+            on = square & np.isclose(corners[:, 0, axis], extreme, atol=1e-6)
+            assert on.any() and np.all(normals[on, axis] * side > 0), (axis, side)
+
+
 @pytest.mark.parametrize("name", sorted(ROWS))
 def test_drawn_with_its_rows_bays_and_storeys_a_module_is_its_rows_size(name):
     row = ROWS[name]

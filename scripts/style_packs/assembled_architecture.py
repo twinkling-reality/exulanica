@@ -13,6 +13,11 @@ The parts are ``architecture.py``'s (arched walls, cornices, balustrades), place
 place them, so a module reads as the building it repeats. The row's fields are the same: its size,
 bays and storeys give the bay width and storey height the module is drawn at. Every face is cut at
 the zone edges (:func:`split_at`), so no triangle lies across one, which the server holds.
+
+A module's walls are its own (:func:`opening_wall`): one opening between two piers whose faces toward
+it are left to the opening's shaded jambs, and tops left off where a ledge of another colour lies in
+their plane, so no two colours are drawn over each other in one plane (they would speckle in every
+copy); a wall mirrored to the far side keeps its faces turned outward (:func:`mirrored_z`).
 """
 
 from __future__ import annotations
@@ -23,13 +28,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from scripts.style_packs.architecture import (
-    _mirror_z,
-    _turn,
-    arched_wall,
-    balustrade_run,
-    cornice,
-)
+from exulanica.grammar.grammars.site.layout import OUTER_WALL_MM
+from scripts.style_packs.architecture import _turn, arch_points, balustrade_run, cornice
 from scripts.style_packs.authored_packs import Piece
 
 Vec = tuple[float, float, float]
@@ -41,7 +41,7 @@ Zone = tuple[int, int] | None
 OVERHANG_MM = 450
 #: An arcade block's end wall, in millimetres: the site grammar's outer wall, so a building's end
 #: stands where its walls do.
-END_WALL_MM = 200
+END_WALL_MM = OUTER_WALL_MM
 #: An arcade block's plain body begins this far behind its back wall and ends this far before its
 #: loggia, in millimetres, clear of the roof balustrade and the loggia's ceiling.
 BODY_MARGINS_MM = (600, 300)
@@ -70,6 +70,70 @@ class Module:
     size_mm: tuple[int, int, int]
     stretch_mm: tuple[Zone, Zone, Zone]
     repeat_mm: tuple[Zone, Zone, Zone]
+
+
+def opening_wall(
+    piece: Piece,
+    x: tuple[float, float],
+    z: tuple[float, float],
+    y: tuple[float, float],
+    opening: tuple[float, float, float, float],
+    steps: int,
+    kind: str,
+    *,
+    top: bool = True,
+    key: str = "stone",
+    inner: str = "shade",
+) -> None:
+    """A wall slab across ``x`` pierced by one arched opening (centre x, half width, springing
+    height, rise), as ``architecture.arched_wall`` draws one: a pier either side, spandrels above
+    the arch, its soffit and jambs in ``inner``. Each pier draws only its outer end face: its face
+    toward the opening would lie in the jamb's plane. ``top`` draws the wall's top, left off where
+    a ledge of another colour lies in that plane."""
+    (x0, x1), (z0, z1), (y0, y1) = x, z, y
+    cx, half, spring, rise = opening
+    up = "Y" if top else ""
+    piece.box((x0, cx - half), (y0, y1), (z0, z1), key, "xy" + up + "zZ")
+    piece.box((cx + half, x1), (y0, y1), (z0, z1), key, "Xy" + up + "zZ")
+    points = arch_points(cx, spring, half, rise, steps, kind)
+    for (xa, ya), (xb, yb) in pairwise(points):
+        for depth, sign in ((z1, 1.0), (z0, -1.0)):
+            piece.face(
+                [(xa, ya, depth), (xb, yb, depth), (xb, y1, depth), (xa, y1, depth)],
+                key,
+                (0.0, 0.0, sign),
+            )
+        middle_x, middle_y = (xa + xb) / 2, (ya + yb) / 2
+        piece.face(
+            [(xa, ya, z0), (xb, yb, z0), (xb, yb, z1), (xa, ya, z1)],
+            inner,
+            (cx - middle_x, spring - middle_y, 0.0),
+        )
+    for jamb, sign in ((cx - half, 1.0), (cx + half, -1.0)):
+        piece.face(
+            [(jamb, y0, z0), (jamb, y0, z1), (jamb, spring, z1), (jamb, spring, z0)],
+            inner,
+            (sign, 0.0, 0.0),
+        )
+    if top:
+        piece.face(
+            [(cx - half, y1, z0), (cx + half, y1, z0), (cx + half, y1, z1), (cx - half, y1, z1)],
+            key,
+            (0.0, 1.0, 0.0),
+        )
+
+
+def mirrored_z(target: Piece, source: Piece, sign: float) -> None:
+    """Add ``source`` to ``target``, mirrored across z = 0 when ``sign`` is negative: a mirror
+    reverses each triangle's winding, so its corners are taken in the other order and its faces
+    stay turned outward."""
+    for k, key in enumerate(source.keys):
+        a, b, c = source.corners[k * 3 : k * 3 + 3]
+        if sign < 0:
+            target.corners += [(p[0], p[1], -p[2]) for p in (a, c, b)]
+        else:
+            target.corners += [a, b, c]
+        target.keys.append(key)
 
 
 def _clip(polygon: list[Vec], axis: int, cut: float, keep_above: bool) -> list[Vec]:
@@ -177,7 +241,7 @@ def arcade_block(row: Mapping[str, Any]) -> Module:
     piece = Piece()
     half = bay / 2 - pier / 2
     arch = (0.0, half, ground * 0.62, min(half, ground * 0.3))
-    arched_wall(piece, (-w / 2, w / 2), (front - 0.8, front), (0, ground), [arch], steps, kind)
+    opening_wall(piece, (-w / 2, w / 2), (front - 0.8, front), (0, ground), arch, steps, kind)
     piece.box((-w / 2, w / 2), (0, ground), (back, front - loggia), "stone", "xXyYz")
     piece.face(
         [
@@ -200,14 +264,16 @@ def arcade_block(row: Mapping[str, Any]) -> Module:
         piece.box((-w / 2, w / 2), (y0, eaves), (back, front - 0.25), "stone", "xXz")
         window = min(bay * 0.18, 1.1)
         spring = y0 + storey * 0.6
-        arched_wall(
+        # Its top lies in the plane of the storey's string course, which covers it.
+        opening_wall(
             piece,
             (-w / 2, w / 2),
             (front - 0.25, front),
             (y0, eaves),
-            [(0.0, window, spring, window)],
+            (0.0, window, spring, window),
             8,
             kind,
+            top=False,
         )
         sill = y0 + storey * 0.25
         piece.face(
@@ -297,22 +363,31 @@ def tower(row: Mapping[str, Any]) -> Module:
     arch = [(0.0, opening, y0 + belfry * 0.55, min(opening, belfry * 0.3))]
     for sign in (1.0, -1.0):
         wall = Piece()
-        arched_wall(
-            wall, (-inner, inner), (inner - thick, inner), (y0, y1), arch, row["segments"], kind
+        # The belfry's walls stand under the trim ledge at its top, which covers their tops.
+        opening_wall(
+            wall,
+            (-inner, inner),
+            (inner - thick, inner),
+            (y0, y1),
+            arch[0],
+            row["segments"],
+            kind,
+            top=False,
         )
-        _mirror_z(piece, wall, sign)
+        mirrored_z(piece, wall, sign)
         side = Piece()
         narrow = [
             (0.0, min(opening, inner - thick - 0.3), y0 + belfry * 0.55, min(opening, belfry * 0.3))
         ]
-        arched_wall(
+        opening_wall(
             side,
             (-inner + thick, inner - thick),
             (inner - thick, inner),
             (y0, y1),
-            narrow,
+            narrow[0],
             row["segments"],
             kind,
+            top=False,
         )
         _turn(piece, side, sign)
     piece.box((-inner * 0.55, inner * 0.55), (y0, y1 - 0.4), (-inner * 0.55, inner * 0.55), "shade")
@@ -365,8 +440,14 @@ def hall(row: Mapping[str, Any]) -> Module:
     for sign in (1.0, -1.0):
         side = Piece()
         arches = [(0.0, bay * 0.33, aisle_h * 0.55, min(bay * 0.33, aisle_h * 0.35))]
-        arched_wall(
-            side, (-w / 2, w / 2), (d / 2 - 0.7, d / 2), (0, aisle_h), arches, row["segments"], kind
+        opening_wall(
+            side,
+            (-w / 2, w / 2),
+            (d / 2 - 0.7, d / 2),
+            (0, aisle_h),
+            arches[0],
+            row["segments"],
+            kind,
         )
         windows = [
             (
@@ -376,12 +457,12 @@ def hall(row: Mapping[str, Any]) -> Module:
                 min(bay * 0.2, (clere - aisle_h) * 0.3),
             )
         ]
-        arched_wall(
+        opening_wall(
             side,
             (-w / 2, w / 2),
             (nave / 2 - 0.6, nave / 2),
             (aisle_h + 0.5, clere),
-            windows,
+            windows[0],
             row["segments"],
             kind,
         )
@@ -398,7 +479,7 @@ def hall(row: Mapping[str, Any]) -> Module:
             )
         side.box((-w / 2, w / 2), (aisle_h, aisle_h + 0.5), (nave / 2, d / 2), "trim")
         side.box((-w / 2, w / 2), (0, aisle_h), (nave / 2, nave / 2 + 0.6), "shade")
-        _mirror_z(piece, side, sign)
+        mirrored_z(piece, side, sign)
     piece.box(
         (-w / 2 + 0.6, w / 2 - 0.6),
         (aisle_h + 0.5, clere),
