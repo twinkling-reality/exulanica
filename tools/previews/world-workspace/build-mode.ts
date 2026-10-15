@@ -19,7 +19,8 @@
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { pickSiteSlot } from '/src/composition/sight.ts';
 import { currentOpenSite } from '/src/composition/site-world.ts';
-import { buildHints, cardPrompts, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
+import { buildHints, cardPrompts, createKindLabels, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 import { cardWords, keyWord, nameTag, outline, path, promptColumn, promptRow, ring, scaleOf, sideCard } from './world-ui.ts';
 
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
@@ -165,7 +166,15 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     return thing?.id ?? null;
   }
 
-  function nameOf(id) { return isPart(id) ? partOf(id)?.label ?? 'part' : thingName(records.get(id)); }
+  /**
+   * A creature its workspace made is called by its kind's own label (rulings J20, J23), read once by
+   * digest and again after a failed read's pause; until it arrives build mode says "creature", and
+   * draws its card again when it does.
+   */
+  const kindLabels = createKindLabels(read, kindDocumentLabel);
+  kindLabels.listen(() => { if (on && !lifetime.signal.aborted) render(); });
+  const kindLabel = (kind) => kindLabels.label(kind);
+  function nameOf(id) { return isPart(id) ? partOf(id)?.label ?? 'part' : thingName(records.get(id), kindLabel); }
 
   /** The card's answer line: the server's sentence, its "Not here:" drawn as a refusal. */
   function answer(words) {
@@ -410,7 +419,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = redoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.redo', '/things/redo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = redoneNote(preview.would_change), { undoable: true });
+        say(said = redoneNote(preview.would_change, partNamed, kindLabel), { undoable: true });
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;
@@ -434,7 +443,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = undoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.undo', '/things/undo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = undoneNote(preview.would_change, partNamed));
+        say(said = undoneNote(preview.would_change, partNamed, kindLabel));
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;
@@ -546,6 +555,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     active: () => on,
     undo,
     redo,
+    /**
+     * The made kinds' labels as build mode reads them (`label(kind)`, and `listen` to be told when one
+     * lands), for History's rows to name creatures with the same reads; a page with no build mode
+     * makes its own with `createKindLabels`.
+     */
+    kindLabels,
     /** Act on a key; true when build mode took it. */
     key(event) {
       const action = keyAction(flags(), event);

@@ -901,7 +901,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
     corners.frame(now);
     // The Back corner says Back while something is chosen, and hides its Esc while a question shows its own.
-    corners.back(asking ? null : held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds);
+    if (!build?.active()) corners.back(asking ? null : held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own
     corners.reticle.hidden = pageShown();
     corners.reticle.dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';
     root.dataset.reachable = String(targetReachable);

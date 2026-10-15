@@ -1,12 +1,67 @@
 // Build mode's words and keys, without the page: what a placed thing is called, what each server
 // answer says to a person, and what a key does in each of build mode's states. build-mode.ts acts
 // on these answers; verify-build-words.mjs holds them.
+import { createReadBackoff } from './read-backoff.mjs';
 
-/** What a placed thing is called in a sentence, from its document's kind: "well", "lamp post". */
-export function thingName(document) {
+/**
+ * What a placed thing is called in a sentence, from its document's kind: "well", "lamp post". A
+ * creature its workspace made is called by its own label, its maker's words, as its tag, its
+ * character page and History call it ("two legged two armed creature"), read by `kindLabel(kind)`;
+ * until the label is read, or where the workspace no longer holds the kind, "creature" (rulings J20
+ * and J23). Every name build mode and History say comes from here.
+ */
+export function thingName(document, kindLabel = () => null) {
   const kind = document?.kind;
-  if (kind?.source === 'workspace') return 'creature you made';
+  if (kind?.source === 'workspace') {
+    // A thing whose kind its workspace no longer holds is read as gone: no label to ask for.
+    const label = document.gone === true ? null : kindLabel(kind);
+    return typeof label === 'string' && label.trim() ? inSentence(label.trim()) : 'creature';
+  }
   return typeof kind?.kind === 'string' && kind.kind ? kind.kind.replaceAll('_', ' ') : 'thing';
+}
+
+/**
+ * The labels of the kinds a workspace made, read by digest through `read(path)` (the page's own read
+ * of GET /things/kinds/{sha256}) and `labelOf(document)`, for `thingName`'s reader: `label(kind)` is
+ * null until its read lands, then the label from memory. A read that fails is asked again only once
+ * the page's quiet-read pause has passed (read-backoff.mjs), so a passing failure never leaves
+ * "creature" where the tag says the label; `listen(listener)` is told each label that lands, so a page
+ * draws its names again (build mode, History). One reader per page part is enough: each read is one
+ * small document.
+ */
+export function createKindLabels(read, labelOf, { now = () => Date.now(), backoff = createReadBackoff() } = {}) {
+  const labels = new Map(), reading = new Set(), listeners = new Set();
+  function label(kind) {
+    const digest = typeof kind?.sha256 === 'string' && /^[0-9a-f]{64}$/u.test(kind.sha256) ? kind.sha256 : null;
+    if (digest === null) return null;
+    if (labels.has(digest)) return labels.get(digest);
+    if (!reading.has(digest) && backoff.ready(digest, now())) {
+      reading.add(digest);
+      Promise.resolve()
+        .then(() => read('/things/kinds/' + digest))
+        .then(
+          (document) => {
+            backoff.succeeded(digest);
+            labels.set(digest, labelOf(document));
+            for (const listener of listeners) listener(digest);
+          },
+          () => { backoff.failed(digest, now()); },
+        )
+        .finally(() => { reading.delete(digest); });
+    }
+    return null;
+  }
+  return {
+    label,
+    /** Be told each label that lands; answers the function that stops telling. */
+    listen(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  };
+}
+
+/** A label as a sentence says it: its first letter lowered, unless its first word is all capitals. */
+function inSentence(label) {
+  const first = label.split(/\s/u)[0];
+  return first.length > 1 && first === first.toUpperCase() ? label : label.charAt(0).toLowerCase() + label.slice(1);
 }
 
 /** The same name as a title: "Well", "Lamp post". */
@@ -56,11 +111,32 @@ export function removedNote(name) {
  * An undone change as the note, History and the pull request all say it (ruling W2), without the
  * full stop: by the kind of the edit it reverses and what that edit changed ("the bench").
  */
-function undoneWords(kind, what) {
+function undoneWords(kind, what, storeysBack) {
+  // A storeys change taken back says the storeys it leaves (null: as the world made the building).
+  if (storeysBack !== undefined) {
+    return storeysBack === null
+      ? `Put ${what} back to the storeys it was made with`
+      : `Put ${what} back to ${storeysWords(storeysBack)}`;
+  }
   if (kind === 'remove_thing' || kind === 'suppress_element') return `Brought back ${what}`;
   if (kind === 'move_thing' || kind === 'transform_element') return `Put ${what} back where it was`;
   if (kind === 'add_thing') return `Took away ${what} that was placed`;
   return 'Undid the last change';
+}
+
+/** A count of storeys: "1 storey", "4 storeys". */
+const storeysWords = (count) => `${count} ${count === 1 ? 'storey' : 'storeys'}`;
+
+/** The storeys a made part's document states, null where it states none (as the world made it). */
+const storeysOf = (document) => (Number.isInteger(document?.storeys) ? document.storeys : null);
+
+/**
+ * A storeys change, as what was done (ruling W6): "Raised the tea house to 4 storeys", "Lowered the
+ * tea house to 1 storey", or "Set the tea house to 4 storeys" where it stood as the world made it.
+ */
+function storeysDone(what, before, after) {
+  if (before === null) return `Set ${what} to ${storeysWords(after)}`;
+  return `${after > before ? 'Raised' : 'Lowered'} ${what} to ${storeysWords(after)}`;
 }
 
 /** How a change names a made part (`partNameOf(partId)`, a name or null): "the pond". */
@@ -71,23 +147,38 @@ const partCalled = (partId, partNameOf) => {
 
 /**
  * What an undo did, from its preview's `would_change`: the edit it reverses and the thing's
- * document as it stands and as the undo leaves it, or the made part it names (`partNameOf`).
+ * document as it stands and as the undo leaves it (named as `thingName` names it, with `kindLabel`),
+ * or the made part it names (`partNameOf`).
  */
-export function undoneNote(change, partNameOf = () => null) {
+export function undoneNote(change, partNameOf = () => null, kindLabel = () => null) {
   const undoes = change?.undoes?.kind, subject = change?.subject_id;
-  const what = typeof subject === 'string' && subject.startsWith('part:')
+  const part = typeof subject === 'string' && subject.startsWith('part:');
+  const what = part
     ? partCalled(subject.slice('part:'.length), partNameOf)
-    : `the ${thingName(change?.after ?? change?.before)}`;
-  return `${undoneWords(undoes, what)}.`;
+    : `the ${thingName(change?.after ?? change?.before, kindLabel)}`;
+  // A building's storeys change and a move are both element transforms: the storeys tell them apart.
+  const before = storeysOf(change?.before), after = storeysOf(change?.after);
+  const storeysBack = part && undoes === 'transform_element' && before !== after ? after : undefined;
+  return `${undoneWords(undoes, what, storeysBack)}.`;
 }
 
 /**
- * What a redo did, from its preview's `would_change`: the thing's document as it stands and as the
- * redo leaves it. Read from the documents, since a redo is the undo of an undo.
+ * What a redo did, from its preview's `would_change`: the thing's or the made part's document as it
+ * stands and as the redo leaves it, read from the documents, since a redo is the undo of an undo;
+ * a part named by `partNameOf`, a thing as `thingName` names it with `kindLabel`.
  */
-export function redoneNote(change) {
+export function redoneNote(change, partNameOf = () => null, kindLabel = () => null) {
   const before = change?.before ?? null, after = change?.after ?? null;
-  const name = thingName(after ?? before);
+  const subject = change?.subject_id;
+  if (typeof subject === 'string' && subject.startsWith('part:')) {
+    const what = partCalled(subject.slice('part:'.length), partNameOf);
+    const was = storeysOf(before), now = storeysOf(after);
+    if (now !== null && was !== now) return `${storeysDone(what, was, now)} again.`;
+    if (after?.suppressed === true && before?.suppressed !== true) return `Removed ${what} again.`;
+    if (JSON.stringify(before?.transform ?? null) !== JSON.stringify(after?.transform ?? null)) return `Moved ${what} again.`;
+    return 'Did the change again.';
+  }
+  const name = thingName(after ?? before, kindLabel);
   if (before !== null && after !== null && !before.removed && after.removed) return `Removed the ${name} again.`;
   if ((before === null || before.removed) && after !== null && !after.removed) return `Placed the ${name} again.`;
   const a = before?.transform, b = after?.transform;
@@ -114,9 +205,14 @@ export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
     const name = one.thing_id ? nameOf(one.thing_id) : null;
     return name ? `the ${name}` : 'a thing';
   };
+  // A building's storeys change, as the version read states it on its row ({before, after}).
+  const storeys = (one) => (Number.isInteger(one.storeys?.after) ? one.storeys : null);
   const plain = (one) => {
     if (isPart(one)) {
       if (one.kind === 'suppress_element') return `Removed ${called(one)}`;
+      if (one.kind === 'transform_element' && storeys(one) !== null) {
+        return storeysDone(called(one), storeys(one).before ?? null, storeys(one).after);
+      }
       if (one.kind === 'transform_element') return `Moved ${called(one)}`;
     }
     const thing = called(one);
@@ -133,7 +229,8 @@ export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
     const again = byId.get(undone.undone_edit_id);
     return again ? `${plain(again)} again` : 'Did a change again';
   }
-  return undoneWords(undone.kind, called(undone));
+  const back = isPart(undone) && storeys(undone) !== null ? storeys(undone).before ?? null : undefined;
+  return undoneWords(undone.kind, called(undone), back);
 }
 
 const MONTHS = Object.freeze(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);

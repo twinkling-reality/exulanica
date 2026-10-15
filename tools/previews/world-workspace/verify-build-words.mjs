@@ -1,11 +1,54 @@
 import assert from 'node:assert/strict';
-import { HISTORY, MAX_YAW, buildHints, cardPrompts, changeWords, clockWords, dayWords, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { HISTORY, MAX_YAW, buildHints, createKindLabels, cardPrompts, changeWords, clockWords, dayWords, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
 assert.equal(titled(thingName({ kind: { kind: 'well', version: 2 } })), 'Well');
-assert.equal(thingName({ kind: { source: 'workspace', sha256: 'b'.repeat(64) } }), 'creature you made');
 assert.equal(thingName(null), 'thing');
+// A creature its workspace made is called by its own label, its maker's words, in a title and in a
+// sentence; until the label is read, or where its kind is gone, "creature" (rulings J20, J23).
+const made = { kind: { source: 'workspace', sha256: 'b'.repeat(64) } };
+const label = (kind) => (kind.sha256 === 'b'.repeat(64) ? 'Two legged two armed creature' : null);
+assert.equal(titled(thingName(made, label)), 'Two legged two armed creature');
+assert.equal(thingName(made, label), 'two legged two armed creature');
+assert.equal(thingName(made), 'creature');
+assert.equal(titled(thingName(made, () => null)), 'Creature');
+assert.equal(thingName(made, () => '   '), 'creature');
+assert.equal(thingName(made, () => 'NASA rover'), 'NASA rover');
+for (const name of [thingName(made), thingName(made, label)]) assert.doesNotMatch(name, /you made/);
+// A thing whose kind its workspace no longer holds is "creature", and its label is never asked for.
+assert.equal(thingName({ ...made, gone: true }, () => { throw Error('asked'); }), 'creature');
+// The labels are read once by digest; a failed read is asked again only after the page's quiet-read
+// pause, so a passing failure never leaves "creature" for good; each label that lands is told.
+{
+  let clock = 0, answers = [Promise.reject(Error('blip')), Promise.resolve({ label: 'Two legged two armed creature' })];
+  const asked = [];
+  const labels = createKindLabels((path) => { asked.push(path); return answers.shift(); }, (document) => document?.label ?? null, { now: () => clock });
+  const told = [];
+  labels.listen((digest) => told.push(digest));
+  const kind = made.kind;
+  const settle = () => new Promise((done) => setTimeout(done, 0));
+  assert.equal(labels.label(kind), null);
+  await settle(); await settle();
+  assert.deepEqual(asked, ['/things/kinds/' + 'b'.repeat(64)]);
+  assert.equal(labels.label(kind), null, 'a failed read says nothing yet');
+  await settle();
+  assert.equal(asked.length, 1, 'asked again before the pause');
+  clock += 1000;
+  assert.equal(labels.label(kind), null);
+  await settle(); await settle();
+  assert.equal(asked.length, 2, 'asked again after the pause');
+  assert.equal(labels.label(kind), 'Two legged two armed creature');
+  assert.deepEqual(told, ['b'.repeat(64)]);
+  assert.equal(titled(thingName(made, labels.label)), 'Two legged two armed creature');
+  assert.equal(labels.label({ source: 'workspace', sha256: 'not a digest' }), null);
+  assert.equal(asked.length, 2, 'a label in memory, or no digest, is not read');
+}
+// The same name in an undo's note and a redo's, as the card says it.
+const placedMade = { ...made, removed: false, transform: { x_mm: 0, z_mm: 0, yaw_microradians: 0 } };
+assert.equal(undoneNote({ undoes: { kind: 'move_thing' }, before: placedMade, after: placedMade }, () => null, label), 'Put the two legged two armed creature back where it was.');
+assert.equal(undoneNote({ undoes: { kind: 'add_thing' }, before: placedMade, after: null }), 'Took away the creature that was placed.');
+assert.equal(redoneNote({ before: placedMade, after: { ...placedMade, removed: true } }, () => null, label), 'Removed the two legged two armed creature again.');
 
 // Where a thing may not stand, the server's own sentence; codes become sentences, never shown as codes.
 assert.equal(refusalWords('thing_landing_blocked', 'That spot is in the water basin.'), 'Not here: that spot is in the water basin.');
@@ -65,6 +108,39 @@ for (const kind of ['add_thing', 'move_thing', 'remove_thing']) {
   assert.equal(`${row}.`, undoneNote({ undoes: { kind }, before: well, after: well }), kind);
 }
 assert.equal(changeWords({ edit_id: 'u', kind: 'undo', undone_edit_id: 'missing' }, [], () => null), 'Undid the last change');
+// A building's storeys change is told from a move by its storeys, in the notes and in History's rows,
+// which read the same (ruling W6): what was done, "1 storey" singular, and "made with" where the
+// building stood as the world made it.
+const tea = (id) => (id === 'tea' ? 'tea house' : null);
+const teaAt = (storeys, transform = null) => ({ element_id: 'part:tea', suppressed: false, transform, ...(storeys === null ? {} : { storeys }) });
+const teaUndo = (before, after) => ({ subject_id: 'part:tea', undoes: { kind: 'transform_element' }, before, after });
+assert.equal(undoneNote(teaUndo(teaAt(4), teaAt(2)), tea), 'Put the tea house back to 2 storeys.');
+assert.equal(undoneNote(teaUndo(teaAt(4), null), tea), 'Put the tea house back to the storeys it was made with.');
+assert.equal(undoneNote(teaUndo(teaAt(4, { x_mm: 1000 }), teaAt(4, { x_mm: 0 })), tea), 'Put the tea house back where it was.');
+assert.equal(redoneNote({ subject_id: 'part:tea', before: teaAt(2), after: teaAt(4) }, tea), 'Raised the tea house to 4 storeys again.');
+assert.equal(redoneNote({ subject_id: 'part:tea', before: teaAt(2), after: teaAt(1) }, tea), 'Lowered the tea house to 1 storey again.');
+assert.equal(redoneNote({ subject_id: 'part:tea', before: null, after: teaAt(4) }, tea), 'Set the tea house to 4 storeys again.');
+assert.equal(redoneNote({ subject_id: 'part:tea', before: teaAt(null, { x_mm: 0 }), after: teaAt(null, { x_mm: 2000 }) }, tea), 'Moved the tea house again.');
+assert.equal(redoneNote({ subject_id: 'part:tea', before: null, after: { ...teaAt(null), suppressed: true } }, tea), 'Removed the tea house again.');
+const storeysLog = [
+  { edit_id: 's1', kind: 'transform_element', element_id: 'part:tea', storeys: { before: null, after: 4 } },
+  { edit_id: 's2', kind: 'transform_element', element_id: 'part:tea', storeys: { before: 4, after: 1 } },
+  { edit_id: 's3', kind: 'undo', undone_edit_id: 's2', element_id: null },
+  { edit_id: 's4', kind: 'undo', undone_edit_id: 's3', element_id: null },
+  { edit_id: 's5', kind: 'undo', undone_edit_id: 's1', element_id: null },
+  { edit_id: 's6', kind: 'transform_element', element_id: 'part:tea' },
+];
+assert.deepEqual(storeysLog.map(edit => changeWords(edit, storeysLog, () => null, tea)), [
+  'Set the tea house to 4 storeys',
+  'Lowered the tea house to 1 storey',
+  'Put the tea house back to 4 storeys',
+  'Lowered the tea house to 1 storey again',
+  'Put the tea house back to the storeys it was made with',
+  'Moved the tea house',
+]);
+// Each note is its row and a full stop.
+assert.equal(`${changeWords(storeysLog[2], storeysLog, () => null, tea)}.`, undoneNote(teaUndo(teaAt(1), teaAt(4)), tea));
+assert.equal(`${changeWords(storeysLog[3], storeysLog, () => null, tea)}.`, redoneNote({ subject_id: 'part:tea', before: teaAt(4), after: teaAt(1) }, tea));
 assert.equal(changeWords({ edit_id: 'p4', kind: 'transform_element', element_id: 'part:gone', thing_id: null }, [], () => null), 'Moved a part of the world');
 // Snapping: half metres and 15 degree steps unless free; a yaw stays within one revolution.
 assert.equal(snapped(1249, false), 1000);
