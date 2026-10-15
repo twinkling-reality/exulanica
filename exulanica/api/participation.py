@@ -299,6 +299,11 @@ class ParticipationRuntime:
             for entry in choices.get("workspace_looks", ())
             if entry["thing_id"] in present
         }
+        # A present being of a workspace kind may wear its kind's made look (0220) as well as the
+        # kind's own looks.
+        worn_by_kind = {
+            entry["kind_sha256"]: entry["look"]["sha256"] for entry in choices.get("kind_looks", ())
+        }
         store = ThingStore(connection, scope.workspace_id, None)
         for person in snapshot["state"]["inhabitants"]:
             reference = person.get("kind", {})
@@ -306,6 +311,8 @@ class ParticipationRuntime:
                 kind = store.kind_by_digest(reference["sha256"])
                 if kind is not None:
                     look_ids.update(look["sha256"] for look in kind.looks)
+                    if kind.sha256 in worn_by_kind:
+                        look_ids.add(worn_by_kind[kind.sha256])
         result = {}
         for identity in sorted(look_ids):
             kept = store.look_by_digest(identity)

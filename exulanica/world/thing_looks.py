@@ -345,7 +345,9 @@ def effective_look(
     *,
     workspace_kind: bool = False,
 ) -> EffectiveLook | None:
-    """The latest still-admitted choice, else the kind's first look, without reading a card."""
+    """The latest still-admitted choice, else the look a workspace kind wears (its made look,
+    :func:`~exulanica.world.creature_look_jobs.kind_looks`), else the kind's first look, without
+    reading a card."""
     if kind is None:
         return None
     choices = look_choices(connection, workspace_id, world_id, version_id, thing_id=thing_id)
@@ -363,6 +365,17 @@ def effective_look(
             if raw.get("source") == "workspace"
             else LookReference(raw["look"], raw["version"], raw["sha256"])
         )
+    elif workspace_kind:
+        worn = next(
+            (
+                row["look"]["sha256"]
+                for row in choices.get("kind_looks", ())
+                if row["kind_sha256"] == kind.sha256
+            ),
+            None,
+        )
+        if worn is not None:
+            reference = LookReference(None, None, worn, "workspace")
     return resolve_look_reference(
         connection,
         workspace_id,

@@ -8,6 +8,10 @@
  * digest alone (stated only when some thing wears one); a thing is in one list at most. Its key and
  * version are its document's own, read by digest (`resolve`); one no longer held is left out, and
  * the thing wears its kind's first look.
+ *
+ * `kind_looks` (stated only when there is one) names the look each of the workspace's creatures wears
+ * by its kind, its made look: a thing with no choice of its own wears it before its kind's first
+ * look. Each is resolved by digest as a workspace choice is, and one no longer held is left out.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -36,6 +40,29 @@ export interface WorkspaceLook {
 
 export interface WorkspaceLookChoice extends Omit<ThingLookChoice, 'look'> {
   readonly look: WorkspaceLook;
+}
+
+/** The looks chosen, by thing id, and the look each workspace kind wears, by the kind's digest. */
+export type ThingLooks = ReadonlyMap<string, ThingLookChoice> & { readonly kinds: ReadonlyMap<string, Named> };
+
+/** The look each workspace kind wears (`kind_looks`), by the kind's digest; none when unstated. */
+export function parseKindLooks(value: unknown): ReadonlyMap<string, WorkspaceLook> {
+  const rows = record(value)['kind_looks'];
+  if (rows === undefined) return new Map();
+  if (!Array.isArray(rows)) throw new TypeError('The kind looks are not a list');
+  const kinds = new Map<string, WorkspaceLook>();
+  for (const row of rows) {
+    const entry = record(row);
+    const look = record(entry['look']);
+    const kind = entry['kind_sha256'];
+    const sha256 = look['sha256'];
+    if (typeof kind !== 'string' || !DIGEST.test(kind)) throw new TypeError('A kind look needs its kind\'s SHA-256');
+    if (kinds.has(kind)) throw new TypeError('A kind wears two looks');
+    if (look['source'] !== 'workspace' || Object.keys(look).length !== 2) throw new TypeError('A workspace look is named by its source and digest alone');
+    if (typeof sha256 !== 'string' || !DIGEST.test(sha256)) throw new TypeError('A kind look needs its SHA-256');
+    kinds.set(kind, Object.freeze({ source: 'workspace' as const, sha256 }));
+  }
+  return kinds;
 }
 
 /** A workspace look's key and version from its own document, by its digest; null where it is not held. */
@@ -127,16 +154,24 @@ export class ThingLooksClient {
 
   /**
    * The looks chosen for `versionId`'s things, by thing id: the shipped ones as listed, and each a
-   * workspace keeps named by its own key and version (`resolve`), or left out where it cannot be.
+   * workspace keeps named by its own key and version (`resolve`), or left out where it cannot be;
+   * with `kinds`, the look each workspace kind wears, resolved the same way.
    */
-  async read(versionId: string, resolve?: ResolveWorkspaceLook): Promise<ReadonlyMap<string, ThingLookChoice>> {
+  async read(versionId: string, resolve?: ResolveWorkspaceLook): Promise<ThingLooks> {
     const path = openWorldPath(`/world/versions/${encodeURIComponent(versionId)}/thing-looks`, this.#worldId, 'the looks chosen for this world\'s things');
-    const { shipped, workspace } = parseLookChoices(await this.#transport.getJson<unknown>(path), versionId);
+    const body = await this.#transport.getJson<unknown>(path);
+    const { shipped, workspace } = parseLookChoices(body, versionId);
     const named = await Promise.all(workspace.map(async (choice) => {
       const look = resolve === undefined ? null : await resolve(choice.look.sha256).catch(() => null);
       return look === null ? null : Object.freeze({ ...choice, look });
     }));
+    const worn = await Promise.all([...parseKindLooks(body)].map(async ([kind, look]) => {
+      const named = resolve === undefined ? null : await resolve(look.sha256).catch(() => null);
+      return named === null ? null : [kind, named] as const;
+    }));
     const choices = [...shipped, ...named.filter((choice): choice is ThingLookChoice => choice !== null)];
-    return new Map(choices.map((choice) => [choice.thingId, choice]));
+    return Object.assign(new Map(choices.map((choice) => [choice.thingId, choice])), {
+      kinds: new Map(worn.filter((pair): pair is readonly [string, Named] => pair !== null)),
+    });
   }
 }

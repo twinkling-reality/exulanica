@@ -703,8 +703,8 @@ as not looking like its words.
 no local detector does that yet, so only concepts drawn from words, or a picture the person kept
 with the right to send it to a model, may be named. A person asks for a made look as a look job,
 which an operator's run stages, makes with route P and admits, and which the creature's kind then
-wears ([things contract](things-contract.md#a-creatures-made-look)); no run has spent yet, and the
-page wearing a kind's made look is planned.
+wears wherever it is placed, on the page and in every server read
+([things contract](things-contract.md#a-creatures-made-look)); no run has spent yet.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (benches, seating planters, and lamp posts,

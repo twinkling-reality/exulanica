@@ -21,6 +21,7 @@ import {
   type SocietyPoint,
   type ThingLayerOptions,
   type ThingLibrary,
+  type Named,
   type ThingMiss,
   type ThingPick,
 } from '@exulanica/atlas-react/things';
@@ -95,11 +96,12 @@ export interface MountedThings {
   /** How the society's crowd draws its things by their looks (`AuthoredRegionSociety.setFigures`). */
   readonly crowdFigures: ThingCrowdFigures;
   /**
-   * The looks chosen for the society's things, by thing id (`GET .../thing-looks`): a person of a
-   * kind wears its chosen look in the crowd, a placed thing in the layer; a thing with none wears its
-   * kind's first look. The crowd is asked again by its caller (`refreshFigures`).
+   * The looks chosen for the society's things, by thing id (`GET .../thing-looks`), and with `kinds`
+   * the look each workspace kind wears (its made look): a person of a kind wears its chosen look in
+   * the crowd, a placed thing in the layer; a thing with none wears its kind's look, else its kind's
+   * first look. The crowd is asked again by its caller (`refreshFigures`).
    */
-  setLooks(choices: ReadonlyMap<string, ThingLookChoice>): void;
+  setLooks(choices: ReadonlyMap<string, ThingLookChoice> & { readonly kinds?: ReadonlyMap<string, Named> }): void;
   /** Placed things drawn as nothing, and why. */
   readonly misses: readonly ThingMiss[];
   /** Play this one: ring the being the viewer plays at its feet, or none with null. */
@@ -217,13 +219,38 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
   };
   deps.shell.addEventListener(THING_PICK_EVENT, onPick);
   let chosen: ReadonlyMap<string, ThingLookChoice> = new Map();
-  /** The placed things a choice was last given to, so a choice withdrawn returns them to their first look. */
-  let chosenPlaced = new Set<string>();
+  /** The look each workspace kind wears, by the kind's digest. */
+  let kindLooks: ReadonlyMap<string, Named> = new Map();
+  /** Each placed thing of a workspace kind, by its placed id: the kind's digest. */
+  let placedKinds: ReadonlyMap<string, string> = new Map();
+  /**
+   * The look each placed thing was last given, by placed id, so a look withdrawn returns it to its
+   * kind's first look and an unchanged one is not drawn again (each look given redraws the layer).
+   */
+  let worn = new Map<string, Named>();
+  const same = (one: Named, other: Named) => one.key === other.key && one.version === other.version && one.sha256 === other.sha256;
+  /** Every placed thing's look: its own choice, else its workspace kind's look; none for the rest. */
+  const wearLooks = () => {
+    const wanted = new Map<string, Named>();
+    for (const choice of chosen.values()) if (choice.placedId !== null) wanted.set(choice.placedId, choice.look);
+    for (const [placedId, kind] of placedKinds) {
+      const look = kindLooks.get(kind);
+      if (look !== undefined && !wanted.has(placedId)) wanted.set(placedId, look);
+    }
+    for (const [placedId, look] of wanted) {
+      const before = worn.get(placedId);
+      if (before === undefined || !same(before, look)) void layer.setLook(placedId, look);
+    }
+    for (const placedId of worn.keys()) if (!wanted.has(placedId)) void layer.setLook(placedId, null);
+    worn = wanted;
+  };
   /** Each placed thing's authored yaw, by its placed id, so a placed being stands as it was placed. */
   let placedYaw: ReadonlyMap<string, number> = new Map();
   const crowdFigures = new ThingCrowdFigures({
     maker: layer.maker,
-    lookOf: (person) => chosen.get(person.id)?.look ?? null,
+    lookOf: (person) => chosen.get(person.id)?.look
+      ?? (person.kind !== undefined && 'source' in person.kind && person.kind.source === 'workspace' ? kindLooks.get(person.kind.sha256) : undefined)
+      ?? null,
     placedYawOf: (placedId) => placedYaw.get(placedId) ?? null,
   });
   let destroyed = false;
@@ -239,7 +266,9 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
         if (thing.gone === true && thing.kind.source === 'workspace') void library.forgetHeldKind(thing.kind.sha256);
       }
       const newest = edits === undefined ? null : newestThingEdits(edits);
+      placedKinds = new Map(things.flatMap((thing) => !thing.gone && thing.kind.source === 'workspace' ? [[thing.thingId, thing.kind.sha256] as const] : []));
       await layer.setPlaced(things.filter((thing) => !thing.gone).map((thing) => placedThingRecord(thing, newest?.get(thing.thingId))));
+      wearLooks();
     },
     setSociety(state) {
       if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures, deps.walkEnded ?? (() => true), deps.leaving ?? (() => false));
@@ -248,14 +277,8 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     setLooks(choices) {
       if (destroyed) return;
       chosen = choices;
-      const placed = new Set<string>();
-      for (const choice of choices.values()) {
-        if (choice.placedId === null) continue;
-        placed.add(choice.placedId);
-        void layer.setLook(choice.placedId, choice.look);
-      }
-      for (const placedId of chosenPlaced) if (!placed.has(placedId)) void layer.setLook(placedId, null);
-      chosenPlaced = placed;
+      kindLooks = choices.kinds ?? new Map();
+      wearLooks();
     },
     pick: (origin, direction) => layer.pick(origin, direction),
     raise(pick, via) {

@@ -4,6 +4,7 @@ import type { Named, ThingLayerOptions } from '@exulanica/atlas-react/things';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings } from '../src/composition/things.js';
 import type { ThingLookChoice } from '../src/thing-looks-api.js';
+import type { PlacedThing } from '../src/world-objects-api.js';
 
 /*
  * The looks chosen for a society's things: a person wears theirs in the crowd (the figure the
@@ -65,6 +66,34 @@ describe('the looks chosen for a society\'s things', () => {
     expect(layer.looks).toEqual([['well-1', LOOK('stone-well')]]);
     things.setLooks(new Map([['visitor-1', choice('visitor-1', null, 'kaykit-mannequin')]]));
     expect(layer.looks.at(-1)).toEqual(['well-1', null]);
+  });
+
+  it('dresses a thing with no choice of its own in its workspace kind\'s look, after its own choice, before its kind\'s first', async () => {
+    const { things, layer } = await mount();
+    const MADE = 'f'.repeat(64);
+    const made = { source: 'workspace' as const, sha256: MADE };
+    const placed = (thingId: string): PlacedThing => ({
+      thingId, kind: made, regionId: 'r', removed: false, origin: { kind: 'authored', role: 'thing' },
+      transform: { xMm: 0, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000 } as PlacedThing['transform'],
+    });
+    const creature = (id: string): OwnedSocietyState['inhabitants'][number] =>
+      ({ id, synthetic: true, position_mm: [0, 0], kind: made, came_by: 'populated' }) as never;
+    await things.setPlaced([placed('duck-1'), placed('duck-2')]);
+    const looks = (choices: [string, ThingLookChoice][], kinds: [string, Named][]) =>
+      Object.assign(new Map(choices), { kinds: new Map(kinds) });
+    things.setLooks(looks([['thing-2', choice('thing-2', 'duck-2', 'chosen-duck')]], [[MADE, LOOK('made-duck')]]));
+    // The placed thing with no choice wears its kind's look; the one with a choice wears its choice.
+    expect(new Map(layer.looks)).toEqual(new Map([['duck-1', LOOK('made-duck')], ['duck-2', LOOK('chosen-duck')]]));
+    // So does a person of that kind in the crowd.
+    expect(things.crowdFigures.figureFor(creature('walker'))!.key).toContain(`|made-duck/1/${'d'.repeat(64)}`);
+    // The same looks read again draw nothing again: each look given redraws the layer.
+    const given = layer.looks.length;
+    things.setLooks(looks([['thing-2', choice('thing-2', 'duck-2', 'chosen-duck')]], [[MADE, LOOK('made-duck')]]));
+    expect(layer.looks.length).toBe(given);
+    // The kind's look withdrawn: the thing returns to its kind's first look.
+    things.setLooks(looks([['thing-2', choice('thing-2', 'duck-2', 'chosen-duck')]], []));
+    expect(layer.looks.at(-1)).toEqual(['duck-1', null]);
+    expect(things.crowdFigures.figureFor(creature('walker'))!.key).toContain('|none');
   });
 
   it('reads them at once, then once a minute however settled the things are, never twice within the minute', () => {

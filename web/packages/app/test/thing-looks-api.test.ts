@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { THING_LOOK_CHOICES_PROFILE, ThingLooksClient, parseLookChoices, parseThingLookChoices } from '../src/thing-looks-api.js';
+import { THING_LOOK_CHOICES_PROFILE, ThingLooksClient, parseKindLooks, parseLookChoices, parseThingLookChoices } from '../src/thing-looks-api.js';
 
 /*
  * The looks chosen for a version's things, read strictly. The body is THINGS's agreed read
@@ -63,5 +63,32 @@ describe('the looks chosen for a version\'s things', () => {
     expect(() => parseLookChoices({ ...served([]), workspace_looks: [named] }, 'version-1')).toThrow(/digest alone/u);
     // Stated only when some thing wears one: absent is none.
     expect(parseLookChoices(served([owner]), 'version-1').workspace).toEqual([]);
+  });
+
+  it('names the look each workspace kind wears, leaving out one no longer held', async () => {
+    const MADE = 'a'.repeat(64);
+    const GONE = 'b'.repeat(64);
+    const [K1, K2] = ['1'.repeat(64), '2'.repeat(64)];
+    const kindLooks = [
+      { kind_sha256: K1, look: { source: 'workspace', sha256: MADE } },
+      { kind_sha256: K2, look: { source: 'workspace', sha256: GONE } },
+    ];
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ ...served([owner]), kind_looks: kindLooks }), { status: 200 }));
+    const resolve = vi.fn(async (sha256: string) => (sha256 === MADE ? { key: 'heron-made', version: 1, sha256 } : null));
+    const looks = await new ThingLooksClient({ baseUrl: 'http://host.test', token: 'token-1', worldId: 'world:1', fetch }).read('version-1', resolve);
+    expect(looks.kinds.get(K1)).toEqual({ key: 'heron-made', version: 1, sha256: MADE });
+    // No longer held: left out, so the kind's things wear its first look.
+    expect(looks.kinds.has(K2)).toBe(false);
+    // The choices are as they were: a kind's look is no thing's choice.
+    expect([...looks.keys()]).toEqual([owner.thing_id]);
+  });
+
+  it('reads no kind looks where none is stated, and refuses a kind named twice or a look named by more than its digest', () => {
+    expect(parseKindLooks(served([])).size).toBe(0);
+    const one = { kind_sha256: '1'.repeat(64), look: { source: 'workspace', sha256: SHA } };
+    expect(() => parseKindLooks({ kind_looks: [one, one] })).toThrow(/two looks/u);
+    expect(() => parseKindLooks({ kind_looks: [{ ...one, look: { ...one.look, key: 'x' } }] })).toThrow(/digest alone/u);
+    expect(() => parseKindLooks({ kind_looks: [{ ...one, kind_sha256: 'x' }] })).toThrow(/kind's SHA-256/u);
+    expect(() => parseKindLooks({ kind_looks: {} })).toThrow(/not a list/u);
   });
 });
