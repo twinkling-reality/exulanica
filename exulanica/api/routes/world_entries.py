@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Annotated, Final, Literal
+from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Depends, Path, Response
+import psycopg
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,6 +36,14 @@ from exulanica.world import (
 )
 from exulanica.world.arrival_selection import ArrivalDescriptor, RetainedScenePin
 from exulanica.world.saved_entries import SourceRebindRequired, WorldTakesNoPhotographs
+from exulanica.world.saved_entry_pictures import (
+    PICTURE_MAX_BYTES,
+    PICTURE_MEDIA_TYPES,
+    KeptPicture,
+    PictureRefused,
+    PictureShows,
+    SavedEntryPictureRepository,
+)
 from exulanica.world.source_membership_events import (
     MembershipEventConflict,
     MembershipEventRefused,
@@ -43,6 +52,21 @@ from exulanica.world.starter import AuthoredStarterScene
 from exulanica.world.worlds import WorldsReadOnly, require_world_registration
 
 router = APIRouter(prefix="/world-entries", tags=["world-entries"])
+
+#: A picture's body, at most: the picture's own bound and room for nothing else. Refused before
+#: routing, before any of it is read.
+PICTURE_BODY_MAXIMUM: Final = PICTURE_MAX_BYTES + 1024
+BODY_LIMITS: Final = (("PUT", "/world-entries/{entry_id}/picture", PICTURE_BODY_MAXIMUM),)
+#: The picture's body as the API document states it: the bytes themselves, of either type.
+_PICTURE_BODY: Final[dict[str, Any]] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            media_type: {"schema": {"type": "string", "contentMediaType": media_type}}
+            for media_type in PICTURE_MEDIA_TYPES
+        },
+    }
+}
 #: What a creation this workspace cannot make is answered with, whatever its reason.
 SAVED_WORLD_CONFLICT: Final = "saved_world_conflict"
 
@@ -182,6 +206,24 @@ class GeneratedTerrainView(BaseModel):
     contact_sha256: str
 
 
+class SavedWorldEntryPictureView(BaseModel):
+    """The saved world's kept picture: what it is, and what of the world it shows."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sha256: str
+    media_type: Literal["image/jpeg", "image/webp"]
+    byte_size: int
+    width: int
+    height: int
+    authored_version_id: uuid.UUID
+    authored_state_sha256: str
+    style_version_id: uuid.UUID
+    #: Whether it shows the world as it is now: the entry's own version, state and look.
+    current: bool
+    taken_at: dt.datetime
+
+
 class SavedWorldEntryView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -228,6 +270,9 @@ class SavedWorldEntryView(BaseModel):
     arrival: ArrivalDescriptor | None = None
     arrival_unavailable_reason: Literal["arrival_source_unavailable"] | None = None
     arrival_scene: ReconstructionSceneRow | None = None
+    #: The picture a page put of this world's first view, for its card; null until one is put.
+    #: Fetch it from ``GET /world-entries/{entry_id}/picture?sha256=``.
+    picture: SavedWorldEntryPictureView | None = None
 
 
 class CreateSavedWorldEntryBody(BaseModel):
@@ -375,7 +420,36 @@ class SavedWorldCandidateView(BaseModel):
     styles: list[SavedWorldStyleCandidateView]
 
 
-def _view(entry: SavedWorldEntry, *, societies_of_things: bool) -> SavedWorldEntryView:
+def _picture_view(entry: SavedWorldEntry, picture: KeptPicture) -> SavedWorldEntryPictureView:
+    return SavedWorldEntryPictureView(
+        sha256=picture.sha256,
+        media_type=picture.media_type,  # type: ignore[arg-type]
+        byte_size=picture.byte_size,
+        width=picture.width,
+        height=picture.height,
+        authored_version_id=picture.shows.authored_version_id,
+        authored_state_sha256=picture.shows.authored_state_sha256,
+        style_version_id=picture.shows.style_version_id,
+        current=picture.shows == PictureShows.of(entry),
+        taken_at=picture.taken_at,
+    )
+
+
+def _pictured(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    entry: SavedWorldEntry,
+    *,
+    societies_of_things: bool,
+) -> SavedWorldEntryView:
+    """The entry as served, with its kept picture's record."""
+    kept = SavedEntryPictureRepository(connection, workspace_id).record(entry.entry_id)
+    return _view(entry, societies_of_things=societies_of_things, picture=kept)
+
+
+def _view(
+    entry: SavedWorldEntry, *, societies_of_things: bool, picture: KeptPicture | None = None
+) -> SavedWorldEntryView:
     """The entry as served. On a host that offers societies of things its society engine is the one
     a world holding a thing its author placed takes (the engine table's ``creates_holding_things``),
     read with the entry, so a page creating with it brings the placed beings to life."""
@@ -404,6 +478,8 @@ def _view(entry: SavedWorldEntry, *, societies_of_things: bool) -> SavedWorldEnt
         SavedWorldPreviousSourceAttachmentView.model_validate(attachment)
         for attachment in entry.previous_source_attachments
     ]
+    if picture is not None:
+        values["picture"] = _picture_view(entry, picture)
     return SavedWorldEntryView(**values)
 
 
@@ -426,8 +502,13 @@ def entries(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> list[SavedWorldEntryView]:
+    pictures = SavedEntryPictureRepository(connection, session.workspace_id).records()
     return [
-        _view(entry, societies_of_things=services.societies_of_things)
+        _view(
+            entry,
+            societies_of_things=services.societies_of_things,
+            picture=pictures.get(entry.entry_id),
+        )
         for entry in SavedWorldEntryRepository(
             connection, session.workspace_id, services.store
         ).entries()
@@ -505,7 +586,9 @@ def entry(
     saved = SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(
         entry_id
     )
-    view = _view(saved, societies_of_things=services.societies_of_things)
+    view = _pictured(
+        connection, session.workspace_id, saved, societies_of_things=services.societies_of_things
+    )
     if saved.source_kind != "personal":
         return view
     row = connection.execute(
@@ -659,7 +742,12 @@ def update_entry(
             content={"code": "invalid_saved_world_entry", "detail": str(exc)},
         )
     # Read after the write's own transaction has committed: the read checks viewer images.
-    return _view(entries.entry(entry_id), societies_of_things=services.societies_of_things)
+    return _pictured(
+        connection,
+        session.workspace_id,
+        entries.entry(entry_id),
+        societies_of_things=services.societies_of_things,
+    )
 
 
 @router.post("/{entry_id}/source-attachments", response_model=SavedWorldEntryView)
@@ -712,7 +800,9 @@ def attach_sources(
             status_code=422,
             content={"code": "invalid_source_attachment", "detail": str(exc)},
         )
-    return _view(attached, societies_of_things=services.societies_of_things)
+    return _pictured(
+        connection, session.workspace_id, attached, societies_of_things=services.societies_of_things
+    )
 
 
 def _membership_refusal(exc: Exception) -> JSONResponse:
@@ -763,7 +853,9 @@ def detach_sources(
         ValueError,
     ) as exc:
         return _membership_refusal(exc)
-    return _view(detached, societies_of_things=services.societies_of_things)
+    return _pictured(
+        connection, session.workspace_id, detached, societies_of_things=services.societies_of_things
+    )
 
 
 @router.post("/{entry_id}/source-rebinds", response_model=SavedWorldEntryView)
@@ -802,4 +894,72 @@ def rebind_sources(
         ValueError,
     ) as exc:
         return _membership_refusal(exc)
-    return _view(rebound, societies_of_things=services.societies_of_things)
+    return _pictured(
+        connection, session.workspace_id, rebound, societies_of_things=services.societies_of_things
+    )
+
+
+@router.put(
+    "/{entry_id}/picture",
+    response_model=SavedWorldEntryPictureView,
+    openapi_extra=_PICTURE_BODY,
+)
+async def put_picture(
+    entry_id: Annotated[uuid.UUID, Path()],
+    request: Request,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+    authored_version_id: Annotated[uuid.UUID, Query()],
+    authored_state_sha256: Annotated[str, Query(pattern="^[0-9a-f]{64}$")],
+    style_version_id: Annotated[uuid.UUID, Query()],
+) -> SavedWorldEntryPictureView | JSONResponse:
+    """Keep the picture of the world's first view a page drew, in place of any other.
+
+    The body is the picture itself, typed by ``Content-Type``; the query names the version, state
+    and look it shows, which must be the entry's own now. Refused by name: another type (415), a
+    larger one (413), one with anything but the picture in it or of another size (422), one of a
+    world that holds a photograph (422), one of a world as it no longer is (409).
+    """
+    data = await request.body()
+    media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    saved = SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(
+        entry_id
+    )
+    try:
+        kept = SavedEntryPictureRepository(connection, session.workspace_id).keep(
+            saved,
+            data,
+            media_type,
+            PictureShows(authored_version_id, authored_state_sha256, style_version_id),
+            session.actor,
+        )
+    except PictureRefused as exc:
+        return JSONResponse(status_code=exc.status, content={"code": exc.code, "detail": str(exc)})
+    return _picture_view(saved, kept)
+
+
+@router.get("/{entry_id}/picture")
+def picture(
+    entry_id: Annotated[uuid.UUID, Path()],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    sha256: Annotated[str, Query(pattern="^[0-9a-f]{64}$")],
+) -> Response:
+    """The kept picture's bytes, while ``sha256`` is its digest: the address names the bytes, so a
+    browser keeps them as long as it likes."""
+    found = SavedEntryPictureRepository(connection, session.workspace_id).picture(entry_id, sha256)
+    if found is None:
+        return JSONResponse(
+            status_code=404,
+            content={"code": "picture_not_found", "detail": "no picture with this digest"},
+        )
+    media_type, data = found
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, max-age=31536000, immutable",
+        },
+    )

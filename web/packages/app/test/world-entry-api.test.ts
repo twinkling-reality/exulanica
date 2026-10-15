@@ -845,3 +845,78 @@ it('reads terrain independently of kind sites and rejects conflicting generated 
   await expect(client([wire({generated_terrain:terrain})]).entries()).rejects.toThrow();
   await expect(client([wire({source_kind:'generated',generated_terrain:{...terrain,arrival_facing_mm:[0,0]}})]).entries()).rejects.toThrow();
 });
+
+describe('a saved world\'s picture', () => {
+  const pictureWire = (overrides: Record<string, unknown> = {}) => ({
+    sha256: 'f'.repeat(64), media_type: 'image/jpeg', byte_size: 120_000, width: 1280, height: 720,
+    authored_version_id: '22222222-2222-4222-8222-222222222222', authored_state_sha256: 'a'.repeat(64),
+    style_version_id: '33333333-3333-4333-8333-333333333333', current: true,
+    taken_at: '2026-10-14T20:00:00Z', ...overrides,
+  });
+  const listing = (rows: readonly unknown[]) => new WorldEntryClient({
+    baseUrl: 'https://exulanica.test', token: 'private', fetch: vi.fn(async () => Response.json(rows)),
+  });
+
+  it('reads the picture an entry is served with, none where a server keeps none, and refuses another type', async () => {
+    const [kept, none, older] = await listing([
+      wire({ picture: pictureWire() }),
+      wire({ entry_id: '12121212-1212-4121-8121-121212121212', picture: null }),
+      wire({ entry_id: '13131313-1313-4131-8131-131313131313' }),
+    ]).entries();
+    expect(kept?.picture).toEqual({
+      sha256: 'f'.repeat(64), mediaType: 'image/jpeg', byteSize: 120_000, width: 1280, height: 720,
+      authoredVersionId: '22222222-2222-4222-8222-222222222222', authoredStateSha256: 'a'.repeat(64),
+      styleVersionId: '33333333-3333-4333-8333-333333333333', current: true, takenAt: '2026-10-14T20:00:00Z',
+    });
+    expect(none?.picture).toBeNull();
+    expect(older?.picture).toBeNull();
+    await expect(listing([wire({ picture: pictureWire({ media_type: 'image/png' }) })]).entries()).rejects.toThrow();
+    await expect(listing([wire({ picture: pictureWire({ current: 'yes' }) })]).entries()).rejects.toThrow();
+  });
+
+  it('reads a picture by its digest and puts one naming the version, saved state and look it shows', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+      calls.push({ url: String(input), init });
+      return init.method === 'PUT' ? Response.json(pictureWire()) : new Response(new Uint8Array([1, 2, 3]), {
+        headers: { 'content-type': 'image/jpeg' },
+      });
+    });
+    const client = new WorldEntryClient({ baseUrl: 'https://exulanica.test/', token: 'private', csrfToken: 'csrf', fetch });
+    const bytes = await client.picture('11111111-1111-4111-8111-111111111111', 'f'.repeat(64));
+    expect(new Uint8Array(await bytes.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect(calls[0]!.url).toBe(`https://exulanica.test/world-entries/11111111-1111-4111-8111-111111111111/picture?sha256=${'f'.repeat(64)}`);
+
+    // An entry whose branch moved on elsewhere: the picture shows the state it is saved at.
+    const base = { ...parseFixture(), currentAuthoredStateSha256: 'b'.repeat(64) };
+    const picture = new Blob([new Uint8Array([9, 9])], { type: 'image/jpeg' });
+    const kept = await client.putPicture(base, picture);
+    expect(kept.sha256).toBe('f'.repeat(64));
+    const put = calls[1]!;
+    const url = new URL(put.url);
+    expect(url.pathname).toBe('/world-entries/11111111-1111-4111-8111-111111111111/picture');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      authored_version_id: base.authoredVersionId,
+      authored_state_sha256: base.authoredStateSha256,
+      style_version_id: base.styleVersionId,
+    });
+    expect(put.init.method).toBe('PUT');
+    expect(put.init.body).toBe(picture);
+    expect(put.init.headers).toMatchObject({
+      'content-type': 'image/jpeg', authorization: 'Bearer private', 'x-csrf-token': 'csrf',
+    });
+  });
+
+  it('carries a refused picture\'s code to the caller', async () => {
+    const client = new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: '',
+      fetch: vi.fn(async (_input: string | URL | Request, init: RequestInit = {}) => {
+        // No bearer header when there is no token, so the account cookie answers.
+        expect(init.headers).not.toHaveProperty('authorization');
+        return Response.json({ code: 'picture_not_current', detail: 'no longer that world' }, { status: 409 });
+      }),
+    });
+    await expect(client.putPicture(parseFixture(), new Blob([new Uint8Array([1])], { type: 'image/jpeg' })))
+      .rejects.toMatchObject({ status: 409, code: 'picture_not_current' });
+  });
+});

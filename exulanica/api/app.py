@@ -542,6 +542,7 @@ def create_app(
             *workspace_assets.BODY_LIMITS,
             *workspace_style_packs.BODY_LIMITS,
             *intake.BODY_LIMITS,
+            *world_entries.BODY_LIMITS,
         ),
     )
 

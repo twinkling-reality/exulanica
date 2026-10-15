@@ -13,6 +13,7 @@ edits, projects, a door grant, piece requests and comparisons among them.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import re
 import uuid
 from decimal import Decimal
@@ -62,6 +63,9 @@ KEPT_KINDS = "world_kind_version"
 ERASED_WITH_ITS_SOCIETY = "society_erase_rows(uuid,uuid)"
 ERASED_WITH_ITS_WORLD = "world_erase_rows(uuid,text)"
 ERASED_WITH_PARTICIPATION = "participation_erase(uuid,text)"
+#: A saved world's picture hangs from its entry alone (0218): the entry's own BEFORE DELETE trigger
+#: runs this definer, which deletes the picture as world_erase_rows deletes the entry.
+ERASED_WITH_ITS_ENTRY = "saved_world_entry_picture_erase()"
 PARTICIPATION_GUARD = "tg_participation_record_guard"
 #: The guard 0182 put on a society's tables, and the one this erasure puts on a world's.
 SOCIETY_GUARD = "tg_society_record_erased_whole"
@@ -314,6 +318,18 @@ def _budgets_and_citations(existence, scratch: str) -> None:
             )
 
 
+def _pictures(admin) -> None:
+    """A picture for every saved world of every workspace, written by the schema's owner (0218)."""
+    data = b"a picture"
+    admin.execute(
+        "insert into saved_world_entry_picture (workspace_id,entry_id,media_type,bytes,byte_size,"
+        "sha256,width,height,authored_version_id,authored_state_sha256,style_version_id,taken_by) "
+        "select e.workspace_id,e.entry_id,'image/jpeg',%s,%s,%s,640,360,e.authored_version_id,"
+        "e.authored_state_sha256,e.style_version_id,e.created_by from saved_world_entry e",
+        (data, len(data), hashlib.sha256(data).hexdigest()),
+    )
+
+
 def _erase_one_world(admin, workspace: uuid.UUID, world: str) -> None:
     """``world_erase_rows`` as its owner runs it, in the workspace's own session."""
     with admin.transaction():
@@ -340,7 +356,25 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
     by_participation = _deleted_by(admin, ERASED_WITH_PARTICIPATION) - {
         "participation_redemption_refusal"  # This workspace-wide audit is no single world's.
     }
-    assert by_world | by_society | by_participation == (hanging - {ERASURE_RECORD}) | {
+    by_entry = _deleted_by(admin, ERASED_WITH_ITS_ENTRY)
+    # What the entry's trigger deletes is reached only because the trigger runs on the entry's own
+    # delete, which world_erase_rows makes: before each row's delete, as the definers' owner.
+    assert "saved_world_entry" in by_world
+    assert (
+        admin.execute(
+            "select count(*) as n from pg_trigger where tgrelid = 'saved_world_entry'::regclass "
+            "and tgfoid = %s::regprocedure and not tgisinternal "
+            "and (tgtype & 1) = 1 and (tgtype & 2) = 2 and (tgtype & 8) = 8",
+            (ERASED_WITH_ITS_ENTRY,),
+        ).fetchone()["n"]
+        == 1
+    )
+    assert admin.execute(
+        "select p.prosecdef and pg_get_userbyid(p.proowner) = 'exulanica_definer' as definer "
+        "from pg_proc p where p.oid = %s::regprocedure",
+        (ERASED_WITH_ITS_ENTRY,),
+    ).fetchone()["definer"]
+    assert by_world | by_society | by_participation | by_entry == (hanging - {ERASURE_RECORD}) | {
         NAMING_NO_KEY
     }
     # What its societies' erasure leaves is the world's own to delete: every table that carries
@@ -348,7 +382,7 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
     assert (hanging & _with_column(admin, "world_id")) - {
         ERASURE_RECORD
     } <= by_world | by_participation
-    assert hanging - by_society - {ERASURE_RECORD} <= by_world | by_participation
+    assert hanging - by_society - {ERASURE_RECORD} <= by_world | by_participation | by_entry
     assert REGISTRATION in by_world and KEPT_KINDS not in by_world
 
     guards = {
@@ -363,7 +397,7 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
     by_world_s_guard = {table for table, name in guards if name == WORLD_GUARD}
     # piece_output never had a delete guard (0175), and world_minds_budget's is its own.
     own = {"piece_output", "world_minds_budget"}
-    assert by_world_s_guard == ((by_world | {KEPT_KINDS}) - by_society_s_guard - own)
+    assert by_world_s_guard == ((by_world | by_entry | {KEPT_KINDS}) - by_society_s_guard - own)
     assert not by_world_s_guard & by_society_s_guard
     assert {table for table, name in guards if name == PARTICIPATION_GUARD} == (
         by_participation | {"participation_redemption_refusal"}
@@ -377,7 +411,7 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
             "and privilege_type = 'DELETE'"
         ).fetchall()
     }
-    required_delete = by_world | by_participation | {KEPT_KINDS}
+    required_delete = by_world | by_participation | by_entry | {KEPT_KINDS}
     assert required_delete <= may_delete, sorted(required_delete - may_delete)
 
 
@@ -452,6 +486,7 @@ def test_one_world_is_erased_whole_and_every_other_world_keeps_every_row(existen
     admin = _admin(existence)
     workspace = existence.workspace_id
     _keep_a_kind(admin, workspace, existence.actor)
+    _pictures(admin)
     worlds = _worlds(admin, workspace)
     assert len(worlds) >= 3, worlds
     before = {world: _world_rows(admin, workspace, world) for world in worlds}
@@ -460,6 +495,9 @@ def test_one_world_is_erased_whole_and_every_other_world_keeps_every_row(existen
     held = {table for table, count in before[erased].items() if count}
     assert len(held) >= 40, sorted(held)
     # Each other world holds what the erased one holds of these, so a delete too wide would show.
+    # Saved worlds' pictures (0218): some world keeps one, so a delete too wide would show; the
+    # erasure of a world that has one is test_saved_entry_pictures_postgres.py's.
+    assert sum(1 for world in worlds if before[world]["saved_world_entry_picture"]) >= 1
     for table, count in (
         ("world_minds_budget", 1),
         ("companion_answer_simulation_citation", 1),
@@ -517,6 +555,7 @@ def test_a_workspace_tombstone_erases_every_world_it_holds_and_the_kinds_it_kept
     admin = _admin(existence)
     workspace = existence.workspace_id
     _keep_a_kind(admin, workspace, existence.actor)
+    _pictures(admin)
     held = _workspace_rows(admin, workspace)
     assert held[REGISTRATION] >= 3 and sum(1 for count in held.values() if count) >= 50, held
     assert "saved_world_entry" in _tables_holding(admin, "A town")

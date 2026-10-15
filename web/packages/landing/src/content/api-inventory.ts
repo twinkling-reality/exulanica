@@ -19244,6 +19244,188 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world-entries/{entry_id}/picture",
+    "method": "put",
+    "id": "put_picture_world_entries__entry_id__picture_put",
+    "title": "Put Picture",
+    "description": "Keep the picture of the world's first view a page drew, in place of any other.\n\nThe body is the picture itself, typed by ``Content-Type``; the query names the version, state\nand look it shows, which must be the entry's own now. Refused by name: another type (415), a\nlarger one (413), one with anything but the picture in it or of another size (422), one of a\nworld that holds a photograph (422), one of a world as it no longer is (409).",
+    "group": "world-entries",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "entry_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Entry Id"
+        }
+      },
+      {
+        "name": "authored_version_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Authored Version Id"
+        }
+      },
+      {
+        "name": "authored_state_sha256",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Authored State Sha256"
+        }
+      },
+      {
+        "name": "style_version_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Style Version Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "image/jpeg": {
+          "schema": {
+            "type": "string",
+            "contentMediaType": "image/jpeg"
+          }
+        },
+        "image/webp": {
+          "schema": {
+            "type": "string",
+            "contentMediaType": "image/webp"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SavedWorldEntryPictureView"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world-entries/{entry_id}/picture",
+    "method": "get",
+    "id": "picture_world_entries__entry_id__picture_get",
+    "title": "Picture",
+    "description": "The kept picture's bytes, while ``sha256`` is its digest: the address names the bytes, so a\nbrowser keeps them as long as it likes.",
+    "group": "world-entries",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "entry_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Entry Id"
+        }
+      },
+      {
+        "name": "sha256",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/clock",
     "method": "get",
     "id": "read_clock_world_versions__version_id__clock_get",

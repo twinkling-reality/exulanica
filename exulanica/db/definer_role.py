@@ -530,6 +530,8 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     # society_erase_rows, made again with one statement more, deletes the asks of a society's
     # recorded decisions before the requests they name (0216).
     "0216": DefinerGrants(tables={"world_society_decision_ask": frozenset(("SELECT", "DELETE"))}),
+    # A saved entry's trigger deletes the entry's picture before the entry itself, by its key.
+    "0218": DefinerGrants(tables={"saved_world_entry_picture": frozenset(("SELECT", "DELETE"))}),
 }
 
 

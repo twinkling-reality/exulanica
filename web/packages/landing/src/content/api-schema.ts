@@ -1161,6 +1161,16 @@ export const API_SCHEMA: ApiSpec = {
               "type": "null"
             }
           ]
+        },
+        "picture": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/SavedWorldEntryPictureView"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -3257,6 +3267,73 @@ export const API_SCHEMA: ApiSpec = {
       ],
       "title": "SceneStandpointExclusionRow",
       "description": "A member photograph the arrangement does not hold, and why, in a stable code."
+    },
+    "SavedWorldEntryPictureView": {
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "title": "Sha256"
+        },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "image/jpeg",
+            "image/webp"
+          ],
+          "title": "Media Type"
+        },
+        "byte_size": {
+          "type": "integer",
+          "title": "Byte Size"
+        },
+        "width": {
+          "type": "integer",
+          "title": "Width"
+        },
+        "height": {
+          "type": "integer",
+          "title": "Height"
+        },
+        "authored_version_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Authored Version Id"
+        },
+        "authored_state_sha256": {
+          "type": "string",
+          "title": "Authored State Sha256"
+        },
+        "style_version_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Style Version Id"
+        },
+        "current": {
+          "type": "boolean",
+          "title": "Current"
+        },
+        "taken_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Taken At"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "sha256",
+        "media_type",
+        "byte_size",
+        "width",
+        "height",
+        "authored_version_id",
+        "authored_state_sha256",
+        "style_version_id",
+        "current",
+        "taken_at"
+      ],
+      "title": "SavedWorldEntryPictureView",
+      "description": "The saved world's kept picture: what it is, and what of the world it shows."
     },
     "AlternateVersionView": {
       "properties": {

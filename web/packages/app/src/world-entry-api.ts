@@ -1,6 +1,6 @@
 /** Exact, durable workspace entries into personal authored worlds, and the worlds they name. */
 
-import { Transport, type GraphPayload, type TransportOptions } from '@exulanica/graph-client';
+import { Transport, toApiError, type GraphPayload, type TransportOptions } from '@exulanica/graph-client';
 import { societyEngine, type SocietyEngineProfile } from './society-engines.js';
 import { worldPath } from './world-scope.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
@@ -172,6 +172,26 @@ export interface SavedWorldEntry {
   readonly arrival?: SavedArrivalDescriptor | null;
   readonly arrivalUnavailableReason?: 'arrival_source_unavailable' | null;
   readonly arrivalScene?: GraphPayload['reconstruction_scenes'][number] | null;
+  /**
+   * The picture of this world's first view a page put for its card, as the server keeps it: null
+   * until one is put. Optional so entries built elsewhere need not name it.
+   */
+  readonly picture?: SavedWorldEntryPicture | null;
+}
+
+/** A saved world's kept picture: what it is, and what of the world it shows. */
+export interface SavedWorldEntryPicture {
+  readonly sha256: string;
+  readonly mediaType: 'image/jpeg' | 'image/webp';
+  readonly byteSize: number;
+  readonly width: number;
+  readonly height: number;
+  readonly authoredVersionId: string;
+  readonly authoredStateSha256: string;
+  readonly styleVersionId: string;
+  /** Whether it shows the world as opening it draws it now: the entry's version, saved state and look. */
+  readonly current: boolean;
+  readonly takenAt: string;
 }
 
 export interface SavedArrivalDescriptor {
@@ -444,9 +464,11 @@ export function requireMetadataOnlyEntryUpdate(
 
 export class WorldEntryClient {
   readonly #transport: Transport;
+  readonly #options: TransportOptions;
 
   constructor(options: TransportOptions) {
     this.#transport = new Transport(options);
+    this.#options = options;
   }
 
   /** Every world this workspace holds, and how many of each kind it may hold. */
@@ -464,6 +486,37 @@ export class WorldEntryClient {
     return parseEntry(await this.#transport.getJson<unknown>(
       `/world-entries/${encodeURIComponent(entryId)}`,
     ));
+  }
+
+  /** The kept picture's bytes, while `sha256` is its digest (`GET /world-entries/{entry_id}/picture`). */
+  async picture(entryId: string, sha256: string): Promise<Blob> {
+    const response = await this.#transport.getBytes(
+      `/world-entries/${encodeURIComponent(entryId)}/picture`, { sha256 },
+    );
+    return response.blob();
+  }
+
+  /**
+   * Keep `picture`, a frame of `entry`'s first view, as its card's picture in place of any other
+   * (`PUT /world-entries/{entry_id}/picture`). It names what it shows: the entry's version, the
+   * state it is saved at and its look, which the server refuses unless they are the entry's now.
+   */
+  async putPicture(entry: SavedWorldEntry, picture: Blob): Promise<SavedWorldEntryPicture> {
+    const url = new URL(`${this.#options.baseUrl.replace(/\/+$/, '')}/world-entries/${encodeURIComponent(entry.entryId)}/picture`);
+    url.searchParams.set('authored_version_id', entry.authoredVersionId);
+    url.searchParams.set('authored_state_sha256', entry.authoredStateSha256);
+    url.searchParams.set('style_version_id', entry.styleVersionId);
+    // Transport sends JSON only; the body here is the picture itself, typed as it is.
+    const headers: Record<string, string> = { 'content-type': picture.type };
+    // No bearer header lets the API resolve its account cookie; an empty one would refuse it.
+    if (this.#options.token) headers['authorization'] = `Bearer ${this.#options.token}`;
+    if (this.#options.csrfToken) headers['x-csrf-token'] = this.#options.csrfToken;
+    const init: RequestInit = {
+      method: 'PUT', headers, body: picture, credentials: 'include', signal: this.#options.signal ?? null,
+    };
+    const response = await (this.#options.fetch ?? globalThis.fetch.bind(globalThis))(url.toString(), init);
+    if (!response.ok) throw await toApiError(response);
+    return parsePicture(await response.json());
   }
 
   /** The recipes this server generates worlds from, in the catalog's order. */
@@ -937,6 +990,29 @@ export function parseEntry(value: unknown): SavedWorldEntry {
     arrival,
     arrivalUnavailableReason: arrivalUnavailableReason ?? null,
     arrivalScene,
+    // A server before kept pictures sends none; it keeps none.
+    picture: row['picture'] == null ? null : parsePicture(row['picture']),
+  });
+}
+
+/** A kept picture's record as the server serves it with its entry, or after it is put. */
+export function parsePicture(value: unknown): SavedWorldEntryPicture {
+  const row = record(value, 'saved world picture');
+  const mediaType = row['media_type'];
+  if (mediaType !== 'image/jpeg' && mediaType !== 'image/webp') {
+    throw new TypeError('The server returned a saved world picture of an unknown type.');
+  }
+  return Object.freeze({
+    sha256: sha256(row['sha256'], 'picture digest'),
+    mediaType,
+    byteSize: positiveInteger(row['byte_size'], 'picture size'),
+    width: positiveInteger(row['width'], 'picture width'),
+    height: positiveInteger(row['height'], 'picture height'),
+    authoredVersionId: text(row['authored_version_id'], 'picture authored version ID'),
+    authoredStateSha256: sha256(row['authored_state_sha256'], 'picture authored state digest'),
+    styleVersionId: text(row['style_version_id'], 'picture style version ID'),
+    current: flag(row['current'], 'whether the picture is current'),
+    takenAt: text(row['taken_at'], 'picture time'),
   });
 }
 

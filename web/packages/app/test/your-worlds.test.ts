@@ -2,8 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildYourWorlds, onlyUntouchedStarter } from '../src/composition/world-entry.js';
-import { worldPicture } from '../src/composition/world-pictures.js';
-import type { SavedWorldEntry } from '../src/world-entry-api.js';
+import {
+  jpegWithoutMetadata, keepFirstViewPicture, mayPutPicture, readServedPictures, worldPicture, type PictureSource,
+} from '../src/composition/world-pictures.js';
+import type { SavedWorldEntry, SavedWorldEntryPicture } from '../src/world-entry-api.js';
 
 const entry = (overrides: Partial<SavedWorldEntry> = {}): SavedWorldEntry => ({
   entryId: '11111111-1111-4111-8111-111111111111',
@@ -65,6 +67,7 @@ const title = (root: HTMLElement) => root.querySelector('.your-worlds-title')?.t
 afterEach(() => {
   document.body.replaceChildren();
   window.localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe('Your worlds', () => {
@@ -153,6 +156,173 @@ describe('the pictures on Your worlds', () => {
     // Anything else under the key is not a picture and is not shown.
     window.localStorage.setItem(`exulanica.world-picture.v1.${quiet.entryId}`, 'javascript:alert(1)');
     expect(worldPicture(quiet)).toBe('/your-worlds/small_town.jpg');
+  });
+});
+
+describe('the pictures the server keeps', () => {
+  const hex = async (bytes: Blob): Promise<string> => [...new Uint8Array(
+    await crypto.subtle.digest('SHA-256', await bytes.arrayBuffer()),
+  )].map((n) => n.toString(16).padStart(2, '0')).join('');
+  const jpeg = (...values: number[]) => new Blob([new Uint8Array(values)], { type: 'image/jpeg' });
+  /** Each case its own world: the page holds what it read for as long as it lives. */
+  let serial = 0;
+  const world = (overrides: Partial<SavedWorldEntry> = {}): SavedWorldEntry => {
+    serial += 1;
+    return entry({ entryId: `aaaaaaaa-aaaa-4aaa-8aaa-${String(serial).padStart(12, '0')}`, ...overrides });
+  };
+  const kept = (sha256: string, overrides: Partial<SavedWorldEntryPicture> = {}): SavedWorldEntryPicture => ({
+    sha256, mediaType: 'image/jpeg', byteSize: 3, width: 1280, height: 720,
+    authoredVersionId: entry().authoredVersionId, authoredStateSha256: entry().authoredStateSha256,
+    styleVersionId: entry().styleVersionId, current: true, takenAt: '2026-10-14T20:00:00Z', ...overrides,
+  });
+  const own = (one: SavedWorldEntry) => window.localStorage.getItem(`exulanica.world-picture.v1.${one.entryId}`);
+
+  it('shows the server\'s picture while it shows the world as it is, read once by its digest', async () => {
+    const bytes = jpeg(1, 2, 3);
+    const digest = await hex(bytes);
+    const server = { picture: vi.fn(async () => bytes) };
+    const current = world({ picture: kept(digest) });
+    window.localStorage.setItem(`exulanica.world-picture.v1.${current.entryId}`, 'data:image/jpeg;base64,AAAA');
+    expect(worldPicture(current)).toBe('data:image/jpeg;base64,AAAA');
+    expect(await readServedPictures(server, [current])).toBe(1);
+    expect(server.picture).toHaveBeenCalledWith(current.entryId, digest);
+    expect(worldPicture(current)).toMatch(/^blob:/);
+    expect(await readServedPictures(server, [current])).toBe(0);
+    expect(server.picture).toHaveBeenCalledTimes(1);
+    // The world changed since: its own picture, then its recipe's, until a page puts a new one.
+    const changed = { ...current, picture: kept(digest, { current: false }) };
+    expect(worldPicture(changed)).toBe('data:image/jpeg;base64,AAAA');
+    window.localStorage.clear();
+    expect(worldPicture(changed)).toBe('/your-worlds/market_town.jpg');
+    const unread = world({ picture: kept(digest, { current: false }) });
+    expect(await readServedPictures(server, [unread])).toBe(0);
+    expect(server.picture).toHaveBeenCalledTimes(1);
+  });
+
+  it('never shows bytes that are not the digest the entry states, nor a picture it could not read', async () => {
+    const stated = await hex(jpeg(1, 2, 3));
+    const other = world({ picture: kept(stated) });
+    expect(await readServedPictures({ picture: vi.fn(async () => jpeg(4, 5, 6)) }, [other])).toBe(0);
+    expect(worldPicture(other)).toBe('/your-worlds/market_town.jpg');
+    const failed = world({ picture: kept(stated) });
+    expect(await readServedPictures({ picture: vi.fn(async () => { throw new Error('offline'); }) }, [failed])).toBe(0);
+    expect(worldPicture(failed)).toBe('/your-worlds/market_town.jpg');
+  });
+
+  it('draws the cards again with the pictures that arrived', async () => {
+    const bytes = jpeg(7, 8, 9);
+    const pictured = world({ picture: kept(await hex(bytes)) });
+    const bare = world({ generatedGround: { ...entry().generatedGround!, recipeKey: 'harbour' }, picture: kept(await hex(bytes)) });
+    const { root, refreshPictures } = build([pictured, bare], { picture: worldPicture });
+    const image = (one: SavedWorldEntry) => root.querySelector(`[data-entry-id="${one.entryId}"] .your-worlds-picture img`);
+    expect(image(pictured)?.getAttribute('src')).toBe('/your-worlds/market_town.jpg');
+    expect(image(bare)).toBeNull();
+    await readServedPictures({ picture: vi.fn(async () => bytes) }, [pictured, bare]);
+    refreshPictures();
+    expect(image(pictured)?.getAttribute('src')).toMatch(/^blob:/);
+    expect(image(bare)?.getAttribute('src')).toMatch(/^blob:/);
+  });
+
+  /** A renderer whose next frame is drawn when asked for, onto a canvas `level` paints. */
+  const renderer = (level: (index: number) => number = (index) => index % 251): PictureSource => {
+    const frames = new Set<() => void>();
+    const data = new Uint8ClampedArray(1280 * 720 * 4).map((_, index) => level(index));
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: () => undefined, getImageData: () => ({ data }),
+    } as never);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,BBBB');
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((done) => done(jpeg(3, 1, 4)));
+    const canvas = document.createElement('canvas');
+    canvas.width = 1600;
+    canvas.height = 900;
+    return {
+      app: {
+        on: (_name, handler) => frames.add(handler),
+        off: (_name, handler) => frames.delete(handler),
+        get renderNextFrame() { return false; },
+        set renderNextFrame(_asked: boolean) { queueMicrotask(() => frames.forEach((frame) => frame())); },
+        graphicsDevice: { canvas },
+      },
+    };
+  };
+  const server = () => ({
+    putPicture: vi.fn(async (one: SavedWorldEntry, bytes: Blob) => kept(await hex(bytes), {
+      authoredVersionId: one.authoredVersionId, authoredStateSha256: one.authoredStateSha256, styleVersionId: one.styleVersionId,
+    })),
+  });
+
+  it('keeps a first view here and puts it where the server has none current, once for what it shows', async () => {
+    const put = server();
+    const first = world();
+    const record = await keepFirstViewPicture(renderer(), first, put);
+    expect(own(first)).toBe('data:image/jpeg;base64,BBBB');
+    expect(put.putPicture).toHaveBeenCalledTimes(1);
+    expect(put.putPicture.mock.calls[0]![0]).toBe(first);
+    expect(put.putPicture.mock.calls[0]![1].type).toBe('image/jpeg');
+    // Shown from what was put, with no read of it.
+    expect(worldPicture({ ...first, picture: record })).toMatch(/^blob:/);
+    await keepFirstViewPicture(renderer(), first, put);
+    expect(put.putPicture).toHaveBeenCalledTimes(1);
+    await keepFirstViewPicture(renderer(), { ...first, styleVersionId: '77777777-7777-4777-8777-777777777777' }, put);
+    expect(put.putPicture).toHaveBeenCalledTimes(2);
+    const pictured = world({ picture: kept('e'.repeat(64)) });
+    await keepFirstViewPicture(renderer(), pictured, put);
+    expect(own(pictured)).toBe('data:image/jpeg;base64,BBBB');
+    expect(put.putPicture).toHaveBeenCalledTimes(2);
+    const stale = world({ picture: kept('e'.repeat(64), { current: false }) });
+    await keepFirstViewPicture(renderer(), stale, put);
+    expect(put.putPicture).toHaveBeenCalledTimes(3);
+  });
+
+  it('sends a JPEG without the metadata a browser writes, which the server refuses, and its scan unchanged', () => {
+    const segment = (marker: number, body: number[]): number[] => [0xff, marker, ((body.length + 2) >> 8) & 0xff, (body.length + 2) & 0xff, ...body];
+    const app0 = segment(0xe0, [0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0]);
+    const quantised = segment(0xdb, [0, ...Array.from({ length: 64 }, (_, index) => index)]);
+    const frame = segment(0xc0, [8, 0, 180, 1, 64, 1, 1, 0x11, 0]);
+    const scan = [...segment(0xda, [1, 1, 0, 0, 63, 0]), 0x12, 0xff, 0x00, 0x34, 0xff, 0xd9];
+    const bare = [0xff, 0xd8, ...app0, ...quantised, ...frame, ...scan];
+    // A colour profile (APP2), Exif (APP1) and a comment, as an encoder may add them.
+    const written = [0xff, 0xd8, ...app0, ...segment(0xe2, [0x49, 0x43, 0x43, 0x5f, 1, 2, 3]), ...segment(0xe1, [0x45, 0x78, 0x69, 0x66, 0, 0]),
+      ...quantised, ...segment(0xfe, [0x68, 0x69]), ...frame, ...scan];
+    expect([...jpegWithoutMetadata(Uint8Array.from(written))]).toEqual(bare);
+    expect([...jpegWithoutMetadata(Uint8Array.from(bare))]).toEqual(bare);
+    // Not a JPEG, or one cut short, comes back as it is for the server to refuse.
+    const notJpeg = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]);
+    expect(jpegWithoutMetadata(notJpeg)).toBe(notJpeg);
+    const cut = Uint8Array.from(written.slice(0, 30));
+    expect(jpegWithoutMetadata(cut)).toBe(cut);
+  });
+
+  it('never sends a frame of a world that holds or held a photograph', async () => {
+    const attachment = {} as SavedWorldEntry['sourceAttachments'][number];
+    const removed = {} as NonNullable<SavedWorldEntry['previousSourceAttachments']>[number];
+    const photographed = [
+      world({ sourceKind: 'personal', generatedGround: null }),
+      world({ sourceKind: 'authored', authoredScene: {} as never, generatedGround: null, sourceAttachments: [attachment] }),
+      world({ sourceKind: 'authored', authoredScene: {} as never, generatedGround: null, previousSourceAttachments: [removed] }),
+    ];
+    const put = server();
+    for (const one of photographed) {
+      expect(mayPutPicture(one)).toBe(false);
+      expect(await keepFirstViewPicture(renderer(), one, put)).toBeNull();
+      expect(own(one)).toBe('data:image/jpeg;base64,BBBB');
+    }
+    expect(put.putPicture).not.toHaveBeenCalled();
+    expect(mayPutPicture(world())).toBe(true);
+    expect(mayPutPicture(starter())).toBe(true);
+  });
+
+  it('leaves the browser\'s own picture when the put is refused, and keeps and puts no flat frame', async () => {
+    const refused = world();
+    const put = { putPicture: vi.fn(async () => { throw new Error('read only'); }) };
+    expect(await keepFirstViewPicture(renderer(), refused, put)).toBeNull();
+    expect(own(refused)).toBe('data:image/jpeg;base64,BBBB');
+    expect(worldPicture(refused)).toBe('data:image/jpeg;base64,BBBB');
+    const flat = world();
+    const quietPut = server();
+    expect(await keepFirstViewPicture(renderer(() => 40), flat, quietPut)).toBeNull();
+    expect(own(flat)).toBeNull();
+    expect(quietPut.putPicture).not.toHaveBeenCalled();
   });
 });
 

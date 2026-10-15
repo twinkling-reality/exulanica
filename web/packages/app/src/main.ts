@@ -117,7 +117,7 @@ import {
   buildYourWorlds,
   type PersonalWorldControl,
 } from './composition/world-entry.js';
-import { keepWorldPicture, worldPicture } from './composition/world-pictures.js';
+import { keepFirstViewPicture, keepWorldPicture, readServedPictures, worldPicture } from './composition/world-pictures.js';
 import { CapabilitiesClient } from './capabilities-api.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { mountThingCard } from './composition/thing-card-mount.js';
@@ -570,6 +570,12 @@ async function mountWorldEntry(failed?: string): Promise<void> {
   replaceSurface(shell, [yourWorlds.root]);
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
+  // The pictures the server keeps, read by their digests; the cards are drawn again with them.
+  if (entries !== null) {
+    void readServedPictures(entries, state.savedWorldEntries).then((added) => {
+      if (added > 0 && yourWorlds.root.isConnected) yourWorlds.refreshPictures();
+    });
+  }
   // Create a world's availability, read the way a mounted world's registry reads it.
   if (entries !== null && state.credentials !== null) {
     const spec = actionSpec('world.make');
@@ -1983,12 +1989,16 @@ async function mountWorld(): Promise<void> {
   retainedLoading.remove();
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
-  // A picture of this world for its card on Your worlds, once it has drawn for a few seconds.
+  // A picture of this world's first view for its card on Your worlds, once it has drawn for a few
+  // seconds: kept here, and put to the server for every browser (composition/world-pictures.ts).
   const pictured = state.activeWorldEntry?.entryId ?? null;
   if (!preview && pictured !== null) {
     window.setTimeout(() => {
       const binding = state.atlas?.binding;
-      if (binding !== undefined && state.activeWorldEntry?.entryId === pictured) void keepWorldPicture(binding, pictured);
+      const entry = state.activeWorldEntry;
+      if (binding === undefined || entry?.entryId !== pictured) return;
+      if (state.worldEntries === null) void keepWorldPicture(binding, pictured);
+      else void keepFirstViewPicture(binding, entry, state.worldEntries);
     }, WORLD_PICTURE_DELAY_MS);
   }
   if (preview) {

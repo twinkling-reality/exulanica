@@ -18090,6 +18090,179 @@
     }
    }
   },
+  "/world-entries/{entry_id}/picture": {
+   "put": {
+    "tags": [
+     "world-entries"
+    ],
+    "summary": "Put Picture",
+    "description": "Keep the picture of the world's first view a page drew, in place of any other.\n\nThe body is the picture itself, typed by ``Content-Type``; the query names the version, state\nand look it shows, which must be the entry's own now. Refused by name: another type (415), a\nlarger one (413), one with anything but the picture in it or of another size (422), one of a\nworld that holds a photograph (422), one of a world as it no longer is (409).",
+    "operationId": "put_picture_world_entries__entry_id__picture_put",
+    "parameters": [
+     {
+      "name": "entry_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entry Id"
+      }
+     },
+     {
+      "name": "authored_version_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Authored Version Id"
+      }
+     },
+     {
+      "name": "authored_state_sha256",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Authored State Sha256"
+      }
+     },
+     {
+      "name": "style_version_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Style Version Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedWorldEntryPictureView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "image/jpeg": {
+       "schema": {
+        "type": "string",
+        "contentMediaType": "image/jpeg"
+       }
+      },
+      "image/webp": {
+       "schema": {
+        "type": "string",
+        "contentMediaType": "image/webp"
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "world-entries"
+    ],
+    "summary": "Picture",
+    "description": "The kept picture's bytes, while ``sha256`` is its digest: the address names the bytes, so a\nbrowser keeps them as long as it likes.",
+    "operationId": "picture_world_entries__entry_id__picture_get",
+    "parameters": [
+     {
+      "name": "entry_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entry Id"
+      }
+     },
+     {
+      "name": "sha256",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/clock": {
    "get": {
     "tags": [
@@ -43362,6 +43535,73 @@
     ],
     "title": "SavedWorldCandidateView"
    },
+   "SavedWorldEntryPictureView": {
+    "properties": {
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "media_type": {
+      "type": "string",
+      "enum": [
+       "image/jpeg",
+       "image/webp"
+      ],
+      "title": "Media Type"
+     },
+     "byte_size": {
+      "type": "integer",
+      "title": "Byte Size"
+     },
+     "width": {
+      "type": "integer",
+      "title": "Width"
+     },
+     "height": {
+      "type": "integer",
+      "title": "Height"
+     },
+     "authored_version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Authored Version Id"
+     },
+     "authored_state_sha256": {
+      "type": "string",
+      "title": "Authored State Sha256"
+     },
+     "style_version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Style Version Id"
+     },
+     "current": {
+      "type": "boolean",
+      "title": "Current"
+     },
+     "taken_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Taken At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "sha256",
+     "media_type",
+     "byte_size",
+     "width",
+     "height",
+     "authored_version_id",
+     "authored_state_sha256",
+     "style_version_id",
+     "current",
+     "taken_at"
+    ],
+    "title": "SavedWorldEntryPictureView",
+    "description": "The saved world's kept picture: what it is, and what of the world it shows."
+   },
    "SavedWorldEntryView": {
     "properties": {
      "entry_id": {
@@ -43564,6 +43804,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/ReconstructionSceneRow"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "picture": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SavedWorldEntryPictureView"
        },
        {
         "type": "null"

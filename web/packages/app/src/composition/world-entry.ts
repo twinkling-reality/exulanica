@@ -46,6 +46,8 @@ export interface WorldEntrySurfaceHandle {
   readonly root: HTMLElement;
   /** Whether Create a world is offered, and why not where it is refused. */
   setCreate(state: WorldEntryCreateState): void;
+  /** Draw each card's picture again, as `picture` answers now. */
+  refreshPictures(): void;
 }
 
 /** The values a generated world was made with, as its entry serves them, or null where there are none. */
@@ -303,9 +305,20 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
 
   };
   setCreate(createState);
+  const refreshPictures = (): void => {
+    for (const card of cards) {
+      const entry = entries.find(item => item.entryId === card.dataset['entryId']);
+      const picture = entry === undefined ? null : deps.picture?.(entry) ?? null;
+      const frame = card.querySelector('.your-worlds-picture');
+      const shown = frame?.querySelector('img') ?? null;
+      if (frame === null || picture === null || shown?.getAttribute('src') === picture) continue;
+      if (shown !== null) shown.src = picture;
+      else frame.append(el('img', { src: picture, alt: '', loading: 'lazy', decoding: 'async' }));
+    }
+  };
   const initial = entries.find(entry => entry.entryId === deps.initialEntryId) ?? entries[0];
   if (initial !== undefined) choose(initial);
-  return { root, setCreate };
+  return { root, setCreate, refreshPictures };
 }
 
 /** How the choice to make a world from reviewed photographs reaches the server and the world. */

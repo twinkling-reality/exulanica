@@ -242,6 +242,17 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "style_version_id": str(uuid.uuid4()),
         }
     },
+    "GET /world-entries/{entry_id}/picture": {"params": {"sha256": _ZERO_DIGEST}},
+    # The picture's bytes are the body; the entry's lookup comes before they are read for type or
+    # walk, so these reach it. What the route keeps is tests/test_saved_entry_pictures_postgres.py.
+    "PUT /world-entries/{entry_id}/picture": {
+        "params": {
+            "authored_version_id": str(uuid.uuid4()),
+            "authored_state_sha256": _ZERO_DIGEST,
+            "style_version_id": str(uuid.uuid4()),
+        },
+        "content": b"probe",
+    },
     "POST /world-entries/{entry_id}/source-attachments": {
         "json": {
             "operation_id": str(uuid.uuid4()),

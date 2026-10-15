@@ -16,6 +16,7 @@ for either [version authority](world-version-authorities.md).
 - [Entry and creation](#entry-and-creation)
 - [The worlds a workspace holds](#the-worlds-a-workspace-holds)
 - [Mutation and reopen](#mutation-and-reopen)
+- [A saved world's picture](#a-saved-worlds-picture)
 - [Structural rendering boundary](#structural-rendering-boundary)
 - [Reference photographs](#reference-photographs)
 - [HTTP surface](#http-surface)
@@ -505,6 +506,51 @@ it sends. Apply may carry the same optional
 `saved_entry` binding as authored object edits so the reopen cursor advances with the
 mutation. Attachment membership, detach, and rebind remain separate from composition apply.
 
+## A saved world's picture
+
+Each card in Your worlds shows a picture of its world. The server keeps one picture per saved
+entry in `saved_world_entry_picture`
+(`exulanica/migrations/0218_a_saved_world_keeps_one_picture.sql`), so a browser that never opened
+a world still shows it. The server cannot draw a world: a page that draws it puts the picture, and
+the server holds the picture to what it can check (`exulanica/world/saved_entry_pictures.py`).
+
+- **What it is.** A JPEG or WebP of at most 512 KiB, from 320 by 180 to 1280 by 720 pixels, walked
+  whole by the style pack preview's walk: no metadata, no embedded thumbnail, nothing after the
+  picture. Its digest is the server's own.
+- **What it shows.** The request names the entry's authored version, the state digest the entry is
+  saved at (the state opening the world draws) and the style version the picture was drawn in. Unless all three are the entry's now, the
+  server refuses it as `409 picture_not_current`, so a page that drew an older world never
+  replaces the picture of the current one. The entry's `picture` states the three, and `current`
+  says whether they are still the entry's.
+- **What it may be of.** A world that holds or held a photograph is refused as
+  `422 picture_of_photographs`: a personal-source world, and an authored world with a reference
+  photograph attached now or before. A kept picture is a render of made geometry and drawn
+  figures. The server cannot see pixels, so the rule is held on what the world is made of.
+
+A new picture replaces the old. The bytes stay in the picture's row: at most 512 KiB for each
+saved world needs no object store namespace and no purge job. A world's erasure and its permanent
+removal delete its entries through `world_erase_rows`; a definer trigger on `saved_world_entry`
+deletes the entry's picture first, and the picture carries the guard that refuses every other
+delete.
+
+`PUT /world-entries/{entry_id}/picture` takes the picture as the raw body with its `Content-Type`,
+and the three identities as query parameters. Its refusals are `415 picture_media_type`,
+`413 picture_too_large`, `422 picture_refused` (the walk refused a byte), `422 picture_size`,
+`409 picture_not_current` and `422 picture_of_photographs`. `GET /world-entries/{entry_id}/picture`
+answers the bytes while its `sha256` query is the kept picture's digest, with that digest as the
+`ETag` and `Cache-Control: private, max-age=31536000, immutable`; any other digest is
+`404 picture_not_found`. An entry the workspace does not hold is `404 unknown_reference` on both.
+
+The browser (`web/packages/app/src/composition/world-pictures.ts`) shows the server's picture on a
+card while its `current` is true, after checking the bytes against the stated digest. Otherwise
+the card shows the picture the browser kept itself, then the recipe picture. A few seconds after a
+world opens, the page keeps a picture of its first view and puts it, unless the server's is current
+already or the world holds or held a photograph, whose picture never leaves the browser. The
+picture kept when a person leaves the world is the view they left; it stays in that browser. A
+world changed since its picture, in its objects or its look, shows the browser's own picture until
+a page opens it again and puts a new one. A put that is refused, as a read-only copy refuses every
+write, leaves the browser's own picture in place.
+
 ## Structural rendering boundary
 
 The entry read exposes `source_snapshot_id` and `source_snapshot_sha256` from the immutable snapshot
@@ -741,6 +787,8 @@ cannot be restored over them; recovery is a restore from backup.
 | `POST` | `/world-entries/{entry_id}/source-attachments` | Attach reviewed reference photographs while preserving the world cursor |
 | `POST` | `/world-entries/{entry_id}/source-detachments` | Remove references from the current collection; no row or media is deleted |
 | `POST` | `/world-entries/{entry_id}/source-rebinds` | Add removed references back under a new human review, as new membership rows |
+| `PUT` | `/world-entries/{entry_id}/picture` | Keep a picture of the world's first view for its card, in place of any other |
+| `GET` | `/world-entries/{entry_id}/picture?sha256=` | The kept picture's bytes, while the digest is its own |
 
 ## Verification
 
@@ -797,6 +845,18 @@ module version disagree, and every endless ground that declares an extent.
 `web/packages/atlas-react/test/endless-authored-ground.test.ts` measures the walking surface, the
 field an endless ground admits and the walk itself; `objects-surface.test.ts` covers placement and
 drawing on both grounds, including that the object bound and the walking surface are one number.
+
+`tests/test_saved_entry_pictures.py` holds a picture's bounds, types and walk, a picture with
+camera data in it, the photographs rule and what a picture shows, with no database.
+`tests/test_saved_entry_pictures_postgres.py` puts a picture through the route and reads it with
+its entry and by its digest, replaces it, refuses a picture of the world as it was, a world that
+holds a photograph and a refused body by name, keeps it from another workspace, and erases it with
+its world while refusing every other delete. `tests/test_world_erasure_postgres.py` holds that the
+picture is reached through its entry's trigger. `web/packages/app/test/your-worlds.test.ts` shows
+the server's picture only while it is current and only bytes of its stated digest, draws the cards
+again when pictures arrive, puts a first view once for what it shows, never sends a frame of a
+world that holds or held a photograph, and leaves the browser's own picture after a refusal;
+`world-entry-api.test.ts` covers the picture's parse and the two requests.
 
 Reference-attachment coverage includes atomic mixed-source refusal, exact retry and operation
 identity conflicts, live authored-cursor drift, preserved object undo, authorization and screening
