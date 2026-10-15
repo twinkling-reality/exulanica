@@ -25,8 +25,10 @@ export const VOLUME_CHUNK_MM = 32_000;
 export const VOLUME_LEVELS_MM: readonly number[] = Object.freeze([500, 1_000, 2_000, 4_000]);
 /** A normal's length. */
 export const VOLUME_NORMAL_ONE = 32_767;
-/** The looks a vertex names, by index. */
+/** The looks a vertex names, by index, and the looks a volume's faces may be dressed in. */
 export const VOLUME_LOOKS: readonly string[] = Object.freeze(['rock', 'wall']);
+/** The looks a volume's upward faces may be dressed in: the volume catalog's words. */
+const VOLUME_TOP_LOOKS: readonly string[] = Object.freeze(['moss', 'grass', 'rock', 'sand']);
 /** The finest cell a page draws a volume at unless told otherwise: the landscape's default. */
 export const VOLUME_DRAWN_FINEST_MM = 2_000;
 /** A placement's origin, each axis: the landscape catalog's bound. */
@@ -61,6 +63,10 @@ function text(raw: unknown, pattern: RegExp, where: string): string {
   require(typeof raw === 'string' && pattern.test(raw), where, `matches ${pattern.source}`);
   return raw;
 }
+function word(raw: unknown, words: readonly string[], where: string): string {
+  require(typeof raw === 'string' && words.includes(raw), where, `is one of ${words.join(', ')}`);
+  return raw;
+}
 function checked(raw: unknown, digest: HeightfieldDigest, expected: string | undefined, where: string): string {
   const actual = digest(new TextEncoder().encode(canonicalJson(raw)));
   if (expected !== undefined) require(actual === expected, where, 'is the document its digest names');
@@ -84,6 +90,10 @@ export interface PlacedVolume {
   readonly inputSha256: string;
   readonly atMm: readonly [number, number, number];
   readonly yawMdeg: number;
+  /** The look its faces are dressed in; rock where the drawing names none. */
+  readonly look: string;
+  /** The look its upward faces are dressed in; none where the drawing names none, so they are its rock. */
+  readonly topLook: string | null;
   readonly chunks: readonly VolumeChunkRef[];
   readonly tops: readonly VolumeTopRef[];
 }
@@ -108,7 +118,10 @@ function chunkRef(raw: unknown, where: string): VolumeChunkRef {
 }
 
 function placedVolume(raw: unknown, where: string): PlacedVolume {
-  const row = fields(raw, 'id volume_sha256 input_sha256 at_mm yaw_mdeg chunks tops', where);
+  // A drawing names a volume's looks together, or (made before it named them) neither.
+  const named = 'id volume_sha256 input_sha256 at_mm yaw_mdeg chunks tops';
+  const looked = raw !== null && typeof raw === 'object' && ('look' in raw || 'top_look' in raw);
+  const row = fields(raw, looked ? `${named} look top_look` : named, where);
   const [x, y, z] = integers(row['at_mm'], 3, PLACED_LOW_MM, PLACED_HIGH_MM, `${where}.at_mm`);
   require(Array.isArray(row['chunks']), `${where}.chunks`, 'is a list');
   require(Array.isArray(row['tops']), `${where}.tops`, 'is a list');
@@ -126,6 +139,8 @@ function placedVolume(raw: unknown, where: string): PlacedVolume {
     inputSha256: text(row['input_sha256'], DIGEST, `${where}.input_sha256`),
     atMm: Object.freeze([x!, y!, z!] as const),
     yawMdeg: integer(row['yaw_mdeg'], 0, 359_999, `${where}.yaw_mdeg`),
+    look: looked ? word(row['look'], VOLUME_LOOKS, `${where}.look`) : 'rock',
+    topLook: looked ? word(row['top_look'], VOLUME_TOP_LOOKS, `${where}.top_look`) : null,
     chunks: Object.freeze(chunks),
     tops: Object.freeze(tops),
   });

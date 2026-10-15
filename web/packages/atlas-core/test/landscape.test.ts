@@ -38,6 +38,25 @@ describe('the landscape drawing', () => {
     expect(island!.yawMdeg).toBe(30000);
     expect(island!.chunks.every((one) => one.cellMm === 4000)).toBe(true);
     expect(island!.tops.map((top) => top.surface)).toEqual(['top:0']);
+    // A drawing made before drawings named a volume's looks: rock, and no top of its own.
+    expect([island!.look, island!.topLook]).toEqual(['rock', null]);
+  });
+
+  it('reads the looks a drawing names for a volume, together and in the volume catalog\'s words', () => {
+    const looked = (look: unknown, topLook: unknown): Record<string, unknown> => {
+      const raw = drawing();
+      const volume = (raw['volumes'] as Record<string, unknown>[])[0]!;
+      if (look !== undefined) volume['look'] = look;
+      if (topLook !== undefined) volume['top_look'] = topLook;
+      return raw;
+    };
+    const [island] = readLandscapeDrawing(looked('rock', 'grass'), digest).volumes;
+    expect([island!.look, island!.topLook]).toEqual(['rock', 'grass']);
+    expect(readLandscapeDrawing(looked('wall', 'sand'), digest).volumes[0]!.topLook).toBe('sand');
+    expect(refusal(() => readLandscapeDrawing(looked('rock', 'lawn'), digest))).toBe('landscape.volumes[0].top_look');
+    expect(refusal(() => readLandscapeDrawing(looked('glass', 'grass'), digest))).toBe('landscape.volumes[0].look');
+    expect(refusal(() => readLandscapeDrawing(looked(undefined, 'grass'), digest))).toBe('landscape.volumes[0]');
+    expect(refusal(() => readLandscapeDrawing(looked('rock', undefined), digest))).toBe('landscape.volumes[0]');
   });
 
   it('refuses each broken bound by where it broke, and another document than its digest names', () => {
@@ -96,6 +115,7 @@ describe('a volume chunk', () => {
 describe('where a page draws a volume', () => {
   const placed = (cells: number[], yawMdeg = 0): PlacedVolume => ({
     id: 'probe', volumeSha256: '0'.repeat(64), inputSha256: '0'.repeat(64), atMm: [1000, 2000, 3000], yawMdeg,
+    look: 'rock', topLook: null,
     chunks: cells.map((cellMm) => ({ chunk: [0, 0, 0], cellMm, sha256: '0'.repeat(64) })), tops: [],
   });
 

@@ -16,7 +16,9 @@ placed round it (:mod:`exulanica.grammar.landscape`). Here:
   (``generated_world_landscape_rules_changed``, ``generated_world_landscape_changed``).
 * :func:`landscape_drawing` realizes its volumes under a seed drawn from the world and the
   landscape (:func:`landscape_seed`) and names the site drawing, the land and every volume chunk
-  and top by digest; the documents those digests name come with it, to be served by digest.
+  and top by digest, and each placed volume's look and top look, so a page dresses its faces and
+  its upward faces as the volume says; the documents those digests name come with it, to be
+  served by digest.
 
 A placed volume's chunks and tops are in its own frame: a reader places a point ``p`` of them at
 ``at_mm + R(yaw) p``, ``R`` the turn counterclockwise seen from above.
@@ -139,6 +141,10 @@ def landscape_drawing(
     digest."""
     landscape = receipt_landscape(receipt)
     placed = compose_volumes(landscape, landscape_seed(world_id, landscape.sha256))
+    section = volumes_section(placed)
+    for entry, placement in zip(section["volumes"], landscape.placements, strict=True):
+        entry["look"] = placement.volume.look
+        entry["top_look"] = placement.volume.top_look
     drawing = {
         "profile": LANDSCAPE_DRAWING_PROFILE,
         "world_id": world_id,
@@ -147,7 +153,7 @@ def landscape_drawing(
         "land_sha256": receipt["land_sha256"],
         "landscape_sha256": landscape.sha256,
         "landscape_rules_version": receipt["landscape_rules"]["version"],
-        **volumes_section(placed),
+        **section,
     }
     return drawing, volume_bodies(placed)
 

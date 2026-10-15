@@ -523,20 +523,40 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     // own depth; a fall, the look's falling water. Made here, with everything else the dresser makes,
     // so their time is kept from the start.
     // The rock a landscape's volumes are drawn in: the look's ground.rock, as its catalog material or
-    // the pack's own surface, made once and only when asked.
-    let volumeRock: pc.Material | null | undefined;
-    const volumeLook = (): pc.Material | null => {
-      if (volumeRock !== undefined) return volumeRock;
-      const role: StyleSlot = { identity: 'site-volumes', lookRole: 'ground.rock', positionMm: [0, 0, 0], yawQuarterTurns: 0, boxMm: [0, 0, 0] };
+    // the pack's own surface, its upward faces in the look's ground for the volume's top look
+    // (ground.grass for grass) where that is not rock; made once for each top look and only when
+    // asked. As every surface that colours its upward faces apart, rock with a top drops its pattern.
+    const groundSwatch = (leaf: string) => {
+      const role: StyleSlot = { identity: 'site-volumes', lookRole: `ground.${leaf}`, positionMm: [0, 0, 0], yawQuarterTurns: 0, boxMm: [0, 0, 0] };
       const resolved = catalog === null ? resolveLookRole(pack, role, families, 'surface') : resolveSurfaceLookRole(pack, role, families, 'surface', catalog);
-      const swatch = resolved?.kind === 'material' ? { swatch: resolved.material.swatch, up: null, key: resolved.material.key }
+      return resolved?.kind === 'material' ? { swatch: resolved.material.swatch, up: null, key: resolved.material.key as string | null }
         : resolved?.kind === 'surface' && resolved.swatch !== null ? { swatch: resolved.swatch, up: resolved.up, key: null } : null;
-      if (swatch === null) return (volumeRock = null);
-      const material = swatchMaterial(swatch.swatch, swatch.up, shading, 'style-pack:volumes:rock');
-      const pattern = swatch.key === null || patterns === null ? null : patterns.byMaterial.get(swatch.key) ?? null;
-      if (pattern !== null) applyPattern(material, pattern, shading.ink);
-      made.push(material);
-      return (volumeRock = material);
+    };
+    const volumeRocks = new Map<string, pc.Material | null>();
+    const volumeLook = (topLook: string | null): pc.Material | null => {
+      const asked = topLook === null || topLook === 'rock' ? null : topLook;
+      const known = volumeRocks.get(asked ?? 'rock');
+      if (known !== undefined) return known;
+      const rock = groundSwatch('rock');
+      const topSwatch = asked === null ? null : groundSwatch(asked)?.swatch ?? null;
+      // A top the look has no ground for is the rock throughout.
+      if (asked !== null && topSwatch === null) {
+        const plain = volumeLook(null);
+        volumeRocks.set(asked, plain);
+        return plain;
+      }
+      const top = topSwatch === null ? null : asked;
+      const up = topSwatch ?? rock?.up ?? null;
+      let material: pc.Material | null = null;
+      if (rock !== null) {
+        const dressed = swatchMaterial(rock.swatch, up, shading, `style-pack:volumes:rock${top === null ? '' : `:${top}`}`);
+        const pattern = up !== null || rock.key === null || patterns === null ? null : patterns.byMaterial.get(rock.key) ?? null;
+        if (pattern !== null) applyPattern(dressed, pattern, shading.ink);
+        made.push(dressed);
+        material = dressed;
+      }
+      volumeRocks.set(asked ?? 'rock', material);
+      return material;
     };
     const landWaters = new Map<string, pc.StandardMaterial>();
     const resolveWater = (identity: string, lookRole: string) => {

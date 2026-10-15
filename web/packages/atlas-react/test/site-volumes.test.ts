@@ -37,6 +37,14 @@ const drawingOf = (worldId?: string): LandscapeDrawing => {
 };
 const bodies = (): Map<string, unknown> => new Map(Object.entries(structuredClone(FIXTURE.chunks)));
 const volumesOf = (worldId?: string): SiteVolumes => readSiteVolumes(drawingOf(worldId), bodies(), sha256, 4321);
+/** The fixture's landscape with its island's looks named, as a drawing does from 4c on. */
+const toppedOf = (worldId: string, topLook: string): SiteVolumes => {
+  const raw: Record<string, unknown> = { ...structuredClone(FIXTURE.drawing), world_id: worldId };
+  const island = (raw['volumes'] as Record<string, unknown>[])[0]!;
+  island['look'] = 'rock';
+  island['top_look'] = topLook;
+  return readSiteVolumes(readLandscapeDrawing(raw, sha256), bodies(), sha256, 4321);
+};
 
 /** The yard's land, as `site-land.test.ts` rebuilds it. */
 const lattice = (east: number, north: number): number => 6000 + (40 * north) / 1000 + (east >= 8000 ? 500 : 0);
@@ -135,6 +143,11 @@ describe('drawing the volumes', () => {
     const other = new pc.StandardMaterial();
     drawn.wear(other);
     expect(drawn.instances.every((instance) => instance.material === other)).toBe(true);
+    const topped = new pc.StandardMaterial();
+    expect(drawn.wearEach(() => null)).toBe(0);
+    expect(drawn.instances.every((instance) => instance.material === other)).toBe(true);
+    expect(drawn.wearEach((volume) => (volume.id === 'small_island' ? topped : null))).toBe(1);
+    expect(drawn.instances.every((instance) => instance.material === topped)).toBe(true);
     drawn.destroy();
     drawn.destroy();
   });
@@ -155,7 +168,7 @@ describe('a site on a landscape, mounted', () => {
     expect(root).not.toBeNull();
     expect(attachment.metrics.triangles).toBe(plainTriangles + 264);
     const said = JSON.parse((app.graphicsDevice.canvas as HTMLCanvasElement).dataset['siteLandscape']!) as { volumes: { id: string; cellMm: number }[]; dressed: boolean };
-    expect(said.volumes).toEqual([{ id: 'small_island', cellMm: 4000, chunks: volumesOf().volumes[0]!.chunks.length }]);
+    expect(said.volumes).toEqual([{ id: 'small_island', cellMm: 4000, chunks: volumesOf().volumes[0]!.chunks.length, topLook: null }]);
     expect(said.dressed).toBe(false);
     attachment.dispose();
     expect(environmentRoot.findByName('site-volumes')).toBeNull();
@@ -188,6 +201,22 @@ describe('a site on a landscape, mounted', () => {
     const said = JSON.parse((app.graphicsDevice.canvas as HTMLCanvasElement).dataset['siteLandscape']!) as { dressed: boolean };
     expect(said.dressed).toBe(true);
     attachment.dispose();
+    // An island whose upward faces are grass wears the rock with the look's grass on them; one whose
+    // top is rock wears the rock alone.
+    const grassy = siteMount(site, { servedBytes: 1, land: landOf(site), materials: MATERIALS, dress, landscape: toppedOf(worldId, 'grass') })
+      .attach({ app, camera, environmentRoot });
+    const island = environmentRoot.findByName('site-volumes:small_island') as pc.Entity;
+    const worn = island.render!.meshInstances[0]!.material as pc.StandardMaterial;
+    expect(worn.name).toBe('style-pack:volumes:rock:grass');
+    expect(worn.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS')).toMatch(/normalize\(vNormalW\)\.y/);
+    const grassSaid = JSON.parse((app.graphicsDevice.canvas as HTMLCanvasElement).dataset['siteLandscape']!) as { volumes: { topLook: string | null }[] };
+    expect(grassSaid.volumes.map((one) => one.topLook)).toEqual(['grass']);
+    grassy.dispose();
+    const rocky = siteMount(site, { servedBytes: 1, land: landOf(site), materials: MATERIALS, dress, landscape: toppedOf(worldId, 'rock') })
+      .attach({ app, camera, environmentRoot });
+    const bare = (environmentRoot.findByName('site-volumes:small_island') as pc.Entity).render!.meshInstances[0]!.material;
+    expect(bare.name).toBe('style-pack:volumes:rock');
+    rocky.dispose();
   });
 
   it('is the same document the fixture names', () => {

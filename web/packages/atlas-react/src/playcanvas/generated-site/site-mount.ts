@@ -52,7 +52,7 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * disposer, which runs before the slots are taken away and puts back everything it changed. It
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
-export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null; readonly volumeLook?: () => pc.Material | null };
+export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null; readonly volumeLook?: (topLook: string | null) => pc.Material | null };
 export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment, land?: SiteLand) => SiteUndress;
 
 export interface SiteMountOptions {
@@ -109,7 +109,8 @@ export interface SiteMountOptions {
   /**
    * The volumes a site on a landscape places round it, read and held to the digests its landscape
    * drawing names (`readSiteVolumes`): drawn on the land, off the site, in the engine's rock or the
-   * rock the dresser makes (`volumeLook`). None draws none; they are never walked.
+   * rock the dresser makes for each volume's top look (`volumeLook`). None draws none; they are
+   * never walked.
    */
   readonly landscape?: SiteVolumes;
 }
@@ -225,9 +226,10 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       }
       // The land's sea and lakes in the look's water, as the dresser makes it; plain where it makes none.
       if (drawnLand !== null && undress?.landWater !== undefined) drawnLand.wearWater(undress.landWater);
-      // The volumes in the look's rock, as the dresser makes it; the engine's rock where it makes none.
-      const dressedRock = drawnVolumes === null ? null : undress?.volumeLook?.() ?? null;
-      if (drawnVolumes !== null && dressedRock !== null) drawnVolumes.wear(dressedRock);
+      // Each volume in the look's rock with its upward faces in its top look, as the dresser makes
+      // them; the engine's rock where it makes none.
+      const volumeLook = undress?.volumeLook;
+      const dressedVolumes = drawnVolumes === null || volumeLook === undefined ? 0 : drawnVolumes.wearEach((volume) => volumeLook(volume.topLook));
       const withdrawSeats = options.seated === undefined ? undefined : options.seated(drawnSiteSeats(drawing, slots, undress?.seatTriangles));
       // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn
       // in once dressed, and the look's sun turned into the light under it.
@@ -268,8 +270,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       if (drawnVolumes !== null && canvas?.dataset !== undefined) {
         canvas.dataset['siteLandscape'] = JSON.stringify({
           landscape: volumes!.drawing.landscapeSha256,
-          volumes: volumes!.volumes.map((one) => ({ id: one.volume.id, cellMm: one.cellMm, chunks: one.chunks.length })),
-          dressed: dressedRock !== null,
+          volumes: volumes!.volumes.map((one) => ({ id: one.volume.id, cellMm: one.cellMm, chunks: one.chunks.length, topLook: one.volume.topLook })),
+          dressed: dressedVolumes > 0,
           draws: drawnVolumes.draws,
           triangles: drawnVolumes.triangles,
         });

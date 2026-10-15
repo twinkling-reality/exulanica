@@ -19,7 +19,8 @@ import {
  * every triangle from solid toward air, which this frame keeps, so faces cull as drawn.
  *
  * Volumes stand off the site and are seen, not walked: nothing here is read by the site's walk,
- * its society or its seats.
+ * its society or its seats. Each is worn in its own look ({@link DrawnSiteVolumes.wearEach}), so a
+ * floating island's upward faces can be its grass while a sea stack is rock throughout.
  */
 
 /** The rock a volume is drawn in where nothing dresses it: the engine's own, as the land's ground has. */
@@ -106,6 +107,8 @@ export interface DrawnSiteVolumes {
   readonly draws: number;
   /** Draw every volume in `material`, as the site's dressing makes it. */
   wear(material: pc.Material): void;
+  /** Draw each volume in the material `lookOf` gives it, one it gives none keeping what it wears; how many it dressed. */
+  wearEach(lookOf: (volume: PlacedVolume) => pc.Material | null): number;
   destroy(): void;
 }
 
@@ -118,6 +121,7 @@ export function drawSiteVolumes(device: pc.GraphicsDevice, volumes: SiteVolumes,
   const root = new pc.Entity('site-volumes');
   const meshes: pc.Mesh[] = [];
   const instances: pc.MeshInstance[] = [];
+  const worn: { readonly volume: PlacedVolume; readonly instances: readonly pc.MeshInstance[] }[] = [];
   let triangles = 0;
   for (const { volume, chunks } of volumes.volumes) {
     const placed = new pc.Entity(`site-volumes:${volume.id}`);
@@ -139,6 +143,7 @@ export function drawSiteVolumes(device: pc.GraphicsDevice, volumes: SiteVolumes,
     }
     if (own.length > 0) placed.addComponent('render', { meshInstances: own, castShadows: true, receiveShadows: true });
     instances.push(...own);
+    worn.push({ volume, instances: own });
     root.addChild(placed);
   }
   let destroyed = false;
@@ -147,8 +152,18 @@ export function drawSiteVolumes(device: pc.GraphicsDevice, volumes: SiteVolumes,
     instances,
     triangles,
     draws: instances.length,
-    wear(worn: pc.Material): void {
-      for (const instance of instances) instance.material = worn;
+    wear(material: pc.Material): void {
+      for (const instance of instances) instance.material = material;
+    },
+    wearEach(lookOf: (volume: PlacedVolume) => pc.Material | null): number {
+      let dressed = 0;
+      for (const { volume, instances: own } of worn) {
+        const material = lookOf(volume);
+        if (material === null) continue;
+        for (const instance of own) instance.material = material;
+        dressed += 1;
+      }
+      return dressed;
     },
     destroy(): void {
       if (destroyed) return;

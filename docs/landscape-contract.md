@@ -198,7 +198,8 @@ people never meet rock their place does not know. Volumes stand on the land beyo
 
 `exulanica.landscape-drawing/v1` (`exulanica/world/landscape_drawing.py`) names the world, its
 receipt's digest, its site drawing's digest, its land's and its landscape's digests, the landscape
-rules version, and the `volumes` section; it is made with the site's drawing in the kind worker
+rules version, and the `volumes` section, which also names each placed volume's `look` and
+`top_look` from its volume document; it is made with the site's drawing in the kind worker
 from a seed drawn from the world's identity and the landscape's digest, and kept with it. A reader
 places a point `p` of a placed volume's chunk or top at `at_mm + R(yaw) p`, `R` the turn
 counterclockwise seen from above. The drawing, each chunk and each top are served by digest
@@ -218,9 +219,13 @@ landscape's default finest cell), else the coarsest it names (`volumeDrawnCellMm
 level's chunks are fetched (`readSiteVolumes`, `web/packages/atlas-react/src/playcanvas/generated-site/site-volumes.ts`).
 A volume's chunks are placed at its origin and turned about the renderer's up axis; a point
 `(x, y, z)` of its own frame is the renderer's `(x, z, -y) / 1000` metres, which keeps every face
-turned from solid toward air. They are drawn in the look's `ground.rock` (the surface material
-catalog's rock and its grain pattern, or the pack's own surface), else the engine's rock colour;
-volumes cast and receive shadows and are counted in the site's triangles and draws. A landscape that
+turned from solid toward air. Each is drawn in the look's `ground.rock` (the surface material
+catalog's rock and its grain pattern, or the pack's own surface), else the engine's rock colour,
+and its upward faces (within about 44 degrees of level) in the look's ground for its top look
+(`ground.grass` for `grass`) where the look has one; rock that takes a top takes no grain pattern,
+as every surface that colours its upward faces apart, and a drawing that names no looks draws its
+volumes in rock throughout (`wearEach`, `volumeLook` in `style-pack/site-dresser.ts`). Volumes
+cast and receive shadows and are counted in the site's triangles and draws. A landscape that
 cannot be read does not stop the site: it opens without its volumes and the page keeps the reason.
 
 ## Refusals
@@ -254,7 +259,10 @@ cannot be read does not stop the site: it opens without its volumes and the page
   touch in one cell border four triangles.
 - A solid thinner than 250 mm can be stepped over by the top search; tops are of one volume alone,
   and where placed volumes meet, which top is walked is not decided yet.
-- Volumes are drawn at one level each, in one rock, with no texture yet, and are not walked by
+- Volumes are drawn at one level each, in the look's rock with their upward faces in their top
+  look's ground, with no texture yet (the surface material catalog has no moss: a moss top takes
+  what the look gives a ground it has no material for, or the rock where it gives none), and are
+  not walked by
   people; they stand only off a site;
   sky islands, spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
 - Realized chunks and tops are kept in the kind worker's memory with the site's drawing, as a site's

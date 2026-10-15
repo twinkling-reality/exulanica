@@ -99,6 +99,9 @@ def test_its_site_is_drawn_on_its_land_and_its_landscape_beside_it(on_land, on_l
     assert landscape["landscape_sha256"] == receipt["landscape_sha256"]
     (stack,) = landscape["volumes"]
     assert stack["id"] == "stack" and stack["chunks"] and stack["tops"]
+    # The page dresses a volume's faces and its upward faces as the volume says.
+    rock = read_landscape_document(receipt["landscape"]).placements[0].volume
+    assert (stack["look"], stack["top_look"]) == (rock.look, rock.top_look) == ("rock", "moss")
     named = {entry["sha256"] for entry in [*stack["chunks"], *stack["tops"]]}
     assert named == set(bodies)
     again, _ = landscape_drawing(WORLD, receipt, digest, site_drawing_sha256(drawing))
