@@ -20,6 +20,8 @@
     assets nebius stage|submit|status|fetch|cancel|clear|usage ...   on this Mac
     creatures dry-run --repository ROOT --staged DIR --out DIR   a staged creature job, stand-in models
     creatures run ...   on the rented machine, from container/assets/job.sh (route C)
+    creatures fit --repository ROOT --request FILE --cutout FILE --model FILE --up=+Z --front=-Y
+                  --simplifier quadric|stand-in --out DIR   route P's fit of one model, on a CPU
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -601,6 +603,48 @@ def _creatures_run(args: argparse.Namespace) -> int:
     )
 
 
+def _creatures_fit(args: argparse.Namespace) -> int:
+    from exulanica_pieces.canonical import canonical_bytes, sha256_hex
+    from exulanica_pieces.colour import read_table
+    from exulanica_pieces.geometry.mesh import cluster_simplify
+
+    from exulanica_appearance.creatures.fit import fit_look, model_from_npz
+    from exulanica_appearance.creatures.job import _write_once
+    from exulanica_appearance.creatures.request import read_request
+
+    if args.simplifier == "quadric":
+        from exulanica_appearance.assets.backends.shared import quadric_simplify as simplifier
+    else:
+        simplifier = cluster_simplify
+    table, _table_sha256 = read_table(Path(args.repository))
+    fitted = fit_look(
+        read_request(Path(args.request).read_bytes()),
+        model_from_npz(Path(args.model).read_bytes()),
+        up=args.up,
+        front=args.front,
+        cutout_png=Path(args.cutout).read_bytes(),
+        simplifier=simplifier,
+        table=table,
+    )
+    out = Path(args.out)
+    receipt = canonical_bytes(fitted.receipt)
+    receipt_sha256 = sha256_hex(receipt)
+    _write_once(out / "receipts" / f"{receipt_sha256}.json", receipt)
+    if fitted.container is not None:
+        _write_once(out / "looks" / f"{fitted.receipt['output']['sha256']}.glb", fitted.container)
+    print(
+        json.dumps(
+            {
+                "outcome": fitted.receipt["outcome"],
+                "receipt": receipt_sha256,
+                **({"refusal": fitted.receipt["refusal"]} if "refusal" in fitted.receipt else {}),
+                **({"look": fitted.receipt["output"]["sha256"]} if fitted.container else {}),
+            }
+        )
+    )
+    return 0 if fitted.container is not None else REFUSED
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -805,6 +849,11 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("--code", "--upstream", "--job", "--requests", "--sketches", "--weights", "--out"):
         creatures_run.add_argument(name, required=True)
     creatures_run.set_defaults(run=_creatures_run)
+    creatures_fit = creatures.add_parser("fit")
+    for name in ("--repository", "--request", "--cutout", "--model", "--up", "--front", "--out"):
+        creatures_fit.add_argument(name, required=True)
+    creatures_fit.add_argument("--simplifier", required=True, choices=("quadric", "stand-in"))
+    creatures_fit.set_defaults(run=_creatures_fit)
 
     args = parser.parse_args(argv)
     try:
