@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import time
 
 import pytest
 from exulanica.grammar.landform import land_recipes, read_land_document
@@ -16,6 +17,9 @@ from test_world_kinds_postgres import _uploaded
 pytestmark = pytest.mark.postgres
 
 [ROLLING] = [recipe for recipe in land_recipes() if recipe.key == "rolling"]
+#: How many times a land document is asked for while the kind worker is still making it: each ask
+#: waits as long as a request does, so this bounds a slow machine's wait at a few minutes.
+ASKS = 12
 
 
 @pytest.fixture(name="made")
@@ -37,9 +41,13 @@ def _town(api, **more):  # type: ignore[no-untyped-def]
 
 
 def _read(api, path: str):  # type: ignore[no-untyped-def]
-    """A land document, asked once more when the worker was still making it."""
+    """A land document, asked again while the worker is still making it, after the wait its answer
+    names, as the route asks: the finished work is kept and read."""
     response = api.get(path)
-    if response.status_code == 503:
+    for _ in range(ASKS - 1):
+        if response.status_code != 503:
+            break
+        time.sleep(min(int(response.headers.get("retry-after", "1")), 5))
         response = api.get(path)
     return response
 
