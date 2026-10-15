@@ -32,6 +32,8 @@ const REFUSALS = Object.freeze({
 
 export function refusalWords(code, detail) {
   if (typeof code === 'string' && code.startsWith('thing_landing_') && typeof detail === 'string' && detail) return 'Not here: ' + detail.charAt(0).toLowerCase() + detail.slice(1);
+  // A made part's refusals, and the land's under it, are the server's sentences for a person already.
+  if (typeof code === 'string' && (code.startsWith('part_') || code.startsWith('landform_')) && typeof detail === 'string' && detail) return detail;
   return Object.hasOwn(REFUSALS, code) ? REFUSALS[code] : 'That could not be done. Nothing changed.';
 }
 
@@ -84,12 +86,19 @@ export function redoRefusalWords(code, detail) {
 
 /**
  * One line of the world's changes, from its edit log: what the edit did, by its kind and the
- * thing it names (`nameOf(thingId)`, a name or null), an undo by what it took back, and a redo
- * (an undo of an undo) by what it did again.
+ * thing it names (`nameOf(thingId)`, a name or null) or the made part (`partNameOf(partId)`), an undo
+ * by what it took back, and a redo (an undo of an undo) by what it did again.
  */
-export function changeWords(edit, edits, nameOf) {
+export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
   const byId = new Map(edits.map(each => [each.edit_id, each]));
   const plain = (one) => {
+    // A part made with the world: named by its parts read, its change stored as an element's.
+    if (typeof one.element_id === 'string' && one.element_id.startsWith('part:')) {
+      const name = partNameOf(one.element_id.slice('part:'.length));
+      const part = name ? `the ${name}` : 'a part of the world';
+      if (one.kind === 'suppress_element') return `Removed ${part}`;
+      if (one.kind === 'transform_element') return `Moved ${part}`;
+    }
     const name = one.thing_id ? nameOf(one.thing_id) : null;
     const thing = name ? `the ${name}` : 'a thing';
     if (one.kind === 'add_thing') return `Placed ${thing}`;
@@ -163,6 +172,11 @@ export function placedLine() {
   return 'Placed in this world';
 }
 
+/** The card's line for a part made with the world, with the area it stands in when it names one. */
+export function madeLine(area) {
+  return typeof area === 'string' && area ? `Made with this world · ${titled(area)}` : 'Made with this world';
+}
+
 /** What keeping a move will do, said before it is kept. */
 export function keepLine() {
   return 'People who use it go to the new spot from the next minute.';
@@ -199,8 +213,9 @@ export function buildHints(state) {
 /**
  * The prompts on the chosen thing's card in build mode's state `{ moving, ready, confirming }`, each
  * with the action pressing it does (keyAction's names; none for a prompt that only says how):
- * chosen, Drag to move, Turn and Remove; moving, Keep (dimmed until the server says it may stand
- * there) and Put it back; refused, Put it back alone; a question, Remove and Keep it.
+ * chosen, Drag to move, Turn and Remove (not Remove once a removal was refused: it would only be
+ * refused again); moving, Keep (dimmed until the server says it may stand there) and Put it back;
+ * refused, Put it back alone; a question, Remove and Keep it.
  */
 export function cardPrompts(state) {
   if (state.confirming) {
@@ -217,7 +232,7 @@ export function cardPrompts(state) {
   return [
     { keys: 'mouse', word: 'Drag to move' },
     { keys: ['[', ']'], word: 'Turn', shortcut: '[ ]', action: 'turn-right' },
-    { keys: ['Del'], word: 'Remove', shortcut: 'Delete', action: 'remove' },
+    ...(state.removeRefused ? [] : [{ keys: ['Del'], word: 'Remove', shortcut: 'Delete', action: 'remove' }]),
   ];
 }
 

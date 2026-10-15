@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { HISTORY, MAX_YAW, buildHints, cardPrompts, changeWords, clockWords, dayWords, keyAction, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { HISTORY, MAX_YAW, buildHints, cardPrompts, changeWords, clockWords, dayWords, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
@@ -38,6 +38,23 @@ assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, 
 assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: -3500, z: 0, yaw: 261_799 })), 'Moved the bench 3.5 m west, turned 15°.');
 // The card's line for a placed thing, which the chosen card outside build mode reads too.
 assert.equal(placedLine(), 'Placed in this world');
+// A part made with the world says so, with the area it stands in (frame 13).
+assert.equal(madeLine('lower pools'), 'Made with this world · Lower pools');
+assert.equal(madeLine(''), 'Made with this world');
+// A made part's refusals, and the land's under it, are the server's own sentences.
+assert.equal(refusalWords('part_blocked', 'Not here: it would stand on the farmhouse.'), 'Not here: it would stand on the farmhouse.');
+assert.equal(refusalWords('part_houses_people', 'Not removed: Ada Lane 1 lives there. The farmhouse can be moved instead.'), 'Not removed: Ada Lane 1 lives there. The farmhouse can be moved instead.');
+assert.equal(refusalWords('landform_water_spills', 'Not here: water would spill out there.'), 'Not here: water would spill out there.');
+assert.equal(refusalWords('part_blocked', ''), 'That could not be done. Nothing changed.');
+// History names a made part's change by the part, from the parts read.
+const partLog = [
+  { edit_id: 'p1', kind: 'transform_element', element_id: 'part:barn-id', thing_id: null },
+  { edit_id: 'p2', kind: 'suppress_element', element_id: 'part:pond-id', thing_id: null },
+  { edit_id: 'p3', kind: 'undo', undone_edit_id: 'p2', element_id: null, thing_id: null },
+];
+const partName = (id) => ({ 'barn-id': 'barn', 'pond-id': 'pond' })[id] ?? null;
+assert.deepEqual(partLog.map(edit => changeWords(edit, partLog, () => null, partName)), ['Moved the barn', 'Removed the pond', 'Took back: removed the pond']);
+assert.equal(changeWords({ edit_id: 'p4', kind: 'transform_element', element_id: 'part:gone', thing_id: null }, [], () => null), 'Moved a part of the world');
 // Snapping: half metres and 15 degree steps unless free; a yaw stays within one revolution.
 assert.equal(snapped(1249, false), 1000);
 assert.equal(snapped(1251, false), 1500);
@@ -154,6 +171,8 @@ assert.deepEqual(said(cardPrompts({ moving: true, ready: true })), [['Enter', 'K
 assert.equal(cardPrompts({ moving: true, ready: false })[0].disabled, true);
 assert.deepEqual(said(cardPrompts({ moving: true, refused: true })), [['Esc', 'Put it back']]);
 assert.deepEqual(said(cardPrompts({ confirming: true })), [['Enter', 'Remove'], ['Esc', 'Keep it']]);
+// After a removal was refused (people live or work there), the card offers moving it, not removing it again.
+assert.deepEqual(said(cardPrompts({ removeRefused: true })), [['mouse', 'Drag to move'], ['[ ]', 'Turn']]);
 const keyOf = { Enter: 'Enter', Esc: 'Escape', Del: 'Delete', '[ ]': 'BracketRight' };
 const flagsOf = (state) => ({ on: true, selected: true, confirming: false, moving: false, ready: false, busy: false, changes: false, focused: false, ...state });
 for (const state of [{}, { moving: true, ready: true }, { moving: true, refused: true }, { confirming: true }]) {

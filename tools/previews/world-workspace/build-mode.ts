@@ -9,11 +9,16 @@
 // History. Every write goes through the app's own edit path (`send`, main.ts's sendPlanned), which
 // advances the saved world and redraws what changed; every write is asked of the server first as a
 // preview, and only the server's answer is shown.
+// In a site world (one made from a world kind) the parts made with the world (a building, a garden
+// fixture, a pond or field) are chosen, moved, turned a quarter at a time and removed the same way,
+// through the parts routes; after a change the made world is drawn again (main.ts).
 // It is drawn with the in-world design's shared parts (world-ui.ts) and the world's corners (the
 // mode word, the Back corner, the hints and the note); what a key does in each state, and every
 // sentence, is build-words.mjs.
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
-import { HISTORY, buildHints, cardPrompts, changeWords, clockWords, dayWords, keepLine, keyAction, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { pickSiteSlot } from '/src/composition/sight.ts';
+import { currentOpenSite } from '/src/composition/site-world.ts';
+import { HISTORY, buildHints, cardPrompts, changeWords, clockWords, dayWords, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 import { cardWords, keyWord, label, nameTag, outline, page, path, promptColumn, promptRow, ring, scaleOf, sideCard } from './world-ui.ts';
 
 /** How many of the world's newest changes History lists. */
@@ -24,6 +29,11 @@ const ASK_AFTER_MS = 180;
 const RING_MARGIN = 1.18;
 /** What a refusal the server words for a person starts with, drawn in the refused colour. */
 const NOT_HERE = 'Not here:';
+/** How a made part is named where a placed thing's id would be: chosen, carried, pointed at. */
+const PART = 'part:';
+/** The four turns a made part can take, microradians, as the parts routes state them. */
+const QUARTER_TURNS = [0, 1_570_796, 3_141_593, 4_712_389];
+const quarterOf = (yaw) => Math.max(0, QUARTER_TURNS.indexOf(yaw));
 
 export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting }) {
   const lifetime = new AbortController();
@@ -55,6 +65,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   root.append(origin.root, trail.root, chosen.root, copy.root, foot.root, tag.root, card.root);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
+  /** Whether the server refused removing what is chosen: its card then offers moving it only. */
+  let removeRefused = false;
   /**
    * A move being made: the thing, where it stands (`from`) and where it would stand (`to`, region
    * frame: east, up, south in millimetres, yaw in microradians), the grip while it is dragged, and
@@ -62,12 +74,32 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    */
   let moving = null, asked = 0, askTimer = 0;
   let records = new Map(), pointer = null, lastPick = 0;
+  /** A site world's made parts as the parts read gives them, by `part:<id>`; none in any other world. */
+  let parts = new Map();
+  /**
+   * The version's changes to its parts by part id, as the parts read states them: a move's pose
+   * is turned from how the part was made, so its turns as the version stands are the change's
+   * (`quarter_turns`), none where it has no change; the read's own turns are the part's turns in all.
+   */
+  let partChanges = new Map();
+  const turnsNow = (id) => partChanges.get(id.slice(PART.length))?.quarter_turns ?? 0;
+  const isPart = (id) => typeof id === 'string' && id.startsWith(PART);
+  const partOf = (id) => parts.get(id) ?? null;
+  const exists = (id) => (isPart(id) ? parts.has(id) : records.has(id));
+  const siteDrawing = () => currentOpenSite()?.drawing() ?? null;
+  const slotOf = (id) => siteDrawing()?.slots?.find(slot => slot.identity === id.slice(PART.length)) ?? null;
+  const regionRoot = () => (entry.generatedSite ? b.regionRoots?.get(entry.generatedSite.regionId) ?? null : null);
   /** The version's edit log and every thing it ever placed (removed ones too), for History. */
   let edits = [], everyThing = new Map(), changesOpen = false;
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
   /** What the corners show now, so they are told only when it changes (a hint's fade restarts when told). */
   let cornersShow = '';
+  /**
+   * The projected points the card and marks were last placed at, so a still view places nothing
+   * (placing the card reads its size, which lays the page out); cleared whenever the card is redrawn.
+   */
+  let lastPlacedKey = '';
   const point = b.camera.getPosition().clone(), seen = point.clone();
   let wasInspecting = false;
 
@@ -92,7 +124,18 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     records = new Map((version.things || []).filter(thing => !thing.removed).map(thing => [thing.thing_id, thing]));
     everyThing = new Map((version.things || []).map(thing => [thing.thing_id, thing]));
     edits = Array.isArray(version.edits) ? version.edits : [];
+    await refreshParts();
     if (changesOpen) renderChanges();
+  }
+
+  /** A site world's made parts as they stand; a world not made from a kind has none, and while its worker is busy the last read stands. */
+  async function refreshParts() {
+    if (!entry.generatedSite) return;
+    try {
+      const answered = await read(versionPath + '/parts' + worldQuery);
+      parts = new Map((answered.parts || []).map(part => [PART + part.part_id, part]));
+      partChanges = new Map((answered.changes || []).map(change => [change.identity, change]));
+    } catch { /* Read again after the next change. */ }
   }
 
   /** History while it lists only build mode's changes: the world's newest changes in words, newest first. */
@@ -101,6 +144,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const list = [];
     if (!shown.length) list.push(label(HISTORY.today), node('p', HISTORY.empty, 'wu-small-text'));
     const named = (thingId) => { const thing = everyThing.get(thingId); return thing ? thingName(thing) : null; };
+    const partNamed = (partId) => parts.get(PART + partId)?.label ?? null;
     const now = Date.now();
     let day = null;
     for (const edit of shown) {
@@ -108,7 +152,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const heading = dayWords(edit.recorded_at, now);
       if (heading !== day) { day = heading; list.push(label(heading)); }
       const row = node('div', '', 'wu-list-row');
-      row.append(node('span', clockWords(edit.recorded_at), 'wu-time'), node('div', changeWords(edit, edits, named), 'wu-what'));
+      row.append(node('span', clockWords(edit.recorded_at), 'wu-time'), node('div', changeWords(edit, edits, named, partNamed), 'wu-what'));
       list.push(row);
     }
     historyBody.replaceChildren(...list);
@@ -133,6 +177,15 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (screen.z <= 0 || screen.x < 0 || screen.x > innerWidth || screen.y < 0 || screen.y > innerHeight) continue;
       found.push({ placedId, distance: eye.distance(figure.root.getPosition()) });
     }
+    const root = regionRoot();
+    if (root) for (const [id, part] of parts) {
+      const slot = slotOf(id);
+      root.getWorldTransform().transformPoint(point.set(part.centre_mm[0] / 1000, (slot?.positionMm[2] ?? 0) / 1000 + 1, -part.centre_mm[1] / 1000), point);
+      const distance = eye.distance(point);
+      const screen = b.camera.camera.worldToScreen(point, seen);
+      if (screen.z <= 0 || screen.x < 0 || screen.x > innerWidth || screen.y < 0 || screen.y > innerHeight) continue;
+      found.push({ placedId: id, distance });
+    }
     return found.sort((a, c) => a.distance - c.distance || (a.placedId < c.placedId ? -1 : 1)).map(item => item.placedId);
   }
   function cycle(step) {
@@ -142,16 +195,24 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     select(ids[at === -1 ? (step > 0 ? 0 : ids.length - 1) : (at + step + ids.length) % ids.length]);
   }
 
-  /** The placed thing a screen point meets first, or null: a person or an object in front hides it. */
+  /**
+   * The placed thing or made part a screen point meets first, or null: a person or an object in front
+   * hides it, and a part is met by its box in the drawing the world shows now.
+   */
   function placedAt(x, y) {
     if (!b.__workspacePick) return null;
     const ray = pointerRay(b, x, y); if (!ray) return null;
     const hit = b.__workspacePick(ray.origin, ray.direction);
-    const placedId = hit?.inhabitantId ? null : hit?.thing?.pick?.placedId ?? null;
-    return placedId !== null && records.has(placedId) ? placedId : null;
+    if (hit?.inhabitantId) return null;
+    const thingId = hit?.thing?.pick?.placedId ?? null;
+    const thing = thingId !== null && records.has(thingId) ? { id: thingId, distance: hit.thing.distance } : null;
+    const drawing = parts.size ? siteDrawing() : null;
+    const part = drawing ? pickSiteSlot(drawing, ray.origin, ray.direction, (id) => parts.has(PART + id)) : null;
+    if (part !== null && (thing === null || part.distance < thing.distance)) return PART + part.identity;
+    return thing?.id ?? null;
   }
 
-  function nameOf(placedId) { return thingName(records.get(placedId)); }
+  function nameOf(id) { return isPart(id) ? partOf(id)?.label ?? 'part' : thingName(records.get(id)); }
 
   /** The card's answer line: the server's sentence, its "Not here:" drawn as a refusal. */
   function answer(words) {
@@ -164,7 +225,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** The card's prompts for the state build mode is in: a column while chosen, an answer pair in one row. */
   function prompts() {
     const verdict = moving?.verdict.state ?? null;
-    const items = cardPrompts({ moving: moving !== null, ready: verdict === 'ready', refused: verdict === 'refused', confirming: confirming !== null });
+    const items = cardPrompts({ moving: moving !== null, ready: verdict === 'ready', refused: verdict === 'refused', confirming: confirming !== null, removeRefused });
     const made = items.map(item => keyWord({
       keys: item.keys, word: item.word, shortcut: item.shortcut, disabled: busy || item.disabled === true,
       onPress: item.action ? () => act(item.action, false) : undefined,
@@ -195,6 +256,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   function render() {
     renderCorners();
+    lastPlacedKey = '';
     if (!cardShows()) { card.hide(); hideMarks(); return; }
     const name = nameOf(selected) || 'thing';
     const body = [];
@@ -206,7 +268,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const verdict = moving.verdict;
       body.push(answer(verdict.state === 'checking' ? 'Checking…' : verdict.words || keepLine()));
     } else {
-      body.push(cardWords({ title: titled(name), lines: [placedLine()] }));
+      body.push(cardWords({ title: titled(name), lines: [isPart(selected) ? madeLine(partOf(selected)?.zone_label) : placedLine()] }));
       if (busy) body.push(answer('Checking…'));
       else if (failure) body.push(answer(failure));
     }
@@ -221,15 +283,15 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   function select(placedId) {
     dropMove();
-    selected = placedId; confirming = null; failure = '';
+    selected = placedId; confirming = null; failure = ''; removeRefused = false;
     render();
   }
   function deselect() {
     dropMove();
-    selected = null; confirming = null; failure = '';
+    selected = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
   }
-  function cancel() { confirming = null; failure = ''; render(); }
+  function cancel() { confirming = null; failure = ''; removeRefused = false; render(); }
 
   async function toggle() {
     if (on) { leave(); return; }
@@ -241,7 +303,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     dropMove();
     if (changesOpen) { changesOpen = false; history.close(); }
     on = false; hovered = null; tag.hide();
-    selected = null; confirming = null; failure = '';
+    selected = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
   }
 
@@ -250,6 +312,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (moving === null) return;
     moving = null; ++asked; clearTimeout(askTimer);
     things()?.layer.setGhost(null);
+    things()?.layer.setBoxGhost?.(null);
   }
   function putBack() { dropMove(); render(); canvas.focus({ preventScroll: true }); }
 
@@ -262,6 +325,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** Start a move of the selected thing from where it stands, or keep the one under way. */
   function beginMove() {
     if (moving !== null || selected === null) return moving;
+    if (isPart(selected)) {
+      // A part stands where the parts read says, turned as it says; on the ground it is moved over.
+      const part = partOf(selected); if (!part) return null;
+      const from = { x: part.centre_mm[0], y: slotOf(selected)?.positionMm[2] ?? 0, z: -part.centre_mm[1], yaw: QUARTER_TURNS[turnsNow(selected) % 4] };
+      moving = { placedId: selected, from, to: { ...from }, grip: null, verdict: { state: 'checking', words: '' } };
+      return moving;
+    }
     const record = records.get(selected); if (!record) return null;
     const t = record.transform;
     const from = { x: t.x_mm, y: t.y_mm, z: t.z_mm, yaw: t.yaw_microradians };
@@ -274,7 +344,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (moving === null) return;
     moving.to = to;
     moving.verdict = { state: 'checking', words: '' };
-    things()?.layer.setGhost({ placedId: moving.placedId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused: false });
+    showCopy(moving, to, false);
     clearTimeout(askTimer);
     askTimer = window.setTimeout(() => { void askMove(); }, ASK_AFTER_MS);
     render();
@@ -285,8 +355,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (moving === null) return;
     const request = ++asked, move = moving, to = { ...move.to }, stateBase = base();
     try {
-      const answered = (await post('things.move.preview', '/things/' + encodeURIComponent(move.placedId) + '/move/preview',
-        { base_state_sha256: stateBase, pose: { x_mm: to.x, y_mm: to.y, z_mm: to.z, yaw_microradians: to.yaw } })).body;
+      const answered = (await post(actionOf(move.placedId, 'move.preview'), routeOf(move.placedId) + '/move/preview',
+        { base_state_sha256: stateBase, pose: poseOf(move.placedId, to) })).body;
       if (request !== asked || moving !== move) return;
       move.verdict = answered.availability === 'ready'
         ? { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to }
@@ -295,12 +365,29 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (request !== asked || moving !== move) return;
       move.verdict = { state: 'refused', words: problem(error) };
     }
-    things()?.layer.setGhost({ placedId: move.placedId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused: move.verdict.state === 'refused' });
+    showCopy(move, to, move.verdict.state === 'refused');
     render();
   }
 
+  /** The see-through copy where a move would put what it carries: a thing's own, a made part's box. */
+  function showCopy(move, to, refused) {
+    const layer = things()?.layer;
+    if (!isPart(move.placedId)) { layer?.setGhost({ placedId: move.placedId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused }); return; }
+    const slot = slotOf(move.placedId), regionId = entry.generatedSite?.regionId;
+    if (!slot || !regionId) return;
+    const turns = slot.yawQuarterTurns + quarterOf(to.yaw) - quarterOf(move.from.yaw);
+    layer?.setBoxGhost({ regionId, xMm: to.x, yMm: to.y, zMm: to.z, sizeMm: slot.boxMm, quarterTurns: ((turns % 4) + 4) % 4, refused });
+  }
+
+  /** The route and the pose a carried thing or part is asked about and moved by. */
+  const routeOf = (id) => (isPart(id) ? '/parts/' + encodeURIComponent(id.slice(PART.length)) : '/things/' + encodeURIComponent(id));
+  const actionOf = (id, what) => (isPart(id) ? 'parts.' : 'things.') + what;
+  const poseOf = (id, to) => ({ x_mm: to.x, y_mm: isPart(id) ? 0 : to.y, z_mm: to.z, yaw_microradians: to.yaw });
+
   function turn(degrees, free) {
     const move = beginMove(); if (move === null) return;
+    // A made part turns a quarter at a time, the only turns it can take.
+    if (isPart(move.placedId)) { moveTo({ ...move.to, yaw: QUARTER_TURNS[(quarterOf(move.to.yaw) + (degrees > 0 ? 1 : 3)) % 4] }); return; }
     moveTo({ ...move.to, yaw: turned(move.to.yaw, degrees, free) });
   }
 
@@ -311,8 +398,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     try {
       // The pose and the base the server's answer was about: anything since is refused as stale.
       const to = verdict.to;
-      await post('things.move', '/things/' + encodeURIComponent(move.placedId) + '/move',
-        { base_state_sha256: verdict.base, pose: { x_mm: to.x, y_mm: to.y, z_mm: to.z, yaw_microradians: to.yaw }, saved_entry: savedEntry() });
+      await post(actionOf(move.placedId, 'move'), routeOf(move.placedId) + '/move',
+        { base_state_sha256: verdict.base, pose: poseOf(move.placedId, to), saved_entry: savedEntry() });
       busy = false; dropMove(); render(); say(movedNote(name, moveWords(move.from, to)), { undoable: true });
     } catch (error) {
       busy = false;
@@ -332,12 +419,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   async function askRemove() {
     if (selected === null || busy) return;
     const placedId = selected, stateBase = base();
-    busy = true; failure = ''; render();
+    busy = true; failure = ''; removeRefused = false; render();
     try {
-      const answered = (await post('things.remove.preview', '/things/' + encodeURIComponent(placedId) + '/remove/preview', { base_state_sha256: stateBase })).body;
+      const answered = (await post(actionOf(placedId, 'remove.preview'), routeOf(placedId) + '/remove/preview', { base_state_sha256: stateBase })).body;
       if (selected !== placedId) return;
       if (answered.availability === 'ready') confirming = { placedId, base: stateBase };
-      else failure = refusalWords(answered.blocked_reason, answered.blocked_detail);
+      else { failure = refusalWords(answered.blocked_reason, answered.blocked_detail); removeRefused = true; }
     } catch (error) { failure = problem(error); }
     finally { busy = false; render(); }
   }
@@ -348,7 +435,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     busy = true; render();
     try {
       // Against the state the preview read: a change in between is refused as stale, never kept.
-      await post('things.remove', '/things/' + encodeURIComponent(placedId) + '/remove', { base_state_sha256: confirming.base, saved_entry: savedEntry() });
+      await post(actionOf(placedId, 'remove'), routeOf(placedId) + '/remove', { base_state_sha256: confirming.base, saved_entry: savedEntry() });
       busy = false; deselect(); say(removedNote(name), { undoable: true });
     } catch (error) { busy = false; confirming = null; failure = problem(error); render(); }
     try { await refreshRecords(); } catch {}
@@ -367,7 +454,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     finally {
       busy = false;
       try { await refreshRecords(); } catch {}
-      if (selected !== null && !records.has(selected)) deselect(); else render();
+      if (selected !== null && !exists(selected)) deselect(); else render();
     }
   }
 
@@ -384,7 +471,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     finally {
       busy = false;
       try { await refreshRecords(); } catch {}
-      if (selected !== null && !records.has(selected)) deselect(); else render();
+      if (selected !== null && !exists(selected)) deselect(); else render();
     }
   }
 
@@ -435,6 +522,36 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         const at = b.camera.camera.worldToScreen(point, seen);
         if (at.z <= 0) return null;
         if (y === 0) ground.push({ x: at.x, y: at.y });
+        left = Math.min(left, at.x); right = Math.max(right, at.x); top = Math.min(top, at.y); bottom = Math.max(bottom, at.y);
+      }
+    }
+    return { ground, bounds: { left, right, top, bottom, headY: top, waistY: (top + bottom) / 2 } };
+  }
+
+  /**
+   * A made part on the screen, standing where the parts read says or at `to` (its copy): its
+   * footprint's ground corners in order and the box around it with its height, from the region's
+   * frame through the region root; null when the world or part is not drawn or a corner is behind
+   * the camera.
+   */
+  function partOnScreen(id, to) {
+    const part = partOf(id), root = regionRoot();
+    if (part === null || root === null) return null;
+    const slot = slotOf(id);
+    const base = to?.y ?? slot?.positionMm[2] ?? 0, height = Math.max(slot?.boxMm[2] ?? 0, 300);
+    let [width, depth] = part.size_mm;
+    // Turned an odd number of quarters from how it stands now, its sides swap.
+    if (to !== null && Math.abs(quarterOf(to.yaw) - turnsNow(id)) % 2 === 1) [width, depth] = [depth, width];
+    const east = to === null ? part.centre_mm[0] : to.x, north = to === null ? part.centre_mm[1] : -to.z;
+    const frame = root.getWorldTransform();
+    const ground = [];
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (const [x, n] of [[east - width / 2, north - depth / 2], [east + width / 2, north - depth / 2], [east + width / 2, north + depth / 2], [east - width / 2, north + depth / 2]]) {
+      for (const y of [base, base + height]) {
+        frame.transformPoint(point.set(x / 1000, y / 1000, -n / 1000), point);
+        const at = b.camera.camera.worldToScreen(point, seen);
+        if (at.z <= 0) return null;
+        if (y === base) ground.push({ x: at.x, y: at.y });
         left = Math.min(left, at.x); right = Math.max(right, at.x); top = Math.min(top, at.y); bottom = Math.max(bottom, at.y);
       }
     }
@@ -512,18 +629,30 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const layer = things()?.layer;
       // The name of what the pointer is on, above it; the chosen thing's card names it instead, and
       // a carried copy's card speaks for where it is going.
-      const named = hovered !== null && hovered !== selected && moving === null && !changesOpen ? layer?.figureOf(hovered) : null;
-      const head = named && named.root.enabled ? b.camera.camera.worldToScreen(named.markAnchor(point), seen) : null;
+      let head = null;
+      if (hovered !== null && hovered !== selected && moving === null && !changesOpen) {
+        if (isPart(hovered)) {
+          const shape = partOnScreen(hovered, null);
+          head = shape === null ? null : { x: (shape.bounds.left + shape.bounds.right) / 2, y: shape.bounds.top, z: 1 };
+        } else {
+          const named = layer?.figureOf(hovered);
+          head = named && named.root.enabled ? b.camera.camera.worldToScreen(named.markAnchor(point), seen) : null;
+        }
+      }
       if (head && head.z > 0) { tag.set({ name: titled(nameOf(hovered)) }); tag.place(head.x, head.y); }
       else tag.hide();
-      if (!cardShows()) { hideMarks(); }
+      if (!cardShows()) { hideMarks(); lastPlacedKey = ''; }
       else {
         // Out of view is not closed: the card keeps its state and shows again when it is in view.
-        const figure = layer?.figureOf(selected) ?? null;
-        const standing = figure && figure.root.enabled ? onScreen(figure, null) : null;
-        const carried = figure && moving !== null && moving.placedId === selected ? onScreen(figure, moving.to) : null;
-        if (carried === null && standing === null) { card.root.style.visibility = 'hidden'; hideMarks(); }
+        const figure = isPart(selected) ? null : layer?.figureOf(selected) ?? null;
+        const carrying = moving !== null && moving.placedId === selected;
+        const standing = isPart(selected) ? partOnScreen(selected, null) : figure && figure.root.enabled ? onScreen(figure, null) : null;
+        const carried = !carrying ? null : isPart(selected) ? partOnScreen(selected, moving.to) : figure ? onScreen(figure, moving.to) : null;
+        const key = [standing, carried].map(shape => shape === null ? '-' : [...shape.ground.flatMap(p => [p.x, p.y]), shape.bounds.left, shape.bounds.right, shape.bounds.top, shape.bounds.bottom].map(v => v.toFixed(1)).join(',')).join('|') + (moving?.verdict.state ?? '');
+        if (key === lastPlacedKey) { /* Nothing moved on the screen: everything stays where it is. */ }
+        else if (carried === null && standing === null) { lastPlacedKey = key; card.root.style.visibility = 'hidden'; hideMarks(); }
         else {
+          lastPlacedKey = key;
           card.root.style.visibility = '';
           // While a copy is carried, the card stands beside the copy and the spot it left together,
           // its connector to the copy (ruling L11).
