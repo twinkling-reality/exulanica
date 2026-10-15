@@ -716,6 +716,8 @@ export type { BorderNeighbour, GroundBorder, GroundBorders, GroundPlane, PlaneBo
 export { BORDER_NEIGHBOURS_MOST, GROUND_BORDER_CATALOG_ID, borderReachMm, planBorders, readGroundBorders } from './ground-border.js';
 export type { RenderBudget, RenderCapClass, RenderCaps, RenderForm, RenderLevel } from './render-budget.js';
 export { RENDER_BUDGET_CATALOG_ID, RENDER_CAP_RANGES, RENDER_FORMS, capsAtLevel, readRenderBudget, renderCapsFor } from './render-budget.js';
+export type { PieceDrawing } from './piece-drawing.js';
+export { PIECE_DRAWING_DEFAULTS, PIECE_DRAWING_RANGES, pieceDrawingOf } from './piece-drawing.js';
 export type { FrameGovernorOptions, FrameGovernorRules, FrameGovernorState, FrameSample, FrameVerdict, FrameWindow } from './frame-governor.js';
 export { FRAME_GOVERNOR_RULES, FrameGovernor } from './frame-governor.js';
 
@@ -732,6 +734,8 @@ export {
 } from './surface-material.js';
 export type { StylePiece, StylePieceGroup } from './style-piece.js';
 export { StylePieceRefusal, readStylePiece } from './style-piece.js';
+export type { TexturedImageMedia, TexturedPiece, TexturedPieceImage, TexturedPieceMaterial, TexturedPiecePrimitive, TexturedWrap } from './textured-piece.js';
+export { TexturedPieceRefusal, isTexturedPiece, readTexturedPiece } from './textured-piece.js';
 
 export { SupportNavigation, SupportNavigationError, readSupportNavigation } from './support-navigation.js';
 export type { SupportState, SupportSurface, SupportNetworkDocument } from './support-navigation.js';

@@ -4,9 +4,11 @@ An upload is admitted on everything that needs no accessor data (:mod:`exulanica
 .style_pack_admission`). What does, reading every vertex colour of every piece, runs here: the
 check worker claims a waiting version's check, reads each listed piece from the workspace's own
 namespace, and holds every triangle to one colour of the pack's palette, or of a pack in its base
-chain, through :func:`exulanica.world.style_pack_pieces.read_palette_piece`. A version passes and
-becomes ready, or fails ``refused`` naming the piece and what it found, or ``interrupted`` when its
-time bound ran out, which a repeat of the upload may ask again. It runs in the asset preparation
+chain, through :func:`exulanica.world.style_pack_pieces.read_palette_piece`. A textured piece is
+read through :func:`~exulanica.world.style_pack_pieces.read_textured_piece` instead: it is drawn in
+its own images, not the palette. A version passes and becomes ready, or fails ``refused`` naming
+the piece and what it found, or ``interrupted`` when its time bound ran out, which a repeat of the
+upload may ask again. It runs in the asset preparation
 process (:mod:`exulanica.world.asset_preparation_command`), which holds the runtime role, the
 workspaces and the stores it needs.
 """
@@ -34,8 +36,10 @@ from exulanica.world.style_pack_pieces import (
     PieceOutOfBounds,
     StylePieceRefused,
     hold_pieces,
+    is_textured_piece,
     piece_roles,
     read_palette_piece,
+    read_textured_piece,
 )
 from exulanica.world.workspace_style_packs import (
     StylePackNotReady,
@@ -181,7 +185,15 @@ def check_version(
             data = read.get(file.path) or store.get(BlobId.from_hex(file.content_sha256))
         except (BlobNotFoundError, StylePackNotReady):
             return "interrupted", f"{file.path}: its bytes are missing from their store", report
+        # A textured piece is drawn as it is, in its own images: they are read, not colours.
         try:
+            if is_textured_piece(data):
+                textured = read_textured_piece(data)
+                report["pieces"][file.path] = {
+                    "triangles": textured.triangles,
+                    "images": textured.images,
+                }
+                continue
             piece = read_palette_piece(data, table)
         except StylePieceRefused as refused:
             return "refused", f"{file.path}: {refused.reason}: {refused}", report

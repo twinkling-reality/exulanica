@@ -291,14 +291,16 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       }
     }
 
-    const pieces = uploadPackPieces(device, dressing.pieces);
+    const pieces = uploadPackPieces(device, dressing.pieces, shading);
+    // Textured pieces choose their level of detail by where the person looks from.
+    const view = { app: host.app, camera: host.camera };
     const seatTriangles = new Map<string, SeatGeometry>();
     const placed = dressSlots(drawn.root, modules, pack, families, pieces, shading, {
       identities: new Set(drawing.seats.map(seat => seat.identity)),
       // Bound retained contact copies across the whole site; oversized seats remain unavailable.
       maximumVertices: 100_000,
       triangles: (identity, positions, normals) => seatTriangles.set(identity, seatGeometry(positions, normals)),
-    }, land?.groundM);
+    }, land?.groundM, view);
     const standing = new Set(modules.map((slot) => slot.identity));
     for (const identity of placed.undressed) standing.delete(identity);
     for (const identity of standing) {
@@ -442,7 +444,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
           front: FRONTS[piece.quarterTurns]!,
           boxMm: [piece.widthMm, piece.widthMm, piece.heightMm],
         }));
-        const stood = dressSlots(scenery.root.parent as pc.Entity, standingTrees, pack, families, pieces, shading);
+        const stood = dressSlots(scenery.root.parent as pc.Entity, standingTrees, pack, families, pieces, shading, undefined, undefined, view);
         if (stood.undressed.length === 0 && stood.placed > 0) {
           sceneryPieces = stood;
           hidden.push([trees, trees.enabled]);
@@ -469,6 +471,14 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (sceneryPieces !== null && canvas?.dataset !== undefined) canvas.dataset['siteSceneryPieces'] = String(sceneryPieces.placed);
     // How many grounds are drawn with a broken border.
     if (bordered.length > 0 && canvas?.dataset !== undefined) canvas.dataset['siteBorders'] = String(bordered.length);
+    // How many textured pieces stand instanced, in how many cells, the site's and the scenery's.
+    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null].filter((one) => one !== null);
+    if (instancedParts.length > 0 && canvas?.dataset !== undefined) {
+      canvas.dataset['sitePieceInstances'] = JSON.stringify({
+        instances: instancedParts.reduce((sum, one) => sum + one.instances, 0),
+        cells: instancedParts.reduce((sum, one) => sum + one.cells, 0),
+      });
+    }
     // How many of the site's materials wear the surface finish, and whether its water reflects.
     if (finish !== null && canvas?.dataset !== undefined) {
       canvas.dataset['siteFinish'] = JSON.stringify({ grounds: finishedGrounds.size, waters: finishedWaters.size, reflection: reflection !== null });
@@ -498,6 +508,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       }
       if (sceneryPieces !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteSceneryPieces'];
       if (bordered.length > 0 && canvas?.dataset !== undefined) delete canvas.dataset['siteBorders'];
+      if (instancedParts.length > 0 && canvas?.dataset !== undefined) delete canvas.dataset['sitePieceInstances'];
       if (finish !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFinish'];
       reflection?.dispose();
       // Every bordered ground is its full rectangle again, with nothing stated on it.
@@ -530,6 +541,12 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
           }
         }
       },
-    }), 'textureMetrics', { get: () => textures.metrics() });
+    }), 'textureMetrics', {
+      // The pieces' pictures are textures the site holds too.
+      get: () => {
+        const metrics = textures.metrics();
+        return { ...metrics, decodedTextureBytes: metrics.decodedTextureBytes + pieces.decodedTextureBytes };
+      },
+    });
   };
 }

@@ -1,7 +1,8 @@
 import * as pc from 'playcanvas';
 import { resolveLookRole, stretchCoordinate, type AxisStretch, type LookFamily, type ResolvedStylePack } from '@exulanica/atlas-core';
 import type { RenderShading } from '../generated-tile/look.js';
-import type { LoadedPieceGroup, PackPieces } from './pieces.js';
+import type { LoadedPieceGroup, LoadedTexturedLevels, PackPieces } from './pieces.js';
+import { drawInstancedPieces, type InstancePlacement, type InstancedDressing, type InstancedView } from './instanced-pieces.js';
 import { swatchMaterial } from './swatch-material.js';
 
 /**
@@ -19,6 +20,12 @@ import { swatchMaterial } from './swatch-material.js';
  * swatch become one mesh, so a town's six hundred windows are a draw per swatch. Normals follow each
  * triangle's own stretch. Positions are renderer metres (east, up, south) in the same frame as the
  * tiles' roots, so the caller parents the dressing where the tiles are parented.
+ *
+ * A textured piece (`pieces.ts`) is not baked: it is drawn instanced (`instanced-pieces.ts`) by the
+ * matrix `placementMatrix` makes, the same transform the bake applies to each corner, so it stands
+ * exactly where a palette piece would. It stands whole on its base: a draped slot's piece is not
+ * bent to the land under each of its points, as a palette piece's is, and a stretch zone is not
+ * drawn (the server refuses one on a textured piece; a slot asking for one is left undressed).
  *
  * A slot the pack does not dress, or that no variant fits, is returned by identity for the caller
  * to draw as it would without a pack. Nothing here changes what a slot is, what collides or where
@@ -47,7 +54,56 @@ export interface SlotDressing {
   readonly undressed: readonly string[];
   readonly triangles: number;
   readonly draws: number;
+  /** The textured pieces drawn instanced, or none. */
+  readonly instanced: InstancedDressing | null;
   dispose(): void;
+}
+
+/**
+ * The column-major matrix that stands a piece (glTF metres) in its slot, in renderer metres (east,
+ * up, south): scaled by `scale` on glTF x, y, z, moved `shift` metres along its own width (a tiled
+ * copy), turned so +Z is the slot's `front` (east, north) and set at the slot's base centre
+ * (`baseM`: east, north, up). Exactly the transform the bake applies to an unstretched corner.
+ */
+export function placementMatrix(
+  front: readonly [number, number],
+  baseM: readonly [number, number, number],
+  scale: readonly [number, number, number],
+  shift: number,
+): Float32Array {
+  const [fe, fn] = front;
+  const [east, north, up] = baseM;
+  const [sx, sy, sz] = scale;
+  // glTF x to renderer: (-north, 0, -east) of the front; z: (east, 0, -north) of the front.
+  return new Float32Array([
+    -fn * sx, 0, -fe * sx, 0,
+    0, sy, 0, 0,
+    fe * sz, 0, -fn * sz, 0,
+    east - shift * fn, up, -north - shift * fe, 1,
+  ]);
+}
+
+/** A textured piece's first-level triangles as `matrix` places them, as the bake would copy a seat's. */
+function placedTriangles(levels: LoadedTexturedLevels, matrix: Float32Array, batch: { positions: number[]; normals: number[] }): void {
+  const m = matrix;
+  for (const primitive of levels.lod0) {
+    const { positions, normals, indices } = primitive;
+    for (const v of indices) {
+      const x = positions[v * 3]!;
+      const y = positions[v * 3 + 1]!;
+      const z = positions[v * 3 + 2]!;
+      for (let k = 0; k < 3; k += 1) batch.positions.push(Math.fround(m[k]! * x + m[4 + k]! * y + m[8 + k]! * z + m[12 + k]!));
+      // A uniform scale and a turn: the normal turns with the piece, kept unit length.
+      const nx = normals[v * 3]!;
+      const ny = normals[v * 3 + 1]!;
+      const nz = normals[v * 3 + 2]!;
+      const tx = m[0]! * nx + m[4]! * ny + m[8]! * nz;
+      const ty = m[1]! * nx + m[5]! * ny + m[9]! * nz;
+      const tz = m[2]! * nx + m[6]! * ny + m[10]! * nz;
+      const length = Math.hypot(tx, ty, tz);
+      batch.normals.push(Math.fround(tx / length), Math.fround(ty / length), Math.fround(tz / length));
+    }
+  }
 }
 
 const PREFIX = 'style-pack:';
@@ -91,8 +147,11 @@ export function dressSlots(
   capture?: { readonly identities: ReadonlySet<string>; readonly maximumVertices: number; readonly triangles: (identity: string, positions: readonly number[], normals: readonly number[]) => void },
   /** The land's height under a point of the parent's frame (east, south, metres), for draped slots; none on level ground. */
   ground?: (east: number, south: number) => number,
+  /** The camera textured pieces choose their level of detail by; none draws every one at its first. */
+  view?: InstancedView,
 ): SlotDressing {
   const batches = new Map<string, SwatchBatch>();
+  const placements: InstancePlacement[] = [];
   const undressed: string[] = [];
   let placed = 0;
   let capturedVertices = 0;
@@ -112,6 +171,40 @@ export function dressSlots(
     }
     const [w, d] = module.variants[dressing.variant]!.size_mm;
     const [bw, bd] = slot.boxMm;
+    if (piece.textured !== undefined) {
+      // Drawn instanced, never stretched: a slot that asks a textured piece to stretch keeps its primitive.
+      if (dressing.stretch.some((axis) => axis !== null)) {
+        undressed.push(slot.identity);
+        continue;
+      }
+      const base = slot.positionMm.map((value) => value / 1000) as [number, number, number];
+      for (let copy = 0; copy < dressing.copies; copy += 1) {
+        const shift = (copy + 0.5 - dressing.copies / 2) * (w / 1000) * dressing.scale[0];
+        const matrix = placementMatrix(slot.front, base, dressing.scale, shift);
+        placements.push({
+          key: `${String(module.stated)}:${dressing.file.sha256}`,
+          lod0: piece.textured.lod0,
+          lod1: piece.textured.lod1,
+          matrix,
+          heightM: piece.bounds[4] * dressing.scale[1],
+        });
+        if (captured !== null && !captureRefused) {
+          const from = captured.positions.length;
+          placedTriangles(piece.textured, matrix, captured);
+          const count = (captured.positions.length - from) / 3;
+          if (capturedVertices + count > captureLimit) {
+            captured.positions.length = 0;
+            captured.normals.length = 0;
+            captureRefused = true;
+          } else {
+            capturedVertices += count;
+          }
+        }
+        placed += 1;
+      }
+      if (captured !== null) capture!.triangles(slot.identity, captured.positions, captured.normals);
+      continue;
+    }
     // glTF axes x (width), y (height), z (depth); height's low face is the pivot itself.
     const axes: AxisPlacement[] = [
       { scale: dressing.scale[0], stretch: dressing.stretch[0], lowMm: -w / 2, boxLowMm: -bw / 2 },
@@ -188,18 +281,22 @@ export function dressSlots(
     parent.addChild(entity);
   }
 
+  const instanced = placements.length === 0 ? null : drawInstancedPieces(parent, placements, view ?? null);
+
   let disposed = false;
   return {
     placed,
     undressed,
     triangles,
     draws: instances.length,
+    instanced,
     dispose() {
       if (disposed) return;
       disposed = true;
       entity.destroy();
       for (const mesh of meshes) mesh.destroy();
       for (const material of materials) material.destroy();
+      instanced?.dispose();
     },
   };
 }

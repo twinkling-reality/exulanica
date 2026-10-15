@@ -20,7 +20,8 @@ The order, so one upload always answers the same first refusal:
 4. The parts: exactly the manifest's files by path, each its listed size and digest, a piece within
    its family's file size before it is opened.
 5. Each piece's profile (:func:`exulanica.world.style_pack_pieces.check_piece_profile`) and its
-   family's triangle and material budget, read from accessor counts.
+   family's triangle and material budget, read from accessor counts; a textured piece's pictures,
+   walked to their end, held to its family's texture side and counted with the textures' pictures.
 6. The preview, walked to its end (:func:`exulanica.world.style_pack_preview.walk_preview`).
 7. Each texture image, walked to its end the same way (:func:`style_packs.probe_pack_image`), a
    texture's maps one size.
@@ -318,8 +319,18 @@ def admit(
                 "a file is not the size and digest its manifest lists",
                 path=path,
             )
+    # The pictures the pack's textures draw with, counted once each, beside every picture its pieces
+    # embed, against the one shared count.
+    texture_images = {
+        texture[map_name]
+        for texture in manifest.get("textures", {}).values()
+        for map_name in ("colour", "normal", "roughness")
+        if texture[map_name] is not None
+    }
     try:
-        measured = hold_pieces(pieces, files.__getitem__, budgets, lod1_share_permille)
+        measured = hold_pieces(
+            pieces, files.__getitem__, budgets, lod1_share_permille, len(texture_images)
+        )
     except PieceOutOfBounds as refused:
         raise StylePackAdmissionRefused(refused.code, str(refused), path=refused.path) from None
     preview = manifest.get("preview")
