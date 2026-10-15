@@ -41,6 +41,7 @@ export function renderLookOfPreset(
 ): RenderLook {
   const sky = preset.sky;
   const haze = preset.haze;
+  const wind = preset.wind;
   const post = preset.post;
   const look: RenderLook = {
     id: RENDER_LOOK_ID,
@@ -136,6 +137,17 @@ export function renderLookOfPreset(
       ink: shading.ink === null ? null : linearRgb(shading.ink),
     },
     edge: edge === null ? null : { ground: linearRgb(edge.ground), dropM: edge.drop_mm / 1000, reachM: edge.reach_mm / 1000 },
+    ...(wind === undefined ? {} : {
+      wind: {
+        direction: (wind.direction_mdeg / 1000) * (Math.PI / 180),
+        swayM: wind.sway_mm / 1000,
+        pace: wind.pace_millirad_per_s / 1000,
+        gustScaleM: wind.gust_scale_mm / 1000,
+        gustShare: wind.gust_share_permille / 1000,
+        flutterM: wind.flutter_mm / 1000,
+        swayFamilies: [...wind.sway_families],
+      },
+    }),
     ...(haze === undefined ? {} : {
       haze: {
         density: haze.density_micro / 1_000_000,

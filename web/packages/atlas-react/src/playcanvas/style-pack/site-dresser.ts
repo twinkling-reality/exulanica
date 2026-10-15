@@ -19,6 +19,9 @@ import { uploadPackPieces, type FetchedPieces } from './pieces.js';
 import { swatchMaterial } from './swatch-material.js';
 import { SiteTextures, packTextureSetId } from './site-textures.js';
 import { WaterRipples } from './water-material.js';
+import { coverMatrix, growCover, type CoverSlot } from './ground-cover.js';
+import { drawInstancedPieces, type InstancePlacement } from './instanced-pieces.js';
+import { PlantWind, windRuns } from './wind.js';
 import type { PreparedTextureSet } from '../generated-tile/texture-materials.js';
 import { TILE_LOOK_V1, isRenderLook, type TileLook } from '../generated-tile/look.js';
 import { seatGeometry, type SeatGeometry } from '../generated-site/site-seating.js';
@@ -117,6 +120,10 @@ export interface SiteDressingSummary {
   readonly bordered: number;
   /** Neighbours left out of a plane's working because it has more than the working carries. */
   readonly borderNeighboursLeftOut: number;
+  /** What the pack's cover grew, where it states any: its pieces, the slots growing them, and the pieces the guard left out. */
+  readonly cover?: { readonly pieces: number; readonly slots: number; readonly leftOut: number };
+  /** How many of the pieces' materials sway, where the look states a wind and the device runs it. */
+  readonly swaying?: number;
 }
 
 /**
@@ -319,6 +326,54 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       hidden.push([entity, entity.enabled]);
       entity.enabled = false;
     }
+    // What grows on the grounds, where the pack states cover for their look roles: its textured plant
+    // pieces, instanced in cells like any textured piece, on the slots drawn as surfaces and nowhere
+    // anything stands on them or lies over them. A piece the library holds untextured grows nowhere.
+    const grown = Object.keys(pack.cover).length === 0 ? null : growCover(drawing.slots as readonly CoverSlot[], pack.cover, {
+      land: land === undefined ? null : { groundMm: land.groundMm, waters: land.section.water },
+      grows: (slot) => {
+        const entity = drawn.entities.get(slot.identity);
+        return entity !== undefined && entity.enabled && (slot.primitive === 'plane' || slot.primitive === 'box');
+      },
+      // The role its surface resolved to: a leaf the pack states takes its own rule alone, so a paving
+      // drawn in its own surface never grows its family default's grass.
+      drawnAs: (slot) => {
+        const resolved = resolve(slot as SiteSlot);
+        return resolved === null || resolved.kind === 'module' ? null : resolved.role;
+      },
+    });
+    const coverPlacements: InstancePlacement[] = [];
+    for (const point of grown?.points ?? []) {
+      const module = pack.modules[point.piece];
+      const variant = module?.variants[Math.floor(point.pick * module.variants.length)];
+      const file = variant === undefined ? undefined : module!.files.get(variant.file);
+      const piece = file === undefined ? undefined : pieces.get(module!, file);
+      if (piece?.textured === undefined) continue;
+      coverPlacements.push({
+        key: `cover:${String(module!.stated)}:${file!.sha256}`,
+        lod0: piece.textured.lod0,
+        lod1: piece.textured.lod1,
+        matrix: coverMatrix(point, point.upM),
+        heightM: piece.bounds[4] * point.scale,
+      });
+    }
+    const cover = coverPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, coverPlacements, view);
+    // The look's wind sways every textured piece of the families it names, the cover's and the slots'.
+    const lookWind = dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.wind ?? null : null;
+    const wind = lookWind === null || !windRuns(device) ? null : new PlantWind(host.app, lookWind);
+    if (wind !== null && lookWind !== null) {
+      const swaying = new Set(lookWind.swayFamilies);
+      for (const [role, module] of Object.entries(pack.modules)) {
+        if (!swaying.has(role.split('.')[0]!)) continue;
+        for (const variant of module.variants) {
+          const file = module.files.get(variant.file);
+          const piece = file === undefined ? undefined : pieces.get(module, file);
+          if (piece?.textured === undefined) continue;
+          for (const primitive of [...piece.textured.lod0, ...(piece.textured.lod1 ?? [])]) wind.add(primitive.material, piece.bounds[4]);
+        }
+      }
+    }
+
     // A drawn slot no piece could stand in after all keeps its primitive, as one the pack left out.
     for (const identity of placed.undressed) {
       const slot = drawing.slots.find((one) => one.identity === identity);
@@ -471,14 +526,18 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (sceneryPieces !== null && canvas?.dataset !== undefined) canvas.dataset['siteSceneryPieces'] = String(sceneryPieces.placed);
     // How many grounds are drawn with a broken border.
     if (bordered.length > 0 && canvas?.dataset !== undefined) canvas.dataset['siteBorders'] = String(bordered.length);
-    // How many textured pieces stand instanced, in how many cells, the site's and the scenery's.
-    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null].filter((one) => one !== null);
+    // How many textured pieces stand instanced, in how many cells, the site's, the scenery's and the cover's.
+    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null, cover].filter((one) => one !== null);
     if (instancedParts.length > 0 && canvas?.dataset !== undefined) {
       canvas.dataset['sitePieceInstances'] = JSON.stringify({
         instances: instancedParts.reduce((sum, one) => sum + one.instances, 0),
         cells: instancedParts.reduce((sum, one) => sum + one.cells, 0),
       });
     }
+    // What the cover grew, and how many materials sway.
+    const coverSaid = grown === null ? null : { pieces: coverPlacements.length, slots: grown.slots, leftOut: grown.leftOut };
+    if (coverSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteCover'] = JSON.stringify(coverSaid);
+    if (wind !== null && canvas?.dataset !== undefined) canvas.dataset['siteWind'] = String(wind.materials);
     // How many of the site's materials wear the surface finish, and whether its water reflects.
     if (finish !== null && canvas?.dataset !== undefined) {
       canvas.dataset['siteFinish'] = JSON.stringify({ grounds: finishedGrounds.size, waters: finishedWaters.size, reflection: reflection !== null });
@@ -495,6 +554,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       sceneryPieces: sceneryPieces?.placed ?? 0,
       bordered: bordered.length,
       borderNeighboursLeftOut,
+      ...(coverSaid === null ? {} : { cover: coverSaid }),
+      ...(wind === null ? {} : { swaying: wind.materials }),
     });
 
     let undone = false;
@@ -510,6 +571,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (bordered.length > 0 && canvas?.dataset !== undefined) delete canvas.dataset['siteBorders'];
       if (instancedParts.length > 0 && canvas?.dataset !== undefined) delete canvas.dataset['sitePieceInstances'];
       if (finish !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFinish'];
+      if (coverSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCover'];
+      if (wind !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteWind'];
       reflection?.dispose();
       // Every bordered ground is its full rectangle again, with nothing stated on it.
       for (const [instance, shape, x, z] of bordered.splice(0)) {
@@ -518,6 +581,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       }
       ink?.dispose();
       sceneryPieces?.dispose();
+      cover?.dispose();
+      wind?.dispose();
       placed.dispose();
       for (const [entity, enabled] of hidden.splice(0).reverse()) entity.enabled = enabled;
       for (const [instance, material] of replaced.splice(0).reverse()) instance.material = material;
@@ -528,7 +593,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     };
     return Object.defineProperty(Object.assign(dispose, {
       seatTriangles,
-      animating: water.animating,
+      animating: water.animating || (wind?.animating ?? false),
       landWater: (body: LandWater): pc.Material | null => landWaters.get(body.id) ?? null,
       dressBeyond(instance: pc.MeshInstance, slot: SiteSlot): void {
         const resolved = catalog === null

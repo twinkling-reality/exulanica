@@ -198,7 +198,9 @@ type Shape =
   /** Three finite numbers within a range, one per colour channel. */
   | { readonly kind: 'triple'; readonly min: number; readonly max: number }
   /** A list of `min` to `max` items, each of the shape. */
-  | { readonly kind: 'list'; readonly shape: Shape; readonly min: number; readonly max: number };
+  | { readonly kind: 'list'; readonly shape: Shape; readonly min: number; readonly max: number }
+  /** A key as catalogs write them: a lowercase letter, then lowercase letters, digits and underscores. */
+  | { readonly kind: 'key' };
 
 const num = (min: number, max: number, integer = false): Shape => ({ kind: 'number', min, max, integer });
 const rgb: Shape = { kind: 'rgb' };
@@ -296,6 +298,9 @@ function check(value: unknown, shape: Shape, path: string): void {
     }
     case 'optional':
       check(value, shape.shape, path);
+      return;
+    case 'key':
+      if (typeof value !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(value)) fail('must be a key');
       return;
     case 'list':
       if (!Array.isArray(value) || value.length < shape.min || value.length > shape.max) fail(`must be a list of ${shape.min} to ${shape.max}`);
@@ -443,6 +448,23 @@ export interface RenderWater {
   readonly caustics?: RenderCaustics;
 }
 
+/** The wind a look's plants sway in. */
+export interface RenderWind {
+  /** Radians from east toward south: where the wind blows to. */
+  readonly direction: number;
+  /** How far a piece's top sways, metres. */
+  readonly swayM: number;
+  /** Radians a second. */
+  readonly pace: number;
+  /** The size of a gust across the ground, metres, and the share of the sway that comes and goes with the gusts. */
+  readonly gustScaleM: number;
+  readonly gustShare: number;
+  /** A leaf's own small flutter, metres. */
+  readonly flutterM: number;
+  /** The look families whose pieces sway. */
+  readonly swayFamilies: readonly string[];
+}
+
 /** Octaves of drifting noise whose slope tilts the water, and the cells a pixel over which each fades. */
 export interface RenderRipples {
   readonly octaves: readonly {
@@ -540,6 +562,8 @@ export interface RenderLook {
   readonly edge: RenderEdge | null;
   /** Absent: the fog is drawn. */
   readonly haze?: RenderHaze;
+  /** The wind its plants sway in; absent, nothing sways. */
+  readonly wind?: RenderWind;
   /** Absent: water is drawn as its surface states. */
   readonly water?: RenderWater;
   readonly unavailable: TileLookV1['unavailable'];
@@ -624,6 +648,10 @@ const RENDER_SHAPE: Shape = obj({
   }),
   edge: nullable(obj({ ground: rgb, dropM: num(0.2, 5), reachM: num(200, 8000) })),
   haze: optional(obj({ density: num(0.000001, 0.006), falloff: num(0.0001, 0.05), baseM: num(-50, 50), maxDepth: num(0.001, 8), colour: nullable(rgb) })),
+  wind: optional(obj({
+    direction: num(0, 2 * Math.PI), swayM: num(0, 2), pace: num(0, 20), gustScaleM: num(1, 200), gustShare: num(0, 1), flutterM: num(0, 0.2),
+    swayFamilies: { kind: 'list', min: 1, max: 8, shape: { kind: 'key' } },
+  })),
   water: optional(obj({
     shallow: rgb, deep: rgb, absorption: { kind: 'triple', min: 0, max: 5 }, depthScaleM: num(0.5, 50), foamWidthM: num(0, 2), reflection: num(0, 2),
     ripples: optional(obj({

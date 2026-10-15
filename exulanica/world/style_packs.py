@@ -475,6 +475,27 @@ def _water(value: Any, path: str) -> dict[str, Any]:
     )
 
 
+def _wind(value: Any, path: str) -> dict[str, Any]:
+    # The wind a preset's plants sway in: its direction, sway, pace, gusts and flutter, and which
+    # families sway. Absent, nothing sways.
+    def families(v: Any, p: str) -> list[str]:
+        return _list(_pattern(_KEY, "a look family"), 1, 8)(v, p)
+
+    return _object(
+        value,
+        path,
+        {
+            "direction_mdeg": _integer(0, 359_999),
+            "sway_mm": _integer(0, 2000),
+            "pace_millirad_per_s": _integer(0, 20_000),
+            "gust_scale_mm": _integer(1000, 200_000),
+            "gust_share_permille": _integer(0, 1000),
+            "flutter_mm": _integer(0, 200),
+            "sway_families": families,
+        },
+    )
+
+
 def _light_preset(value: Any, path: str) -> dict[str, Any]:
     clouds = _nullable(
         lambda c, q: _object(
@@ -566,6 +587,8 @@ def _light_preset(value: Any, path: str) -> dict[str, Any]:
             "post": lambda v, p: _object(v, p, post),
             # Added within the profile: a preset written before it draws its fog.
             "haze": _Optional(_haze),
+            # Added within the profile: a preset written before it holds every plant still.
+            "wind": _Optional(_wind),
         },
     )
 
@@ -705,6 +728,32 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                 _fail("reference", path, f"family {json.dumps(family)} is not dressed this way")
 
         return read
+
+    def piece_role(value: Any, path: str) -> str:
+        if not isinstance(value, str):
+            _fail("shape", path, "must be a look role")
+        look_role_key(("module", "both"))(value, path)
+        return value
+
+    def cover(value: Any, path: str) -> dict[str, Any]:
+        def scale(v: Any, p: str) -> list[int]:
+            if not isinstance(v, list) or len(v) != 2:
+                _fail("shape", p, "must be a least and a most scale in thousandths")
+            read = [_integer(100, 3000)(n, f"{p}[{i}]") for i, n in enumerate(v)]
+            if read[0] > read[1]:
+                _fail("range", p, "must not have its least above its most")
+            return read
+
+        return _object(
+            value,
+            path,
+            {
+                "pieces": _list(piece_role, 1, 8),
+                "density_per_100m2": _integer(1, 4000),
+                "scale_permille": scale,
+                "seed": _integer(0, 2_147_483_647),
+            },
+        )
 
     def preset_key(key: str, path: str) -> None:
         if _KEY.fullmatch(key) is None:
@@ -877,6 +926,8 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             "surfaces": _record(look_role_key(("surface", "both")), surface, 256),
             # Added within the profile: a pack that carries no textures of its own names none.
             "textures": _Optional(_record(texture_key, texture, MAX_TEXTURES)),
+            # Added within the profile: a pack written before it grows nothing on its grounds.
+            "cover": _Optional(_record(look_role_key(("surface", "both")), cover, 64)),
             "modules": _record(
                 look_role_key(("module", "both")),
                 lambda v, p: _object(
@@ -995,6 +1046,21 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             _fail(
                 "reference", f"surfaces.{role}.up", f"names no swatch {json.dumps(surface['up'])}"
             )
+    for role, rule in manifest.get("cover", {}).items():
+        for index, piece in enumerate(rule["pieces"]):
+            where = f"cover.{role}.pieces[{index}]"
+            if split_look_role(piece, where)[0] != "plant":
+                _fail("reference", where, "a cover piece is a plant")
+            if manifest["base"] is None and piece not in manifest["modules"]:
+                _fail("reference", where, f"names no module {json.dumps(piece)}")
+    for name, preset in (manifest["light"] or {"presets": {}})["presets"].items():
+        for index, family in enumerate(preset.get("wind", {}).get("sway_families", [])):
+            if family not in context.families:
+                _fail(
+                    "reference",
+                    f"light.presets.{name}.wind.sway_families[{index}]",
+                    f"names no look family {json.dumps(family)}",
+                )
     listed: dict[str, dict[str, Any]] = {}
     total = 0
     previous: str | None = None

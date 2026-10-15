@@ -188,6 +188,8 @@ export interface StylePackLightPreset {
   };
   /** Absent in a preset written before it: the preset's fog is drawn. */
   readonly haze?: StylePackHaze;
+  /** Absent: nothing sways. */
+  readonly wind?: StylePackWind;
 }
 
 export interface StylePackSwatch {
@@ -202,6 +204,25 @@ export type StylePackSurface =
   | { readonly swatch: string; readonly up: string | null }
   | { readonly texture_set: string; readonly up: string | null }
   | { readonly texture: string; readonly up: string | null };
+
+/** The wind a preset's plants sway in: its direction, sway, pace, gusts and flutter, and which families sway. */
+export interface StylePackWind {
+  readonly direction_mdeg: number;
+  readonly sway_mm: number;
+  readonly pace_millirad_per_s: number;
+  readonly gust_scale_mm: number;
+  readonly gust_share_permille: number;
+  readonly flutter_mm: number;
+  readonly sway_families: readonly string[];
+}
+
+/** What grows on a surface look role: which of the pack's plant pieces, how densely, at what sizes, from which seed. */
+export interface StylePackCover {
+  readonly pieces: readonly string[];
+  readonly density_per_100m2: number;
+  readonly scale_permille: readonly [number, number];
+  readonly seed: number;
+}
 
 /**
  * A texture a pack carries for its surfaces: its colour map and, optionally, its normal and roughness
@@ -271,6 +292,8 @@ export interface StylePackManifest {
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
   /** Absent in a pack that carries no textures of its own. */
   readonly textures?: Readonly<Record<string, StylePackTexture>>;
+  /** Absent in a pack that grows nothing on its grounds. */
+  readonly cover?: Readonly<Record<string, StylePackCover>>;
   readonly modules: Readonly<Record<string, { readonly variants: readonly StylePackVariant[] }>>;
   readonly files: readonly StylePackFile[];
 }
@@ -458,6 +481,12 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
       density_micro: integer(1, 6000), falloff_micro: integer(100, 50_000), base_mm: integer(-50_000, 50_000),
       max_depth_permille: permille(1, 8000), colour: nullable(srgb8),
     })),
+    // Added within the profile: a preset written before it holds every plant still.
+    wind: optional((v, p) => object(v, p, {
+      direction_mdeg: integer(0, 359_999), sway_mm: integer(0, 2000), pace_millirad_per_s: integer(0, 20_000),
+      gust_scale_mm: integer(1000, 200_000), gust_share_permille: permille(0, 1000), flutter_mm: integer(0, 200),
+      sway_families: list(pattern(KEY, 'a look family'), 1, 8),
+    })),
   }) as unknown as StylePackLightPreset;
 }
 
@@ -592,6 +621,25 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
         : object(v, p, { swatch: pattern(KEY, 'a swatch key'), up: nullable(pattern(KEY, 'a swatch key')) });
     }, 256),
     // Added within the profile: a pack that carries no textures of its own names none.
+    // Added within the profile: a pack written before it grows nothing on its grounds.
+    cover: optional(record(lookRoleKey(['surface', 'both']), (v, p) => {
+      const read = object(v, p, {
+        pieces: list((role, q) => {
+          if (typeof role !== 'string') return fail('shape', q, 'must be a look role');
+          lookRoleKey(['module', 'both'])(role, q);
+          return role;
+        }, 1, 8),
+        density_per_100m2: integer(1, 4000),
+        scale_permille: (s, q) => {
+          if (!Array.isArray(s) || s.length !== 2) return fail('shape', q, 'must be a least and a most scale in thousandths');
+          const scale = s.map((n, i) => integer(100, 3000)(n, `${q}[${i}]`)) as number[];
+          if (scale[0]! > scale[1]!) fail('range', q, 'must not have its least above its most');
+          return scale;
+        },
+        seed: integer(0, 2_147_483_647),
+      });
+      return read;
+    }, 64)),
     textures: optional(record((key, path) => { if (!KEY.test(key)) fail('shape', path, 'must be a texture key'); }, (v, p) => {
       const image = pattern(IMAGE_PATH, 'a lowercase relative path ending .jpg or .png');
       return object(v, p, {
@@ -672,6 +720,18 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
     if ('texture' in surface && manifest.textures?.[surface.texture] === undefined) fail('reference', `surfaces.${role}.texture`, `names no texture ${JSON.stringify(surface.texture)}`);
     if ('texture_set' in surface && !context.textureSets.has(surface.texture_set)) fail('reference', `surfaces.${role}.texture_set`, `names no texture set ${JSON.stringify(surface.texture_set)}`);
     if (surface.up !== null && !swatchKeys.has(surface.up)) fail('reference', `surfaces.${role}.up`, `names no swatch ${JSON.stringify(surface.up)}`);
+  }
+  for (const [role, rule] of Object.entries(manifest.cover ?? {})) {
+    rule.pieces.forEach((piece, index) => {
+      const where = `cover.${role}.pieces[${index}]`;
+      if (splitLookRole(piece, where).family !== 'plant') fail('reference', where, 'a cover piece is a plant');
+      if (manifest.base === null && manifest.modules[piece] === undefined) fail('reference', where, `names no module ${JSON.stringify(piece)}`);
+    });
+  }
+  for (const [name, preset] of Object.entries(manifest.light?.presets ?? {})) {
+    (preset.wind?.sway_families ?? []).forEach((family, index) => {
+      if (!context.families.has(family)) fail('reference', `light.presets.${name}.wind.sway_families[${index}]`, `names no look family ${JSON.stringify(family)}`);
+    });
   }
   const listed = new Map<string, StylePackFile>();
   let total = 0;
@@ -778,6 +838,8 @@ export interface ResolvedStylePack {
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
   /** Each texture the chain carries, nearest first, with the files of the manifest that carries it. */
   readonly textures: ReadonlyMap<string, ResolvedTexture>;
+  /** What grows on each surface look role, the nearest manifest's rule for a role. */
+  readonly cover: Readonly<Record<string, StylePackCover>>;
   readonly modules: Readonly<Record<string, ResolvedModule>>;
 }
 
@@ -828,6 +890,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   const swatches = new Map<string, StylePackSwatch>();
   const surfaces: Record<string, StylePackSurface> = {};
   const textures = new Map<string, ResolvedTexture>();
+  const cover: Record<string, StylePackCover> = {};
   const modules: Record<string, ResolvedModule> = {};
   let light: StylePackManifest['light'] = null;
   let shading: StylePackManifest['shading'] = null;
@@ -839,13 +902,14 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     Object.assign(surfaces, manifest.surfaces);
     const files = new Map(manifest.files.map((file) => [file.path, file] as const));
     for (const [key, texture] of Object.entries(manifest.textures ?? {})) textures.set(key, { texture, files });
+    Object.assign(cover, manifest.cover ?? {});
     for (const [role, module] of Object.entries(manifest.modules)) modules[role] = { variants: module.variants, files, stated: index };
     if (manifest.light !== null) light = manifest.light;
     if (manifest.shading !== null) shading = manifest.shading;
     if (manifest.base === null || manifest.edge !== null) edge = manifest.edge;
     if (manifest.water !== undefined) water = manifest.water;
   }
-  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, textures, modules };
+  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, textures, cover, modules };
 }
 
 /** A slot as a world kind states it: millimetres, base centre, front +y, up +z. */

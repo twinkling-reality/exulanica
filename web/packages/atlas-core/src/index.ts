@@ -654,6 +654,7 @@ export type {
   ResolvedStylePack,
   Srgb8,
   StylePackContext,
+  StylePackCover,
   StylePackFile,
   StylePackFog,
   StylePackLicence,
@@ -666,6 +667,7 @@ export type {
   StylePackSurface,
   StylePackSwatch,
   StylePackVariant,
+  StylePackWind,
   StyleSlot,
   StretchZone,
 } from './style-pack.js';
