@@ -16,6 +16,7 @@ simulated events stay with their owners ([world memory model](world-memory-model
 | --- | --- |
 | Schema | [migration 0127](../exulanica/migrations/0127_a_world_project_keeps_what_its_person_chose.sql) |
 | Repository, visibility, lifecycle | [`exulanica/world/project_context.py`](../exulanica/world/project_context.py) |
+| Item vocabulary, bounds, refusals and views | [`exulanica/world/project_context_shapes.py`](../exulanica/world/project_context_shapes.py) |
 | Reference kinds and resolution | [`exulanica/world/project_context_references.py`](../exulanica/world/project_context_references.py) |
 | Assembly rule | [`exulanica/world/project_context_assembly.py`](../exulanica/world/project_context_assembly.py) |
 | Routes | [`exulanica/api/routes/world_projects.py`](../exulanica/api/routes/world_projects.py) |

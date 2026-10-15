@@ -7,6 +7,8 @@ records, and events that name simulated ones. Each item keeps its corrections as
 ids an item points at are resolved against their own authorities at every read
 (:mod:`exulanica.world.project_context_references`), and the context a reader may hand onward is
 assembled, bounded, from current rows every time (:mod:`exulanica.world.project_context_assembly`).
+What a project and an item are made of, the refusals this plane owns and the views a read returns
+are :mod:`exulanica.world.project_context_shapes`'s.
 
 **The actor is a constructor argument and every statement carries it**, for the reason
 :class:`~exulanica.world.companion_memory.CompanionMemoryRepository` gives: row-level security
@@ -42,8 +44,6 @@ import hashlib
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
-from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Concatenate, Final, ParamSpec, TypeVar
 
@@ -53,9 +53,9 @@ from psycopg.types.json import Jsonb
 from exulanica.canonical import canonical_json
 from exulanica.db.guards import TOMBSTONE_REFUSAL
 from exulanica.epistemics.saved_names import PLACEHOLDER
-from exulanica.errors import ExulanicaError, TombstonedError
+from exulanica.errors import TombstonedError
 from exulanica.world.companion_memory import SIMULATED_LABEL
-from exulanica.world.project_context_assembly import Assembly, Budget, Candidate, assemble
+from exulanica.world.project_context_assembly import Budget, Candidate, assemble
 from exulanica.world.project_context_references import (
     OUTCOME_KINDS,
     SIMULATED_KINDS,
@@ -66,6 +66,48 @@ from exulanica.world.project_context_references import (
     ReferenceState,
     Resolution,
     parse_references,
+)
+from exulanica.world.project_context_shapes import (
+    _BASES,
+    _CORRECTED_BASIS,
+    _KIND_ORDER,
+    _RESOLVABLE,
+    _WORDED,
+    LIST_DEFAULT,
+    LIST_MAX,
+    MAX_ITEMS,
+    MAX_PENDING,
+    MAX_PROJECTS,
+    MAX_REVISIONS,
+    MAX_SOURCES,
+    NOTE_MAX,
+    TEXT_MAX,
+    TITLE_MAX,
+    AuditItem,
+    Binding,
+    ContextView,
+    IdempotencyKeyReused,
+    InvalidProjectContext,
+    ItemBasis,
+    ItemKind,
+    ItemOrigin,
+    ItemStatus,
+    ItemView,
+    NotProjectOwner,
+    ProjectAudit,
+    ProjectContextBusy,
+    ProjectContextError,
+    ProjectContextLimit,
+    ProjectItemNotCurrent,
+    ProjectView,
+    ReferenceRefused,
+    ReferenceView,
+    Reuse,
+    RevisionView,
+    ShareView,
+    StaleProjectContext,
+    UnknownProjectContext,
+    WithdrawalReason,
 )
 
 __all__ = [
@@ -107,22 +149,6 @@ __all__ = [
     "WithdrawalReason",
 ]
 
-#: Declared bounds. Characters, counts and revisions, as ``docs/project-context.md`` states them.
-TITLE_MAX: Final = 200
-TEXT_MAX: Final = 2_000
-NOTE_MAX: Final = 2_000
-#: Live projects one person keeps in one world.
-MAX_PROJECTS: Final = 50
-#: Items a project holds that are not deleted.
-MAX_ITEMS: Final = 500
-#: Revisions one item may take, its first included.
-MAX_REVISIONS: Final = 50
-#: Suggestions a project holds waiting for review.
-MAX_PENDING: Final = 50
-#: Records an item is drawn from: Companion answers and an item it copies.
-MAX_SOURCES: Final = 16
-LIST_DEFAULT: Final = 50
-LIST_MAX: Final = 100
 
 #: Creating a project counts a person's live projects in one world under this lock, so the count
 #: bound holds under concurrent creation. Its own key, never the workspace lock's: it is taken
@@ -140,276 +166,14 @@ _DEADLOCK_ATTEMPTS: Final = 3
 _REQUEST_KEYS: Final = frozenset({"world_project_request_key", "world_project_item_request_key"})
 
 
-class ItemKind(StrEnum):
-    GOAL = "goal"
-    PREFERENCE = "preference"
-    QUESTION = "question"
-    TASK = "task"
-    DECISION = "decision"
-    EVENT = "event"
-
-
-class ItemBasis(StrEnum):
-    USER_STATEMENT = "user_statement"
-    INFERRED_SUGGESTION = "inferred_suggestion"
-    RECORDED_OUTCOME = "recorded_outcome"
-    SIMULATED_EVENT = "simulated_event"
-
-
-class ItemStatus(StrEnum):
-    PROPOSED = "proposed"
-    ACTIVE = "active"
-    RESOLVED = "resolved"
-    WITHDRAWN = "withdrawn"
-
-
-class ItemOrigin(StrEnum):
-    PERSON = "person"
-    COMPANION = "companion"
-
-
-class WithdrawalReason(StrEnum):
-    DELETED = "deleted"
-    REJECTED = "rejected"
-    PROJECT_DELETED = "project_deleted"
-    SOURCE_WITHDRAWN = "source_withdrawn"
-    WORKSPACE_DELETED = "workspace_deleted"
-
-
-#: What an item of each kind is written as. Held equal to the revision guard of migration 0127.
-_WORDED: Final = frozenset({ItemKind.GOAL, ItemKind.PREFERENCE, ItemKind.QUESTION, ItemKind.TASK})
-_BASES: Final[Mapping[ItemKind, frozenset[ItemBasis]]] = MappingProxyType(
-    {
-        **{
-            kind: frozenset({ItemBasis.USER_STATEMENT, ItemBasis.INFERRED_SUGGESTION})
-            for kind in _WORDED
-        },
-        ItemKind.DECISION: frozenset({ItemBasis.RECORDED_OUTCOME}),
-        ItemKind.EVENT: frozenset({ItemBasis.SIMULATED_EVENT}),
-    }
-)
-#: What the person's own correction of each kind is filed as.
-_CORRECTED_BASIS: Final[Mapping[ItemKind, ItemBasis]] = MappingProxyType(
-    {
-        **{kind: ItemBasis.USER_STATEMENT for kind in _WORDED},
-        ItemKind.DECISION: ItemBasis.RECORDED_OUTCOME,
-        ItemKind.EVENT: ItemBasis.SIMULATED_EVENT,
-    }
-)
-#: Kinds that close when done. A preference, a decision and an event are corrected or deleted.
-_RESOLVABLE: Final = frozenset({ItemKind.GOAL, ItemKind.QUESTION, ItemKind.TASK})
-
-_KIND_ORDER: Final = tuple(kind.value for kind in ItemKind)
-
-
 # -- failures ----------------------------------------------------------------------------------
-
-
-class ProjectContextError(ExulanicaError):
-    """A refusal this plane owns, with the status and stable code the API answers it with."""
-
-    status: int = 422
-    code: str = "invalid_project_context"
-
-
-class UnknownProjectContext(ProjectContextError):
-    """Absent, deleted, another person's private record, another workspace's, or a world the
-    project is not in: one answer, so none of them can be told from an id nobody minted."""
-
-    status = 404
-    code = "unknown_reference"
-
-
-class InvalidProjectContext(ProjectContextError):
-    status = 422
-    code = "invalid_project_context"
-
-
-class StaleProjectContext(ProjectContextError):
-    status = 409
-    code = "stale_project_context"
-
-
-class IdempotencyKeyReused(ProjectContextError):
-    status = 409
-    code = "idempotency_key_reused"
-
-
-class NotProjectOwner(ProjectContextError):
-    """A person who may read a shared project asked to change it."""
-
-    status = 403
-    code = "not_project_owner"
-
-
-class ProjectItemNotCurrent(ProjectContextError):
-    status = 409
-    code = "project_item_not_current"
-
-
-class ProjectContextLimit(ProjectContextError):
-    status = 409
-
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-
-
-class ProjectContextBusy(ProjectContextError):
-    """A write the database ended to break a lock cycle, every time it was tried."""
-
-    status = 503
-    code = "project_context_busy"
 
 
 class _KeyRace(Exception):
     """Another request under the same idempotency key committed first; look it up again."""
 
 
-class ReferenceRefused(ProjectContextError):
-    """A record an item names is not one it may name now: its source was deleted, or its ids
-    disagree with the record. The status and code are the authority's own."""
-
-    def __init__(self, resolution: Resolution) -> None:
-        code = resolution.code or "reference_mismatch"
-        super().__init__(f"a named record is {resolution.state.value}: {code}")
-        self.code = code
-        self.status = 424 if code == "unavailable_society_input" else 409
-
-
 # -- views -------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class Binding:
-    """The version a project works on, as its authority reads now and as it was when bound."""
-
-    version_id: uuid.UUID
-    state: str
-    code: str | None
-    state_sha256: str
-    edit_seq: int
-    bound_at: dt.datetime
-    bound_state_sha256: str
-    bound_edit_seq: int
-    #: The world's saved entry, where it has one, and the version that entry opens now.
-    entry_id: uuid.UUID | None
-    entry_version_id: uuid.UUID | None
-
-
-@dataclass(frozen=True, slots=True)
-class ProjectView:
-    project_id: uuid.UUID
-    world_id: str
-    title: str
-    revision: int
-    created_at: dt.datetime
-    changed_at: dt.datetime
-    owner_is_reader: bool
-    #: The open share of the project itself, or None. Another reader sees one by definition.
-    share_id: uuid.UUID | None
-    binding: Binding
-    #: Items this reader may see: active ones by kind, and how many are resolved or proposed.
-    counts: Mapping[str, int]
-
-
-@dataclass(frozen=True, slots=True)
-class ReferenceView:
-    reference: Mapping[str, Any]
-    state: str
-    code: str | None
-    detail: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class Reuse:
-    """The item an item was copied from: its own world, project and id."""
-
-    world_id: str
-    project_id: uuid.UUID
-    item_id: uuid.UUID
-
-
-@dataclass(frozen=True, slots=True)
-class ItemView:
-    item_id: uuid.UUID
-    project_id: uuid.UUID
-    project_revision: int
-    kind: ItemKind
-    basis: ItemBasis
-    origin: ItemOrigin
-    status: ItemStatus
-    revision: int
-    created_at: dt.datetime
-    changed_at: dt.datetime
-    recorded_at: dt.datetime
-    reviewed_at: dt.datetime | None
-    resolved_at: dt.datetime | None
-    text: str | None
-    note: str | None
-    references: tuple[ReferenceView, ...]
-    #: References into planes this reader may not see: another person's Companion answers.
-    hidden_references: int
-    share_id: uuid.UUID | None
-    owner_is_reader: bool
-    #: The owner's own: the Companion answers it was drawn from and the item it copied.
-    source_answer_ids: tuple[uuid.UUID, ...]
-    reused_from: Reuse | None
-
-
-@dataclass(frozen=True, slots=True)
-class RevisionView:
-    revision: int
-    basis: ItemBasis
-    origin: ItemOrigin
-    text: str | None
-    note: str | None
-    references: tuple[Mapping[str, Any], ...]
-    recorded_at: dt.datetime
-
-
-@dataclass(frozen=True, slots=True)
-class ShareView:
-    share_id: uuid.UUID
-    item_id: uuid.UUID | None
-    shared_at: dt.datetime
-
-
-@dataclass(frozen=True, slots=True)
-class AuditItem:
-    item_id: uuid.UUID
-    kind: ItemKind
-    status: ItemStatus
-    created_at: dt.datetime
-    reviewed_at: dt.datetime | None
-    resolved_at: dt.datetime | None
-    withdrawn_at: dt.datetime | None
-    withdrawn_reason: WithdrawalReason | None
-    #: Each revision's basis, origin and instant, in order; never its words.
-    revisions: tuple[tuple[ItemBasis, ItemOrigin, dt.datetime], ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ProjectAudit:
-    """What remains of a project that may have been deleted: that things existed and when they
-    ended, and none of what they said."""
-
-    project_id: uuid.UUID
-    world_id: str
-    created_at: dt.datetime
-    withdrawn_at: dt.datetime | None
-    #: True when a tombstone deleted the project rather than its owner.
-    withdrawn_by_tombstone: bool
-    revision: int
-    bindings: tuple[tuple[int, uuid.UUID, dt.datetime], ...]
-    items: tuple[AuditItem, ...]
-    shares: tuple[tuple[uuid.UUID, uuid.UUID | None, dt.datetime, dt.datetime | None], ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ContextView:
-    project: ProjectView
-    assembly: Assembly
 
 
 # -- the repository ----------------------------------------------------------------------------

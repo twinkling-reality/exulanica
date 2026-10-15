@@ -38,6 +38,7 @@ _PROJECT_SOURCES = (
     _ROOT / "exulanica" / "world" / "project_context.py",
     _ROOT / "exulanica" / "world" / "project_context_assembly.py",
     _ROOT / "exulanica" / "world" / "project_context_references.py",
+    _ROOT / "exulanica" / "world" / "project_context_shapes.py",
     _ROOT / "exulanica" / "api" / "routes" / "world_projects.py",
 )
 
@@ -76,6 +77,7 @@ def test_the_import_contract_names_every_module_of_the_plane():
         "exulanica.world.project_context",
         "exulanica.world.project_context_assembly",
         "exulanica.world.project_context_references",
+        "exulanica.world.project_context_shapes",
     ):
         assert f'"{module}"' in contract
     for forbidden in ("exulanica.world.interaction", "exulanica.models.client"):
