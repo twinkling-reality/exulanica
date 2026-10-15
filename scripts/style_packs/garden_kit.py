@@ -476,14 +476,16 @@ def build(document, output, sources=None):
                             media_type="model/gltf-binary",
                         )
                     )
-                variants.append(
-                    dict(
-                        file=row["file"],
-                        lod1=_far(row["file"]),
-                        size_mm=list(made.size_mm),
-                        stretch_mm=[None, None, None],
-                    )
+                variant_entry = dict(
+                    file=row["file"],
+                    lod1=_far(row["file"]),
+                    size_mm=list(made.size_mm),
+                    stretch_mm=[None, None, None],
                 )
+                # Its species' share of the look's wind, where the species states one.
+                if made.sway_permille is not None:
+                    variant_entry["sway_permille"] = made.sway_permille
+                variants.append(variant_entry)
                 receipts.append({"file": row["file"], "role": row["role"], **made.receipt})
                 continue
             if index in creepers:

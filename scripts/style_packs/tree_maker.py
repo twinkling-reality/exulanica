@@ -127,8 +127,10 @@ def _species(value: Any, path: str, leaves: dict[str, Any], barks: dict[str, Any
         value,
         path,
         {"type", "bark", "branch", "leaves", "card", "lod1"},
-        {"bark_tint", "bark_scale", "spread_scales"},
+        {"bark_tint", "bark_scale", "spread_scales", "sway_permille"},
     )
+    if "sway_permille" in item:
+        _number(item["sway_permille"], f"{path}.sway_permille", 0, 4000, whole=True)
     if item["type"] not in ("deciduous", "evergreen"):
         raise TreeCatalogRefused(f"{path}.type", "is deciduous or evergreen")
     if item["bark"] not in barks:
@@ -643,12 +645,14 @@ def fit_spread(species: dict[str, Any], seed: int, ratio: float) -> float:
 
 @dataclass(frozen=True)
 class MadeTree:
-    """A tree's two levels as piece bytes, its size as placed, and what made it."""
+    """A tree's two levels as piece bytes, its size as placed, what made it, and the share of a
+    look's wind its species takes (none when the species states no share: the whole of it)."""
 
     lod0: bytes
     lod1: bytes
     size_mm: tuple[int, int, int]
     receipt: dict[str, Any]
+    sway_permille: int | None = None
 
 
 def _jpeg(image: Image.Image, quality: int) -> bytes:
@@ -792,7 +796,13 @@ def make_tree(
         ],
     }
     size_mm = tuple(out[0][1])
-    return MadeTree(out[0][0], out[1][0], (size_mm[0], size_mm[1], size_mm[2]), receipt)
+    return MadeTree(
+        out[0][0],
+        out[1][0],
+        (size_mm[0], size_mm[1], size_mm[2]),
+        receipt,
+        species.get("sway_permille"),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

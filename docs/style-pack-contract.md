@@ -435,7 +435,9 @@ a height, an optional width and a seed). The tree maker (`scripts/style_packs/tr
 grows each as a textured piece (section 4.1) with its second level: the species is data, every
 figure held to its range when the catalog is read (`assets/style-packs/makers/tree-species.v1.json`,
 profile `exulanica.tree-species/v1`: how the trunk and branches grow, the leaf card it carries, its
-bark, how its second level thins it, and the sides of its pictures). Given a width, the crown is
+bark, how its second level thins it, the sides of its pictures, and the share of a look's wind it
+takes, `sway_permille`, which each of its tree variants carries: a stiff cypress less, a palm
+more). Given a width, the crown is
 grown to the box's proportions, never stretched to them; a crown that cannot be narrower than its
 cards is made at its narrowest and its receipt says how wide. Leaf cards are composed from scanned
 single leaves (`leaf_cards.py`) and the bark is a scanned bark; the scans are not in this repository,

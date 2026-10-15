@@ -183,6 +183,14 @@ def test_a_scan_that_is_not_the_catalogs_is_refused_by_its_path(made):
             lambda c: c["sources"]["leaves"]["oval"]["colour"].update(path="../x.jpg"),
             "$.sources.leaves.oval.colour.path",
         ),
+        (
+            lambda c: c["species"]["olive"].update(sway_permille=4001),
+            "$.species.olive.sway_permille",
+        ),
+        (
+            lambda c: c["species"]["olive"].update(sway_permille=1.5),
+            "$.species.olive.sway_permille",
+        ),
     ],
     ids=[
         "levels",
@@ -192,6 +200,8 @@ def test_a_scan_that_is_not_the_catalogs_is_refused_by_its_path(made):
         "far leaf scale",
         "sheet side",
         "path outside",
+        "sway past its range",
+        "sway a fraction",
     ],
 )
 def test_a_catalog_out_of_its_ranges_is_refused_by_the_path_that_broke_it(edit: Any, path: str):
@@ -239,6 +249,12 @@ def test_tree_rows_of_one_role_become_its_variants_each_with_its_second_level(
         ("pieces/pine.glb", "pieces/pine-far.glb"),
         ("pieces/cypress.glb", "pieces/cypress-far.glb"),
     ]
+    # Each variant takes its species' share of the look's wind: a stiff cypress less than a pine.
+    assert [v["sway_permille"] for v in variants] == [
+        CATALOG["species"]["stone_pine"]["sway_permille"],
+        CATALOG["species"]["italian_cypress"]["sway_permille"],
+    ]
+    assert variants[1]["sway_permille"] < variants[0]["sway_permille"]
     receipts = json.loads((tmp_path / f"{pack}.trees.json").read_text())
     assert [r["species"] for r in receipts] == ["stone_pine", "italian_cypress"]
     with pytest.raises(ValueError, match="names the folder of its scans"):

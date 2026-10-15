@@ -1,5 +1,5 @@
 {
- "about": "Species the tree maker (scripts/style_packs/tree_maker.py) grows textured tree pieces from: how each trunk and its branches grow (after ez-tree, MIT), the leaf card it carries, its bark, and how its second level of detail thins it. Every figure is a species' own and is held to its range when the catalog is read. Sources are CC0 scans from ambientCG, named by the path of each file in the unpacked scans and its SHA-256, with the archive it came from; they are not in this repository.",
+ "about": "Species the tree maker (scripts/style_packs/tree_maker.py) grows textured tree pieces from: how each trunk and its branches grow (after ez-tree, MIT), the leaf card it carries, its bark, how its second level of detail thins it, and the share of a look's wind it takes (a stiff cypress less, a palm more). Every figure is a species' own and is held to its range when the catalog is read. Sources are CC0 scans from ambientCG, named by the path of each file in the unpacked scans and its SHA-256, with the archive it came from; they are not in this repository.",
  "profile": "exulanica.tree-species/v1",
  "sources": {
   "barks": {
@@ -201,6 +201,7 @@
     "section_stride": 2,
     "segment_factor": 0.5
    },
+   "sway_permille": 900,
    "type": "deciduous"
   },
   "fan_palm": {
@@ -300,6 +301,7 @@
     "length",
     "leaves"
    ],
+   "sway_permille": 1500,
    "type": "deciduous"
   },
   "flower_bed": {
@@ -418,6 +420,7 @@
     "length",
     "leaves"
    ],
+   "sway_permille": 1200,
    "type": "deciduous"
   },
   "italian_cypress": {
@@ -533,6 +536,7 @@
     "length",
     "leaves"
    ],
+   "sway_permille": 450,
    "type": "evergreen"
   },
   "oleander": {
@@ -656,6 +660,7 @@
     "length",
     "leaves"
    ],
+   "sway_permille": 800,
    "type": "deciduous"
   },
   "olive": {
@@ -754,6 +759,7 @@
     "section_stride": 2,
     "segment_factor": 0.5
    },
+   "sway_permille": 750,
    "type": "deciduous"
   },
   "round_shrub": {
@@ -855,6 +861,7 @@
     "length",
     "leaves"
    ],
+   "sway_permille": 600,
    "type": "deciduous"
   },
   "stone_pine": {
@@ -957,6 +964,7 @@
     "section_stride": 2,
     "segment_factor": 0.5
    },
+   "sway_permille": 650,
    "type": "deciduous"
   }
  },
