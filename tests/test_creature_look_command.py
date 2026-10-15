@@ -101,7 +101,13 @@ def _admit(run, fits, data, *extra, cost="0.50") -> int:
 
 def _fits_by_stand_in(run: Path, out: Path, monkeypatch) -> dict:
     """Route P's middle steps with stand-in models: the job record, the pictures and models, the
-    fit of each, as ``make-job``, the GPU job and ``fit-run`` write them."""
+    fit of each, as ``make-job``, the GPU job and ``fit-run`` write them.
+
+    The fit reads and writes meshes with numpy, which only the reconstruction extra installs;
+    without it a test skips here, after the staging it has already checked."""
+    pytest.importorskip(
+        "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+    )
     monkeypatch.syspath_prepend(str(ROOT / "ml" / "appearance"))
     from exulanica_appearance.creatures.fit import fit_run
     from exulanica_appearance.creatures.pictures import (
@@ -153,11 +159,6 @@ def test_a_run_stages_the_asked_looks_and_admits_what_the_fit_made(
             staged["run_id"],
             item["request_sha256"],
         )
-    # The fit reads and writes meshes with numpy, which only the reconstruction extra installs;
-    # without it the staging above has still run.
-    pytest.importorskip(
-        "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
-    )
     document = _fits_by_stand_in(run, fits, monkeypatch)
     assert [entry["outcome"] for entry in document["requests"].values()] == ["passed"] * 2
     capsys.readouterr()
