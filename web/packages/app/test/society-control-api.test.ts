@@ -95,7 +95,7 @@ const openSession = {
 };
 const closing = {
   state: 'closed', end_tick: 7, closed_at: '2026-10-14T01:05:00+00:00', closed_reason: 'session_decisions',
-  closed_reason_words: 'The session used all the model decisions it was given.',
+  closed_reason_words: 'The run reached its decision limit.',
 };
 const rate = { numerator: 0, denominator: 0, minimum: 5, value: null };
 const measures = {

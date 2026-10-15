@@ -193,7 +193,7 @@ def test_a_living_session_is_headed_with_its_stop_its_limits_and_its_spending():
     world, sessions = living_evidence()
     text = "\n".join(insight(world, sessions, readable=True))
     assert "Living session 0190a1b2, minutes 4 to 61:" in text
-    assert "The session played all the minutes it was given." in text
+    assert "The run played all its minutes." in text
     assert "6 decisions (every request of the session)" in text
     assert "Limits: 60 minutes, 500 decisions, $0.5, 600 calls, 60 minutes of wall time." in text
     assert "Spending as found: $0.0411 committed for 415 calls, within its $0.5 limit." in text

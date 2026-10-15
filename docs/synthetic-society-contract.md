@@ -1514,8 +1514,9 @@ from: the page through the reads below, and a project's pull request by importin
 every reason in `SESSION_CLOSE_REASONS`: the two a person causes, the five limits, and the three
 error pauses. The repository closes a session only by those named reasons, and a test holds that
 each has words. A close is how a session's spending stops, so it is never refused: a reason
-without words still closes the session, read as "The session ended." (`UNWORDED_CLOSE`), and the
-missing words are logged.
+without words still closes the session, read as "The run ended." (`UNWORDED_CLOSE`), and the
+missing words are logged. Each sentence names the run, as the workspace calls a living session, and
+is true for every reader.
 
 A session's decisions are the receipts of the requests asked for its minutes: those whose request
 `base_tick` lies from its `start_tick` up to, not including, its `end_tick`, with no end while it

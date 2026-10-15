@@ -189,25 +189,25 @@ SESSION_CLOSE_REASONS: Final = (
     INVALID_SOCIETY_STATE,
 )
 
-#: Why a session closed, in words, by its reason: the one wording a page and a project's pull
-#: request read. Every reason in ``SESSION_CLOSE_REASONS`` has its words here, which a test holds.
+#: Why a session closed, in words, by its reason: the one wording a page, History and a project's
+#: pull request read. A person meets a living session as a run, so each sentence names the run and
+#: is true for every reader. Every reason in ``SESSION_CLOSE_REASONS`` has its words here, which a
+#: test holds.
 SESSION_CLOSED_WORDS: Final[Mapping[str, str]] = {
-    "stopped_by_person": "Someone stopped the session.",
-    "paused_by_person": "Someone paused the world, which ended the session.",
-    "session_deadline": "The session reached its time limit.",
-    "session_minutes": "The session played all the minutes it was given.",
-    "session_decisions": "The session used all the model decisions it was given.",
-    "session_spending_limit": "The session's spending allowance ran out.",
-    "session_liability_unknown": (
-        "A model call's cost is not known yet, so the session stopped until it is settled."
-    ),
-    "lease_recovery_limit": "Playback stopped after it was interrupted too many times.",
-    "source_unavailable": "Playback stopped because the world's source could not be read.",
-    "invalid_society_state": "Playback stopped because the world's state could not be used.",
+    "stopped_by_person": "The run was stopped.",
+    "paused_by_person": "The world was paused, which ended the run.",
+    "session_deadline": "The run reached its time limit.",
+    "session_minutes": "The run played all its minutes.",
+    "session_decisions": "The run reached its decision limit.",
+    "session_spending_limit": "The run reached its spending limit.",
+    "session_liability_unknown": "The run stopped because a model's cost is not known yet.",
+    "lease_recovery_limit": "The run stopped because it kept being interrupted.",
+    "source_unavailable": "The run stopped because the world could not be read.",
+    "invalid_society_state": "The run stopped because the world's state could not be used.",
 }
 #: Said of a reason without words of its own. A session is never left open for want of words: it
 #: closes, and the missing words are logged when it does.
-UNWORDED_CLOSE: Final = "The session ended."
+UNWORDED_CLOSE: Final = "The run ended."
 
 
 def closed_words(reason: str) -> str:
