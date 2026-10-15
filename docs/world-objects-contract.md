@@ -1224,8 +1224,9 @@ version's changes and this one, and holds the part to the records: inside its ow
 of every building, every other fixture, every path and every pond (a fixture may stand in a field),
 and the records' own rules. It then makes the place the world's people walk from the changed records
 and requires every place of it to be reached from the entry. A part somebody of the version's
-society lives or works in is not removed: the refusal names up to three of them and says the part can
-be moved instead, since a person's home and work name the part, not its position. A refusal is
+society lives or works in is not removed: the refusal names up to three of them, counts the rest and
+anyone whose name is withheld, and says the part can be moved instead, since a person's home and
+work name the part, not its position. A refusal is
 answered as a placed thing's refused landing (422, its `code`, `where` and a sentence): codes
 `part_unknown`, `part_not_changeable`, `part_outside_zone`, `part_blocked`, `part_records_refused`,
 `part_strands_people`, `part_houses_people` and `parts_not_served`. On a world on land, the land is

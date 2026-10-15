@@ -150,12 +150,13 @@ def landing_refusal(
         )
     above = ground.height_above(thing)
     if above is not None:
+        # Said as the ground's step, not as the thing buried or floating: what to do is plain.
         metres = f"{abs(above) / 1000:.1f}"
-        side = "above" if above > 0 else "below"
+        side = "lower" if above > 0 else "higher"
         return ThingLandingRefused(
             OFF_GROUND,
             {"height_above_mm": above},
-            f"It would stand {metres} m {side} the ground there.",
+            f"The ground there is {metres} m {side}. Choose a spot on the same level.",
         )
     met = [
         part

@@ -678,7 +678,7 @@ def check_change(
 # -- the people a part houses or employs ----------------------------------------------------------
 
 
-def people_of_part(state: Mapping[str, Any], identity: str) -> list[tuple[str, str]]:
+def people_of_part(state: Mapping[str, Any], identity: str) -> list[tuple[str | None, str]]:
     """Who lives or works in a site's part, as ``(name, "lives" | "works")`` in the society's
     order (:func:`people_in`)."""
     return people_in(
@@ -694,11 +694,12 @@ def people_of_part(state: Mapping[str, Any], identity: str) -> list[tuple[str, s
 
 def people_in(
     state: Mapping[str, Any], *, subjects: set[str], destinations: set[str]
-) -> list[tuple[str, str]]:
+) -> list[tuple[str | None, str]]:
     """Who lives or works in any of these premises, as ``(name, "lives" | "works")`` in the
     society's order, read from either engine that keeps residents
     (:func:`~exulanica.world.town_people.resident_of`): a society of things names a premises by its
-    record subject, a living town by its destination."""
+    record subject, a living town by its destination. A person whose name is withheld is there
+    with no name (None), counted, never called by a stand-in word."""
     from exulanica.world.town_people import resident_of
 
     def names(premises: Mapping[str, Any] | None) -> bool:
@@ -713,7 +714,7 @@ def people_in(
         resident = resident_of(state, person)
         if resident is None:
             continue
-        name = str(person.get("display_name") or "someone")
+        name = str(person["display_name"]) if person.get("display_name") else None
         if names(resident["home"]):
             found.append((name, "lives"))
         elif names(resident["job"]):
@@ -721,12 +722,30 @@ def people_in(
     return found
 
 
-def refused_people_words(label: str, people: Sequence[tuple[str, str]]) -> str:
-    """The sentence a removal refused for its people reads: who lives or works in it, up to three
-    by name."""
-    shown = [f"{name} {verb} there" for name, verb in people[:3]]
-    more = len(people) - len(shown)
-    said = shown[0] if len(shown) == 1 else ", ".join(shown[:-1]) + " and " + shown[-1]
-    if more:
-        said += f", and {more} more"
-    return f"Not removed: {said}. The {label} can be moved instead."
+#: How many people a refusal names before it counts the rest.
+_NAMED_MOST: Final = 3
+
+
+def refused_people_words(label: str, people: Sequence[tuple[str | None, str]]) -> str:
+    """The sentence a removal refused for its people reads: who lives there, then who works there,
+    those who may be named by name (three at most) and the rest counted, each verb agreeing with who
+    does it: "Ines and Teo work there", "2 people work there", "Ines and 2 more work there",
+    "1 person lives there and 2 people work there"."""
+    said: list[str] = []
+    names_left = _NAMED_MOST
+    for verb, plural in (("lives", "live"), ("works", "work")):
+        everyone = [name for name, does in people if does == verb]
+        if not everyone:
+            continue
+        named = [name for name in everyone if name][:names_left]
+        names_left -= len(named)
+        rest = len(everyone) - len(named)
+        if not named:
+            counted = "1 person" if rest == 1 else f"{rest} people"
+            said.append(f"{counted} {verb if rest == 1 else plural} there")
+        elif rest == 0:
+            who = named[0] if len(named) == 1 else ", ".join(named[:-1]) + " and " + named[-1]
+            said.append(f"{who} {verb if len(named) == 1 else plural} there")
+        else:
+            said.append(f"{', '.join(named)} and {rest} more {plural} there")
+    return f"Not removed: {' and '.join(said)}. The {label} can be moved instead."

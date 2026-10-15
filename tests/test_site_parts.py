@@ -263,9 +263,36 @@ def test_the_people_a_part_houses_are_named_from_either_engine():
     ]
     assert people_of_part(state, "pond") == []
     assert refused_people_words("farmhouse", people_of_part(state, "house")) == (
-        "Not removed: Ada Lane 1 lives there, Bo Cole 2 works there and Cy Moss 3 lives there. "
+        "Not removed: Ada Lane 1 and Cy Moss 3 live there and Bo Cole 2 works there. "
         "The farmhouse can be moved instead."
     )
+    # A person whose name is withheld is there with no name, never a stand-in word.
+    state["inhabitants"][0]["display_name"] = ""
+    assert people_of_part(state, "house")[0] == (None, "lives")
+
+
+@pytest.mark.parametrize(
+    ("people", "said"),
+    [
+        ([(None, "works"), (None, "works")], "2 people work there"),
+        ([("Ines", "works"), ("Teo", "works")], "Ines and Teo work there"),
+        ([("Ines", "works"), (None, "works"), (None, "works")], "Ines and 2 more work there"),
+        ([(None, "works")], "1 person works there"),
+        ([("Ines", "lives")], "Ines lives there"),
+        (
+            [(None, "works"), (None, "lives"), (None, "works")],
+            "1 person lives there and 2 people work there",
+        ),
+        (
+            [(name, "works") for name in ("Ada", "Bo", "Cy", "Di")],
+            "Ada, Bo, Cy and 1 more work there",
+        ),
+    ],
+)
+def test_a_refused_removal_names_who_may_be_named_and_counts_the_rest(people, said):
+    words = refused_people_words("pool bar", people)
+    assert words == f"Not removed: {said}. The pool bar can be moved instead."
+    assert "someone" not in words
 
 
 LAND = {

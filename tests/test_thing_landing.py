@@ -75,13 +75,21 @@ def test_past_the_edge_is_refused_before_the_ground_is_asked():
     )
 
 
-@pytest.mark.parametrize(("y", "words"), [(1_500, "1.5 m above"), (-400, "0.4 m below")])
-def test_off_the_ground_says_how_far(y, words):
+@pytest.mark.parametrize(
+    ("y", "words"),
+    [
+        # Standing above the ground: the ground there is lower.
+        (1_500, "The ground there is 1.5 m lower. Choose a spot on the same level."),
+        # Standing below it: the ground there is higher.
+        (-400, "The ground there is 0.4 m higher. Choose a spot on the same level."),
+    ],
+)
+def test_off_the_ground_says_how_far_the_ground_steps(y, words):
     refused = _refusal(_ground(), _thing(0, 0, y=y))
     assert refused is not None
     assert refused.code == "thing_landing_off_ground"
     assert refused.where == {"height_above_mm": y}
-    assert words in str(refused)
+    assert str(refused) == words
 
 
 def test_a_well_in_the_pond_is_refused_by_the_pond_s_own_name():

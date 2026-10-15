@@ -124,7 +124,9 @@ def storeys_refusal(refused: BuildingStoreysRefused) -> PartChangeRefused:
     return PartChangeRefused("part_storeys_refused", where, words)
 
 
-def people_of_building(state: Mapping[str, Any], premises: Sequence[str]) -> list[tuple[str, str]]:
+def people_of_building(
+    state: Mapping[str, Any], premises: Sequence[str]
+) -> list[tuple[str | None, str]]:
     """Who lives or works in any of a building's premises, as ``(name, "lives" | "works")``: a
     society of things names a premises ``city.premises:<identity>``, a living town
     ``premises:<identity>`` (:func:`~exulanica.world.site_parts.people_in`)."""
