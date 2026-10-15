@@ -294,9 +294,11 @@ again only after its land reads again under the rules its receipt names and to t
 (`generated_world_land_changed`, `generated_world_land_rules_changed`). Where the deployment makes
 worlds on land, a town drafted from a sentence ([below](#land-for-a-world-made-from-a-sentence)) and
 `POST /worlds/kinds/town/worlds` with `land` make one, trying one identity; elsewhere the route
-answers 422 `landform_not_served`. The tessellator reads straight two-point street lines only, so a
-town on land's tiles do not bake and the town does not open: the setting stays off until the
-tessellator reads a street that bends in height.
+answers 422 `landform_not_served`. The tessellator bakes a town on land: its street lines bend in
+height at the mouths, and its terrain closes the steps round lots at other heights than their
+footways and their neighbours ([loom-tess](../web/packages/loom-tess/README.md)). The browser draws
+a town's tiles but not the land round them (the near land beyond them, the backdrop and the sea), so
+the setting stays off until it does.
 
 ## A world's land rules
 
@@ -398,8 +400,8 @@ as walls up to about 4 m.
 ## Limits
 
 - Only a place drafted from words stands on land, and only where the deployment turns it on; no
-  page asks for land otherwise. A town is made on land only there too, and its tiles do not bake
-  (the tessellator reads straight two-point street lines only), so it does not open.
+  page asks for land otherwise. A town is made on land only there too, and the browser draws its
+  tiles without the land round them.
 - Walkable land stays within 64 m above or below the sea, so "high ground" cannot be high: an
   upland is a place among peaks, not a place on a high plateau. Raising the bound is a change to
   the land rules.

@@ -26,7 +26,7 @@
  * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
 import { GRAMMAR_TABLES, nestedShapeOf, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
-import { add, subtract } from './integer-math.js';
+import { add, CORNER_LENGTH_SCALE, floorDivide, multiply, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
 import { backingPieces, facadePieces, faceCover, faceHeights, panelRoles } from './facades.js';
 import type { BackingFields, FaceFrame, FacadeFields, GroundBayFields } from './facades.js';
@@ -43,6 +43,8 @@ import type { GrammarTable, ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from './streets.js';
 import type { ApproachContext, CornerContext, CornerNeed, StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
+import { lotSteps } from './lot-steps.js';
+import type { SteppedLot } from './lot-steps.js';
 import { hullKeepingEdges } from './piece-carve.js';
 import { carveSupport } from './support-carve.js';
 import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
@@ -50,8 +52,13 @@ import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
 import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
 
 /**
- * Bumped whenever an expander, a statement, a contract or the materialised projection set
- * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
+ * Bumped whenever an expander, a statement, a contract or the materialised projection set changes
+ * how any tile a world could have stored expands, because that changes the bytes a bake writes and
+ * the bake stage's parameters carry it. A record shape no stored tile can hold may gain an expansion
+ * without one: lines that bend only in height and terrain graded for lots at their own heights came
+ * with city grammar version 6, which no stored world states, and every line of two points and every
+ * level terrain patch expands to the bytes it did (held by the tile golden, the triangle-digest
+ * conformance, the bake determinism tests and the street rules' own digest).
  */
 export const TESSELLATOR_SOURCE_VERSION = 20;
 
@@ -389,14 +396,56 @@ function groundPartition(patch: TerrainPatch, context: ExpandContext, where: str
  */
 function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
   const where = `city.terrain ${fields.identity as string}`;
-  const { vertices, triangles } = groundPartition(patchOf(fields, context), context, where);
+  const patch = patchOf(fields, context);
+  const { vertices, triangles } = groundPartition(patch, context, where);
   if (triangles.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
   const coordinates: number[] = [];
   for (let vertex = 0; vertex < vertices.length; vertex += 3) {
     coordinates.push(vertices[vertex]!, vertices[vertex + 1]!);
   }
   const surface: SurfaceExpansion = { role: 'terrain', orientation: 'horizontal', coordinates };
-  return { state: 'drawn', pieces: [{ vertices, triangles, surface }] };
+  // The steps round lots at other heights than their neighbours and their footways are the
+  // terrain's to close (`lot-steps.ts`); a town on level ground has none, and its terrain draws
+  // exactly as it did.
+  const lots: SteppedLot[] = [];
+  for (const record of context.carried.values()) {
+    if (record.kind !== 'city.parcel') continue;
+    const frontages = (record.fields.frontages as readonly Fields[]).map((frontage) => {
+      const curb = context.carried.get(frontage.curb_identity as string);
+      const fields = curb !== undefined && curb.kind === 'city.curb_edge' ? curb.fields : undefined;
+      const up = fields === undefined
+        ? 0
+        : add(
+          fields.kerb_height_mm as number,
+          floorDivide(multiply(fields.footway_width_mm as number, fields.footway_crossfall_millionths as number, where), CORNER_LENGTH_SCALE, where),
+          where,
+        );
+      return {
+        edgeOrdinal: frontage.edge_ordinal as number,
+        kerbLine: fields === undefined ? undefined : fields.kerb_line_mm as readonly (readonly [number, number, number])[],
+        upMm: up,
+      };
+    });
+    lots.push({ ring: record.fields.boundary_mm as readonly Plan[], gradeMm: record.fields.grade_elevation_mm as number, frontages });
+  }
+  const tile: [number, number, number, number] = [
+    patch.originX, patch.originY, patch.originX + context.tileSizeMm, patch.originY + context.tileSizeMm,
+  ];
+  let [lowest, highest] = [patch.heights[0]!, patch.heights[0]!];
+  for (const height of patch.heights) {
+    if (height < lowest) lowest = height;
+    if (height > highest) highest = height;
+  }
+  const steps = lotSteps(lots, tile, [lowest, highest], where);
+  const pieces: Piece[] = [{ vertices, triangles, surface }];
+  if (steps.triangles.length > 0) {
+    pieces.push({
+      vertices: steps.vertices,
+      triangles: steps.triangles,
+      surface: { role: 'terrain', orientation: 'vertical', coordinates: steps.coordinates },
+    });
+  }
+  return { state: 'drawn', pieces };
 }
 
 /**

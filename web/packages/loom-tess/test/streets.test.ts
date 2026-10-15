@@ -9,6 +9,7 @@
  * orientation however many corners it turns. A test that rebuilt the wedge from the same fields
  * would agree with the rule by construction and could not fail.
  */
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { Piece } from '../src/core/pieces.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from '../src/core/streets.js';
@@ -379,5 +380,33 @@ describe('the junction rule', () => {
   it('waits on a leg the tile does not carry', () => {
     const partial: StreetLookup = { ...lookup, record: (identity) => (identity === junction.segment_identities[1] ? undefined : carried.get(identity)) };
     expect(junctionSurface(junction, partial, 1, 'case')).toEqual({ state: 'waiting', need: 'junction_legs' });
+  });
+});
+
+describe('a line of two points', () => {
+  it('draws the bytes it drew before lines could bend in height', () => {
+    // Every segment, every curb with its corners and the strips that give way to them, and the
+    // junction at two resolutions, as one digest: a line of two points takes the path it always
+    // took, so a tile a world could have stored expands as it did (no tessellator version bump).
+    const carried = new Map<string, Fields>(
+      [...fixture.grammars[0].owned, ...fixture.grammars[0].halo].map((record: any) => [record.fields.identity, record.fields]),
+    );
+    const lookup: StreetLookup = {
+      record: (identity) => carried.get(identity),
+      curbs: (segment) => ({ left: curbOf({ identity: segment }, 'left'), right: curbOf({ identity: segment }, 'right') }),
+    };
+    const results: unknown[] = [];
+    for (const segment of segments) results.push(segmentSurfaces(segment, curbOf(segment, 'left'), curbOf(segment, 'right'), 'case'));
+    for (const curb of curbs) {
+      const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
+      const corner = cornerOf(curb);
+      const approaches = curbs
+        .filter((other) => (other.next_curb_identity as string[]).includes(curb.identity))
+        .map((owner) => ({ owner }));
+      results.push(curbSurfaces(curb, segment, corner === undefined ? [] : [corner], approaches, 'case'));
+    }
+    const junction = recordsOf(fixture, 'city.junction')[0].fields;
+    for (const resolution of [1, 50]) results.push(junctionSurface(junction, lookup, resolution, 'case'));
+    expect(createHash('sha256').update(JSON.stringify(results)).digest('hex')).toBe('956df3585497042e69b72a988ffe962999e668a794670619bc053629e68c3980');
   });
 });

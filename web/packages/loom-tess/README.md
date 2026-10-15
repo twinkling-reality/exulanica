@@ -133,7 +133,11 @@ solids an object states as its parts, and the ground a lot states.
 - In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
   yield rule below: the segments' carriageways and gutters, and the ground a drawn building stands
   on. No published texture set dresses terrain, so its one surface (role `terrain`, horizontal)
-  states `none-exists`.
+  states `none-exists`. On land the terrain also closes the steps round lots at other heights than
+  their neighbours and their footways, as a second surface (role `terrain`, vertical), by the step
+  rule (`src/core/lot-steps.ts`): between lots on their shared edges, and along each frontage
+  between the footway's back edge and the lot's grade, facing the lower side. Steps are drawn, never
+  walked; a town on level ground has none, and its terrain draws as it did.
 - A building draws its own faces by the massing rule (`src/core/massing.ts`): a wall along every
   tier ring edge between the storeys that tier covers, a roof on the top tier and a terrace on each
   tier the one above is set back from, a wall round every light well, a parapet where a deck meets
@@ -187,11 +191,14 @@ solids an object states as its parts, and the ground a lot states.
   the three cannot disagree about which edge they stand on.
 - A street segment draws its carriageway and its gutters by the street rules
   (`src/core/streets.ts`), between the kerb lines of the two curbs the tile carries for it, each a
-  horizontal surface dressed by the material record for its role. Terrain yields to both. A segment
-  whose centreline or kerb lines are bent, or whose curbs the tile does not carry, waits on
-  `bent_street` or `street_curbs`.
-- A curb draws its straight kerb face, kerb top and footway, AND THE CORNER it turns into each curb
-  it names as its follower: the kerb face along the fillet arc, the kerb top out to the back arc,
+  horizontal surface dressed by the material record for its role. Terrain yields to both. A
+  centreline or kerb line may bend in height, as a town laid on its land climbs between its
+  junctions' mouths, and is read piece by piece; a segment whose lines bend in plan, or bend in
+  height inside its strip, or whose curbs the tile does not carry, waits on `bent_street` or
+  `street_curbs`.
+- A curb draws its kerb face, kerb top and footway, piece by piece along its kerb line, AND THE
+  CORNER it turns into each curb it names as its follower, read from the end pieces of the two kerb
+  lines: the kerb face along the fillet arc, the kerb top out to the back arc,
   and the footway wedge, all three added to the curb's own three surfaces so a curb draws one
   surface per role and orientation however many corners it turns. THE WEDGE IS THE SLICE BETWEEN THE
   TWO TANGENT POINTS' NORMALS LESS THE BLOCKS THE CURB NAMES, which is the corner rule's partition

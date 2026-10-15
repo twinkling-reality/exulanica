@@ -14,6 +14,7 @@ validates exactly as before.
 from __future__ import annotations
 
 import dataclasses
+import importlib.util
 from functools import cache
 from pathlib import Path
 
@@ -425,3 +426,19 @@ def test_a_door_above_one_step_is_a_version_6_facade_and_no_earlier_one():
         assert validate_record(facade, FACADE_SHAPE) is facade
         with pytest.raises(GrammarError, match="threshold_height_mm"):
             validate_record(dataclasses.replace(facade, grammar_version=5), FACADE_SHAPE)
+
+
+# ---------------------------------------------------------------------------------------------
+# What the tessellator reads of a town on its land
+
+
+def test_the_lines_the_tessellator_reads_heights_along_are_the_grammars():
+    """``lifted-lines.json`` holds the tessellator's reading of a line that bends in height to the
+    grammar's own (``streets-on-land.test.ts``); it is what the builder writes from a generated
+    town today, so the grammar cannot change its lines without the tessellator's test seeing it."""
+    builder = ROOT / "tests" / "fixtures" / "city-v6" / "build_lifted_lines.py"
+    spec = importlib.util.spec_from_file_location("city_v6_lifted_lines", builder)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.FIXTURE.read_bytes() == module.lifted_lines()

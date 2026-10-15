@@ -685,11 +685,11 @@ Each of these is known and not built.
   corridor's counts, including the facade ground bands its tile leaves undressed, are in
   [generated-corridor-street](generated-corridor-street.md). Version 5 dresses terrain with the tree
   pit soil, the one bare earth set the texture package publishes.
-- **A town on land is not drawn or made.** The tessellator draws straight two-point kerb lines and
-  centrelines, so a version 6 street, which bends in height at its mouths, draws nothing, and
-  nothing draws the faces where surfaces step (lot to lot, lot to footway, a building's plinth on a
-  slope). The town composer's version 3 makes a version 6 town and keeps its land in its receipt
-  ([landform contract](landform-contract.md#towns-on-land)), but no route or sentence asks for one.
+- **A town on land is not shown.** The town composer's version 3 makes a version 6 town and keeps its
+  land in its receipt, and its tiles bake (the tessellator reads lines that bend in height, and the
+  terrain closes the steps round lots), but the browser draws no land beyond a town's tiles, so a
+  sentence or the kind route makes one only where the deployment turns worlds on land on
+  ([landform contract](landform-contract.md#towns-on-land)).
 - **Tree roles.** A street tree's parts take surface roles 25 `canopy` and 26 `trunk`, appended
   so foliage and bark are dressed apart; every other object's parts take object roles, and a
   catalog part may take only an object role.

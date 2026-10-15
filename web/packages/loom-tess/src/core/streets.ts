@@ -11,8 +11,13 @@
  * point's place against a line is `along` and `across` it, floored the same way (`measureAgainst`),
  * with `S = 10^6`.
  *
- * STRAIGHT ONLY. A centreline or a kerb line of more than one piece, or a kerb line not
- * running with its centreline, is the `bent_street` waiting state and draws nothing.
+ * STRAIGHT IN PLAN. A centreline or a kerb line is a RUN: two points or more, every piece running
+ * the same way as the whole line, so it is straight in plan and may bend only in height (a town
+ * laid on its land climbs between its junctions' mouths). Its height at a point is read on the piece
+ * the point's position falls in, `z_i + floor((z_{i+1} - z_i) * (p - p_i) / (p_{i+1} - p_i))`, and
+ * past either end on the end piece, so a line of two points is read exactly as before. A line that
+ * bends in plan, a kerb line not running with its centreline, or a line that bends in height inside
+ * its segment's strip is the `bent_street` waiting state and draws nothing.
  *
  * THE SEGMENT.
  *   1. The strip runs where both kerb lines exist along the centreline. At each end, the kerb line
@@ -107,12 +112,8 @@ export type StreetResult<Need extends string> =
 /** What a segment's strip waits on. */
 export type StripNeed = 'bent_street' | 'street_curbs';
 
-/** A straight line of a record: exactly two points, or undefined for a bent one. */
-function straight(points: unknown): readonly [Space, Space] | undefined {
-  const line = points as readonly Space[];
-  if (line.length !== 2) return undefined;
-  return [line[0]!, line[1]!];
-}
+/** A line of a record, straight in plan: two points or more. */
+type Run = readonly Space[];
 
 const plan = (point: Space): Plan => [point[0], point[1]];
 
@@ -124,11 +125,34 @@ function moved(point: Plan, by: Plan, where: string): Plan {
   return [add(point[0], by[0], where), add(point[1], by[1], where)];
 }
 
-/** Whether `line` runs with `direction`: parallel and the same way. */
-function runsWith(direction: Plan, line: readonly [Space, Space], where: string): boolean {
-  const piece = between(plan(line[0]), plan(line[1]), where);
-  if (crossVectors(direction, piece, where) !== 0) return false;
-  return dot(direction, piece, where) > 0;
+/**
+ * A line of a record that is straight in plan: two points or more, every piece running the same way
+ * as the whole line. Undefined for one of fewer points or one that bends in plan.
+ */
+function straightRun(points: unknown, where: string): Run | undefined {
+  const line = points as readonly Space[];
+  if (line.length < 2) return undefined;
+  if (line.length === 2) return line;
+  const whole = between(plan(line[0]!), plan(line[line.length - 1]!), where);
+  for (let index = 0; index + 1 < line.length; index += 1) {
+    const piece = between(plan(line[index]!), plan(line[index + 1]!), where);
+    if (crossVectors(whole, piece, where) !== 0) return undefined;
+    if (dot(whole, piece, where) <= 0) return undefined;
+  }
+  return line;
+}
+
+/** The first and last points of a run: its ends in plan. */
+const runEnds = (line: Run): readonly [Space, Space] => [line[0]!, line[line.length - 1]!];
+
+/** Whether every piece of `line` runs with `direction`: parallel and the same way. */
+function runsWith(direction: Plan, line: Run, where: string): boolean {
+  for (let index = 0; index + 1 < line.length; index += 1) {
+    const piece = between(plan(line[index]!), plan(line[index + 1]!), where);
+    if (crossVectors(direction, piece, where) !== 0) return false;
+    if (dot(direction, piece, where) <= 0) return false;
+  }
+  return true;
 }
 
 /** The unit normals of a direction, unscaled: left `(-dy, dx)` and right `(dy, -dx)`. */
@@ -136,15 +160,42 @@ const leftOf = (direction: Plan): Plan => [-direction[1], direction[0]];
 const rightOf = (direction: Plan): Plan => [direction[1], -direction[0]];
 
 /**
- * The height at `point` on a straight line of a record, by positions along `direction`:
- * `z0 + floor((z1 - z0) * p / p1)`, with `p` and `p1` the positions of the point and of the line's
- * end, `dot(point - start, direction)`.
+ * The height at `point` on a run, by positions along `direction`: on the piece the point's position
+ * falls in (the end piece past either end), `z_i + floor((z_{i+1} - z_i) * p / p1)`, with `p` and
+ * `p1` the positions of the point and of the piece's far end from its near end,
+ * `dot(point - start, direction)`. A run of two points is one piece, read as it always was.
  */
-function heightOn(line: readonly [Space, Space], direction: Plan, point: Plan, where: string): number {
-  const end = dot(between(plan(line[0]), plan(line[1]), where), direction, where);
-  const here = dot(between(plan(line[0]), point, where), direction, where);
+function heightOn(line: Run, direction: Plan, point: Plan, where: string): number {
+  let at = 0;
+  for (let index = 1; index + 1 < line.length; index += 1) {
+    if (dot(between(plan(line[index]!), point, where), direction, where) >= 0) at = index;
+  }
+  const [near, far] = [line[at]!, line[at + 1]!];
+  const end = dot(between(plan(near), plan(far), where), direction, where);
+  const here = dot(between(plan(near), point, where), direction, where);
   if (end === 0) throw new GeometryError(`${where} measures a height on a line of no length`);
-  return add(line[0][2], floorDivide(multiply(subtract(line[1][2], line[0][2], where), here, where), end, where), where);
+  return add(near[2], floorDivide(multiply(subtract(far[2], near[2], where), here, where), end, where), where);
+}
+
+/**
+ * The height at `point` on a record's line, as every street rule reads it: on the piece the point's
+ * position falls in, positions along the line's own first-to-last direction (any direction the line
+ * runs with gives the same reading). Undefined for a line that bends in plan.
+ */
+export function heightAlong(points: unknown, point: Plan, where: string): number | undefined {
+  const line = straightRun(points, where);
+  if (line === undefined) return undefined;
+  const [first, last] = runEnds(line);
+  return heightOn(line, between(plan(first), plan(last), where), point, where);
+}
+
+/** Whether any point inside a run lies strictly between two positions along `direction`. */
+function bendsBetween(line: Run, direction: Plan, origin: Plan, low: number, high: number, where: string): boolean {
+  for (let index = 1; index + 1 < line.length; index += 1) {
+    const at = dot(between(origin, plan(line[index]!), where), direction, where);
+    if (low < at && at < high) return true;
+  }
+  return false;
 }
 
 interface Measured {
@@ -207,15 +258,15 @@ export function segmentEnds(
 ): SegmentEnds {
   if (left === undefined) return { state: 'waiting', need: 'street_curbs' };
   if (right === undefined) return { state: 'waiting', need: 'street_curbs' };
-  const centre = straight(segment.centreline_mm);
-  const leftLine = straight(left.kerb_line_mm);
-  const rightLine = straight(right.kerb_line_mm);
+  const centre = straightRun(segment.centreline_mm, where);
+  const leftLine = straightRun(left.kerb_line_mm, where);
+  const rightLine = straightRun(right.kerb_line_mm, where);
   const bent = { state: 'waiting', need: 'bent_street' } as const;
   if (centre === undefined) return bent;
   if (leftLine === undefined) return bent;
   if (rightLine === undefined) return bent;
-  const origin = plan(centre[0]);
-  const direction = between(origin, plan(centre[1]), where);
+  const origin = plan(centre[0]!);
+  const direction = between(origin, plan(runEnds(centre)[1]), where);
   if (!runsWith(direction, leftLine, where)) return bent;
   if (!runsWith(direction, rightLine, where)) return bent;
   const width = segment.carriageway_width_mm as number;
@@ -251,9 +302,15 @@ export function segmentEnds(
       right: rightPoint,
     };
   };
-  const [left0, right0] = endPoints(leftLine[0], rightLine[0], true);
-  const [left1, right1] = endPoints(leftLine[1], rightLine[1], false);
-  if (position(plan(left0)) >= position(plan(left1))) return { state: 'waiting', need: 'street_curbs' };
+  const [left0, right0] = endPoints(runEnds(leftLine)[0], runEnds(rightLine)[0], true);
+  const [left1, right1] = endPoints(runEnds(leftLine)[1], runEnds(rightLine)[1], false);
+  const [low, high] = [position(plan(left0)), position(plan(left1))];
+  if (low >= high) return { state: 'waiting', need: 'street_curbs' };
+  // A line may bend in height at the strip's ends and beyond them, never inside it: the strip is one
+  // slope from end to end.
+  for (const line of [centre, leftLine, rightLine]) {
+    if (bendsBetween(line, direction, origin, low, high, where)) return bent;
+  }
   return { state: 'ends', origin, direction, start: stripEnd(left0, right0), end: stripEnd(left1, right1) };
 }
 
@@ -294,7 +351,11 @@ export function segmentSurfaces(
   return { state: 'drawn', pieces };
 }
 
-/** A curb's straight part: its kerb face, its kerb top and its footway. */
+/**
+ * A curb's straight part: its kerb face, its kerb top and its footway, piece by piece along its kerb
+ * line. The step between its footway and a lot behind it at another height is the terrain's to close
+ * (`lot-steps.ts`).
+ */
 export function curbSurfaces(
   curb: StreetFields,
   segment: StreetFields,
@@ -302,12 +363,12 @@ export function curbSurfaces(
   approaches: readonly ApproachContext[],
   where: string,
 ): StreetResult<'bent_street' | CornerNeed> {
-  const centre = straight(segment.centreline_mm);
-  const line = straight(curb.kerb_line_mm);
+  const centre = straightRun(segment.centreline_mm, where);
+  const line = straightRun(curb.kerb_line_mm, where);
   if (centre === undefined) return { state: 'waiting', need: 'bent_street' };
   if (line === undefined) return { state: 'waiting', need: 'bent_street' };
-  const origin = plan(centre[0]);
-  const direction = between(origin, plan(centre[1]), where);
+  const origin = plan(centre[0]!);
+  const direction = between(origin, plan(runEnds(centre)[1]), where);
   if (!runsWith(direction, line, where)) return { state: 'waiting', need: 'bent_street' };
   const onLeft = curb.side === 'left';
   const outward = onLeft ? leftOf(direction) : rightOf(direction);
@@ -320,53 +381,67 @@ export function curbSurfaces(
     const at = moved(plan(point), alongByCornerRule(outward, distance, where), where);
     return [at[0], at[1], add(point[2], up, where)];
   };
-  const [k0, k1] = line;
-  const top0 = raised(k0, height);
-  const top1 = raised(k1, height);
-  const back0 = out(k0, kerbWidth, height);
-  const back1 = out(k1, kerbWidth, height);
-  const footway0 = out(k0, add(kerbWidth, footwayWidth, where), add(height, rise, where));
-  const footway1 = out(k1, add(kerbWidth, footwayWidth, where), add(height, rise, where));
-
-  // The face, seen from the carriageway: the kerb point on the viewer's left first.
-  const [a, b] = onLeft ? [k0, k1] : [k1, k0];
-  const facePoints: Space[] = [a, b, raised(b, height), raised(a, height)];
-  const faceVertices: number[] = [];
-  const faceCoordinates: number[] = [];
-  for (const point of facePoints) {
-    faceVertices.push(point[0], point[1], point[2]);
-    faceCoordinates.push(
-      measureAgainst(origin, direction, plan(point), where).along,
-      subtract(heightOn(line, direction, plan(point), where), point[2], where),
-    );
-  }
-  const topQuad: Space[] = onLeft ? [top0, top1, back1, back0] : [back0, back1, top1, top0];
-  // THE FOOTWAY IS A RING IN WALK ORDER, not a quad, because either end of it may GIVE WAY TO A
-  // MITRE. Where a corner's width reaches its radius, this strip and the one it meets would both
-  // cover the ground beyond the arc's centre; the corner rule gives each the side of the line from
-  // that centre to the frontage corner that its own length runs along. Both those points lie on
-  // this strip's own edges by construction, the centre on its end normal and the frontage corner on
-  // its frontage line, so the clip adds no point either strip has to find: it replaces the corner of
-  // the quad with the two the corner rule names, and the two strips meet on the line between them.
-  const [walkStart, walkEnd] = onLeft ? [0, 1] : [1, 0];
-  const backs = [back0, back1];
-  const fronts = [footway0, footway1];
-  const ring: Space[] = [backs[walkStart]!, backs[walkEnd]!];
+  const built: { readonly [name: string]: Built } = {
+    face: { vertices: [], coordinates: [], triangles: [] },
+    top: { vertices: [], coordinates: [], triangles: [] },
+    footway: { vertices: [], coordinates: [], triangles: [] },
+  };
+  // The walk round the face runs from the kerb line's start for a left curb, from its end for a
+  // right one: a mitre at the walk's end is the corner this curb turns, one at its start the corner
+  // that turns into it, and each gives way on the piece that reaches it.
   const turnedMitre = corners.length === 0 ? undefined : cornerMitre(curb, corners[0]!.follower, where);
   const metMitre = approaches.length === 0 ? undefined : cornerMitre(approaches[0]!.owner, curb, where);
-  if (turnedMitre === undefined) ring.push(fronts[walkEnd]!);
-  else ring.push(turnedMitre.centre, turnedMitre.frontage);
-  if (metMitre === undefined) ring.push(fronts[walkStart]!);
-  else ring.push(metMitre.frontage, metMitre.centre);
-  const footwayRing = ring.filter((point, index) => !samePoint(point, ring[(index + ring.length - 1) % ring.length]!));
-  const built: { readonly [name: string]: Built } = {
-    face: { vertices: faceVertices, coordinates: faceCoordinates, triangles: [...QUAD] },
-    top: { ...horizontal(topQuad, origin, direction, where), triangles: [...QUAD] },
-    footway: {
+  const pieces = line.length - 1;
+  for (let index = 0; index < pieces; index += 1) {
+    const [k0, k1] = [line[index]!, line[index + 1]!];
+    const top0 = raised(k0, height);
+    const top1 = raised(k1, height);
+    const back0 = out(k0, kerbWidth, height);
+    const back1 = out(k1, kerbWidth, height);
+    const footway0 = out(k0, add(kerbWidth, footwayWidth, where), add(height, rise, where));
+    const footway1 = out(k1, add(kerbWidth, footwayWidth, where), add(height, rise, where));
+
+    // The face, seen from the carriageway: the kerb point on the viewer's left first.
+    const [a, b] = onLeft ? [k0, k1] : [k1, k0];
+    const facePoints: Space[] = [a, b, raised(b, height), raised(a, height)];
+    const faceVertices: number[] = [];
+    const faceCoordinates: number[] = [];
+    for (const point of facePoints) {
+      faceVertices.push(point[0], point[1], point[2]);
+      faceCoordinates.push(
+        measureAgainst(origin, direction, plan(point), where).along,
+        subtract(heightOn(line, direction, plan(point), where), point[2], where),
+      );
+    }
+    appended(built.face!, { vertices: faceVertices, coordinates: faceCoordinates, triangles: [...QUAD] });
+    const topQuad: Space[] = onLeft ? [top0, top1, back1, back0] : [back0, back1, top1, top0];
+    appended(built.top!, { ...horizontal(topQuad, origin, direction, where), triangles: [...QUAD] });
+    // THE FOOTWAY IS A RING IN WALK ORDER, not a quad, because either end of it may GIVE WAY TO A
+    // MITRE. Where a corner's width reaches its radius, this strip and the one it meets would both
+    // cover the ground beyond the arc's centre; the corner rule gives each the side of the line from
+    // that centre to the frontage corner that its own length runs along. Both those points lie on
+    // this strip's own edges by construction, the centre on its end normal and the frontage corner on
+    // its frontage line, so the clip adds no point either strip has to find: it replaces the corner of
+    // the quad with the two the corner rule names, and the two strips meet on the line between them.
+    // Each piece of a kerb line that bends in height is its own ring, so no triangle spans a bend.
+    const [walkStartIndex, walkEndIndex] = onLeft ? [0, 1] : [1, 0];
+    const reachesWalkEnd = onLeft ? index === pieces - 1 : index === 0;
+    const reachesWalkStart = onLeft ? index === 0 : index === pieces - 1;
+    const backs = [back0, back1];
+    const fronts = [footway0, footway1];
+    const ring: Space[] = [backs[walkStartIndex]!, backs[walkEndIndex]!];
+    const turnedHere = reachesWalkEnd ? turnedMitre : undefined;
+    const metHere = reachesWalkStart ? metMitre : undefined;
+    if (turnedHere === undefined) ring.push(fronts[walkEndIndex]!);
+    else ring.push(turnedHere.centre, turnedHere.frontage);
+    if (metHere === undefined) ring.push(fronts[walkStartIndex]!);
+    else ring.push(metHere.frontage, metHere.centre);
+    const footwayRing = ring.filter((point, at) => !samePoint(point, ring[(at + ring.length - 1) % ring.length]!));
+    appended(built.footway!, {
       ...horizontal(footwayRing, origin, direction, where),
       triangles: [...triangulateRing(footwayRing.map(plan), where)],
-    },
-  };
+    });
+  }
   for (const corner of corners) {
     const turned = curbCorner(curb, corner, origin, direction, where);
     if (turned.state === 'waiting') return turned;
@@ -439,8 +514,8 @@ export function curbCorner(
   const radius = curb.corner_radius_mm as number;
   const nothing: Built = { vertices: [], coordinates: [], triangles: [] };
   if (radius === 0) return { state: 'drawn', parts: { face: nothing, top: nothing, footway: nothing }, mitre: undefined };
-  const [beforeP, p] = walked(curb);
-  const [q, afterQ] = walked(corner.follower);
+  const [beforeP, p] = walkEnd(curb);
+  const [q, afterQ] = walkStart(corner.follower);
   const into = between(plan(beforeP), plan(p), where);
   const out = between(plan(q), plan(afterQ), where);
   const turning = crossVectors(into, out, where);
@@ -548,8 +623,8 @@ export function curbCorner(
 export function cornerMitre(curb: StreetFields, follower: StreetFields, where: string): CornerMitre | undefined {
   const radius = curb.corner_radius_mm as number;
   if (radius === 0) return undefined;
-  const [beforeP, p] = walked(curb);
-  const [q, afterQ] = walked(follower);
+  const [beforeP, p] = walkEnd(curb);
+  const [q, afterQ] = walkStart(follower);
   const into = between(plan(beforeP), plan(p), where);
   const out = between(plan(q), plan(afterQ), where);
   if (crossVectors(into, out, where) <= 0) return undefined;
@@ -622,10 +697,27 @@ export interface StreetLookup {
 
 const samePoint = (a: Space, b: Space): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
-/** A curb's straight kerb line in the order a counter-clockwise walk round its face takes it. */
-function walked(curb: StreetFields): readonly [Space, Space] {
-  const line = straight(curb.kerb_line_mm)!;
-  return curb.side === 'left' ? line : [line[1], line[0]];
+/**
+ * A curb's kerb line in the order a counter-clockwise walk round its face takes it, read by the
+ * corner rule at its two ends as the grammar's corners are (`corners.corner_of`): the walk's last
+ * piece arrives at `P`, its first piece leaves `Q`. A kerb line that bends in plan has no walk.
+ */
+function walkOf(curb: StreetFields): Run {
+  const line = straightRun(curb.kerb_line_mm, `curb ${String(curb.identity)}`);
+  if (line === undefined) throw new GeometryError(`curb ${String(curb.identity)} has a kerb line that bends in plan`);
+  return curb.side === 'left' ? line : [...line].reverse();
+}
+
+/** The piece a curb's walk arrives at its end `P` along: the point before `P`, and `P`. */
+function walkEnd(curb: StreetFields): readonly [Space, Space] {
+  const walk = walkOf(curb);
+  return [walk[walk.length - 2]!, walk[walk.length - 1]!];
+}
+
+/** The piece a curb's walk leaves its start `Q` along: `Q`, and the point after it. */
+function walkStart(curb: StreetFields): readonly [Space, Space] {
+  const walk = walkOf(curb);
+  return [walk[0]!, walk[1]!];
 }
 
 /** The power of two a fillet's segments may not pass: the least one at or above its radius. */
@@ -651,9 +743,9 @@ export function junctionSurface(junction: StreetFields, lookup: StreetLookup, re
     if (right === undefined) return legsNeeded;
     const ends = segmentEnds(segment, left, right, where);
     if (ends.state !== 'ends') return ends;
-    const centre = straight(segment.centreline_mm)!;
-    const atStart = centre[0][0] === nodePlan[0] && centre[0][1] === nodePlan[1];
-    const atEnd = centre[1][0] === nodePlan[0] && centre[1][1] === nodePlan[1];
+    const [first, last] = runEnds(straightRun(segment.centreline_mm, where)!);
+    const atStart = first[0] === nodePlan[0] && first[1] === nodePlan[1];
+    const atEnd = last[0] === nodePlan[0] && last[1] === nodePlan[1];
     if (atStart === atEnd) throw new GeometryError(`${where}: segment ${identity} does not meet the junction's node at one end`);
     const e = atStart ? ends.start : ends.end;
     legs.push(atStart
@@ -670,8 +762,8 @@ export function junctionSurface(junction: StreetFields, lookup: StreetLookup, re
     for (const point of leg.mouth) push(point);
     const a = leg.outwardLeft;
     const b = next.outwardRight;
-    const [q, afterQ] = walked(a);
-    const [beforeP, p] = walked(b);
+    const [q, afterQ] = walkStart(a);
+    const [beforeP, p] = walkEnd(b);
     push(q);
     if ((b.next_curb_identity as readonly string[])[0] !== a.identity) return legsNeeded;
     const radius = b.corner_radius_mm as number;
