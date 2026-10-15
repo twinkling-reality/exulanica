@@ -17,6 +17,7 @@ import {
   COVER_PLACEMENTS_MAX, coverMatrix, growCover, packSiteDresser, scatterCover,
   type CoverSlot, type FetchedPieces, type SiteDressingSummary,
 } from '../src/playcanvas/style-pack/index.js';
+import { COVER_TRIES_MAX } from '../src/playcanvas/style-pack/ground-cover.js';
 
 // Relative to web/, where the suite runs.
 const CASES = JSON.parse(readFileSync('../assets/style-packs/manifest-cases.v1.json', 'utf8')) as {
@@ -117,8 +118,33 @@ describe('a site\'s cover', () => {
     const grown = growCover([LAWN, other], pack.cover, { most: 3000 });
     expect(grown.points.length).toBe(3000);
     expect(grown.leftOut).toBe(1800);
+    expect(grown.untried).toBe(0);
     expect(grown.points.filter((point) => point.eastM < 30).length).toBe(2400);
     expect(COVER_PLACEMENTS_MAX).toBe(40_000);
+  });
+
+  it('counts toward its guard only the pieces that grow, never a point refused under a path or a building', () => {
+    const other = slot('lawn-far', 'ground.lawn', [50_000, 10_000, 0], [20_000, 20_000, 0]);
+    const near = growCover([LAWN, PATH, HOUSE], pack.cover).points.length;
+    const all = growCover([LAWN, PATH, HOUSE, other], pack.cover);
+    expect(all.points.length).toBe(near + 2400);
+    // Room for every piece the first lawn grows and 100 more: the far lawn grows those 100, not fewer.
+    const grown = growCover([LAWN, PATH, HOUSE, other], pack.cover, { most: near + 100 });
+    expect(grown.points.length).toBe(near + 100);
+    expect(grown.points.filter((point) => point.eastM < 30).length).toBe(near);
+    expect(grown.leftOut).toBe(2300);
+    expect(grown.untried).toBe(0);
+  });
+
+  it('tries at most its bound on points, grown or not, and counts the points it never tried', () => {
+    const other = slot('lawn-far', 'ground.lawn', [50_000, 10_000, 0], [20_000, 20_000, 0]);
+    const near = growCover([LAWN, PATH, HOUSE], pack.cover).points.length;
+    // The first lawn's 2400 points are all tried, and 600 of the far lawn's: its other 1800 never are.
+    const grown = growCover([LAWN, PATH, HOUSE, other], pack.cover, { tries: 3000 });
+    expect(grown.points.length).toBe(near + 600);
+    expect(grown.untried).toBe(1800);
+    expect(grown.leftOut).toBe(0);
+    expect(COVER_TRIES_MAX).toBe(4 * COVER_PLACEMENTS_MAX);
   });
 
   it('on land, stands each piece of a draped ground on the land under it, and grows none where the land\'s water stands above it', () => {
@@ -250,10 +276,10 @@ describe('a site dressed in a pack with cover', () => {
   it('grows its lawn\'s cover off its path as instanced pieces, swaying both pieces\' materials, and takes it all back', () => {
     const { summaries, during, after } = site(true);
     const expected = SITE_COVER();
-    expect(summaries[0]!.cover).toEqual({ pieces: expected, slots: 1, leftOut: 0 });
+    expect(summaries[0]!.cover).toEqual({ pieces: expected, slots: 1, leftOut: 0, untried: 0 });
     expect(summaries[0]!.swaying).toBe(2);
     expect(JSON.parse(during.instanced!).instances).toBe(expected);
-    expect(JSON.parse(during.cover!)).toEqual({ pieces: expected, slots: 1, leftOut: 0 });
+    expect(JSON.parse(during.cover!)).toEqual({ pieces: expected, slots: 1, leftOut: 0, untried: 0 });
     expect([during.wind, during.animating]).toEqual(['2', true]);
     expect(after).toEqual({ cover: undefined, wind: undefined });
   });
@@ -270,7 +296,7 @@ describe('a site dressed in a pack with cover', () => {
       plane('meadow', 'ground.meadow', [15_000, 10_000, 6], [10_000, 20_000, 0]),
     ]);
     // The base lies under both, so only the meadow grows: 200 square metres at 600 a hundred.
-    expect(grownOn(drawing, dressed)).toEqual({ pieces: 1200, slots: 1, leftOut: 0 });
+    expect(grownOn(drawing, dressed)).toEqual({ pieces: 1200, slots: 1, leftOut: 0, untried: 0 });
   });
 
   it('gives each piece its variant\'s share of the wind: the stiff flowers less, the grass all of it', () => {

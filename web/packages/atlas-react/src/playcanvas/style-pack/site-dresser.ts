@@ -120,8 +120,11 @@ export interface SiteDressingSummary {
   readonly bordered: number;
   /** Neighbours left out of a plane's working because it has more than the working carries. */
   readonly borderNeighboursLeftOut: number;
-  /** What the pack's cover grew, where it states any: its pieces, the slots growing them, and the pieces the guard left out. */
-  readonly cover?: { readonly pieces: number; readonly slots: number; readonly leftOut: number };
+  /**
+   * What the pack's cover grew, where it states any: its pieces, the slots growing them, the pieces
+   * the guard left out, and the points the bound on tries never tried.
+   */
+  readonly cover?: { readonly pieces: number; readonly slots: number; readonly leftOut: number; readonly untried: number };
   /** How many of the pieces' materials sway, where the look states a wind and the device runs it. */
   readonly swaying?: number;
 }
@@ -537,7 +540,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       });
     }
     // What the cover grew, and how many materials sway.
-    const coverSaid = grown === null ? null : { pieces: coverPlacements.length, slots: grown.slots, leftOut: grown.leftOut };
+    const coverSaid = grown === null ? null : { pieces: coverPlacements.length, slots: grown.slots, leftOut: grown.leftOut, untried: grown.untried };
     if (coverSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteCover'] = JSON.stringify(coverSaid);
     if (wind !== null && canvas?.dataset !== undefined) canvas.dataset['siteWind'] = String(wind.materials);
     // How many of the site's materials wear the surface finish, and whether its water reflects.

@@ -12,13 +12,18 @@ import type { LandWater, StylePackCover } from '@exulanica/atlas-core';
  * own point.
  *
  * PRESENTATION ONLY. Cover is drawn on a ground; it is not a part of the world, is never walked,
- * picked or listed, and hides nobody. A site grows at most `COVER_PLACEMENTS_MAX` pieces: past it the
- * slots met first keep theirs and the rest grow none, so a dense rule on a wide ground cannot bring a
- * page to its knees.
+ * picked or listed, and hides nobody. A site grows at most `COVER_PLACEMENTS_MAX` pieces, counting
+ * only pieces that grow: past it the pieces met first keep their places and the rest are counted as
+ * left out. Finding where pieces grow tries at most `COVER_TRIES_MAX` points in all, grown or not, and
+ * counts the points it never tried, so neither a dense rule on a wide ground nor one on a ground
+ * mostly built over can bring a page to its knees.
  */
 
 /** The most cover pieces one site grows: a guard on the page's work, not a look's choice. */
 export const COVER_PLACEMENTS_MAX = 40_000;
+
+/** The most points one site's scatter tries, grown or not: a bound on the work of finding where cover grows. */
+export const COVER_TRIES_MAX = 4 * COVER_PLACEMENTS_MAX;
 
 /** A slot as the scatter reads it: its identity (the seed's second half) and its rectangle in plan. */
 export interface CoverSlot {
@@ -53,11 +58,15 @@ export interface GrownPoint extends CoverPoint {
   readonly upM: number;
 }
 
-/** A site's cover: its pieces, how many slots grow any, and how many pieces the guard left out. */
+/**
+ * A site's cover: its pieces, how many slots grow any, how many pieces would have grown but the guard
+ * left out, and how many points the bound on tries never tried.
+ */
 export interface GrownCover {
   readonly points: readonly GrownPoint[];
   readonly slots: number;
   readonly leftOut: number;
+  readonly untried: number;
 }
 
 /**
@@ -165,27 +174,31 @@ export interface CoverOptions {
   readonly grows?: (slot: CoverSlot) => boolean;
   /** The look role a slot is drawn in, whose rule it takes when its own role has none; none when absent. */
   readonly drawnAs?: (slot: CoverSlot) => string | null;
+  /** The most pieces grown; `COVER_PLACEMENTS_MAX` when absent. */
   readonly most?: number;
+  /** The most points tried, grown or not; `COVER_TRIES_MAX` when absent. */
+  readonly tries?: number;
 }
 
 /**
- * Grow `cover` over a site's `slots`, at most `most` pieces in all: each slot's rule's pieces, kept
- * where nothing of `slots` stands on its slot or lies above it, and where no water of the land, if
- * any, stands above the ground.
+ * Grow `cover` over a site's `slots`, at most `most` pieces in all from at most `tries` points tried:
+ * each slot's rule's pieces, kept where nothing of `slots` stands on its slot or lies above it, and
+ * where no water of the land, if any, stands above the ground. Only a kept piece counts toward `most`.
  */
 export function growCover(
   slots: readonly CoverSlot[],
   cover: Readonly<Record<string, StylePackCover>>,
-  { land = null, grows = () => true, drawnAs = () => null, most = COVER_PLACEMENTS_MAX }: CoverOptions = {},
+  { land = null, grows = () => true, drawnAs = () => null, most = COVER_PLACEMENTS_MAX, tries = COVER_TRIES_MAX }: CoverOptions = {},
 ): GrownCover {
   const points: GrownPoint[] = [];
-  let grown = 0;
+  let tried = 0;
   let leftOut = 0;
+  let untried = 0;
   const ruled = slots.flatMap((slot) => {
     const rule = coverRuleOf(cover, slot.lookRole, drawnAs(slot));
     return rule === null || !grows(slot) ? [] : [{ slot, rule }];
   });
-  if (ruled.length === 0) return { points, slots: 0, leftOut };
+  if (ruled.length === 0) return { points, slots: 0, leftOut, untried };
   // Every slot's rectangle, in the grid cells it touches.
   const rects = slots.map(rectOf);
   const grid = new Map<string, number[]>();
@@ -221,10 +234,10 @@ export function growCover(
   };
   let growing = 0;
   for (const { slot, rule } of ruled) {
-    const room = Math.max(0, most - grown);
-    const count = coverCount(slot, rule);
-    leftOut += Math.max(0, count - room);
+    const room = Math.max(0, tries - tried);
+    untried += Math.max(0, coverCount(slot, rule) - room);
     const scattered = scatterCover(slot, rule, room);
+    tried += scattered.length;
     const own = indexOf.get(slot)!;
     let kept = 0;
     for (const point of scattered) {
@@ -233,11 +246,14 @@ export function growCover(
       const upMm = heightAt(own, eastMm, northMm);
       if (covered(own, eastMm, northMm, upMm)) continue;
       if (land !== null && wetAt(land, eastMm, northMm)) continue;
+      if (points.length >= most) {
+        leftOut += 1;
+        continue;
+      }
       points.push({ ...point, upM: upMm / 1000 });
       kept += 1;
     }
-    grown += scattered.length;
     if (kept > 0) growing += 1;
   }
-  return { points, slots: growing, leftOut };
+  return { points, slots: growing, leftOut, untried };
 }
