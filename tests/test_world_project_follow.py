@@ -35,6 +35,8 @@ SESSIONS = f"/world/versions/{VERSION}/society/control/sessions"
 A = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5a"
 B = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
 OLD = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a50"
+#: The workspace a request to keep the world names.
+WORKSPACE = "0b0e0c1d-0000-4000-8000-0000000000aa"
 LIMITS = {"wall_seconds": 600, "minutes": 60, "decisions": 50, "usd": "0.05", "calls": 100}
 
 
@@ -776,5 +778,130 @@ def test_the_follower_writes_where_the_project_is_kept_beside_it_and_never_sends
         assert held["github"]["sent_through_at"] == held["last_checkpoint_at"]
         assert STATUS_FILE not in Project(folder).git("ls-files")
         assert all(STATUS_FILE not in b["files"] for b in remote.branches.values())
+    finally:
+        follower.close()
+
+
+def test_a_project_a_person_asked_for_through_the_server_starts_on_the_next_scan(world, tmp_path):
+    from datetime import UTC, datetime
+
+    from exulanica.world.project_requests import read_requests, request_project
+
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    when = datetime(2026, 10, 15, 7, 0, tzinfo=UTC)
+    request = request_project(
+        projects,
+        workspace_id=WORKSPACE,
+        world_id=WORLD,
+        version_id=VERSION,
+        readable=False,
+        now=when,
+    )
+    clock = Clock()
+    follower = Follower(projects, base_url=world.url, token=TOKEN, clock=clock)
+    try:
+        told = follower.scan()
+        # The follower names the folder from the request's own identity, which the server made.
+        name = f"world-{request['request_id'][:12]}"
+        assert {"project": name, "state": "started"} in told
+        assert {"project": name, "state": "following"} in told
+        assert follower.followed() == [name] and read_requests(projects) == []
+        settings = read_follow(projects / name)
+        assert (settings["world_id"], settings["version_id"]) == (WORLD, VERSION)
+        assert settings["things"] == "every" and settings["readable"] is False
+        assert commits(projects / name)[-1] == "Start the project"
+        # Asked again for a world it already follows at that version: no second folder.
+        request_project(
+            projects,
+            workspace_id=WORKSPACE,
+            world_id=WORLD,
+            version_id=VERSION,
+            readable=True,
+            now=when,
+        )
+        assert {"project": None, "state": "already followed"} in follower.scan()
+        assert read_requests(projects) == [] and follower.followed() == [name]
+    finally:
+        follower.close()
+
+
+def test_a_project_that_cannot_start_leaves_its_request_refused_and_no_folder(world, tmp_path):
+    from datetime import UTC, datetime
+
+    from exulanica.world.project_requests import read_requests, request_project
+
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    when = datetime(2026, 10, 15, 7, 0, tzinfo=UTC)
+    clock = Clock()
+    follower = Follower(projects, base_url=world.url, token=TOKEN, clock=clock)
+    try:
+        world.broken = True
+        request_project(
+            projects,
+            workspace_id=WORKSPACE,
+            world_id=WORLD,
+            version_id=VERSION,
+            readable=False,
+            now=when,
+        )
+        assert {"project": None, "state": "refused", "error": "world_unreadable"} in follower.scan()
+        [refused] = read_requests(projects)
+        assert refused["refused"]["code"] == "world_unreadable"
+        # Asked again once the world reads, but with nothing a project can keep.
+        world.broken = False
+        world.routes[f"/world/versions/{VERSION}"]["things"] = []
+        request_project(
+            projects,
+            workspace_id=WORKSPACE,
+            world_id=WORLD,
+            version_id=VERSION,
+            readable=False,
+            now=when,
+        )
+        assert {"project": None, "state": "refused", "error": "nothing_to_keep"} in follower.scan()
+        assert [r["refused"]["code"] for r in read_requests(projects)] == ["nothing_to_keep"]
+        assert not any(path.name.startswith("world-") for path in projects.iterdir())
+        assert follower.followed() == []
+    finally:
+        follower.close()
+
+
+def test_a_request_this_follower_can_never_start_leaves_as_gone(world, tmp_path):
+    # Another workspace's request names a version this follower's workspace does not hold (404),
+    # and a world erased since answers 410: neither can ever start here, so neither waits.
+    from datetime import UTC, datetime
+
+    from exulanica.world.project_requests import read_requests, request_project
+
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    when = datetime(2026, 10, 15, 7, 0, tzinfo=UTC)
+    clock = Clock()
+    follower = Follower(projects, base_url=world.url, token=TOKEN, clock=clock)
+    try:
+        request_project(
+            projects,
+            workspace_id=WORKSPACE,
+            world_id=WORLD,
+            version_id="0b0e0c1d-0000-4000-8000-0000000000cc",
+            readable=False,
+            now=when,
+        )
+        assert {"project": None, "state": "gone"} in follower.scan()
+        assert read_requests(projects) == []
+        world.refusals[f"/world/versions/{VERSION}"] = (410, {"code": "world_removed"})
+        request_project(
+            projects,
+            workspace_id=WORKSPACE,
+            world_id=WORLD,
+            version_id=VERSION,
+            readable=False,
+            now=when,
+        )
+        assert {"project": None, "state": "gone"} in follower.scan()
+        assert read_requests(projects) == [] and follower.followed() == []
+        assert not any(path.name.startswith("world-") for path in projects.iterdir())
     finally:
         follower.close()

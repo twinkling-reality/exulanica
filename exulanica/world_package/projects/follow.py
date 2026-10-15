@@ -21,8 +21,11 @@ the project's link says to publish on its own: after each checkpoint it records,
 rolling pull request follows it
 (:mod:`exulanica.world_package.projects.publish`, at most `limits.publications_per_day` attempts a
 day). One follower holds a projects directory at a time; one project's fault never stops the
-others. When it stops, each project with pending changes records them once, and nothing more is
-published.
+others. A person may also ask through the server for a world to be kept
+(:mod:`exulanica.world.project_requests`): the follower takes one such request a scan, makes and
+names the folder itself, starts the project as following a world does, and removes the request,
+or leaves it refused by a code where the project cannot start. When it stops, each project with
+pending changes records them once, and nothing more is published.
 """
 
 from __future__ import annotations
@@ -42,6 +45,7 @@ from pydantic import Field, ValidationError, model_validator
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
+from exulanica.world.project_requests import read_requests, refuse_request, remove_request
 from exulanica.world.project_status import (
     PROFILE as STATUS_PROFILE,
 )
@@ -57,6 +61,7 @@ from exulanica.world_package.projects.capture import (
     WorldReader,
     capture,
     check_origin,
+    segment,
     sessions_listing,
 )
 from exulanica.world_package.projects.checkpoint import MAX_BYTES, Conflict, ProjectError, decode
@@ -71,6 +76,7 @@ from exulanica.world_package.projects.repository import (
     PROJECT_FILE,
     Author,
     Project,
+    create,
 )
 from exulanica.world_package.projects.schema import Closed, Instant, Name, scan_values, unique
 from exulanica.world_package.projects.watch import Policy, Watcher
@@ -454,23 +460,93 @@ class Follower:
         self._refused[name] = reason
         return [{"project": name, "state": "refused", "error": reason}]
 
+    def take_request(self) -> list[dict[str, Any]]:
+        """Start the project a person asked for through the server (the projects directory's
+        requests, :mod:`exulanica.world.project_requests`), one a scan, oldest first.
+
+        The folder is named here, from the request's own identity, which the server made; the
+        project starts as following a world does (every thing, sessions from now, readable text
+        as asked). Taken, the request leaves; a start that cannot be made leaves it refused by a
+        code, and the folder is not made. A world this follower already follows at that version
+        needs no new folder: its request just leaves."""
+        for request in read_requests(self.directory):
+            if request["refused"] is not None:
+                continue
+            request_id, world_id = request["request_id"], request["world_id"]
+            now = datetime.fromtimestamp(self.clock(), UTC)
+            if any(
+                (item.settings["world_id"], item.settings["version_id"])
+                == (world_id, request["version_id"])
+                for item in self._items.values()
+            ):
+                remove_request(self.directory, request_id)
+                return [{"project": None, "state": "already followed"}]
+            if len(self._items) >= self.maximum:
+                refuse_request(self.directory, request_id, "too_many_projects", now)
+                return [{"project": None, "state": "refused", "error": "too_many_projects"}]
+            name = f"world-{request_id[:12]}"
+            settings = follow_document(
+                {
+                    "profile": PROFILE,
+                    "world_id": world_id,
+                    "version_id": request["version_id"],
+                    "things": "every",
+                    "readable": request["readable"],
+                    "sessions": {"since": now.strftime("%Y-%m-%dT%H:%M:%SZ")},
+                }
+            )
+            try:
+                with WorldReader(self.base_url, self._token, world_id) as reader:
+                    # Only a version this follower's own workspace holds is ever started: the
+                    # server made the request's version id and took it only from the workspace
+                    # that holds it. Another workspace's request, or one for a world erased
+                    # since, can never start here, so it leaves rather than waiting refused.
+                    if not reader.holds(
+                        "GET version", f"/world/versions/{segment(request['version_id'])}"
+                    ):
+                        remove_request(self.directory, request_id)
+                        return [{"project": None, "state": "gone"}]
+                    captured = read_world(reader, settings, f"project:{request_id[:12]}")
+                create(
+                    self.directory / name,
+                    captured.checkpoint,
+                    author=self.author,
+                    message="Start the project",
+                    dependencies=captured.dependencies,
+                )
+                write_follow(Project(self.directory / name, author=self.author), settings)
+            except NothingSelectable:
+                code = "nothing_to_keep"
+            except (ProjectError, OSError):
+                code = "world_unreadable"
+            except Exception:
+                # Its class names it in the follower's own events; the request says only "failed".
+                code = "failed"
+            else:
+                remove_request(self.directory, request_id)
+                return [{"project": name, "state": "started"}]
+            refuse_request(self.directory, request_id, code, now)
+            return [{"project": None, "state": "refused", "error": code}]
+        return []
+
     def scan(self) -> list[dict[str, Any]]:
-        """Follow the folders that gained a follow file, by the settings they now state, and
-        leave the ones that lost theirs."""
-        told: list[dict[str, Any]] = []
+        """Start a project a person asked for, then follow the folders that gained a follow file,
+        by the settings they now state, and leave the ones that lost theirs."""
+        told: list[dict[str, Any]] = self.take_request()
         try:
             entries = sorted(self.directory.iterdir())
         except OSError:
             # The folders already followed go on being followed; the fault is said once.
             if self._unreadable:
-                return []
+                return told
             self._unreadable = True
             return [
+                *told,
                 {
                     "project": None,
                     "state": "unreadable",
                     "error": "the projects directory could not be read",
-                }
+                },
             ]
         self._unreadable = False
         present: dict[str, Path] = {}

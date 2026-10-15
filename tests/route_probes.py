@@ -1021,6 +1021,10 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         "publishes one document for everyone, addressed by its own digest",
         build.invented_digest,
     ),
+    # A request is named by 32 hexadecimal characters, so an invented one has that shape too.
+    "/world/github-projects/requests/{request_id}": Owned(
+        build.project_request, lambda: uuid.uuid4().hex
+    ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),
     "/world/invitations/{grant_id}": Owned(build.invitation, owner_succeeds=True),

@@ -165,6 +165,15 @@ class WorldReader:
             return None
         return self._decoded(route, self._ok(route, response))
 
+    def holds(self, route: str, path: str) -> bool:
+        """Whether the world holds what `path` reads: False where it answers 404 (none, or not
+        the reader's workspace's) or 410 (the world was removed); any other refusal is raised."""
+        response = self._send(route, path, {"world_id": self.world_id})
+        if response.status_code in (404, 410):
+            return False
+        self._ok(route, response)
+        return True
+
     def json_unless_refused(self, route: str, path: str, code: str, **params: Any) -> Any:
         """As `json_if_found`, except that the world's refusal named `code` (422) is None too:
         what is read does not exist for this world."""

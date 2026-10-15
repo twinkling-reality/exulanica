@@ -289,6 +289,11 @@ def existence(tmp_path, photo_dir, repository, spine_schema, request):
         )
     store = LocalContentAddressedStore(tmp_path / "blobs")
     tiles = tile_store(tmp_path / "tiles")
+    # The projects directory a personal install keeps worlds' projects in, for this test alone.
+    (tmp_path / "projects").mkdir()
+    request.getfixturevalue("monkeypatch").setenv(
+        "EXULANICA_PROJECTS_DIRECTORY", str(tmp_path / "projects")
+    )
     services = Services(
         database=database,
         readonly_database=scratch_role_database(scratch, _READER_ROLE),

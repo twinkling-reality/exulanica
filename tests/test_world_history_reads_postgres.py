@@ -10,6 +10,7 @@ import uuid
 import pytest
 from exulanica.world.project_status import write_status
 
+from personal_world_support import OWNER_TOKEN
 from test_saved_world_holding_things_postgres import _query, _scope
 from test_society_made_world import made as imported_made  # noqa: F401
 from test_thing_characters_postgres import CHARACTER, _a_society_with_a_knight, _knight, _write
@@ -104,3 +105,46 @@ def test_where_the_world_is_kept_on_github_reads_the_configured_directory_alone(
     assert kept["world_id"] == entry["world_id"]
     assert kept["link"] == {"repository": "learner/world", "publish": "automatic"}
     assert str(projects) not in read.text  # no path is ever answered
+
+
+def _delete(api, path):
+    return api.client.delete(path, headers={"Authorization": f"Bearer {OWNER_TOKEN}"})
+
+
+def test_a_person_asks_for_a_world_to_be_kept_and_takes_the_request_back(
+    made, tmp_path, monkeypatch
+):
+    api = made
+    entry, _society = _a_society_with_a_knight(api)
+    query = _query(entry)
+    path = "/world/github-projects" + query
+    body = {"version_id": entry["authored_version_id"], "readable": True}
+    refused = api.post(path, body)
+    assert refused.status_code == 409 and refused.json()["code"] == "projects_not_kept"
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    monkeypatch.setenv("EXULANICA_PROJECTS_DIRECTORY", str(projects))
+    asked = api.post(path, body)
+    assert asked.status_code == 202, asked.text
+    request = asked.json()
+    assert (request["world_id"], request["version_id"], request["readable"]) == (
+        entry["world_id"],
+        entry["authored_version_id"],
+        True,
+    )
+    assert str(projects) not in asked.text  # no path is ever answered
+    # Asked again while it waits: the same request.
+    assert api.post(path, body).json()["request_id"] == request["request_id"]
+    assert [r["request_id"] for r in api.get(path).json()["requests"]] == [request["request_id"]]
+    # Only a version this workspace holds, and nothing but the version and the setting.
+    assert api.post(path, {"version_id": str(uuid.uuid4())}).status_code == 404
+    assert api.post(path, {**body, "folder": "elsewhere"}).status_code == 422
+    taken = f"/world/github-projects/requests/{request['request_id']}" + query
+    assert _delete(api, taken).status_code == 204
+    assert _delete(api, taken).status_code == 404
+    # A crafted name never reaches a file: refused by its pattern, or, climbing out, by no route.
+    for crafted in ("..", "A" * 32, "a" * 31, "%2E%2E%2Foutside"):
+        answer = _delete(api, f"/world/github-projects/requests/{crafted}" + query)
+        assert answer.status_code in (404, 405, 422), answer.text
+    assert api.get(path).json()["requests"] == []
+    assert sorted(entry.name for entry in projects.iterdir()) == [".requests"]

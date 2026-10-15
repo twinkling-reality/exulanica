@@ -967,7 +967,22 @@ not hold yet and when the newest one it holds was saved, the open rolling pull r
 pause), read once after each checkpoint of a linked project. The API reads these from the same directory
 (`EXULANICA_PROJECTS_DIRECTORY`) and answers them as `GET /world/github-projects` (`world.write`, so
 a guest with a world read does not see where it is kept), the read a world's History page shows; no
-value a caller sends becomes a path, and a folder that is a link is never followed. The three
+value a caller sends becomes a path, and a folder that is a link is never followed. A person may
+also ask for a world to be kept with no command: `POST /world/github-projects` (`world.write`;
+a version of the world the requester's workspace holds, and whether readable text is kept) writes
+a request (`exulanica.world-project-request/v1`,
+[`project_requests.py`](../exulanica/world/project_requests.py)) into the directory's `.requests`
+folder, named by an identity the server makes and stating the workspace that asked; a world has
+one waiting request per workspace, `DELETE /world/github-projects/requests/{request_id}` takes it
+back, and the read lists the waiting ones. The worker takes one request a scan: it names and makes
+the project's folder itself and starts it as following a world does (every thing, sessions from
+now), then removes the request, or leaves it refused by a code (`nothing_to_keep`,
+`world_unreadable`, `too_many_projects`, `failed`) and makes no folder. It starts only a version
+its own workspace holds: a request it reads as absent (another workspace's, or a world erased
+since) leaves as gone. The server and the worker change the requests folder under one lock, so
+two asks for one world at once never both write. Where no projects
+directory is configured the server answers 409 `projects_not_kept`. Linking a repository stays a
+command, and nothing in a request reaches GitHub. The three
 settings may also be given as `EXULANICA_PROJECTS_DIRECTORY`,
 `EXULANICA_PROJECT_API_URL` and `EXULANICA_PROJECT_TOKEN_FILE`. SIGTERM or SIGINT stops it: the
 round in hand finishes, each project with pending changes records them once within 60 seconds

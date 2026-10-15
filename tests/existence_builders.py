@@ -1614,6 +1614,18 @@ def _world_project(owner) -> dict[str, Any]:
     return owner.memo["world_project"]
 
 
+def project_request(owner) -> str:
+    """A request to keep a version of the owner's world in a project, written into the projects
+    directory the sweep's application is configured with (API)."""
+    made = _ok(
+        in_world(
+            owner, "POST", "/world/github-projects", json={"version_id": str(_plain_version(owner))}
+        ),
+        202,
+    )
+    return made["request_id"]
+
+
 def world_project(owner) -> str:
     return _world_project(owner)["/world/projects/{project_id}"]
 
