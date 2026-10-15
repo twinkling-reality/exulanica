@@ -153,7 +153,15 @@ def read_land_document(raw: object, catalog: LandformCatalog | None = None) -> L
                 f"a land lists at most {most} {feature.kind} features", path=f"features[{index}]"
             )
         features.append(feature)
-    for feature in features:
+    for index, feature in enumerate(features):
+        if feature.kind == "cascade" and int(feature.values["from_mm"]) >= int(
+            feature.values["to_mm"]
+        ):
+            raise LandformRefused(
+                f"cascade {feature.id} runs from {feature.values['from_mm']} mm to "
+                f"{feature.values['to_mm']} mm; it ends beyond where it begins",
+                path=f"features[{index}].to_mm",
+            )
         if feature.kind == "shore" and ground < int(feature.values["beach_top_mm"]):
             raise LandformRefused(
                 f"shore {feature.id} needs level ground at or above its beach top "

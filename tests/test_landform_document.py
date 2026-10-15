@@ -27,17 +27,10 @@ def refusal(raw: object) -> LandformRefused:
 
 
 def test_every_value_bound_names_a_feature_the_catalog_lists_and_holds_its_default():
+    first = {"tilt", "rise", "valley", "undulation", "range", "shore", "basin", "terraces"}
+    assert set(landform_catalog(1).features) == first
     catalog = landform_catalog()
-    assert set(catalog.features) == {
-        "tilt",
-        "rise",
-        "valley",
-        "undulation",
-        "range",
-        "shore",
-        "basin",
-        "terraces",
-    }
+    assert set(catalog.features) == first | {"cascade"}
     for (feature, value), bound in catalog.values.items():
         assert feature in catalog.features or feature == "land", (feature, value)
         if bound.words:

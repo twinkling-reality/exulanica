@@ -22,6 +22,7 @@ from exulanica.grammar.landform import (
     WorldFrame,
     height_at,
     land_heights,
+    landform_catalog,
     level_land,
     near_chunks,
     read_land_chunk,
@@ -362,3 +363,113 @@ def test_near_chunks_cover_the_world_and_one_ring_round_it():
     assert near_chunks(FRAME) == tuple((x, y) for y in (-1, 0, 1) for x in (-1, 0, 1))
     town = WorldFrame(width_mm=256_000, depth_mm=128_000, seed="c" * 64)
     assert near_chunks(town) == tuple((x, y) for y in (-1, 0, 1) for x in (-1, 0, 1, 2))
+
+
+# A stepped watercourse from the hill north of the world, past its west side, into the southern sea.
+FALLS = {
+    "id": "falls", "kind": "cascade", "side": "south", "offset_mm": -55_000,
+    "from_mm": -150_000, "to_mm": 100_000,
+}  # fmt: skip
+CASCADE_FEATURES = [
+    {"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 30},
+    {"id": "hill", "kind": "rise", "side": "north", "distance_mm": 20000, "height_mm": 24000,
+     "roughness_permille": 400},
+    {"id": "swell", "kind": "undulation", "amplitude_mm": 900, "wavelength_mm": 30000},
+    {"id": "sea", "kind": "shore", "side": "south", "distance_mm": 60000},
+]  # fmt: skip
+
+
+def cascade_land(*features: dict, ground_mm: int = 8000):  # type: ignore[no-untyped-def]
+    return read_land_document(
+        {"profile": PROFILE, "ground_mm": ground_mm, "features": [*CASCADE_FEATURES, *features]}
+    )
+
+
+def _holds(near, pool) -> None:  # type: ignore[no-untyped-def]
+    """Every lattice sample in a pool stands below its water, and every sample beside the pool and
+    outside it stands at or above the water: the pool is held."""
+    x0, y0, x1, y1 = pool.rect_mm
+    inside = {(x, y) for x, y, _ in near.samples() if x0 <= x <= x1 and y0 <= y <= y1}
+    assert inside, pool.id
+    for x, y in inside:
+        assert near.at(x, y) < pool.level_mm, (pool.id, x, y)
+        for nx_, ny_ in ((x + CELL_MM, y), (x - CELL_MM, y), (x, y + CELL_MM), (x, y - CELL_MM)):
+            if (nx_, ny_) not in inside:
+                assert near.at(nx_, ny_) >= pool.level_mm, (pool.id, nx_, ny_)
+
+
+def test_a_cascade_steps_down_in_held_pools_and_falls_no_higher_than_its_step_into_the_sea():
+    land = cascade_land(FALLS)
+    bodies = water_bodies(land, FRAME)
+    pools = [body for body in bodies if body.kind == "pool"]
+    falls = [body for body in bodies if body.kind == "fall"]
+    assert len(pools) == len(falls) >= 2, "it ends in the sea: every pool falls, the last into it"
+    levels = [pool.level_mm for pool in pools]
+    assert all(a > b for a, b in pairwise(levels))
+    for i, fall in enumerate(falls):
+        below = levels[i + 1] if i + 1 < len(levels) else 0
+        assert (fall.level_mm, fall.bottom_mm, fall.side) == (levels[i], below, "south")
+        assert 0 < fall.level_mm - fall.bottom_mm <= 3000, "no fall higher than the step"
+        assert fall.rect_mm[1] == fall.rect_mm[3], "a fall is a line across the channel"
+    near = realize_region(land, FRAME, -40_000, -128_000, 20_000, 200_000)
+    for pool in pools:
+        _holds(near, pool)
+    # Each pool's floor lies its depth below its water.
+    x0, y0, x1, y1 = pools[0].rect_mm
+    assert near.at((x0 + x1) // 2 // CELL_MM * CELL_MM, (y0 + y1) // 2 // CELL_MM * CELL_MM) <= (
+        levels[0] - 1200
+    )
+
+
+def test_a_cascade_ending_on_land_closes_its_last_pool():
+    land = cascade_land({**FALLS, "to_mm": -20_000})
+    bodies = [body for body in water_bodies(land, FRAME) if body.id.startswith("falls")]
+    assert bodies[-1].kind == "pool", "the last pool on land falls nowhere"
+    assert len([b for b in bodies if b.kind == "fall"]) == len(bodies) // 2
+    near = realize_region(land, FRAME, -40_000, -40_000, 20_000, 200_000)
+    for pool in (body for body in bodies if body.kind == "pool"):
+        _holds(near, pool)
+
+
+def test_land_with_a_cascade_is_still_one_function_of_each_point():
+    land = cascade_land(FALLS)
+    near = realize_region(land, FRAME, -40_000, -128_000, 20_000, 200_000)
+    part = realize_region(land, FRAME, -30_000, -20_000, -5_000, 40_000)
+    for x, y, h in part.samples():
+        assert near.at(x, y) == h == height_at(land, FRAME, x, y)
+    backdrop = realize_backdrop(land, FRAME, reach_mm=400_000)
+    x0, y0, x1, y1 = backdrop.near_mm
+    shared = [
+        (x, y) for x in backdrop.x_mm for y in backdrop.y_mm if x0 <= x <= x1 and y0 <= y <= y1
+    ]
+    for x, y in shared:
+        assert backdrop.height(x, y) == height_at(land, FRAME, x, y)
+    assert [b.document() for b in backdrop.water] == [
+        b.document() for b in water_bodies(land, FRAME)
+    ]
+
+
+def test_land_without_a_cascade_reads_the_same_under_every_catalog_version():
+    raw = {"profile": PROFILE, "ground_mm": 8000, "features": CASCADE_FEATURES}
+    assert read_land_document(raw, landform_catalog(1)) == read_land_document(raw)
+    with pytest.raises(LandformRefused) as caught:
+        read_land_document({**raw, "features": [*CASCADE_FEATURES, FALLS]}, landform_catalog(1))
+    assert caught.value.path == "features[4].kind", "the first catalog version names no cascade"
+
+
+@pytest.mark.parametrize(
+    ("change", "code", "path"),
+    [
+        ({"to_mm": -150_000}, "landform_invalid", "features[4].to_mm"),
+        ({"side": "south_west"}, "landform_invalid", "features[4].side"),
+        ({"to_mm": 400_000}, "landform_cascade_beyond_near", "features[4]"),
+        ({"side": "north", "from_mm": -150_000, "to_mm": 60_000, "offset_mm": 55_000},
+         "landform_cascade_rises", ""),
+        ({"from_mm": -60_000, "to_mm": -50_000, "step_mm": 500}, "landform_cascade_too_steep", ""),
+    ],
+)  # fmt: skip
+def test_a_cascade_that_cannot_stand_is_refused_by_name(change: dict, code: str, path: str):
+    with pytest.raises(LandformRefused) as caught:
+        land = cascade_land({**FALLS, **change})
+        realize_region(land, FRAME, -40_000, -40_000, 20_000, 40_000)
+    assert (caught.value.code, caught.value.path) == (code, path)

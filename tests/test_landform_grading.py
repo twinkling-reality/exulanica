@@ -15,6 +15,7 @@ from exulanica.grammar.landform import (
     grade_land,
     read_land_document,
     realize_region,
+    water_bodies,
 )
 
 FRAME = WorldFrame(width_mm=60_000, depth_mm=60_000, seed="e" * 64)
@@ -170,3 +171,33 @@ def test_grading_is_deterministic_and_never_changes_the_land_it_was_given():
     second = grade_land(before, plan(pads=(hall,)))
     assert first.near.heights == second.near.heights and first.walls == second.walls
     assert list(before.heights) == heights
+
+
+# Water stepping east down the slope's foot, clear of the spine at x 28 to 32 m.
+CASCADE = land(
+    {"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 60},
+    {"id": "falls", "kind": "cascade", "side": "south", "offset_mm": -18_000,
+     "from_mm": -60_000, "to_mm": 0, "step_mm": 1000, "width_mm": 4000},
+)  # fmt: skip
+
+
+def test_a_layout_beside_a_cascade_grades_and_its_pools_stay_held():
+    water = water_bodies(CASCADE, FRAME)
+    assert {body.kind for body in water} == {"pool", "fall"}
+    graded = grade_land(region(CASCADE), plan(), water=water)
+    for pool in (body for body in water if body.kind == "pool"):
+        x0, y0, x1, y1 = pool.rect_mm
+        wet = [
+            (x, y)
+            for x, y, h in graded.near.samples()
+            if x0 <= x <= x1 and y0 <= y <= y1 and h < pool.level_mm
+        ]
+        assert wet, pool.id
+
+
+def test_a_layout_crossing_a_cascade_is_refused_by_name():
+    water = water_bodies(CASCADE, FRAME)
+    yard = Pad(id="yard", rect_mm=(4_000, 20_000, 26_000, 36_000), door_mm=(28_000, 28_000))
+    with pytest.raises(LandformRefused) as caught:
+        grade_land(region(CASCADE), plan(pads=(yard,)), water=water)
+    assert caught.value.code == "landform_cascade_crossed" and "yard" in str(caught.value)

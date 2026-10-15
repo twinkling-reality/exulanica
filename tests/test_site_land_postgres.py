@@ -124,7 +124,9 @@ def test_a_world_whose_land_rules_the_server_does_not_serve_is_listed_unavailabl
     on_land = _farm(api, "Farm on older land rules", land=LAND)
     level = _farm(api, "Level farm beside it")
     assert on_land.status_code == 201 and level.status_code == 201, (on_land.text, level.text)
-    monkeypatch.setattr(rules, "LAND_RULES_VERSION", rules.LAND_RULES_VERSION + 1)
+    # A server that makes and serves only the first rules version: the world was made by a later.
+    monkeypatch.setattr(rules, "SERVED_LAND_RULES", {1: 1})
+    monkeypatch.setattr(rules, "LAND_RULES_VERSION", 1)
     listed = {entry["entry_id"]: entry for entry in api.get("/world-entries").json()}
     refused = listed[on_land.json()["entry_id"]]
     assert (refused["availability"], refused["unavailable_reason"]) == (

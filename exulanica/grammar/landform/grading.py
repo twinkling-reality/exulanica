@@ -17,9 +17,13 @@ realized near land, in a fixed order:
 5. **Ponds** are carved as ellipses inscribed in their rectangles, below a level that is the
    lowest ground on the ring just outside them less a freeboard, so the water holds.
 
+Before any of them, a layout whose pads or corridors would cross a cascade's pools or falls is
+refused (``landform_cascade_crossed``): a layout stands beside a cascade.
+
 Then the checks, each refused by name with the figure: cut and fill within their bound; every
-water body holds (its dry neighbours stand at or above its level); every door reachable from the
-entry over ground walked within the walking grade, never through a wall or water; the near bound.
+water body holds (its dry neighbours stand at or above its level; a cascade's falls are its drops
+and are not held); every door reachable from the entry over ground walked within the walking grade,
+never through a wall or water; the near bound.
 
 Pure and integer: the same land and plan grade to the same heights.
 """
@@ -344,6 +348,11 @@ def _pond(work: _Work, basin: Basin, pads: Sequence[Pad] = ()) -> WaterBody:
 def _within(body: WaterBody, x: int, y: int) -> bool:
     if body.kind == "sea":
         return True
+    if body.kind == "fall":
+        return False
+    if body.kind == "pool":
+        x0, y0, x1, y1 = body.rect_mm
+        return x0 <= x <= x1 and y0 <= y <= y1
     if body.kind == "lake":
         cx, cy = body.centre_mm
         return (x - cx) * (x - cx) + (y - cy) * (y - cy) < body.radius_mm * body.radius_mm
@@ -353,7 +362,7 @@ def _within(body: WaterBody, x: int, y: int) -> bool:
 def _water_holds(work: _Work, bodies: Sequence[WaterBody]) -> None:
     n = work.near
     for body in bodies:
-        if body.kind == "sea":
+        if body.kind in ("sea", "fall"):
             continue
         for index in range(len(work.h)):
             x, y = work.place(index)
@@ -407,9 +416,28 @@ def _reachable(
             )
 
 
+def _clear_of_cascades(plan: GradingPlan, water: Sequence[WaterBody]) -> None:
+    """Refuse a layout whose terraces or paths would cross a cascade's pools or falls."""
+    for owner, (x0, y0, x1, y1) in (
+        *((pad.id, pad.rect_mm) for pad in plan.pads),
+        *((corridor.id, corridor.rect_mm) for corridor in plan.corridors),
+    ):
+        for body in water:
+            if body.kind not in ("pool", "fall"):
+                continue
+            bx0, by0, bx1, by1 = body.rect_mm
+            if x0 <= bx1 and bx0 <= x1 and y0 <= by1 and by0 <= y1:
+                raise LandformRefused(
+                    f"{owner} would cross {body.kind} {body.id}; a layout stands beside a cascade",
+                    code="landform_cascade_crossed",
+                )
+
+
 def grade_land(near: NearLand, plan: GradingPlan, water: Sequence[WaterBody] = ()) -> GradedLand:
     """Grade realized near land for a layout, or refuse it by name. ``water`` is the land's own
-    water (a sea, lakes), held to the same check as the ponds the plan carves."""
+    water (a sea, lakes, a cascade's pools and falls), held to the same check as the ponds the plan
+    carves; a layout crossing a cascade is refused."""
+    _clear_of_cascades(plan, water)
     work = _Work(near)
     levels: dict[str, int] = {}
     for pad in plan.pads:

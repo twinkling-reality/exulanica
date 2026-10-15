@@ -75,12 +75,16 @@ each entry carries a reason and a licence (`exulanica/grammar/landform/catalog.p
 `landform-surface.v1.json` states [the land's look](#the-lands-look) and `landform-recipe.v1.json`
 the [land a place made from a sentence stands on](#land-for-a-world-made-from-a-sentence):
 
-- `landform-feature.v1.json`: one entry per kind: `words` (what a person or a model reads),
+- `landform-feature.vN.json`: one entry per kind: `words` (what a person or a model reads),
   `domain` (`near_and_far`, or `far` for a feature drawn only), `composition` (`additive` or
   `shaping`) and `most` (how many one land may list).
-- `landform-value.v1.json`: one entry per value, keyed `<feature>_<value>`: `minimum`, `maximum`,
+- `landform-value.vN.json`: one entry per value, keyed `<feature>_<value>`: `minimum`, `maximum`,
   `default`, `required`, and for a value in words its `words` (the default indexes them). The
   feature `land` bounds the document: `ground_mm` and how many `features` it lists.
+
+Both change only by a new version, and a version keeps every entry of the one before it unchanged
+and adds to it: version 2 adds the `cascade`. New land is read against the newest version, and a
+world's land against the version its [land rules](#a-worlds-land-rules) name.
 
 | Kind | What it makes |
 | --- | --- |
@@ -92,6 +96,7 @@ the [land a place made from a sentence stands on](#land-for-a-world-made-from-a-
 | `shore` | The land falling to a beach and a sea floor below the datum, rising behind the beach no faster than its coast grade |
 | `basin` | A bowl; filled, a lake whose level is its rim less a freeboard |
 | `terraces` | Level benches stepping up a slope, each joined to the next by a bank, fading at their ends |
+| `cascade` | Water stepping down a straight channel toward a main side, from level pool to level pool over falls no higher than its step, into the sea or onto level land (version 2) |
 
 ## Realizing a land
 
@@ -99,9 +104,9 @@ the [land a place made from a sentence stands on](#land-for-a-world-made-from-a-
 corner (`exulanica/grammar/landform/realize.py`). It is a pure function of the land and the
 world's seed, computed with integers only: hashed value noise on integer lattices, fixed-point
 smoothsteps, integer square roots. Additive features sum; then shaping features apply in a fixed
-order, terraces, shores, basins, so a basin's level is set by the rim it ends with. Each recipe is
-bounded to the land it was written for and fades out beyond it. Noise is sampled on the world's
-own axes, so a grid of samples computes its interpolation weights once per row and column.
+order, terraces, shores, basins, cascades, so a basin's level is set by the rim it ends with. Each
+recipe is bounded to the land it was written for and fades out beyond it. Noise is sampled on the
+world's own axes, so a grid of samples computes its interpolation weights once per row and column.
 
 Within each tier of natural rise a terrace holds the lower part level, a bench, and the upper part
 (`riser_share_permille` of the tier, 800 by default) is a bank climbing the whole tier, so a bank is
@@ -110,6 +115,18 @@ banks, on steep land they are as steep as the land demands. Behind a beach the l
 the water at most at the coast grade (350 per mille by default); where the waterline wanders that
 slope steepens, and a level coast with the defaults rises no steeper than 600 per mille. Both are
 functions of each point alone, so the near land and the backdrop agree wherever they meet.
+
+A cascade runs toward north, east, south or west, `offset_mm` across from the world's middle, from
+`from_mm` to `to_mm` beyond the world's edge on that side (negative reaches in). Its top is the
+land's height at its source, before the cascade, less its freeboard; its bottom is the sea's level
+where its end lies in the sea, else the land's height at its end less the freeboard. The drop is
+split into the fewest equal falls no higher than `step_mm`, and the channel into as many equal
+pools (one more where it ends on land), each at least 4 m long. Within the channel the land is cut
+to each pool's level less its `depth_mm`; each pool ends in a 2 m sill at its own level, over which
+the water falls to the next; a lip of `wall_mm` (at least 1 m, the lattice) beside the channel and
+at its head is raised to the water's level and the freeboard where the land is lower, and closes
+the last pool of a cascade that ends on land. Both levels are read once per land and world, so
+every point is then computed alone. A cascade lies within the near land.
 
 ## Near land in chunks
 
@@ -149,6 +166,11 @@ under the surface and its edge faded in at the shore
 (`assets/catalogs/world-kinds/surface-finish.v2.json`); where no pack dresses the site they are
 drawn in one plain colour.
 
+A cascade states its pools (`pool`: a rectangle and its level), and between them its falls (`fall`:
+a line across the channel, `rect_mm` with no depth, from `level_mm` down to `bottom_mm`, falling
+toward `side`); the last fall of a cascade that reaches the sea drops to level 0. The near land, the
+backdrop and a site's drawing list them with the land's other water.
+
 ## Grading
 
 `exulanica/grammar/landform/grading.py` grades realized near land for a layout, in order:
@@ -167,8 +189,12 @@ drawn in one plain colour.
 5. Ponds are carved as the ellipse inscribed in their rectangle, below a level that is the lowest
    ground on the 2 m ring outside them less a freeboard.
 
+Before any of these, a layout whose pads or corridors would cross a cascade's pools or falls is
+refused: a layout stands beside a cascade, and the next layout candidate is tried.
+
 Then the checks: cut and fill within 8,000 mm; every water body holds (every dry sample beside a
-wet one stands at or above its level); every door reachable from the entry over ground walked at 1
+wet one stands at or above its level; a fall is a cascade's drop and is not held); every door
+reachable from the entry over ground walked at 1
 in 4 or less, never through a wall or within 350 mm of a water's level; heights within the near
 bound. Grading never changes the land it was given.
 
@@ -239,7 +265,7 @@ land, so the receipt also names the rules that made it, `land_rules`
 ([`rules.py`](../exulanica/grammar/landform/rules.py)):
 
 ```json
-{"version": 1, "catalogs": {"landform-feature.v1": "<sha256>", "landform-value.v1": "<sha256>"}}
+{"version": 2, "catalogs": {"landform-feature.v2": "<sha256>", "landform-value.v2": "<sha256>"}}
 ```
 
 - `version` stands for the realizer, its grading and the grading plan a site's layout asks of its
@@ -251,10 +277,15 @@ A receipt that names other rules than the server's is refused by name before its
 generated again (`generated_world_land_rules_changed`, saying both rules); its world is never drawn
 as other land, and its saved entry is listed unavailable by the same name
 ([saved world entry](saved-world-entry.md)). A level world's receipt names no land rules, and one
-that does is refused the same way. The tests pin every shipped landform catalog byte for byte, and each rules version with the
-catalogs it names and the graded land of one golden site that uses every feature kind
-([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a change that moves land fails
-until it is the next version.
+that does is refused the same way.
+
+Every rules version this code makes the same land by is served: versions 1 and 2, each reading its
+own catalog version (`SERVED_LAND_RULES`). The realizer and grading are one code for both; version
+2 only adds the `cascade`, so land version 1 admits is the same land under it, and a world made
+under version 1 regenerates byte for byte. New worlds name version 2. The tests pin every shipped
+landform catalog byte for byte, and each served version with the catalogs it names and the graded
+land of its own golden site ([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a
+change that would move a served version's land fails until that version is no longer served.
 
 The land's look is not part of the rules: `landform-surface.v1.json` colours land and shapes none
 of it. A world's appearance should change only when its look does, so the surface catalog version a
@@ -311,6 +342,10 @@ document it was made with, so a later recipe never moves it.
 | `landform_digest_mismatch` | A chunk is not the one its digest names |
 | `landform_rules_changed` | A receipt names other land rules than the server's; the world is refused as `generated_world_land_rules_changed` |
 | `landform_not_served` | Land asked of the town, or with a support declaration |
+| `landform_cascade_beyond_near` | A cascade, its lips included, would reach beyond the near land |
+| `landform_cascade_rises` | A cascade's end lies as high as its source or higher |
+| `landform_cascade_too_steep` | A cascade's pools would be shorter than 4 m for its drop and length |
+| `landform_cascade_crossed` | A layout's pad or corridor would cross a cascade's pool or fall |
 
 ## Limits
 
@@ -336,7 +371,11 @@ document it was made with, so a later recipe never moves it.
 - A corridor steeper than its grade is refused rather than given stairs.
 - Below the datum a shore's sea covers everything; a valley carved below it floods.
 - Performance is measured only on the development machine's tests; no drawing cost is stated here.
-- The server realizes land by one rules version. A world made under other rules is refused, not
+- The server serves land rules versions 1 and 2. A world made under any other is refused, not
   realized by the rules it names.
 - A world does not name the land surface catalog it wears: a newer land look reaches every world on
   land. Naming it by the world's look is planned.
+- A cascade is straight, along one of the four main sides, and its water stands still: level pools
+  and fixed falls. No stream meanders, and nobody walks in the water or behind a fall.
+- The browser's land reader does not read a cascade's pools and falls yet, so a world whose land
+  lists a cascade is not drawn; no world, recipe or showcase lists one.

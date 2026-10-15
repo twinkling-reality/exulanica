@@ -5,7 +5,8 @@
 * :mod:`.noise`: integer value noise on axis grids.
 * :mod:`.realize`: ``H(x, y)``; near land in 128 m chunks on the city's tile grid; the backdrop
   drawn to the horizon; water bodies.
-* :mod:`.grading`: pads, corridors, banks and walls, ponds, and the checks a graded land meets.
+* :mod:`.grading`: pads, corridors, banks and walls, ponds, and the checks a graded land meets,
+  a layout kept clear of cascades among them.
 * :mod:`.rules`: the land rules a world's receipt names, so its land rebuilds the same.
 * :mod:`.recipes`: the land a world made from a sentence stands on, as data.
 
@@ -14,6 +15,8 @@ and the world's seed, as every generated subject is.
 """
 
 from exulanica.grammar.landform.catalog import (
+    CATALOG_VERSION,
+    CATALOG_VERSIONS,
     FeatureKind,
     LandformCatalog,
     ValueBound,
@@ -66,12 +69,19 @@ from exulanica.grammar.landform.realize import (
     water_bodies,
 )
 from exulanica.grammar.landform.recipes import LandRecipe, land_recipes, load_land_recipes
-from exulanica.grammar.landform.rules import LAND_RULES_VERSION, check_land_rules, land_rules
+from exulanica.grammar.landform.rules import (
+    LAND_RULES_VERSION,
+    SERVED_LAND_RULES,
+    check_land_rules,
+    land_rules,
+)
 
 __all__ = [
     "BACKDROP_PROFILE",
     "BACKDROP_REACH_MM",
     "BANK_GRADE_PERMILLE",
+    "CATALOG_VERSION",
+    "CATALOG_VERSIONS",
     "CELL_MM",
     "CHUNK_MM",
     "CHUNK_PROFILE",
@@ -81,6 +91,7 @@ __all__ = [
     "NEAR_BOUND_MM",
     "PROFILE",
     "SAMPLES_PER_SIDE",
+    "SERVED_LAND_RULES",
     "WALK_GRADE_PERMILLE",
     "Backdrop",
     "Basin",

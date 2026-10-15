@@ -16,9 +16,11 @@ from exulanica.grammar.grammars.site.records import (
 )
 from exulanica.grammar.landform import (
     LAND_RULES_VERSION,
+    SERVED_LAND_RULES,
     LandformRefused,
     check_land_rules,
     land_rules,
+    landform_catalog,
     read_land_document,
 )
 from exulanica.world.site_land import land_seed, site_land
@@ -30,13 +32,16 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "landform"
 #: edit, since a world made on land names the catalogs that shaped it.
 SHIPPED = {
     "landform-feature.v1.json": "5da02f1b42b263f9d54981f34baedcd56a62af2df81c2878a94cb1f5977fbc50",
+    "landform-feature.v2.json": "1cc522bbccff9650e92d7f5fd46fc7d2300318c3da5496ab4cc3eb64bb385110",
     "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
     "landform-value.v1.json": "328c2b0f98b5fa7621a048916d774ef5de6b81cd68042bd58d4e0c77aeb9a9e6",
+    "landform-value.v2.json": "9898e222ad0b12d8832b6a93da4a4c0146888cfd398e3b6a62ab09ba7b44512b",
 }
 
-#: Each rules version: the catalogs it names, and the golden site's graded land under it. A change
-#: that moves land is a new version with both pinned again; the old entries stay as the record.
+#: Each rules version: the catalogs it names, and its golden land's graded site under the code as
+#: it stands. Every served version's golden stays pinned: a change that would move an earlier
+#: version's land fails here until that version is no longer served.
 RULES = {
     1: {
         "catalogs": {
@@ -46,6 +51,15 @@ RULES = {
             "landform-value.v1": "1f3eb0a980eb173b5cdd9135062a4cf0fd14c3bf75c8e38983b791b49820387a",
         },
         "golden_site": "1dfca9b52e76b075feab422c16ce8199c1cb9c1d7a12b6234e693c9ee9ec1620",
+    },
+    2: {
+        "catalogs": {
+            "landform-feature.v2": (
+                "a3d1302a5159473cd4b95e761518a4c9bb8ce441d6b110d51e2644e9bc5fe067"
+            ),
+            "landform-value.v2": "e0d4f3442a8085922f2eea15680ae3118952767461f23d6872614f2aaf545630",
+        },
+        "golden_site": "2bac1f2a82cbfaa5a367420d7e33c5ef586122db39987b3e9d39b553d4781452",
     },
 }
 
@@ -125,16 +139,39 @@ def test_land_made_by_other_rules_is_refused_saying_both(other: object) -> None:
     assert f"this server makes land by land rules version {LAND_RULES_VERSION}" in str(caught.value)
 
 
-def test_a_graded_site_is_the_same_land_until_the_rules_version_changes() -> None:
-    land = read_land_document(GOLDEN_LAND)
+#: Each served version's golden land: version 1's as it was pinned, and version 2's the same with a
+#: cascade from the terraced hill, past the site's west side, into the sea.
+GOLDEN_LANDS = {
+    1: GOLDEN_LAND,
+    2: {
+        **GOLDEN_LAND,
+        "features": [
+            *GOLDEN_LAND["features"],
+            {"id": "falls", "kind": "cascade", "side": "south", "offset_mm": -40000,
+             "from_mm": -110000, "to_mm": 120000},
+        ],
+    },
+}  # fmt: skip
+WATER = {1: {"sea", "lake", "pond"}, 2: {"sea", "lake", "pond", "pool", "fall"}}
+
+
+def test_every_served_version_and_only_those_are_pinned() -> None:
+    assert set(SERVED_LAND_RULES) == set(RULES) == set(GOLDEN_LANDS)
+    assert max(SERVED_LAND_RULES) == LAND_RULES_VERSION
+    for version in SERVED_LAND_RULES:
+        assert land_rules(version) == {"version": version, "catalogs": RULES[version]["catalogs"]}
+        assert check_land_rules(land_rules(version)) == SERVED_LAND_RULES[version]
+
+
+@pytest.mark.parametrize("version", sorted(RULES))
+def test_a_graded_site_is_the_same_land_while_its_rules_version_is_served(version: int) -> None:
+    land = read_land_document(GOLDEN_LANDS[version], landform_catalog(SERVED_LAND_RULES[version]))
     graded = site_land(land, GOLDEN_SITE, land_seed("world:golden", land.sha256), 4000)
     section = graded.drawing_section()
-    assert {body["kind"] for body in section["water"]} == {"sea", "lake", "pond"}
-    assert (
-        hashlib.sha256(canonical_json(section)).hexdigest()
-        == (RULES[LAND_RULES_VERSION]["golden_site"])
-    ), (
-        "the land a site is graded on moved: the realizer, its grading or a site's grading plan "
-        "changed. Worlds already made on land name the rules that made them; a change that moves "
-        "land is the next LAND_RULES_VERSION, pinned here with its golden site"
+    assert {body["kind"] for body in section["water"]} == WATER[version]
+    assert hashlib.sha256(canonical_json(section)).hexdigest() == RULES[version]["golden_site"], (
+        f"the land a site is graded on moved under rules version {version}: the realizer, its "
+        "grading or a site's grading plan changed. Worlds made on land name the rules that made "
+        "them, and every served version must make the same land; a change that moves land is the "
+        "next LAND_RULES_VERSION, and an earlier version it moves is no longer served"
     )

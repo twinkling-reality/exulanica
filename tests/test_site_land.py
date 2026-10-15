@@ -130,6 +130,40 @@ def test_a_world_on_land_names_the_land_rules_that_made_it_and_other_rules_are_r
         site_plan.records(named_on_level)
 
 
+def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> None:
+    """Land made before the cascade (rules version 1) is still served: the same receipt naming
+    version 1 regenerates the same records, the same drawing and the same land."""
+    world = made("site")
+    first = copy.deepcopy(world.receipt)
+    first["land_rules"] = land_rules(1)
+    assert first["land_rules"]["catalogs"] != world.receipt["land_rules"]["catalogs"]
+    records = site_plan.records(first)
+    assert records == world.records
+    before, after = site_land_of(world.receipt, records, 4000), site_land_of(first, records, 4000)
+    assert after.drawing_section() == before.drawing_section()
+    assert [c.sha256 for c in after.chunks()] == [c.sha256 for c in before.chunks()]
+    drawing = site_drawing(
+        world_id=first["world_id"], receipt=first, receipt_sha256="b" * 64, records=records
+    )
+    named_now = site_drawing(
+        world_id=first["world_id"], receipt=world.receipt, receipt_sha256="b" * 64, records=records
+    )
+    assert site_drawing_sha256(drawing) == site_drawing_sha256(named_now)
+
+
+def test_a_site_stands_beside_a_cascade_and_its_drawing_lists_the_pools_and_falls() -> None:
+    falls = {"id": "falls", "kind": "cascade", "side": "south", "offset_mm": -70_000,
+             "from_mm": -140_000, "to_mm": 90_000}  # fmt: skip
+    land = {**TILT, "features": [*TILT["features"], falls]}
+    world = made("farm", land=land)
+    assert world.receipt["land_rules"] == land_rules()
+    assert site_plan.records(world.receipt) == world.records
+    water = drawn(world)["land"]["water"]
+    kinds = [body["kind"] for body in water if body["id"].startswith("falls")]
+    assert kinds and kinds[0] == "pool" and "fall" in kinds
+    assert all(body["level_mm"] > body["bottom_mm"] for body in water if body["kind"] == "fall")
+
+
 def test_every_zone_is_a_level_terrace_and_every_walking_edge_stays_within_a_step() -> None:
     world = made("farm")
     graded = site_land_of(world.receipt, world.records, 4000)

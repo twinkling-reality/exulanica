@@ -4,14 +4,20 @@ Two reviewed files in ``assets/catalogs/landform``, read through the grammar's c
 each entry carries a reason and a licence. They have a folder of their own because the city
 grammar refuses any file directly in ``assets/catalogs`` it has no schema for.
 
-* ``landform-feature.v1.json``: one entry per kind of feature, with the plain words a person or a
+* ``landform-feature.vN.json``: one entry per kind of feature, with the plain words a person or a
   model reads (``words``), whether it shapes the near land a world stands on or only the far land
   drawn to the horizon (``domain``), how it composes (``additive`` features sum; ``shaping``
   features then carve or hold the land), and the most of it one document may list (``most``).
-* ``landform-value.v1.json``: one entry per value a feature states (``<feature>_<value>``), with
+* ``landform-value.vN.json``: one entry per value a feature states (``<feature>_<value>``), with
   its minimum, maximum and default, whether it must be stated, and for a value stated in words the
   words it may take (its default is then an index into them). The pseudo-feature ``land`` bounds
   the document itself: its level ground and how many features it lists.
+
+Each version is a pair of files (``landform-feature.vN.json``, ``landform-value.vN.json``), and a
+catalog changes only by a new version. A later version keeps every entry of the one before it
+unchanged and adds to it, so a document an earlier version admits reads the same under a later
+one; a world is read against the version its receipt's land rules name
+(:mod:`exulanica.grammar.landform.rules`). Version 2 adds the ``cascade``.
 
 Read on first use, never at import, and kept for the process: a catalog is authored data and
 changes only with a release.
@@ -35,18 +41,25 @@ from exulanica.grammar.catalogs import (
 from exulanica.grammar.errors import CatalogError
 
 __all__ = [
+    "CATALOG_VERSION",
+    "CATALOG_VERSIONS",
     "COMPOSITIONS",
     "DOMAINS",
     "FeatureKind",
     "LandformCatalog",
     "ValueBound",
+    "feature_schema",
     "landform_catalog",
     "load_landform_catalog",
+    "value_schema",
 ]
 
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[3].joinpath("assets", "catalogs", "landform")
 )
+#: Every version of the landform catalogs this code reads, and the newest, which reads new land.
+CATALOG_VERSIONS: Final = (1, 2)
+CATALOG_VERSION: Final = 2
 DOMAINS: Final = ("near_and_far", "far")
 COMPOSITIONS: Final = ("additive", "shaping")
 #: Wider than any bound a value states, so the file, not this schema, says what a value may be.
@@ -101,38 +114,52 @@ def _value_check(where: str, fields: dict) -> None:
         raise CatalogError(f"{where}: the default lies within the bounds")
 
 
-FEATURE_SCHEMA: Final = CatalogSchema(
-    "landform-feature",
-    1,
-    (
-        ("words", text_field),
-        ("domain", text_field),
-        ("composition", text_field),
-        ("most", integer_field(1, 64)),
-        ("reason", text_field),
-    ),
-    entry_check=_feature_check,
-)
-VALUE_SCHEMA: Final = CatalogSchema(
-    "landform-value",
-    1,
-    (
-        ("feature", text_field),
-        ("value", text_field),
-        ("minimum", integer_field(-_ANY, _ANY)),
-        ("maximum", integer_field(-_ANY, _ANY)),
-        ("default", integer_field(-_ANY, _ANY)),
-        ("required", integer_field(0, 1)),
-        ("words", key_list_field),
-        ("reason", text_field),
-    ),
-    entry_check=_value_check,
-)
+def feature_schema(version: int) -> CatalogSchema:
+    """The feature catalog's schema at ``version``: the same fields at every version."""
+    return CatalogSchema(
+        "landform-feature",
+        version,
+        (
+            ("words", text_field),
+            ("domain", text_field),
+            ("composition", text_field),
+            ("most", integer_field(1, 64)),
+            ("reason", text_field),
+        ),
+        entry_check=_feature_check,
+    )
 
 
-def load_landform_catalog(directory: Path = CATALOG_DIRECTORY) -> LandformCatalog:
-    features_file = load_catalog(directory.joinpath("landform-feature.v1.json"), FEATURE_SCHEMA)
-    values_file = load_catalog(directory.joinpath("landform-value.v1.json"), VALUE_SCHEMA)
+def value_schema(version: int) -> CatalogSchema:
+    """The value catalog's schema at ``version``: the same fields at every version."""
+    return CatalogSchema(
+        "landform-value",
+        version,
+        (
+            ("feature", text_field),
+            ("value", text_field),
+            ("minimum", integer_field(-_ANY, _ANY)),
+            ("maximum", integer_field(-_ANY, _ANY)),
+            ("default", integer_field(-_ANY, _ANY)),
+            ("required", integer_field(0, 1)),
+            ("words", key_list_field),
+            ("reason", text_field),
+        ),
+        entry_check=_value_check,
+    )
+
+
+def load_landform_catalog(
+    directory: Path = CATALOG_DIRECTORY, version: int = CATALOG_VERSION
+) -> LandformCatalog:
+    if version not in CATALOG_VERSIONS:
+        raise CatalogError(f"landform catalogs are versions {CATALOG_VERSIONS}, not {version}")
+    features_file = load_catalog(
+        directory.joinpath(f"landform-feature.v{version}.json"), feature_schema(version)
+    )
+    values_file = load_catalog(
+        directory.joinpath(f"landform-value.v{version}.json"), value_schema(version)
+    )
     features = {}
     for entry in features_file.entries:
         fields = dict(entry.values)
@@ -164,6 +191,7 @@ def load_landform_catalog(directory: Path = CATALOG_DIRECTORY) -> LandformCatalo
 
 
 @functools.cache
-def landform_catalog() -> LandformCatalog:
-    """The shipped catalogs, read once per process."""
-    return load_landform_catalog()
+def landform_catalog(version: int = CATALOG_VERSION) -> LandformCatalog:
+    """The shipped catalogs at ``version`` (the newest unless one is named), read once per
+    process."""
+    return load_landform_catalog(version=version)

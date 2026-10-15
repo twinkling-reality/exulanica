@@ -9,9 +9,16 @@ realizer (:mod:`exulanica.grammar.landform.realize`), its grading
 kinds and their values). A world whose receipt names other rules than this code's is refused by
 name; it is never drawn as other land.
 
-A change to any of those rules is a new version, and a change to a catalog is a new catalog file
+A change to any of those rules is a new version, and a change to a catalog is a new catalog version
 (``landform-value.v2.json``), never an edit of a shipped one: the tests pin both. The land's look
 (``landform-surface.v1.json``, colours only) shapes nothing and is not named here.
+
+**Every version this code can make the same land by is served.** The realizer and its grading are
+one code for every served version: a later version only adds what an earlier one could not state
+(version 2 adds the ``cascade``), so a document an earlier version admits is the same land under
+this code. A receipt's land is read against the catalog version its rules name, and the tests pin
+each served version's golden site, so a change that would move an earlier version's land fails
+until that version is no longer served. New worlds name :data:`LAND_RULES_VERSION`.
 """
 
 from __future__ import annotations
@@ -21,34 +28,43 @@ from collections.abc import Mapping
 from typing import Any, Final
 
 from exulanica.grammar.catalogs import catalog_digest, load_catalog
-from exulanica.grammar.landform.catalog import CATALOG_DIRECTORY, FEATURE_SCHEMA, VALUE_SCHEMA
+from exulanica.grammar.landform.catalog import CATALOG_DIRECTORY, feature_schema, value_schema
 from exulanica.grammar.landform.document import LandformRefused
 
-__all__ = ["LAND_RULES_VERSION", "check_land_rules", "land_rules"]
+__all__ = ["LAND_RULES_VERSION", "SERVED_LAND_RULES", "check_land_rules", "land_rules"]
 
-#: The realizer, its grading and a site's grading plan as they stand. A change to any of them is
-#: a new version.
-LAND_RULES_VERSION: Final = 1
-
-#: The catalogs that shape land, by the name a receipt gives them.
-_SHAPING_CATALOGS: Final = (
-    ("landform-feature.v1", "landform-feature.v1.json", FEATURE_SCHEMA),
-    ("landform-value.v1", "landform-value.v1.json", VALUE_SCHEMA),
-)
+#: The rules new land is made by. A change to the realizer, its grading or a site's grading plan
+#: that moves land is a new version.
+LAND_RULES_VERSION: Final = 2
+#: Every rules version this code makes land by, and the landform catalog version each reads.
+SERVED_LAND_RULES: Final = {1: 1, 2: 2}
 
 
 @functools.cache
-def _catalog_digests() -> tuple[tuple[str, str], ...]:
+def _catalog_digests(version: int) -> tuple[tuple[str, str], ...]:
+    """Each catalog that shapes land at ``version`` (the feature kinds and their values), by the
+    name a receipt gives it, and its digest."""
+    shaping = (("feature", feature_schema(version)), ("value", value_schema(version)))
     return tuple(
-        (name, catalog_digest([load_catalog(CATALOG_DIRECTORY.joinpath(file), schema)]))
-        for name, file, schema in _SHAPING_CATALOGS
+        (
+            f"landform-{part}.v{version}",
+            catalog_digest(
+                [
+                    load_catalog(
+                        CATALOG_DIRECTORY.joinpath(f"landform-{part}.v{version}.json"), schema
+                    )
+                ]
+            ),
+        )
+        for part, schema in shaping
     )
 
 
-def land_rules() -> dict[str, Any]:
-    """The rules this code makes land by: its version and each shaping catalog's digest. A new
-    mapping each time, since a receipt keeps it."""
-    return {"version": LAND_RULES_VERSION, "catalogs": dict(_catalog_digests())}
+def land_rules(version: int | None = None) -> dict[str, Any]:
+    """The rules ``version`` (the newest unless one is named): its number and each shaping
+    catalog's digest. A new mapping each time, since a receipt keeps it."""
+    named = LAND_RULES_VERSION if version is None else version
+    return {"version": named, "catalogs": dict(_catalog_digests(SERVED_LAND_RULES[named]))}
 
 
 def _said(rules: object) -> str:
@@ -63,11 +79,15 @@ def _said(rules: object) -> str:
     return f"land rules version {rules.get('version')} ({named})"
 
 
-def check_land_rules(named: object) -> None:
-    """Refuse land whose receipt names other rules than this code's, saying both."""
-    if named != land_rules():
-        raise LandformRefused(
-            f"this world's land was made by {_said(named)}; this server makes land by "
-            f"{_said(land_rules())}",
-            code="landform_rules_changed",
-        )
+def check_land_rules(named: object) -> int:
+    """The landform catalog version land made by the rules ``named`` is read against, or a refusal
+    of rules this code does not serve, saying both."""
+    for version, catalog_version in SERVED_LAND_RULES.items():
+        if named == land_rules(version):
+            return catalog_version
+    served = ", ".join(str(version) for version in SERVED_LAND_RULES)
+    raise LandformRefused(
+        f"this world's land was made by {_said(named)}; this server makes land by "
+        f"{_said(land_rules())} and reads land made by versions {served}",
+        code="landform_rules_changed",
+    )
