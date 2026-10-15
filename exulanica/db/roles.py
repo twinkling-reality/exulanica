@@ -255,6 +255,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0140 appends each version of a workspace's own world kinds and refuses every
     # update and delete of one.
     "world_kind_version",
+    # Migration 0220 appends the look each creature of a workspace wears and refuses every update
+    # and every delete but its erasures'.
+    "kind_look",
     # Migration 0121 appends a completed comparison run's verified drawing and refuses every
     # update and delete of it.
     "society_comparison_replay",

@@ -542,6 +542,13 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             "world_version_tile_object": frozenset(("SELECT",)),
         }
     ),
+    # A creature's erasure, and its workspace's, delete its look jobs and kind looks (0220).
+    "0220": DefinerGrants(
+        tables={
+            "creature_look": frozenset(("SELECT", "DELETE")),
+            "kind_look": frozenset(("SELECT", "DELETE")),
+        }
+    ),
 }
 
 

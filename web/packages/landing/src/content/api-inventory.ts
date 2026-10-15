@@ -14394,6 +14394,131 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/things/creatures/{kind_sha256}/looks",
+    "method": "post",
+    "id": "ask_creature_look_things_creatures__kind_sha256__looks_post",
+    "title": "Ask Creature Look",
+    "description": "Ask for a made look of a creature this workspace keeps; answers 202 with its look job at\nonce, or with the one already waiting for that creature.",
+    "group": "things",
+    "permission": {
+      "requires": [
+        "model.invoke",
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "kind_sha256",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Kind Sha256"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "202": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/things/creatures/looks/{look_id}",
+    "method": "get",
+    "id": "read_creature_look_things_creatures_looks__look_id__get",
+    "title": "Read Creature Look",
+    "description": "One look job, for any member of the workspace: queued, staged, made with the look's digest,\nrefused with the fit's code, or failed or cancelled with why.",
+    "group": "things",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "look_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Look Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/behaviours",
     "method": "get",
     "id": "reviewed_behaviours_world_behaviours_get",

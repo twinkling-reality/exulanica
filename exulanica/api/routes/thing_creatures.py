@@ -16,6 +16,17 @@ sendable`) and are kept only in the draft's job until it ends; the draft keeps n
 Only the workspaces this installation lists draft creatures (``EXULANICA_CREATURE_WORKSPACES``), at
 most one unfinished draft and a bounded number an hour for one requester; only the requester reads
 a draft. Asking needs ``world.write`` and ``model.invoke``; reading needs ``world.read``.
+
+``POST /things/creatures/{kind_sha256}/looks`` asks for a made look of a creature the workspace
+keeps and answers ``202`` at once with its look job (``exulanica.creature-look/v1``), queued, or
+with the one already waiting for that creature; ``GET /things/creatures/looks/{look_id}`` answers it
+as it goes: ``queued``; ``staged`` by an operator's run; ``made``, naming the look the creature now
+wears by its document's digest (served by :mod:`exulanica.api.routes.thing_store`); ``refused``, by
+the fit's code; ``failed`` or ``cancelled``, by why. Nothing here spends: an operator's run makes
+the look (:mod:`exulanica.world.creature_look_jobs`). Only the workspaces this installation lists
+ask, at most a few unfinished jobs and a bounded number an hour for one requester; any member of the
+workspace reads a job, which holds no word, and a creature's erasure takes its jobs with it. The
+same permissions as a draft.
 """
 
 from __future__ import annotations
@@ -23,7 +34,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
@@ -38,15 +49,25 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.selection import creature_drafts as drafts
 from exulanica.selection.world_drafting import sendable
 from exulanica.things.lines import LineRefused, check_line
+from exulanica.world import creature_look_jobs as look_jobs
+from exulanica.world.committed_content import DIGEST
 from exulanica.world.thing_store import ThingStore
 
-__all__ = ["DRAFTS_PROFILE", "DRAFT_PROFILE", "OFFER_CODES", "OFFER_PROFILE", "router"]
+__all__ = [
+    "DRAFTS_PROFILE",
+    "DRAFT_PROFILE",
+    "LOOK_PROFILE",
+    "OFFER_CODES",
+    "OFFER_PROFILE",
+    "router",
+]
 
 router = APIRouter(prefix="/things", tags=["things"])
 
 DRAFT_PROFILE: Final = "exulanica.creature-draft/v1"
 OFFER_PROFILE: Final = "exulanica.creature-offer/v1"
 DRAFTS_PROFILE: Final = "exulanica.creature-drafts/v1"
+LOOK_PROFILE: Final = "exulanica.creature-look/v1"
 #: Why a workspace may not ask for a creature here, by code.
 OFFER_CODES: Final = drafts.OFFER_REFUSALS
 #: Another requester's draft answers exactly as one that does not exist.
@@ -224,3 +245,62 @@ def read_creature_draft(
     if found is None:
         return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
     return JSONResponse(_view(connection, session.workspace_id, found), headers=_HEADERS)
+
+
+def _look_view(look: look_jobs.CreatureLook) -> dict[str, Any]:
+    return {
+        "profile": LOOK_PROFILE,
+        "look_id": str(look.look_id),
+        "status": look.status,
+        "kind_sha256": look.kind_sha256,
+        "look_sha256": look.look_sha256,
+        "refusal": look.refusal_code,
+        "failure": look.failure,
+        "cost_usd": None if look.cost_usd is None else str(look.cost_usd),
+        "created_at": look.created_at.isoformat(),
+        "staged_at": None if look.staged_at is None else look.staged_at.isoformat(),
+        "finished_at": None if look.finished_at is None else look.finished_at.isoformat(),
+    }
+
+
+@router.post("/creatures/{kind_sha256}/looks", status_code=202)
+def ask_creature_look(
+    kind_sha256: Annotated[str, Path(pattern=f"^{DIGEST.pattern}$")],
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> JSONResponse:
+    """Ask for a made look of a creature this workspace keeps; answers 202 with its look job at
+    once, or with the one already waiting for that creature."""
+    # The creature is looked for first, so a kind this workspace does not keep is answered alike
+    # wherever it is asked.
+    if not look_jobs.keeps_creature(connection, session.workspace_id, kind_sha256):
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    if session.workspace_id not in services.creature_workspaces:
+        return _refusal(409, "creatures_not_run_here", "creature looks are not made here")
+    try:
+        asked = look_jobs.ask_look(
+            connection, session.workspace_id, kind_sha256=kind_sha256, requested_by=session.actor
+        )
+    except look_jobs.LookNotAsked:
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    except look_jobs.LookLimitReached:
+        return _refusal(
+            429,
+            "look_limit_reached",
+            f"at most {look_jobs.MAX_OPEN_PER_ACTOR} look jobs open and "
+            f"{look_jobs.MAX_PER_ACTOR_HOUR} an hour for one requester",
+        )
+    return JSONResponse(_look_view(asked), status_code=202, headers=_HEADERS)
+
+
+@router.get("/creatures/looks/{look_id}")
+def read_creature_look(
+    look_id: uuid.UUID, connection: ReadOnlyConnection, session: CurrentSession
+) -> JSONResponse:
+    """One look job, for any member of the workspace: queued, staged, made with the look's digest,
+    refused with the fit's code, or failed or cancelled with why."""
+    found = look_jobs.read_look(connection, session.workspace_id, look_id)
+    if found is None:
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    return JSONResponse(_look_view(found), headers=_HEADERS)

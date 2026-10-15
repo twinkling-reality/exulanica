@@ -10,7 +10,10 @@ worker played by the test, so each step is seen. What is shown:
 *   another requester, another workspace and an absent draft all read as absent;
 *   words that are not one plain line are refused before anything is queued; a workspace this
     installation does not list is told so; one requester has one draft open at a time;
-*   asking needs world.write and model.invoke.
+*   asking needs world.write and model.invoke;
+*   a made look of a kept creature is asked once, answered 202 and queued, and read by any member
+    of the workspace; a kind the workspace does not keep, asked anywhere, is absent, and so is the
+    route to a caller without world.write and model.invoke.
 """
 
 from __future__ import annotations
@@ -312,3 +315,47 @@ def test_a_requester_lists_their_own_drafts_newest_first(served):
     ended = listed["drafts"][1]
     assert ended["status"] == "failed" and ended["started_at"] is not None
     assert _get(client, "/things/creatures/drafts", _OTHER).json()["drafts"] == []
+
+
+def test_a_kept_creature_s_look_is_asked_once_and_read_by_its_requester(served):
+    from exulanica.world.thing_store import ThingStore
+
+    from test_thing_store_postgres import _creature
+
+    client, database, workspace_id, stores = served
+    creature = _creature()
+    with database.session(workspace_id) as connection:
+        ThingStore(
+            connection, workspace_id, stores.looks.for_workspace(workspace_id)
+        ).keep_creature(creature, created_by=uuid.uuid4())
+    path = f"/things/creatures/{creature.kind.sha256}/looks"
+    headers = {"Authorization": f"Bearer {_OWNER}"}
+    asked = client.post(path, headers=headers)
+    assert asked.status_code == 202
+    look = asked.json()
+    assert (look["profile"], look["status"], look["kind_sha256"], look["look_sha256"]) == (
+        "exulanica.creature-look/v1",
+        "queued",
+        creature.kind.sha256,
+        None,
+    )
+    assert client.post(path, headers=headers).json()["look_id"] == look["look_id"]
+    read = f"/things/creatures/looks/{look['look_id']}"
+    assert _get(client, read).json() == look
+    # Another member asking for the same creature is answered with the same job, and reads it.
+    other = client.post(path, headers={"Authorization": f"Bearer {_OTHER}"})
+    assert (other.status_code, other.json()["look_id"]) == (202, look["look_id"])
+    assert _get(client, read, _OTHER).json() == look
+    assert _get(client, read, _ELSEWHERE).status_code == 404
+    assert _get(client, f"/things/creatures/looks/{uuid.uuid4()}").status_code == 404
+    # A kind this workspace does not keep, and a kept one asked from another workspace, are absent.
+    missing = client.post(f"/things/creatures/{'6' * 64}/looks", headers=headers)
+    elsewhere = client.post(path, headers={"Authorization": f"Bearer {_ELSEWHERE}"})
+    assert (missing.status_code, elsewhere.status_code) == (404, 404)
+    assert missing.json() == elsewhere.json()
+    # Asking needs world.write and model.invoke; a route that takes an id answers a caller without
+    # them as it answers an absent id, and queues nothing.
+    refused = client.post(path, headers={"Authorization": f"Bearer {_READER}"})
+    assert refused.status_code == 404
+    with database.session(workspace_id) as connection:
+        assert connection.execute("select count(*) as n from creature_look").fetchone()["n"] == 1

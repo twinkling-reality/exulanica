@@ -13496,6 +13496,122 @@
     }
    }
   },
+  "/things/creatures/{kind_sha256}/looks": {
+   "post": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Ask Creature Look",
+    "description": "Ask for a made look of a creature this workspace keeps; answers 202 with its look job at\nonce, or with the one already waiting for that creature.",
+    "operationId": "ask_creature_look_things_creatures__kind_sha256__looks_post",
+    "parameters": [
+     {
+      "name": "kind_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Kind Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/things/creatures/looks/{look_id}": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Read Creature Look",
+    "description": "One look job, for any member of the workspace: queued, staged, made with the look's digest,\nrefused with the fit's code, or failed or cancelled with why.",
+    "operationId": "read_creature_look_things_creatures_looks__look_id__get",
+    "parameters": [
+     {
+      "name": "look_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Look Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/behaviours": {
    "get": {
     "tags": [

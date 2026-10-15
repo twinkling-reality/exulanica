@@ -452,6 +452,39 @@ def test_a_creature_erased_after_the_backup_stays_erased(purged, commands, tmp_p
     assert (row["tombstones"], row["erasures"]) == (2, 1)
 
 
+def test_a_creature_erased_after_the_backup_has_its_look_jobs_and_kind_looks_erased_again(
+    purged, commands, tmp_path
+):
+    """A creature's look jobs and kind looks (migration 0220) go with it. A backup taken before the
+    erasure holds them; the erasure the restore carries deletes them again."""
+    from exulanica.world import creature_look_jobs as look_jobs
+
+    creature, actor, _looks = _kept_creature(purged, tmp_path, "looked ten legs")
+    with purged.database().session(purged.workspace_id) as connection:
+        look_jobs.ask_look(
+            connection, purged.workspace_id, kind_sha256=creature.kind.sha256, requested_by=actor
+        )
+        look_jobs.wear_by_kind(
+            connection,
+            purged.workspace_id,
+            kind_sha256=creature.kind.sha256,
+            look_sha256=creature.sketch.sha256,
+            chosen_by=actor,
+        )
+
+    def held() -> bool:
+        with purged.database().session(purged.workspace_id) as connection:
+            [row] = connection.execute(
+                "select (select count(*) from creature_look) + (select count(*) from kind_look) "
+                "as held"
+            ).fetchall()
+        return bool(row["held"])
+
+    assert not _through_a_restore(
+        purged, tmp_path, withdraw=lambda: _erase(purged, creature, actor), current=held
+    )
+
+
 def test_a_restore_of_a_creature_erased_and_kept_again_leaves_its_file_held(
     purged, commands, tmp_path
 ):

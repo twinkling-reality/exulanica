@@ -63,6 +63,10 @@ RUNTIME_UPDATES: dict[str, str] = {
         "the bake worker claims, records and fails bakes and retakes an expired lease; a request "
         "re-queues one under FOR UPDATE; a withdrawal or a tombstone cancels one"
     ),
+    "creature_look": (
+        "the operator's run stages a creature's look job and ends it "
+        "(world/creature_look_jobs.py); migration 0220 refuses any other change and every delete"
+    ),
     "creature_draft": (
         "a creature job moves its draft's status and result while it runs, under the job's claim "
         "(selection/creature_drafts.py)"

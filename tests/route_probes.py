@@ -976,6 +976,8 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/scene-segments/{scene_id}": Owned(build.reconstruction_scene),
     "/selection/place-bridges/{decision_id}": Owned(build.place_bridge),
     "/things/creatures/drafts/{draft_id}": Owned(build.creature_draft),
+    "/things/creatures/looks/{look_id}": Owned(build.creature_look),
+    "/things/creatures/{kind_sha256}": Owned(build.held_kind, build.invented_digest),
     "/things/kinds/{kind_sha256}": Owned(build.held_kind, build.invented_digest),
     "/things/library/{content_sha256}": Shared(
         build.thing_library_content,

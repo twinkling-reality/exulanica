@@ -1476,6 +1476,20 @@ def creature_draft(owner) -> str:
     return str(made.draft_id)
 
 
+def creature_look(owner) -> str:
+    """A look job the owner asked for a creature their workspace holds, queued (domain: no
+    operator's run takes it in the sweep's application)."""
+    from exulanica.world.creature_look_jobs import ask_look
+
+    made = ask_look(
+        owner.repository.connection,
+        owner.workspace_id,
+        kind_sha256=held_kind(owner),
+        requested_by=owner.actor,
+    )
+    return str(made.look_id)
+
+
 def held_plan(owner) -> str:
     """The drafted body plan of a creature the owner's workspace holds, by its document's digest."""
     return _held_creature(owner).plan.sha256

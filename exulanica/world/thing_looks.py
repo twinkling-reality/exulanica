@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Final
 
+from exulanica.world.creature_look_jobs import kind_looks
 from exulanica.world.errors import InvalidThingPlacement, UnknownWorldResource
 from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.thing_library import shipped_looks
@@ -196,9 +197,12 @@ def look_choices(
     it read). A thing whose worn look is a shipped one is listed in ``looks``, as every reader of
     this profile reads it; one whose worn look is the workspace's own, named by its digest alone, in
     ``workspace_looks``, which a reader that does not know it leaves alone (the thing then wears its
-    kind's first look there). ``thing_id`` reads one thing's alone. The database picks the one row
-    per thing, so a read stays one row per thing however many choices were appended. An absent
-    version, or another workspace's, is :class:`~exulanica.world.errors.UnknownWorldResource`."""
+    kind's first look there). ``kind_looks`` names the look each of the workspace's creatures wears
+    by its kind (:func:`~exulanica.world.creature_look_jobs.kind_looks`), which a thing with no
+    choice of its own wears before its kind's first look; a reader that does not know it leaves it
+    alone. ``thing_id`` reads one thing's alone. The database picks the one row per thing, so a read
+    stays one row per thing however many choices were appended. An absent version, or another
+    workspace's, is :class:`~exulanica.world.errors.UnknownWorldResource`."""
     held = connection.execute(
         "select 1 from world_alternate_version where workspace_id=%s and world_id=%s "
         "and version_id=%s",
@@ -263,11 +267,21 @@ def look_choices(
             "chosen_at": _instant(row["chosen_at"]),
         }
         (own if row["source"] == "workspace" else shipped).append(entry)
+    # The look each of the workspace's creatures wears by its kind (0220), where it has one: a
+    # thing with no choice of its own wears it before its kind's first look.
+    by_kind = [
+        {
+            "kind_sha256": kind_sha256,
+            "look": LookReference(None, None, look.sha256, "workspace").document(),
+        }
+        for kind_sha256, look in sorted(kind_looks(connection, workspace_id).items())
+    ]
     return {
         "profile": LOOK_CHOICES_PROFILE,
         "version_id": str(version_id),
         "looks": shipped,
         **({"workspace_looks": own} if own else {}),
+        **({"kind_looks": by_kind} if by_kind else {}),
     }
 
 

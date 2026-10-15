@@ -68,6 +68,10 @@ TABLE_PRIVILEGES = {
     "workspace_model_binding_snapshot": {"SELECT", "DELETE"},
     "baked_tile": {"SELECT", "INSERT", "UPDATE"},
     "baked_tile_stage": {"SELECT"},
+    # tg_creature_look_erases_with_its_creature and tg_creature_look_erases_on_tombstone (0220)
+    # delete a creature's look jobs and kind looks.
+    "creature_look": {"SELECT", "DELETE"},
+    "kind_look": {"SELECT", "DELETE"},
     # tg_thing_erasure_erases (0172) deletes a drafted creature's rows.
     "body_plan_version": {"SELECT", "DELETE"},
     "body_recipe_version": {"SELECT", "DELETE"},
@@ -338,6 +342,8 @@ DEFINERS = {
             "tg_spending_event_ends_guest_policies()",
             "tg_thing_erasure_erases()",
             "tg_thing_store_erases_on_tombstone()",
+            "tg_creature_look_erases_with_its_creature()",
+            "tg_creature_look_erases_on_tombstone()",
             "tg_tombstone_erases_models_and_minds_budgets()",
             "tg_tombstone_erases_piece_batches()",
             "tg_tombstone_withdraws_project_context()",
