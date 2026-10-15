@@ -48,7 +48,7 @@ import psycopg
 from PIL import Image, ImageOps
 from psycopg.rows import dict_row
 
-from exulanica.corpus.decode import UNREADABLE, decoding, probe
+from exulanica.corpus.decode import UNREADABLE, decoding, open_sensor, probe
 from exulanica.evidence.blob import BlobId
 from exulanica.references import picture_fetch
 from exulanica.references.adapters.base import WebPicture
@@ -140,24 +140,25 @@ class KeptPicture:
 
 def clean_picture(data: bytes) -> CleanPicture:
     """``data`` decoded within the pixel budget, turned upright and written again in its own format
-    with no metadata, or :class:`KeptPictureRefused`. Takes one of the process's decode turns."""
+    with no metadata, or :class:`KeptPictureRefused`. The one hardened decoder
+    (:func:`exulanica.corpus.decode.open_sensor`) turns the bytes into pixels, after its header-only
+    :func:`~exulanica.corpus.decode.probe` refuses a frame too large; one of the process's decode
+    turns covers the load and the upright copy, the two buffers of the peak."""
     if not data:
         raise KeptPictureRefused("picture_not_an_image")
     if len(data) > MAX_PICTURE_BYTES:
         raise KeptPictureRefused("picture_too_large")
     try:
         width, height = probe(data)
-        with Image.open(io.BytesIO(data)) as opened:
+        if max(width, height) > MAX_PICTURE_SIDE:
+            raise KeptPictureRefused("picture_too_many_pixels")
+        with decoding(), open_sensor(data) as opened:
             media_type = KEPT_FORMATS.get(opened.format or "")
             if media_type is None:
                 raise KeptPictureRefused("picture_format_not_kept")
-            if max(width, height) > MAX_PICTURE_SIDE:
-                raise KeptPictureRefused("picture_too_many_pixels")
-            with decoding():
-                opened.load()
-                upright = ImageOps.exif_transpose(opened)
-                written = io.BytesIO()
-                _write(upright, opened.format or "", written)
+            upright = ImageOps.exif_transpose(opened)
+            written = io.BytesIO()
+            _write(upright, opened.format or "", written)
     except KeptPictureRefused:
         raise
     except Image.DecompressionBombError as exc:
