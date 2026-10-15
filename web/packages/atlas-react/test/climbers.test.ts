@@ -167,7 +167,7 @@ function dressed() {
   app.root.addChild(camera);
   const environmentRoot = new pc.Entity('environment');
   app.root.addChild(environmentRoot);
-  let during: { climb: string | undefined; translations: number[][] } | null = null;
+  let during: { climb: string | undefined; translations: number[][]; casting: boolean[] } | null = null;
   const attached = siteMount(drawing, {
     servedBytes: 1,
     dress: (host, drawn, dressing) => {
@@ -181,7 +181,12 @@ function dressed() {
           for (let at = 0; at < instance.instancingCount * 16; at += 16) out.push([matrices[at + 12]!, matrices[at + 13]!, matrices[at + 14]!]);
           return out;
         });
-      during = { climb: canvas.dataset['siteClimb'], translations };
+      // Whether each climbing cell's first level casts a shadow, as the drawing chose at creation.
+      const casting = (drawn.root.find((node) => node.name.startsWith('style-pack:instanced:climb:')) as pc.Entity[])
+        .flatMap((cell) => cell.render?.meshInstances ?? [])
+        .filter((instance) => instance.visible)
+        .map((instance) => instance.castShadow);
+      during = { climb: canvas.dataset['siteClimb'], translations, casting };
       return undress;
     },
   }).attach({ app, camera, environmentRoot });
@@ -210,6 +215,9 @@ describe('a site dressed in a pack with climbing plants', () => {
     // The drawing's root sits at the site's origin; compare in plan, east and south.
     const got = during.translations.map(([east, , south]) => [east!, 0, south!].map((value) => value.toFixed(3)).join(',')).sort();
     expect(got).toEqual(want);
+    // A plant lying on its wall casts no shadow within the trees' reach: the drawing gives climbers none.
+    expect(during.casting.length).toBeGreaterThan(0);
+    expect(during.casting.every((cast) => !cast)).toBe(true);
   });
 });
 

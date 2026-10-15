@@ -19,6 +19,9 @@
  * - `repeatedTrianglesMost`: a palette piece that repeats its bays or storeys to meet a slot
  *   (`repeat_mm`) is baked copy by copy; a slot whose copies would bake more triangles than this
  *   keeps the engine's own primitive, so no box asks the bake for more than a few whole pieces.
+ * - `climbShadowReachM`: climbing plants (a look's `climb`) lie flat on their walls, where their own
+ *   shadow falls on the wall just behind them; they cast from their first level only within this
+ *   distance of the camera, in place of `shadowReachM`.
  *
  * The render budget catalog will state these per scene form (MOTION's version); until it does, a
  * caller passes none and the defaults hold. Pure: no DOM, no renderer.
@@ -30,6 +33,7 @@ export interface PieceDrawing {
   readonly shadowReachM: number;
   readonly cellSizeM: number;
   readonly repeatedTrianglesMost: number;
+  readonly climbShadowReachM: number;
 }
 
 /** Today's figures, each with its reason. */
@@ -48,6 +52,11 @@ export const PIECE_DRAWING_DEFAULTS: PieceDrawing = Object.freeze({
   // Four structure pieces at their family's budget (20,000 triangles each). A 36 m block of five
   // storeys over a ground storey and nine bays bakes about 4,000; a forty-storey tower about 12,000.
   repeatedTrianglesMost: 80_000,
+  // None: on Wall city on 15 October, 282 climbing plants raised the quay view from 2.58 to 4.08
+  // million triangles; casting within the trees' 80 m reach was 0.65 million of it and 24 draws, and
+  // left out the view's GPU frame fell from 6.05 to 5.37 ms (two runs each), for a shadow lying on
+  // the wall a few centimetres behind each leaf.
+  climbShadowReachM: 0,
 });
 
 /** The range each figure may take. */
@@ -57,6 +66,7 @@ export const PIECE_DRAWING_RANGES = Object.freeze({
   shadowReachM: Object.freeze({ least: 0, most: 400 }),
   cellSizeM: Object.freeze({ least: 8, most: 512 }),
   repeatedTrianglesMost: Object.freeze({ least: 0, most: 1_000_000 }),
+  climbShadowReachM: Object.freeze({ least: 0, most: 400 }),
 });
 
 /**

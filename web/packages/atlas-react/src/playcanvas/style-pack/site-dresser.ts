@@ -1,6 +1,6 @@
 import type * as pc from 'playcanvas';
 import {
-  materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
+  PIECE_DRAWING_DEFAULTS, materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
   type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type SurfaceMaterials,
   type LandWater, type StyleSlot, type StylePackSurface, type SurfacePattern, type SurfacePatterns,
   type LandSurfaces,
@@ -441,7 +441,10 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         heightM: point.heightM,
       });
     }
-    const climbers = climbPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, climbPlacements, view);
+    // A climbing plant's shadow lies on the wall a few centimetres behind it: climbers cast within the
+    // drawing's own reach for them (by default none), not the trees' reach.
+    const climbView = { ...view, drawing: { ...PIECE_DRAWING_DEFAULTS, shadowReachM: PIECE_DRAWING_DEFAULTS.climbShadowReachM } };
+    const climbers = climbPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, climbPlacements, climbView);
     // What grows on the land itself, where the pack states land cover: its textured pieces over the
     // near land by the surface role the land is drawn in at each point, kept off the place's own slots
     // (the land under the place, its base ground, grows), instanced in cells like cover.
