@@ -281,7 +281,12 @@ def _drawn(
 ) -> dict[str, Any]:
     """The drawing as the bytes a response carries (written as the API writes JSON, here rather
     than on the request's thread) and its digest."""
-    from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION, receipt_land
+    from exulanica.world.composers.site_plan import (
+        LANDSCAPE_COMPOSER_VERSION,
+        ON_LAND_VERSIONS,
+        receipt_land,
+    )
+    from exulanica.world.landscape_drawing import landscape_drawing, landscape_drawing_sha256
     from exulanica.world.site_drawing import site_drawing, site_drawing_sha256
 
     drawing = site_drawing(
@@ -291,10 +296,31 @@ def _drawn(
         drawing, ensure_ascii=False, allow_nan=False, indent=None, separators=(",", ":")
     ).encode("utf-8")
     drawn: dict[str, Any] = {"body": body, "sha256": site_drawing_sha256(drawing)}
-    if receipt["composer"]["version"] == LAND_COMPOSER_VERSION:
+    if receipt["composer"]["version"] in ON_LAND_VERSIONS:
         # A site on land keeps its chunks and backdrop with its drawing: the land routes serve
         # them by the digests the drawing names.
         drawn["land"] = receipt_land(receipt, records).documents()
+    if receipt["composer"]["version"] == LANDSCAPE_COMPOSER_VERSION:
+        # A site on a landscape keeps the landscape's drawing and every volume chunk and top it
+        # names: the landscape routes serve them by digest.
+        landscape, bodies = landscape_drawing(world_id, receipt, receipt_sha256, drawn["sha256"])
+        drawn["landscape"] = {
+            "body": json.dumps(
+                landscape, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+            ).encode("utf-8"),
+            "sha256": landscape_drawing_sha256(landscape),
+            **{
+                kind: {
+                    digest: json.dumps(document, separators=(",", ":")).encode("utf-8")
+                    for digest, document in bodies.items()
+                    if document["profile"] == profile
+                }
+                for kind, profile in (
+                    ("chunks", "exulanica.volume-chunk/v1"),
+                    ("tops", "exulanica.volume-sheet/v1"),
+                )
+            },
+        }
     return drawn
 
 
@@ -388,10 +414,12 @@ def compose_job(
     world_id: str,
     support: dict[str, Any] | None = None,
     land: dict[str, Any] | None = None,
+    landscape: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose the world the kind makes with ``values`` for ``world_id`` and draw it, with the
     place its society walks (the one its checks built), or say why not."""
     from exulanica.grammar.landform import LandformRefused
+    from exulanica.grammar.landscape import LandscapeRefused
     from exulanica.world.composers.site_plan import compose_kind
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
@@ -401,8 +429,21 @@ def compose_job(
     place_id = site_ground_place_id()
     try:
         composed = compose_kind(
-            read_kind(document), values, world_id, place_id=place_id, support=support, land=land
+            read_kind(document),
+            values,
+            world_id,
+            place_id=place_id,
+            support=support,
+            land=land,
+            landscape=landscape,
         )
+    except LandscapeRefused as refused:
+        return {
+            "status": "landscape_refused",
+            "code": refused.code,
+            "detail": refused.detail,
+            "path": refused.path,
+        }
     except LandformRefused as refused:
         return {
             "status": "land_refused",
@@ -561,12 +602,12 @@ def _graded(
     ``where``. The graded land is kept by the records' digest, so the drawing and the place that
     follow read it again rather than grading twice."""
     from exulanica.grammar.landform import LandformRefused
-    from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION, receipt_routine
+    from exulanica.world.composers.site_plan import ON_LAND_VERSIONS, receipt_routine
     from exulanica.world.errors import InvalidStructuralData
     from exulanica.world.site_land import site_land_of
     from exulanica.world.site_parts import LAND_WORDS, LAND_WORDS_OTHERWISE, PART_CODES
 
-    if receipt["composer"]["version"] != LAND_COMPOSER_VERSION:
+    if receipt["composer"]["version"] not in ON_LAND_VERSIONS:
         return None
     try:
         site_land_of(
@@ -865,6 +906,7 @@ class WorkerComposer:
         *,
         support: Mapping[str, Any] | None = None,
         land: Mapping[str, Any] | None = None,
+        landscape: Mapping[str, Any] | None = None,
         seconds: float = COMPOSE_SECONDS,
     ) -> None:
         self.workspace = str(workspace)
@@ -885,6 +927,17 @@ class WorkerComposer:
                 self._land_key = f":land:{sha256_of_canonical(self._land).hex()}"
             except (TypeError, ValueError) as exc:
                 raise LandformRefused("land is canonical integer JSON", path="land") from exc
+        self._landscape = None if landscape is None else copy.deepcopy(dict(landscape))
+        if self._landscape is not None:
+            from exulanica.canonical import sha256_of_canonical
+            from exulanica.grammar.landscape import LandscapeRefused
+
+            try:
+                self._land_key += f":landscape:{sha256_of_canonical(self._landscape).hex()}"
+            except (TypeError, ValueError) as exc:
+                raise LandscapeRefused(
+                    "landscape is canonical integer JSON", path="landscape"
+                ) from exc
         if self._support is not None:
             from exulanica.canonical import sha256_of_canonical
             from exulanica.world.support_surfaces import SupportRefused
@@ -912,12 +965,20 @@ class WorkerComposer:
             dict(values),
             world_id,
             self._support,
-            *(() if self._land is None else (self._land,)),
+            *(
+                ()
+                if self._land is None and self._landscape is None
+                else (self._land, self._landscape)
+            ),
             workspace=self.workspace,
         )
         if outcome.status != "done" or outcome.value is None:
             raise KindWorkWaiting(outcome.status, kept=False, reason=outcome.reason)
         answer = outcome.value
+        if answer["status"] == "landscape_refused":
+            from exulanica.grammar.landscape import LandscapeRefused
+
+            raise LandscapeRefused(answer["detail"], path=answer["path"], code=answer["code"])
         if answer["status"] == "land_refused":
             raise LandformRefused(answer["detail"], path=answer["path"], code=answer["code"])
         if answer["status"] == "support_refused":
@@ -928,6 +989,8 @@ class WorkerComposer:
         drawn = {"status": "done", "body": answer["body"], "sha256": answer["sha256"]}
         if "land" in answer:
             drawn["land"] = answer["land"]
+        if "landscape" in answer:
+            drawn["landscape"] = answer["landscape"]
         self.drawn = (drawing_key(self.workspace, composed.receipt_sha256), drawn)
         self.placed = (
             place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),

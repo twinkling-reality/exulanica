@@ -35,7 +35,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Final, Literal
 
 import psycopg
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -273,6 +273,9 @@ class CreateKindWorldBody(BaseModel):
     #: The land the site is laid out on (``exulanica.landform/v1``); absent makes the level site
     #: every earlier world is, byte for byte.
     land: dict[str, Any] | None = None
+    #: The landscape the site is laid out on (``exulanica.landscape/v1``): its land, and volumes
+    #: placed round the site; instead of ``land``.
+    landscape: dict[str, Any] | None = None
 
 
 def _echo(value: object) -> object:
@@ -929,6 +932,7 @@ def create_kind_world(
     """
     try:
         from exulanica.grammar.landform import LandformRefused
+        from exulanica.grammar.landscape import LandscapeRefused
         from exulanica.world.support_surfaces import SupportRefused
 
         require_world_registration(connection)
@@ -950,6 +954,13 @@ def create_kind_world(
                     "landform_not_served",
                     "Land is served for a town where the deployment makes worlds on land.",
                     path="land",
+                )
+            if body.landscape is not None:
+                return _problem(
+                    422,
+                    "landscape_not_served",
+                    "A landscape is served for site worlds, not for the town.",
+                    path="landscape",
                 )
             created = entries.create_generated(
                 title=body.title,
@@ -973,7 +984,12 @@ def create_kind_world(
                 return _problem(404, "unknown_world_kind", f"no world kind is named {kind!r}")
             used_kind = found
             values = found.values(body.preset, body.values)
-            composer = WorkerComposer(session.workspace_id, support=body.support, land=body.land)
+            composer = WorkerComposer(
+                session.workspace_id,
+                support=body.support,
+                land=body.land,
+                landscape=body.landscape,
+            )
             created = entries.create_from_kind(
                 title=body.title,
                 kind=found,
@@ -1010,6 +1026,8 @@ def create_kind_world(
     except SupportRefused as exc:
         return _problem(422, exc.code, exc.detail, where=exc.where)
     except LandformRefused as exc:
+        return _problem(422, exc.code, exc.detail, path=exc.path)
+    except LandscapeRefused as exc:
         return _problem(422, exc.code, exc.detail, path=exc.path)
     except TileBudgetReached as exc:
         return _problem(409, exc.code, str(exc), returns_at=exc.returns_at.isoformat())
@@ -1119,18 +1137,19 @@ def read_site_drawing(
     )
 
 
-def _site_land_document(
+def _site_drawn(
     version_id: uuid.UUID,
     connection: Any,
     session: Any,
     world_id: str,
-    pick: str,
-) -> Response:
-    """Serve one of a site world's land documents (``pick`` is ``backdrop`` or ``x,y`` for a
-    chunk), made with its drawing in the kind worker and kept beside it, by the digest the drawing
-    names."""
+    versions: tuple[int, ...],
+    unavailable: tuple[str, str],
+) -> dict[str, Any] | Response:
+    """What the kind worker made with a site world's drawing (its land documents, and on a
+    landscape the landscape's drawing and documents), for a world whose site-plan composer version
+    is one of ``versions``; else the problem the route answers (``unavailable`` its code and
+    sentence where the version is another)."""
     from exulanica.api.world_edit import object_problem
-    from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION
     from exulanica.world.object_repository import WorldObjectRepository
     from exulanica.world.site_parts import changes_document, changes_sha256
 
@@ -1143,10 +1162,11 @@ def _site_land_document(
         digest, receipt = generation_receipt(
             connection, session.workspace_id, world_id, snapshot_id
         )
-        if receipt["composer"] != {"key": "site-plan", "version": LAND_COMPOSER_VERSION}:
-            return _problem(404, "land_unavailable", "this world stands on level ground")
-        # The land the version's drawing names: graded for its records with the changes a person
-        # made to its parts (exulanica.world.site_parts), as the drawing route reads them.
+        composer = receipt["composer"]
+        if composer.get("key") != "site-plan" or composer.get("version") not in versions:
+            return _problem(404, *unavailable)
+        # What the version's drawing names: made for its records with the changes a person made
+        # to its parts (exulanica.world.site_parts), as the drawing route reads them.
         changes = repository.part_changes(version_id)
         worker = kind_worker()
         outcome = worker.run(
@@ -1166,10 +1186,7 @@ def _site_land_document(
         answer = outcome.value
         if answer["status"] == "refused":
             return _problem(409, "generated_world_unreadable", answer["detail"])
-        land = answer["land"]
-        found = land["backdrop"] if pick == "backdrop" else land["chunks"].get(pick)
-        if found is None:
-            return _problem(404, "land_chunk_unavailable", f"this world's land has no chunk {pick}")
+        return answer
     except KindWorkWaiting as exc:
         return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
     except InvalidStructuralData as exc:
@@ -1179,6 +1196,34 @@ def _site_land_document(
         if problem is None:
             raise
         return problem
+
+
+def _site_land_document(
+    version_id: uuid.UUID,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    pick: str,
+) -> Response:
+    """Serve one of a site world's land documents (``pick`` is ``backdrop`` or ``x,y`` for a
+    chunk), made with its drawing in the kind worker and kept beside it, by the digest the drawing
+    names."""
+    from exulanica.world.composers.site_plan import ON_LAND_VERSIONS
+
+    answer = _site_drawn(
+        version_id,
+        connection,
+        session,
+        world_id,
+        ON_LAND_VERSIONS,
+        ("land_unavailable", "this world stands on level ground"),
+    )
+    if isinstance(answer, Response):
+        return answer
+    land = answer["land"]
+    found = land["backdrop"] if pick == "backdrop" else land["chunks"].get(pick)
+    if found is None:
+        return _problem(404, "land_chunk_unavailable", f"this world's land has no chunk {pick}")
     return Response(
         content=found["body"].encode("utf-8"),
         media_type="application/json",
@@ -1217,3 +1262,91 @@ def read_site_land_backdrop(
     """Serve a site world's backdrop (``exulanica.landform-backdrop/v1``), held to the digest its
     drawing names. A level world answers 404 ``land_unavailable``."""
     return _site_land_document(version_id, connection, session, world_id, "backdrop")
+
+
+def _site_landscape_document(
+    version_id: uuid.UUID,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    pick: tuple[str, str] | None,
+) -> Response:
+    """Serve a site world's landscape drawing, or (``pick`` a document kind, ``chunks`` or
+    ``tops``, and a digest) one document it names, made with its drawing in the kind worker."""
+    from exulanica.world.composers.site_plan import LANDSCAPE_COMPOSER_VERSION
+
+    answer = _site_drawn(
+        version_id,
+        connection,
+        session,
+        world_id,
+        (LANDSCAPE_COMPOSER_VERSION,),
+        ("landscape_unavailable", "this world stands on no landscape"),
+    )
+    if isinstance(answer, Response):
+        return answer
+    landscape = answer["landscape"]
+    if pick is None:
+        body, digest = landscape["body"], landscape["sha256"]
+    else:
+        kind, digest = pick
+        body = landscape[kind].get(digest)
+        if body is None:
+            return _problem(
+                404,
+                "landscape_document_unavailable",
+                f"this world's landscape names no {kind[:-1]} {digest}",
+            )
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={**_HEADERS, "ETag": f'"{digest}"'},
+    )
+
+
+@site_router.get(
+    "/versions/{version_id}/landscape",
+    summary="The volumes placed round a site world, their chunks and tops named by digest.",
+)
+def read_site_landscape(
+    version_id: uuid.UUID,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve a site world's landscape drawing (``exulanica.landscape-drawing/v1``), naming its
+    site drawing, its land and each placed volume's chunks and tops by digest. A world on no
+    landscape answers 404 ``landscape_unavailable``."""
+    return _site_landscape_document(version_id, connection, session, world_id, None)
+
+
+@site_router.get(
+    "/versions/{version_id}/landscape/chunk",
+    summary="One chunk of a placed volume's surface, by the digest the landscape drawing names.",
+)
+def read_site_landscape_chunk(
+    version_id: uuid.UUID,
+    sha256: Annotated[str, Query(pattern="^[0-9a-f]{64}$")],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve one volume chunk (``exulanica.volume-chunk/v1``) the world's landscape drawing names
+    by ``sha256``; a digest it does not name 404 ``landscape_document_unavailable``."""
+    return _site_landscape_document(version_id, connection, session, world_id, ("chunks", sha256))
+
+
+@site_router.get(
+    "/versions/{version_id}/landscape/top",
+    summary="One walkable top of a placed volume, by the digest the landscape drawing names.",
+)
+def read_site_landscape_top(
+    version_id: uuid.UUID,
+    sha256: Annotated[str, Query(pattern="^[0-9a-f]{64}$")],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve one walkable top (``exulanica.volume-sheet/v1``) the world's landscape drawing names
+    by ``sha256``; a digest it does not name 404 ``landscape_document_unavailable``."""
+    return _site_landscape_document(version_id, connection, session, world_id, ("tops", sha256))

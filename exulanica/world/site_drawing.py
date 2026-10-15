@@ -71,9 +71,10 @@ __all__ = [
 ]
 
 DRAWING_PROFILE: Final = "exulanica.site-drawing/v1"
-#: The composer version whose drawing stands on land (``site_plan.LAND_COMPOSER_VERSION``), and
-#: the drawing it serves.
-LAND_DRAWING_COMPOSER_VERSION: Final = 5
+#: The composer versions whose drawing stands on land (``site_plan.ON_LAND_VERSIONS``: a site on
+#: land, and a site on a landscape, whose volumes are drawn by the landscape's own drawing), and
+#: the drawing they serve.
+LAND_DRAWING_COMPOSER_VERSIONS: Final = (5, 6)
 LAND_DRAWING_PROFILE: Final = "exulanica.site-drawing/v5"
 #: How far above the ground each kind of surface lies, so planes never share a height.
 LAYER_MM: Final = {"ground": 0, "zone": 6, "path": 12, "area": 18, "floor": 24}
@@ -496,7 +497,7 @@ def site_drawing(
 
         drawing["profile"] = "exulanica.site-drawing/v2"
         drawing["support"] = receipt_support(receipt, tuple(records)).adapter_document()
-    if receipt["composer"]["version"] == LAND_DRAWING_COMPOSER_VERSION:
+    if receipt["composer"]["version"] in LAND_DRAWING_COMPOSER_VERSIONS:
         _on_land(drawing, receipt, records)
     return drawing
 

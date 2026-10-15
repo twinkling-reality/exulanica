@@ -88,8 +88,10 @@ BAKE_JOB_KIND: Final = "bake_generated_tile"
 _RECORDS_KEPT: Final = 4
 #: The refusals a generated world's composer names first when its receipt no longer generates what
 #: it recorded: the grammar or the catalogs changed under it, the records came out otherwise, or a
-#: world on land no longer takes its layout or names land rules this server does not make land by.
-#: Any other refusal to read a generated world is ``generated_world_unreadable``.
+#: world on land no longer takes its layout or names land rules this server does not make land by,
+#: or a world on a landscape no longer reads its landscape or names landscape rules this server
+#: does not make landscapes by. Any other refusal to read a generated world is
+#: ``generated_world_unreadable``.
 UNREADABLE_REASONS: Final = frozenset(
     {
         "generated_world_grammar_changed",
@@ -97,6 +99,8 @@ UNREADABLE_REASONS: Final = frozenset(
         "generated_world_output_changed",
         "generated_world_land_changed",
         "generated_world_land_rules_changed",
+        "generated_world_landscape_changed",
+        "generated_world_landscape_rules_changed",
     }
 )
 
