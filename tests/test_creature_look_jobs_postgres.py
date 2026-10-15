@@ -19,6 +19,7 @@ What is shown, against PostgreSQL, as the deployed writer (the runtime role) unl
     wearing its look in one transaction takes that lock before the job's row, as an erasure does,
     so the two wait for each other in turn and never in a cycle;
 *   a job is dated by the statement that asks it, whatever the row says;
+*   a kind wears only a look drawn on its own plan;
 *   the rows go only through an erasure: the runtime holds no delete, the table owner is refused by
     the guards, and only the definer owner deletes; row-level security is forced on both tables;
 *   a creature's erasure deletes its look jobs and kind looks and nothing of another creature; a
@@ -220,6 +221,23 @@ def test_a_run_stages_a_look_and_ends_it_once_and_the_kind_wears_it(
                 look_sha256="3" * 64,
                 chosen_by=ACTOR,
             )
+
+
+def test_a_kind_wears_only_a_look_drawn_on_its_own_plan(provisioned, spine_schema, tmp_path):
+    creature, other = _creature(), _creature("store dragon", "dragon")
+    workspace_id = provisioned.workspace_id
+    with _runtime(spine_schema, workspace_id) as connection:
+        _kept(connection, workspace_id, tmp_path, creature, other)
+        # Another creature's sketch: kept by the workspace, drawn on another plan.
+        with pytest.raises(look_jobs.LookNotAsked, match="plan"):
+            look_jobs.wear_by_kind(
+                connection,
+                workspace_id,
+                kind_sha256=creature.kind.sha256,
+                look_sha256=other.sketch.sha256,
+                chosen_by=ACTOR,
+            )
+        assert _count(connection, "kind_look") == 0
 
 
 def test_the_newest_kind_look_still_kept_is_worn(provisioned, spine_schema, tmp_path):

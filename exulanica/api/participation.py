@@ -311,8 +311,11 @@ class ParticipationRuntime:
                 kind = store.kind_by_digest(reference["sha256"])
                 if kind is not None:
                     look_ids.update(look["sha256"] for look in kind.looks)
-                    if kind.sha256 in worn_by_kind:
-                        look_ids.add(worn_by_kind[kind.sha256])
+                    worn = worn_by_kind.get(kind.sha256)
+                    kept = None if worn is None else store.look_by_digest(worn)
+                    # Only a look drawn on the kind's own plan, the rule the wearing itself holds.
+                    if kept is not None and kept.look.body_plan == kind.plan:
+                        look_ids.add(worn)
         result = {}
         for identity in sorted(look_ids):
             kept = store.look_by_digest(identity)

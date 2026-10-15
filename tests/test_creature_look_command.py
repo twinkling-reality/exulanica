@@ -13,7 +13,9 @@ and the command admits what the fit made. What is shown, against PostgreSQL:
     cost, and the creature then wears the look by its kind; admitting again keeps nothing more;
 *   a refused fit ends its job refused by the fit's code, and a request the job did not make ends
     its job failed; an end the database broke off to end a lock cycle is tried again;
-*   a job whose creature was erased between staging and admitting keeps nothing.
+*   a job whose creature was erased between staging and admitting keeps nothing;
+*   admitting again after an end that failed once the look was kept wears that look, and keeps no
+    second one of the same fit.
 """
 
 from __future__ import annotations
@@ -268,3 +270,39 @@ def test_a_made_look_is_admitted_only_generated_private_and_on_its_creature_s_pl
         with pytest.raises(ThingStoreRefused) as refused:
             admit(SimpleNamespace(body_plan=body_plan, document={"origin": {**origin, **changed}}))
         assert refused.value.code == "look_not_admitted"
+
+
+def test_admitting_again_after_a_failed_end_wears_the_look_already_kept(
+    kept, tmp_path, capsys, monkeypatch
+):
+    workspace, data, creatures, asked = kept
+    run, fits = tmp_path / "run", tmp_path / "fits"
+    assert _stage(workspace, data, run, "--apply") == 0
+    _fits_by_stand_in(run, fits, monkeypatch)
+    real = look_jobs.end_look
+
+    def crash(*_args, **_kwargs):
+        raise RuntimeError("the run's machine went down once the look was kept")
+
+    monkeypatch.setattr(look_jobs, "end_look", crash)
+    with pytest.raises(RuntimeError):
+        _admit(run, fits, data, "--apply")
+    monkeypatch.setattr(look_jobs, "end_look", real)
+    # The first job's look was kept and its end never written: it is still staged.
+    assert _job(workspace, asked[0].look_id).status == "staged"
+    capsys.readouterr()
+    assert _admit(run, fits, data) == 0
+    assert "kept already" in capsys.readouterr().out
+    assert _admit(run, fits, data, "--apply") == 0
+    with _connect() as connection:
+        set_workspace(connection, workspace)
+        worn = look_jobs.kind_looks(connection, workspace)
+        for creature, look in zip(creatures, asked, strict=True):
+            key = f"{creature.plan.key.replace('_', '-')}-made"
+            [row] = connection.execute(
+                "select count(*) as n from look_version where workspace_id=%s and key=%s",
+                (workspace, key),
+            ).fetchall()
+            assert row["n"] == 1, key
+            job = look_jobs.read_look(connection, workspace, look.look_id)
+            assert job.status == "made" and worn[creature.kind.sha256].sha256 == job.look_sha256

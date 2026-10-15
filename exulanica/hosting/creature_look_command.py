@@ -26,7 +26,9 @@ under the owner's yes, in five steps, of which this command is the first and the
    kind (:func:`~exulanica.world.creature_look_jobs.wear_by_kind`), together; a refused fit ends
    the job refused by its code; a request the job did not make, or the fit could not read, ends it
    failed. Each job is given an equal share of ``--cost-usd``, the run's measured cost. A job no
-   longer staged under the run (its creature or its workspace erased since) keeps nothing.
+   longer staged under the run (its creature or its workspace erased since) keeps nothing. A look
+   already kept from the same fit (its end failed after the admission) is worn rather than kept
+   twice, so the step may be run again.
 
 The product and the job meet only at documents (the request, ``fits.json``, the receipts and the
 containers), so this command never imports ``ml/appearance``. Without ``--apply`` each step makes
@@ -340,6 +342,19 @@ def _retrying(end: Callable[[], _Ended]) -> _Ended:
     raise AssertionError("unreachable")
 
 
+def _kept_from_fit(store: ThingStore, key: str, receipt_sha256: str) -> Any:
+    """The look of ``key`` already kept from this fit (its document names the fit's receipt), not
+    withdrawn, or None: a run admitted it and then its end failed (a crash, or every try ended to
+    break a lock cycle), so the job is still staged and the run, run again, wears that look rather
+    than keeping a second one of the same fit."""
+    row = store.connection.execute(
+        "select version from look_version where workspace_id=%s and key=%s "
+        "and document->'origin'->'lineage'->'receipts' ? %s order by version desc limit 1",
+        (store.workspace_id, key, receipt_sha256),
+    ).fetchone()
+    return None if row is None else store.look(key, int(row["version"]))
+
+
 def _next_version(connection: psycopg.Connection, workspace_id: uuid.UUID, key: str) -> int:
     row = connection.execute(
         "select coalesce(max(version), 0) as v from look_version where workspace_id=%s and key=%s",
@@ -407,22 +422,27 @@ def _admit_one(
     ):
         raise ValueError(f"the fit of {item['request_sha256']} is not the bytes it names")
     key = f"{str(plan_document['key']).replace('_', '-')}-made"
-    document = made_look_document(
-        plan_document=plan_document,
-        version=_next_version(connection, workspace_id, key),
-        container=container,
-        height_mm=int(fitted["height_mm"]),
-        made_by=made_by,
-        ingredients=[str(fitted["cutout_sha256"])],
-        receipt_sha256=fitted["receipt_sha256"],
-    )
-    plan_name = f"{plan_document['key']}/v{plan_document['version']}"
-    admit = made_admits(plan_name)
-    if not apply:
-        look = read_admission(document, container, plan_of=store.plan).look
-        admit(look)
-        return f"would admit {look.look} v{look.version} {look.sha256} for {look_id}"
-    kept = store.admit_look(document, container, created_by=job.requested_by, admit=admit)
+    kept = _kept_from_fit(store, key, fitted["receipt_sha256"])
+    if kept is not None:
+        if not apply:
+            return f"would wear {kept.look.look} v{kept.look.version}, kept already, for {look_id}"
+    else:
+        document = made_look_document(
+            plan_document=plan_document,
+            version=_next_version(connection, workspace_id, key),
+            container=container,
+            height_mm=int(fitted["height_mm"]),
+            made_by=made_by,
+            ingredients=[str(fitted["cutout_sha256"])],
+            receipt_sha256=fitted["receipt_sha256"],
+        )
+        plan_name = f"{plan_document['key']}/v{plan_document['version']}"
+        admit = made_admits(plan_name)
+        if not apply:
+            look = read_admission(document, container, plan_of=store.plan).look
+            admit(look)
+            return f"would admit {look.look} v{look.version} {look.sha256} for {look_id}"
+        kept = store.admit_look(document, container, created_by=job.requested_by, admit=admit)
 
     def end_made() -> look_jobs.CreatureLook | None:
         # The job's end and its kind's look together, the workspace's lock first (end_look).

@@ -7,7 +7,7 @@ snapshot stand in.
     workspace no longer keeps, is passed by for the first look; a kind look never dresses another
     kind.
 *   A participant may read a present being's kind look, as it may a chosen one, and never the kind
-    look of a kind no present being has.
+    look of a kind no present being has, or one drawn on another plan.
 """
 
 from __future__ import annotations
@@ -88,15 +88,23 @@ def test_a_kind_look_on_another_plan_or_no_longer_kept_is_passed_by(monkeypatch)
     assert _worn(monkeypatch, _choices(kind_looks={KIND: MADE}), kept=elsewhere) == FIRST
 
 
+#: The plan each kept look is drawn on; the kind's made look is on its own plan unless a test says.
+_PLANS = {FIRST: PLAN, MADE: PLAN}
+
+
 class _Store:
     def __init__(self, *_args, **_kwargs) -> None:
         pass
 
     def kind_by_digest(self, sha256: str) -> SimpleNamespace:
-        return SimpleNamespace(sha256=sha256, looks=[{"sha256": FIRST}])
+        return SimpleNamespace(sha256=sha256, plan=PLAN, looks=[{"sha256": FIRST}])
 
     def look_by_digest(self, sha256: str) -> SimpleNamespace:
-        return SimpleNamespace(container_sha256=f"{sha256[:8]}-container", container_bytes=1)
+        return SimpleNamespace(
+            container_sha256=f"{sha256[:8]}-container",
+            container_bytes=1,
+            look=SimpleNamespace(body_plan=_PLANS.get(sha256, PLAN)),
+        )
 
 
 def test_a_participant_reads_a_present_being_s_kind_look_and_no_absent_kind_s(monkeypatch):
@@ -118,3 +126,7 @@ def test_a_participant_reads_a_present_being_s_kind_look_and_no_absent_kind_s(mo
     scope = SimpleNamespace(workspace_id=uuid.uuid4(), world_id="world", version_id=uuid.uuid4())
     files = participation.ParticipationRuntime._files(runtime, None, scope)  # type: ignore[arg-type]
     assert {entry["look_sha256"] for entry in files.values()} == {FIRST, MADE}
+    # A kind look drawn on another plan is no look the kind wears, so none a participant reads.
+    monkeypatch.setitem(_PLANS, MADE, "another_body/v1")
+    files = participation.ParticipationRuntime._files(runtime, None, scope)  # type: ignore[arg-type]
+    assert {entry["look_sha256"] for entry in files.values()} == {FIRST}

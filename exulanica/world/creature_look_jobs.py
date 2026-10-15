@@ -261,7 +261,8 @@ def wear_by_kind(
     look_id: uuid.UUID | None = None,
 ) -> int:
     """Append the look the creature of ``kind_sha256`` wears wherever it is placed; its choice id.
-    The look must be one the workspace keeps, and the kind a creature it keeps.
+    The look must be one the workspace keeps, drawn on the creature's own plan, and the kind a
+    creature it keeps.
 
     The workspace's lock is taken first and held to the end of the transaction, as an erasure of
     the creature and a workspace tombstone take it, so neither commits between the check and the
@@ -279,8 +280,13 @@ def wear_by_kind(
             )
         if not keeps_creature(connection, workspace_id, kind_sha256):
             raise LookNotAsked("this workspace keeps no creature of that kind")
-        if admitted_look_by_digest(connection, workspace_id, look_sha256) is None:
+        look = admitted_look_by_digest(connection, workspace_id, look_sha256)
+        if look is None:
             raise LookNotAsked("this workspace keeps no such look")
+        kind = ThingStore(connection, workspace_id, None).kind_by_digest(kind_sha256)
+        # A kind wears only a look drawn on its own plan, as every reader of the row holds it to.
+        if kind is None or look.body_plan != kind.plan:
+            raise LookNotAsked("the look is not drawn on that creature's plan")
         row = cursor.execute(
             "insert into kind_look (workspace_id, kind_sha256, look_sha256, look_id, chosen_by) "
             "values (%s, %s, %s, %s, %s) returning choice_id",
