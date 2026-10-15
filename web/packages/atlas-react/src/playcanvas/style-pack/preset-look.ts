@@ -149,6 +149,7 @@ export function renderLookOfPreset(
         swayFamilies: [...wind.sway_families],
       },
     }),
+    ...(preset.lit_windows_permille === undefined ? {} : { litWindows: preset.lit_windows_permille / 1000 }),
     ...(haze === undefined ? {} : {
       haze: {
         density: haze.density_micro / 1_000_000,

@@ -375,6 +375,7 @@ through `validateRenderLook`; a test that builds the look and hands it on direct
 | Haze (`aerial-haze.ts`), optional | Exponential height fog integrated along each view ray, so a far valley fades while a high ridge stays a silhouette, turning toward the sun's colour when looking toward the sun; drawn in place of the fog. One block inserted before tone mapping in the device's lit end chunk, guarded by a uniform: with no haze the block is skipped and the end chunk computes what it did. A program built before a hazy look installed the block draws without haze. GLSL only; on WebGPU the fog is drawn |
 | Water finish (`water-material.ts`), optional | Water coloured by its own thickness from the scene's depth map: absorbed light, the seabed through shallow water, the deep colour, and foam at thin edges; blended over the scene without a colour copy (see the style pack contract). GLSL only |
 | Wind (`wind.ts`), optional | The wind a site's plants sway in: its direction, sway, pace, gusts and flutter, and the look families whose textured pieces sway, in their vertex positions so their shadows sway too (see the style pack contract, a site in a pack). GLSL only; on WebGPU nothing sways |
+| Lit windows, optional | The share of a facade's windows lit under the look's light whatever its sun (`litWindows`, 0 to 1), as a moonlit night needs; absent, each facade lights its windows by the look's sun (see the style pack contract, a site in a pack) |
 | Sun and shadows | Elevation, azimuth, colour and intensity; shadow maps up to 4096 texels in up to four cascades; one-tap, three-tap or five-tap filtering, or soft (PCSS) filtering with a penumbra, which a person may choose as a quality setting and a style pack may not, since it alone costs more than a frame (below) |
 | Contact shadowing and the probe | As the tile look: neither has an off switch |
 | Finish | The camera frame's bloom, grading, colour enhancement, vignette and temporal anti-aliasing, each optional or bounded, and optionally its sharpening (`post.sharpness`, 0 to 1; absent, none), which restores the fine detail temporal anti-aliasing softens |
@@ -385,7 +386,8 @@ through `validateRenderLook`; a test that builds the look and hands it on direct
 A look leaves each optional part out unless its pack states it, and a look without them is the
 same object it was before they existed; `web/packages/atlas-react/test/render-look-finish.test.ts`
 holds their conversion, refusals, the haze block's placement and the water material with and
-without a finish, and `web/packages/atlas-react/test/style-pack-wind.test.ts` the wind's. Their cost is not yet measured in the product; no authored pack states them.
+without a finish, and `web/packages/atlas-react/test/style-pack-wind.test.ts` the wind's and
+`web/packages/atlas-react/test/style-pack-facade.test.ts` the facade's. Their cost is not yet measured in the product; no authored pack states them.
 
 `web/packages/atlas-react/test/generated-tile-render-look.test.ts` holds the descriptor's refusals,
 the sky's colours at the zenith, horizon and nadir, the disc kept out of the image light, the clouds'

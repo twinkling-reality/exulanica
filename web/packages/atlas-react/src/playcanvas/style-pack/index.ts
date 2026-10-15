@@ -18,6 +18,8 @@ export type { InstancePlacement, InstancedDressing, InstancedView } from './inst
 export { COVER_PLACEMENTS_MAX, coverCount, coverMatrix, coverRuleOf, growCover, scatterCover } from './ground-cover.js';
 export type { CoverLand, CoverOptions, CoverPoint, CoverSlot, GrownCover, GrownPoint } from './ground-cover.js';
 export { PlantWind, windRuns, withWind } from './wind.js';
+export { applyFacadeFinish, clearFacadeWall, facadeApplied, facadeFronts, facadeRuns, facadeWears, litShareOf, setFacadeWall, withFacadeColour, withFacadeEmission, withFacadeGloss } from './facade-finish.js';
+export type { FacadeBuilding, FacadeFront, FacadeSlot, PlanRect } from './facade-finish.js';
 export type { PackVehicleBodies } from './vehicle-bodies.js';
 export { VEHICLE_BODY_SWATCH, packVehicleBodies } from './vehicle-bodies.js';
 export type { SiteDressingSummary, SitePackDressing } from './site-dresser.js';

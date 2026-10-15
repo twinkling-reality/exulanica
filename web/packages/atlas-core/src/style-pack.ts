@@ -197,6 +197,8 @@ export interface StylePackLightPreset {
   readonly haze?: StylePackHaze;
   /** Absent: nothing sways. */
   readonly wind?: StylePackWind;
+  /** The share of windows lit under this light, per mille, whatever its sun; absent, each facade's by the sun. */
+  readonly lit_windows_permille?: number;
 }
 
 export interface StylePackSwatch {
@@ -229,6 +231,42 @@ export interface StylePackCover {
   readonly density_per_100m2: number;
   readonly scale_permille: readonly [number, number];
   readonly seed: number;
+}
+
+/**
+ * The windows a wall look role's building walls are drawn with: the storey height its rows aim for
+ * (each storey the drawing states holding the whole number of rows nearest it), its least bay, one window size, the storeys kept clear from the ground, the windows a room
+ * lights together, its reveals and sill ledge, its glass, its lamps (warm, cool and the dim of a room
+ * with none on) and how many are lit with the sun high and low, how deep a room is, and where the
+ * grid fades to its average.
+ */
+export interface StylePackFacade {
+  readonly storey_mm: number;
+  readonly bay_mm: number;
+  readonly window_mm: readonly [number, number];
+  readonly sill_mm: number;
+  readonly head_mm: number;
+  readonly clear_storeys: number;
+  readonly room_bays: number;
+  readonly reveal_mm: number;
+  readonly reveal_shade_permille: number;
+  readonly ledge_mm: number;
+  readonly ledge_light_permille: number;
+  readonly glass_darkening_permille: number;
+  readonly glass_gloss_permille: number;
+  readonly lit_day_permille: number;
+  readonly lit_dusk_permille: number;
+  readonly day_sun_mdeg: number;
+  readonly dusk_sun_mdeg: number;
+  readonly warm: Srgb8;
+  readonly cool: Srgb8;
+  readonly unlit: Srgb8;
+  readonly warm_permille: number;
+  readonly lamp_spread_permille: number;
+  readonly light_permille: number;
+  readonly room_depth_mm: number;
+  readonly fade_from_millicells_per_px: number;
+  readonly fade_to_millicells_per_px: number;
 }
 
 /**
@@ -311,6 +349,8 @@ export interface StylePackManifest {
   readonly textures?: Readonly<Record<string, StylePackTexture>>;
   /** Absent in a pack that grows nothing on its grounds. */
   readonly cover?: Readonly<Record<string, StylePackCover>>;
+  /** Absent in a pack that draws no windows on its walls. */
+  readonly facade?: Readonly<Record<string, StylePackFacade>>;
   readonly modules: Readonly<Record<string, { readonly variants: readonly StylePackVariant[] }>>;
   readonly files: readonly StylePackFile[];
 }
@@ -506,6 +546,8 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
       gust_scale_mm: integer(1000, 200_000), gust_share_permille: permille(0, 1000), flutter_mm: integer(0, 200),
       sway_families: list(pattern(KEY, 'a look family'), 1, 8),
     })),
+    // Added within the profile: absent, each facade's windows are lit by its sun.
+    lit_windows_permille: optional(permille(0, 1000)),
   }) as unknown as StylePackLightPreset;
 }
 
@@ -668,6 +710,44 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
       });
       return read;
     }, 64)),
+    // Added within the profile: a pack written before it draws no windows on its walls.
+    facade: optional(record(lookRoleKey(['surface', 'both']), (v, p) => {
+      const read = object(v, p, {
+        storey_mm: integer(2000, 12_000),
+        bay_mm: integer(600, 20_000),
+        window_mm: (w, q) => {
+          if (!Array.isArray(w) || w.length !== 2) return fail('shape', q, 'must be a width and a height in millimetres');
+          return [integer(300, 19_000)(w[0]!, `${q}[0]`), integer(300, 10_000)(w[1]!, `${q}[1]`)];
+        },
+        sill_mm: integer(0, 3000),
+        head_mm: integer(0, 3000),
+        clear_storeys: integer(0, 20),
+        room_bays: integer(1, 8),
+        reveal_mm: integer(0, 600),
+        reveal_shade_permille: permille(0, 1000),
+        ledge_mm: integer(0, 300),
+        ledge_light_permille: permille(0, 1000),
+        glass_darkening_permille: permille(0, 1000),
+        glass_gloss_permille: permille(0, 1000),
+        lit_day_permille: permille(0, 1000),
+        lit_dusk_permille: permille(0, 1000),
+        day_sun_mdeg: integer(5000, 85_000),
+        dusk_sun_mdeg: integer(5000, 85_000),
+        warm: srgb8,
+        cool: srgb8,
+        unlit: srgb8,
+        warm_permille: permille(0, 1000),
+        lamp_spread_permille: permille(0, 1000),
+        light_permille: permille(0, 20_000),
+        room_depth_mm: integer(500, 30_000),
+        fade_from_millicells_per_px: integer(10, 4000),
+        fade_to_millicells_per_px: integer(20, 8000),
+      }) as unknown as StylePackFacade;
+      if (read.window_mm[0] >= read.bay_mm) fail('range', `${p}.window_mm`, 'must be narrower than its bay');
+      if (read.day_sun_mdeg <= read.dusk_sun_mdeg) fail('range', `${p}.day_sun_mdeg`, 'must lie above dusk_sun_mdeg');
+      if (read.fade_to_millicells_per_px <= read.fade_from_millicells_per_px) fail('range', `${p}.fade_to_millicells_per_px`, "must be above the fade's start");
+      return read;
+    }, 64)),
     textures: optional(record((key, path) => { if (!KEY.test(key)) fail('shape', path, 'must be a texture key'); }, (v, p) => {
       const image = pattern(IMAGE_PATH, 'a lowercase relative path ending .jpg or .png');
       return object(v, p, {
@@ -753,6 +833,9 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
       if (splitLookRole(piece, where).family !== 'plant') fail('reference', where, 'a cover piece is a plant');
       if (manifest.base === null && manifest.modules[piece] === undefined) fail('reference', where, `names no module ${JSON.stringify(piece)}`);
     });
+  }
+  for (const role of Object.keys(manifest.facade ?? {})) {
+    if (splitLookRole(role, `facade.${role}`).family !== 'wall') fail('reference', `facade.${role}`, "a facade is a wall's");
   }
   for (const [name, preset] of Object.entries(manifest.light?.presets ?? {})) {
     (preset.wind?.sway_families ?? []).forEach((family, index) => {
@@ -878,6 +961,8 @@ export interface ResolvedStylePack {
   readonly textures: ReadonlyMap<string, ResolvedTexture>;
   /** What grows on each surface look role, the nearest manifest's rule for a role. */
   readonly cover: Readonly<Record<string, StylePackCover>>;
+  /** The windows each wall look role's building walls are drawn with, the nearest manifest's rule for a role. */
+  readonly facade: Readonly<Record<string, StylePackFacade>>;
   readonly modules: Readonly<Record<string, ResolvedModule>>;
 }
 
@@ -929,6 +1014,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   const surfaces: Record<string, StylePackSurface> = {};
   const textures = new Map<string, ResolvedTexture>();
   const cover: Record<string, StylePackCover> = {};
+  const facade: Record<string, StylePackFacade> = {};
   const modules: Record<string, ResolvedModule> = {};
   let light: StylePackManifest['light'] = null;
   let shading: StylePackManifest['shading'] = null;
@@ -941,13 +1027,14 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     const files = new Map(manifest.files.map((file) => [file.path, file] as const));
     for (const [key, texture] of Object.entries(manifest.textures ?? {})) textures.set(key, { texture, files });
     Object.assign(cover, manifest.cover ?? {});
+    Object.assign(facade, manifest.facade ?? {});
     for (const [role, module] of Object.entries(manifest.modules)) modules[role] = { variants: module.variants, files, stated: index };
     if (manifest.light !== null) light = manifest.light;
     if (manifest.shading !== null) shading = manifest.shading;
     if (manifest.base === null || manifest.edge !== null) edge = manifest.edge;
     if (manifest.water !== undefined) water = manifest.water;
   }
-  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, textures, cover, modules };
+  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, textures, cover, facade, modules };
 }
 
 /** A slot as a world kind states it: millimetres, base centre, front +y, up +z. */

@@ -55,6 +55,16 @@ describe('a render look\'s sharpness', () => {
   });
 });
 
+describe('a render look\'s lit windows', () => {
+  it('is the preset\'s share in the look\'s units, absent where the preset states none, and read as a whole look within 0 to 1', () => {
+    const look = lookOf(caseNamed('a night light lighting its windows whatever its sun'));
+    expect(look.litWindows).toBe(0.65);
+    expect('litWindows' in lookOf(caseNamed('a pack drawing windows on its building walls'))).toBe(false);
+    expect(validateRenderLook(look).litWindows).toBe(0.65);
+    expect(refused({ ...look, litWindows: 1.5 })).toBe('litWindows: must be within 0 to 1');
+  });
+});
+
 describe('a render look from a pack that states a finish', () => {
   it('converts the pack\'s whole numbers to the look\'s units', () => {
     const look = lookOf(FINISHED);

@@ -591,6 +591,8 @@ def _light_preset(value: Any, path: str) -> dict[str, Any]:
             "haze": _Optional(_haze),
             # Added within the profile: a preset written before it holds every plant still.
             "wind": _Optional(_wind),
+            # Added within the profile: absent, each facade's windows are lit by its sun.
+            "lit_windows_permille": _Optional(_integer(0, 1000)),
         },
     )
 
@@ -756,6 +758,54 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                 "seed": _integer(0, 2_147_483_647),
             },
         )
+
+    def facade(value: Any, path: str) -> dict[str, Any]:
+        # The windows a wall look role's building walls are drawn with: storeys, bays, one window
+        # size, trims, glass, the lamps behind them and how many are lit by the sun.
+        def window(v: Any, p: str) -> list[int]:
+            if not isinstance(v, list) or len(v) != 2:
+                _fail("shape", p, "must be a width and a height in millimetres")
+            return [_integer(300, 19_000)(v[0], f"{p}[0]"), _integer(300, 10_000)(v[1], f"{p}[1]")]
+
+        read = _object(
+            value,
+            path,
+            {
+                "storey_mm": _integer(2000, 12_000),
+                "bay_mm": _integer(600, 20_000),
+                "window_mm": window,
+                "sill_mm": _integer(0, 3000),
+                "head_mm": _integer(0, 3000),
+                "clear_storeys": _integer(0, 20),
+                "room_bays": _integer(1, 8),
+                "reveal_mm": _integer(0, 600),
+                "reveal_shade_permille": _integer(0, 1000),
+                "ledge_mm": _integer(0, 300),
+                "ledge_light_permille": _integer(0, 1000),
+                "glass_darkening_permille": _integer(0, 1000),
+                "glass_gloss_permille": _integer(0, 1000),
+                "lit_day_permille": _integer(0, 1000),
+                "lit_dusk_permille": _integer(0, 1000),
+                "day_sun_mdeg": _integer(5000, 85_000),
+                "dusk_sun_mdeg": _integer(5000, 85_000),
+                "warm": _srgb8,
+                "cool": _srgb8,
+                "unlit": _srgb8,
+                "warm_permille": _integer(0, 1000),
+                "lamp_spread_permille": _integer(0, 1000),
+                "light_permille": _integer(0, 20_000),
+                "room_depth_mm": _integer(500, 30_000),
+                "fade_from_millicells_per_px": _integer(10, 4000),
+                "fade_to_millicells_per_px": _integer(20, 8000),
+            },
+        )
+        if read["window_mm"][0] >= read["bay_mm"]:
+            _fail("range", f"{path}.window_mm", "must be narrower than its bay")
+        if read["day_sun_mdeg"] <= read["dusk_sun_mdeg"]:
+            _fail("range", f"{path}.day_sun_mdeg", "must lie above dusk_sun_mdeg")
+        if read["fade_to_millicells_per_px"] <= read["fade_from_millicells_per_px"]:
+            _fail("range", f"{path}.fade_to_millicells_per_px", "must be above the fade's start")
+        return read
 
     def preset_key(key: str, path: str) -> None:
         if _KEY.fullmatch(key) is None:
@@ -930,6 +980,8 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             "textures": _Optional(_record(texture_key, texture, MAX_TEXTURES)),
             # Added within the profile: a pack written before it grows nothing on its grounds.
             "cover": _Optional(_record(look_role_key(("surface", "both")), cover, 64)),
+            # Added within the profile: a pack written before it draws no windows on its walls.
+            "facade": _Optional(_record(look_role_key(("surface", "both")), facade, 64)),
             "modules": _record(
                 look_role_key(("module", "both")),
                 lambda v, p: _object(
@@ -1061,6 +1113,9 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
                 _fail("reference", where, "a cover piece is a plant")
             if manifest["base"] is None and piece not in manifest["modules"]:
                 _fail("reference", where, f"names no module {json.dumps(piece)}")
+    for role in manifest.get("facade", {}):
+        if split_look_role(role, f"facade.{role}")[0] != "wall":
+            _fail("reference", f"facade.{role}", "a facade is a wall's")
     for name, preset in (manifest["light"] or {"presets": {}})["presets"].items():
         for index, family in enumerate(preset.get("wind", {}).get("sway_families", [])):
             if family not in context.families:

@@ -566,6 +566,8 @@ export interface RenderLook {
   readonly haze?: RenderHaze;
   /** The wind its plants sway in; absent, nothing sways. */
   readonly wind?: RenderWind;
+  /** The share of a facade's windows lit under this light, whatever its sun; absent, each facade's share by the sun. */
+  readonly litWindows?: number;
   /** Absent: water is drawn as its surface states. */
   readonly water?: RenderWater;
   readonly unavailable: TileLookV1['unavailable'];
@@ -655,6 +657,7 @@ const RENDER_SHAPE: Shape = obj({
     direction: num(0, 2 * Math.PI), swayM: num(0, 2), pace: num(0, 20), gustScaleM: num(1, 200), gustShare: num(0, 1), flutterM: num(0, 0.2),
     swayFamilies: { kind: 'list', min: 1, max: 8, shape: { kind: 'key' } },
   })),
+  litWindows: optional(num(0, 1)),
   water: optional(obj({
     shallow: rgb, deep: rgb, absorption: { kind: 'triple', min: 0, max: 5 }, depthScaleM: num(0.5, 50), foamWidthM: num(0, 2), reflection: num(0, 2),
     ripples: optional(obj({

@@ -657,6 +657,7 @@ export type {
   Srgb8,
   StylePackContext,
   StylePackCover,
+  StylePackFacade,
   StylePackFile,
   StylePackFog,
   StylePackLicence,

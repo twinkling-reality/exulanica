@@ -22,6 +22,7 @@ import { WaterRipples } from './water-material.js';
 import { coverMatrix, growCover, type CoverSlot } from './ground-cover.js';
 import { drawInstancedPieces, type InstancePlacement } from './instanced-pieces.js';
 import { PlantWind, windRuns } from './wind.js';
+import { applyFacadeFinish, clearFacadeWall, facadeApplied, facadeFronts, facadeRuns, facadeWears, litShareOf, setFacadeWall, type FacadeFront } from './facade-finish.js';
 import type { PreparedTextureSet } from '../generated-tile/texture-materials.js';
 import { TILE_LOOK_V1, isRenderLook, type TileLook } from '../generated-tile/look.js';
 import { seatGeometry, type SeatGeometry } from '../generated-site/site-seating.js';
@@ -125,6 +126,8 @@ export interface SiteDressingSummary {
    * the guard left out, and the points the bound on tries never tried.
    */
   readonly cover?: { readonly pieces: number; readonly slots: number; readonly leftOut: number; readonly untried: number };
+  /** The building walls drawn with windows, where the pack states any facade, and the materials they wear. */
+  readonly facade?: { readonly walls: number; readonly materials: number };
   /** How many of the pieces' materials sway, where the look states a wind and the device runs it. */
   readonly swaying?: number;
 }
@@ -194,6 +197,38 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         applyGroundFinish(device, material, finish);
         finishedGrounds.add(material);
       }
+    };
+    // The pack's windows, where it states a facade for a wall's look role or the role its surface is
+    // drawn in, on the device they are written for: on the walls that face out of a building
+    // (`facadeFronts`), each stating its building and its rule on its own instances, lit by the
+    // light's own share or the rule's by the look's sun. Materials stay shared: a wall that states
+    // none, a boundary wall among them, draws its plain colour; glazing draws none.
+    const facades = Object.keys(pack.facade).length > 0 && facadeRuns(device) ? pack.facade : null;
+    const fronts = facades === null ? new Map<string, FacadeFront>() : facadeFronts(drawing.slots);
+    const facadeLook = dressing.look ?? TILE_LOOK_V1;
+    const litStated = isRenderLook(facadeLook) ? facadeLook.litWindows ?? null : null;
+    const facaded = new Set<pc.StandardMaterial>();
+    const facadeWalls: string[] = [];
+    const facing: pc.MeshInstance[] = [];
+    /** The facade rule a wall facing out of its building takes: its own role's, else that of the role it is drawn in. */
+    const facadeRuleOf = (slot: SiteSlot, drawnAs: string | null) => facades === null || !fronts.has(slot.identity)
+      ? null : facades[slot.lookRole] ?? (drawnAs === null ? null : facades[drawnAs] ?? null);
+    /** Set the facade into what a facade wall wears, its own, and state its building and rule on each of its instances. */
+    const faceOut = (entity: pc.Entity, slot: SiteSlot, drawnAs: string | null): void => {
+      const rule = facadeRuleOf(slot, drawnAs);
+      if (rule === null) return;
+      const litShare = litShareOf(rule, facadeLook.sun.elevationDeg, litStated);
+      const shape = entity.findByName(`${slot.identity}:shape`) as pc.Entity | null;
+      let stated = false;
+      for (const instance of shape?.render?.meshInstances ?? []) {
+        const material = instance.material;
+        if (!facadeWears(material) || !setFacadeWall(instance, drawn.root, fronts.get(slot.identity)!, rule, litShare)) continue;
+        if (!facadeApplied(material)) applyFacadeFinish(device, material);
+        facaded.add(material);
+        facing.push(instance);
+        stated = true;
+      }
+      if (stated) facadeWalls.push(slot.identity);
     };
     const texturedSlots = new Set<string>();
     const made: pc.StandardMaterial[] = [];
@@ -270,13 +305,17 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         }
         const worn = material;
         wear(entity, slot.identity, () => worn);
+        faceOut(entity, slot, resolved.role);
         materials += 1;
         if (pattern !== null) patterned += 1;
        } else if (resolved?.kind === 'surface' && textureSetOf(resolved.surface) !== null && entity !== undefined) {
         const shape = entity.findByName(`${slot.identity}:shape`) as pc.Entity | null;
+        const unavailable = textures.metrics().unavailableSurfaces;
         for (const instance of shape?.render?.meshInstances ?? []) {
           if (textures.wear(instance, slot, textureSetOf(resolved.surface)!, resolved.up, drawn.root)) environment?.requestSceneColor();
         }
+        // A wall whose texture could not be read shows that, and no windows over it.
+        if (textures.metrics().unavailableSurfaces === unavailable) faceOut(entity, slot, resolved.role);
         texturedSlots.add(slot.identity);
         surfaces += 1;
       } else if (resolved?.kind === 'surface' && resolved.swatch !== null && entity !== undefined) {
@@ -294,6 +333,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         }
         const worn = material;
         wear(entity, slot.identity, () => worn);
+        faceOut(entity, slot, resolved.role);
         surfaces += 1;
         if (pattern !== null) patterned += 1;
       } else if (entity !== undefined) {
@@ -384,8 +424,24 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       const slot = drawing.slots.find((one) => one.identity === identity);
       if (slot !== undefined && drawn.entities.has(identity)) leftAsDrawn.push(slot);
     }
+    // A facade wall left as drawn wears its own copy of the fallback, so the engine's is never changed.
+    const facadeFallbacks = new Map<pc.Material, pc.Material>();
+    const facadeFallback = (fallback: pc.Material): pc.Material => {
+      let copy = facadeFallbacks.get(fallback);
+      if (copy === undefined) {
+        const own = (shaded(fallback) as pc.StandardMaterial).clone();
+        own.name = `style-pack:facade:${fallback.name}`;
+        made.push(own);
+        facadeFallbacks.set(fallback, own);
+        copy = own;
+      }
+      return copy;
+    };
     for (const slot of leftAsDrawn) {
-      wear(drawn.entities.get(slot.identity)!, slot.identity, shaded);
+      const entity = drawn.entities.get(slot.identity)!;
+      const front = facadeRuleOf(slot, null) !== null;
+      wear(entity, slot.identity, front ? facadeFallback : shaded);
+      if (front) faceOut(entity, slot, null);
       undressed += 1;
     }
 
@@ -543,6 +599,12 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const coverSaid = grown === null ? null : { pieces: coverPlacements.length, slots: grown.slots, leftOut: grown.leftOut, untried: grown.untried };
     if (coverSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteCover'] = JSON.stringify(coverSaid);
     if (wind !== null && canvas?.dataset !== undefined) canvas.dataset['siteWind'] = String(wind.materials);
+    // How many building walls show windows (a dressed building's hidden walls not among them), and in how many materials.
+    const facadeSaid = facades === null ? null : {
+      walls: facadeWalls.filter((identity) => drawn.entities.get(identity)?.enabled === true).length,
+      materials: facaded.size,
+    };
+    if (facadeSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteFacade'] = JSON.stringify(facadeSaid);
     // How many of the site's materials wear the surface finish, and whether its water reflects.
     if (finish !== null && canvas?.dataset !== undefined) {
       canvas.dataset['siteFinish'] = JSON.stringify({ grounds: finishedGrounds.size, waters: finishedWaters.size, reflection: reflection !== null });
@@ -561,6 +623,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       borderNeighboursLeftOut,
       ...(coverSaid === null ? {} : { cover: coverSaid }),
       ...(wind === null ? {} : { swaying: wind.materials }),
+      ...(facadeSaid === null ? {} : { facade: facadeSaid }),
     });
 
     let undone = false;
@@ -578,6 +641,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (finish !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFinish'];
       if (coverSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCover'];
       if (wind !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteWind'];
+      if (facadeSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFacade'];
+      for (const instance of facing.splice(0)) clearFacadeWall(instance);
       reflection?.dispose();
       // Every bordered ground is its full rectangle again, with nothing stated on it.
       for (const [instance, shape, x, z] of bordered.splice(0)) {
