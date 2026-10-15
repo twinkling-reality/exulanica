@@ -35,7 +35,10 @@ def _key(event: dict[str, Any]) -> tuple[int, float, str]:
     return (event["tick"], float("inf") if order is None else order, event["event_id"])
 
 
-def _stepped(api, minutes: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _stepped(
+    api, minutes: int, *, event_minutes: int = 0
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Step ``minutes``, then on (to three times as many) until events fall in ``event_minutes``."""
     entry = _starter(api)
     assert _place(api, entry, "region:starter").status_code == 201
     created = api.post(
@@ -44,17 +47,25 @@ def _stepped(api, minutes: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     )
     assert created.status_code == 200, created.text
     snapshot = created.json()
-    for _ in range(minutes):
+    stepped_minutes = 0
+    while True:
         stepped = api.post(
             _version_path(entry, "/society/steps"),
             {"base_tick": snapshot["current_tick"], "base_state_sha256": snapshot["state_sha256"]},
         )
         assert stepped.status_code == 200, stepped.text
         snapshot = stepped.json()
-    whole = api.get(_version_path(entry, "/society/events"))
-    assert whole.status_code == 200, whole.text
-    assert whole.json()["next"] is None
-    return entry, whole.json()["events"]
+        stepped_minutes += 1
+        if stepped_minutes < minutes:
+            continue
+        whole = api.get(_version_path(entry, "/society/events"))
+        assert whole.status_code == 200, whole.text
+        assert whole.json()["next"] is None
+        events = whole.json()["events"]
+        # A society's people act on their own schedule, so the minutes holding events vary.
+        held = len({event["tick"] for event in events})
+        if held >= event_minutes or stepped_minutes >= 3 * minutes:
+            return entry, events
 
 
 def _read(api, entry: dict[str, Any], query: str) -> dict[str, Any]:
@@ -64,7 +75,7 @@ def _read(api, entry: dict[str, Any], query: str) -> dict[str, Any]:
 
 
 def test_a_window_and_kinds_answer_exactly_those_events_oldest_first(api):
-    entry, everything = _stepped(api, 6)
+    entry, everything = _stepped(api, 6, event_minutes=4)
     ticks = sorted({event["tick"] for event in everything})
     kinds = sorted({event["event_kind"] for event in everything})
     assert len(ticks) >= 4 and len(kinds) >= 2, (ticks, kinds)
