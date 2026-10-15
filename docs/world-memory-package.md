@@ -854,9 +854,12 @@ builds the selection: the named placed things, each one's current model assignme
 decisions the society consumed for them, mapped back to placed things through the society's
 subject identity, at most the latest 256 consumed records per capture. `--session` puts the
 decisions in an evidence file; `--readable` adds the readable records, the version's title and
-the words of each being's character. Where the version has a society, each selected being (a
-thing of a kind its workspace made, or of a shipped kind whose class is `being`) has its card read
-once per capture for its character (`GET /world/versions/{version}/society/things/{subject}`).
+the words of each being's character. The selected beings' characters (a being is a thing of a
+kind its workspace made, or of a shipped kind whose class is `being`) come from one read of the
+version's character records (`GET /world/versions/{version}/things/characters`, in the
+[things contract](things-contract.md#who-a-placed-being-is)); an API that does not serve it is asked
+each being's card instead where the version has a society
+(`GET /world/versions/{version}/society/things/{subject}`).
 The bearer is read from a file into memory and sent only in the request header.
 Every request passes through the egress check held to the one origin the caller names
 ([security floor](security-floor.md)); plain http is accepted only for `localhost`, and redirects

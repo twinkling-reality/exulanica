@@ -395,6 +395,14 @@ society). It refuses by name, writing nothing: `character_changed` (409, with th
 newest already says, `character_out_of_bounds` and `character_carries_a_saved_name` (422) for the
 text, `character_for_beings_only` (422) for an object, and 404 for a thing the version does not hold.
 
+`GET /world/versions/{version_id}/things/characters` (`world.read`, never cached) answers
+`exulanica.thing-characters/v1`: the newest record of every placed thing of the version anyone
+wrote one for, a clearing one included (`placed_id`, `revision`, `character`, null where the record
+clears it, and `written_at`), in placed id order, and `society` as the write answers it. It is one
+read for a reader that follows a whole world, such as a world's project
+([world memory package](world-memory-package.md#capture-and-automatic-tracking)), where a being's
+card would be one read a being. A version the world does not hold is 404 `unknown_reference`.
+
 Records are appended to `world_thing_character` (migration 0213) with the actor who wrote each and
 the record it replaced, never changed, and only the newest may be replaced: the database holds
 that too. A record belongs to one version, as a look choice does: a version branched or carried

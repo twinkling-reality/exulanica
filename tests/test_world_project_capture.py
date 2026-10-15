@@ -713,3 +713,39 @@ def test_a_cleared_character_keeps_its_revision_and_a_being_without_one_keeps_no
             readable=True,
         ).checkpoint
     assert "characters" not in none
+
+
+def test_one_read_of_the_version_s_characters_replaces_the_cards(world):
+    world.routes[f"/world/versions/{VERSION}/things/characters"] = {
+        "profile": "exulanica.thing-characters/v1",
+        "version_id": VERSION,
+        "characters": [
+            {
+                "placed_id": "knight:1",
+                "revision": 5,
+                "character": {"name": "Sir Pip", "about": "Guards the well at night."},
+                "written_at": "2026-10-14T01:00:00Z",
+            }
+        ],
+        "society": "runs_characters",
+    }
+    card(world, {"name": "an older card", "about": "never read"}, revision=1)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        project = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=None,
+            include_decisions=False,
+            readable=True,
+        ).checkpoint
+    assert project["characters"] == [
+        {
+            "thing_id": "knight:1",
+            "revision": 5,
+            "words": {"name": "Sir Pip", "about": "Guards the well at night."},
+        }
+    ]
+    paths = [path.split("?")[0] for _, path, _ in world.requests]
+    assert paths.count(f"/world/versions/{VERSION}/things/characters") == 1
+    assert not any("/society/things/" in path for path in paths)

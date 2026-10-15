@@ -1,4 +1,5 @@
-"""Who a placed being is, as its world's owner writes it: one route that writes or clears it.
+"""Who a placed being is, as its world's owner writes it: one route that writes or clears it,
+and one that reads every placed thing's newest record.
 
 ``POST /world/versions/{version_id}/things/{thing_id}/character`` appends a record for the being
 the author placed under ``thing_id`` (the placed id the move and remove routes take), over the
@@ -15,6 +16,13 @@ Refused by name: 404 ``unknown_reference`` for a thing the version does not hold
 ``character_out_of_bounds``, ``character_carries_a_saved_name`` and ``character_for_beings_only``;
 424 ``unavailable_society_input`` where the society's next input cannot be composed, and then
 nothing is written.
+
+``GET /world/versions/{version_id}/things/characters`` answers ``exulanica.thing-characters/v1``:
+the newest record of every placed thing of the version anyone wrote one for, a clearing one
+included (``placed_id``, ``revision``, ``character`` and ``written_at``), and ``society`` as the
+write answers it, never cached. It is one read where a being's card would be one read a being, for
+a reader that follows a world (``exulanica/world_package/projects/capture.py``). A version the
+world does not hold is 404 ``unknown_reference``.
 """
 
 from __future__ import annotations
@@ -37,6 +45,7 @@ from exulanica.world.thing_characters import (
     ThingCharacterRefused,
     screened_character,
     society_reads_characters,
+    version_characters,
     write_character,
 )
 from exulanica.world.workspace_lock import lock_workspace
@@ -144,5 +153,22 @@ def thing_character_write(
             **record.document(),
             "society": society,
         },
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.get(
+    "/versions/{version_id}/things/characters",
+    summary="Every placed thing's newest character record of a version, in one read.",
+)
+def thing_characters_read(
+    version_id: Annotated[uuid.UUID, Path()],
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> JSONResponse:
+    require_world(connection, session.workspace_id, world_id)
+    return JSONResponse(
+        content=version_characters(connection, session.workspace_id, world_id, version_id),
         headers={"Cache-Control": "private, no-store"},
     )

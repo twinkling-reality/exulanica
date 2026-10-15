@@ -14,9 +14,12 @@ Nothing derives one from a photograph, a kind's description or a person.
     a being;
 *   :func:`write_character` appends one record for a placed being of a version, over the newest
     record the writer read (``base_revision``), or refuses by name;
-*   :func:`character_of` reads the newest record for one placed thing, and
+*   :func:`character_of` reads the newest record for one placed thing, :func:`newest_records`
+    the newest record of every placed thing of a version, a clearing one included, and
     :func:`newest_characters` the character of every placed being of a version that has one, as
-    a society's next input carries them.
+    a society's next input carries them;
+*   :func:`version_characters` answers ``exulanica.thing-characters/v1``: every placed thing's
+    newest record in one read, what a reader following a world takes in place of a card a being.
 
 Records are appended and never changed; a record holding neither part clears the character.
 """
@@ -39,18 +42,23 @@ from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_thing_inputs import CHARACTER_MODULE, check_character
 
 __all__ = [
+    "CHARACTERS_PROFILE",
     "CHARACTER_PROFILE",
     "THING_CHARACTER_CODES",
     "CharacterRecord",
     "ThingCharacterRefused",
     "character_of",
     "newest_characters",
+    "newest_records",
     "screened_character",
     "society_reads_characters",
+    "version_characters",
     "write_character",
 ]
 
 CHARACTER_PROFILE: Final = "exulanica.thing-character/v1"
+#: Every placed thing's newest record of one version, in one read.
+CHARACTERS_PROFILE: Final = "exulanica.thing-characters/v1"
 #: Why a character is not written, each answered by name.
 THING_CHARACTER_CODES: Final = (
     "character_out_of_bounds",
@@ -143,6 +151,24 @@ def character_of(
     return None if row is None else _record(row)
 
 
+def newest_records(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version_id: uuid.UUID,
+) -> list[CharacterRecord]:
+    """The newest record of every placed thing of a version anyone wrote one for, a clearing one
+    included, in placed id order. The database picks the one row per thing."""
+    rows = connection.execute(
+        "select distinct on (placed_id) placed_id,revision,name,about,written_at "
+        "from world_thing_character "
+        "where workspace_id=%s and world_id=%s and version_id=%s "
+        "order by placed_id, revision desc",
+        (workspace_id, world_id, version_id),
+    ).fetchall()
+    return [_record(row) for row in rows]
+
+
 def newest_characters(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
@@ -151,19 +177,40 @@ def newest_characters(
 ) -> dict[str, dict[str, str]]:
     """The character of every placed thing of a version whose newest record states one, by placed
     id: what a society that records the character module is told in its next input."""
-    rows = connection.execute(
-        "select distinct on (placed_id) placed_id,revision,name,about,written_at "
-        "from world_thing_character "
-        "where workspace_id=%s and world_id=%s and version_id=%s "
-        "order by placed_id, revision desc",
+    return {
+        record.placed_id: dict(record.character)
+        for record in newest_records(connection, workspace_id, world_id, version_id)
+        if record.character is not None
+    }
+
+
+def version_characters(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version_id: uuid.UUID,
+) -> dict[str, Any]:
+    """``exulanica.thing-characters/v1``: every placed thing's newest record (``placed_id``,
+    ``revision``, ``character``, null where the record clears it, and ``written_at``), and
+    whether the version's society shows a character (``society``, as the write answers it). An
+    absent version, or another workspace's, is
+    :class:`~exulanica.world.errors.UnknownWorldResource`."""
+    held = connection.execute(
+        "select 1 from world_alternate_version where workspace_id=%s and world_id=%s "
+        "and version_id=%s",
         (workspace_id, world_id, version_id),
-    ).fetchall()
-    found = {}
-    for row in rows:
-        record = _record(row)
-        if record.character is not None:
-            found[record.placed_id] = dict(record.character)
-    return found
+    ).fetchone()
+    if held is None:
+        raise UnknownWorldResource("no such alternate version")
+    return {
+        "profile": CHARACTERS_PROFILE,
+        "version_id": str(version_id),
+        "characters": [
+            {"placed_id": record.placed_id, **record.document()}
+            for record in newest_records(connection, workspace_id, world_id, version_id)
+        ],
+        "society": society_reads_characters(connection, workspace_id, world_id, version_id),
+    }
 
 
 def society_reads_characters(

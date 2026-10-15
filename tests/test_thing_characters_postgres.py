@@ -13,6 +13,8 @@ deployment builds:
 *   migration 0213's table: a record is never changed, deleted only by the definers' owner, and
     only the newest may be replaced; the runtime role holds insert and select alone, and another
     workspace sees no row;
+*   one read answers every placed thing's newest record, a clearing one included, and a version
+    the world does not hold is 404;
 *   a world's erasure and a workspace's tombstone delete every record.
 """
 
@@ -145,6 +147,33 @@ def test_the_owner_writes_a_character_a_society_of_things_takes_in_and_clears(ma
     }
     society = _step(api, entry, society)
     assert "character" not in _knight(society)
+
+
+def test_one_read_answers_every_placed_thing_s_newest_record_a_clearing_one_included(made):
+    api = made
+    entry, _society = _a_society_with_a_knight(api)
+    path = _scope(entry) + "/things/characters" + _query(entry)
+    empty = api.get(path)
+    assert empty.status_code == 200, empty.text
+    assert empty.headers["cache-control"] == "private, no-store"
+    assert (empty.json()["profile"], empty.json()["characters"], empty.json()["society"]) == (
+        "exulanica.thing-characters/v1",
+        [],
+        "runs_characters",
+    )
+    first = _write(api, entry, "knight", None, CHARACTER).json()
+    [held] = api.get(path).json()["characters"]
+    assert held == {
+        "placed_id": "knight",
+        "revision": first["revision"],
+        "character": CHARACTER,
+        "written_at": first["written_at"],
+    }
+    cleared = _write(api, entry, "knight", first["revision"], None).json()
+    [held] = api.get(path).json()["characters"]
+    assert (held["revision"], held["character"]) == (cleared["revision"], None)
+    unknown = api.get(f"/world/versions/{uuid.uuid4()}" + "/things/characters" + _query(entry))
+    assert (unknown.status_code, unknown.json()["code"]) == (404, "unknown_reference")
 
 
 def test_an_object_is_refused_a_character(made):

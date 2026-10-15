@@ -344,21 +344,44 @@ def _being(thing: Mapping[str, Any]) -> bool:
 
 
 def _characters(
-    reader: WorldReader, version: str, things: Sequence[Mapping[str, Any]], readable: bool
+    reader: WorldReader,
+    version: str,
+    things: Sequence[Mapping[str, Any]],
+    readable: bool,
+    *,
+    cards: bool,
 ) -> list[dict[str, Any]]:
-    """Who the world's owner wrote each selected being to be, read from its card (one read a
-    being): the newest record's revision always, its words only with readable text. A being with
-    no record, or that its society does not hold, has none."""
+    """Who the world's owner wrote each selected being to be: the newest record's revision
+    always, its words only with readable text. Read in one request
+    (``GET .../things/characters``); an API that does not serve it is asked each being's card
+    instead, where `cards` says the version has a society to answer them. A being with no record
+    has none."""
+    beings = [thing for thing in things if not thing.get("removed") and _being(thing)]
+    if not beings:
+        return []
+    listed = reader.json_if_found(
+        "GET thing characters", f"/world/versions/{version}/things/characters"
+    )
+    newest: dict[str, Any] | None = None
+    if isinstance(listed, dict) and isinstance(listed.get("characters"), list):
+        newest = {
+            record.get("placed_id"): record
+            for record in listed["characters"]
+            if isinstance(record, dict)
+        }
+    elif not cards:
+        return []
     found = []
-    for thing in things:
-        if thing.get("removed") or not _being(thing):
-            continue
-        card = reader.json_if_found(
-            "GET society thing",
-            f"/world/versions/{version}/society/things/"
-            f"{subject_id(reader.world_id, thing['thing_id'])}",
-        )
-        held = card.get("character") if isinstance(card, dict) else None
+    for thing in beings:
+        if newest is not None:
+            held = newest.get(thing["thing_id"])
+        else:
+            card = reader.json_if_found(
+                "GET society thing",
+                f"/world/versions/{version}/society/things/"
+                f"{subject_id(reader.world_id, thing['thing_id'])}",
+            )
+            held = card.get("character") if isinstance(card, dict) else None
         if not isinstance(held, dict):
             continue
         revision = held.get("revision")
@@ -463,8 +486,9 @@ def capture(
 
     With readable text the checkpoint also keeps the version's title and what the world's owner
     wrote for each selected being (its name and the words about it); without it, only each such
-    record's revision, so a change is still seen. Those are read from each being's card where
-    the version has a society.
+    record's revision, so a change is still seen. Those come from one read of the version's
+    character records, or, from an API without it, from each being's card where the version has
+    a society.
     """
     note = progress or (lambda _: None)
     version = segment(version_id)
@@ -552,7 +576,6 @@ def capture(
     skipped: dict[str, int] = {}
     # Every binding a decision of this capture is held under, by its digest.
     bindings_used: dict[str, dict[str, Any]] = {}
-    characters: list[dict[str, Any]] = []
     if include_models:
         society = reader.json("GET society models", f"/world/versions/{version}/society/models")
         contract = {
@@ -711,8 +734,8 @@ def capture(
                 decision["readable"] = _readable(request, receipt, event)
             decisions.append(decision)
             bindings_used[decision["binding_sha256"]] = binding
-        characters = _characters(reader, version, things, readable)
 
+    characters = _characters(reader, version, things, readable, cards=include_models)
     source = {
         "world_id": reader.world_id,
         "version_id": version_id,
