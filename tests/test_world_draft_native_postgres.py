@@ -188,9 +188,11 @@ def test_saved_before_outcome_crash_recovers_without_a_second_model_request(
     assert bench.query("select 1 from world_draft_outcome") == []
     asked = len(transport.requests)
     monkeypatch.setattr(WorldDraftRepository, "finish", original)
+    # Only a job still running holds a lease to expire: under load its own lease can lapse and the
+    # job recover before this line, and a finished job may not hold one.
     bench.query(
         "update job set lease_expires_at=now()-interval '1 second' "
-        "where kind='world_draft' returning job_id"
+        "where kind='world_draft' and state='running' returning job_id"
     )
     result = done(client, ident)
     assert result["state"] == "ready" and result["recovered"] is True, result
