@@ -190,3 +190,49 @@ describe('the fall finish', () => {
     close((material.getParameter('exuFallMotion') as { data: unknown }).data, [0, 1, FALLING_WATER_DEFAULTS.streakSpeedMps, FALLING_WATER_DEFAULTS.streakContrast]);
   });
 });
+
+describe('a site\'s waters dressed under a look that states how water meets solids', () => {
+  const CONTACT = { wetKeep: 0.6, lightDown: 0.5, shallowFacing: 1, foamReachM: { 'water.sea': 2.5, 'water.pool': 0.8, 'water.trough': 1 } };
+  const stating = (contact: boolean): TileLook => {
+    const look = lookOf(false) as RenderLook;
+    return contact ? { ...look, water: { ...look.water!, contact: CONTACT } } : look;
+  };
+  /** Each water's material by its entity: the land's, and the pond and a trough, two roles drawn in the pond's one surface. */
+  function worn(look: TileLook): Map<string, pc.StandardMaterial> {
+    const { app, camera, environmentRoot } = nullApp();
+    const document = structuredClone(FIXTURE);
+    (document['land'] as { water: unknown[] }).water.push(POOL, FALL, LOWER);
+    const slots = document['slots'] as Record<string, unknown>[];
+    const pond = slots.find((slot) => slot['lookRole'] === 'water.pond')!;
+    slots.push({ ...pond, identity: 'trough', label: 'trough', lookRole: 'water.trough', positionMm: [7000, 2500, 6500] });
+    const drawing = parseStructuredSiteDrawing(document);
+    const resolved = resolveStylePack([readStylePackManifest(manifest('a complete pack with no base'), { families, textureSets: new Set(CASES.context.texture_sets) })]);
+    const dress = packSiteDresser({ pack: resolved, families, pieces: { pieces: new Map() }, shading: PBR, materials: MATERIALS, finish: FINISH, look });
+    const attachment = siteMount(drawing, { servedBytes: 1, land: landOf(drawing), materials: MATERIALS, dress, look }).attach({ app, camera, environmentRoot });
+    const out = new Map<string, pc.StandardMaterial>();
+    for (const name of ['site-land:water:sea', 'site-land:water:falls pool 0', 'site-land:water:falls fall 0', 'pond:shape', 'trough:shape']) {
+      out.set(name, (app.root.findByName(name) as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial);
+    }
+    attachment.dispose();
+    return out;
+  }
+  const reach = (material: pc.StandardMaterial): number | undefined => (material.getParameter('exuWaterContact') as { data: Float32Array } | undefined)?.data[2];
+
+  it('foams each land water by the role its own kind asks for, a pool wearing the lake\'s water included', () => {
+    const waters = worn(stating(true));
+    expect(reach(waters.get('site-land:water:sea')!)).toBeCloseTo(2.5, 6);
+    expect(reach(waters.get('site-land:water:falls pool 0')!)).toBeCloseTo(0.8, 6);
+    expect(waters.get('site-land:water:falls fall 0')!.getParameter('exuWaterContact')).toBeUndefined();
+  });
+
+  it('keeps a material for each role two slot waters ask for where it states contact, and shares one as before where it does not', () => {
+    const met = worn(stating(true));
+    expect(met.get('pond:shape')!.name).toBe(met.get('trough:shape')!.name);
+    expect(met.get('pond:shape')).not.toBe(met.get('trough:shape'));
+    expect(reach(met.get('trough:shape')!)).toBeCloseTo(1, 6);
+    expect(reach(met.get('pond:shape')!)).toBe(0);
+    const today = worn(stating(false));
+    expect(today.get('pond:shape')).toBe(today.get('trough:shape'));
+    expect(today.get('pond:shape')!.getParameter('exuWaterContact')).toBeUndefined();
+  });
+});

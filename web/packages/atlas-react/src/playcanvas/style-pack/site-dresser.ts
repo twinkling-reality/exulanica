@@ -191,6 +191,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const water = new WaterRipples(host.app, host.camera);
     // A look's water finish, when it states one; otherwise water keeps its ripples alone.
     const waterFinish = dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.water ?? null : null;
+    // A water whose look states how it meets solids takes its foam by the look role it asks for, so two
+    // waters drawn in one surface but asking for different roles keep a material each.
+    const waterRoleKey = (slot: SiteSlot): string => slot.family === 'water' && waterFinish?.contact !== undefined ? `@${slot.lookRole}` : '';
     const fallingWater = (dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.fallingWater : undefined) ?? FALLING_WATER_DEFAULTS;
     // The surface finish, on the device it is written for; the materials it was set into, by kind.
     const finish = dressing.finish !== undefined && finishRuns(device) ? dressing.finish : null;
@@ -305,14 +308,15 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         if (envelopeOf(slot) === null) modules.push(pieceSlot(slot));
       } else if (resolved?.kind === 'material' && entity !== undefined) {
         const pattern = patternOf(slot);
-        let material = surfaceMaterials.get(resolved.role);
+        const key = resolved.role + waterRoleKey(slot);
+        let material = surfaceMaterials.get(key);
         if (material === undefined) {
           material = swatchMaterial(resolved.material.swatch, null, shading, `style-pack:material:${resolved.role}`);
-          const byDepth = slot.family === 'water' && shading.model === 'pbr' && water.add(material, waterFinish);
+          const byDepth = slot.family === 'water' && shading.model === 'pbr' && water.add(material, waterFinish, { role: slot.lookRole });
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
           finished(slot, material, byDepth);
           made.push(material);
-          surfaceMaterials.set(resolved.role, material);
+          surfaceMaterials.set(key, material);
         }
         const worn = material;
         wear(entity, slot.identity, () => worn);
@@ -333,14 +337,14 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         // The pack's own surface takes its material's pattern too, unless it colours its upward faces apart.
         const pattern = resolved.up === null ? patternOf(slot) : null;
         const key = pattern === null ? resolved.role : `${resolved.role}:${pattern.key}`;
-        let material = surfaceMaterials.get(key);
+        let material = surfaceMaterials.get(key + waterRoleKey(slot));
         if (material === undefined) {
           material = swatchMaterial(resolved.swatch, resolved.up, shading, `style-pack:surface:${key}`);
-          const byDepth = slot.family === 'water' && shading.model === 'pbr' && water.add(material, waterFinish);
+          const byDepth = slot.family === 'water' && shading.model === 'pbr' && water.add(material, waterFinish, { role: slot.lookRole });
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
           finished(slot, material, byDepth);
           made.push(material);
-          surfaceMaterials.set(key, material);
+          surfaceMaterials.set(key + waterRoleKey(slot), material);
         }
         const worn = material;
         wear(entity, slot.identity, () => worn);
@@ -561,7 +565,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       // No ripple normals on a lake or the sea, under the look's depth finish or the surface finish:
       // each is seen from afar, where ripples read as glints, and the finish's drift and sheen move
       // its colour. A pool lies within the site, near, and keeps the noise ripple a pond has.
-      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish, { ripples: body.kind === 'pool' });
+      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish, { ripples: body.kind === 'pool', role: `water.${body.kind}` });
       if (!byDepth && finish !== null && applySeaFinish(device, material, finish)) water.animate(material);
     }
 

@@ -7,7 +7,7 @@ import { hazeEndChunk } from '../src/playcanvas/generated-tile/aerial-haze.js';
 import { applyTileEnvironment } from '../src/playcanvas/generated-tile/environment.js';
 import { TileLookError, validateRenderLook } from '../src/playcanvas/generated-tile/look.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
-import { WATER_RIPPLE_DEFAULTS, WaterRipples } from '../src/playcanvas/style-pack/water-material.js';
+import { WATER_CONTACT_TAPS, WATER_RIPPLE_DEFAULTS, WaterRipples } from '../src/playcanvas/style-pack/water-material.js';
 
 /*
  * The optional finish of a render look: haze and a water finish. Each is carried
@@ -240,5 +240,93 @@ describe('the environment a look with haze builds', () => {
     expect(app.scene.fog.type).not.toBe(pc.FOG_NONE);
     expect(pc.ShaderChunks.get(app.graphicsDevice, pc.SHADERLANGUAGE_GLSL).get('endPS')).toBe(end);
     environment.dispose();
+  });
+});
+
+describe('a water meeting what stands in it and lies under it', () => {
+  const MET = caseNamed('a water finish meeting solids: wet, lit from above, shallow where faces turn up, foam on the sea');
+  const world = (): { app: pc.AppBase; camera: pc.Entity } => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 200;
+    const app = new pc.AppBase(canvas);
+    const options = new pc.AppOptions();
+    options.graphicsDevice = new pc.NullGraphicsDevice(canvas);
+    options.componentSystems = [pc.RenderComponentSystem, pc.CameraComponentSystem];
+    app.init(options);
+    const camera = new pc.Entity('camera');
+    camera.addComponent('camera');
+    app.root.addChild(camera);
+    return { app, camera };
+  };
+  const contactOf = (material: pc.StandardMaterial): number[] => Array.from((material.getParameter('exuWaterContact') as { data: Float32Array }).data);
+
+  it('carries its contact into the render look in shares and metres, and reads as a whole render look', () => {
+    const water = lookOf(MET).water!;
+    expect(water.contact).toEqual({ wetKeep: 0.6, lightDown: 0.5, shallowFacing: 1, foamReachM: { 'water.sea': 2.5, 'water.lake': 1.2 } });
+    expect(validateRenderLook(lookOf(MET)).water?.contact).toEqual(water.contact);
+    expect('contact' in lookOf(FINISHED).water!).toBe(false);
+  });
+
+  it('refuses foam on a key that is no look role, more roles than it holds, a reach too far and a share above one', () => {
+    const base = lookOf(MET);
+    const contact = base.water!.contact!;
+    const stating = (change: Partial<typeof contact>) => ({ ...base, water: { ...base.water!, contact: { ...contact, ...change } } });
+    expect(refused(stating({ foamReachM: { sea: 2 } }))).toBe('water.contact.foamReachM: has "sea", not a look role');
+    expect(refused(stating({ foamReachM: { 'water.sea': 6 } }))).toBe('water.contact.foamReachM.water.sea: must be within 0.1 to 5');
+    const many = Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`water.w${i}`, 1]));
+    expect(refused(stating({ foamReachM: many }))).toBe('water.contact.foamReachM: must hold at most 16 entries');
+    expect(refused(stating({ wetKeep: 1.2 }))).toBe('water.contact.wetKeep: must be within 0 to 1');
+  });
+
+  it('meets solids as today where its look states no contact, and where no eye places the depth map in the world', () => {
+    const { app, camera } = world();
+    const today = new pc.StandardMaterial();
+    new WaterRipples(app, camera).add(today, lookOf(FINISHED).water!, { role: 'water.sea' });
+    const blind = new pc.StandardMaterial();
+    new WaterRipples(app).add(blind, lookOf(MET).water!, { role: 'water.sea' });
+    const chunk = today.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('opacityPS') as string;
+    expect(chunk).not.toContain('exuWaterContact');
+    expect(blind.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('opacityPS')).toBe(chunk);
+    expect(blind.getParameter('exuWaterContact')).toBeUndefined();
+  });
+
+  it('with an eye: darkens what lies under, keeps the shallow colour for faces turned up, and foams for the roles it names', () => {
+    const { app, camera } = world();
+    const ripples = new WaterRipples(app, camera);
+    const water = (role: string | null): pc.StandardMaterial => {
+      const material = new pc.StandardMaterial();
+      ripples.add(material, lookOf(MET).water!, { role });
+      return material;
+    };
+    const sea = water('water.sea');
+    const chunk = sea.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('opacityPS') as string;
+    expect(chunk).toContain('float shown = through * dot(exp(-exuWaterAbsorb * depth * exuWaterContact.y)');
+    expect(chunk).toContain('exp(-depth / exuWaterFinish.x) * mix(1.0, facingUp, exuWaterContact.w)');
+    expect(chunk).toContain(`for (int i = 0; i < ${WATER_CONTACT_TAPS}; i++)`);
+    expect(chunk).toContain('gathered * shown * (1.0 - foam)');
+    expect(chunk).not.toContain('dAlpha = 1.0 - through * (1.0 - foam);');
+    const [wet, down, reach, facing] = contactOf(sea);
+    expect([wet, down, reach, facing].map((n) => Math.round(n! * 1000) / 1000)).toEqual([0.6, 0.5, 2.5, 1]);
+    expect(contactOf(water('water.pond'))[2]).toBe(0);
+    expect(contactOf(water(null))[2]).toBe(0);
+  });
+
+  it('places the depth map in the world from the eye\'s camera before each frame, and stops when let go', () => {
+    const { app, camera } = world();
+    camera.setPosition(3, 4, 5);
+    camera.setEulerAngles(-20, 30, 0);
+    const ripples = new WaterRipples(app, camera);
+    ripples.add(new pc.StandardMaterial(), lookOf(MET).water!, { role: 'water.sea' });
+    app.fire('prerender');
+    const scope = app.graphicsDevice.scope;
+    const expected = new pc.Mat4().mul2(camera.camera!.projectionMatrix, camera.camera!.viewMatrix).invert();
+    Array.from(scope.resolve('exuWaterInverse').getValue() as Float32Array).forEach((n, i) => expect(n).toBeCloseTo(expected.data[i]!, 5));
+    expect(scope.resolve('exuWaterYScale').getValue()).toBeCloseTo(camera.camera!.projectionMatrix.data[5]!, 6);
+    expect(scope.resolve('exuWaterForward').getValue()).toEqual([camera.forward.x, camera.forward.y, camera.forward.z]);
+    ripples.dispose();
+    scope.resolve('exuWaterYScale').setValue(-1);
+    app.fire('prerender');
+    expect(scope.resolve('exuWaterYScale').getValue()).toBe(-1);
   });
 });

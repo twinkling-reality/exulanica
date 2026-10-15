@@ -129,6 +129,21 @@ export interface StylePackWater {
   readonly ripples?: StylePackRipples;
   /** Absent: no caustics. */
   readonly caustics?: StylePackCaustics;
+  /** Absent: the water meets solids as it always has. */
+  readonly contact?: StylePackWaterContact;
+}
+
+/**
+ * Where water meets what stands in it and lies under it: the share of light a surface under the water
+ * keeps, how far light travels down to it per metre of depth, how much the shallow colour needs a
+ * surface turned up to the sky, and how far across the surface foam reaches from a solid, by the
+ * water's look role (a role named nowhere gets no foam ring).
+ */
+export interface StylePackWaterContact {
+  readonly wet_keep_permille: number;
+  readonly light_down_permille: number;
+  readonly shallow_facing_permille: number;
+  readonly foam_reach_mm: Readonly<Record<string, number>>;
 }
 
 /**
@@ -724,6 +739,14 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
         pace_millirad_per_s: integer(0, 10_000),
         reach_mm: integer(100, 10_000),
       })),
+      // Added within the profile: absent, the water meets solids as it always has.
+      contact: optional((c, q) => object(c, q, {
+        wet_keep_permille: integer(0, 1000),
+        light_down_permille: integer(0, 4000),
+        shallow_facing_permille: integer(0, 1000),
+        // Each a water role, checked with the whole pack.
+        foam_reach_mm: record(() => undefined, integer(100, 5000), 16),
+      })),
     })),
     // Added within the profile: a pack written before it finishes falling water as the page's defaults do.
     falling_water: optional((v, p) => object(v, p, {
@@ -944,6 +967,10 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
   }
   for (const role of Object.keys(manifest.facade ?? {})) {
     if (splitLookRole(role, `facade.${role}`).family !== 'wall') fail('reference', `facade.${role}`, "a facade is a wall's");
+  }
+  for (const role of Object.keys(manifest.water?.contact?.foam_reach_mm ?? {})) {
+    const where = `water.contact.foam_reach_mm.${role}`;
+    if (splitLookRole(role, where).family !== 'water') fail('reference', where, "a foam reach is a water's");
   }
   for (const [role, rule] of Object.entries(manifest.climb ?? {})) {
     if (splitLookRole(role, `climb.${role}`).family !== 'structure') fail('reference', `climb.${role}`, 'plants climb only a structure\'s walls');

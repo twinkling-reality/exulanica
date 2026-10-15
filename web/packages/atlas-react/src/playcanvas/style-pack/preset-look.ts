@@ -188,6 +188,14 @@ export function renderLookOfPreset(
             reachM: water.caustics.reach_mm / 1000,
           },
         }),
+        ...(water.contact === undefined ? {} : {
+          contact: {
+            wetKeep: water.contact.wet_keep_permille / 1000,
+            lightDown: water.contact.light_down_permille / 1000,
+            shallowFacing: water.contact.shallow_facing_permille / 1000,
+            foamReachM: Object.fromEntries(Object.entries(water.contact.foam_reach_mm).map(([role, mm]) => [role, mm / 1000])),
+          },
+        }),
       },
     }),
     ...(fallingWater === undefined ? {} : {

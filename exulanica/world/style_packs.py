@@ -460,6 +460,22 @@ def _water(value: Any, path: str) -> dict[str, Any]:
             },
         )
 
+    def contact(v: Any, p: str) -> dict[str, Any]:
+        # Where the water meets what stands in it and lies under it: how much light a surface under
+        # the water keeps, how far light travels down to it per metre of depth, how much the shallow
+        # colour needs a surface turned up to the sky, and how far across the surface foam reaches
+        # from a solid, by the water's look role (each a water role, checked with the whole pack).
+        return _object(
+            v,
+            p,
+            {
+                "wet_keep_permille": _integer(0, 1000),
+                "light_down_permille": _integer(0, 4000),
+                "shallow_facing_permille": _integer(0, 1000),
+                "foam_reach_mm": _record(lambda key, kp: None, _integer(100, 5000), 16),
+            },
+        )
+
     return _object(
         value,
         path,
@@ -473,6 +489,8 @@ def _water(value: Any, path: str) -> dict[str, Any]:
             # Added within the profile: absent, the ripple is today's and there are no caustics.
             "ripples": _Optional(ripples),
             "caustics": _Optional(caustics),
+            # Added within the profile: absent, the water meets solids as it always has.
+            "contact": _Optional(contact),
         },
     )
 
@@ -1212,6 +1230,10 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
     for role in manifest.get("facade", {}):
         if split_look_role(role, f"facade.{role}")[0] != "wall":
             _fail("reference", f"facade.{role}", "a facade is a wall's")
+    for role in manifest.get("water", {}).get("contact", {}).get("foam_reach_mm", {}):
+        where = f"water.contact.foam_reach_mm.{role}"
+        if split_look_role(role, where)[0] != "water":
+            _fail("reference", where, "a foam reach is a water's")
     for role, rule in manifest.get("climb", {}).items():
         if split_look_role(role, f"climb.{role}")[0] != "structure":
             _fail("reference", f"climb.{role}", "plants climb only a structure's walls")

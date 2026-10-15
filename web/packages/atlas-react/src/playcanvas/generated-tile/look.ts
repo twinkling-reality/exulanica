@@ -200,7 +200,9 @@ type Shape =
   /** A list of `min` to `max` items, each of the shape. */
   | { readonly kind: 'list'; readonly shape: Shape; readonly min: number; readonly max: number }
   /** A key as catalogs write them: a lowercase letter, then lowercase letters, digits and underscores. */
-  | { readonly kind: 'key' };
+  | { readonly kind: 'key' }
+  /** An object of at most `max` entries keyed by look roles (`family.leaf`), each of the shape. */
+  | { readonly kind: 'roles'; readonly shape: Shape; readonly max: number };
 
 const num = (min: number, max: number, integer = false): Shape => ({ kind: 'number', min, max, integer });
 const rgb: Shape = { kind: 'rgb' };
@@ -302,6 +304,16 @@ function check(value: unknown, shape: Shape, path: string): void {
     case 'key':
       if (typeof value !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(value)) fail('must be a key');
       return;
+    case 'roles': {
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) fail('must be an object');
+      const entries = Object.entries(value as Record<string, unknown>);
+      if (entries.length > shape.max) fail(`must hold at most ${shape.max} entries`);
+      for (const [key, item] of entries) {
+        if (!/^[a-z][a-z0-9_]{0,31}\.[a-z][a-z0-9_]{0,47}$/.test(key)) fail(`has ${JSON.stringify(key)}, not a look role`);
+        check(item, shape.shape, `${path}.${key}`);
+      }
+      return;
+    }
     case 'list':
       if (!Array.isArray(value) || value.length < shape.min || value.length > shape.max) fail(`must be a list of ${shape.min} to ${shape.max}`);
       (value as unknown[]).forEach((item, index) => check(item, shape.shape, `${path}[${index}]`));
@@ -446,6 +458,20 @@ export interface RenderWater {
   readonly ripples?: RenderRipples;
   /** Light gathered on what lies under shallow water; absent, none. */
   readonly caustics?: RenderCaustics;
+  /** Where the water meets what stands in it and lies under it; absent, as it always has. */
+  readonly contact?: RenderWaterContact;
+}
+
+/** Where water meets solids: what a surface under it keeps, the light's way down, the shallow colour's need of a face turned up, and foam by water look role. */
+export interface RenderWaterContact {
+  /** Share of light a surface under the water keeps, 0 to 1. */
+  readonly wetKeep: number;
+  /** Metres light travels down to a surface per metre of its depth. */
+  readonly lightDown: number;
+  /** How much the shallow colour needs a surface turned up to the sky, 0 to 1. */
+  readonly shallowFacing: number;
+  /** How far foam reaches across the surface from a solid that meets it, metres, by the water's look role. */
+  readonly foamReachM: Readonly<Record<string, number>>;
 }
 
 /** The wind a look's plants sway in. */
@@ -705,6 +731,7 @@ const RENDER_SHAPE: Shape = obj({
       fadeTo: num(0.02, 4),
     })),
     caustics: optional(obj({ strength: num(0, 2), cellM: num(0.1, 10), pace: num(0, 10), reachM: num(0.1, 10) })),
+    contact: optional(obj({ wetKeep: num(0, 1), lightDown: num(0, 4), shallowFacing: num(0, 1), foamReachM: { kind: 'roles', shape: num(0.1, 5), max: 16 } })),
   })),
   fallingWater: optional(obj({
     streakSpeedMps: num(0.2, 20), streakWidthM: num(0.02, 2), streakLengthM: num(0.1, 20), streakContrast: num(0, 1), aeration: num(0, 1), foamHeightM: num(0, 5), foam: rgb,

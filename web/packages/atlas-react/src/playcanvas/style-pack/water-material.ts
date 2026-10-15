@@ -125,6 +125,69 @@ void getOpacity() {
     exuWaterBody = (body * (1.0 - through) * (1.0 - foam) + vec3(0.85, 0.9, 0.9) * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
 }
 `;
+
+/** How many points of the depth map round a pixel the foam's search for a solid reads: a bound on the work. */
+export const WATER_CONTACT_TAPS = 16;
+/** The widest the foam's search reaches on screen, pixels: a bound on the work at a near water. */
+const WATER_CONTACT_MOST_PX = 64;
+/** How many pixels each way the facing of what lies under the water is read across: wide enough to blend a mesh's flat faces. */
+const WATER_CONTACT_FACING_PX = 4;
+
+/** The text with `from` replaced by `to`, refusing a text that does not hold `from` exactly once. */
+function replacedOnce(text: string, from: string, to: string): string {
+  const at = text.indexOf(from);
+  if (at < 0 || text.indexOf(from, at + 1) >= 0) throw new Error(`The water's depth finish does not hold one ${JSON.stringify(from.slice(0, 48))}.`);
+  return text.slice(0, at) + to + text.slice(at + from.length);
+}
+
+/**
+ * The depth finish where the look states how its water meets solids (`contact`). What lies under the
+ * water keeps only the look's share of light (it is wet) and is lit through the water above it, so it
+ * darkens with depth, the light lost and not replaced by the water's colour. The shallow colour is
+ * light a surface under the water returns from the sky above it: a face turned away (a stack's or a
+ * wall's side) returns less, as the look states. Foam reaches across the surface from a solid that
+ * meets it: a solid is found among points of the depth map round the pixel, within the reach for the
+ * water's look role, each placed in the world from the camera's inverse view-projection; a solid
+ * counts when it stands no lower than the foam width under the surface.
+ */
+const DEPTH_WATER_CONTACT_OPACITY = ([
+  ['uniform vec2 exuWaterCausticFade;', `uniform vec4 exuWaterContact; // x share a surface under the water keeps, y metres light travels down a metre of depth, z foam reach m, w the shallow colour's need of a face turned up
+uniform mat4 exuWaterInverse; // the inverse view-projection of the camera drawing the water
+uniform vec3 exuWaterForward; // that camera's forward
+uniform float exuWaterYScale; // that camera's projection y scale
+// Where the scene drawn at a screen point lies in the world, from the camera frame's depth map.
+vec3 exuWaterScenePoint(vec2 uv) {
+    vec4 near = exuWaterInverse * vec4(uv * 2.0 - 1.0, -1.0, 1.0);
+    vec4 far = exuWaterInverse * vec4(uv * 2.0 - 1.0, 1.0, 1.0);
+    vec3 ray = normalize(far.xyz / far.w - near.xyz / near.w);
+    return view_position + ray * (getLinearScreenDepth(uv) / max(dot(ray, exuWaterForward), 1e-3));
+}
+uniform vec2 exuWaterCausticFade;`],
+  ['    vec3 body = mix(exuWaterShallow, exuWaterDeep, 1.0 - exp(-depth / exuWaterFinish.x));', `    // How far what lies under turns up, read across a few pixels each way so a mesh's flat faces blend.
+    vec2 span = uScreenSize.zw * ${WATER_CONTACT_FACING_PX.toFixed(1)};
+    vec3 across = exuWaterScenePoint(screen + vec2(span.x, 0.0)) - exuWaterScenePoint(screen - vec2(span.x, 0.0));
+    vec3 along = exuWaterScenePoint(screen + vec2(0.0, span.y)) - exuWaterScenePoint(screen - vec2(0.0, span.y));
+    float facingUp = abs(normalize(cross(across, along)).y);
+    vec3 body = mix(exuWaterDeep, exuWaterShallow, exp(-depth / exuWaterFinish.x) * mix(1.0, facingUp, exuWaterContact.w));`],
+  ['    dAlpha = 1.0 - through * (1.0 - foam);', `    if (exuWaterContact.z > 0.0) {
+        float metresPerPixel = 2.0 * (1.0 / gl_FragCoord.w) / (exuWaterYScale * uScreenSize.y);
+        float reachPx = clamp(exuWaterContact.z / max(metresPerPixel, 1e-4), 1.0, ${WATER_CONTACT_MOST_PX.toFixed(1)});
+        float nearest = 1e6;
+        for (int i = 0; i < ${WATER_CONTACT_TAPS}; i++) {
+            float k = float(i);
+            float r = reachPx * sqrt((k + 0.5) / ${WATER_CONTACT_TAPS.toFixed(1)});
+            vec3 p = exuWaterScenePoint(screen + vec2(cos(k * 2.39996), sin(k * 2.39996)) * r * uScreenSize.zw);
+            if (p.y > vPositionW.y - exuWaterFinish.y) nearest = min(nearest, length(p.xz - vPositionW.xz));
+        }
+        float ring = 1.0 - smoothstep(0.0, exuWaterContact.z, nearest);
+        foam = max(foam, clamp(ring * smoothstep(0.35, 0.75, noise + 0.25 * ring), 0.0, 1.0) * 0.85);
+    }
+    // Wet once it is under the water at all (5 cm), and lit through the water above it.
+    float shown = through * dot(exp(-exuWaterAbsorb * depth * exuWaterContact.y), vec3(1.0 / 3.0))
+        * mix(1.0, exuWaterContact.x, smoothstep(0.0, 0.05, depth));
+    dAlpha = 1.0 - shown * (1.0 - foam);`],
+  ['gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);', 'gathered * shown * (1.0 - foam)) / max(dAlpha, 1e-3);'],
+] as const).reduce((text, [from, to]) => replacedOnce(text, from, to), DEPTH_WATER_OPACITY);
 const DEPTH_WATER_EMISSIVE = 'void getEmission() { dEmission = exuWaterBody; }';
 const DEPTH_WATER_DIFFUSE = 'void getAlbedo() { dAlbedo = vec3(0.0); }';
 
@@ -139,8 +202,21 @@ const DEPTH_WATER_DIFFUSE = 'void getAlbedo() { dAlbedo = vec3(0.0); }';
 export class WaterRipples {
   readonly #materials = new Set<pc.StandardMaterial>();
   readonly #finished = new Set<pc.StandardMaterial>();
+  readonly #inverse = new pc.Mat4();
+  #contacts = 0;
   #time = 0;
   #disposed = false;
+  // Where the eye's camera draws from, for the waters that find solids in its depth map: before each frame.
+  readonly #frame = (): void => {
+    const camera = this.eye?.camera;
+    if (camera === undefined) return;
+    this.#inverse.mul2(camera.projectionMatrix, camera.viewMatrix).invert();
+    const scope = this.app.graphicsDevice.scope;
+    scope.resolve('exuWaterInverse').setValue(this.#inverse.data);
+    const forward = this.eye!.forward;
+    scope.resolve('exuWaterForward').setValue([forward.x, forward.y, forward.z]);
+    scope.resolve('exuWaterYScale').setValue(camera.projectionMatrix.data[5]);
+  };
   readonly #tick = (dt: number): void => {
     this.#time = (this.#time + Math.min(dt, 0.1)) % 3600;
     for (const material of this.#materials) material.setParameter('exuWaterTime', this.#time);
@@ -177,7 +253,7 @@ export class WaterRipples {
    * false gives the depth finish alone, with no ripple in the water's light: a sea or a lake seen
    * from afar.
    */
-  add(material: pc.StandardMaterial, finish: RenderWater | null = null, { ripples = true }: { readonly ripples?: boolean } = {}): boolean {
+  add(material: pc.StandardMaterial, finish: RenderWater | null = null, { ripples = true, role = null }: { readonly ripples?: boolean; readonly role?: string | null } = {}): boolean {
     const finished = finish !== null && !this.app.graphicsDevice.isWebGPU;
     if (this.#materials.has(material) && !this.#finished.has(material)) return finished;
     this.#start(material);
@@ -206,7 +282,15 @@ ${octaveLines(ripple, 'uniform.exuWaterTime', (name) => `let ${name}`, 'vec2f')}
     }
     if (finished && finish !== null) {
       const glsl = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
-      glsl.set('opacityPS', DEPTH_WATER_OPACITY);
+      // How it meets solids needs the eye's camera, whose matrices place the depth map in the world.
+      const contact = finish.contact !== undefined && this.eye?.camera !== undefined ? finish.contact : null;
+      glsl.set('opacityPS', contact === null ? DEPTH_WATER_OPACITY : DEPTH_WATER_CONTACT_OPACITY);
+      if (contact !== null) {
+        const reach = role === null ? 0 : contact.foamReachM[role] ?? 0;
+        material.setParameter('exuWaterContact', new Float32Array([contact.wetKeep, contact.lightDown, reach, contact.shallowFacing]));
+        if (this.#contacts === 0) this.app.on('prerender', this.#frame);
+        this.#contacts += 1;
+      }
       glsl.set('emissivePS', DEPTH_WATER_EMISSIVE);
       glsl.set('diffusePS', DEPTH_WATER_DIFFUSE);
       material.blendType = pc.BLEND_NORMAL;
@@ -230,6 +314,7 @@ ${octaveLines(ripple, 'uniform.exuWaterTime', (name) => `let ${name}`, 'vec2f')}
     if (this.#disposed) return;
     this.#disposed = true;
     this.app.off('update', this.#tick);
+    this.app.off('prerender', this.#frame);
     this.#materials.clear();
     this.#finished.clear();
   }
