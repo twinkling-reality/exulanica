@@ -269,8 +269,14 @@ def test_every_world_table_names_a_registered_world(repository):
     ]
     # Immutable erasure records survive the registration they permanently remove. A draft
     # reserves its deterministic generated identity before a world exists, and its anchor
-    # survives removal; only a ready outcome must bind to a registered saved world.
-    assert unkeyed == ["society_erasure", "world_draft_start", "world_erasure"]
+    # survives removal; only a ready outcome must bind to a registered saved world. The version
+    # tiles inventory is never deleted, so a tombstone finds the bytes of a world erased before it.
+    assert unkeyed == [
+        "society_erasure",
+        "world_draft_start",
+        "world_erasure",
+        "world_version_tile_object",
+    ]
     generated = {
         # The catalog's layout of the expression is PostgreSQL's; its words are the migration's.
         row["table_name"]: (row["column_name"], " ".join(row["expression"].split()))
