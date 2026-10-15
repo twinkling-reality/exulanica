@@ -337,11 +337,11 @@ World API origin its caller names, and for nothing else:
   10 MiB of a JPEG, PNG or WebP answer; 10 seconds in all; no proxy and no cookies. It runs only
   where `EXULANICA_REFERENCE_WEB_PICTURES` is on, for the workspaces the installation lists, never
   on a `public` installation ([reference notes](reference-notes-contract.md#13-pictures-a-person-keeps)).
-- `exulanica/store/object.py`, the S3-compatible content store, reaches the one endpoint its
-  settings name ([deployment](deployment.md#4-the-content-store)) with a client of its own. It
-  follows no redirect and reads no proxy setting, and it refuses plain `http` except to a loopback
-  host or an acknowledged private network; it is not held to this allowlist, which lives in the
-  model client that the store's layer may not import.
+- `exulanica/store/object_requests.py`, the S3-compatible content store's request set, reaches the
+  one endpoint its settings name ([deployment](deployment.md#4-the-content-store)) with a client of
+  its own. It follows no redirect and reads no proxy setting, and it refuses plain `http` except to
+  a loopback host or an acknowledged private network; it is not held to this allowlist, which lives
+  in the model client that the store's layer may not import.
 - The test that keeps this list true matches `urlopen`, `httpx` and `httpx2` clients,
   `OAuth2Client`, `requests`, `aiohttp`, `urllib3` and `socket.create_connection`. A client library
   outside that pattern would be missed.

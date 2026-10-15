@@ -103,7 +103,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the authored objects surface: place, move, run, remove, undo",
     ),
     "exulanica/world/society_repository.py": (1_789, "deterministic societies and their inputs"),
-    "exulanica/store/object.py": (1_764, "S3-compatible content-addressed storage"),
     "exulanica/world/static_glb.py": (
         1_624,
         "a workspace's static glTF binary, admitted and prepared",

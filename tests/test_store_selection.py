@@ -295,8 +295,10 @@ def test_overlapping_local_locations_are_recognised(tmp_path):
 
 
 def test_the_module_reads_no_ambient_cloud_configuration():
-    source = (ROOT / "exulanica" / "store" / "object.py").read_text(encoding="utf-8")
-    source += (ROOT / "exulanica" / "store" / "configured.py").read_text(encoding="utf-8")
+    source = "".join(
+        (ROOT / "exulanica" / "store" / name).read_text(encoding="utf-8")
+        for name in ("object.py", "object_requests.py", "object_bucket.py", "configured.py")
+    )
     assert "AWS_" not in source and ".aws" not in source
     assert "trust_env=False" in source
     assert configured_module.STORE_KIND_ENV == "EXULANICA_STORE_KIND"

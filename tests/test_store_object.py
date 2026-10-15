@@ -34,7 +34,12 @@ from exulanica.errors import (
     PurgeNotAuthorisedError,
 )
 from exulanica.evidence import BlobId
-from exulanica.store import ContentAddressedStore, PurgeAuthorization, privileged_purger
+from exulanica.store import (
+    ContentAddressedStore,
+    PurgeAuthorization,
+    object_requests,
+    privileged_purger,
+)
 from exulanica.store import base as base_module
 from exulanica.store import object as object_module
 from exulanica.store.base import VERIFY_CHUNK_BYTES
@@ -970,9 +975,9 @@ def test_trust_is_the_named_file_or_certifi_and_never_the_environment(monkeypatc
     import certifi
 
     monkeypatch.setenv("SSL_CERT_FILE", str(tmp_path / "absent.pem"))
-    context = object_module._trust(None)
+    context = object_requests._trust(None)
     assert len(context.get_ca_certs()) > 50, "certifi's bundle, whatever SSL_CERT_FILE says"
-    named = object_module._trust(certifi.where())
+    named = object_requests._trust(certifi.where())
     assert named.get_ca_certs()
 
 
