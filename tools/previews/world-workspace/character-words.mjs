@@ -137,14 +137,31 @@ export const routineRun = who => `${who.start} follows a routine. Choose a model
 /** The same where this person cannot choose a model here (no [M] Model): no instruction it cannot follow. */
 export const followsRoutine = who => `${who.start} follows a routine.`;
 
+/** The host's money for models is spent (its codes, as the models read and a run's refusal name them). */
+export const BUDGET_SPENT = Object.freeze(['process_budget_spent', 'process_share_spent']);
+
+/** The Run section where the host's budget for models is spent (J22). */
+export const budgetSpent = who => `The budget for AI models here is spent, so ${who.within} follows a routine.`;
+
+/** The Run section where the character's chosen model is refused here and others are not (J22). */
+export const modelCannot = (who, assignable) =>
+  `This model cannot decide for ${who.within} here, so ${who.within} follows a routine.${assignable ? ' Choose another model to run.' : ''}`;
+
 /**
- * Which line the Run section of a character with no model says (DESIGN's J2 and J22): with no model
- * connected here at all, that; where a model can be chosen, how to run; else only that it follows a
- * routine.
+ * Why a character's model does not run here, as the page's Run section says it (DESIGN's J2 and
+ * J22), or null where it can run. From the models read: the host's own refusal, each offered model's
+ * refusal, and the chosen model's (`chosen` false with none chosen). The host's budget spent wins;
+ * then nothing that can be asked at all; then a chosen model refused while others can be asked; then
+ * no model chosen, with how to run only where [M] is drawn (`assignable`).
  */
-export function routineLine(who, { anyConnected, assignable }) {
-  if (!anyConnected) return notConnected(who);
-  return assignable ? routineRun(who) : followsRoutine(who);
+export function runSectionLine(who, { hostRefusal = null, offered = [], chosen = false, chosenRefusal = null, assignable = false }) {
+  const refusals = offered.map(model => model.refusal ?? null);
+  if (BUDGET_SPENT.includes(hostRefusal) || BUDGET_SPENT.includes(chosenRefusal)
+    || (refusals.length > 0 && refusals.every(code => BUDGET_SPENT.includes(code)))) return budgetSpent(who);
+  if (hostRefusal || !refusals.some(code => code === null)) return notConnected(who);
+  if (chosen && chosenRefusal) return modelCannot(who, assignable);
+  if (!chosen) return assignable ? routineRun(who) : followsRoutine(who);
+  return null;
 }
 
 /** The page's Run section where no AI model can be asked here (spec 7, empty). */

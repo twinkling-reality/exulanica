@@ -26,7 +26,11 @@ export const RUN_REFUSALS = Object.freeze({
 });
 
 /** Why a run is not offered before anything is sent, by the host's refusal code (spec 8.8). */
-export const NOT_CONNECTED = Object.freeze({ provider_credential_absent: 'No AI model is connected here.' });
+export const NOT_CONNECTED = Object.freeze({
+  provider_credential_absent: 'No AI model is connected here.',
+  process_budget_spent: 'The budget for AI models here is spent.',
+  process_share_spent: 'The budget for AI models here is spent.',
+});
 
 /** The refusal whose card also offers [P] Pause. */
 export const PAUSE_FIRST = 'society_not_paused';

@@ -3,7 +3,7 @@
 // It draws from what it is given and says what it was asked through `act`; contextual-world.ts
 // reads, writes and runs. The words are character-words.mjs's and run-words.mjs's.
 import { chip, keyRow, keyWord, label, orb, page, type Page } from './world-ui.ts';
-import { CHARACTER_WORDS, modelLine, notConnected, routineLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
+import { CHARACTER_WORDS, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach } from './personality-words.mjs';
 
 type Who = ReturnType<typeof called>;
@@ -31,8 +31,8 @@ export interface CharacterPageState {
   readonly model: { readonly name: string; readonly price: unknown; readonly local?: boolean } | null | undefined;
   /** Whether a run can be asked of a model here: false where no model is connected. */
   readonly connected: boolean;
-  /** Whether any model is connected here at all (the models read offers one it can ask). */
-  readonly anyConnected: boolean;
+  /** Why the character's model does not run here, in the Run section's words (J2, J22), or null where it can. */
+  readonly runLine: string | null;
   readonly run: {
     readonly open: boolean;
     /** "10 minutes · at most $0.05", or the running line. */
@@ -154,7 +154,7 @@ export function openCharacterPage(host: HTMLElement, act: (action: string, value
         });
         words.append(big, element('p', 'wu-small-text', state.run.small));
       }
-      else words.append(element('p', 'wu-small-text', state.model === null ? routineLine(state.who, state) : state.model ? notConnected(state.who) : ''));
+      else words.append(element('p', 'wu-small-text', state.runLine ?? ''));
       row.append(button, words);
       run.append(row);
       if (state.run.refusal) {

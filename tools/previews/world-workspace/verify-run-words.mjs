@@ -19,6 +19,11 @@ assert.ok(raised.has(PAUSE_FIRST));
 assert.equal(runRefusalWords('society_not_paused'), 'The world is playing. Pause it first, then run.');
 assert.equal(runRefusalWords('provider_credential_absent'), 'No AI model is connected here.');
 assert.match(python('exulanica/world/decision_roles.py'), /"provider_credential_absent"/);
+// The host's money for models spent (J22); a run's own cap stays its spending limit.
+for (const code of ['process_budget_spent', 'process_share_spent']) {
+  assert.equal(runRefusalWords(code), 'The budget for AI models here is spent.');
+  assert.match(python('exulanica/world/decision_roles.py'), new RegExp(`"${code}"`));
+}
 for (const code of ['toString', 'http_500', null]) assert.equal(runRefusalWords(code), 'The run did not start. Nothing was spent.');
 
 // One noun: a run, never a session; never a code, an id or an em dash.

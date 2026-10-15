@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { routineLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
+import { runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -63,8 +63,22 @@ for (const words of said) {
   assert.doesNotMatch(words, /_|\u2014|entity|session|provider/i, words);
   assert.doesNotMatch(words, /\b(he|she)\b/i, words);
 }
-// A character with no model (J2, J22): the line asks for nothing the page cannot do.
-assert.equal(routineLine(called({ name: 'Teo' }), { anyConnected: true, assignable: true }), 'Teo follows a routine. Choose a model to run.');
-assert.equal(routineLine(called({ kind: 'resident' }), { anyConnected: false, assignable: true }), 'No AI model is connected here, so the resident follows a routine.');
-assert.equal(routineLine(called({ kind: 'resident' }), { anyConnected: true, assignable: false }), 'The resident follows a routine.');
+// Why a character's model does not run (J2, J22): the cause the models read states, asking for
+// nothing the page cannot do.
+const open = [{ refusal: null }, { refusal: 'model_no_longer_offered' }];
+assert.equal(runSectionLine(teo, { offered: open, assignable: true }), 'Teo follows a routine. Choose a model to run.');
+assert.equal(runSectionLine(resident, { offered: open }), 'The resident follows a routine.');
+assert.equal(runSectionLine(teo, { offered: open, chosen: true }), null, 'a chosen model that may be asked runs');
+for (const unasked of [{ hostRefusal: 'provider_credential_absent', offered: open }, { hostRefusal: 'models_not_run_here', offered: open },
+  { offered: [{ refusal: 'provider_not_admitted' }], chosen: true, chosenRefusal: 'provider_not_admitted' }, { offered: [] }]) {
+  assert.equal(runSectionLine(resident, { ...unasked, assignable: true }), 'No AI model is connected here, so the resident follows a routine.');
+}
+for (const spent of [{ hostRefusal: 'process_budget_spent', offered: open }, { offered: open, chosen: true, chosenRefusal: 'process_share_spent' },
+  { offered: [{ refusal: 'process_budget_spent' }, { refusal: 'process_share_spent' }] }]) {
+  assert.equal(runSectionLine(teo, { ...spent, assignable: true }), 'The budget for AI models here is spent, so Teo follows a routine.');
+}
+assert.equal(runSectionLine(teo, { offered: open, chosen: true, chosenRefusal: 'provider_changed', assignable: true }),
+  'This model cannot decide for Teo here, so Teo follows a routine. Choose another model to run.');
+assert.equal(runSectionLine(resident, { offered: open, chosen: true, chosenRefusal: 'model_no_longer_offered' }),
+  'This model cannot decide for the resident here, so the resident follows a routine.');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

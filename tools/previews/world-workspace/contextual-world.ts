@@ -11,7 +11,7 @@ import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
-import { CHARACTER_WORDS, called, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub } from './character-words.mjs';
+import { CHARACTER_WORDS, called, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { mountRunWatch } from './run-watch.ts';
@@ -468,7 +468,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     return {
       who: view.who, sub: pageSub(view.who.named ? view.facts?.kind ?? null : null, entry.title), assignable,
       model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null, local: served?.local === true } : null) : undefined,
-      connected, anyConnected: Boolean(subjectReads.models?.models.some(item => !item.refusal) && !subjectReads.models?.hostRefusal),
+      connected,
+      runLine: subjectReads.models ? runSectionLine(view.who, { hostRefusal: subjectReads.models.hostRefusal, offered: subjectReads.models.models,
+        chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId) })) : null,
