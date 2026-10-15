@@ -1257,6 +1257,27 @@ def reference_request(owner) -> uuid.UUID:
     return made.reference_id
 
 
+def web_picture(owner) -> uuid.UUID:
+    """A picture the owner kept from a picture search: its inventory and record, as a keep writes
+    them (domain: the API keeps one only from a search's held pictures, which no sweep runs)."""
+    connection = owner.repository.connection
+    digest = "ab" * 32
+    connection.execute(
+        "insert into web_picture_object (workspace_id, content_sha256, byte_size) "
+        "values (%s, %s, 1) on conflict (workspace_id, content_sha256) "
+        "where purged_at is null do nothing",
+        (owner.workspace_id, digest),
+    )
+    row = connection.execute(
+        "insert into web_picture (workspace_id, content_sha256, fetched_sha256, media_type, "
+        "byte_size, width, height, address, website, answer, answered_by) "
+        "values (%s, %s, %s, 'image/png', 1, 1, 1, 'https://pictures.example/a.png', "
+        "'pictures.example', 'private_world_only', %s) returning picture_id",
+        (owner.workspace_id, digest, "cd" * 32, owner.actor),
+    ).fetchone()
+    return row["picture_id"]
+
+
 def piece_request(owner) -> uuid.UUID:
     """A requested piece of the owner's world's look, a well in the default pack (domain: the
     API asks only within the workspace's GPU allowance)."""

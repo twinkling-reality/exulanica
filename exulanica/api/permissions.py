@@ -563,6 +563,13 @@ _REFERENCE_REQUESTS: Final = _every(
     "POST /worlds/references/{reference_id}/cancel",
 )
 
+#: Keeping a picture a picture search found: a change to the workspace, and the fetch of a picture
+#: from the website the search named, so the references permission as well; no model is asked.
+_WEB_PICTURE_KEEPS: Final = _every(
+    _requires(_P.WORLD_WRITE, _P.REFERENCES_REQUEST),
+    "POST /worlds/references/{reference_id}/pictures/{n}/keep",
+)
+
 #: The only way new photographs arrive.
 _INTAKE: Final = _every(
     _requires(_P.INTAKE_WRITE),
@@ -789,6 +796,9 @@ _WORLD_READS: Final = _every(
     "GET /worlds/references/{reference_id}",
     "GET /worlds/references/{reference_id}/pictures",
     "GET /worlds/specification",
+    "GET /worlds/web-pictures",
+    "GET /worlds/web-pictures/{picture_id}",
+    "GET /worlds/web-pictures/{picture_id}/bytes",
     "GET /worlds/{world_id}/removal",
 )
 
@@ -942,6 +952,7 @@ _WORLD_ERASURES: Final = _every(
     "DELETE /world/versions/{version_id}/society",
     "POST /world/versions/{version_id}/society/take-in",
     "DELETE /worlds/kinds/versions/{document_sha256}",
+    "DELETE /worlds/web-pictures/{picture_id}",
     "DELETE /worlds/{world_id}",
 )
 
@@ -1034,6 +1045,7 @@ ROUTE_RULE_SECTIONS: Final[
     _WORLD_READS_WITH_A_MODEL,
     _WORLD_WRITES_WITH_A_MODEL,
     _REFERENCE_REQUESTS,
+    _WEB_PICTURE_KEEPS,
     _INTAKE,
     _DELETIONS,
     _CONSENT_READS,

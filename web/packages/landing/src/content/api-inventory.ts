@@ -25118,6 +25118,89 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/worlds/references/{reference_id}/pictures/{n}/keep",
+    "method": "post",
+    "id": "keep_reference_picture_worlds_references__reference_id__pictures__n__keep_post",
+    "title": "Keep Reference Picture",
+    "description": "Keep the picture a search found at position ``n``, with the person's answer: fetched once,\nwritten again with no metadata, and kept apart from their own photographs. Only the request's\nrequester keeps one, while this process holds the search's pictures.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "references.request",
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "reference_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Reference Id"
+        }
+      },
+      {
+        "name": "n",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "maximum": 7,
+          "minimum": 0,
+          "title": "N"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/KeepBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "201": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/worlds/references/{reference_id}/cancel",
     "method": "post",
     "id": "cancel_reference_worlds_references__reference_id__cancel_post",
@@ -25167,6 +25250,249 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
           "application/json": {
             "schema": {}
           }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/worlds/web-pictures",
+    "method": "get",
+    "id": "list_web_pictures_worlds_web_pictures_get",
+    "title": "The pictures this workspace keeps from picture searches.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response List Web Pictures Worlds Web Pictures Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/worlds/web-pictures/{picture_id}",
+    "method": "get",
+    "id": "read_web_picture_worlds_web_pictures__picture_id__get",
+    "title": "One picture this workspace keeps.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "picture_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Picture Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Read Web Picture Worlds Web Pictures  Picture Id  Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/worlds/web-pictures/{picture_id}",
+    "method": "delete",
+    "id": "erase_web_picture_worlds_web_pictures__picture_id__delete",
+    "title": "Erase one picture this workspace keeps.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "deletion.write",
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "picture_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Picture Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "204": {
+        "description": "Successful Response"
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/worlds/web-pictures/{picture_id}/bytes",
+    "method": "get",
+    "id": "read_web_picture_bytes_worlds_web_pictures__picture_id__bytes_get",
+    "title": "The kept bytes of one picture this workspace keeps.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "picture_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Picture Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Read Web Picture Bytes Worlds Web Pictures  Picture Id  Bytes Get"
+            }
+          },
+          "image/jpeg": {},
+          "image/png": {},
+          "image/webp": {}
         }
       },
       "422": {

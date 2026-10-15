@@ -723,6 +723,9 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /worlds/references": {
         "json": {"purpose": "kind", "description": "a harbour town", "web": True}
     },
+    "POST /worlds/references/{reference_id}/pictures/{n}/keep": {
+        "json": {"answer": "private_world_only"}
+    },
     # A realistic body with a reference id nobody made. The sweeps run without a model, so they stop
     # at 503 before the notes are read; tests/test_world_draft_notes_api.py holds the id's answer.
     "POST /worlds/specification/drafts": {
@@ -805,6 +808,8 @@ _NON_IDENTIFIER_PARAMETERS: Final[Mapping[str, str]] = {
     "chunk_x": "0",
     "chunk_y": "0",
     "kind": "source",
+    # The place of a picture among those a picture search found: a small whole number.
+    "n": "0",
     "role_key": decision_roles().deciding_for("person").key,
     "subject_kind": "avatar",
 }
@@ -1034,6 +1039,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/worlds/kinds/drafts/{draft_id}": Owned(build.kind_draft),
     "/worlds/kinds/versions/{document_sha256}": Owned(build.held_world_kind, build.invented_digest),
     "/worlds/references/{reference_id}": Owned(build.reference_request),
+    "/worlds/web-pictures/{picture_id}": Owned(build.web_picture),
     "/worlds/{world_id}": Owned(build.removable_world, owner_succeeds=True),
 }
 

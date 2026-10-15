@@ -14,7 +14,7 @@ contract; the hosted-request boundary itself belongs to the
 | A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
 | A picture search for a creature: the person's words as its one search, the pictures it finds passed to its requester from memory and never stored | Implemented, off by default (`EXULANICA_REFERENCE_WEB_PICTURES`), offered to listed workspaces only and never on a `public` installation; no live picture search has run through the product |
-| Keeping a picture a person picks from a picture search | Storage, reading and erasure implemented (migration 0215, section 13); fetching a picked picture and its routes are not built |
+| Keeping a picture a person picks from a picture search: fetched once, kept apart from their photographs, read and erased | Implemented (migration 0215, section 13), off with picture searches; no live fetch has run through the product |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
 
 ## 1. What a person gets
@@ -31,7 +31,7 @@ with a right for the picture reader that the same person granted, and get notes 
 things they show (section 10).
 
 Nothing a search returned is kept, served or exported: no page text, title, web address or picture.
-Online pictures are never fetched. A request serves its notes, its steps and our own record of each
+No search fetches a picture; a person may keep one they pick (section 13). A request serves its notes, its steps and our own record of each
 search (the source, its outcome, how many results, the credits it reported and when), never a
 result and never the query text.
 
@@ -40,7 +40,8 @@ Where picture searches are offered, a person making a creature may ask for pictu
 without a planner. The pictures it finds, at most eight, each its address, its website and the
 source's words about it, are passed to that person alone, from the memory of the process that ran
 the job, for at most thirty minutes: their page shows each picture from its own website. Nothing of
-a picture is written to the database, the store or a log, and a picture is still never fetched.
+a picture is written to the database, the store or a log, and nothing is fetched until the person
+picks one and keeps it (section 13).
 
 ## 2. Sources are catalog data
 
@@ -214,6 +215,10 @@ the workspace's grant like every model call. Without durable spending, web notes
 | `GET /worlds/references/{reference_id}` | `world.read` | One of the caller's own requests: steps, notes, missed steps, our search records |
 | `GET /worlds/references/{reference_id}/pictures` | `world.read` | The pictures one of the caller's own picture searches found, while this process holds them: `{reference_id, pictures: [{n, address, website, description}], seconds_left}`, with `Cache-Control: no-store` |
 | `POST /worlds/references/{reference_id}/cancel` | `world.write`, `model.invoke` and `references.request` | Stop one of the caller's own requests |
+| `POST /worlds/references/{reference_id}/pictures/{n}/keep` | `world.write` and `references.request` | `{answer, licence?}`; keep the picture one of the caller's own picture searches found at place `n` (section 13); 201 with the kept picture |
+| `GET /worlds/web-pictures`, `GET /worlds/web-pictures/{picture_id}` | `world.read` | The pictures the workspace keeps, newest first, or one of them |
+| `GET /worlds/web-pictures/{picture_id}/bytes` | `world.read` | One kept picture's bytes, verified against their digest, `Cache-Control: private, no-store` |
+| `DELETE /worlds/web-pictures/{picture_id}` | `world.write` and `deletion.write` | Erase one kept picture; 204 |
 
 `references.request` is a permission of its own: an account owner holds it, a token holds it when
 its grant names it, and a guest never does, because the source's acceptable use policy binds the
@@ -489,6 +494,8 @@ sees it (`exulanica/world/kept_web_pictures.py`, migration 0215).
 | The record | `web_picture`: the digests of what was fetched and what was kept, media type, size and pixel size, the picture's address and website, its licence where its source states one, the person's answer (`made_or_permitted`, `licence_allows` with the licence it names, or `private_world_only`), who answered, the picture search it came from, and when. Never the source's words about the picture |
 | Erasure | Asked by the person who kept the picture, or an owner: a `web_picture` tombstone and a `web_picture_erasure` row naming the picture, its bytes' digest and that tombstone, in one transaction. The row's trigger deletes the record and enqueues the bytes for `exulanica-purge`, unless another kept picture of the workspace holds the same bytes. A workspace's tombstone deletes every record and enqueues every object. A restore carries the erasure row before it replays the tombstone, which then enqueues the bytes |
 | Who reads it | Only routes that name the table, for the workspace that keeps it |
+| Keeping one | `POST /worlds/references/{reference_id}/pictures/{n}/keep`, by the search's requester while this process holds its pictures: the answer is checked, the picture fetched once from its address under the fetch rules the [security floor](security-floor.md) names (`exulanica/references/picture_fetch.py`), cleaned and kept, recording the address and website the person picked. A fetch refused for the picture is 422 with its code (`picture_address_refused`, `picture_host_not_public`, `picture_too_many_redirects`, `picture_not_an_image`, `picture_too_large`); one the website failed is 502 (`picture_unreachable`, `picture_timed_out`); a picture the keeper refuses is 422 (`picture_not_an_image`, `picture_format_not_kept`, `picture_too_many_pixels`, `licence_missing`); a workspace being erased is 409. Where picture searches are not offered it is 409 `web_pictures_not_offered`; pictures no longer held are 404 `pictures_not_held`, and a place the search did not fill 404 `picture_unknown` |
+| Erasing one | `DELETE /worlds/web-pictures/{picture_id}`: the keeper, or an owner of the workspace; anyone else is 403 `picture_not_yours`, and a picture the workspace does not keep 404 `unknown_web_picture` |
 
 **No hosted provider model ever receives a web picture**: not a vision, language or notes model,
 nor any other model reached through a provider. The one model that may read a kept picture is its

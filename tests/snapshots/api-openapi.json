@@ -23599,6 +23599,85 @@
     }
    }
   },
+  "/worlds/references/{reference_id}/pictures/{n}/keep": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Keep Reference Picture",
+    "description": "Keep the picture a search found at position ``n``, with the person's answer: fetched once,\nwritten again with no metadata, and kept apart from their own photographs. Only the request's\nrequester keeps one, while this process holds the search's pictures.",
+    "operationId": "keep_reference_picture_worlds_references__reference_id__pictures__n__keep_post",
+    "parameters": [
+     {
+      "name": "reference_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Reference Id"
+      }
+     },
+     {
+      "name": "n",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "maximum": 7,
+       "minimum": 0,
+       "title": "N"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/KeepBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/references/{reference_id}/cancel": {
    "post": {
     "tags": [
@@ -23642,6 +23721,226 @@
        "application/json": {
         "schema": {}
        }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/web-pictures": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The pictures this workspace keeps from picture searches.",
+    "operationId": "list_web_pictures_worlds_web_pictures_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response List Web Pictures Worlds Web Pictures Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/web-pictures/{picture_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "One picture this workspace keeps.",
+    "operationId": "read_web_picture_worlds_web_pictures__picture_id__get",
+    "parameters": [
+     {
+      "name": "picture_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Picture Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Web Picture Worlds Web Pictures  Picture Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Erase one picture this workspace keeps.",
+    "operationId": "erase_web_picture_worlds_web_pictures__picture_id__delete",
+    "parameters": [
+     {
+      "name": "picture_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Picture Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/web-pictures/{picture_id}/bytes": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The kept bytes of one picture this workspace keeps.",
+    "operationId": "read_web_picture_bytes_worlds_web_pictures__picture_id__bytes_get",
+    "parameters": [
+     {
+      "name": "picture_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Picture Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Web Picture Bytes Worlds Web Pictures  Picture Id  Bytes Get"
+        }
+       },
+       "image/jpeg": {},
+       "image/png": {},
+       "image/webp": {}
       }
      },
      "422": {
@@ -34288,6 +34587,38 @@
     "title": "ItemStatus"
    },
    "JsonValue": {},
+   "KeepBody": {
+    "properties": {
+     "answer": {
+      "type": "string",
+      "enum": [
+       "made_or_permitted",
+       "licence_allows",
+       "private_world_only"
+      ],
+      "title": "Answer"
+     },
+     "licence": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Licence"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "answer"
+    ],
+    "title": "KeepBody"
+   },
    "KindBody": {
     "properties": {
      "key": {

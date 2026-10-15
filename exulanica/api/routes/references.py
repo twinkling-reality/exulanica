@@ -29,7 +29,9 @@ A picture search (``web_pictures``, for a creature) is offered only where
 search, and the pictures it finds are served to its requester alone from
 ``GET /worlds/references/{reference_id}/pictures`` while this process holds them (thirty minutes),
 with ``Cache-Control: no-store``; the page shows each from its own website. Nothing of them is
-written anywhere.
+written anywhere. ``POST .../pictures/{n}/keep`` keeps the one the person picks, with their answer
+to whether they may use it: fetched once (:mod:`exulanica.references.picture_fetch`) and kept apart
+from their own photographs (:mod:`exulanica.world.kept_web_pictures`).
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ import unicodedata
 import uuid
 from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import JSONResponse
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field
@@ -71,9 +73,15 @@ from exulanica.references.bundle import read_bundle
 from exulanica.references.catalogs import web_source
 from exulanica.references.drafting import prompts_for_request
 from exulanica.references.held_pictures import held_pictures
+from exulanica.references.picture_fetch import PictureFetchRefused
 from exulanica.references.pictures import PICTURE_ROLE
 from exulanica.selection.world_drafting import sendable
 from exulanica.spending.status import workspace_status
+from exulanica.world.kept_web_pictures import (
+    KeptPictureRefused,
+    KeptWebPictures,
+    keep_held_picture,
+)
 
 __all__ = ["REFERENCE_UNAVAILABLE", "router"]
 
@@ -112,6 +120,19 @@ class ReferenceBody(BaseModel):
     #: Whether to search the web for pictures of the creature the words describe; a web search.
     web_pictures: bool = False
     idempotency_key: uuid.UUID | None = None
+
+
+class KeepBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: Whether the person may use the picture for their own world, in their own answer.
+    answer: Literal["made_or_permitted", "licence_allows", "private_world_only"]
+    #: The licence that allows it, where the answer says one does.
+    licence: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+#: A fetch refusal that is the website's doing, not the picture's: answered as a bad gateway.
+_UPSTREAM: Final = frozenset({"picture_unreachable", "picture_timed_out"})
 
 
 def _refusal(status: int, code: str, detail: str) -> JSONResponse:
@@ -545,6 +566,76 @@ def read_reference_pictures(
         },
         headers=_NOT_STORED,
     )
+
+
+@router.post("/references/{reference_id}/pictures/{n}/keep", status_code=201)
+def keep_reference_picture(
+    reference_id: uuid.UUID,
+    n: Annotated[int, Path(ge=0, le=7)],
+    body: KeepBody,
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> JSONResponse:
+    """Keep the picture a search found at position ``n``, with the person's answer: fetched once,
+    written again with no metadata, and kept apart from their own photographs. Only the request's
+    requester keeps one, while this process holds the search's pictures."""
+    found = store.read_request(
+        connection, session.workspace_id, reference_id, owner_actor_id=session.actor
+    )
+    if found is None:
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    code = web_pictures_unavailable_because(
+        services, session.workspace_id, running=_running(request)
+    )
+    if code is not None:
+        return _refusal(409, code, "picture searches are not offered to this workspace here")
+    held = held_pictures().read(session.workspace_id, reference_id)
+    if held is None:
+        return _refusal(404, "pictures_not_held", "no pictures are held for this request")
+    if n >= len(held.pictures):
+        return _refusal(404, "picture_unknown", "the search found no picture at this place")
+    stores = services.content_stores
+    if stores is None:
+        return _refusal(503, "web_picture_store_unavailable", "this server keeps no pictures")
+    try:
+        with services.database.session(session.workspace_id) as keeping:
+            kept = keep_held_picture(
+                KeptWebPictures(
+                    keeping,
+                    session.workspace_id,
+                    stores.web_pictures.for_workspace(session.workspace_id),
+                ),
+                held.pictures[n],
+                answer=body.answer,
+                answered_by=session.actor,
+                reference_id=reference_id,
+                licence=body.licence,
+            )
+    except PictureFetchRefused as refused:
+        return _refusal(502 if refused.code in _UPSTREAM else 422, refused.code, str(refused))
+    except KeptPictureRefused as refused:
+        status = 409 if refused.code in ("workspace_erased", "restore_sealed") else 422
+        return _refusal(status, refused.code, refused.detail)
+    return JSONResponse(kept_picture_view(kept), status_code=201)
+
+
+def kept_picture_view(kept: Any) -> dict[str, Any]:
+    """A kept picture as the routes answer it: where it came from, what was kept and the answer."""
+    return {
+        "picture_id": str(kept.picture_id),
+        "address": kept.address,
+        "website": kept.website,
+        "media_type": kept.media_type,
+        "byte_size": kept.byte_size,
+        "width": kept.width,
+        "height": kept.height,
+        "answer": kept.answer,
+        "licence": kept.licence,
+        "reference_id": None if kept.reference_id is None else str(kept.reference_id),
+        "kept_at": kept.kept_at.isoformat(),
+    }
 
 
 @router.post("/references/{reference_id}/cancel")

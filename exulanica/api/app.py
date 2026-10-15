@@ -135,6 +135,7 @@ from exulanica.api.routes import (
     thing_store,
     things,
     tiles,
+    web_pictures,
     workspace_assets,
     workspace_style_packs,
     world,
@@ -621,6 +622,7 @@ def create_app(
     app.include_router(world_making.router)
     app.include_router(world_draft_actions.router)
     app.include_router(references.router)
+    app.include_router(web_pictures.router)
     app.include_router(piece_requests.router)
     app.include_router(world_drafts.router)
     app.include_router(door.router)

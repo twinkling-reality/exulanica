@@ -327,6 +327,16 @@ World API origin its caller names, and for nothing else:
 
 - `exulanica/environment/nyc_open_data.py`, `exulanica/environment/owned_district.py` and
   `exulanica/evaluation/benchmark.py` open URLs with `urllib` and do not pass through it.
+- `exulanica/references/picture_fetch.py` fetches one picture a person picked from a picture
+  search and chose to keep, from whatever website the search named, so no list of origins can hold
+  it. It holds its own rules instead: `https` only to a host by name on the default port, with no
+  user or password; the name resolved once and every address it resolves to public (not private,
+  loopback, link-local, shared, multicast or reserved; an IPv4 address mapped into IPv6 or carried
+  in a 6to4 address judged as itself; never a Teredo or NAT64 address), and the connection made to
+  that address with the name as the TLS server name; at most 3 redirects, each held to the same rules; at most
+  10 MiB of a JPEG, PNG or WebP answer; 10 seconds in all; no proxy and no cookies. It runs only
+  where `EXULANICA_REFERENCE_WEB_PICTURES` is on, for the workspaces the installation lists, never
+  on a `public` installation ([reference notes](reference-notes-contract.md#13-pictures-a-person-keeps)).
 - `exulanica/store/object.py`, the S3-compatible content store, reaches the one endpoint its
   settings name ([deployment](deployment.md#4-the-content-store)) with a client of its own. It
   follows no redirect and reads no proxy setting, and it refuses plain `http` except to a loopback

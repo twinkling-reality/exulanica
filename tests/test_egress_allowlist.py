@@ -421,6 +421,7 @@ UNCOVERED_NETWORK_MODULES = {
     "exulanica/environment/nyc_open_data.py",
     "exulanica/environment/owned_district.py",
     "exulanica/evaluation/benchmark.py",
+    "exulanica/references/picture_fetch.py",
     "exulanica/store/object.py",
 }
 

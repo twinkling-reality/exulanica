@@ -22,6 +22,11 @@ whether the workspace is being erased again, so a record never names bytes the s
 store never holds bytes its inventory lacks: the order
 :class:`exulanica.world.thing_store.ThingStore` keeps a look's container in.
 
+:func:`keep_held_picture` is how a person keeps a picture a search found: it fetches the picture
+once from its address through the guarded fetcher (:mod:`exulanica.references.picture_fetch`), then
+keeps it, recording the address and website the person picked, whatever redirects the fetch
+followed.
+
 Erasing writes a web picture tombstone and one row naming the picture, its bytes and that tombstone
 in one transaction; the row's trigger deletes the record and enqueues the bytes for
 ``exulanica-purge`` (migration 0215). Asked by the person who kept the picture, or by an owner of
@@ -33,7 +38,7 @@ from __future__ import annotations
 import hashlib
 import io
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -45,6 +50,8 @@ from psycopg.rows import dict_row
 
 from exulanica.corpus.decode import UNREADABLE, decoding, probe
 from exulanica.evidence.blob import BlobId
+from exulanica.references import picture_fetch
+from exulanica.references.adapters.base import WebPicture
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import web_picture_lock_key
 from exulanica.world.workspace_lock import lock_workspace
@@ -60,6 +67,7 @@ __all__ = [
     "KeptPictureRefused",
     "KeptWebPictures",
     "clean_picture",
+    "keep_held_picture",
 ]
 
 #: The most bytes a picture may have, fetched or kept.
@@ -374,6 +382,36 @@ class KeptWebPictures:
             raise KeptPictureRefused("picture_changed") from exc
         assert row is not None
         return row["erasure_id"]
+
+
+def keep_held_picture(
+    pictures: KeptWebPictures,
+    picture: WebPicture,
+    *,
+    answer: str,
+    answered_by: uuid.UUID,
+    reference_id: uuid.UUID,
+    licence: str | None = None,
+    fetch: Callable[[str], picture_fetch.FetchedPicture] | None = None,
+) -> KeptPicture:
+    """Keep a picture a search found: fetched once from its address under the fetcher's rules,
+    cleaned, then kept with the address and website the person picked. Refused by name: the
+    answer's refusals before anything is fetched, then the fetcher's
+    (:class:`~exulanica.references.picture_fetch.PictureFetchRefused`) and the keeper's."""
+    if answer not in ANSWERS:
+        raise KeptPictureRefused("answer_unknown")
+    if answer == "licence_allows" and not licence:
+        raise KeptPictureRefused("licence_missing")
+    fetched = (fetch or picture_fetch.fetch_picture)(picture.address)
+    return pictures.keep(
+        clean_picture(fetched.data),
+        address=picture.address,
+        website=picture.website,
+        answer=answer,
+        answered_by=answered_by,
+        reference_id=reference_id,
+        licence=licence,
+    )
 
 
 _COLUMNS: Final = (
