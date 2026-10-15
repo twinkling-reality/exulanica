@@ -14,8 +14,8 @@ import uuid
 
 import pytest
 from exulanica.models.manifest import Role
+from exulanica.selection import action_digests, action_outcome, action_typing, action_world
 from exulanica.selection import action_drafting as drafting
-from exulanica.selection import action_outcome
 from exulanica.selection import action_plan as plan
 from exulanica.selection.action_plan import WorldEditOperation as Op
 from exulanica.selection.calls import CallLog
@@ -45,15 +45,19 @@ def _world(*, objects: bool = True, descriptors: dict | None = None) -> plan._Wo
         state_sha256="a" * 64,
         edit_seq=3,
         assets=(
-            plan._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),
-            plan._Choice("cc0.seating-planter", "cc0.seating-planter", "Planter seat", "A seat."),
+            action_world._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),
+            action_world._Choice(
+                "cc0.seating-planter", "cc0.seating-planter", "Planter seat", "A seat."
+            ),
         ),
         objects=(
-            (plan._Choice("object-1", "object:bench-for-ada", "Bench", selected=True),)
+            (action_world._Choice("object-1", "object:bench-for-ada", "Bench", selected=True),)
             if objects
             else ()
         ),
-        arrangements=(plan._Choice("small_square", "small_square", "Small square", "Seats."),),
+        arrangements=(
+            action_world._Choice("small_square", "small_square", "Small square", "Seats."),
+        ),
         arrangement_versions={"small_square": 1},
         descriptors={**matrix, **(descriptors or {})},
         object_ids=frozenset({"object:bench-for-ada"}) if objects else frozenset(),
@@ -127,7 +131,9 @@ def test_a_drafted_label_resolves_to_the_value_its_read_listed():
         _world(),
     )
     assert verdict.refusal is None and verdict.clarification is None
-    assert verdict.actions == [plan._Action(Op.REMOVE_OBJECT, object_id="object:bench-for-ada")]
+    assert verdict.actions == [
+        action_typing._Action(Op.REMOVE_OBJECT, object_id="object:bench-for-ada")
+    ]
 
 
 def test_two_options_for_one_slot_are_asked_about():
@@ -174,7 +180,7 @@ def test_the_capability_read_decides_and_its_code_travels_with_the_refusal(
         }
     )
     refused = plan._availability(
-        [plan._Action(Op.PLACE_ARRANGEMENT, arrangement_key="small_square")], world
+        [action_typing._Action(Op.PLACE_ARRANGEMENT, arrangement_key="small_square")], world
     )
     assert refused is not None
     assert refused["code"] == expected
@@ -199,7 +205,7 @@ def test_an_operation_no_descriptor_states_is_refused_not_assumed():
         descriptors=descriptors,
         object_ids=world.object_ids,
     )
-    refused = plan._availability([plan._Action(Op.UNDO_LAST_EDIT)], stripped)
+    refused = plan._availability([action_typing._Action(Op.UNDO_LAST_EDIT)], stripped)
     assert refused is not None and refused["code"] == "action_not_offered"
 
 
@@ -207,23 +213,23 @@ def test_an_operation_no_descriptor_states_is_refused_not_assumed():
     ("action", "overrides", "code"),
     [
         (
-            plan._Action(Op.PLACE_OBJECT, asset_key="cc0.bench"),
+            action_typing._Action(Op.PLACE_OBJECT, asset_key="cc0.bench"),
             {"origin_role": None},
             "origin_role_required",
         ),
         (
-            plan._Action(Op.PLACE_OBJECT, asset_key="cc0.bench"),
+            action_typing._Action(Op.PLACE_OBJECT, asset_key="cc0.bench"),
             {"context": {"placement": None, "viewer": None, "selected_object_id": None}},
             "placement_required",
         ),
         (
-            plan._Action(
+            action_typing._Action(
                 Op.PLACE_ARRANGEMENT, arrangement_key="small_square", arrangement_version=1
             ),
             {"context": {"placement": None, "viewer": None, "selected_object_id": None}},
             "viewer_required",
         ),
-        (plan._Action(Op.MOVE_OBJECT), {}, "object_required"),
+        (action_typing._Action(Op.MOVE_OBJECT), {}, "object_required"),
     ],
 )
 def test_what_a_step_needs_and_nobody_supplied_is_asked_for(action, overrides, code):
@@ -241,7 +247,7 @@ def test_a_plan_is_named_by_its_content_and_not_by_what_it_cost():
     assert digest == plan.plan_document_sha256(dict(reversed(list(document.items()))))
     assert digest != plan.plan_document_sha256({**document, "steps": [{"value": 0.81}]})
     # A float enters the digest tagged, never as a bare number.
-    assert plan._digest_input(0.8) == {"float": "0.8"}
+    assert action_digests._digest_input(0.8) == {"float": "0.8"}
 
 
 def test_the_action_path_states_every_call_it_can_make():

@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_plan as plan
+from exulanica.selection import action_preparation, action_typing, action_world
 from exulanica.selection import action_things as things
-from exulanica.selection import action_world
 from exulanica.selection.action_plan import WorldEditOperation as Op
 from exulanica.world.authored_delta import delta_sha256
 from exulanica.world.objects import ObjectOrigin, Transform
@@ -337,8 +337,8 @@ def _world(read: things.ThingsRead | None = None) -> plan._World:
         version_id=VERSION,
         state_sha256=BASE,
         edit_seq=3,
-        assets=(plan._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),),
-        objects=(plan._Choice("object-1", "object:bench-for-ada", "Bench"),),
+        assets=(action_world._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),),
+        objects=(action_world._Choice("object-1", "object:bench-for-ada", "Bench"),),
         arrangements=(),
         arrangement_versions={},
         descriptors=matrix,
@@ -618,21 +618,21 @@ def test_a_walk_or_a_use_that_names_a_thing_goes_to_that_thing_s_place():
     ("action", "overrides", "code"),
     [
         (
-            plan._Action(Op.PLACE_THING, kind="knight", kind_version=2),
+            action_typing._Action(Op.PLACE_THING, kind="knight", kind_version=2),
             {"origin_role": None},
             "origin_role_required",
         ),
         (
-            plan._Action(Op.PLACE_THING, kind="knight", kind_version=2),
+            action_typing._Action(Op.PLACE_THING, kind="knight", kind_version=2),
             {"context": {"placement": None, "viewer": None, "selected_object_id": None}},
             "placement_required",
         ),
         (
-            plan._Action(Op.DIRECT_THING, act="go_to", target_id="thing:well:visit"),
+            action_typing._Action(Op.DIRECT_THING, act="go_to", target_id="thing:well:visit"),
             {},
             "being_required",
         ),
-        (plan._Action(Op.DIRECT_THING, act="go_to", subject_id="x"), {}, "place_required"),
+        (action_typing._Action(Op.DIRECT_THING, act="go_to", subject_id="x"), {}, "place_required"),
     ],
 )
 def test_what_a_thing_step_needs_and_nobody_supplied_is_asked_for(action, overrides, code):
@@ -641,7 +641,7 @@ def test_what_a_thing_step_needs_and_nobody_supplied_is_asked_for(action, overri
 
 
 def test_a_thing_step_beside_something_needs_no_pointed_spot():
-    action = plan._Action(Op.PLACE_THING, kind="knight", kind_version=2, near="thing:well")
+    action = action_typing._Action(Op.PLACE_THING, kind="knight", kind_version=2, near="thing:well")
     none = {"context": {"placement": None, "viewer": None, "selected_object_id": None}}
     assert plan._requirements([action], _context(**none), _world()) is None
 
@@ -682,11 +682,11 @@ def test_the_form_offers_every_option_the_reads_listed_and_no_other_field():
 
 
 def _prepare(action, *, read=None, **context):
-    return plan._prepared_things_step(0, action, _context(**context), _world(read))
+    return action_preparation._prepared_things_step(0, action, _context(**context), _world(read))
 
 
 def test_a_place_step_is_the_add_thing_request_beside_what_it_names():
-    action = plan._Action(
+    action = action_typing._Action(
         Op.PLACE_THING,
         kind="knight",
         kind_version=_kind("knight").version,
@@ -716,17 +716,17 @@ def test_a_place_step_is_the_add_thing_request_beside_what_it_names():
 
 
 def test_a_thing_step_names_what_it_names_as_the_reads_label_it():
-    place = plan._Action(Op.PLACE_THING, kind="lantern", kind_version=1, near="thing:well")
-    beside = plan._Action(
+    place = action_typing._Action(Op.PLACE_THING, kind="lantern", kind_version=1, near="thing:well")
+    beside = action_typing._Action(
         Op.PLACE_THING, kind="lantern", kind_version=1, near=f"being:{uuid.UUID(int=2)}"
     )
-    ask = plan._Action(
+    ask = action_typing._Action(
         Op.DIRECT_THING, act="use", subject_id=str(uuid.UUID(int=1)), target_id="thing:well:visit"
     )
     world = _world()
-    assert plan._titles(place, world) == {"kind": "lantern", "near": "well"}
-    assert plan._titles(beside, world) == {"kind": "lantern", "near": "Traveller 2"}
-    assert plan._titles(ask, world) == {
+    assert action_preparation._titles(place, world) == {"kind": "lantern", "near": "well"}
+    assert action_preparation._titles(beside, world) == {"kind": "lantern", "near": "Traveller 2"}
+    assert action_preparation._titles(ask, world) == {
         "subject": "Traveller",
         "place": "well",
         "affordance": "visit",
@@ -735,7 +735,7 @@ def test_a_thing_step_names_what_it_names_as_the_reads_label_it():
 
 
 def test_a_place_step_the_route_would_refuse_is_blocked_by_the_route_s_code():
-    action = plan._Action(
+    action = action_typing._Action(
         Op.PLACE_THING, kind="knight", kind_version=_kind("knight").version, thing_id="well"
     )
     taken = _prepare(action)

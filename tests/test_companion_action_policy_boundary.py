@@ -26,6 +26,8 @@ _ACTION_SOURCES = (
     _ROOT / "exulanica" / "selection" / "action_world.py",
     _ROOT / "exulanica" / "selection" / "action_drafting.py",
     _ROOT / "exulanica" / "selection" / "action_typing.py",
+    _ROOT / "exulanica" / "selection" / "action_preparation.py",
+    _ROOT / "exulanica" / "selection" / "action_digests.py",
     _ROOT / "exulanica" / "selection" / "action_outcome.py",
     _ROOT / "exulanica" / "api" / "routes" / "selection_actions.py",
 )

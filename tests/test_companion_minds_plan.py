@@ -23,6 +23,7 @@ from exulanica.api.routes.world_models import RoleChoiceBody
 from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_minds as minds
 from exulanica.selection import action_plan as plan
+from exulanica.selection import action_typing
 from exulanica.selection.action_plan import MIND
 from exulanica.selection.action_plan import WorldEditOperation as Op
 
@@ -965,7 +966,7 @@ def test_the_capability_read_and_the_route_s_object_decide_whether_a_mind_is_off
     bare = plan._with_minds(_with_route(_world()), None)
     assert MIND not in bare.descriptors
     refused = plan._world_edit_document(
-        plan._Verdict(actions=[plan._Action(Op.CHOOSE_MIND, whom="everyone", mind=nano)]),
+        plan._Verdict(actions=[action_typing._Action(Op.CHOOSE_MIND, whom="everyone", mind=nano)]),
         _context(),
         bare,
         previewer=None,

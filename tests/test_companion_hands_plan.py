@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from exulanica.selection import action_plan as plan
+from exulanica.selection import action_preparation
 from exulanica.selection import action_things as things
 from exulanica.selection.action_plan import WorldEditOperation as Op
 from exulanica.world.authored_delta import delta_sha256
@@ -149,7 +150,7 @@ def _knight_holds_the_sword():
     [action] = _draft(
         world, ("pick_up", _label(world.beings, "Knight"), _label(world.placed, "sword"))
     ).actions
-    step = plan._prepared_things_step(0, action, cx1._context(), world)
+    step = action_preparation._prepared_things_step(0, action, cx1._context(), world)
     after, events, dispositions = _minute(
         state, document, [_recorded(state, document, step["body"])]
     )
@@ -239,7 +240,7 @@ def test_a_give_is_prepared_as_the_route_s_request_and_a_take_is_refused_by_its_
         _label(world.placed, "sword"),
     )
     [give] = _draft(world, ("give", knight, other, sword)).actions
-    given = plan._prepared_things_step(0, give, cx1._context(), world)
+    given = action_preparation._prepared_things_step(0, give, cx1._context(), world)
     assert (given["state"], given["code"]) == ("prepared", None)
     assert given["body"]["intent"] == {
         "kind": "hands",
@@ -256,7 +257,7 @@ def test_a_give_is_prepared_as_the_route_s_request_and_a_take_is_refused_by_its_
     ]
     assert letting == []
     [take] = _draft(world, ("take", other, knight, sword)).actions
-    taken = plan._prepared_things_step(0, take, cx1._context(), world)
+    taken = action_preparation._prepared_things_step(0, take, cx1._context(), world)
     assert (taken["state"], taken["code"], taken["body"]) == ("blocked", "act_not_offered", None)
 
 
@@ -274,7 +275,7 @@ def test_a_kind_an_earlier_step_adds_names_that_thing_in_a_later_hands_step():
         pick_up.thing_id, "lantern"
     )
     assert pick_up.subject_id == _person(state, "traveller")["id"]
-    assert plan._titles(pick_up, world) == {
+    assert action_preparation._titles(pick_up, world) == {
         "subject": _person(state, "traveller")["display_name"],
         "act": "pick_up",
         "thing": _kind_label("lantern", 1),
@@ -320,7 +321,7 @@ def test_a_hands_step_the_route_refuses_is_blocked_by_the_route_s_own_name(chang
     [action] = _draft(
         world, ("pick_up", _label(world.beings, "Knight"), _label(world.placed, "sword"))
     ).actions
-    step = plan._prepared_things_step(0, action, cx1._context(), world)
+    step = action_preparation._prepared_things_step(0, action, cx1._context(), world)
     assert (step["state"], step["code"]) == (
         ("prepared", None) if code is None else ("blocked", code)
     )

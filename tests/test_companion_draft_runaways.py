@@ -31,6 +31,7 @@ from exulanica.models.schema import response_format_for
 from exulanica.models.transport import HttpResponse
 from exulanica.selection import action_drafting as drafting
 from exulanica.selection import action_plan as plan
+from exulanica.selection import action_typing, action_world
 from exulanica.selection.calls import CallLog
 
 from form_shapes import arrays_followed_by_a_property
@@ -53,11 +54,13 @@ def _world() -> plan._World:
         state_sha256="a" * 64,
         edit_seq=3,
         assets=(
-            plan._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),
-            plan._Choice("cc0.lamp-post", "cc0.lamp-post", "Lamp post", "A lamp."),
+            action_world._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),
+            action_world._Choice("cc0.lamp-post", "cc0.lamp-post", "Lamp post", "A lamp."),
         ),
-        objects=(plan._Choice("object-1", "object:bench", "Bench"),),
-        arrangements=(plan._Choice("small_square", "small_square", "Small square", "Seats."),),
+        objects=(action_world._Choice("object-1", "object:bench", "Bench"),),
+        arrangements=(
+            action_world._Choice("small_square", "small_square", "Small square", "Seats."),
+        ),
         arrangement_versions={"small_square": 1},
         descriptors={},
         object_ids=frozenset({"object:bench"}),
@@ -163,7 +166,7 @@ def test_an_option_is_read_in_the_list_its_operation_takes_options_from():
         [{"operation": "remove_object", "options": ["cc0.bench", "object-1"]}], world
     )
     assert removed.actions == [
-        plan._Action(plan.WorldEditOperation.REMOVE_OBJECT, object_id="object:bench")
+        action_typing._Action(plan.WorldEditOperation.REMOVE_OBJECT, object_id="object:bench")
     ]
     placed = plan._typed_from_draft(
         [{"operation": "place_object", "options": ["object-1", "small_square"]}], world
@@ -282,7 +285,7 @@ def test_a_draft_that_takes_back_more_than_one_change_is_refused():
     undo = {"operation": "undo_last_edit", "options": []}
     one = plan._typed_from_draft([undo], _world())
     assert one.refusal is None
-    assert one.actions == [plan._Action(plan.WorldEditOperation.UNDO_LAST_EDIT)]
+    assert one.actions == [action_typing._Action(plan.WorldEditOperation.UNDO_LAST_EDIT)]
     padded = plan._typed_from_draft([undo, undo, undo], _world())
     assert padded.refusal is not None
     assert padded.refusal["code"] == "action_not_offered" and padded.refusal["step"] == 1

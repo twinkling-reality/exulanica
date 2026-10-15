@@ -70,7 +70,7 @@ from exulanica.references.boundary import SearchSubject, admit_query
 from exulanica.references.catalogs import load_reference_catalogs
 from exulanica.references.drafting import plan_subjects, read_notes
 from exulanica.references.pictures import read_picture
-from exulanica.selection import action_plan
+from exulanica.selection import action_plan, action_world
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.calls import CallLog
 from exulanica.selection.creature_drafting import draft_creature
@@ -526,10 +526,10 @@ def _action_world() -> action_plan._World:
         version_id=uuid.UUID(int=1),
         state_sha256="0" * 64,
         edit_seq=0,
-        assets=(action_plan._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),),
+        assets=(action_world._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),),
         objects=(),
         arrangements=(
-            action_plan._Choice("small_square", "small_square", "Small square", "Seats."),
+            action_world._Choice("small_square", "small_square", "Small square", "Seats."),
         ),
         arrangement_versions={"small_square": 1},
         descriptors={},
