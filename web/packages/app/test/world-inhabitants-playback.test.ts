@@ -270,8 +270,9 @@ describe('who a person is and what they are doing, in words', () => {
     expect(done.doing).toBe('Just finished visiting a place that is no longer there.');
   });
 
-  it('names a reason code it has no words for rather than guessing', () => {
+  it('says a reason code it has no words for is in the record, rather than guessing or printing the code', () => {
     const odd = words({ action: { kind: 'idle', status: 'blocked', target_id: null, remaining_ticks: 0, reason: 'a_new_reason' } });
-    expect(odd.why).toBe('Because of a reason this page has no words for (a_new_reason).');
+    expect(odd.why).toBe('Because the reason is only in the record.');
+    expect(odd.why).not.toContain('a_new_reason');
   });
 });

@@ -3,7 +3,7 @@
 // things (v7)": `thing_arrived` with reason `crossed_in`, `thing_departed` with `sent_home` or
 // `grant_ended`, `arrival_refused` naming its crossing), the refusal codes are the ones that
 // contract lists, the reasons' words are the words catalog's own
-// (assets/catalogs/society-words/society-inhabitant-words.v1.json) and the labels are the shipped
+// (assets/catalogs/society-words/society-inhabitant-words.v4.json) and the labels are the shipped
 // kinds' own (assets/catalogs/things).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -16,7 +16,7 @@ const kindDocument = (file: string) =>
   JSON.parse(readFileSync(`${repository}/assets/catalogs/things/kinds/${file}`, 'utf8')) as { kind: string; version: number; label: string };
 const KNIGHT = kindDocument('knight.v2.json');
 const SWORD = kindDocument('sword.v3.json');
-const catalog = JSON.parse(readFileSync(`${repository}/assets/catalogs/society-words/society-inhabitant-words.v1.json`, 'utf8')) as
+const catalog = JSON.parse(readFileSync(`${repository}/assets/catalogs/society-words/society-inhabitant-words.v4.json`, 'utf8')) as
   { entries: { kind: string; code: string; words: string }[] };
 /** Why an event happened, as the words catalog says it. */
 const because = (code: string): string => catalog.entries.find((entry) => entry.kind === 'event_reason' && entry.code === code)!.words;
