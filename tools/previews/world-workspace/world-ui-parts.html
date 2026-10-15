@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World parts</title>
+<!-- The in-world parts on one screen, for review against DESIGN's frames. Nothing in the product
+     opens this page. ?picture=<address> draws a world picture behind the parts; ?view=page shows a
+     character page instead of the world's corners. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1216; }
+  body { position: relative; }
+  .parts-world { position: absolute; inset: 0; background: linear-gradient(180deg, #5d8fb3 0%, #a9c6d6 46%, #d8cdb6 47%, #c2b496 100%) center / cover no-repeat; }
+</style>
+<script type="module" src="./world-ui-parts.ts"></script>
+</head>
+<body class="wu-root">
+<div class="parts-world"></div>
+</body>
+</html>
