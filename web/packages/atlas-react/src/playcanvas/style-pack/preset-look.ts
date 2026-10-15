@@ -153,6 +153,26 @@ export function renderLookOfPreset(
         depthScaleM: water.depth_scale_mm / 1000,
         foamWidthM: water.foam_width_mm / 1000,
         reflection: water.reflection_permille / 1000,
+        ...(water.ripples === undefined ? {} : {
+          ripples: {
+            octaves: water.ripples.octaves.map((octave) => ({
+              angle: (octave.angle_mdeg / 1000) * (Math.PI / 180),
+              cellM: octave.cell_mm / 1000,
+              tilt: octave.tilt_permille / 1000,
+              drift: [octave.drift_mm_per_s[0] / 1000, octave.drift_mm_per_s[1] / 1000] as const,
+            })),
+            fadeFrom: water.ripples.fade_from_millicells_per_px / 1000,
+            fadeTo: water.ripples.fade_to_millicells_per_px / 1000,
+          },
+        }),
+        ...(water.caustics === undefined ? {} : {
+          caustics: {
+            strength: water.caustics.strength_permille / 1000,
+            cellM: water.caustics.cell_mm / 1000,
+            pace: water.caustics.pace_millirad_per_s / 1000,
+            reachM: water.caustics.reach_mm / 1000,
+          },
+        }),
       },
     }),
     unavailable: TILE_LOOK_V1.unavailable,

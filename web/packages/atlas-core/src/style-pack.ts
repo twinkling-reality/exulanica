@@ -120,6 +120,33 @@ export interface StylePackWater {
   readonly depth_scale_mm: number;
   readonly foam_width_mm: number;
   readonly reflection_permille: number;
+  /** Absent: today's ripple. */
+  readonly ripples?: StylePackRipples;
+  /** Absent: no caustics. */
+  readonly caustics?: StylePackCaustics;
+}
+
+/**
+ * The ripple a pack's water carries: octaves of drifting noise, each turned to the others, its cell,
+ * the tilt it gives and its drift; and the cells a pixel over which an octave fades.
+ */
+export interface StylePackRipples {
+  readonly octaves: readonly {
+    readonly angle_mdeg: number;
+    readonly cell_mm: number;
+    readonly tilt_permille: number;
+    readonly drift_mm_per_s: readonly [number, number];
+  }[];
+  readonly fade_from_millicells_per_px: number;
+  readonly fade_to_millicells_per_px: number;
+}
+
+/** Light gathered on what lies under shallow water: its strength, its cell, its pace and the depth it fades over. */
+export interface StylePackCaustics {
+  readonly strength_permille: number;
+  readonly cell_mm: number;
+  readonly pace_millirad_per_s: number;
+  readonly reach_mm: number;
 }
 
 export type StylePackFog =
@@ -521,6 +548,30 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
       depth_scale_mm: integer(500, 50_000),
       foam_width_mm: integer(0, 2000),
       reflection_permille: permille(0, 2000),
+      // Added within the profile: absent, the ripple is today's and there are no caustics.
+      ripples: optional((r, q) => {
+        const read = object(r, q, {
+          octaves: list((o, k) => object(o, k, {
+            angle_mdeg: integer(0, 359_999),
+            cell_mm: integer(100, 20_000),
+            tilt_permille: integer(0, 200),
+            drift_mm_per_s: (d, w) => {
+              if (!Array.isArray(d) || d.length !== 2) return fail('shape', w, 'must be a drift along the octave\'s two axes in millimetres a second');
+              return d.map((n, i) => integer(-5000, 5000)(n, `${w}[${i}]`));
+            },
+          }), 1, 4),
+          fade_from_millicells_per_px: integer(10, 2000),
+          fade_to_millicells_per_px: integer(20, 4000),
+        }) as { fade_from_millicells_per_px: number; fade_to_millicells_per_px: number };
+        if (read.fade_to_millicells_per_px <= read.fade_from_millicells_per_px) fail('range', `${q}.fade_to_millicells_per_px`, "must be above the fade's start");
+        return read;
+      }),
+      caustics: optional((c, q) => object(c, q, {
+        strength_permille: integer(0, 2000),
+        cell_mm: integer(100, 10_000),
+        pace_millirad_per_s: integer(0, 10_000),
+        reach_mm: integer(100, 10_000),
+      })),
     })),
     palette: (v, p) => object(v, p, {
       encoding: literal(STYLE_PACK_COLOUR_ENCODING),

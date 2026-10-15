@@ -361,7 +361,11 @@ state alike, and the environment reads which one it is by its id. `validateRende
 unknown or missing key, a wrong kind and an out-of-range value by the same rules as the tile look,
 and `validateLook` reads either descriptor by its id; a caller validates a look before handing it to
 the runtime. Every field is a reviewed renderer capability with bounded parameters: a style chooses
-and sets them and can never supply shader code.
+and sets them and can never supply shader code. A field added to the render look within its profile is optional,
+and its shape in `validateRenderLook` lands in the same change as the field: a look that states a
+field the validator does not know is refused whole, and the page then draws the world without it
+by another route. So each such change carries a test that reads a whole look stating the field
+through `validateRenderLook`; a test that builds the look and hands it on directly does not count.
 
 | Capability | What it does |
 | --- | --- |

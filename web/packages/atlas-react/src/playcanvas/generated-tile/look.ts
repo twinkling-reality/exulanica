@@ -196,7 +196,9 @@ type Shape =
   /** A field a look may leave out: absent keeps the meaning a look had before the field existed. */
   | { readonly kind: 'optional'; readonly shape: Shape }
   /** Three finite numbers within a range, one per colour channel. */
-  | { readonly kind: 'triple'; readonly min: number; readonly max: number };
+  | { readonly kind: 'triple'; readonly min: number; readonly max: number }
+  /** A list of `min` to `max` items, each of the shape. */
+  | { readonly kind: 'list'; readonly shape: Shape; readonly min: number; readonly max: number };
 
 const num = (min: number, max: number, integer = false): Shape => ({ kind: 'number', min, max, integer });
 const rgb: Shape = { kind: 'rgb' };
@@ -294,6 +296,10 @@ function check(value: unknown, shape: Shape, path: string): void {
     }
     case 'optional':
       check(value, shape.shape, path);
+      return;
+    case 'list':
+      if (!Array.isArray(value) || value.length < shape.min || value.length > shape.max) fail(`must be a list of ${shape.min} to ${shape.max}`);
+      (value as unknown[]).forEach((item, index) => check(item, shape.shape, `${path}[${index}]`));
       return;
     case 'triple':
       if (!Array.isArray(value) || value.length !== 3 ||
@@ -431,6 +437,35 @@ export interface RenderWater {
   readonly foamWidthM: number;
   /** Scale of the surface's reflection, 0 to 2. */
   readonly reflection: number;
+  /** The ripple in the water's light; absent, `WATER_RIPPLE_DEFAULTS`. */
+  readonly ripples?: RenderRipples;
+  /** Light gathered on what lies under shallow water; absent, none. */
+  readonly caustics?: RenderCaustics;
+}
+
+/** Octaves of drifting noise whose slope tilts the water, and the cells a pixel over which each fades. */
+export interface RenderRipples {
+  readonly octaves: readonly {
+    /** Radians from east toward south. */
+    readonly angle: number;
+    readonly cellM: number;
+    /** The tilt the octave's slope gives the surface. */
+    readonly tilt: number;
+    /** Metres a second along the octave's own two axes, as it is turned. */
+    readonly drift: readonly [number, number];
+  }[];
+  readonly fadeFrom: number;
+  readonly fadeTo: number;
+}
+
+export interface RenderCaustics {
+  /** Linear radiance added at full strength, before what shows through takes it. */
+  readonly strength: number;
+  readonly cellM: number;
+  /** Radians a second. */
+  readonly pace: number;
+  /** Water deeper than this shows none, metres. */
+  readonly reachM: number;
 }
 
 export type RenderFog =
@@ -591,6 +626,12 @@ const RENDER_SHAPE: Shape = obj({
   haze: optional(obj({ density: num(0.000001, 0.006), falloff: num(0.0001, 0.05), baseM: num(-50, 50), maxDepth: num(0.001, 8), colour: nullable(rgb) })),
   water: optional(obj({
     shallow: rgb, deep: rgb, absorption: { kind: 'triple', min: 0, max: 5 }, depthScaleM: num(0.5, 50), foamWidthM: num(0, 2), reflection: num(0, 2),
+    ripples: optional(obj({
+      octaves: { kind: 'list', min: 1, max: 4, shape: obj({ angle: num(0, 2 * Math.PI), cellM: num(0.1, 20), tilt: num(0, 0.2), drift: { kind: 'list', min: 2, max: 2, shape: num(-5, 5) } }) },
+      fadeFrom: num(0.01, 2),
+      fadeTo: num(0.02, 4),
+    })),
+    caustics: optional(obj({ strength: num(0, 2), cellM: num(0.1, 10), pace: num(0, 10), reachM: num(0.1, 10) })),
   })),
   unavailable: tileField('unavailable'),
 });
@@ -608,6 +649,9 @@ export function validateRenderLook(value: unknown): RenderLook {
   }
   if (look.shading.toon !== null && look.shading.toon.shadowEdge >= look.shading.toon.lightEdge) {
     throw new TileLookError('shading.toon: shadowEdge must lie below lightEdge');
+  }
+  if (look.water?.ripples !== undefined && look.water.ripples.fadeTo <= look.water.ripples.fadeFrom) {
+    throw new TileLookError("water.ripples: fadeTo must lie beyond fadeFrom");
   }
   if (look.sun.shadow.filter !== 'pcss' && look.sun.shadow.penumbra !== 0) {
     throw new TileLookError('sun.shadow: penumbra must be 0 unless the filter is pcss');

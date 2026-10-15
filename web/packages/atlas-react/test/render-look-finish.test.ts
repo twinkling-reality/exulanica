@@ -7,7 +7,7 @@ import { hazeEndChunk } from '../src/playcanvas/generated-tile/aerial-haze.js';
 import { applyTileEnvironment } from '../src/playcanvas/generated-tile/environment.js';
 import { TileLookError, validateRenderLook } from '../src/playcanvas/generated-tile/look.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
-import { WaterRipples } from '../src/playcanvas/style-pack/water-material.js';
+import { WATER_RIPPLE_DEFAULTS, WaterRipples } from '../src/playcanvas/style-pack/water-material.js';
 
 /*
  * The optional finish of a render look: haze and a water finish. Each is carried
@@ -112,6 +112,37 @@ describe('a water material', () => {
     const finished = normalOf(lookOf(FINISHED).water!).glsl.get('normalMapPS') as string;
     expect(finished).not.toBe(plain);
     expect(finished.replace('#ifndef EXU_WATER_TIME\n#define EXU_WATER_TIME\nuniform float exuWaterTime;\n#endif', 'uniform float exuWaterTime;')).toBe(plain);
+  });
+
+  it('ripples as today where its look states no ripple, and as a look that states today\'s figures', () => {
+    const finish = lookOf(FINISHED).water!;
+    expect(finish.ripples).toBeUndefined();
+    const stated = normalOf({ ...finish, ripples: WATER_RIPPLE_DEFAULTS }).glsl.get('normalMapPS');
+    expect(normalOf(finish).glsl.get('normalMapPS')).toBe(stated);
+  });
+
+  it('ripples in a look\'s own octaves: as many as it states, at its cells, faded where it says', () => {
+    const one = { octaves: [{ angle: 0, cellM: 4, tilt: 0.05, drift: [0.4, 0] as const }], fadeFrom: 0.2, fadeTo: 0.5 };
+    const chunk = normalOf({ ...lookOf(FINISHED).water!, ripples: one }).glsl.get('normalMapPS') as string;
+    expect(chunk).toContain('vec2 q0 = vec2(vPositionW.x * 0.2500');
+    expect(chunk).not.toContain('q1');
+    expect(chunk).toContain('smoothstep(0.2000, 0.5000');
+  });
+
+  it('reads as a whole render look with its own ripple and caustics, and refuses a fade that ends where it starts', () => {
+    const base = lookOf(FINISHED);
+    const ripples = { octaves: [{ angle: 0.6, cellM: 2.4, tilt: 0.07, drift: [0.24, 0.096] as const }], fadeFrom: 0.15, fadeTo: 0.4 };
+    const caustics = { strength: 0.6, cellM: 1.5, pace: 0.8, reachM: 1.5 };
+    expect(validateRenderLook({ ...base, water: { ...base.water!, ripples, caustics } }).water?.caustics).toEqual(caustics);
+    expect(() => validateRenderLook({ ...base, water: { ...base.water!, ripples: { ...ripples, fadeTo: 0.15 } } })).toThrow(/fadeTo must lie beyond fadeFrom/);
+  });
+
+  it('gathers caustics under shallow water only where its look states them', () => {
+    const finish = lookOf(FINISHED).water!;
+    const strength = (water: typeof finish) => (normalOf(water).material.getParameter('exuWaterCaustics') as { data: Float32Array }).data[0];
+    expect(strength(finish)).toBe(0);
+    expect(strength({ ...finish, caustics: { strength: 0.6, cellM: 1.5, pace: 0.8, reachM: 1.2 } })).toBeCloseTo(0.6, 6);
+    expect(normalOf(finish).glsl.get('opacityPS')).toContain('exuWaterCaustics.x > 0.0');
   });
 
   it('gives the depth finish without ripples where asked, as a sea or a lake seen from afar', () => {

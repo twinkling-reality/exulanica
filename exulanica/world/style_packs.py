@@ -415,6 +415,49 @@ def _water(value: Any, path: str) -> dict[str, Any]:
             _fail("shape", p, "must be three absorptions per kilometre")
         return [_integer(0, 5000)(n, f"{p}[{i}]") for i, n in enumerate(v)]
 
+    def drift(v: Any, p: str) -> list[int]:
+        if not isinstance(v, list) or len(v) != 2:
+            _fail("shape", p, "must be a drift along the octave's two axes in millimetres a second")
+        return [_integer(-5000, 5000)(n, f"{p}[{i}]") for i, n in enumerate(v)]
+
+    def octave(v: Any, p: str) -> dict[str, Any]:
+        return _object(
+            v,
+            p,
+            {
+                "angle_mdeg": _integer(0, 359_999),
+                "cell_mm": _integer(100, 20_000),
+                "tilt_permille": _integer(0, 200),
+                "drift_mm_per_s": drift,
+            },
+        )
+
+    def ripples(v: Any, p: str) -> dict[str, Any]:
+        read = _object(
+            v,
+            p,
+            {
+                "octaves": _list(octave, 1, 4),
+                "fade_from_millicells_per_px": _integer(10, 2000),
+                "fade_to_millicells_per_px": _integer(20, 4000),
+            },
+        )
+        if read["fade_to_millicells_per_px"] <= read["fade_from_millicells_per_px"]:
+            _fail("range", f"{p}.fade_to_millicells_per_px", "must be above the fade's start")
+        return read
+
+    def caustics(v: Any, p: str) -> dict[str, Any]:
+        return _object(
+            v,
+            p,
+            {
+                "strength_permille": _integer(0, 2000),
+                "cell_mm": _integer(100, 10_000),
+                "pace_millirad_per_s": _integer(0, 10_000),
+                "reach_mm": _integer(100, 10_000),
+            },
+        )
+
     return _object(
         value,
         path,
@@ -425,6 +468,9 @@ def _water(value: Any, path: str) -> dict[str, Any]:
             "depth_scale_mm": _integer(500, 50_000),
             "foam_width_mm": _integer(0, 2000),
             "reflection_permille": _integer(0, 2000),
+            # Added within the profile: absent, the ripple is today's and there are no caustics.
+            "ripples": _Optional(ripples),
+            "caustics": _Optional(caustics),
         },
     )
 
