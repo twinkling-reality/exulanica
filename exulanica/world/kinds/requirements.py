@@ -26,8 +26,8 @@ def check_requirements(
 ) -> None:
     """Validate every declared claim over all admissible values; extraction completeness is
     outside this deterministic contract."""
-    from exulanica.world.kinds.document import (
-        _HEX64,
+    from exulanica.world.kinds.document import _HEX64
+    from exulanica.world.kinds.reader import (
         _LOOK,
         KindRefused,
         _int,

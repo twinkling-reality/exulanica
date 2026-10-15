@@ -56,7 +56,7 @@ def load_thing_leaves(path: Path | None = None, *, version: int = 1) -> ThingLea
         ),
     )
     # The document reader's fixture families are the authority for admissible leaves.
-    from exulanica.world.kinds.document import _FORM_LOOKS
+    from exulanica.world.kinds.parts import _FORM_LOOKS
 
     entries = {}
     for entry in catalog.entries:
