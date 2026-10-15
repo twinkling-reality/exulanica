@@ -125,6 +125,14 @@ def test_0167_reads_stored_choices_as_shipped_and_indexes_said_events_by_speaker
                 "select convalidated from pg_constraint "
                 "where conname='world_thing_look_names_its_source'"
             ).fetchone() == (True,)
+            # A kind's made look (0220), which today's look read names. No kind look exists before
+            # it, so an empty view is a fact.
+            admin.execute(
+                "create view kind_look as select null::uuid as workspace_id,"
+                "null::text as kind_sha256,null::text as look_sha256,null::bigint as choice_id "
+                "where false"
+            )
+            admin.commit()
             with database.session(workspace) as connection:
                 read = look_choices(connection, workspace, world, version.version_id)
             assert [(entry["thing_id"], entry["look"]) for entry in read["looks"]] == [
