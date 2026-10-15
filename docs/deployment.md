@@ -112,6 +112,7 @@ boundary ([security floor](security-floor.md)).
 | Character catalogs | `exulanica-character-catalog publish --apply` | Publishes the character catalogs the code carries, after `exulanica-db`, into the store the API serves | 5.2.1 |
 | Derivative worker | `exulanica-derivative-worker` | Drains the photograph derivative queue | 5.2.2 |
 | Playback worker | `exulanica-playback-worker` | Plays the societies the API leaves to it and seals their coupled traffic | 5.1.5, 5.2.12 |
+| Project worker | `exulanica-project-worker` | Keeps the world projects a person follows current, beside the API on their own computer, reading the World API by GET alone; the acceptance launcher starts it with `--projects` | [Following a world](world-memory-package.md#following-a-world) |
 | Scene worker | `exulanica-scene-worker` | Recovers camera poses and publishes scenes for queued scene jobs | 5.2.3 |
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |

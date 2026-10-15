@@ -73,6 +73,12 @@ starts exactly what it always did:
   ``--spending process|durable`` states the scripted API's ``EXULANICA_SPENDING`` explicitly.
 - ``--read-only-token`` adds one more token, ``token-read``, for the first workspace with
   ``world.read`` alone, so a client can be shown a refusal its grant earns.
+- ``--projects DIR`` follows the world projects in ``DIR`` beside the API: after the token probe it
+  starts the project worker (``python -m exulanica.orchestration.project_worker``) with the
+  slot's API at its ``localhost`` origin and ``token-read`` (made for it when ``--read-only-token``
+  was not given), checks its startup event, and ``down`` stops it with SIGTERM alone, waiting its
+  finish deadline before anything is killed, so each followed project records what is pending.
+  The directory must exist, be no link, and lie outside the checkout and the run's directory.
 - ``--door-bridges FILE`` admits the outside programs a JSON array of bridge declarations names
   (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
   the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
@@ -195,6 +201,15 @@ WORKSPACES_MAXIMUM = 8
 PEER_TOKEN_NAME = "token-peer"
 #: The one permission ``--read-only-token`` grants.
 READ_ONLY_PERMISSIONS = ("world.read",)
+#: What ``--projects`` runs beside the API: the project worker's module, run by the checkout's
+#: own interpreter so it needs no console script installed.
+PROJECT_WORKER_MODULE = "exulanica.orchestration.project_worker"
+#: How long the project worker has to report its startup.
+PROJECT_WORKER_START_SECONDS = 30
+#: The worker's own finish deadline in a run: how long stopping may spend recording.
+PROJECT_WORKER_FINISH_SECONDS = 20
+#: How long ``down`` waits past that deadline for the worker to exit before it is killed.
+PROJECT_WORKER_GRACE_SECONDS = 10
 
 #: Where run state and run records live, under the system temporary directory: disposable, and
 #: never inside a checkout.
@@ -297,6 +312,9 @@ REFUSALS = {
     "depth-checkpoint-missing": "the depth model's pinned checkpoint is not in the local model "
     "cache, and --depth-worker never downloads it",
     "depth-worker-startup": "the depth-capable derivative worker did not report a startup",
+    "projects-directory": "--projects names an existing directory of its own, no link, outside "
+    "the checkout and the run's directory",
+    "project-worker-startup": "the project worker did not report a startup",
     "database-latency-shape": "--database-latency takes the slot's spare port, which "
     "--second-api also takes",
     "latency-proxy-startup": "the database latency proxy did not report a startup",
@@ -1180,6 +1198,113 @@ def start_depth_worker(
     refuse("depth-worker-startup", log.read_text(errors="replace")[-REFUSAL_EXCERPT_CHARACTERS:])
 
 
+def projects_directory(path: Path, worktree: Path) -> Path:
+    """The directory ``--projects`` names, resolved, or a refusal: it must exist, be no link,
+    and lie outside the checkout and the run state, which ``down`` and a new run may remove."""
+    absolute = Path(os.path.abspath(path))
+    if absolute.is_symlink() or not absolute.is_dir():
+        refuse("projects-directory", "the directory does not exist or is a link")
+    resolved = absolute.resolve()
+    for holder in (worktree.resolve(), state_dir(worktree).parent.resolve()):
+        if resolved == holder or holder in resolved.parents:
+            refuse("projects-directory", "the directory lies inside the checkout or the run")
+    return resolved
+
+
+def wants_read_only_token(arguments: argparse.Namespace) -> bool:
+    """Whether the run writes ``token-read``: asked for, or needed by the project worker."""
+    return bool(arguments.read_only_token or arguments.projects is not None)
+
+
+def project_worker_command(
+    python: Path, projects: Path, api_port: int, token_file: Path
+) -> list[str]:
+    """The project worker as a run starts it: the slot's API by its ``localhost`` origin, which
+    is the one plain http origin a project capture may reach, and the read-only token."""
+    return [
+        str(python),
+        "-m",
+        PROJECT_WORKER_MODULE,
+        "--projects",
+        str(projects),
+        "--api",
+        f"http://localhost:{api_port}",
+        "--token-file",
+        str(token_file),
+        "--finish-seconds",
+        str(PROJECT_WORKER_FINISH_SECONDS),
+    ]
+
+
+def project_worker_events(log: Path) -> list[dict[str, object]]:
+    """The project worker's events: one JSON line each, naming a folder by its name alone."""
+    events: list[dict[str, object]] = []
+    for line in log.read_text(errors="replace").splitlines() if log.exists() else []:
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(event, dict) and event.get("component") == "project-worker":
+            events.append(event)
+    return events
+
+
+def start_project_worker(
+    python: Path,
+    worktree: Path,
+    projects: Path,
+    api_port: int,
+    token_file: Path,
+    logs: Path,
+    state: dict,
+    state_file: Path,
+) -> None:
+    """Start the project worker beside the API, and wait for its startup event."""
+    log = logs / "project-worker.log"
+    command = project_worker_command(python, projects, api_port, token_file)
+    state["pids"]["project_worker"] = spawn(command, worktree, clean_environment(), log)
+    state["project_worker"] = {
+        "projects": str(projects),
+        "finish_seconds": PROJECT_WORKER_FINISH_SECONDS,
+    }
+    write_state(state_file, state)
+    deadline = time.monotonic() + PROJECT_WORKER_START_SECONDS
+    while time.monotonic() < deadline:
+        said = [event.get("event") for event in project_worker_events(log)]
+        if "startup_failed" in said or not command_of(state["pids"]["project_worker"]):
+            break
+        if "startup" in said:
+            return
+        time.sleep(0.5)
+    refuse("project-worker-startup", log.read_text(errors="replace")[-REFUSAL_EXCERPT_CHARACTERS:])
+
+
+def stop_project_worker(state: dict) -> None:
+    """SIGTERM to the worker alone, never its group, so a git command it runs finishes; then wait
+    its finish deadline and the grace before anything is killed."""
+    pid = int(state["pids"]["project_worker"])
+    command = command_of(pid)
+    if not command:
+        print(f"project worker: pid {pid} already gone")
+        return
+    if PROJECT_WORKER_MODULE not in command:
+        print(f"project worker: pid {pid} is now '{command[:120]}', not ours; left alone")
+        return
+    finish = state.get("project_worker", {}).get("finish_seconds", PROJECT_WORKER_FINISH_SECONDS)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    deadline = time.monotonic() + float(finish) + PROJECT_WORKER_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        if not command_of(pid):
+            print(f"project worker: stopped pid {pid}")
+            return
+        time.sleep(0.25)
+    os.killpg(pid, signal.SIGKILL)
+    print(f"project worker: killed pid {pid} after its finish deadline")
+
+
 def through_proxy(exports: Mapping[str, str], port: int) -> dict[str, str]:
     """The exports with the API's database URLs pointed at the latency proxy on ``port``."""
     proxied = dict(exports)
@@ -1505,6 +1630,9 @@ def up(arguments: argparse.Namespace) -> None:
         refuse("database-latency-shape", REFUSALS["database-latency-shape"])
     if arguments.depth_worker and not arguments.no_derivative_worker:
         refuse("depth-worker-shape", REFUSALS["depth-worker-shape"])
+    projects = (
+        None if arguments.projects is None else projects_directory(arguments.projects, worktree)
+    )
     if arguments.scripted_model is not None:
         if arguments.model:
             refuse("scripted-with-model", REFUSALS["scripted-with-model"])
@@ -1702,7 +1830,7 @@ def up(arguments: argparse.Namespace) -> None:
             }
         )
     read_only_grant = None
-    if arguments.read_only_token:
+    if wants_read_only_token(arguments):
         read_only = secrets.token_urlsafe(48)
         read_only_file = run_dir / "token-read"
         read_only_file.write_text(read_only)
@@ -1894,6 +2022,17 @@ def up(arguments: argparse.Namespace) -> None:
     write_state(state_file, state)
     if probe_status != 200:
         refuse("token-refused", f"{probe_status} {probe_body[:REFUSAL_EXCERPT_CHARACTERS]!r}")
+    if projects is not None and read_only_grant is not None:
+        start_project_worker(
+            python,
+            worktree,
+            projects,
+            chosen["api"],
+            Path(str(read_only_grant["token_file"])),
+            logs,
+            state,
+            state_file,
+        )
     if arguments.second_api:
         second_log = logs / "api-2.log"
         state["pids"]["api_2"] = spawn(
@@ -2051,6 +2190,21 @@ def status(arguments: argparse.Namespace) -> None:
                 }
             )
         )
+    if "project_worker" in state["pids"]:
+        events = project_worker_events(Path(state["run_dir"]) / "logs" / "project-worker.log")
+        print(
+            "project worker: "
+            + json.dumps(
+                {
+                    "running": bool(command_of(state["pids"]["project_worker"])),
+                    "following": sorted(
+                        {str(e.get("project")) for e in events if e.get("state") == "following"}
+                    ),
+                    "checkpoints": sum(e.get("state") == "checkpointed" for e in events),
+                    "last_event": events[-1] if events else None,
+                }
+            )
+        )
     shown = ("tree", "ports", "run_dir", "workspace_id", "database", "society_playback")
     print(json.dumps({key: state.get(key) for key in shown}, indent=2))
 
@@ -2181,6 +2335,9 @@ def down(arguments: argparse.Namespace) -> None:
     if not state_file.exists():
         refuse("no-state", str(state_file))
     state = json.loads(state_file.read_text())
+    if "project_worker" in state["pids"]:
+        # First, while the API it reads still answers, so pending changes are recorded.
+        stop_project_worker(state)
     if "edge" in state:
         stop_edge(state, Path(state["run_dir"]) / "logs")
     if "tile_worker" in state["pids"]:
@@ -2315,6 +2472,12 @@ def build_parser() -> argparse.ArgumentParser:
                 "--read-only-token",
                 action="store_true",
                 help="also write token-read, granting the first workspace world.read alone",
+            )
+            command.add_argument(
+                "--projects",
+                type=Path,
+                default=None,
+                help="follow the world projects in this directory beside the API",
             )
             command.add_argument(
                 "--database-latency",

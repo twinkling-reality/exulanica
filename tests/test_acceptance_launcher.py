@@ -1154,3 +1154,96 @@ def test_workspace_style_packs_turn_uploads_on_by_the_products_own_setting():
         .parse_args(["up", "--worktree", ".", "--workspace-style-packs"])
         .workspace_style_packs
     )
+
+
+# -- the project worker ---------------------------------------------------------------------------
+
+
+def test_projects_is_off_unless_given_and_then_mints_the_read_only_token():
+    parser = LAUNCH.build_parser()
+    plain = parser.parse_args(["up", "--worktree", "w"])
+    followed = parser.parse_args(["up", "--worktree", "w", "--projects", "p"])
+    assert plain.projects is None and not LAUNCH.wants_read_only_token(plain)
+    assert followed.projects == Path("p") and LAUNCH.wants_read_only_token(followed)
+    assert LAUNCH.wants_read_only_token(
+        parser.parse_args(["up", "--worktree", "w", "--read-only-token"])
+    )
+
+
+def test_the_project_worker_reads_the_slot_api_at_localhost_with_the_read_only_token():
+    command = LAUNCH.project_worker_command(
+        Path("/w/.venv/bin/python"), Path("/p"), 19431, Path("/r/token-read")
+    )
+    assert command == [
+        "/w/.venv/bin/python",
+        "-m",
+        "exulanica.orchestration.project_worker",
+        "--projects",
+        "/p",
+        "--api",
+        "http://localhost:19431",
+        "--token-file",
+        "/r/token-read",
+        "--finish-seconds",
+        str(LAUNCH.PROJECT_WORKER_FINISH_SECONDS),
+    ]
+
+
+def test_a_projects_directory_is_its_own_outside_the_checkout_and_the_run(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    assert LAUNCH.projects_directory(projects, worktree) == projects.resolve()
+    link = tmp_path / "linked"
+    link.symlink_to(projects)
+    (worktree / "inside").mkdir()
+    run = LAUNCH.state_dir(worktree)
+    run.mkdir(parents=True)
+    (tmp_path / "file").write_text("")
+    for refused in (tmp_path / "missing", tmp_path / "file", link, worktree / "inside", run):
+        assert _refusal(LAUNCH.projects_directory, refused, worktree) == "projects-directory"
+
+
+def test_up_refuses_a_projects_directory_before_it_starts_anything(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--projects", str(tmp_path / "missing")]
+    )
+    assert _refusal(LAUNCH.up, arguments) == "projects-directory"
+    assert not LAUNCH.state_dir(worktree).exists()
+
+
+def test_the_project_worker_s_events_are_read_from_its_own_lines(tmp_path):
+    log = tmp_path / "project-worker.log"
+    log.write_text(
+        "\n".join(
+            [
+                json.dumps({"component": "project-worker", "event": "startup"}),
+                "a line that is not JSON",
+                json.dumps({"component": "tile-worker", "event": "startup"}),
+                json.dumps({"component": "project-worker", "event": "project", "state": "clean"}),
+            ]
+        )
+    )
+    assert [e["event"] for e in LAUNCH.project_worker_events(log)] == ["startup", "project"]
+    assert LAUNCH.project_worker_events(tmp_path / "absent.log") == []
+
+
+def test_down_stops_the_project_worker_alone_and_waits_its_finish_before_any_kill(monkeypatch):
+    """SIGTERM to the worker, never its group (a git command it runs must finish), and no
+    SIGKILL while it records what is pending within its deadline."""
+    polls = iter([LAUNCH.PROJECT_WORKER_MODULE] * 6 + [""])
+    sent = []
+    monkeypatch.setattr(LAUNCH, "command_of", lambda pid: next(polls))
+    monkeypatch.setattr(LAUNCH.os, "kill", lambda pid, signum: sent.append(("kill", signum)))
+    monkeypatch.setattr(LAUNCH.os, "killpg", lambda pid, signum: sent.append(("killpg", signum)))
+    monkeypatch.setattr(LAUNCH.time, "sleep", lambda seconds: None)
+    state = {"pids": {"project_worker": 4242}, "project_worker": {"finish_seconds": 20}}
+    with redirect_stderr(io.StringIO()):
+        LAUNCH.stop_project_worker(state)
+    assert sent == [("kill", LAUNCH.signal.SIGTERM)]
+    # A process that is no longer the worker is left alone.
+    monkeypatch.setattr(LAUNCH, "command_of", lambda pid: "something else")
+    sent.clear()
+    LAUNCH.stop_project_worker(state)
+    assert sent == []
