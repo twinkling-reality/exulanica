@@ -23541,6 +23541,64 @@
     }
    }
   },
+  "/worlds/references/{reference_id}/pictures": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Read Reference Pictures",
+    "description": "The pictures a picture search found, for its requester only, while this process holds\nthem: each its address, its website and its words, for the page to show from the website.\nNever stored, so never cached either.",
+    "operationId": "read_reference_pictures_worlds_references__reference_id__pictures_get",
+    "parameters": [
+     {
+      "name": "reference_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Reference Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/references/{reference_id}/cancel": {
    "post": {
     "tags": [
@@ -41027,6 +41085,11 @@
        }
       ],
       "title": "Pictures"
+     },
+     "web_pictures": {
+      "type": "boolean",
+      "title": "Web Pictures",
+      "default": false
      },
      "idempotency_key": {
       "anyOf": [

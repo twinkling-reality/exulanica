@@ -22,13 +22,19 @@ One job, in steps the page reads as they happen:
 5.  **bundle**: the notes become a reference bundle, complete or partial with the steps it missed.
 
 A request that did not ask for web notes skips plan, search and read; one that names no picture has
-no picture step. Each step has its own share of the job's time (:func:`stage_seconds`), each from a
-measured latency by the manifest's timeout rule, and the job's deadline is their sum, so a slow
-search never eats the reader's share; one request's searches are sent at once. Every step checks
-the deadline, whether the person asked to stop and whether the process is shutting down; each model
-call is given its share, or what is left of the deadline when that is less. Past the deadline, or at
-shutdown, the job ends partial with what it has, so the person is never left waiting on a source.
-What the searches returned lives only in this function's locals and is gone when it returns.
+no picture step. A picture search (``web_pictures``) skips the planner: the person's own words, as
+sent, are its one search subject, about anatomy; the pictures its search finds are held in this
+process for the person who asked (:mod:`exulanica.references.held_pictures`) and never written,
+and the reader drafts notes from its words as for any search.
+
+Each step has its own share of the job's time (:func:`stage_seconds`), each from a measured latency
+by the manifest's timeout rule, and the job's deadline is their sum, so a slow search never eats the
+reader's share; one request's searches are sent at once. Every step checks the deadline, whether the
+person asked to stop and whether the process is shutting down; each model call is given its share,
+or what is left of the deadline when that is less. Past the deadline, or at shutdown, the job ends
+partial with what it has, so the person is never left waiting on a source.
+What the searches returned lives only in this function's locals and is gone when it returns, but
+for a picture search's pictures, which the holding keeps for at most thirty minutes.
 
 Spending is keyed by the job alone, so a job taken again after a crash is admitted under the same
 keys and the authority refuses what already happened rather than paying for it twice. A source whose
@@ -78,9 +84,16 @@ from exulanica.references.adapters.base import (
     Leads,
     ReferenceAdapter,
     ReferenceSourceUnavailable,
+    WebPicture,
     search_timeout_seconds,
 )
-from exulanica.references.boundary import SEARCH_ROLE, AdmittedQuery, QueryRefused, admit_query
+from exulanica.references.boundary import (
+    SEARCH_ROLE,
+    AdmittedQuery,
+    QueryRefused,
+    SearchSubject,
+    admit_query,
+)
 from exulanica.references.bundle import (
     MAX_NOTES,
     PROFILE,
@@ -92,6 +105,7 @@ from exulanica.references.bundle import (
     ReferenceBundle,
 )
 from exulanica.references.catalogs import ReferenceSource, web_source
+from exulanica.references.held_pictures import PictureHolding, held_pictures
 from exulanica.references.notes import keep_notes
 from exulanica.references.pictures import (
     PICTURE_ROLE,
@@ -117,6 +131,8 @@ __all__ = [
 
 _LOG = logging.getLogger(__name__)
 
+#: What a picture search's one subject is about: what a creature looks like.
+PICTURE_SEARCH_ASPECT: Final = "anatomy"
 #: How often a worker clears each workspace's search query text past its retention.
 QUERY_CLEAR_SECONDS: Final = 3600.0
 #: How soon a worker tries a failed clear again: not every pass, which would send the database a
@@ -296,6 +312,11 @@ def _reason(failure: BaseException) -> str:
     return "failed"
 
 
+#: One search's outcome, credits, result count, the source's request id, its leads (None when it
+#: answered nothing usable) and, for a picture search, the pictures it found.
+_Searched = tuple[str, int, int, str | None, Leads | None, tuple[WebPicture, ...]]
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class _Reserved:
     """A search's admitted spending, held until the search is dispatched or released."""
@@ -343,8 +364,11 @@ class ReferenceWorker:
         clock: Callable[[], float] = time.monotonic,
         clear_clock: Callable[[], float] = time.monotonic,
         stop: threading.Event | None = None,
+        holding: PictureHolding | None = None,
     ) -> None:
         self._database = database
+        #: Where a picture search's pictures are held for the person who asked: this process's own.
+        self._holding = holding if holding is not None else held_pictures()
         self._client = client
         self._policy_for = policy_for
         self._spending = spending
@@ -466,6 +490,7 @@ class ReferenceWorker:
             if stopped.why == "claim_lost":
                 return "claim_lost"
             if stopped.why == "cancelled":
+                self._holding.forget(claimed.workspace_id, claimed.request.reference_id)
                 return self._finish(claimed, steps, status="cancelled")
             # The deadline or a shutdown: what is done stands, and the rest is missed.
             steps.miss_the_rest(stopped.why)
@@ -715,27 +740,34 @@ class ReferenceWorker:
         )
         catalogs = drafting.catalogs_for_prompts(prompts)
 
-        steps.set("plan", "running")
-        self._check(claimed, steps, started)
-        try:
-            planned = drafting.plan_subjects(
-                client,
-                claimed.description,
-                purpose=claimed.request.purpose,
-                prompts=prompts,
-                catalogs=catalogs,
-                deadline_s=self._share(self._stages.plan, started),
+        if claimed.web_pictures:
+            # The person's own words are the search: no planner is asked.
+            planned = drafting.Drafted(
+                subjects=(SearchSubject(claimed.description, PICTURE_SEARCH_ASPECT),)
             )
-        except (ModelError, SpendingRefused, ExulanicaError) as failure:
-            planned = drafting.Drafted(refused=_reason(failure))
-        if planned.call is not None:
-            calls.append(_call(planned.call))
-        if planned.refused is not None:
-            steps.set("plan", "missed", reason=planned.refused)
-            steps.set("search", "missed", reason="nothing_planned")
-            steps.set("read", "missed", reason="nothing_planned")
-            return
-        steps.set("plan", "done", subjects=len(planned.subjects))
+            steps.set("plan", "skipped")
+        else:
+            steps.set("plan", "running")
+            self._check(claimed, steps, started)
+            try:
+                planned = drafting.plan_subjects(
+                    client,
+                    claimed.description,
+                    purpose=claimed.request.purpose,
+                    prompts=prompts,
+                    catalogs=catalogs,
+                    deadline_s=self._share(self._stages.plan, started),
+                )
+            except (ModelError, SpendingRefused, ExulanicaError) as failure:
+                planned = drafting.Drafted(refused=_reason(failure))
+            if planned.call is not None:
+                calls.append(_call(planned.call))
+            if planned.refused is not None:
+                steps.set("plan", "missed", reason=planned.refused)
+                steps.set("search", "missed", reason="nothing_planned")
+                steps.set("read", "missed", reason="nothing_planned")
+                return
+            steps.set("plan", "done", subjects=len(planned.subjects))
 
         queries: list[AdmittedQuery] = []
         refused = 0
@@ -754,10 +786,15 @@ class ReferenceWorker:
                 refused += 1
         steps.set("search", "running", sent=0, of=len(queries), withheld=refused)
         leads: list[Leads] = []
+        pictures: list[WebPicture] = []
         unavailable: str | None = None
         self._check(claimed, steps, started)
-        for query, (outcome, credits, count, provider_id, lead) in zip(
-            queries, self._search_all(claimed, source, adapter, queries, pending), strict=True
+        for query, (outcome, credits, count, provider_id, lead, found) in zip(
+            queries,
+            self._search_all(
+                claimed, source, adapter, queries, pending, pictures=claimed.web_pictures
+            ),
+            strict=True,
         ):
             if outcome in _NOT_SENT:
                 unavailable = outcome
@@ -778,6 +815,7 @@ class ReferenceWorker:
                 )
             if lead is not None:
                 leads.append(lead)
+                pictures.extend(found)
             else:
                 unavailable = outcome
             steps.set("search", "running", sent=len(lookups), of=len(queries), withheld=refused)
@@ -785,7 +823,19 @@ class ReferenceWorker:
             steps.set("search", "missed", reason=unavailable or "nothing_admitted", of=len(queries))
             steps.set("read", "missed", reason="nothing_found")
             return
-        steps.set("search", "done", sent=len(lookups), found=len(leads), withheld=refused)
+        if claimed.web_pictures:
+            # Held for the person who asked, never written: the step states only how many.
+            self._holding.hold(claimed.workspace_id, claimed.request.reference_id, pictures)
+            steps.set(
+                "search",
+                "done",
+                sent=len(lookups),
+                found=len(leads),
+                withheld=refused,
+                pictures=len(pictures),
+            )
+        else:
+            steps.set("search", "done", sent=len(lookups), found=len(leads), withheld=refused)
 
         steps.set("read", "running")
         self._check(claimed, steps, started)
@@ -871,12 +921,14 @@ class ReferenceWorker:
         adapter: ReferenceAdapter,
         queries: Sequence[AdmittedQuery],
         pending: list[_Reserved],
-    ) -> list[tuple[str, int, int, str | None, Leads | None]]:
+        *,
+        pictures: bool = False,
+    ) -> list[_Searched]:
         """Every query's search, in the plan's order. Each is admitted here first, one after another
         under the source's per-minute rate and the workspace's grant, and those admitted are sent
         at once, so the searches take about as long as the slowest of them; one not admitted is
-        answered with why and never sent."""
-        results: list[tuple[str, int, int, str | None, Leads | None] | None] = []
+        answered with why and never sent. With ``pictures``, each is a picture search."""
+        results: list[_Searched | None] = []
         admitted: list[tuple[int, _Reserved]] = []
         for index in range(len(queries)):
             reserved, refusal = (
@@ -885,7 +937,7 @@ class ReferenceWorker:
                 else self._reserve(claimed, source, index)
             )
             if reserved is None:
-                results.append((refusal or "reference_budget_unavailable", 0, 0, None, None))
+                results.append((refusal or "reference_budget_unavailable", 0, 0, None, None, ()))
             else:
                 results.append(None)
                 admitted.append((index, reserved))
@@ -895,7 +947,14 @@ class ReferenceWorker:
             ) as pool:
                 sent = {
                     index: pool.submit(
-                        self._search, claimed, source, adapter, queries[index], index, reserved
+                        self._search,
+                        claimed,
+                        source,
+                        adapter,
+                        queries[index],
+                        index,
+                        reserved,
+                        pictures=pictures,
                     )
                     for index, reserved in admitted
                 }
@@ -911,18 +970,21 @@ class ReferenceWorker:
         query: AdmittedQuery,
         index: int,
         reserved: _Reserved | None = None,
-    ) -> tuple[str, int, int, str | None, Leads | None]:
-        """One search, admitted against the source's spending: outcome, credits, results, id."""
+        *,
+        pictures: bool = False,
+    ) -> _Searched:
+        """One search, admitted against the source's spending: outcome, credits, results, id, its
+        leads and, for a picture search, the pictures it found."""
         if reserved is None:
             reserved, refusal = self._reserve(claimed, source, index)
             if reserved is None:
-                return refusal or "reference_budget_unavailable", 0, 0, None, None
+                return refusal or "reference_budget_unavailable", 0, 0, None, None, ()
         gate, ticket = reserved.gate, reserved.ticket
         try:
             gate.dispatch(ticket)
         except SpendingRefused as refusal:
             self._release(gate, ticket)
-            return refusal.reason, 0, 0, None, None
+            return refusal.reason, 0, 0, None, None, ()
         except BaseException:
             self._release(gate, ticket)
             raise
@@ -936,8 +998,13 @@ class ReferenceWorker:
             cached_prompt_tokens=0,
             usd=Decimal(0),
         )
+        found: tuple[WebPicture, ...] = ()
         try:
-            lead = adapter.search(query)
+            if pictures:
+                answered = adapter.search_pictures(query)
+                lead, found = answered.leads, answered.pictures
+            else:
+                lead = adapter.search(query)
         except ReferenceSourceUnavailable as failure:
             if failure.charged:
                 self._settle(gate, ticket, usage)
@@ -949,9 +1016,9 @@ class ReferenceWorker:
                 credits = failure.credits
             else:
                 credits = source.cost_per_call if failure.charged else 0
-            return failure.code, credits, 0, None, None
+            return failure.code, credits, 0, None, None, ()
         except BaseException:
             self._settle(gate, ticket, usage)
             raise
         self._settle(gate, ticket, usage)
-        return "answered", lead.credits, lead.result_count, lead.request_id, lead
+        return "answered", lead.credits, lead.result_count, lead.request_id, lead, found

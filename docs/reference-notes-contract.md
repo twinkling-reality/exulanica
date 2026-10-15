@@ -13,6 +13,8 @@ contract; the hosted-request boundary itself belongs to the
 | A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
 | A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
+| A picture search for a creature: the person's words as its one search, the pictures it finds passed to its requester from memory and never stored | Implemented, off by default (`EXULANICA_REFERENCE_WEB_PICTURES`), offered to listed workspaces only and never on a `public` installation; no live picture search has run through the product |
+| Keeping a picture a person picks from a picture search | Not built |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
 
 ## 1. What a person gets
@@ -33,18 +35,28 @@ Online pictures are never fetched. A request serves its notes, its steps and our
 search (the source, its outcome, how many results, the credits it reported and when), never a
 result and never the query text.
 
+Where picture searches are offered, a person making a creature may ask for pictures from the web
+(`web_pictures`). Their words, at most eight once saved names are replaced, are the one search, sent
+without a planner. The pictures it finds, at most eight, each its address, its website and the
+source's words about it, are passed to that person alone, from the memory of the process that ran
+the job, for at most thirty minutes: their page shows each picture from its own website. Nothing of
+a picture is written to the database, the store or a log, and a picture is still never fetched.
+
 ## 2. Sources are catalog data
 
 `assets/catalogs/reference-sources/` holds versioned catalogs in the house envelope
 (`exulanica/grammar/catalogs.py`), read by `exulanica/references/catalogs.py`:
 
-- `reference-source.v1.json`: each source states whether it returns leads (words for drafting,
+- `reference-source.v2.json`: each source states whether it returns leads (words for drafting,
   never kept) or records (admissible facts), the one origin it is reached at, its credential
   variable, its terms as read (address, the date the provider states, the date read, the digest of
-  the text read), which classes of its data are kept, shown and exported, whether it is offered to
-  everyone or to the operator only, its cost per call and the one request shape its adapter sends.
-  The reader refuses a leads source that keeps, shows or exports anything it returned, and any
-  records source until record admission exists.
+  the text read), which classes of its data are kept, shown and exported, which it passes (served to
+  the person who asked from memory for one request, never kept, shown to anyone else or exported),
+  whether it is offered to everyone or to the operator only, its cost per call and the one request
+  shape its adapter sends. The reader refuses a leads source that keeps, shows or exports anything
+  it returned, that passes anything but a picture's address and words, or that passes what it
+  keeps, and any records source until record admission exists. `reference-source.v1.json`, which
+  passes nothing, stays readable.
 - `reference-aspect.v1.json`: the closed vocabulary for existing requests and world purposes.
   `reference-aspect.v2.json` adds anatomy and part layout for web notes with purpose `things`;
   materials and colour and rough scale keep their existing meanings. Selected things pictures
@@ -95,8 +107,8 @@ withdrawn; the database holds each of these.
 
 | Step | What happens |
 | --- | --- |
-| plan | Once the source is known to be configured, one call of the `reference_drafting` role writes at most three search subjects |
-| search | Each subject passes the boundary; each search is admitted against the source's spending, sent, and recorded in `reference_lookup` |
+| plan | Once the source is known to be configured, one call of the `reference_drafting` role writes at most three search subjects; skipped by a picture search, whose one subject is the person's words, about anatomy |
+| search | Each subject passes the boundary; each search is admitted against the source's spending, sent, and recorded in `reference_lookup`; a picture search's pictures are held for its requester and the step states only how many (`pictures`) |
 | read | One call of the `reference_drafting` role writes at most twelve notes from what the searches found; a note sharing six consecutive words with anything it was shown, or failing the screen, is dropped |
 | read_picture | Before the searches, once for each picture the request names: the picture is read and its notes checked (section 10); the step names the picture's capture id |
 | bundle | The kept notes become a reference bundle (v1 for existing/world requests, v2 for web-only things, v3 for selected things pictures), complete or partial with the steps it missed |
@@ -189,6 +201,7 @@ the workspace's grant like every model call. Without durable spending, web notes
 | `EXULANICA_REFERENCE_WORKER` | On unless `off`, `0`, `false` or `no`: this process plays reference jobs in a thread |
 | `EXULANICA_REFERENCE_WORKSPACES` | A JSON array of the workspace ids that may ask for web notes; none when absent. A malformed list stops startup |
 | `EXULANICA_REFERENCE_PICTURES` | Off unless `on`, `1`, `true` or `yes`: listed workspaces may also name their own pictures. Any other value stops startup |
+| `EXULANICA_REFERENCE_WEB_PICTURES` | Off unless `on`, `1`, `true` or `yes`: listed workspaces may also ask for picture searches. Any other value stops startup |
 | `TAVILY_API_KEY` | The source's credential, named by its catalog entry |
 | `EXULANICA_EGRESS_ALLOWLIST` | Must include `https://api.tavily.com` for web notes |
 
@@ -196,9 +209,10 @@ the workspace's grant like every model call. Without durable spending, web notes
 
 | Route | Permission | Does |
 | --- | --- | --- |
-| `GET /worlds/references` | `world.read` | The caller's recent requests, the capability to make one, and `pictures` |
-| `POST /worlds/references` | `world.write`, `model.invoke` and `references.request` | `{purpose, description, web, pictures?, idempotency_key?}`; 202 with the request, 200 with the request a repeated key first made |
+| `GET /worlds/references` | `world.read` | The caller's recent requests, the capability to make one, `pictures` and `web_pictures` |
+| `POST /worlds/references` | `world.write`, `model.invoke` and `references.request` | `{purpose, description, web, pictures?, web_pictures?, idempotency_key?}`; 202 with the request, 200 with the request a repeated key first made |
 | `GET /worlds/references/{reference_id}` | `world.read` | One of the caller's own requests: steps, notes, missed steps, our search records |
+| `GET /worlds/references/{reference_id}/pictures` | `world.read` | The pictures one of the caller's own picture searches found, while this process holds them: `{reference_id, pictures: [{n, address, website, description}], seconds_left}`, with `Cache-Control: no-store` |
 | `POST /worlds/references/{reference_id}/cancel` | `world.write`, `model.invoke` and `references.request` | Stop one of the caller's own requests |
 
 `references.request` is a permission of its own: an account owner holds it, a token holds it when
@@ -228,6 +242,18 @@ Naming pictures where they are not offered is 409 with the code the list's `pict
 before anything about web notes, and naming one that may not be read is 409
 `reference_picture_not_admitted` with its reason in the detail (section 10); either is refused
 before anything is queued.
+
+A picture search is a web search for a creature: `web_pictures` without `web` is 422
+`web_pictures_need_web`, and for any purpose but `things` 422 `web_pictures_for_things`. Where
+picture searches are not offered it is 409 with the code the list's `web_pictures.code` states
+(`web_pictures_not_offered`, or why web notes are refused here), and words longer than eight, or
+than the query's character limit, once saved names are replaced, are 422 `web_pictures_words`;
+each is refused before anything is queued. A query the boundary refuses in the job sends nothing
+and holds nothing. The pictures route answers 404 `pictures_not_held` when this process holds none
+for the request: their thirty minutes are up, the request was stopped, the process restarted, or
+another process ran the job. With more than one API process, a request's pictures are served only
+by the process that ran its job. The list's `web_pictures` is `{offered, code, words}`, `words`
+being 8.
 
 The list's `pictures` is `{offered, code, maximum, consent?}`: `offered` is whether this workspace
 may name pictures here, `code` says why not (`reference_pictures_not_offered`, or the code a request
@@ -434,7 +460,9 @@ recorded. An expired right is not a stop and withdraws nothing.
 
 `tests/test_reference_sources.py`, `tests/test_reference_boundary.py`,
 `tests/test_reference_notes.py`, `tests/test_reference_pictures.py` and
-`tests/test_reference_settings.py` run without a database; `tests/test_reference_store.py`,
+`tests/test_reference_settings.py` run without a database, as does most of
+`tests/test_reference_web_pictures.py`, whose picture search through the worker and routes runs on
+PostgreSQL; `tests/test_reference_store.py`,
 `tests/test_reference_worker.py`, `tests/test_reference_routes.py`,
 `tests/test_reference_for_drafting.py`, `tests/test_reference_worker_pictures.py`,
 `tests/test_reference_picture_admission.py`, `tests/test_reference_withdrawal.py` and

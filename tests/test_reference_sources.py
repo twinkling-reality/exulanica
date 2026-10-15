@@ -95,14 +95,21 @@ def test_the_tavily_entry_states_what_the_terms_read_allow() -> None:
     assert source.kept == ("query", "request_record")
     assert source.shown == ("request_record",)
     assert source.exported == ()
+    assert source.passed == ("image_address", "image_description")
     assert source.availability == "operator_only"
     assert (source.cost_unit, source.cost_per_call, source.search_depth) == ("credit", 1, "basic")
+
+
+def test_the_first_source_catalog_version_still_reads_and_passes_nothing() -> None:
+    first = load_reference_catalogs(source_version=1).sources["tavily_search"]
+    assert first.passed == ()
+    assert first.kept == _source().kept
 
 
 def _tampered(tmp_path: Path, change) -> Path:
     directory = tmp_path / "reference-sources"
     shutil.copytree(CATALOG_DIRECTORY, directory)
-    path = directory / "reference-source.v1.json"
+    path = directory / "reference-source.v2.json"
     document = json.loads(path.read_text())
     change(document["entries"][0])
     path.write_text(json.dumps(document))
@@ -123,6 +130,11 @@ TAMPERED = {
     "the advanced depth's shape is not offered": lambda e: e.update(search_depth="advanced"),
     "an unknown data class": lambda e: e.update(kept=["query", "everything"]),
     "a missing field": lambda e: e.pop("availability"),
+    "a source passing what it keeps": lambda e: e.update(passed=["image_address", "query"]),
+    "a leads source passing result text": lambda e: e.update(passed=["result_text"]),
+    "a picture address shown as well as passed": lambda e: e.update(
+        shown=["request_record", "image_address"], kept=["request_record", "image_address"]
+    ),
 }
 
 

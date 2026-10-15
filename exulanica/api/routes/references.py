@@ -23,6 +23,13 @@ A person's own pictures are offered only where ``EXULANICA_REFERENCE_PICTURES`` 
 request names only pictures a privacy screening permits looking at and a current right for the
 picture role covers (:func:`exulanica.api.reference_pictures.picture_refusal`); the job checks both
 again before it reads each one.
+
+A picture search (``web_pictures``, for a creature) is offered only where
+``EXULANICA_REFERENCE_WEB_PICTURES`` is on as well: the person's words, at most eight, are its one
+search, and the pictures it finds are served to its requester alone from
+``GET /worlds/references/{reference_id}/pictures`` while this process holds them (thirty minutes),
+with ``Cache-Control: no-store``; the page shows each from its own website. Nothing of them is
+written anywhere.
 """
 
 from __future__ import annotations
@@ -59,9 +66,11 @@ from exulanica.api.services import Services
 from exulanica.ingest.personal_admission import model_right_offers
 from exulanica.references import store
 from exulanica.references.adapters import ReferenceSourceUnavailable
+from exulanica.references.boundary import MAX_QUERY_CHARACTERS, MAX_QUERY_WORDS
 from exulanica.references.bundle import read_bundle
 from exulanica.references.catalogs import web_source
 from exulanica.references.drafting import prompts_for_request
+from exulanica.references.held_pictures import held_pictures
 from exulanica.references.pictures import PICTURE_ROLE
 from exulanica.selection.world_drafting import sendable
 from exulanica.spending.status import workspace_status
@@ -83,6 +92,8 @@ _LISTED: Final = 20
 #: route answers a credential that may not reach it (exulanica/api/permissions.py).
 _UNKNOWN: Final = "unknown_reference"
 _UNKNOWN_DETAIL: Final = "nothing at this address is available to this credential"
+#: What a held picture's answer may not be: kept by a cache anywhere on its way.
+_NOT_STORED: Final = {"Cache-Control": "no-store"}
 
 
 class ReferenceBody(BaseModel):
@@ -98,6 +109,8 @@ class ReferenceBody(BaseModel):
     pictures: list[uuid.UUID] | None = Field(
         default=None, min_length=1, max_length=store.MAX_PICTURES
     )
+    #: Whether to search the web for pictures of the creature the words describe; a web search.
+    web_pictures: bool = False
     idempotency_key: uuid.UUID | None = None
 
 
@@ -250,6 +263,8 @@ def _request_sha256(body: ReferenceBody) -> str:
     # A request without pictures keeps the digest it had before pictures were offered.
     if body.pictures:
         fields["pictures"] = [str(picture) for picture in body.pictures]
+    if body.web_pictures:
+        fields["web_pictures"] = True
     canonical = json.dumps(
         fields,
         sort_keys=True,
@@ -267,6 +282,29 @@ def pictures_unavailable_because(
     if not services.pictures_offered_to(workspace_id):
         return "reference_pictures_not_offered"
     return unavailable_because(services, workspace_id, running=running, web=False)
+
+
+def web_pictures_unavailable_because(
+    services: Services, workspace_id: uuid.UUID, *, running: bool
+) -> str | None:
+    """Why this workspace may not search the web for pictures here, or None: the one code the
+    list states and a picture search is refused with. Picture searches are offered where they are
+    turned on, references are served to the workspace, and the installation is not public."""
+    profile = services.installation.profile if services.installation is not None else None
+    if (
+        not services.reference_web_pictures
+        or (profile is not None and profile.id == "public")
+        or not services.serves_references_to(workspace_id)
+    ):
+        return "web_pictures_not_offered"
+    return unavailable_because(services, workspace_id, running=running, web=True)
+
+
+def _web_pictures(services: Services, workspace_id: uuid.UUID, *, running: bool) -> dict[str, Any]:
+    """Whether this workspace may search the web for pictures here, and how many words a search
+    holds; the code says why not."""
+    code = web_pictures_unavailable_because(services, workspace_id, running=running)
+    return {"offered": code is None, "code": code, "words": MAX_QUERY_WORDS}
 
 
 def _pictures(
@@ -360,6 +398,7 @@ def list_references(
             "pictures": _pictures(
                 services, session.workspace_id, running=running, holds_right=holds_right
             ),
+            "web_pictures": _web_pictures(services, session.workspace_id, running=running),
         }
     )
 
@@ -378,6 +417,10 @@ def request_reference(
     invalid = _invalid_description(body.description)
     if invalid is not None:
         return _refusal(422, invalid, "a description holds no control character")
+    if body.web_pictures and not body.web:
+        return _refusal(422, "web_pictures_need_web", "a picture search is a web search")
+    if body.web_pictures and body.purpose != "things":
+        return _refusal(422, "web_pictures_for_things", "a picture search is for a creature")
     pictures = body.pictures or []
     if not body.web and not pictures:
         return _refusal(422, "nothing_to_look_up", "ask for web notes, name pictures, or both")
@@ -385,6 +428,10 @@ def request_reference(
         return _refusal(422, "pictures_repeated", "each picture is named once")
     _sweep(services, session.workspace_id)
     running = _running(request)
+    if body.web_pictures:
+        code = web_pictures_unavailable_because(services, session.workspace_id, running=running)
+        if code is not None:
+            return _refusal(409, code, "picture searches are not offered to this workspace here")
     if pictures:
         # The code the list states for pictures, before anything about web notes.
         code = pictures_unavailable_because(services, session.workspace_id, running=running)
@@ -405,6 +452,15 @@ def request_reference(
             f"with its saved names replaced, a description is at most "
             f"{store.MAX_DESCRIPTION_CHARACTERS} characters",
         )
+    if body.web_pictures and (
+        len(sent.text.split()) > MAX_QUERY_WORDS or len(sent.text) > MAX_QUERY_CHARACTERS
+    ):
+        return _refusal(
+            422,
+            "web_pictures_words",
+            f"a picture search is at most {MAX_QUERY_WORDS} words and "
+            f"{MAX_QUERY_CHARACTERS} characters",
+        )
     key = body.idempotency_key
     try:
         made, new = store.create_request(
@@ -420,6 +476,7 @@ def request_reference(
             request_id=key,
             request_sha256=None if key is None else _request_sha256(body),
             pictures=tuple(pictures),
+            web_pictures=body.web_pictures,
         )
     except store.RequestNotOffered:
         return _refusal(409, "references_operator_only", "web notes are not offered here")
@@ -450,6 +507,46 @@ def read_reference(
     return JSONResponse(_view(found, _lookups(connection, session.workspace_id, reference_id)))
 
 
+@router.get("/references/{reference_id}/pictures")
+def read_reference_pictures(
+    reference_id: uuid.UUID, connection: ReadOnlyConnection, session: CurrentSession
+) -> JSONResponse:
+    """The pictures a picture search found, for its requester only, while this process holds
+    them: each its address, its website and its words, for the page to show from the website.
+    Never stored, so never cached either."""
+    found = store.read_request(
+        connection, session.workspace_id, reference_id, owner_actor_id=session.actor
+    )
+    if found is None:
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    held = held_pictures().read(session.workspace_id, reference_id)
+    if held is None:
+        return JSONResponse(
+            {
+                "code": "pictures_not_held",
+                "detail": "no pictures are held for this request in this process",
+            },
+            status_code=404,
+            headers=_NOT_STORED,
+        )
+    return JSONResponse(
+        {
+            "reference_id": str(reference_id),
+            "pictures": [
+                {
+                    "n": n,
+                    "address": picture.address,
+                    "website": picture.website,
+                    "description": picture.description,
+                }
+                for n, picture in enumerate(held.pictures)
+            ],
+            "seconds_left": held.seconds_left,
+        },
+        headers=_NOT_STORED,
+    )
+
+
 @router.post("/references/{reference_id}/cancel")
 def cancel_reference(
     reference_id: uuid.UUID, connection: ScopedConnection, session: CurrentSession
@@ -461,4 +558,9 @@ def cancel_reference(
     )
     if found is None:
         return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    if found.status == "cancelled" or (
+        found.cancel_requested_at is not None and found.finished_at is None
+    ):
+        # A stopped search's pictures go with it; a finished one keeps them for their time.
+        held_pictures().forget(session.workspace_id, reference_id)
     return JSONResponse(_view(found, _lookups(connection, session.workspace_id, reference_id)))

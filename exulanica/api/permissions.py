@@ -787,6 +787,7 @@ _WORLD_READS: Final = _every(
     "GET /worlds/recipes",
     "GET /worlds/references",
     "GET /worlds/references/{reference_id}",
+    "GET /worlds/references/{reference_id}/pictures",
     "GET /worlds/specification",
     "GET /worlds/{world_id}/removal",
 )

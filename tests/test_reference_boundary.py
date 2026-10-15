@@ -237,4 +237,10 @@ def test_a_reference_source_is_sent_to_only_from_an_adapter_search() -> None:
     reference_posts = {
         call for call in _calls("post_json") if call[0].startswith("exulanica.references")
     }
-    assert reference_posts == {("exulanica.references.adapters.tavily", "search")}
+    assert reference_posts == {("exulanica.references.adapters.tavily", "_answer")}
+    # The one sender is reached from the adapter's two searches and from nothing else.
+    senders = {call for call in _calls("_answer") if call[0].startswith("exulanica.references")}
+    assert senders == {
+        ("exulanica.references.adapters.tavily", "search"),
+        ("exulanica.references.adapters.tavily", "search_pictures"),
+    }

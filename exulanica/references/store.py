@@ -9,15 +9,16 @@ that was sent is written whoever holds the job. Every path that locks both rows 
 first, then the request's.
 
 The job's payload holds what the work needs and nothing more: the request's id, the person's
-description as it is sent (saved names already replaced) and any words of the account's own the
-caller asks to be screened (the route passes none: it does not know them). Every end of a request
-(finished, cancelled, stranded, or expired after
-:data:`QUEUED_EXPIRY_SECONDS` unclaimed) blanks the description and the words and clears the
-digest of the request an idempotency key named, so after a request ends nothing of the person's
-words is kept; only our planned queries are, in ``reference_lookup``. A request is accepted only
-for a workspace the caller says is offered references, so no job waits for a worker that will
-never take it, and at most :data:`MAX_OPEN_PER_ACTOR` unfinished and :data:`MAX_PER_ACTOR_HOUR`
-in an hour for any one requester. Only the requester reads or stops a request through the routes.
+description as it is sent (saved names already replaced), any words of the account's own the caller
+asks to be screened (the route passes none: it does not know them), the person's own pictures by id,
+and ``web_pictures`` when the person asked for a picture search. Every end of a request (finished,
+cancelled, stranded, or expired after :data:`QUEUED_EXPIRY_SECONDS` unclaimed) blanks the
+description and the words and clears the digest of the request an idempotency key named, so after a
+request ends nothing of the person's words is kept; only our planned queries are, in
+``reference_lookup``. A request is accepted only for a workspace the caller says is offered
+references, so no job waits for a worker that will never take it, and at most
+:data:`MAX_OPEN_PER_ACTOR` unfinished and :data:`MAX_PER_ACTOR_HOUR` in an hour for any one
+requester. Only the requester reads or stops a request through the routes.
 """
 
 from __future__ import annotations
@@ -215,6 +216,7 @@ def create_request(
     request_id: uuid.UUID | None = None,
     request_sha256: str | None = None,
     pictures: Sequence[uuid.UUID] = (),
+    web_pictures: bool = False,
 ) -> tuple[ReferenceRequest, bool]:
     """A new request and its queued job, or the earlier one its idempotency key names.
 
@@ -251,6 +253,10 @@ def create_request(
     if pictures:
         # Ids only: a picture's bytes stay in the store, read by the worker under its right.
         payload["pictures"] = [str(picture) for picture in pictures]
+    if web_pictures:
+        if not web:
+            raise ValueError("a picture search is a web search")
+        payload["web_pictures"] = True
     try:
         with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
             # One requester at a time is counted, so two requests racing see each other.
@@ -317,6 +323,9 @@ class ClaimedRequest:
     withheld_words: tuple[str, ...] = field(repr=False)
     #: The person's own pictures the request reads, by capture id, in the order given.
     pictures: tuple[uuid.UUID, ...] = ()
+    #: Whether the person asked for pictures from the web: their words are the one search, and the
+    #: pictures it finds are held for them (:mod:`exulanica.references.held_pictures`).
+    web_pictures: bool = False
 
 
 def _fail_orphan(cursor: psycopg.Cursor[Any], job_id: uuid.UUID) -> None:
@@ -359,6 +368,9 @@ def claim(
                 description = str(payload["description"])
                 withheld = tuple(str(word) for word in payload["withheld_words"])
                 pictures = tuple(uuid.UUID(str(item)) for item in payload.get("pictures", ()))
+                web_pictures = payload.get("web_pictures", False)
+                if type(web_pictures) is not bool:
+                    raise TypeError("web_pictures is true or absent")
             except (KeyError, TypeError, ValueError):
                 _fail_orphan(cursor, job["job_id"])
                 continue
@@ -380,6 +392,7 @@ def claim(
             description=description,
             withheld_words=withheld,
             pictures=pictures,
+            web_pictures=web_pictures,
         )
 
 

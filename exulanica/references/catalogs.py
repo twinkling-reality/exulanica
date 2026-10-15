@@ -3,13 +3,15 @@
 ``assets/catalogs/reference-sources/`` holds each as a versioned, licensed catalog in the house
 envelope (:mod:`exulanica.grammar.catalogs`):
 
-* ``reference-source.v1.json``: every source a reference may come from. Each states whether it
+* ``reference-source.v2.json``: every source a reference may come from. Each states whether it
   returns leads (words for drafting, never kept) or records (admissible facts), the one origin it
   is reached at, the environment variable holding its credential, the terms as read (address, the
   date the provider states, the date read and the digest of the text read), which classes of its
-  data are kept, shown and exported, whether it is offered to everyone or to the operator only,
-  its cost per call and the one request shape its adapter may send. Adding or replacing a source
-  is an entry here plus one adapter in :mod:`exulanica.references.adapters`.
+  data are kept, shown and exported, which it passes (served to the person who asked from this
+  process's memory for one request, and never kept, shown to anyone else or exported), whether it
+  is offered to everyone or to the operator only, its cost per call and the one request shape its
+  adapter may send. Adding or replacing a source is an entry here plus one adapter in
+  :mod:`exulanica.references.adapters`. Version 1, which passes nothing, stays readable.
 * ``reference-aspect.v1.json``: the closed vocabulary for places and pictures. Version 2 adds
   anatomy and part layout for web notes about things; picture vocabulary stays unchanged.
 * ``reference-query-screen.v1.json``: words no outgoing query may carry, by category, each with
@@ -46,6 +48,7 @@ __all__ = [
     "DATA_CLASSES",
     "KINDS",
     "LEAD_DATA_CLASSES",
+    "PASSED_DATA_CLASSES",
     "Aspect",
     "ReferenceCatalogs",
     "ReferenceSource",
@@ -74,6 +77,9 @@ DATA_CLASSES: Final = (
 )
 #: The only classes a leads source may keep, show or export: our own.
 LEAD_DATA_CLASSES: Final = ("query", "request_record")
+#: The only classes a leads source may pass: a picture's address and its words, served to the person
+#: who asked so their browser shows the picture from its own website.
+PASSED_DATA_CLASSES: Final = ("image_address", "image_description")
 COST_UNITS: Final = ("credit",)
 SEARCH_DEPTHS: Final = ("basic", "fast", "ultra-fast")
 
@@ -139,6 +145,13 @@ def _source_check(where: str, values: dict[str, FieldValue]) -> None:
             f"{where}: a leads source keeps only our own {list(LEAD_DATA_CLASSES)}, never "
             f"anything it returned, got {sorted(kept)}"
         )
+    passed = set(cast(tuple[str, ...], values.get("passed", ())))
+    if passed & (kept | shown | exported):
+        raise CatalogError(f"{where}: what a source passes is never kept, shown or exported")
+    if values["kind"] == "leads" and not passed <= set(PASSED_DATA_CLASSES):
+        raise CatalogError(
+            f"{where}: a leads source passes only {list(PASSED_DATA_CLASSES)}, got {sorted(passed)}"
+        )
     if values["kind"] == "records":
         raise CatalogError(
             f"{where}: no records source is admitted yet; a records source arrives with the "
@@ -171,6 +184,18 @@ _SOURCE_SCHEMA: Final = CatalogSchema(
         ("reason", text_field),
     ),
     entry_check=_source_check,
+)
+#: Version 2 adds what a source passes.
+_SOURCE_SCHEMA_V2: Final = replace(
+    _SOURCE_SCHEMA,
+    catalog_version=2,
+    fields=tuple(
+        field
+        for name, check in _SOURCE_SCHEMA.fields
+        for field in (
+            ((name, check), ("passed", _data_classes)) if name == "exported" else ((name, check),)
+        )
+    ),
 )
 
 
@@ -243,6 +268,8 @@ class ReferenceSource:
     search_depth: str
     max_results: int
     calls_per_minute: int
+    #: What it passes to the person who asked, from memory for one request; nothing in version 1.
+    passed: tuple[str, ...] = ()
 
     @property
     def endpoint(self) -> str:
@@ -273,14 +300,23 @@ class ReferenceCatalogs:
 
 @functools.cache
 def load_reference_catalogs(
-    directory: Path = CATALOG_DIRECTORY, *, aspect_version: int = 1, picture_version: int = 1
+    directory: Path = CATALOG_DIRECTORY,
+    *,
+    aspect_version: int = 1,
+    picture_version: int = 1,
+    source_version: int = 2,
 ) -> ReferenceCatalogs:
     """Read and check the catalogs; cached per directory and closed aspect version."""
+    if source_version not in (1, 2):
+        raise ValueError("reference source version is 1 or 2")
     if aspect_version not in (1, 2):
         raise ValueError("reference aspect version is 1 or 2")
     if picture_version not in (1, 2) or (picture_version == 2 and aspect_version != 2):
         raise ValueError("picture version 2 uses things aspect version 2")
-    sources = load_catalog(directory / "reference-source.v1.json", _SOURCE_SCHEMA)
+    sources = load_catalog(
+        directory / f"reference-source.v{source_version}.json",
+        _SOURCE_SCHEMA_V2 if source_version == 2 else _SOURCE_SCHEMA,
+    )
     aspects = load_catalog(
         directory / f"reference-aspect.v{aspect_version}.json",
         replace(_ASPECT_SCHEMA, catalog_version=aspect_version),

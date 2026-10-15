@@ -6,6 +6,12 @@ fetched, no generated answer, no page text beyond Tavily's own excerpts, safe se
 credit usage reported back. The answer is read for its excerpts and picture descriptions; every
 address, title, favicon and picture address in it is dropped as it is read.
 
+A picture search (:meth:`TavilySearch.search_pictures`) sends the same request and reads the same
+leads, and also keeps the answer's picture addresses that a page may show
+(:func:`~exulanica.references.adapters.base.picture_address`), at most
+:data:`~exulanica.references.adapters.base.MAX_WEB_PICTURES`, each with its description where
+Tavily gave one: what the catalog entry passes, for the person who asked.
+
 The usage Tavily reports is checked against the catalog's cost per call. A different figure means
 the shape no longer costs what was admitted, so the call is refused as
 ``reference_cost_changed`` (already charged) and the source stops until the catalog is reviewed.
@@ -21,8 +27,12 @@ from exulanica.models.errors import TransportError
 from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import Transport
 from exulanica.references.adapters.base import (
+    MAX_WEB_PICTURES,
     Leads,
+    PictureLeads,
     ReferenceSourceUnavailable,
+    WebPicture,
+    picture_address,
     search_timeout_seconds,
 )
 from exulanica.references.boundary import AdmittedQuery
@@ -90,6 +100,18 @@ class TavilySearch:
         }
 
     def search(self, query: AdmittedQuery) -> Leads:
+        return self._leads(query, self._answer(query))
+
+    def search_pictures(self, query: AdmittedQuery) -> PictureLeads:
+        """One search, its leads and the pictures it found that a page may show."""
+        if not {"image_address", "image_description"} <= set(self.source.passed):
+            raise TypeError("this source's catalog entry passes no pictures")
+        body = self._answer(query)
+        leads = self._leads(query, body)
+        return PictureLeads(leads=leads, pictures=_pictures(body))
+
+    def _answer(self, query: AdmittedQuery) -> Mapping[str, Any]:
+        """Tavily's answer to ``query``, read as JSON, or why there is none."""
         if not isinstance(query, AdmittedQuery) or query.source != self.source.key:
             raise TypeError("the Tavily adapter sends only a query admitted for it")
         try:
@@ -125,11 +147,11 @@ class TavilySearch:
             raise ReferenceSourceUnavailable(
                 "reference_answer_unreadable", "Tavily's answer is not JSON", charged=True
             ) from failure
-        return self._leads(query, body)
-
-    def _leads(self, query: AdmittedQuery, body: object) -> Leads:
         if not isinstance(body, Mapping):
             raise _unreadable("the answer is not an object")
+        return body
+
+    def _leads(self, query: AdmittedQuery, body: Mapping[str, Any]) -> Leads:
         usage = body.get("usage")
         credits = usage.get("credits") if isinstance(usage, Mapping) else None
         if type(credits) is not int:
@@ -180,6 +202,39 @@ def _descriptions(images: object, into: list[str]) -> None:
             description = image.get("description")
             if isinstance(description, str) and description.strip():
                 into.append(description.strip()[:MAX_DESCRIPTION_CHARACTERS])
+
+
+def _pictures(body: Mapping[str, Any]) -> tuple[WebPicture, ...]:
+    """The answer's pictures a page may show, first the answer's own then each result's, each
+    address once, at most :data:`MAX_WEB_PICTURES`; a picture with no description keeps none."""
+    found: dict[str, WebPicture] = {}
+    results = body.get("results")
+    lists = [body.get("images")] + (
+        [result.get("images") for result in results if isinstance(result, Mapping)]
+        if isinstance(results, Sequence) and not isinstance(results, str | bytes)
+        else []
+    )
+    for images in lists:
+        if not isinstance(images, Sequence) or isinstance(images, str | bytes):
+            continue
+        for image in images:
+            address = image.get("url") if isinstance(image, Mapping) else image
+            shown = picture_address(address)
+            if shown is None or shown[0] in found:
+                continue
+            description = image.get("description") if isinstance(image, Mapping) else None
+            found[shown[0]] = WebPicture(
+                address=shown[0],
+                website=shown[1],
+                description=(
+                    description.strip()[:MAX_DESCRIPTION_CHARACTERS]
+                    if isinstance(description, str) and description.strip()
+                    else None
+                ),
+            )
+            if len(found) == MAX_WEB_PICTURES:
+                return tuple(found.values())
+    return tuple(found.values())
 
 
 def _unreadable(detail: str) -> ReferenceSourceUnavailable:

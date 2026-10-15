@@ -156,6 +156,7 @@ from exulanica.references.settings import (
     plays_references_here,
     reads_pictures_here,
     reference_workspaces,
+    searches_web_pictures_here,
 )
 from exulanica.selection import creature_drafts
 from exulanica.selection.creature_drafts import (
@@ -391,6 +392,10 @@ class Services(ServiceRefusals, WorkerFactories):
     #: Whether listed workspaces may ask for notes from their own pictures
     #: (``EXULANICA_REFERENCE_PICTURES``); off for a hand-constructed Services, and off unless set.
     reference_pictures: bool = False
+    #: Whether listed workspaces may ask for picture searches
+    #: (``EXULANICA_REFERENCE_WEB_PICTURES``); off for a hand-constructed Services, and off unless
+    #: set.
+    reference_web_pictures: bool = False
     #: A reference source's adapter from this process's configuration, or a refusal naming what is
     #: missing; None for a hand-constructed Services.
     reference_adapter_for: Callable[[ReferenceSource], ReferenceAdapter] | None = None
@@ -1262,6 +1267,9 @@ def build_services(
         runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
         reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
         reference_pictures=reads_pictures_here(env_get("REFERENCE_PICTURES", environ)),
+        reference_web_pictures=searches_web_pictures_here(
+            env_get("REFERENCE_WEB_PICTURES", environ)
+        ),
         admits_workspace_models=_explicitly_enabled(
             env_get("WORKSPACE_MODELS", environ),
             "workspace_models_not_boolean",

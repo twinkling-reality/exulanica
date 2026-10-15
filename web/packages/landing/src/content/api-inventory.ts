@@ -25056,6 +25056,68 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/worlds/references/{reference_id}/pictures",
+    "method": "get",
+    "id": "read_reference_pictures_worlds_references__reference_id__pictures_get",
+    "title": "Read Reference Pictures",
+    "description": "The pictures a picture search found, for its requester only, while this process holds\nthem: each its address, its website and its words, for the page to show from the website.\nNever stored, so never cached either.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "reference_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Reference Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/worlds/references/{reference_id}/cancel",
     "method": "post",
     "id": "cancel_reference_worlds_references__reference_id__cancel_post",
