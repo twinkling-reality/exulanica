@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildYourWorlds, onlyUntouchedStarter } from '../src/composition/world-entry.js';
 import {
-  jpegWithoutMetadata, keepFirstViewPicture, mayPutPicture, readServedPictures, worldPicture, type PictureSource,
+  FIRST_VIEW_WAIT, holdsWorld, jpegWithoutMetadata, keepFirstViewPicture, mayPutPicture, readServedPictures, worldPicture, type PictureSource,
 } from '../src/composition/world-pictures.js';
 import type { SavedWorldEntry, SavedWorldEntryPicture } from '../src/world-entry-api.js';
 
@@ -293,6 +293,74 @@ describe('the pictures the server keeps', () => {
     expect(jpegWithoutMetadata(cut)).toBe(cut);
   });
 
+  // A frame of a world drawn before its land and light: near white and colourless, crossed by darker
+  // lines (one pixel in ten), so it is not one flat colour: only the washed-out check refuses it.
+  const washedLevel = (index: number): number => ((index >> 2) % 10 === 0 ? 150 : 236 + ((index >> 2) % 7) + (index % 4 === 2 ? 3 : 0));
+  // A drawn world: sky, ground and shade, in colour.
+  const drawnLevel = (index: number): number => (index % 4 === 2 ? 180 : index % 4 === 1 ? 140 : 90) + ((index >> 2) % 60);
+
+  it('reads a frame as the drawn world only when it is neither one flat colour nor washed out', () => {
+    const frame = (level: (index: number) => number) => Uint8ClampedArray.from({ length: 1280 * 720 * 4 }, (_, index) => level(index));
+    expect(holdsWorld(frame(drawnLevel))).toBe(true);
+    expect(holdsWorld(frame(() => 30))).toBe(false);
+    expect(holdsWorld(frame(washedLevel))).toBe(false);
+    // The same frame with its washed share under half is a world: a bright sky over a darker town.
+    expect(holdsWorld(frame((index) => ((index >> 2) % 10 < 6 ? 120 + ((index >> 2) % 30) : washedLevel(index))))).toBe(true);
+    // Bright but coloured (a sunlit sky over sand) is a world.
+    expect(holdsWorld(frame((index) => (index % 4 === 2 ? 215 : index % 4 === 1 ? 190 : 120) + ((index >> 2) % 40)))).toBe(true);
+  });
+
+  it('keeps nothing, here or on the server, until a frame holds the drawn world, then keeps that one', async () => {
+    const put = server();
+    const first = world();
+    const source = renderer(washedLevel);
+    const painted = (source.app.graphicsDevice.canvas.getContext('2d') as unknown as { getImageData: () => { data: Uint8ClampedArray } }).getImageData().data;
+    let waits = 0;
+    const sleep = vi.fn(async () => {
+      waits += 1;
+      // While the world is waited for nothing is kept; on the third wait the land is drawn.
+      expect(own(first)).toBeNull();
+      expect(put.putPicture).not.toHaveBeenCalled();
+      if (waits === 3) painted.forEach((_, index) => { painted[index] = drawnLevel(index); });
+    });
+    const record = await keepFirstViewPicture(source, first, put, { sleep });
+    expect(waits).toBe(3);
+    expect(sleep).toHaveBeenCalledWith(FIRST_VIEW_WAIT.retryMs);
+    expect(record).not.toBeNull();
+    expect(own(first)).toBe('data:image/jpeg;base64,BBBB');
+    expect(put.putPicture).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps nothing when no frame holds the drawn world within the bound, nor once another world is open', async () => {
+    const put = server();
+    const never = world();
+    const sleep = vi.fn(async () => undefined);
+    expect(await keepFirstViewPicture(renderer(washedLevel), never, put, { sleep })).toBeNull();
+    // Asked at the start and after each retry, up to the bound.
+    expect(sleep).toHaveBeenCalledTimes(FIRST_VIEW_WAIT.boundMs / FIRST_VIEW_WAIT.retryMs);
+    expect(own(never)).toBeNull();
+    expect(put.putPicture).not.toHaveBeenCalled();
+    let open = true;
+    const left = world({ entryId: '99999999-9999-4999-8999-999999999999' });
+    const leaving = vi.fn(async () => { open = false; });
+    expect(await keepFirstViewPicture(renderer(washedLevel), left, put, { sleep: leaving, current: () => open })).toBeNull();
+    expect(leaving).toHaveBeenCalledTimes(1);
+    expect(own(left)).toBeNull();
+  });
+
+  it('asks for no frame while the world says its drawing is not ready', async () => {
+    const put = server();
+    const dressed = world();
+    let ready = false;
+    const source = renderer(drawnLevel);
+    const asked = vi.spyOn(source.app, 'on');
+    const sleep = vi.fn(async () => { ready = sleep.mock.calls.length >= 2; });
+    await keepFirstViewPicture(source, dressed, put, { sleep, ready: () => ready });
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(asked).toHaveBeenCalledTimes(1);
+    expect(own(dressed)).toBe('data:image/jpeg;base64,BBBB');
+  });
+
   it('never sends a frame of a world that holds or held a photograph', async () => {
     const attachment = {} as SavedWorldEntry['sourceAttachments'][number];
     const removed = {} as NonNullable<SavedWorldEntry['previousSourceAttachments']>[number];
@@ -320,7 +388,7 @@ describe('the pictures the server keeps', () => {
     expect(worldPicture(refused)).toBe('data:image/jpeg;base64,BBBB');
     const flat = world();
     const quietPut = server();
-    expect(await keepFirstViewPicture(renderer(() => 40), flat, quietPut)).toBeNull();
+    expect(await keepFirstViewPicture(renderer(() => 40), flat, quietPut, { sleep: async () => undefined })).toBeNull();
     expect(own(flat)).toBeNull();
     expect(quietPut.putPicture).not.toHaveBeenCalled();
   });

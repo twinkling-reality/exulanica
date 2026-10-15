@@ -1997,8 +1997,11 @@ async function mountWorld(): Promise<void> {
       const binding = state.atlas?.binding;
       const entry = state.activeWorldEntry;
       if (binding === undefined || entry?.entryId !== pictured) return;
+      // Kept only once a frame holds the drawn world, and a terrain's dressing is ready where it has one.
+      const ready = (): boolean => binding.app.graphicsDevice.canvas.dataset['terrainDressing'] !== 'unavailable';
+      const current = (): boolean => state.atlas?.binding === binding && state.activeWorldEntry?.entryId === pictured;
       if (state.worldEntries === null) void keepWorldPicture(binding, pictured);
-      else void keepFirstViewPicture(binding, entry, state.worldEntries);
+      else void keepFirstViewPicture(binding, entry, state.worldEntries, { ready, current });
     }, WORLD_PICTURE_DELAY_MS);
   }
   if (preview) {

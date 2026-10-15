@@ -76,9 +76,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "photographs from one standpoint, joined by the rotation between them",
     ),
     "web/packages/app/src/main.ts": (
-        2_022,
+        2_025,
         "the legacy app shell's boot and world mount, and the picture of a saved world it keeps "
-        "on the server",
+        "on the server once a frame holds the drawn world",
     ),
     "exulanica/orchestration/judge_seed.py": (
         2_021,

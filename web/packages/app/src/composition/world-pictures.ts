@@ -113,23 +113,37 @@ export interface PictureSource {
   };
 }
 
-/** Whether a frame holds a picture at all: a cleared or unlit buffer reads as one flat colour. */
-function flat(context: CanvasRenderingContext2D): boolean {
-  const { data } = context.getImageData(0, 0, WIDTH, HEIGHT);
+/**
+ * When a frame does not hold a drawn world, from a sample of its pixels (every 97th): one flat
+ * colour (a cleared or unlit buffer), or washed out, where at least `washedShare` of the samples are
+ * near white and colourless (every channel at least `washedLevel`, the channels within
+ * `washedSpread` of each other), as a world draws before its land and light are drawn. Measured
+ * 15 October 2026: such a frame had 0.77 of its samples washed; real first views of a bay by day
+ * and of terraces at night had at most 0.05.
+ */
+export const FRAME_CHECK = Object.freeze({ sampleEvery: 97, flatRange: 12, washedLevel: 220, washedSpread: 24, washedShare: 0.5 });
+
+/** Whether pixels (RGBA) hold a drawn world by `FRAME_CHECK`: not one flat colour and not washed out. */
+export function holdsWorld(data: ArrayLike<number>, check = FRAME_CHECK): boolean {
   let low = 255;
   let high = 0;
-  for (let i = 0; i < data.length; i += 4 * 97) {
-    const level = (data[i]! + data[i + 1]! + data[i + 2]!) / 3;
+  let samples = 0;
+  let washed = 0;
+  for (let i = 0; i + 2 < data.length; i += 4 * check.sampleEvery) {
+    const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+    const level = (r + g + b) / 3;
     low = Math.min(low, level);
     high = Math.max(high, level);
+    samples += 1;
+    if (Math.min(r, g, b) >= check.washedLevel && Math.max(r, g, b) - Math.min(r, g, b) < check.washedSpread) washed += 1;
   }
-  return high - low < 12;
+  return samples > 0 && high - low >= check.flatRange && washed / samples < check.washedShare;
 }
 
 /**
  * A frame of the world the renderer draws, read right after its next draw, the only moment its
  * drawing buffer still holds the frame, at the card's size. The renderer draws only frames it is
- * asked for, so one is asked for. Resolves null for a flat frame or none.
+ * asked for, so one is asked for. Resolves null for a frame that holds no drawn world, or none.
  */
 function takeFrame(source: PictureSource): Promise<HTMLCanvasElement | null> {
   return new Promise((resolve) => {
@@ -155,7 +169,7 @@ function takeFrame(source: PictureSource): Promise<HTMLCanvasElement | null> {
         const sw = WIDTH / scale;
         const sh = HEIGHT / scale;
         context.drawImage(canvas, (canvas.width - sw) / 2, (canvas.height - sh) / 2, sw, sh, 0, 0, WIDTH, HEIGHT);
-        finish(flat(context) ? null : frame);
+        finish(holdsWorld(context.getImageData(0, 0, WIDTH, HEIGHT).data) ? frame : null);
       } catch {
         finish(null);
       }
@@ -185,7 +199,6 @@ export async function keepWorldPicture(source: PictureSource, entryId: string): 
   return frame !== null && keepHere(frame, entryId);
 }
 
-/** The first views this page has put, by entry and what they show, so one is put once. */
 /**
  * A JPEG's bytes without its APP1 to APP15 and comment segments. A browser's encoder may write the
  * canvas's colour profile (APP2) or other metadata into the JPEG it makes, and the server keeps a
@@ -213,18 +226,54 @@ export function jpegWithoutMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<
   return out;
 }
 
+/** The first views this page has put, by entry and what they show, so one is put once. */
 const put = new Set<string>();
 
 /**
+ * How a first view is waited for, from the moment it is first asked for (a few seconds after the
+ * world opens): a frame that holds no drawn world is asked for again every `retryMs`, until
+ * `boundMs` has passed, and nothing is kept until one does.
+ */
+export const FIRST_VIEW_WAIT = Object.freeze({ retryMs: 2_000, boundMs: 30_000 });
+
+/** How the keep waits, and for what: whether the world's drawing says it is ready, and whether the world is still the one open. */
+export interface FirstViewWait {
+  /** False while the world's drawing says it is not ready yet (a terrain's dressing); absent is ready. */
+  readonly ready?: () => boolean;
+  /** False once another world is open, or none: the keep stops. Absent is always. */
+  readonly current?: () => boolean;
+  readonly timing?: typeof FIRST_VIEW_WAIT;
+  /** Waits `ms` (window.setTimeout unless given). */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
+/** The first frame that holds a drawn world, asked for until the wait's bound, or null. */
+async function firstDrawnFrame(source: PictureSource, wait: FirstViewWait): Promise<HTMLCanvasElement | null> {
+  const timing = wait.timing ?? FIRST_VIEW_WAIT;
+  const sleep = wait.sleep ?? ((ms: number) => new Promise<void>((resolve) => { window.setTimeout(resolve, ms); }));
+  for (let waited = 0; waited <= timing.boundMs; waited += timing.retryMs) {
+    if (wait.current?.() === false) return null;
+    if (wait.ready?.() !== false) {
+      const frame = await takeFrame(source);
+      if (frame !== null) return wait.current?.() === false ? null : frame;
+    }
+    if (waited + timing.retryMs > timing.boundMs) break;
+    await sleep(timing.retryMs);
+  }
+  return null;
+}
+
+/**
  * Keep a frame of `entry`'s first view in this browser, and put it to the server unless the
- * server's picture is current already or the world holds or held a photograph. A refusal (a
- * read-only copy refuses every write) leaves this browser's own picture. Resolves the server's
- * record of the picture it kept, or null.
+ * server's picture is current already or the world holds or held a photograph. Only a frame that
+ * holds the drawn world is kept or put: until one does (`wait`), nothing is. A refusal (a read-only
+ * copy refuses every write) leaves this browser's own picture. Resolves the server's record of the
+ * picture it kept, or null.
  */
 export async function keepFirstViewPicture(
-  source: PictureSource, entry: SavedWorldEntry, server: Pick<PictureServer, 'putPicture'>,
+  source: PictureSource, entry: SavedWorldEntry, server: Pick<PictureServer, 'putPicture'>, wait: FirstViewWait = {},
 ): Promise<SavedWorldEntryPicture | null> {
-  const frame = await takeFrame(source);
+  const frame = await firstDrawnFrame(source, wait);
   if (frame === null) return null;
   keepHere(frame, entry.entryId);
   const shows = `${entry.entryId} ${entry.authoredVersionId} ${entry.authoredStateSha256} ${entry.styleVersionId}`;
