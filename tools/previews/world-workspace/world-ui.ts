@@ -228,22 +228,27 @@ export function ring(): Ring {
   };
 }
 
+/** How a footprint's outline reads: the chosen thing, a copy where it would go, a refused copy, the spot it came from (dashed). */
+export type OutlineForm = 'chosen' | 'copy' | 'refused' | 'origin';
+
 export interface Outline {
   readonly root: SVGSVGElement;
   /** Draws a rounded outline through a footprint's corners as projected on screen (CSS pixels, in order). */
   place(corners: readonly { readonly x: number; readonly y: number }[]): void;
+  /** Changes the form (a copy turns refused when the server refuses its spot). */
+  form(form: OutlineForm): void;
   hide(): void;
 }
 
-/** A thing's footprint in build mode (5.4): a rounded outline, 2.2 px white with the ring's glow. */
-export function outline(): Outline {
+/** A thing's footprint (5.4, 5.15): 2.2 px white with the ring's glow when chosen; 1.8 px for a copy, tinted when refused; dashed for the spot it came from. */
+export function outline({ form = 'chosen' }: { readonly form?: OutlineForm } = {}): Outline {
   const id = `wu-outline-${++ringSerial}`;
   const root = document.createElementNS(SVG, 'svg');
   root.setAttribute('class', 'wu-outline');
   root.setAttribute('aria-hidden', 'true');
+  root.dataset.form = form;
   root.innerHTML = `<defs><filter id="${id}-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter></defs>`
-    + `<path class="wu-outline-glow" fill="none" stroke="#bfe9f0" stroke-opacity=".5" stroke-width="6" stroke-linejoin="round" filter="url(#${id}-glow)"/>`
-    + '<path class="wu-outline-line" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>';
+    + `<path class="wu-outline-glow" filter="url(#${id}-glow)"/><path class="wu-outline-line"/>`;
   root.style.display = 'none';
   const paths = [...root.querySelectorAll('path')];
   return {
@@ -254,7 +259,104 @@ export function outline(): Outline {
       for (const path of paths) path.setAttribute('d', d);
       root.style.display = '';
     },
+    form(next) { root.dataset.form = next; },
     hide() { root.style.display = 'none'; },
+  };
+}
+
+export interface DottedPath {
+  readonly root: SVGSVGElement;
+  /** Draws a gentle dotted curve from `from` to `to` (CSS pixels). */
+  place(from: { readonly x: number; readonly y: number }, to: { readonly x: number; readonly y: number }): void;
+  hide(): void;
+}
+
+/** The dotted path from a thing's spot to its copy (5.15): 1.4 px, 75 % white, dashes 3 6, a gentle curve. */
+export function path(): DottedPath {
+  const root = document.createElementNS(SVG, 'svg');
+  root.setAttribute('class', 'wu-path');
+  root.setAttribute('aria-hidden', 'true');
+  root.innerHTML = '<path class="wu-path-line"/>';
+  root.style.display = 'none';
+  const line = root.querySelector('path')!;
+  return {
+    root,
+    place(from, to) {
+      // The bend is a seventh of the length, to the left of the way from the spot to the copy.
+      const dx = to.x - from.x, dy = to.y - from.y, bend = 1 / 7;
+      const control = { x: (from.x + to.x) / 2 + dy * bend, y: (from.y + to.y) / 2 - dx * bend };
+      line.setAttribute('d', `M${from.x.toFixed(1)} ${from.y.toFixed(1)}Q${control.x.toFixed(1)} ${control.y.toFixed(1)} ${to.x.toFixed(1)} ${to.y.toFixed(1)}`);
+      root.style.display = '';
+    },
+    hide() { root.style.display = 'none'; },
+  };
+}
+
+export interface NameTagWords {
+  readonly name: string;
+  /** What the character is doing; null or absent while a pop speaks for it, and for a thing. */
+  readonly doing?: string | null;
+  /** The served model name for the chip, or null with no model (and for a thing). */
+  readonly model?: string | null;
+  /** The chip's live dot while a run is on and this model is deciding. */
+  readonly live?: boolean;
+}
+
+export interface NameTag {
+  readonly root: HTMLElement;
+  set(words: NameTagWords): void;
+  /** Puts the caret 10 reference px above the head point (x, y), centred. */
+  place(x: number, y: number): void;
+  hide(): void;
+}
+
+const CARET = '<svg class="wu-tag-caret" viewBox="0 0 12 7" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/** The sentence a screen reader hears for a name tag: "Teo, waiting by the bench, Nemotron 3 Nano 30B". */
+export function tagSentence({ name, doing, model }: NameTagWords): string {
+  const said = doing ? doing.charAt(0).toLowerCase() + doing.slice(1) : null;
+  return [name, said, model].filter(Boolean).join(', ');
+}
+
+/** The name over the character or thing at the reticle (5.3): name, doing line, model chip, caret. */
+export function nameTag({ scale = () => 1, inset = ANCHOR_INSET }: { readonly scale?: () => number; readonly inset?: number } = {}): NameTag {
+  const root = element('div', 'wu-anchored wu-tag');
+  const name = element('div', 'wu-tag-name'), doing = element('div', 'wu-tag-doing');
+  // What is drawn is hidden from readers; one live line says it all once, on each change.
+  name.setAttribute('aria-hidden', 'true'); doing.setAttribute('aria-hidden', 'true');
+  const spoken = element('div', 'wu-hidden-words');
+  spoken.setAttribute('aria-live', 'polite');
+  root.append(spoken, name, doing);
+  root.insertAdjacentHTML('beforeend', CARET);
+  let modelChip: HTMLSpanElement | null = null, size: { width: number; height: number } | null = null, sizedAt = 0;
+  root.hidden = true;
+  return {
+    root,
+    set(words) {
+      if (name.textContent !== words.name) { name.textContent = words.name; size = null; }
+      const line = words.doing || '';
+      if (doing.textContent !== line) { doing.textContent = line; size = null; }
+      doing.hidden = !line;
+      if (!words.model) { if (modelChip) { modelChip.remove(); modelChip = null; size = null; } }
+      else {
+        if (!modelChip) { modelChip = chip(words.model); modelChip.setAttribute('aria-hidden', 'true'); root.insertBefore(modelChip, root.lastElementChild); size = null; }
+        const held = modelChip.querySelector('.wu-chip-words');
+        if (held && held.textContent !== words.model) { held.textContent = words.model; size = null; }
+        setChipLive(modelChip, words.live === true);
+      }
+      const sentence = tagSentence(words);
+      if (spoken.textContent !== sentence) spoken.textContent = sentence;
+    },
+    place(x, y) {
+      root.hidden = false;
+      const s = scale();
+      // Measured once per change of words or scale, so a frame only writes a transform.
+      if (size === null || sizedAt !== s) { size = { width: root.offsetWidth, height: root.offsetHeight }; sizedAt = s; }
+      const at = clampToView({ x: x - size.width / 2, y: y - size.height - 10 * s }, size, { width: innerWidth, height: innerHeight }, inset * s);
+      const transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`;
+      if (root.style.transform !== transform) root.style.transform = transform;
+    },
+    hide() { root.hidden = true; },
   };
 }
 

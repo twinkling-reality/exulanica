@@ -18,6 +18,9 @@ interface WorldUi {
   stepList(steps: readonly { words: string; state: 'done' | 'now' | 'next'; time?: string }[]): HTMLElement;
   mountUiScale(root: HTMLElement, signal?: AbortSignal): void;
   scaleOf(root: HTMLElement): number;
+  nameTag(options?: { scale?: () => number }): { readonly root: HTMLElement; set(words: { name: string; doing?: string | null; model?: string | null; live?: boolean }): void; place(x: number, y: number): void; hide(): void };
+  outline(options?: { form?: 'chosen' | 'copy' | 'refused' | 'origin' }): { readonly root: SVGSVGElement; place(corners: readonly { x: number; y: number }[]): void; form(form: 'chosen' | 'copy' | 'refused' | 'origin'): void; hide(): void };
+  path(): { readonly root: SVGSVGElement; place(from: { x: number; y: number }, to: { x: number; y: number }): void; hide(): void };
 }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
 // module (outside this package) out of the program.
@@ -134,5 +137,46 @@ describe('the other parts', () => {
     window.dispatchEvent(new Event('resize'));
     expect(scaleOf(document.body)).toBe(1);
     lifetime.abort();
+  });
+});
+
+describe('the parts beside a subject', () => {
+  it('a name tag says the name, what the character does and its model, in one polite announcement', async () => {
+    const { nameTag } = await parts();
+    const tag = nameTag();
+    document.body.append(tag.root);
+    expect(tag.root.hidden).toBe(true);
+    // One live line is what a reader hears; what is drawn is hidden from it.
+    const spoken = tag.root.querySelector('[aria-live="polite"]')!;
+    tag.set({ name: 'Teo', doing: 'Waiting by the bench', model: 'Nemotron 3 Nano 30B', live: true });
+    expect(spoken.textContent).toBe('Teo, waiting by the bench, Nemotron 3 Nano 30B');
+    expect(tag.root.querySelector('.wu-tag-name')!.getAttribute('aria-hidden')).toBe('true');
+    expect(tag.root.querySelector('.wu-chip')!.getAttribute('aria-hidden')).toBe('true');
+    expect(tag.root.querySelectorAll('.wu-chip')).toHaveLength(1);
+    expect(tag.root.querySelector('.wu-live-dot')).not.toBeNull();
+    // While a pop speaks for the character, and for a thing, the doing line goes; a thing has no chip.
+    tag.set({ name: 'Fan palm' });
+    expect((tag.root.querySelector('.wu-tag-doing') as HTMLElement).hidden).toBe(true);
+    expect(tag.root.querySelector('.wu-chip')).toBeNull();
+    expect(spoken.textContent).toBe('Fan palm');
+    tag.place(400, 300);
+    expect(tag.root.hidden).toBe(false);
+    expect(tag.root.style.transform).toMatch(/^translate3d\(/u);
+  });
+
+  it('an outline changes its form in place, and a path draws one curve between two points', async () => {
+    const { outline, path } = await parts();
+    const copy = outline({ form: 'copy' });
+    copy.place([{ x: 0, y: 0 }, { x: 10, y: 0 }]);
+    expect(copy.root.style.display).toBe('none');
+    copy.place([{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 30 }, { x: 0, y: 30 }]);
+    expect(copy.root.style.display).toBe('');
+    expect(copy.root.querySelector('.wu-outline-line')!.getAttribute('d')).toMatch(/^M.*Z$/u);
+    copy.form('refused');
+    expect(copy.root.dataset.form).toBe('refused');
+    expect(outline().root.dataset.form).toBe('chosen');
+    const way = path();
+    way.place({ x: 0, y: 0 }, { x: 70, y: 0 });
+    expect(way.root.querySelector('path')!.getAttribute('d')).toBe('M0.0 0.0Q35.0 -10.0 70.0 0.0');
   });
 });

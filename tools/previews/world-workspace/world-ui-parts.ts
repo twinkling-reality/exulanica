@@ -3,7 +3,7 @@
 // screen uses them. Nothing here reads a world.
 import {
   areaBanner, cardWords, chip, keyWord, label, mountUiScale, notes, orb, page, promptColumn, promptRow,
-  outline, ring, rule, scaleOf, sideCard, stepList,
+  nameTag, outline, path, ring, rule, scaleOf, sideCard, stepList,
 } from './world-ui.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
@@ -67,8 +67,13 @@ if (query.get('view') === 'page') {
     keyWord({ keys: ['Tab'], word: 'Next', shortcut: 'Tab', onPress: press }),
     keyWord({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z', onPress: press }),
   ])).classList.add('wu-hints');
-  const footprint = outline(), chosen = ring();
-  add(footprint.root); add(chosen.root);
+  // The chosen part's outline; a copy where it would go, refused here, with the dotted path from its
+  // spot (outlined dashed); and the name of a thing under the pointer.
+  const footprint = outline(), copy = outline({ form: 'refused' }), origin = outline({ form: 'origin' }), way = path();
+  add(footprint.root); add(copy.root); add(origin.root); add(way.root);
+  const pointed = nameTag({ scale: () => scaleOf(root) });
+  add(pointed.root);
+  pointed.set({ name: 'Fan palm' });
   const card = sideCard({ build: true, scale: () => scaleOf(root) });
   add(card.root);
   card.body.append(cardWords({ title: 'Bench', lines: ['Made with this world · Lower pools'] }), promptColumn([
@@ -79,6 +84,10 @@ if (query.get('view') === 'page') {
   const placeAll = (): void => {
     const x = innerWidth / 1920, y = innerHeight / 1080;
     footprint.place([{ x: 780 * x, y: 700 * y }, { x: 1010 * x, y: 680 * y }, { x: 1080 * x, y: 760 * y }, { x: 820 * x, y: 790 * y }]);
+    origin.place([{ x: 300 * x, y: 820 * y }, { x: 470 * x, y: 805 * y }, { x: 520 * x, y: 870 * y }, { x: 330 * x, y: 890 * y }]);
+    copy.place([{ x: 420 * x, y: 640 * y }, { x: 570 * x, y: 628 * y }, { x: 615 * x, y: 680 * y }, { x: 450 * x, y: 695 * y }]);
+    way.place({ x: 410 * x, y: 850 * y }, { x: 515 * x, y: 662 * y });
+    pointed.place(1460 * x, 470 * y);
     card.place({ left: 780 * x, top: 560 * y, right: 1080 * x, bottom: 790 * y, headY: 600 * y, waistY: 720 * y });
   };
   placeAll();
@@ -112,6 +121,9 @@ if (query.get('view') === 'page') {
   // A chosen subject: its ring, and the card beside it, placed again when the window changes.
   const chosen = ring();
   add(chosen.root);
+  const looking = nameTag({ scale: () => scaleOf(root) });
+  add(looking.root);
+  looking.set({ name: 'Ines', doing: 'Walking to the lower pools', model: 'Qwen3 235B Instruct', live: true });
   const beside = sideCard({ scale: () => scaleOf(root) });
   add(beside.root);
   beside.body.append(cardWords({ title: 'Teo', lines: ['Waiting by the bench', 'Teo\'s model chose this at 07:09, from 7 choices.'] }));
@@ -138,6 +150,7 @@ if (query.get('view') === 'page') {
   const placeAll = (): void => {
     const x = innerWidth / 1920, y = innerHeight / 1080, s = scaleOf(root);
     chosen.place(560 * x, 760 * y, 104 * s, 25 * s);
+    looking.place(300 * x, 600 * y);
     beside.place({ left: 520 * x, top: 470 * y, right: 600 * x, bottom: 760 * y, headY: 480 * y, waistY: 640 * y });
     question.place({ left: 1240 * x, top: 330 * y, right: 1300 * x, bottom: 620 * y, headY: 340 * y, waistY: 480 * y });
   };

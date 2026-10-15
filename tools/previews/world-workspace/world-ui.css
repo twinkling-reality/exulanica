@@ -19,6 +19,7 @@
   --lilac: #ad92bd;
   --live: #bfe9f0;
   --refused: #ff8f7e;
+  --refused-ink: #ffc2b8;
   --glass-fill: rgba(13, 20, 27, .68);
   --glass-blur: blur(30px) saturate(120%) brightness(.92);
   --text-shadow: 0 1px 2px rgba(0, 0, 0, .42), 0 0 22px rgba(0, 0, 0, .30);
@@ -142,7 +143,28 @@ span.wu-prompt { cursor: default; }
 .wu-card.wu-build .wu-card-line { margin-top: calc(8 * var(--u)); font-size: max(12px, calc(15.5 * var(--u))); color: var(--ink-2); }
 .wu-card.wu-build .wu-card-answer { margin: calc(14 * var(--u)) 0 0; font: 400 calc(17 * var(--u))/1.45 var(--font-sans); color: var(--ink); }
 .wu-card.wu-build .wu-col { gap: calc(14 * var(--u)); margin-top: calc(20 * var(--u)); }
-.wu-outline { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
+.wu-card.wu-build .wu-row { margin-top: calc(22 * var(--u)); }
+.wu-outline, .wu-path { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
+/* A footprint's outline (5.4, 5.15): the chosen thing's, a copy's where it would go, a refused copy's,
+   and the original spot's, dashed; and the dotted path from the spot to the copy. */
+.wu-outline-line { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linejoin: round; }
+.wu-outline-glow { fill: none; stroke: var(--live); stroke-opacity: .5; stroke-width: 6; stroke-linejoin: round; }
+.wu-outline[data-form="copy"] .wu-outline-line, .wu-outline[data-form="refused"] .wu-outline-line { stroke-width: 1.8; }
+.wu-outline[data-form="refused"] .wu-outline-line { stroke: var(--refused-ink); }
+.wu-outline[data-form="refused"] .wu-outline-glow { stroke: var(--refused); }
+.wu-outline[data-form="origin"] .wu-outline-line { stroke-opacity: .75; stroke-dasharray: 7 6; }
+.wu-outline[data-form="origin"] .wu-outline-glow { display: none; }
+.wu-path-line { fill: none; stroke: #fff; stroke-opacity: .75; stroke-width: 1.4; stroke-dasharray: 3 6; stroke-linecap: round; }
+.wu-refused { color: var(--refused-ink); }
+/* Words for screen readers only. */
+.wu-hidden-words { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* The name over a character or thing at the reticle (5.3, frame 04). */
+.wu-tag { display: flex; flex-direction: column; align-items: center; gap: calc(7 * var(--u)); text-align: center; text-shadow: var(--text-shadow); pointer-events: none; animation: wu-reveal var(--t-reveal) var(--ease) both; }
+.wu-tag-name { font: 500 calc(23 * var(--u))/1.1 var(--font-sans); letter-spacing: .005em; white-space: nowrap; }
+.wu-tag-doing { font: 400 max(12px, calc(15.5 * var(--u)))/1.25 var(--font-sans); color: var(--ink-2); white-space: nowrap; }
+.wu-tag .wu-chip { margin-top: 2px; }
+.wu-tag-caret { width: calc(12 * var(--u)); height: calc(7 * var(--u)); margin-top: 2px; }
 .wu-card-label { margin: 0 0 calc(12 * var(--u)); font: 500 max(12px, calc(14 * var(--u)))/1 var(--font-sans); color: var(--ink-3); letter-spacing: .03em; }
 .wu-card-title { margin: 0; font: 300 calc(40 * var(--u))/1.05 var(--font-sans); letter-spacing: -.015em; }
 .wu-card-line { margin: calc(14 * var(--u)) 0 0; font: 400 calc(17 * var(--u))/1.45 var(--font-sans); color: var(--ink-2); }
