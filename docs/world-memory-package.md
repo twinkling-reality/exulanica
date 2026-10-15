@@ -944,7 +944,8 @@ another number. The three settings may also be given as `EXULANICA_PROJECTS_DIRE
 round in hand finishes, each project with pending changes records them once within 60 seconds
 (`EXULANICA_PROJECT_FINISH_SECONDS`), and it exits 0. Each event is one line of JSON naming a
 folder by its name, never its path, and never carrying the bearer. It writes only the project
-folders, never the world and never a remote.
+folders and never the world; it reaches a remote only for a folder whose link publishes on its own
+(below, "Automatic publication"), and stopping publishes nothing.
 
 ### GitHub transport
 
@@ -1024,6 +1025,32 @@ files make no commit and unchanged text is not rewritten. The review digest bind
 both branch heads, the pull request, each commit's message and file digests, and the text; `publish-branch` recomputes
 it and refuses any difference. A failed step stops publication, names the steps already done and
 is not retried.
+
+**Automatic publication.** A followed folder whose link says `"publish": "automatic"` has its
+rolling pull request follow it ([`publish.py`](../exulanica/world_package/projects/publish.py)):
+
+```sh
+uv run python -m exulanica.world_package.projects link ./projects/my-world --repository OWNER/REPOSITORY --base main --branch exulanica/my-world --publish automatic
+```
+
+`link --publish automatic` reads the repository once and refuses unless its visibility reads
+`PRIVATE`; `--publish by-hand`, the default, writes no `publish` field, so a link written before it
+keeps its bytes. After each checkpoint the follower records for such a folder, it reviews the
+pull request and, when the review has actions, publishes with the reviewed digest: the same two
+steps a person runs. The visibility is read again on every review, and anything but `PRIVATE`
+stops it, so a repository made public after linking receives nothing. At most
+`limits.publications_per_day` attempts are made in a day (24 unless the follow file states
+another number, `--publications-per-day`); each is recorded before it is made, so a restarted
+follower keeps the bound, and an attempt the bound holds back is made after a later checkpoint.
+Anything refused or uncertain (a repository no longer private, written words or a limited thing
+the rights refuse, a branch that moved, a step whose outcome is unknown) pauses automatic
+publication for that folder with its reason, and nothing is retried; the event says it once. A
+person's own successful `publish-branch` lifts the pause. The attempts and the pause are kept in
+`project-publish.json` (profile `exulanica.world-project-publish/v1`) beside the project's files,
+never committed and never published, so they add no commit to what a pull request replays; the
+history read returns them as `automatic_publication`. The follower takes GitHub through the
+GitHub CLI and the person's own sign-in, as the commands do; changes that cancel out close the
+pull request, as by hand.
 
 **Applying a merged pull request.** A merged pull request becomes a new alternate version of the
 running world through the World API's own routes; the version the project was captured from is

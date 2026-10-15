@@ -406,19 +406,24 @@ class Project:
             "evidence": recorded,
         }
 
-    def link(self, repository: str, base: str, branch: str) -> dict[str, Any]:
-        """Record where this project publishes. A local, committed file; nothing is contacted."""
+    def link(
+        self, repository: str, base: str, branch: str, publish: str | None = None
+    ) -> dict[str, Any]:
+        """Record where this project publishes, and whether the follower publishes it on its own
+        (`publish="automatic"`). A local, committed file; nothing is contacted."""
         self._require()
         if self.head() is None:
             raise ProjectError("project has no saved checkpoint")
-        data = link_bytes(make_link(repository, base, branch))
+        data = link_bytes(make_link(repository, base, branch, publish))
         path = self.folder / LINK_FILE
         if path.is_symlink():
             raise ProjectError("project-link.json must be a regular file")
         if path.is_file() and path.read_bytes() == data:
             return {"committed": False, "reason": "unchanged", "link": read_link(self.folder)}
         path.write_bytes(data)
-        text = f"Link project to {repository} (base {base}, branch {branch})"
+        text = f"Link project to {repository} (base {base}, branch {branch})" + (
+            ", published automatically" if publish == "automatic" else ""
+        )
         return {
             "committed": True,
             "commit": self._commit([LINK_FILE], text),

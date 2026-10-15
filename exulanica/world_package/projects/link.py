@@ -3,6 +3,9 @@
 The link is a committed file in the project folder so it works offline, travels with the folder
 and shows in its history. It holds no credential, token or URL; the GitHub CLI keeps the
 account's authentication. Publication reads it in place of flags and refuses flags that disagree.
+An optional `publish: "automatic"` lets the follower publish after each checkpoint
+(:mod:`exulanica.world_package.projects.publish`); absent, a person publishes by hand, and a link
+written without it keeps its bytes.
 """
 
 from __future__ import annotations
@@ -26,6 +29,8 @@ class Link(BaseModel):
     repository: str
     base: str
     branch: str
+    #: Optional: the follower publishes on its own after each checkpoint; absent is by hand.
+    publish: Literal["automatic"] | None = None
 
     @model_validator(mode="after")
     def names(self) -> Link:
@@ -35,15 +40,26 @@ class Link(BaseModel):
         return self
 
 
-def make_link(repository: str, base: str, branch: str) -> dict[str, Any]:
+def make_link(
+    repository: str, base: str, branch: str, publish: str | None = None
+) -> dict[str, Any]:
     return link_document(
-        {"profile": PROFILE, "repository": repository, "base": base, "branch": branch}
+        {
+            "profile": PROFILE,
+            "repository": repository,
+            "base": base,
+            "branch": branch,
+            **({"publish": publish} if publish is not None else {}),
+        }
     )
 
 
 def link_document(value: Any) -> dict[str, Any]:
     try:
-        return Link.model_validate(value).model_dump()
+        document = Link.model_validate(value).model_dump()
+        if document["publish"] is None:
+            del document["publish"]
+        return document
     except (ValidationError, ValueError) as exc:
         raise ProjectError(
             "project link must name owner/repository and two distinct branches"

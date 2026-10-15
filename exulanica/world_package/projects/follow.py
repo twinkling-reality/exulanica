@@ -16,8 +16,12 @@ since `sessions.since` that the project does not hold, so a session that opened 
 between two polls, or while no follower ran, is still recorded. A closed session that leaves no
 evidence of a followed thing is passed over. A world with no society is followed for its edits
 alone, and a version with nothing placed waits. It writes only the project folders, never the
-world and never a remote; one follower holds a projects directory at a time; one project's fault
-never stops the others. When it stops, each project with pending changes records them once.
+world, and a remote only where the project's link says to publish on its own: after each
+checkpoint it records, such a project's rolling pull request follows it
+(:mod:`exulanica.world_package.projects.publish`, at most `limits.publications_per_day` attempts a
+day). One follower holds a projects directory at a time; one project's fault never stops the
+others. When it stops, each project with pending changes records them once, and nothing more is
+published.
 """
 
 from __future__ import annotations
@@ -46,6 +50,8 @@ from exulanica.world_package.projects.capture import (
     sessions_listing,
 )
 from exulanica.world_package.projects.checkpoint import MAX_BYTES, Conflict, ProjectError, decode
+from exulanica.world_package.projects.link import read_link
+from exulanica.world_package.projects.publish import PUBLICATIONS_PER_DAY, publish_automatically
 from exulanica.world_package.projects.repository import Author, Project
 from exulanica.world_package.projects.schema import Closed, Instant, Name, scan_values, unique
 from exulanica.world_package.projects.watch import Policy, Watcher
@@ -73,6 +79,19 @@ class Limits(Closed):
     settle_seconds: int | None = None
     max_pending_seconds: int | None = None
     daily_cap: int | None = None
+    #: Automatic publications a day, where the project's link publishes on its own.
+    publications_per_day: Annotated[int, Field(ge=1, le=1_000)] | None = None
+
+
+#: The limits the watcher itself takes.
+_WATCHER_LIMITS: Final = ("poll_seconds", "settle_seconds", "max_pending_seconds", "daily_cap")
+#: What each outcome of an automatic publication is called in an event.
+_PUBLICATION_EVENTS: Final = {
+    "published": "published",
+    "paused": "publication_paused",
+    "held": "publication_held",
+    "refused": "publication_refused",
+}
 
 
 class Sessions(Closed):
@@ -101,7 +120,13 @@ class FollowSettings(Closed):
 def policy_of(settings: Mapping[str, Any]) -> Policy:
     """The watcher's policy a follow file states: its own limits, the watcher's defaults else."""
     limits = settings.get("limits") or {}
-    return Policy(**{key: value for key, value in limits.items() if value is not None})
+    return Policy(
+        **{
+            key: value
+            for key, value in limits.items()
+            if value is not None and key in _WATCHER_LIMITS
+        }
+    )
 
 
 def follow_document(value: Any) -> dict[str, Any]:
@@ -307,6 +332,8 @@ class _Followed:
         self.passed: set[str] = set()
         self.state: str | None = None
         self.error: str | None = None
+        #: What its last automatic publication said, so a pause is told once.
+        self.published: tuple[str, str | None] | None = None
         self.due = clock()
         self.watcher = Watcher(
             project,
@@ -336,6 +363,7 @@ class Follower:
         maximum: int = MAXIMUM,
         finish_seconds: float = FINISH_SECONDS,
         author: Author | None = None,
+        github: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
         self.directory = Path(os.path.abspath(directory))
         if self.directory.is_symlink() or not self.directory.is_dir():
@@ -350,6 +378,8 @@ class Follower:
         self.maximum = maximum
         self.finish_seconds = finish_seconds
         self.author = author
+        #: GitHub's GraphQL, for a project linked to publish on its own (the gh CLI when None).
+        self.github = github
         self._items: dict[str, _Followed] = {}
         self._refused: dict[str, str] = {}
         self._unreadable = False
@@ -479,8 +509,42 @@ class Follower:
             if now < item.due:
                 continue
             item.due = now + item.watcher.policy.poll_seconds
-            told += self._told(item, self._attempt(item.watcher.step))
+            outcome = self._attempt(item.watcher.step)
+            told += self._told(item, outcome)
+            if outcome.get("state") == "checkpointed":
+                told += self._publish(item)
         return told
+
+    def _publish(self, item: _Followed) -> list[dict[str, Any]]:
+        """After a checkpoint, publish the project on its own where its link says so. A pause or
+        hold is told once; every publication is told."""
+        try:
+            link = read_link(item.project.folder)
+            if link is None:
+                return []
+            limits = item.settings.get("limits") or {}
+            outcome = publish_automatically(
+                item.project,
+                link,
+                request=self.github,
+                now=self.clock(),
+                per_day=limits.get("publications_per_day") or PUBLICATIONS_PER_DAY,
+            )
+        except ProjectError as exc:
+            outcome = {"state": "refused", "error": str(exc)}
+        except Exception as exc:
+            outcome = {"state": "refused", "error": type(exc).__name__}
+        if outcome is None:
+            return []
+        said = (outcome["state"], outcome.get("error"))
+        if said == item.published and outcome["state"] != "published":
+            return []
+        item.published = said
+        event = {"project": item.name, "state": _PUBLICATION_EVENTS[outcome["state"]]}
+        for key in ("actions", "error"):
+            if key in outcome:
+                event[key] = outcome[key]
+        return [event]
 
     def _pause(self) -> float:
         now = self.clock()

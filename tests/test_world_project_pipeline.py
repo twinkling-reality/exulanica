@@ -199,6 +199,16 @@ def test_the_link_is_closed_and_holds_no_credentials(tmp_path):
         make_link("learner/world", "main", "main")
     with pytest.raises(ProjectError):
         link_document({**make_link("learner/world", "main", "x"), "token": "secret"})
+    with pytest.raises(ProjectError):
+        make_link("learner/world", "main", "x", "whenever")
+    # Publishing by hand writes no publish field, so a link written before it keeps its bytes.
+    assert make_link("learner/world", "main", "x") == {
+        "profile": "exulanica.world-project-link/v1",
+        "repository": "learner/world",
+        "base": "main",
+        "branch": "x",
+    }
+    assert make_link("learner/world", "main", "x", "automatic")["publish"] == "automatic"
     with pytest.raises(ProjectError, match="no link"):
         resolve(tmp_path, "learner/world", None, None)
     assert resolve(tmp_path, "learner/world", "main", "x")["branch"] == "x"

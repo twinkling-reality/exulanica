@@ -49,6 +49,7 @@ from exulanica.world_package.projects.github import (
 )
 from exulanica.world_package.projects.history import history_read, record_application
 from exulanica.world_package.projects.link import resolve
+from exulanica.world_package.projects.publish import PRIVATE, resume
 from exulanica.world_package.projects.repository import (
     Author,
     Project,
@@ -160,6 +161,12 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--repository", required=True)
     command.add_argument("--base", required=True)
     command.add_argument("--branch", required=True)
+    command.add_argument(
+        "--publish",
+        choices=("automatic", "by-hand"),
+        default="by-hand",
+        help="automatic: the follower publishes after each checkpoint, to a private repository",
+    )
     command.add_argument("--author-name")
     command.add_argument("--author-email")
     command = commands.add_parser(
@@ -206,7 +213,13 @@ def parser() -> argparse.ArgumentParser:
     return root
 
 
-FOLLOW_LIMITS = ("poll_seconds", "settle_seconds", "max_pending_seconds", "daily_cap")
+FOLLOW_LIMITS = (
+    "poll_seconds",
+    "settle_seconds",
+    "max_pending_seconds",
+    "daily_cap",
+    "publications_per_day",
+)
 
 
 def _now_instant() -> str:
@@ -358,8 +371,18 @@ def project_command(args: argparse.Namespace) -> dict[str, object]:
                 (args.dependencies_output / sha).write_bytes(data)
         return {**saved, "report": result.report, "published": False}
     if args.command == "link":
+        publish = "automatic" if args.publish == "automatic" else None
+        if publish == "automatic":
+            # Read once now; every automatic publication reads it again.
+            remote = RollingPullRequests().read(
+                BranchTarget(args.repository, args.base, args.branch)
+            )
+            if remote.visibility != PRIVATE:
+                raise ProjectError(
+                    "automatic publication goes only to a private repository; this one is not"
+                )
         return Project(args.folder, author=_author(args)).link(
-            args.repository, args.base, args.branch
+            args.repository, args.base, args.branch, publish
         )
     if args.command == "follow":
         return follow_command(args)
@@ -550,6 +573,8 @@ def main(argv: list[str] | None = None) -> int:
                     reviewed_sha256=args.review_sha256,
                     allow_publication=args.allow_publication,
                 )
+                # A person's own publication lifts a pause of automatic publication.
+                result["automatic_publication_resumed"] = resume(args.folder)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command in (

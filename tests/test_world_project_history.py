@@ -268,3 +268,19 @@ def test_the_apply_command_records_which_version_a_merge_became(tmp_path, monkey
         "committed": False,
         "reason": "unchanged",
     }
+
+
+def test_the_read_says_whether_the_project_publishes_on_its_own_and_why_it_paused(tmp_path):
+    from exulanica.world_package.projects.publish import pause
+
+    local, _, _ = project_with_history(tmp_path)
+    assert history_read(local)["automatic_publication"] is None  # linked by hand
+    local.link("learner/world", "main", "exulanica/world", "automatic")
+    assert history_read(local)["automatic_publication"] == {"paused": None, "attempts": []}
+    pause(local.folder, "the repository is no longer private", 1_760_400_000.0)
+    assert history_read(local)["automatic_publication"]["paused"] == {
+        "at": "2025-10-14T00:00:00Z",
+        "reason": "the repository is no longer private",
+    }
+    # The pause and the link's change are the folder's own: neither is a checkpoint.
+    assert [c["kind"] for c in history_read(local)["checkpoints"][:2]] == ["link", "link"]

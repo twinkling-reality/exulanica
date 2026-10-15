@@ -23,6 +23,7 @@ from exulanica.world_package.projects.checkpoint import (
 )
 from exulanica.world_package.projects.follow import FOLLOW_FILE, read_follow
 from exulanica.world_package.projects.link import LINK_FILE, read_link
+from exulanica.world_package.projects.publish import read_state
 from exulanica.world_package.projects.repository import (
     DEPENDENCY_DIR,
     EVIDENCE_DIR,
@@ -89,6 +90,16 @@ def applications_at(project: Project, revision: str) -> list[dict[str, Any]]:
             application_document(decode(project.git("show", f"{revision}:{path}").encode()))
         )
     return sorted(records, key=lambda r: (r["pull_request"], r["merge_commit"]))
+
+
+def _automatic(project: Project) -> dict[str, Any] | None:
+    """The folder's automatic publication: None where its link publishes by hand (or it has no
+    link); else whether it is paused, why, and the attempts of the last day."""
+    link = read_link(project.folder)
+    if link is None or link.get("publish") != "automatic":
+        return None
+    state = read_state(project.folder)
+    return {"paused": state["paused"], "attempts": state["attempts"]}
 
 
 def _kind(project: Project, commit: str) -> str:
@@ -209,6 +220,8 @@ def history_read(
         "link": read_link(project.folder),
         # What the folder follows, as its follow file states it, or None where it follows none.
         "follow": read_follow(project.folder),
+        # Whether the follower publishes it on its own, and why that is paused if it is.
+        "automatic_publication": _automatic(project),
         "head": head,
         "pending": {
             "world": [] if edited == world else report(world, edited)["summary"],

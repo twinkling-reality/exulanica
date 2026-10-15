@@ -622,3 +622,48 @@ def test_a_follower_follows_at_most_its_maximum_and_names_the_rest(world, token,
         assert "second" not in poll(follower, clock)  # said once
     finally:
         follower.close()
+
+
+def test_a_folder_linked_to_publish_on_its_own_is_published_after_each_checkpoint(
+    world, token, tmp_path
+):
+    from test_world_project_github import Repository
+
+    remote = Repository()
+    projects = tmp_path / "projects"
+    folder = follow(world, token, projects / "demo", "--no-sessions")
+    Project(folder).link("learner/world", "main", "exulanica/world", "automatic")
+    clock = Clock()
+    follower = Follower(
+        projects, base_url=world.url, token=TOKEN, clock=clock, github=remote.request
+    )
+
+    def until_checkpointed():
+        told = []
+        for _ in range(12):
+            clock.now += 15
+            told += [t for t in follower.round() if t["project"] == "demo"]
+            if any(t["state"] == "checkpointed" for t in told):
+                return [t["state"] for t in told]
+        raise AssertionError("no checkpoint")
+
+    try:
+        follower.round()
+        move(world, 2000)
+        states = until_checkpointed()
+        assert states[-2:] == ["checkpointed", "published"]
+        [pull] = remote.pulls
+        assert pull["open"] and pull["title"] == "Changes to this world"
+        # Made public since: the next checkpoint pauses publication, said once, and writes nothing.
+        remote.visibility = "PUBLIC"
+        writes = len(remote.writes)
+        move(world, 4000)
+        assert until_checkpointed()[-2:] == ["checkpointed", "publication_paused"]
+        move(world, 6000)
+        assert until_checkpointed()[-1] == "checkpointed"
+        assert len(remote.writes) == writes
+        # Each move was still recorded in the folder: only publishing paused.
+        moves = [e["message"] for e in Project(folder).history()][:3]
+        assert moves == ["Moved the knight 2 m east"] * 3
+    finally:
+        follower.close()
