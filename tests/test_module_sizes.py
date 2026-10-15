@@ -44,8 +44,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "buildings' storeys among them",
     ),
     "web/packages/app/src/composition/environment-selection.ts": (
-        3_335,
-        "the people, picking and society views of a mounted world, in one closure",
+        3_341,
+        "the people, picking and society views of a mounted world, in one closure, with the "
+        "world's clock and population",
     ),
     "web/packages/atlas-react/src/playcanvas/atlas-binding.ts": (
         3_282,
@@ -76,9 +77,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "photographs from one standpoint, joined by the rotation between them",
     ),
     "web/packages/app/src/main.ts": (
-        2_025,
-        "the legacy app shell's boot and world mount, and the picture of a saved world it keeps "
-        "on the server once a frame holds the drawn world",
+        2_042,
+        "the legacy app shell's boot and world mount, the picture of a saved world it keeps "
+        "on the server once a frame holds the drawn world, and a site redrawn after a part changes",
     ),
     "exulanica/orchestration/judge_seed.py": (
         2_021,
