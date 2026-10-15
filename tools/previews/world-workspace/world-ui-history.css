@@ -3,6 +3,8 @@
    multiplied by --ui-scale. A part a second lane needs moves into world-ui.css. */
 
 .wu-history-head { position: absolute; left: calc(120 * var(--u)); top: calc(92 * var(--u)); width: calc(1400 * var(--u)); }
+/* The title holds the focus a page opens with only so a reader announces it (L18). */
+.wu-history-head .wu-page-title:focus { outline: none; }
 
 .wu-timeline { position: absolute; left: calc(120 * var(--u)); top: calc(300 * var(--u)); width: calc(1680 * var(--u)); height: calc(170 * var(--u)); overflow: visible; }
 .wu-timeline .wu-tl-line { stroke-width: 2; }
@@ -22,7 +24,13 @@
 .wu-timeline .wu-tl-mark:focus-visible { outline: none; }
 .wu-timeline .wu-tl-mark:focus-visible .wu-tl-node { stroke: var(--live); }
 
-.wu-history-list { position: absolute; left: calc(120 * var(--u)); top: calc(540 * var(--u)); width: calc(620 * var(--u)); bottom: calc(120 * var(--u)); overflow: hidden auto; scrollbar-width: none; }
+/* The rows start at 120 as frame 23's do; the 28 px before them hold the chosen row's marker, which
+   the scrolling list would otherwise clip. Until its last row shows whole, the list fades its last 48 px (H6). */
+.wu-history-list { position: absolute; left: calc(92 * var(--u)); padding-left: calc(28 * var(--u)); top: calc(540 * var(--u)); width: calc(648 * var(--u)); bottom: calc(120 * var(--u)); overflow: hidden auto; scrollbar-width: none; }
+.wu-history-list:not([data-end="true"]) {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48 * var(--u)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 48 * var(--u)), transparent);
+}
 .wu-history-list::-webkit-scrollbar { display: none; }
 .wu-history-row { position: relative; display: grid; grid-template-columns: calc(64 * var(--u)) 1fr auto; gap: 0 calc(18 * var(--u)); align-items: baseline;
   width: 100%; padding: calc(13 * var(--u)) 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }

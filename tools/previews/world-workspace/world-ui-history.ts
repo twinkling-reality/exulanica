@@ -61,7 +61,8 @@ export function timeline(marks: readonly TimelineMark[], now: { readonly words: 
   const defs = svg('defs', {});
   const glow = svg('filter', { id: 'wu-tl-glow', x: '-100%', y: '-100%', width: '300%', height: '300%' });
   glow.append(svg('feGaussianBlur', { stdDeviation: 4 }));
-  const fade = svg('linearGradient', { id: 'wu-tl-fade', x1: 0, x2: 1 });
+  // In the timeline's own units: a gradient sized by a level line's box (no height) draws nothing.
+  const fade = svg('linearGradient', { id: 'wu-tl-fade', gradientUnits: 'userSpaceOnUse', x1: 0, y1: LINE, x2: WIDTH, y2: LINE });
   for (const [offset, opacity] of [[0, 0.15], [0.1, 0.55], [1, 0.75]]) {
     fade.append(svg('stop', { offset, style: 'stop-color: var(--ink)', 'stop-opacity': opacity }));
   }
@@ -70,7 +71,8 @@ export function timeline(marks: readonly TimelineMark[], now: { readonly words: 
   const placed = positions(marks);
   marks.forEach((mark, index) => {
     const x = placed[index];
-    const group = svg('g', { tabindex: 0, role: 'listitem', 'aria-label': `${mark.time}, ${mark.words}` }, 'wu-tl-mark');
+    const group = svg('g', { tabindex: 0, role: 'listitem', 'aria-label': `${mark.time}, ${mark.words}`, 'data-id': mark.id }, 'wu-tl-mark');
+    if (mark.chosen) group.dataset.chosen = 'true';
     group.addEventListener('click', () => choose(mark.id));
     group.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') choose(mark.id);

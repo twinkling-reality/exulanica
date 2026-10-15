@@ -11,7 +11,7 @@ interface HistoryHost {
   readonly versionId: string;
   readonly title: string;
   read(path: string): Promise<unknown>;
-  names(): Promise<{ subject(id: string): string; placed(id: string): string }>;
+  names(named: { readonly subjects: readonly string[]; readonly placed: readonly string[] }): Promise<{ subject(id: string): string; placed(id: string): string }>;
   readonly build: { undo(): Promise<string | null>; redo(): Promise<string | null> } | null;
   worldTime?(tick: number): string | null;
   open(url: string): void;
@@ -54,11 +54,11 @@ function reads(overrides: Record<string, unknown> = {}) {
   return { read, asked };
 }
 
-function host(read: HistoryHost['read'], build: HistoryHost['build'] = null): HistoryHost & { closed: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn> } {
+function host(read: HistoryHost['read'], build: HistoryHost['build'] = null): HistoryHost & { closed: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn>; names: ReturnType<typeof vi.fn> } {
   const root = document.createElement('div');
   document.body.append(root);
   return { root, worldId: WORLD, versionId: VERSION, title: 'Terraces on the bay', read, build,
-    names: async () => ({ subject: (id: string) => (id === 'teo' ? 'Teo' : 'the resident'), placed: () => 'the resident' }),
+    names: vi.fn(async () => ({ subject: (id: string) => (id === 'teo' ? 'Teo' : 'the resident'), placed: () => 'the resident' })),
     open: vi.fn(), closed: vi.fn() };
 }
 
@@ -76,6 +76,13 @@ describe('History', () => {
     await history.open();
     const dialog = made.root.querySelector('[role="dialog"]') as HTMLElement;
     expect(dialog.getAttribute('aria-label')).toBe('History');
+    // It opens with the focus on its title, so a reader announces it (L18).
+    expect(document.activeElement?.textContent).toBe('History');
+    expect((document.activeElement as HTMLElement).tabIndex).toBe(-1);
+    // Only the characters the rows name are asked for, to be named as the tag and card name them (J20).
+    expect(made.names).toHaveBeenCalledWith({ subjects: ['teo'], placed: [] });
+    // The spine is drawn in the timeline's own units: a level line has no height for a box-sized gradient.
+    expect(made.root.querySelector('#wu-tl-fade')?.getAttribute('gradientUnits')).toBe('userSpaceOnUse');
     expect(rowWords(made.root)).toEqual(['Moved the bench', "Changed Teo's model to Nemotron 3 Nano 30B", 'Created from your words']);
     expect([...made.root.querySelectorAll('.wu-history-row .wu-cost')].map((cost) => cost.textContent)).toEqual(['', '', '$0.31']);
     expect(sub(made.root)).toBe('Terraces on the bay · kept in your GitHub project terraces-on-the-bay, private · up to date');
@@ -87,6 +94,24 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-history-row[aria-current="true"] .wu-what')?.textContent).toBe("Changed Teo's model to Nemotron 3 Nano 30B");
     history.key(press('KeyG'));
     expect(made.open).toHaveBeenCalledWith('https://github.com/learner/terraces-on-the-bay/pull/3');
+  });
+
+  it('chooses a focused timeline mark on Enter and keeps the focus on the chosen change as it moves', async () => {
+    const { read } = reads();
+    const made = host(read);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    const chosenWords = () => made.root.querySelector('.wu-history-row[aria-current="true"] .wu-what')?.textContent;
+    // The world's handler stops every key while the page is open, so the page chooses the focused mark itself.
+    const first = made.root.querySelector<SVGGElement>('.wu-tl-mark[data-id="creation"]')!;
+    first.focus();
+    expect(history.key(Object.defineProperty(press('Enter'), 'target', { value: first }))).toBe(true);
+    expect(chosenWords()).toBe('Created from your words');
+    // From a focused row, the arrows move the choice and the focus goes with it.
+    (made.root.querySelector('.wu-history-row[aria-current="true"]') as HTMLElement).focus();
+    history.key(press('ArrowRight'));
+    expect(chosenWords()).toBe("Changed Teo's model to Nemotron 3 Nano 30B");
+    expect(document.activeElement?.getAttribute('aria-current')).toBe('true');
   });
 
   it('says only the title where the projects could not be read, never that the world is unlinked', async () => {

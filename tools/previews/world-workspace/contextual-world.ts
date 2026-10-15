@@ -712,16 +712,23 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // dimmed world, read from the server alone. Undo and redo there are build mode's own.
   const history = mountHistory({
     root, worldId: entry.worldId, versionId: entry.authoredVersionId, title: entry.title, read,
-    async names() {
+    async names({ subjects, placed }) {
       if (!subjectReads.society) {
         subjectReads.society = await societyClient.read(entry.authoredVersionId, { places: true }).catch(() => null);
         subjectReads.societyAt = performance.now();
       }
-      const society = subjectReads.society;
-      // A character by name, else by kind ("the resident"); a personality is kept by its placed being.
-      const who = (id) => called({ name: personName(id), kind: characterFacts(society, id)?.kind ?? null }).within;
-      const placedBeing = (placedId) => rows.find(row => row.reference?.source === 'authored-thing' && row.reference.id === placedId)?.scene.id ?? null;
-      return { subject: who, placed: (placedId) => { const id = placedBeing(placedId); return id ? who(id) : called({ name: null, kind: null }).within; } };
+      // One name per character (J20): as the tag and card call it, from its inventory offer: its name,
+      // else "the" and its kind's label. Only the characters History's rows name are read; a
+      // personality is kept by its placed being.
+      const beings = new Map(rows.filter(row => row.scene?.type === 'being').map(row => [row.scene.id, row]));
+      const placedBeings = new Map(rows.filter(row => row.scene?.type === 'being' && row.reference?.source === 'authored-thing').map(row => [row.reference.id, row]));
+      const needed = new Set([...subjects.map(id => beings.get(id)), ...placed.map(id => placedBeings.get(id))].filter(Boolean));
+      await Promise.all([...needed].map(row => entityOffer(row).catch(() => null)));
+      const unlisted = (id) => called({ name: null, kind: characterFacts(subjectReads.society, id)?.kind ?? null }).within;
+      return {
+        subject: (id) => (beings.has(id) ? subjectView(beings.get(id)).who.within : unlisted(id)),
+        placed: (placedId) => (placedBeings.has(placedId) ? subjectView(placedBeings.get(placedId)).who.within : called({ name: null, kind: null }).within),
+      };
     },
     build: build ? { undo: () => build.undo(), redo: () => build.redo() } : null,
     worldTime(tick) {

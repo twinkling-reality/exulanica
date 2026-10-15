@@ -18,6 +18,12 @@ const GENERATED = 'world:generated:';
 
 type Json = Record<string, any>;
 
+/** The characters History's rows name: society subjects (runs, models) and placed beings (personalities). */
+export interface Named {
+  readonly subjects: readonly string[];
+  readonly placed: readonly string[];
+}
+
 export interface HistoryHost {
   /** Where the page is appended: the world's root, whose corners hide while a page is open. */
   readonly root: HTMLElement;
@@ -27,8 +33,8 @@ export interface HistoryHost {
   readonly title: string;
   /** GET through the workspace's reader; throws where the server does not answer 200. */
   read(path: string): Promise<any>;
-  /** What a society subject and a placed thing are called (a name, else its kind). */
-  names(): Promise<{ subject(id: string): string; placed(id: string): string }>;
+  /** What these characters are called inside a sentence, as the tag and card call them (J20): a name, else "the" and its kind. */
+  names(named: Named): Promise<{ subject(id: string): string; placed(id: string): string }>;
   /** Build mode's undo and redo, each resolving after the version is read again; null where this page may not change the world. */
   readonly build: { undo(): Promise<string | null>; redo(): Promise<string | null> } | null;
   /** The world's clock for a society minute ("06:14"), where the clock is read. */
@@ -56,6 +62,16 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
   return made;
 }
 
+/** The page's own parts, made once when it opens and kept while it is open, so focus and scroll stay. */
+interface Shown {
+  readonly page: ReturnType<typeof page>;
+  readonly title: HTMLHeadingElement;
+  readonly sub: HTMLParagraphElement;
+  readonly marks: HTMLDivElement;
+  readonly list: HTMLDivElement;
+  readonly chosen: HTMLDivElement;
+}
+
 export function mountHistory(host: HistoryHost): History {
   const scope = `?world_id=${encodeURIComponent(host.worldId)}`;
   const version = `/world/versions/${encodeURIComponent(host.versionId)}`;
@@ -66,7 +82,7 @@ export function mountHistory(host: HistoryHost): History {
       return null;
     }
   };
-  let shown: ReturnType<typeof page> | null = null;
+  let shown: Shown | null = null;
   let rows: any[] = [];
   /** The GitHub project following this version; null where none does, undefined where unread. */
   let project: Json | null | undefined;
@@ -74,8 +90,7 @@ export function mountHistory(host: HistoryHost): History {
   let state: 'loading' | 'ready' | 'offline' = 'loading';
 
   async function reads() {
-    const [named, view, parts, listed, models, characters, comparisons, projects, draft] = await Promise.all([
-      host.names(),
+    const [view, parts, listed, models, characters, comparisons, projects, draft] = await Promise.all([
       host.read(`${version}${scope}`),
       optional(`${version}/parts${scope}`),
       optional(`${version}/society/control/sessions${scope}`),
@@ -110,12 +125,18 @@ export function mountHistory(host: HistoryHost): History {
         from: host.worldTime?.(run.opened.start_tick) ?? null,
         to: run.closed ? host.worldTime?.(run.closed.end_tick) ?? null : null,
       }));
+    const records: Json[] = characters?.records ?? [];
+    // Only the characters the rows name are asked for, as the tag and card name them.
+    const named = await host.names({
+      subjects: [...new Set<string>([...runs.flatMap((run) => run.subjects), ...choices.flatMap((one) => one.subjects ?? [])])],
+      placed: [...new Set<string>(records.map((record) => record.placed_id))],
+    });
     project = projects ? (projects.projects ?? []).find((one: Json) => one.version_id === host.versionId) ?? null : undefined;
     rows = historyRows({
       edits: view.edits ?? [],
       runs,
       models: choices,
-      characters: characters?.records ?? [],
+      characters: records,
       comparisons: (comparisons?.comparisons ?? []).map((one: Json) => ({
         comparison_id: one.comparison_id,
         created_at: one.created_at,
@@ -166,16 +187,24 @@ export function mountHistory(host: HistoryHost): History {
     return pull ? `https://github.com/${project.link.repository}/pull/${pull.number}` : `https://github.com/${project.link.repository}`;
   }
 
+  /** Whether the list shows its last row whole: it fades its last 48 px until then (H6). */
+  function listEnd() {
+    if (!shown) return;
+    const { list } = shown;
+    list.dataset.end = String(list.scrollTop + list.clientHeight >= list.scrollHeight - 1);
+  }
+
   function draw() {
     if (!shown) return;
     const now = Date.now();
-    const { content, keys } = shown;
-    content.replaceChildren(keys);
-    const head = element('div', 'wu-history-head');
-    head.append(element('h1', 'wu-page-title', HISTORY_WORDS.title), element('p', 'wu-page-sub', subLine(host.title, project)));
-    content.prepend(head);
-    const list = element('div', 'wu-history-list');
-    content.append(list);
+    const { page: drawn, sub, marks, list, chosen: chosenSlot } = shown;
+    // Focus in the timeline or the list follows the chosen change across the redraw.
+    const focused = document.activeElement;
+    const following = focused instanceof Element && (marks.contains(focused) || list.contains(focused));
+    sub.textContent = subLine(host.title, project);
+    marks.replaceChildren();
+    list.replaceChildren();
+    chosenSlot.replaceChildren();
     if (state === 'loading') {
       list.append(label(HISTORY_WORDS.today), element('p', 'wu-body wu-faint', HISTORY_WORDS.loading));
     } else if (state === 'offline') {
@@ -183,8 +212,8 @@ export function mountHistory(host: HistoryHost): History {
     } else if (rows.length === 0) {
       list.append(label(HISTORY_WORDS.today), element('p', 'wu-body', HISTORY_WORDS.empty));
     } else {
-      const marks = timelineMarks(rows, chosen, MARKS).map((mark: any) => ({ ...mark, time: clockAt(mark.at) }));
-      content.append(timeline(marks, { words: HISTORY_WORDS.now, time: clockAt(now) }, choose));
+      const placed = timelineMarks(rows, chosen, MARKS).map((mark: any) => ({ ...mark, time: clockAt(mark.at) }));
+      marks.append(timeline(placed, { words: HISTORY_WORDS.now, time: clockAt(now) }, choose));
       for (const day of byDay(rows, (at: number) => dayHeading(at, now))) {
         const block = element('div', 'wu-history-day');
         block.append(label(day.heading));
@@ -194,15 +223,22 @@ export function mountHistory(host: HistoryHost): History {
         list.append(block);
       }
       const row = rows.find((one) => one.id === chosen);
-      if (row) content.append(chosenView(row, now));
+      if (row) chosenSlot.append(chosenView(row, now));
     }
+    const current = list.querySelector<HTMLElement>('.wu-history-row[aria-current="true"]');
+    current?.scrollIntoView({ block: 'nearest' });
+    if (following) {
+      const mark = marks.querySelector<SVGGElement>('.wu-tl-mark[data-chosen="true"]');
+      (focused instanceof SVGElement && mark ? mark : current)?.focus({ preventScroll: true });
+    }
+    listEnd();
     const prompts = [keyWord({ keys: ['←', '→'], word: HISTORY_WORDS.earlierLater })];
     if (host.build) prompts.push(keyWord({ keys: ['⌘Z'], word: HISTORY_WORDS.undo, shortcut: 'Meta+Z', onPress: () => void undoing(false) }));
     const url = githubUrl();
     if (url) prompts.push(keyWord({ keys: ['G'], word: HISTORY_WORDS.openOnGitHub, shortcut: 'G', onPress: () => host.open(url) }));
     if (state === 'offline') prompts.push(keyWord({ keys: ['Enter'], word: HISTORY_WORDS.tryAgain, shortcut: 'Enter', onPress: () => void load() }));
     prompts.push(keyWord({ keys: ['Esc'], word: HISTORY_WORDS.back, shortcut: 'Escape', onPress: () => close() }));
-    keys.replaceChildren(keyRow(prompts));
+    drawn.keys.replaceChildren(keyRow(prompts));
   }
 
   function chosenView(row: any, now: number): HTMLElement {
@@ -225,7 +261,7 @@ export function mountHistory(host: HistoryHost): History {
 
   function close() {
     if (!shown) return;
-    shown.close();
+    shown.page.close();
     shown = null;
     host.closed();
   }
@@ -236,30 +272,49 @@ export function mountHistory(host: HistoryHost): History {
     },
     async open() {
       if (shown) return;
-      shown = page({ form: 'full' });
-      shown.root.setAttribute('aria-label', HISTORY_WORDS.title);
-      shown.open(host.root);
+      const made = page({ form: 'full' });
+      made.root.setAttribute('aria-label', HISTORY_WORDS.title);
+      // In reading order (L18): the title and where the world is kept, the timeline, the list and
+      // the chosen change, the key row last.
+      const head = element('div', 'wu-history-head');
+      const title = element('h1', 'wu-page-title', HISTORY_WORDS.title);
+      title.tabIndex = -1;
+      const sub = element('p', 'wu-page-sub');
+      head.append(title, sub);
+      const marks = element('div', 'wu-history-marks');
+      const list = element('div', 'wu-history-list');
+      list.addEventListener('scroll', listEnd, { passive: true });
+      const chosenSlot = element('div');
+      made.content.replaceChildren(head, marks, list, chosenSlot, made.keys);
+      shown = { page: made, title, sub, marks, list, chosen: chosenSlot };
+      made.open(host.root);
+      // A page opens with the focus on its title, so a reader announces it (L18).
+      title.focus({ preventScroll: true });
       await load();
     },
     close,
     dispose() {
-      shown?.close();
+      shown?.page.close();
       shown = null;
     },
     key(event) {
       if (!shown) return false;
       const command = event.metaKey || event.ctrlKey;
-      // Tab moves the focus among the page's rows and prompts; Enter presses the one focused.
-      if (event.code === 'Tab' || (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button'))) return false;
+      const target = event.target as Element | null;
+      // Tab moves the focus through the page; Enter or Space presses the focused button.
+      if (event.code === 'Tab' || ((event.code === 'Enter' || event.code === 'Space') && target?.closest?.('.wu-page button'))) return false;
       // A combination the page does not use keeps the browser's own shortcut, as in the world (K8).
       if ((command || event.altKey) && !(command && event.code === 'KeyZ' && !event.altKey)) return false;
       event.preventDefault();
       if (event.repeat && !event.code.startsWith('Arrow')) return true;
+      // The world's handler stops every key while the page is open, so a focused mark's Enter is chosen here.
+      const mark = target?.closest?.('.wu-tl-mark');
       if (event.code === 'Escape' || (event.code === 'KeyH' && !command)) close();
       else if (event.code === 'ArrowLeft' || event.code === 'ArrowDown') move(1);
       else if (event.code === 'ArrowRight' || event.code === 'ArrowUp') move(-1);
       else if (command && event.code === 'KeyZ') void undoing(event.shiftKey);
       else if (event.code === 'KeyG' && !command && githubUrl()) host.open(githubUrl() as string);
+      else if (event.code === 'Enter' && mark?.getAttribute('data-id')) choose(mark.getAttribute('data-id') as string);
       else if (event.code === 'Enter' && state === 'offline') void load();
       return true;
     },
