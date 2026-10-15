@@ -22,7 +22,7 @@ The order, so one upload always answers the same first refusal:
 5. Each piece's profile (:func:`exulanica.world.style_pack_pieces.check_piece_profile`) and its
    family's triangle and material budget, read from accessor counts; a textured piece's pictures,
    walked to their end, held to its family's texture side and counted with the textures' pictures;
-   every piece a cover rule names, textured.
+   every piece a cover or climb rule names, textured.
 6. The preview, walked to its end (:func:`exulanica.world.style_pack_preview.walk_preview`).
 7. Each texture image, walked to its end the same way (:func:`style_packs.probe_pack_image`), a
    texture's maps one size.
@@ -336,16 +336,17 @@ def admit(
     except PieceOutOfBounds as refused:
         raise StylePackAdmissionRefused(refused.code, str(refused), path=refused.path) from None
     # Cover is drawn instanced, as a textured piece is: a palette piece named as cover would grow
-    # nowhere. A base's module was admitted with its own pack.
-    for rule in manifest.get("cover", {}).values():
-        for role in rule["pieces"]:
-            for variant in manifest["modules"].get(role, {"variants": []})["variants"]:
-                if not check_piece_profile(files[variant["file"]]).textured:
-                    raise StylePackAdmissionRefused(
-                        "style_pack_piece_refused",
-                        "a cover piece is a textured piece: cover is drawn instanced",
-                        path=variant["file"],
-                    )
+    # nowhere. A base's module was admitted with its own pack. Plants that climb a wall are too.
+    for field, said in (("cover", "a cover piece"), ("climb", "a climbing piece")):
+        for rule in manifest.get(field, {}).values():
+            for role in rule["pieces"]:
+                for variant in manifest["modules"].get(role, {"variants": []})["variants"]:
+                    if not check_piece_profile(files[variant["file"]]).textured:
+                        raise StylePackAdmissionRefused(
+                            "style_pack_piece_refused",
+                            f"{said} is a textured piece: {field} is drawn instanced",
+                            path=variant["file"],
+                        )
     preview = manifest.get("preview")
     preview_sha256 = None
     preview_size = None

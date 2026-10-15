@@ -106,6 +106,8 @@ MAX_SWATCHES: Final = 64
 MAX_VARIANTS: Final = 8
 MAX_PRESETS: Final = 6
 MAX_FILES: Final = 512
+#: The faces of a building's box a climb rule may grow on, as its slot faces them.
+CLIMB_WALLS: Final = ("front", "back", "left", "right")
 
 _PACK_ID: Final = re.compile(r"[a-z][a-z0-9-]{0,31}(\.[a-z][a-z0-9-]{0,31}){1,3}")
 _KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,31}")
@@ -824,6 +826,34 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             _fail("range", f"{path}.fade_to_millicells_per_px", "must be above the fade's start")
         return read
 
+    def climb(value: Any, path: str) -> dict[str, Any]:
+        def walls(v: Any, p: str) -> list[str]:
+            read = _list(_one_of(CLIMB_WALLS), 1, len(CLIMB_WALLS))(v, p)
+            if len(set(read)) != len(read):
+                _fail("duplicate", p, "names a wall twice")
+            return read
+
+        def height(v: Any, p: str) -> list[int]:
+            if not isinstance(v, list) or len(v) != 2:
+                _fail("shape", p, "must be a least and a most share of the building's height")
+            read = [_integer(1, 1000)(n, f"{p}[{i}]") for i, n in enumerate(v)]
+            if read[0] > read[1]:
+                _fail("range", p, "must not have its least above its most")
+            return read
+
+        return _object(
+            value,
+            path,
+            {
+                "pieces": _list(piece_role, 1, 8),
+                "walls": walls,
+                "sun_within_mdeg": _Optional(_integer(0, 180_000)),
+                "share_permille": _integer(1, 1000),
+                "height_permille": height,
+                "seed": _integer(0, 2_147_483_647),
+            },
+        )
+
     def preset_key(key: str, path: str) -> None:
         if _KEY.fullmatch(key) is None:
             _fail("shape", path, "must be a preset key")
@@ -1002,6 +1032,8 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             "cover": _Optional(_record(look_role_key(("surface", "both")), cover, 64)),
             # Added within the profile: a pack written before it draws no windows on its walls.
             "facade": _Optional(_record(look_role_key(("surface", "both")), facade, 64)),
+            # Added within the profile: a pack that grows nothing on its walls states none.
+            "climb": _Optional(_record(look_role_key(("module", "both")), climb, 64)),
             "modules": _record(
                 look_role_key(("module", "both")),
                 lambda v, p: _object(
@@ -1136,6 +1168,15 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
     for role in manifest.get("facade", {}):
         if split_look_role(role, f"facade.{role}")[0] != "wall":
             _fail("reference", f"facade.{role}", "a facade is a wall's")
+    for role, rule in manifest.get("climb", {}).items():
+        if split_look_role(role, f"climb.{role}")[0] != "structure":
+            _fail("reference", f"climb.{role}", "plants climb only a structure's walls")
+        for index, piece in enumerate(rule["pieces"]):
+            where = f"climb.{role}.pieces[{index}]"
+            if split_look_role(piece, where)[0] != "plant":
+                _fail("reference", where, "a climbing piece is a plant")
+            if manifest["base"] is None and piece not in manifest["modules"]:
+                _fail("reference", where, f"names no module {json.dumps(piece)}")
     for name, preset in (manifest["light"] or {"presets": {}})["presets"].items():
         for index, family in enumerate(preset.get("wind", {}).get("sway_families", [])):
             if family not in context.families:

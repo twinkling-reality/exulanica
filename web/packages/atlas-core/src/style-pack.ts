@@ -244,6 +244,25 @@ export interface StylePackCover {
   readonly seed: number;
 }
 
+/** The faces of a building's box a climb rule may grow on, as its slot faces them. */
+export const STYLE_PACK_CLIMB_WALLS = ['front', 'back', 'left', 'right'] as const;
+
+/**
+ * What climbs a structure look role's walls: one to eight `plant` module roles (textured, one named
+ * more than once grows more often), the faces of the building's box they grow on, optionally only
+ * the faces within an angle of the direction toward the sun the look is drawn with, the share of a
+ * face's length they cover, the least and most share of the building's height a plant reaches, and
+ * a seed that with each building's identity picks every plant.
+ */
+export interface StylePackClimb {
+  readonly pieces: readonly string[];
+  readonly walls: readonly (typeof STYLE_PACK_CLIMB_WALLS)[number][];
+  readonly sun_within_mdeg?: number;
+  readonly share_permille: number;
+  readonly height_permille: readonly [number, number];
+  readonly seed: number;
+}
+
 /**
  * The windows a wall look role's building walls are drawn with: the storey height its rows aim for
  * (each storey the drawing states holding the whole number of rows nearest it), its least bay, one window size, the storeys kept clear from the ground, the windows a room
@@ -364,6 +383,8 @@ export interface StylePackManifest {
   readonly cover?: Readonly<Record<string, StylePackCover>>;
   /** Absent in a pack that draws no windows on its walls. */
   readonly facade?: Readonly<Record<string, StylePackFacade>>;
+  /** Absent in a pack that grows nothing on its walls. */
+  readonly climb?: Readonly<Record<string, StylePackClimb>>;
   readonly modules: Readonly<Record<string, { readonly variants: readonly StylePackVariant[] }>>;
   readonly files: readonly StylePackFile[];
 }
@@ -783,6 +804,28 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
         },
       });
     }, STYLE_PACK_MAX_TEXTURES)),
+    // Added within the profile: a pack written before it grows nothing on its walls.
+    climb: optional(record(lookRoleKey(['module', 'both']), (v, p) => object(v, p, {
+      pieces: list((role, q) => {
+        if (typeof role !== 'string') return fail('shape', q, 'must be a look role');
+        lookRoleKey(['module', 'both'])(role, q);
+        return role;
+      }, 1, 8),
+      walls: (w, q) => {
+        const read = list(oneOf(STYLE_PACK_CLIMB_WALLS), 1, STYLE_PACK_CLIMB_WALLS.length)(w, q);
+        if (new Set(read).size !== read.length) fail('duplicate', q, 'names a wall twice');
+        return read;
+      },
+      sun_within_mdeg: optional(integer(0, 180_000)),
+      share_permille: integer(1, 1000),
+      height_permille: (h, q) => {
+        if (!Array.isArray(h) || h.length !== 2) return fail('shape', q, 'must be a least and a most share of the building\'s height');
+        const read = h.map((n, i) => integer(1, 1000)(n, `${q}[${i}]`)) as number[];
+        if (read[0]! > read[1]!) fail('range', q, 'must not have its least above its most');
+        return read;
+      },
+      seed: integer(0, 2_147_483_647),
+    }), 64)),
     modules: record(lookRoleKey(['module', 'both']), (v, p) => object(v, p, {
       variants: list((item, q) => object(item, q, {
         file: pattern(PATH, 'a lowercase relative path ending .glb'),
@@ -859,6 +902,14 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
   }
   for (const role of Object.keys(manifest.facade ?? {})) {
     if (splitLookRole(role, `facade.${role}`).family !== 'wall') fail('reference', `facade.${role}`, "a facade is a wall's");
+  }
+  for (const [role, rule] of Object.entries(manifest.climb ?? {})) {
+    if (splitLookRole(role, `climb.${role}`).family !== 'structure') fail('reference', `climb.${role}`, 'plants climb only a structure\'s walls');
+    rule.pieces.forEach((piece, index) => {
+      const where = `climb.${role}.pieces[${index}]`;
+      if (splitLookRole(piece, where).family !== 'plant') fail('reference', where, 'a climbing piece is a plant');
+      if (manifest.base === null && manifest.modules[piece] === undefined) fail('reference', where, `names no module ${JSON.stringify(piece)}`);
+    });
   }
   for (const [name, preset] of Object.entries(manifest.light?.presets ?? {})) {
     (preset.wind?.sway_families ?? []).forEach((family, index) => {
@@ -988,6 +1039,8 @@ export interface ResolvedStylePack {
   readonly cover: Readonly<Record<string, StylePackCover>>;
   /** The windows each wall look role's building walls are drawn with, the nearest manifest's rule for a role. */
   readonly facade: Readonly<Record<string, StylePackFacade>>;
+  /** What climbs each structure look role's walls, the nearest manifest's rule for a role. */
+  readonly climb: Readonly<Record<string, StylePackClimb>>;
   readonly modules: Readonly<Record<string, ResolvedModule>>;
 }
 
@@ -1040,6 +1093,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   const textures = new Map<string, ResolvedTexture>();
   const cover: Record<string, StylePackCover> = {};
   const facade: Record<string, StylePackFacade> = {};
+  const climb: Record<string, StylePackClimb> = {};
   const modules: Record<string, ResolvedModule> = {};
   let light: StylePackManifest['light'] = null;
   let shading: StylePackManifest['shading'] = null;
@@ -1054,6 +1108,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     for (const [key, texture] of Object.entries(manifest.textures ?? {})) textures.set(key, { texture, files });
     Object.assign(cover, manifest.cover ?? {});
     Object.assign(facade, manifest.facade ?? {});
+    Object.assign(climb, manifest.climb ?? {});
     for (const [role, module] of Object.entries(manifest.modules)) modules[role] = { variants: module.variants, files, stated: index };
     if (manifest.light !== null) light = manifest.light;
     if (manifest.shading !== null) shading = manifest.shading;
@@ -1063,7 +1118,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   }
   return {
     chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }),
-    ...(fallingWater === undefined ? {} : { falling_water: fallingWater }), swatches, surfaces, textures, cover, facade, modules,
+    ...(fallingWater === undefined ? {} : { falling_water: fallingWater }), swatches, surfaces, textures, cover, facade, climb, modules,
   };
 }
 

@@ -90,6 +90,44 @@ describe('a variant that repeats a zone', () => {
   });
 });
 
+describe('a climb rule', () => {
+  const base = CASES.cases[0]!;
+  const structured: StylePackContext = { ...context, families: new Map([...families, ['structure', { fit: 'contain', dressing: 'both', fillMinimumPermille: 0, fillMaximumPermille: 0 }]]) };
+  const RULE = { pieces: ['plant.ivy'], walls: ['back', 'left', 'right'], sun_within_mdeg: 100_000, share_permille: 400, height_permille: [300, 700], seed: 7 };
+  const withPlant = (rule: Record<string, unknown>, role = 'structure.default'): unknown => {
+    const manifest = structuredClone(base.manifest) as { modules: Record<string, unknown>; climb?: unknown };
+    manifest.modules['plant.ivy'] = structuredClone(manifest.modules['vehicle.car']);
+    manifest.climb = { [role]: rule };
+    return manifest;
+  };
+  const refusal = (manifest: unknown): { reason: string; path: string } | null => {
+    try {
+      readStylePackManifest(manifest, structured);
+      return null;
+    } catch (error) {
+      if (!(error instanceof StylePackRefusal)) throw error;
+      return { reason: error.reason, path: error.path };
+    }
+  };
+  it('is read on a structure\'s walls, and a pack stating none keeps its bytes', () => {
+    expect(readStylePackManifest(withPlant(RULE), structured).climb).toEqual({ 'structure.default': RULE });
+    const read = resolveStylePack([readStylePackManifest(withPlant(RULE), structured)]);
+    expect(read.climb['structure.default']!.walls).toEqual(['back', 'left', 'right']);
+    expect(resolveStylePack([readStylePackManifest(base.manifest, context)]).climb).toEqual({});
+  });
+  it('is refused as the Python reader refuses it, by reason and path', () => {
+    expect(refusal(withPlant(RULE, 'fixture.bench'))).toEqual({ reason: 'reference', path: 'climb.fixture.bench' });
+    expect(refusal(withPlant({ ...RULE, pieces: ['vehicle.car'] }))).toEqual({ reason: 'reference', path: 'climb.structure.default.pieces[0]' });
+    expect(refusal(withPlant({ ...RULE, walls: ['back', 'back'] }))).toEqual({ reason: 'duplicate', path: 'climb.structure.default.walls' });
+    expect(refusal(withPlant({ ...RULE, walls: ['roof'] }))).toEqual({ reason: 'range', path: 'climb.structure.default.walls[0]' });
+    expect(refusal(withPlant({ ...RULE, walls: [] }))).toEqual({ reason: 'range', path: 'climb.structure.default.walls' });
+    expect(refusal(withPlant({ ...RULE, height_permille: [800, 200] }))).toEqual({ reason: 'range', path: 'climb.structure.default.height_permille' });
+    expect(refusal(withPlant({ ...RULE, sun_within_mdeg: 180_001 }))).toEqual({ reason: 'range', path: 'climb.structure.default.sun_within_mdeg' });
+    expect(refusal(withPlant({ ...RULE, share_permille: 0 }))).toEqual({ reason: 'range', path: 'climb.structure.default.share_permille' });
+    expect(refusal(withPlant({ ...RULE, spread: 3 }))).toEqual({ reason: 'shape', path: 'climb.structure.default' });
+  });
+});
+
 describe('canonical bytes', () => {
   it('sorts keys, drops whitespace and escapes past ASCII as Python does', () => {
     // Python: json.dumps({"b": 1, "a": "é☃", "c": [True, None]}, sort_keys=True, separators=(",", ":"))

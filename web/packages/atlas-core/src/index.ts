@@ -656,6 +656,7 @@ export type {
   ResolvedStylePack,
   Srgb8,
   StylePackContext,
+  StylePackClimb,
   StylePackCover,
   StylePackFacade,
   StylePackFile,
@@ -675,6 +676,7 @@ export type {
   StretchZone,
 } from './style-pack.js';
 export {
+  STYLE_PACK_CLIMB_WALLS,
   STYLE_PACK_COLOUR_ENCODING,
   STYLE_PACK_IMAGE_MEDIA_TYPES,
   STYLE_PACK_LICENCES,
