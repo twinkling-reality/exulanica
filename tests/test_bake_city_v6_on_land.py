@@ -43,6 +43,12 @@ RAISED_MM = 200
 #: Two lots' edges this near each other across are read as one edge the lots share, so lots that
 #: miss each other by a millimetre are named, where a step between them would be left out unseen.
 NEAR_MM = 50
+#: How far a drawn step may stop short of the height it closes. The footway's top is read here as
+#: the walking graph reads it (`footway_top_at`: the kerb line's height rounded half away from
+#: zero), the tessellator draws the kerb line's floored heights, and a step's foot runs straight
+#: between whole millimetres: the readings differ by less than 2 mm, and a slit a step leaves is
+#: wider.
+ROUNDING_MM = 2
 
 
 @cache
@@ -170,7 +176,8 @@ def _closed(
     steps: list[list[list[int]]], axis: int, across: int, place: int, low: int, high: int
 ) -> bool:
     """Whether the steps standing on the line where the other coordinate is ``across`` close the
-    height from ``low`` to ``high`` at ``place`` along it, to the millimetre a slope rounds."""
+    height from ``low`` to ``high`` at ``place`` along it, to the millimetres the readings round
+    (:data:`ROUNDING_MM`)."""
     reaches = sorted(
         reach
         for triangle in steps
@@ -182,7 +189,7 @@ def _closed(
         if bottom > top + 1:
             break
         top = max(top, head)
-    return top >= high - 1
+    return top >= high - ROUNDING_MM
 
 
 def _edges(ring: tuple[tuple[int, int], ...]) -> list[tuple[tuple[int, int], tuple[int, int]]]:
