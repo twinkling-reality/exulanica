@@ -285,6 +285,31 @@ describe('textured pieces drawn instanced', () => {
     pieces.dispose();
   });
 
+  it('gives each draw its own instance buffer, each holding its cell\'s matrices', async () => {
+    // The engine keys an instanced draw's vertex array by adding buffer ids to format numbers; draws
+    // sharing an instance buffer could take one key and draw another primitive's vertices.
+    const host = app();
+    const { pack, pieces } = await loaded(true, host);
+    const root = new pc.Entity('root');
+    const dressing = dressSlots(root, SLOTS, pack, families, pieces, SHADING);
+    const cells = (root.findComponents('render') as pc.RenderComponent[])
+      .filter((render) => render.entity.name.startsWith('style-pack:instanced:') && !render.entity.name.endsWith(':pieces'));
+    expect(cells.length).toBeGreaterThan(1);
+    const buffers = new Set<pc.VertexBuffer>();
+    let draws = 0;
+    for (const render of cells) {
+      // Both levels of the piece, one primitive each.
+      expect(render.meshInstances).toHaveLength(2);
+      const held = render.meshInstances.map((instance) => Array.from(new Float32Array(instance.instancingData!.vertexBuffer!.lock())));
+      expect(held[1]).toEqual(held[0]);
+      for (const instance of render.meshInstances) buffers.add(instance.instancingData!.vertexBuffer!);
+      draws += render.meshInstances.length;
+    }
+    expect(buffers.size).toBe(draws);
+    dressing.dispose();
+    pieces.dispose();
+  });
+
   it('gives back every buffer it made, and destroys a texture only when the pieces that hold it go', async () => {
     const host = app();
     const device = host.graphicsDevice;

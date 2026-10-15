@@ -8,9 +8,18 @@ import type { LoadedTexturedPrimitive } from './pieces.js';
  * The dresser hands each placed textured piece over as a placement: the piece's levels (uploaded by
  * `pieces.ts`), the matrix that stands it in its slot (the same transform the bake applies to a
  * palette piece's corners) and its height as placed. Placements of one piece are gathered into
- * square cells of the ground (`cellSizeM`); a cell is one instance buffer of its placements'
- * matrices and, for each level and each primitive, one mesh instance drawing that buffer, culled by
- * the cell's own bounds in the camera and in every shadow cascade.
+ * square cells of the ground (`cellSizeM`); a cell holds its placements' matrices and, for each level
+ * and each primitive, one mesh instance drawing its own instance buffer of them, culled by the cell's
+ * own bounds in the camera and in every shadow cascade.
+ *
+ * Each mesh instance has its own instance buffer, a copy of the cell's matrices (64 bytes a placement
+ * for each primitive of each level), because the engine (PlayCanvas 2.21) keeps an instanced draw's
+ * vertex array under a key that adds each vertex buffer's id to its format's number rather than
+ * joining them. Two primitives uploaded one after the other with neighbouring formats, such as a made
+ * tree's far bark and far leaves, sum alike; drawing one instance buffer, both draws took one key, and
+ * the leaves drew the bark's vertices, which drew nothing. With an instance buffer of its own, no two
+ * draws share the key's second part; a clash then needs two keys whose decimal parts split differently
+ * (such as 22 and 1305 against 221 and 305), which only a fix in the engine removes.
  *
  * A cell draws its first level until the camera stands farther from it than `lod1BeyondPerMetre`
  * metres for each metre of its tallest placed piece, then its second level (where the piece has
@@ -55,7 +64,7 @@ export interface InstancedDressing {
 
 interface Cell {
   readonly entity: pc.Entity;
-  readonly buffer: pc.VertexBuffer;
+  readonly buffers: pc.VertexBuffer[];
   readonly count: number;
   readonly lod0: pc.MeshInstance[];
   readonly lod1: pc.MeshInstance[];
@@ -127,14 +136,13 @@ export function drawInstancedPieces(parent: pc.Entity, placements: readonly Inst
   }
   const root = new pc.Entity(`${PREFIX}pieces`);
   const cells: Cell[] = [];
-  let device: pc.GraphicsDevice | null = null;
   for (const [key, group] of groups) {
     const first = group[0]!;
-    device ??= first.lod0[0]!.mesh.device;
-    const format = pc.VertexFormat.getDefaultInstancingFormat(device);
+    const owner = first.lod0[0]!.mesh.device;
+    const format = pc.VertexFormat.getDefaultInstancingFormat(owner);
     const data = new Float32Array(group.length * 16);
     group.forEach((placement, index) => data.set(placement.matrix, index * 16));
-    const buffer = new pc.VertexBuffer(device, format, group.length, { data: data.buffer });
+    const buffers: pc.VertexBuffer[] = [];
     const box = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
     const bounds0 = levelBounds(first.lod0);
     const bounds1 = first.lod1 === null ? null : levelBounds(first.lod1);
@@ -145,6 +153,8 @@ export function drawInstancedPieces(parent: pc.Entity, placements: readonly Inst
     const aabb = new pc.BoundingBox();
     aabb.setMinMax(new pc.Vec3(box.min[0], box.min[1], box.min[2]), new pc.Vec3(box.max[0], box.max[1], box.max[2]));
     const instances = (level: readonly LoadedTexturedPrimitive[] | null): pc.MeshInstance[] => (level ?? []).map((primitive) => {
+      const buffer = new pc.VertexBuffer(owner, format, group.length, { data: data.slice().buffer });
+      buffers.push(buffer);
       const instance = new pc.MeshInstance(primitive.mesh, primitive.material);
       instance.setInstancing(buffer, true);
       return instance;
@@ -163,7 +173,7 @@ export function drawInstancedPieces(parent: pc.Entity, placements: readonly Inst
     }
     root.addChild(entity);
     cells.push({
-      entity, buffer, count: group.length, lod0, lod1, aabb,
+      entity, buffers, count: group.length, lod0, lod1, aabb,
       tallestM: Math.max(...group.map((placement) => placement.heightM)),
       triangles0: triangleCount(first.lod0) * group.length,
       triangles1: first.lod1 === null ? 0 : triangleCount(first.lod1) * group.length,
@@ -225,7 +235,7 @@ export function drawInstancedPieces(parent: pc.Entity, placements: readonly Inst
       view?.app.off('update', update);
       // Destroying the entities destroys their mesh instances; the meshes are the library's.
       root.destroy();
-      for (const cell of cells) cell.buffer.destroy();
+      for (const cell of cells) for (const buffer of cell.buffers) buffer.destroy();
       cells.length = 0;
     },
   };
