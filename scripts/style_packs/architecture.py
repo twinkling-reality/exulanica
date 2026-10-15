@@ -72,9 +72,12 @@ def arched_wall(
     kind: str,
     key: str = "stone",
     inner: str = "shade",
+    *,
+    top: bool = True,
 ) -> None:
     """A wall slab pierced by arched openings (centre x, half width, springing height, rise), drawn
-    as convex parts: solid piers, spandrel strips above each arch, soffits and jambs."""
+    as convex parts: solid piers, spandrel strips above each arch, soffits and jambs. ``top`` draws
+    the wall's top, left off where a band of another colour lies in that plane."""
     (x0, x1), (z0, z1), (y0, y1) = x, z, y
     edges = [x0]
     for cx, half, _, _ in openings:
@@ -83,8 +86,10 @@ def arched_wall(
     for i in range(0, len(edges), 2):
         a, b = edges[i], edges[i + 1]
         if b - a > 1e-6:
-            faces = "xXyYzZ" if a == x0 or b == x1 else "yYzZ"
-            piece.box((a, b), (y0, y1), (z0, z1), key, faces)
+            # A pier draws only its outer end faces: a face toward an opening would lie in the
+            # plane of that opening's jamb, in another colour, and the two would speckle.
+            ends = ("x" if a == x0 else "") + ("X" if b == x1 else "")
+            piece.box((a, b), (y0, y1), (z0, z1), key, ends + ("yYzZ" if top else "yzZ"))
     for cx, half, spring, rise in openings:
         points = arch_points(cx, spring, half, rise, steps, kind)
         for (xa, ya), (xb, yb) in pairwise(points):
@@ -106,11 +111,17 @@ def arched_wall(
                 inner,
                 (sign, 0.0, 0.0),
             )
-        piece.face(
-            [(cx - half, y1, z0), (cx + half, y1, z0), (cx + half, y1, z1), (cx - half, y1, z1)],
-            key,
-            (0.0, 1.0, 0.0),
-        )
+        if top:
+            piece.face(
+                [
+                    (cx - half, y1, z0),
+                    (cx + half, y1, z0),
+                    (cx + half, y1, z1),
+                    (cx - half, y1, z1),
+                ],
+                key,
+                (0.0, 1.0, 0.0),
+            )
 
 
 def cornice(
@@ -173,8 +184,13 @@ def column(piece: Piece, x: float, z: float, y: tuple[float, float], radius: flo
 
 
 def _mirror_z(target: Piece, source: Piece, sign: float) -> None:
+    """Add ``source`` to ``target``, mirrored across z = 0 when ``sign`` is negative: a mirror
+    reverses each triangle's winding, so its corners are taken in the other order and its faces
+    stay turned outward."""
     for k, key in enumerate(source.keys):
-        target.corners += [(c[0], c[1], sign * c[2]) for c in source.corners[k * 3 : k * 3 + 3]]
+        a, b, c = source.corners[k * 3 : k * 3 + 3]
+        corners = (a, c, b) if sign < 0 else (a, b, c)
+        target.corners += [(p[0], p[1], sign * p[2]) for p in corners]
         target.keys.append(key)
 
 
@@ -240,8 +256,16 @@ def arcade_block(row: Mapping[str, Any]) -> Piece:
             windows = [
                 (-w / 2 + bay * (i + 0.5), half, y0 + storey * 0.6, half) for i in range(bays)
             ]
+            # A band lies on every storey's top but the last's.
             arched_wall(
-                piece, (-w / 2, w / 2), (front - 0.25, front), (y0, y0 + storey), windows, 8, kind
+                piece,
+                (-w / 2, w / 2),
+                (front - 0.25, front),
+                (y0, y0 + storey),
+                windows,
+                8,
+                kind,
+                top=s == storeys - 1,
             )
             for cx, half, spring, _ in windows:
                 sill = y0 + storey * 0.25
@@ -314,7 +338,8 @@ def tower(row: Mapping[str, Any]) -> Piece:
     a = min(w, d) / 2 * 0.86
     for s in range(stages):
         y0, y1, inset = s * shaft / stages, (s + 1) * shaft / stages, s * 0.12
-        piece.box((-a + inset, a - inset), (y0, y1), (-a + inset, a - inset), "stone")
+        # The stage's band covers its top, so the stone's top is not drawn under it.
+        piece.box((-a + inset, a - inset), (y0, y1), (-a + inset, a - inset), "stone", "xXyzZ")
         piece.box(
             (-a + inset - 0.15, a - inset + 0.15),
             (y1 - 0.35, y1),
@@ -349,8 +374,16 @@ def tower(row: Mapping[str, Any]) -> Piece:
     arch = [(0.0, half, y0 + belfry * 0.55, min(half, belfry * 0.3))]
     for sign in (1.0, -1.0):
         wall = Piece()
+        # The belfry's trim covers its walls' tops.
         arched_wall(
-            wall, (-inner, inner), (inner - thick, inner), (y0, y1), arch, row["segments"], kind
+            wall,
+            (-inner, inner),
+            (inner - thick, inner),
+            (y0, y1),
+            arch,
+            row["segments"],
+            kind,
+            top=False,
         )
         _mirror_z(piece, wall, sign)
         side = Piece()
@@ -365,6 +398,7 @@ def tower(row: Mapping[str, Any]) -> Piece:
             narrow,
             row["segments"],
             kind,
+            top=False,
         )
         _turn(piece, side, sign)
     piece.box((-inner * 0.55, inner * 0.55), (y0, y1 - 0.4), (-inner * 0.55, inner * 0.55), "shade")
@@ -416,7 +450,8 @@ def stair_flight(row: Mapping[str, Any]) -> Piece:
             (0, top),
             (z1 - going, z1),
             "stone",
-            "yYzZ" if i else "yYZ",
+            # The step's nosing covers its tread, so the stone's top is not drawn under it.
+            "yzZ" if i else "yZ",
         )
         piece.box(
             (-w / 2 + cheek, w / 2 - cheek),

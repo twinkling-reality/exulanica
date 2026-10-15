@@ -1,5 +1,6 @@
-"""Architecture pieces in authored kits: they hold their declared size, the product reads them, the
-same document builds the same bytes, and numbers that would break a piece refuse before output."""
+"""Architecture pieces in authored kits: they hold their declared size, face out with no two
+colours drawn in one plane, the product reads them, the same document builds the same bytes, and
+numbers that would break a piece refuse before output."""
 
 import copy
 import hashlib
@@ -15,8 +16,11 @@ from scripts.style_packs.architecture import (  # noqa: E402
     ARCHITECTURE_RECIPES,
     ARCHITECTURE_SWATCHES,
     MINIMUM_MM,
+    _mirror_z,
 )
+from scripts.style_packs.authored_packs import Piece  # noqa: E402
 from scripts.style_packs.garden_kit import build, validate_document  # noqa: E402
+from tests.test_assembled_architecture import _same_plane_overlaps  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 GARDEN = ROOT / "assets/style-packs/authoring/water-garden-kit.v1.json"
@@ -127,6 +131,45 @@ def test_every_recipe_stays_inside_its_declared_size(name):
     assert len(piece.keys) > 0 and set(piece.keys) <= KEYS
     assert np.all(points.min(0) >= np.asarray([-width / 2, 0, -depth / 2]) - 0.0001)
     assert np.all(points.max(0) <= np.asarray([width / 2, height, depth / 2]) + 0.0001)
+
+
+def test_a_mirrored_face_stays_turned_out():
+    # A face toward +z, mirrored to the far side, faces -z: its corners are taken in the other
+    # order.
+    source = Piece()
+    source.face([(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)], "stone", (0.0, 0.0, 1.0))
+    for sign, facing in ((1.0, 1.0), (-1.0, -1.0)):
+        target = Piece()
+        _mirror_z(target, source, sign)
+        corners = np.asarray(target.corners).reshape(-1, 3, 3)
+        normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+        assert np.all(normals[:, 2] * facing > 0) and np.allclose(corners[:, :, 2], sign)
+
+
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_no_two_colours_of_a_piece_are_drawn_in_one_plane(name):
+    # A pier's face toward its opening in its jamb's plane, or a wall's top under a band of trim,
+    # would be two colours fighting in the depth buffer: the speckle at end jambs and on ledges.
+    row = CASES[name]
+    overlaps = _same_plane_overlaps(ARCHITECTURE_RECIPES[row["recipe"]](row))
+    assert overlaps == [], f"{len(overlaps)} triangles lie over another's colour, facing alike"
+
+
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_a_pieces_outermost_faces_face_out(name):
+    # A wall mirrored to the far side with its winding kept would face in, and be lit inside out:
+    # of the faces square to each side, the outermost face out.
+    row = CASES[name]
+    corners = np.asarray(ARCHITECTURE_RECIPES[row["recipe"]](row).corners).reshape(-1, 3, 3)
+    normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    lengths = np.linalg.norm(normals, axis=1)
+    for axis in (0, 2):
+        square = np.abs(normals[:, axis]) > 0.999 * lengths
+        for side in (-1, 1):
+            where = corners[square, 0, axis]
+            extreme = where.min() if side < 0 else where.max()
+            on = square & np.isclose(corners[:, 0, axis], extreme, atol=1e-6)
+            assert on.any() and np.all(normals[on, axis] * side > 0), (axis, side)
 
 
 def _document() -> dict:
