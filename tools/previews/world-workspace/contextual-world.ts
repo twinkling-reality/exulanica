@@ -355,7 +355,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   // The ring at a chosen subject's feet, on the ground in the world (atlas-react ground-ring.ts), in
   // the design's --live.
-  const groundRing = createGroundRing(b.app, { invalidate: () => b.invalidate(), look: { ...GROUND_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } });
+  const groundRing = createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } });
   const presence = mountCharacterPresence(beside, {
     onInspect: () => { void choose(); },
     onAction: (action) => questionAct(action),

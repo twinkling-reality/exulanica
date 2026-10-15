@@ -5,7 +5,7 @@
 // whole when disposed. Its look is a shader; a picture of it is the check of the look.
 import * as pc from 'playcanvas';
 import { describe, expect, it, vi } from 'vitest';
-import { GROUND_RING, createGroundRing, groundRingMaterial } from '../src/playcanvas/ground-ring.js';
+import { GROUND_RING, RING_LAYER, createGroundRing, groundRingMaterial } from '../src/playcanvas/ground-ring.js';
 
 function nullApp() {
   const canvas = document.createElement('canvas');
@@ -89,6 +89,44 @@ describe('a ring drawn on the ground', () => {
     shown = 1200;
     app.graphicsDevice.fire(pc.GraphicsDevice.EVENT_RESIZE, 1200, 900);
     expect(drawnWidths()).toEqual(at(2));
+  });
+
+  it('is drawn after tone mapping, testing the scene depth itself, wherever the camera\'s frame leaves that depth', () => {
+    const app = nullApp();
+    const eye = new pc.Entity('eye');
+    eye.addComponent('camera');
+    app.root.addChild(eye);
+    const camera = eye.camera!;
+    const ring = createGroundRing(app, { camera });
+    const instance = ring.entity.render!.meshInstances[0]!;
+    const layer = app.scene.layers.getLayerByName(RING_LAYER)!;
+    // Its own layer comes after every layer of the scene's, and the camera draws it.
+    expect(app.scene.layers.layerList.indexOf(layer)).toBeGreaterThan(app.scene.layers.layerList.indexOf(app.scene.layers.getLayerById(pc.LAYERID_IMMEDIATE)!));
+    expect(camera.layers).toContain(layer.id);
+    // No frame: in the scene, depth-tested by the scene's own buffer.
+    app.fire('prerender');
+    expect(ring.afterToneMapping).toBe(false);
+    expect(ring.entity.render!.layers).toEqual([pc.LAYERID_WORLD]);
+    expect(instance.material.depthTest).toBe(true);
+    // A frame with a depth prepass: on its own layer, testing the scene's depth in its shader.
+    camera.framePasses = [{ prePass: {} } as unknown as pc.RenderPass];
+    app.fire('prerender');
+    expect(ring.afterToneMapping).toBe(true);
+    expect(ring.entity.render!.layers).toEqual([layer.id]);
+    expect(instance.material.depthTest).toBe(false);
+    expect(instance.material.depthWrite).toBe(false);
+    // A frame that draws no prepass leaves no depth to test against: back in the scene.
+    camera.framePasses = [{ prePass: null } as unknown as pc.RenderPass];
+    app.fire('prerender');
+    expect(ring.afterToneMapping).toBe(false);
+    expect(ring.entity.render!.layers).toEqual([pc.LAYERID_WORLD]);
+    // A second ring shares the layer; without a camera a ring is always drawn in the scene.
+    createGroundRing(app, { camera });
+    expect(new Set(app.scene.layers.layerList.filter((one) => one.name === RING_LAYER)).size).toBe(1);
+    const plain = createGroundRing(app);
+    camera.framePasses = [{ prePass: {} } as unknown as pc.RenderPass];
+    app.fire('prerender');
+    expect(plain.afterToneMapping).toBe(false);
   });
 
   it('goes whole when disposed, and draws nothing on a device that runs WebGPU', () => {
