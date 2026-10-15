@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from exulanica.api.arrival_scene_pose import scene_arrival_pose
 from exulanica.api.arrival_source import (
     RetainedScenePin,
     _scene_point_bytes,
@@ -16,6 +15,7 @@ from exulanica.graph.asset_read_policy import evaluation_time, scene_allowed, sc
 from exulanica.graph.geometry import read_point_map
 from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
 from exulanica.graph.scene_geometry import read_scene_geometry
+from exulanica.hosting.arrival_scene_pose import scene_arrival_pose
 
 from test_scene_projection_backfill import _rebuild
 from test_scene_reconstruction_pipeline import FakeColmap, _processor, _queued_scene

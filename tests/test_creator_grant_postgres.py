@@ -31,12 +31,12 @@ import anyio
 import httpx2
 import psycopg
 import pytest
-from exulanica.api import creator_grants
 from exulanica.api.account_runtime import SESSION_COOKIE, AccountRuntime, GoogleOIDCProvider
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
 from exulanica.db.session import Database
+from exulanica.hosting import creator_grants
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import LocalWorkspaceStores
 from exulanica.world.workspace_assets import WorkspaceAssetRuntime

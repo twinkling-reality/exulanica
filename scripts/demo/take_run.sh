@@ -114,7 +114,7 @@ container = document.with_name(re.sub(r"\.v\d+\.json$", ".glb", document.name))
 environment = {"PATH": os.environ["PATH"], "EXULANICA_DATABASE_URL": state["database"]["runtime_url"],
                "EXULANICA_DATA_DIR": state["data_dir"], "EXULANICA_DOOR_BRIDGES": state["door_bridges"]}
 done = subprocess.run(
-    [sys.executable, "-m", "exulanica.api.thing_store_command", "admit-look", "--workspace", state["workspace_id"],
+    [sys.executable, "-m", "exulanica.hosting.thing_store_command", "admit-look", "--workspace", state["workspace_id"],
      "--actor", state["actor"], "--document", str(document), "--container", str(container), "--mapping", sys.argv[3],
      "--apply"], env=environment, capture_output=True, text=True)
 said = [line for line in (done.stdout + done.stderr).splitlines() if "postgresql://" not in line]

@@ -27,15 +27,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from exulanica.api.thing_store_command import (
+from exulanica.door.bridges import load_bridge_directory
+from exulanica.door.mapping import MappingRefused, check_mapping
+from exulanica.evidence.blob import BlobId
+from exulanica.hosting.thing_store_command import (
     MappingNotAdmitted,
     admitted_mapping,
     main,
     mapping_admits,
 )
-from exulanica.door.bridges import load_bridge_directory
-from exulanica.door.mapping import MappingRefused, check_mapping
-from exulanica.evidence.blob import BlobId
 from exulanica.store.configured import content_stores
 from exulanica.things.authored import container_of
 from exulanica.things.looks import Look, read_look

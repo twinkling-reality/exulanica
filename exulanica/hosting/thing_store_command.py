@@ -1,11 +1,11 @@
 """The operator's command for a workspace's own looks: admit one a bridge's mapping names, withdraw
 one, list them.
 
-    python -m exulanica.api.thing_store_command admit-look --workspace UUID --actor UUID \\
+    python -m exulanica.hosting.thing_store_command admit-look --workspace UUID --actor UUID \\
         --document LOOK.json --container LOOK.glb --mapping MAPPING.json [--apply]
-    python -m exulanica.api.thing_store_command withdraw-look --workspace UUID --actor UUID \\
+    python -m exulanica.hosting.thing_store_command withdraw-look --workspace UUID --actor UUID \\
         --look KEY --version N --reason TEXT [--apply]
-    python -m exulanica.api.thing_store_command list --workspace UUID
+    python -m exulanica.hosting.thing_store_command list --workspace UUID
 
 A traveller who crosses in from an outside game arrives looking like itself only when the
 workspace holds that look. A deployment builds the look from its own copy of the game's figure
@@ -186,7 +186,7 @@ def _admit_look(args: argparse.Namespace, parser: argparse.ArgumentParser) -> in
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m exulanica.api.thing_store_command", description=__doc__
+        prog="python -m exulanica.hosting.thing_store_command", description=__doc__
     )
     commands = parser.add_subparsers(dest="command", required=True)
     admit = commands.add_parser("admit-look", help="admit a look a bridge's mapping names")

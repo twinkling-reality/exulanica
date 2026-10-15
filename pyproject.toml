@@ -195,7 +195,7 @@ exulanica-tile-fault = "exulanica.world.tile_faults:main"
 # `uv run exulanica-creator-grant grant|revoke --user <uuid> --reason <code> --operator <code>`, or
 # `list`. The operator's grant of the accounts whose browser sessions may upload a style pack or a
 # workspace asset; connects as the account role (EXULANICA_ACCOUNT_DATABASE_URL).
-exulanica-creator-grant = "exulanica.api.creator_grants:main"
+exulanica-creator-grant = "exulanica.hosting.creator_grants:main"
 # `uv run exulanica-installation check|facts|backup|verify|maintenance|restore`. A complete
 # installation's profile facts, backup sets, unattended maintenance and declared crash recovery;
 # docs/deployment.md section 9 owns its settings and procedures.
@@ -409,6 +409,9 @@ layers = [
   # The HTTP surface depends on everything and nothing depends on it. That is the definition of
   # a thin API: routes validate and delegate, so a route has nothing another module could want.
   "api",
+  # What runs the product without serving HTTP: operator commands and the parts of hosts and
+  # workers that need no web framework. The web layer imports it; it imports nothing above it.
+  "hosting",
   # The door for outside programs: bridges, grants, the long-poll channel and the asker the
   # decision host is given. Only the HTTP surface (and the harness above it) reaches it, and the
   # contracts below keep it from reaching the workflows: it reads worlds, writes its own tables and

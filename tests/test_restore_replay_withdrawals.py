@@ -23,7 +23,6 @@ import uuid
 
 import psycopg
 import pytest
-from exulanica.api import creator_grants
 from exulanica.api.account_repository import AccountRejected, AccountRepository, secret_digest
 from exulanica.canonical import canonical_json
 from exulanica.consent.training import TrainingTerms
@@ -31,6 +30,7 @@ from exulanica.db.session import set_workspace
 from exulanica.deletion.restore import RestoreRefused, verify_restore
 from exulanica.deletion.withdrawals import CATALOG, read_withdrawals
 from exulanica.evidence.blob import BlobId
+from exulanica.hosting import creator_grants
 from exulanica.identity import rename_entity
 from exulanica.ingest.person_review import create_subject, record_consent
 from exulanica.ingest.repository import IngestRepository

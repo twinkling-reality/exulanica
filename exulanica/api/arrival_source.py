@@ -10,7 +10,6 @@ from dataclasses import dataclass
 import psycopg
 from psycopg.pq import TransactionStatus
 
-from exulanica.api.arrival_scene_pose import scene_arrival_pose, standalone_opm_footprint
 from exulanica.errors import BlobNotFoundError, IntegrityError, TombstonedError
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.asset_read_policy import (
@@ -25,6 +24,7 @@ from exulanica.graph.payload import ReconstructionSceneRow
 from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
 from exulanica.graph.scene_geometry import read_scene_geometry
 from exulanica.graph.snapshot import read_snapshot
+from exulanica.hosting.arrival_scene_pose import scene_arrival_pose, standalone_opm_footprint
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.arrival_selection import (
     ArrivalDescriptor,
