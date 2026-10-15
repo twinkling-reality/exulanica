@@ -5,8 +5,9 @@
 // there while it moves and when it is let go, and Enter keeps the move, Esc puts it back. Backspace
 // asks the server what removing it would do and Enter does it, and Cmd+Z takes back the world's
 // newest change, and Cmd+Shift+Z does the last change taken back again. Tab and Shift+Tab choose
-// the next or previous placed thing in view, so selecting needs no pointer; H shows the world's
-// History. Every write goes through the app's own edit path (`send`, main.ts's sendPlanned), which
+// the next or previous placed thing in view, so selecting needs no pointer. History, the page H
+// opens, takes changes back through the same `undo` and `redo` this returns. Every write goes
+// through the app's own edit path (`send`, main.ts's sendPlanned), which
 // advances the saved world and redraws what changed; every write is asked of the server first as a
 // preview, and only the server's answer is shown.
 // In a site world (one made from a world kind) the parts made with the world (a building, a garden
@@ -18,11 +19,9 @@
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { pickSiteSlot } from '/src/composition/sight.ts';
 import { currentOpenSite } from '/src/composition/site-world.ts';
-import { HISTORY, buildHints, cardPrompts, changeWords, clockWords, dayWords, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
-import { cardWords, keyWord, label, nameTag, outline, page, path, promptColumn, promptRow, ring, scaleOf, sideCard } from './world-ui.ts';
+import { buildHints, cardPrompts, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { cardWords, keyWord, nameTag, outline, path, promptColumn, promptRow, ring, scaleOf, sideCard } from './world-ui.ts';
 
-/** How many of the world's newest changes History lists. */
-const CHANGES_SHOWN = 8;
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
 const ASK_AFTER_MS = 180;
 /** How much wider than the footprint's drawn extent the ring at a thing's foot is. */
@@ -48,20 +47,6 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   card.body.setAttribute('role', 'region'); card.body.setAttribute('aria-labelledby', 'bm-title');
   const chosen = outline(), copy = outline({ form: 'copy' }), origin = outline({ form: 'origin' }), trail = path();
   const foot = ring();
-  const history = page({ form: 'full' });
-  history.root.setAttribute('aria-label', HISTORY.title);
-  // The page's title at the top, its list from the sections' line (spec 5.7); the timeline goes above
-  // the list when History holds runs and models too.
-  const historyTitle = node('h1', HISTORY.title, 'wu-page-title');
-  historyTitle.style.cssText = 'position:absolute;left:calc(120 * var(--u));top:calc(96 * var(--u))';
-  const historyBody = node('div');
-  historyBody.style.cssText = 'position:absolute;left:calc(120 * var(--u));top:calc(300 * var(--u));width:calc(620 * var(--u))';
-  history.content.prepend(historyTitle, historyBody);
-  // Undo works while History is open from build mode, so it is drawn, before Back (frame 23).
-  history.keys.append(
-    keyWord({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z', onPress: () => { void undo(); } }),
-    keyWord({ keys: ['Esc'], word: 'Back', shortcut: 'Escape', onPress: () => closeChanges() }),
-  );
   root.append(origin.root, trail.root, chosen.root, copy.root, foot.root, tag.root, card.root);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
@@ -89,8 +74,6 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const siteDrawing = () => currentOpenSite()?.drawing() ?? null;
   const slotOf = (id) => siteDrawing()?.slots?.find(slot => slot.identity === id.slice(PART.length)) ?? null;
   const regionRoot = () => (entry.generatedSite ? b.regionRoots?.get(entry.generatedSite.regionId) ?? null : null);
-  /** The version's edit log and every thing it ever placed (removed ones too), for History. */
-  let edits = [], everyThing = new Map(), changesOpen = false;
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
   /** What the corners show now, so they are told only when it changes (a hint's fade restarts when told). */
@@ -104,8 +87,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   let wasInspecting = false;
 
   const things = () => b.__workspaceThings?.() ?? null;
-  const focused = () => [card.root, history.root].some(element => element.contains(document.activeElement));
-  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, moving: moving !== null, ready: moving?.verdict.state === 'ready', busy, changes: changesOpen, focused: focused() });
+  const focused = () => card.root.contains(document.activeElement);
+  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, moving: moving !== null, ready: moving?.verdict.state === 'ready', busy, removeRefused, focused: focused() });
 
   /** A note at the bottom centre; a change it reports can be taken back from it. */
   function say(words, { undoable = false } = {}) {
@@ -122,10 +105,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const version = await read(versionPath + worldQuery);
     if (version.version_id !== entry.authoredVersionId || version.world_id !== entry.worldId) throw Error('This world changed. Reload it before building.');
     records = new Map((version.things || []).filter(thing => !thing.removed).map(thing => [thing.thing_id, thing]));
-    everyThing = new Map((version.things || []).map(thing => [thing.thing_id, thing]));
-    edits = Array.isArray(version.edits) ? version.edits : [];
     await refreshParts();
-    if (changesOpen) renderChanges();
   }
 
   /** A site world's made parts as they stand; a world not made from a kind has none, and while its worker is busy the last read stands. */
@@ -137,33 +117,6 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       partChanges = new Map((answered.changes || []).map(change => [change.identity, change]));
     } catch { /* Read again after the next change. */ }
   }
-
-  /** History while it lists only build mode's changes: the world's newest changes in words, newest first. */
-  function renderChanges() {
-    const shown = edits.slice(-CHANGES_SHOWN).reverse();
-    const list = [];
-    if (!shown.length) list.push(label(HISTORY.today), node('p', HISTORY.empty, 'wu-small-text'));
-    const named = (thingId) => { const thing = everyThing.get(thingId); return thing ? thingName(thing) : null; };
-    const partNamed = (partId) => parts.get(PART + partId)?.label ?? null;
-    const now = Date.now();
-    let day = null;
-    for (const edit of shown) {
-      // Today's changes under "Today", each earlier day's under its date.
-      const heading = dayWords(edit.recorded_at, now);
-      if (heading !== day) { day = heading; list.push(label(heading)); }
-      const row = node('div', '', 'wu-list-row');
-      row.append(node('span', clockWords(edit.recorded_at), 'wu-time'), node('div', changeWords(edit, edits, named, partNamed), 'wu-what'));
-      list.push(row);
-    }
-    historyBody.replaceChildren(...list);
-  }
-  function toggleChanges() {
-    if (changesOpen) { closeChanges(); return; }
-    changesOpen = true; renderChanges(); history.open(root);
-    void refreshRecords().catch(() => {});
-    render();
-  }
-  function closeChanges() { changesOpen = false; history.close(); render(); canvas.focus({ preventScroll: true }); }
 
   /** The placed things in view now, nearest first: what Tab chooses among. */
   function inView() {
@@ -279,7 +232,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   function hideMarks() { chosen.hide(); copy.hide(); origin.hide(); trail.hide(); foot.hide(); }
   /** Whether the chosen thing's card and marks show: building, something chosen, nothing over them. */
-  const cardShows = () => on && selected !== null && !inspecting() && !changesOpen;
+  const cardShows = () => on && selected !== null && !inspecting();
 
   function select(placedId) {
     dropMove();
@@ -301,7 +254,6 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
   function leave() {
     dropMove();
-    if (changesOpen) { changesOpen = false; history.close(); }
     on = false; hovered = null; tag.hide();
     selected = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
@@ -441,38 +393,54 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     try { await refreshRecords(); } catch {}
   }
 
+  /** A made part's name by its id, from the parts read: what an undone part change names. */
+  const partNamed = (partId) => parts.get(PART + partId)?.label ?? null;
+
+  /**
+   * Does again the last change taken back (Cmd+Shift+Z here and in History). Resolves, once the
+   * version is read again, with the sentence it said, or null when a request was already on its way.
+   */
   async function redo() {
-    if (busy) return;
+    if (busy) return null;
     busy = true; render();
+    let said;
     try {
       const stateBase = base();
       const preview = (await post('things.redo.preview', '/things/redo/preview', { base_state_sha256: stateBase })).body;
-      if (preview.availability !== 'ready') { say(redoRefusalWords(preview.blocked_reason, preview.blocked_detail)); return; }
-      await post('things.redo', '/things/redo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-      say(redoneNote(preview.would_change), { undoable: true });
-    } catch (error) { say(problem(error)); }
-    finally {
-      busy = false;
-      try { await refreshRecords(); } catch {}
-      if (selected !== null && !exists(selected)) deselect(); else render();
-    }
+      if (preview.availability !== 'ready') say(said = redoRefusalWords(preview.blocked_reason, preview.blocked_detail));
+      else {
+        await post('things.redo', '/things/redo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
+        say(said = redoneNote(preview.would_change), { undoable: true });
+      }
+    } catch (error) { say(said = problem(error)); }
+    busy = false;
+    try { await refreshRecords(); } catch {}
+    if (selected !== null && !exists(selected)) deselect(); else render();
+    return said;
   }
 
+  /**
+   * Takes back the world's newest change (Cmd+Z here, the note's Undo and History's). Resolves,
+   * once the version is read again, with the sentence it said, or null when a request was already
+   * on its way.
+   */
   async function undo() {
-    if (busy) return;
+    if (busy) return null;
     busy = true; render();
+    let said;
     try {
       const stateBase = base();
       const preview = (await post('things.undo.preview', '/things/undo/preview', { base_state_sha256: stateBase })).body;
-      if (preview.availability !== 'ready') { say(undoRefusalWords(preview.blocked_reason, preview.blocked_detail)); return; }
-      await post('things.undo', '/things/undo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-      say(undoneNote(preview.would_change));
-    } catch (error) { say(problem(error)); }
-    finally {
-      busy = false;
-      try { await refreshRecords(); } catch {}
-      if (selected !== null && !exists(selected)) deselect(); else render();
-    }
+      if (preview.availability !== 'ready') say(said = undoRefusalWords(preview.blocked_reason, preview.blocked_detail));
+      else {
+        await post('things.undo', '/things/undo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
+        say(said = undoneNote(preview.would_change, partNamed));
+      }
+    } catch (error) { say(said = problem(error)); }
+    busy = false;
+    try { await refreshRecords(); } catch {}
+    if (selected !== null && !exists(selected)) deselect(); else render();
+    return said;
   }
 
   /** What a key or a pressed prompt asks for, by keyAction's name; `free` is Alt held. */
@@ -491,8 +459,6 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     else if (action === 'redo') void redo();
     else if (action === 'next') cycle(1);
     else if (action === 'previous') cycle(-1);
-    else if (action === 'changes') toggleChanges();
-    else if (action === 'close-changes') closeChanges();
   }
 
   /**
@@ -578,6 +544,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   return {
     active: () => on,
+    undo,
+    redo,
     /** Act on a key; true when build mode took it. */
     key(event) {
       const action = keyAction(flags(), event);
@@ -630,7 +598,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       // The name of what the pointer is on, above it; the chosen thing's card names it instead, and
       // a carried copy's card speaks for where it is going.
       let head = null;
-      if (hovered !== null && hovered !== selected && moving === null && !changesOpen) {
+      if (hovered !== null && hovered !== selected && moving === null) {
         if (isPart(hovered)) {
           const shape = partOnScreen(hovered, null);
           head = shape === null ? null : { x: (shape.bounds.left + shape.bounds.right) / 2, y: shape.bounds.top, z: 1 };
@@ -676,7 +644,6 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     dispose() {
       lifetime.abort();
       if (on) { on = false; renderCorners(); }
-      if (changesOpen) history.close();
       canvas.style.cursor = '';
       for (const part of [origin.root, trail.root, chosen.root, copy.root, foot.root, tag.root, card.root]) part.remove();
     },

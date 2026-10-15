@@ -53,16 +53,32 @@ export function removedNote(name) {
 }
 
 /**
- * What an undo did, from its preview's `would_change`: the edit it reverses and the thing's
- * document as it stands and as the undo leaves it.
+ * An undone change as the note, History and the pull request all say it (ruling W2), without the
+ * full stop: by the kind of the edit it reverses and what that edit changed ("the bench").
  */
-export function undoneNote(change) {
-  const undoes = change?.undoes?.kind;
-  const name = thingName(change?.after ?? change?.before);
-  if (undoes === 'remove_thing') return `Brought back the ${name}.`;
-  if (undoes === 'move_thing') return `Put the ${name} back where it was.`;
-  if (undoes === 'add_thing') return `Took away the ${name} that was placed.`;
-  return 'Undid the last change.';
+function undoneWords(kind, what) {
+  if (kind === 'remove_thing' || kind === 'suppress_element') return `Brought back ${what}`;
+  if (kind === 'move_thing' || kind === 'transform_element') return `Put ${what} back where it was`;
+  if (kind === 'add_thing') return `Took away ${what} that was placed`;
+  return 'Undid the last change';
+}
+
+/** How a change names a made part (`partNameOf(partId)`, a name or null): "the pond". */
+const partCalled = (partId, partNameOf) => {
+  const name = partNameOf(partId);
+  return name ? `the ${name}` : 'a part of the world';
+};
+
+/**
+ * What an undo did, from its preview's `would_change`: the edit it reverses and the thing's
+ * document as it stands and as the undo leaves it, or the made part it names (`partNameOf`).
+ */
+export function undoneNote(change, partNameOf = () => null) {
+  const undoes = change?.undoes?.kind, subject = change?.subject_id;
+  const what = typeof subject === 'string' && subject.startsWith('part:')
+    ? partCalled(subject.slice('part:'.length), partNameOf)
+    : `the ${thingName(change?.after ?? change?.before)}`;
+  return `${undoneWords(undoes, what)}.`;
 }
 
 /**
@@ -87,20 +103,23 @@ export function redoRefusalWords(code, detail) {
 /**
  * One line of the world's changes, from its edit log: what the edit did, by its kind and the
  * thing it names (`nameOf(thingId)`, a name or null) or the made part (`partNameOf(partId)`), an undo
- * by what it took back, and a redo (an undo of an undo) by what it did again.
+ * by what it took back as its note said it, and a redo (an undo of an undo) by what it did again.
  */
 export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
   const byId = new Map(edits.map(each => [each.edit_id, each]));
-  const plain = (one) => {
-    // A part made with the world: named by its parts read, its change stored as an element's.
-    if (typeof one.element_id === 'string' && one.element_id.startsWith('part:')) {
-      const name = partNameOf(one.element_id.slice('part:'.length));
-      const part = name ? `the ${name}` : 'a part of the world';
-      if (one.kind === 'suppress_element') return `Removed ${part}`;
-      if (one.kind === 'transform_element') return `Moved ${part}`;
-    }
+  // A part made with the world is named by its parts read, its change stored as an element's.
+  const isPart = (one) => typeof one.element_id === 'string' && one.element_id.startsWith('part:');
+  const called = (one) => {
+    if (isPart(one)) return partCalled(one.element_id.slice('part:'.length), partNameOf);
     const name = one.thing_id ? nameOf(one.thing_id) : null;
-    const thing = name ? `the ${name}` : 'a thing';
+    return name ? `the ${name}` : 'a thing';
+  };
+  const plain = (one) => {
+    if (isPart(one)) {
+      if (one.kind === 'suppress_element') return `Removed ${called(one)}`;
+      if (one.kind === 'transform_element') return `Moved ${called(one)}`;
+    }
+    const thing = called(one);
     if (one.kind === 'add_thing') return `Placed ${thing}`;
     if (one.kind === 'move_thing') return `Moved ${thing}`;
     if (one.kind === 'remove_thing') return `Removed ${thing}`;
@@ -109,13 +128,12 @@ export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
   };
   if (edit.kind !== 'undo') return plain(edit);
   const undone = byId.get(edit.undone_edit_id);
-  if (!undone) return 'Took back a change';
+  if (!undone) return undoneWords(null, null);
   if (undone.kind === 'undo') {
     const again = byId.get(undone.undone_edit_id);
     return again ? `${plain(again)} again` : 'Did a change again';
   }
-  const words = plain(undone);
-  return `Took back: ${words.charAt(0).toLowerCase()}${words.slice(1)}`;
+  return undoneWords(undone.kind, called(undone));
 }
 
 const MONTHS = Object.freeze(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
@@ -187,7 +205,7 @@ export function nothingInView() {
   return 'No placed things in view. Walk closer to one.';
 }
 
-/** The History page while it lists only build mode's changes (until it shows runs and models too). */
+/** History's words: its title, the heading of today's changes and its line when nothing has changed. */
 export const HISTORY = Object.freeze({ title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
 
 /**
@@ -258,16 +276,17 @@ export function snapped(mm, free) {
 }
 
 /**
- * What a key does in build mode's state `{ on, selected, confirming, moving, ready, busy }`: an
+ * What a key does in build mode's state `{ on, selected, confirming, moving, ready, busy, removeRefused }`: an
  * action, 'held' for a key build mode takes and does nothing with now (a held-down B, Backspace with
  * nothing selected), or null when it leaves the key to the page. B switches build mode on and off;
  * Esc puts a question away, puts a moved thing back, lets go of what is selected, then leaves build
  * mode; Backspace or Delete asks to remove what is selected; `[` and `]` turn it, Alt for a free
  * turn; Enter answers yes to a question or keeps a move the server said may be kept; Cmd+Z or
  * Ctrl+Z takes back the world's newest change, with Shift does the last one taken back again; Tab
- * and Shift+Tab choose the next or previous placed thing in view; H shows the world's changes, and
- * Esc closes them first. While a request is on its way only B acts: nothing
- * is sent twice, and Esc does not seem to call back a change already sent.
+ * and Shift+Tab choose the next or previous placed thing in view. After the server refused removing
+ * what is chosen (`removeRefused`), Backspace and Delete do nothing: its card offers moving it only.
+ * H is the page's: it opens History from anywhere. While a request is on its way only B acts:
+ * nothing is sent twice, and Esc does not seem to call back a change already sent.
  */
 export function keyAction(state, event) {
   const command = event.metaKey || event.ctrlKey;
@@ -279,12 +298,11 @@ export function keyAction(state, event) {
   if (event.code === 'KeyB') return event.repeat ? 'held' : 'toggle';
   if (!state.on) return null;
   if (state.busy) return turn !== null || ['Escape', 'Backspace', 'Delete', 'Enter'].includes(event.code) ? 'held' : null;
-  if (event.code === 'Escape') return state.changes ? 'close-changes' : state.confirming ? 'cancel' : state.moving ? 'put-back' : state.selected ? 'deselect' : 'leave';
-  if (event.code === 'KeyH') return event.repeat ? 'held' : 'changes';
+  if (event.code === 'Escape') return state.confirming ? 'cancel' : state.moving ? 'put-back' : state.selected ? 'deselect' : 'leave';
   // Tab chooses the next placed thing in view, Shift+Tab the one before, unless a control of
   // build mode has the focus, where Tab moves the focus as anywhere else.
   if (event.code === 'Tab') return state.focused || state.confirming || state.moving ? null : event.shiftKey ? 'previous' : 'next';
-  if (['Backspace', 'Delete'].includes(event.code)) return state.selected && !state.confirming && !state.moving ? 'remove' : 'held';
+  if (['Backspace', 'Delete'].includes(event.code)) return state.selected && !state.confirming && !state.moving && !state.removeRefused ? 'remove' : 'held';
   if (turn !== null) return state.selected && !state.confirming ? turn : 'held';
   if (event.code === 'Enter') return state.confirming ? 'confirm' : state.moving ? (state.ready ? 'keep' : 'held') : null;
   return null;

@@ -51,9 +51,20 @@ const partLog = [
   { edit_id: 'p1', kind: 'transform_element', element_id: 'part:barn-id', thing_id: null },
   { edit_id: 'p2', kind: 'suppress_element', element_id: 'part:pond-id', thing_id: null },
   { edit_id: 'p3', kind: 'undo', undone_edit_id: 'p2', element_id: null, thing_id: null },
+  { edit_id: 'p4', kind: 'undo', undone_edit_id: 'p1', element_id: null, thing_id: null },
 ];
 const partName = (id) => ({ 'barn-id': 'barn', 'pond-id': 'pond' })[id] ?? null;
-assert.deepEqual(partLog.map(edit => changeWords(edit, partLog, () => null, partName)), ['Moved the barn', 'Removed the pond', 'Took back: removed the pond']);
+assert.deepEqual(partLog.map(edit => changeWords(edit, partLog, () => null, partName)), ['Moved the barn', 'Removed the pond', 'Brought back the pond', 'Put the barn back where it was']);
+// An undone change reads the same in the note and in History, the row without the full stop (ruling W2).
+assert.equal(undoneNote({ subject_id: 'part:pond-id', undoes: { kind: 'suppress_element' } }, partName), 'Brought back the pond.');
+assert.equal(undoneNote({ subject_id: 'part:barn-id', undoes: { kind: 'transform_element' } }, partName), 'Put the barn back where it was.');
+assert.equal(undoneNote({ subject_id: 'part:gone', undoes: { kind: 'suppress_element' } }), 'Brought back a part of the world.');
+const thingLog = (kind) => [{ edit_id: 't1', kind, thing_id: 'well:1' }, { edit_id: 't2', kind: 'undo', undone_edit_id: 't1', thing_id: 'well:1' }];
+for (const kind of ['add_thing', 'move_thing', 'remove_thing']) {
+  const row = changeWords(thingLog(kind)[1], thingLog(kind), () => 'well');
+  assert.equal(`${row}.`, undoneNote({ undoes: { kind }, before: well, after: well }), kind);
+}
+assert.equal(changeWords({ edit_id: 'u', kind: 'undo', undone_edit_id: 'missing' }, [], () => null), 'Undid the last change');
 assert.equal(changeWords({ edit_id: 'p4', kind: 'transform_element', element_id: 'part:gone', thing_id: null }, [], () => null), 'Moved a part of the world');
 // Snapping: half metres and 15 degree steps unless free; a yaw stays within one revolution.
 assert.equal(snapped(1249, false), 1000);
@@ -104,10 +115,15 @@ assert.equal(keyAction(chosen, key('Tab', { shiftKey: true })), 'previous');
 assert.equal(keyAction({ ...chosen, focused: true }, key('Tab')), null);
 assert.equal(keyAction(asking, key('Tab')), null);
 assert.equal(keyAction(off, key('Tab')), null);
-// H shows the changes; Esc closes them before anything else.
-assert.equal(keyAction(on, key('KeyH')), 'changes');
-assert.equal(keyAction({ ...asking, changes: true }, key('Escape')), 'close-changes');
+// H is the page's in build mode too: it opens History from anywhere.
+assert.equal(keyAction(on, key('KeyH')), null);
+assert.equal(keyAction(chosen, key('KeyH')), null);
 assert.equal(keyAction(off, key('KeyH')), null);
+// After the server refused removing what is chosen, Backspace and Delete do nothing; moving it still works.
+const refusedRemoval = { ...chosen, removeRefused: true };
+assert.equal(keyAction(refusedRemoval, key('Delete')), 'held');
+assert.equal(keyAction(refusedRemoval, key('Backspace')), 'held');
+assert.equal(keyAction(refusedRemoval, key('BracketRight')), 'turn-right');
 // Moving: [ and ] turn what is selected, with Alt for a free turn; Enter keeps only a move the
 // server said may be kept; Esc puts it back; Backspace does nothing while moving.
 const moving = { ...chosen, moving: true, ready: false }, keepable = { ...moving, ready: true };
@@ -148,7 +164,7 @@ const log = [
 ];
 const name = (id) => (id === 'well:1' ? 'well' : null);
 assert.deepEqual(log.map(edit => changeWords(edit, log, name)), [
-  'Placed the well', 'Moved the well', 'Took back: moved the well', 'Moved the well again',
+  'Placed the well', 'Moved the well', 'Put the well back where it was', 'Moved the well again',
   'Removed a thing', 'Moved an object', 'Changed the world',
 ]);
 for (const edit of log) assert.doesNotMatch(changeWords(edit, log, name), /_|well:1|gone:1/u);
@@ -174,8 +190,8 @@ assert.deepEqual(said(cardPrompts({ confirming: true })), [['Enter', 'Remove'], 
 // After a removal was refused (people live or work there), the card offers moving it, not removing it again.
 assert.deepEqual(said(cardPrompts({ removeRefused: true })), [['mouse', 'Drag to move'], ['[ ]', 'Turn']]);
 const keyOf = { Enter: 'Enter', Esc: 'Escape', Del: 'Delete', '[ ]': 'BracketRight' };
-const flagsOf = (state) => ({ on: true, selected: true, confirming: false, moving: false, ready: false, busy: false, changes: false, focused: false, ...state });
-for (const state of [{}, { moving: true, ready: true }, { moving: true, refused: true }, { confirming: true }]) {
+const flagsOf = (state) => ({ on: true, selected: true, confirming: false, moving: false, ready: false, busy: false, removeRefused: false, focused: false, ...state });
+for (const state of [{}, { moving: true, ready: true }, { moving: true, refused: true }, { confirming: true }, { removeRefused: true }]) {
   for (const prompt of cardPrompts(state)) {
     if (!prompt.action || prompt.disabled) continue;
     const code = keyOf[Array.isArray(prompt.keys) ? prompt.keys.join(' ') : prompt.keys];
