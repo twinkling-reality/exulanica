@@ -68,6 +68,7 @@ __all__ = [
     "check_storeys",
     "part_identity",
     "part_override",
+    "people_in",
     "people_of_part",
     "receipt_storeys_bound",
     "refused_people_words",
@@ -678,13 +679,27 @@ def check_change(
 
 
 def people_of_part(state: Mapping[str, Any], identity: str) -> list[tuple[str, str]]:
-    """Who lives or works in a part, as ``(name, "lives" | "works")`` in the society's order, read
-    from either engine that keeps residents (:func:`~exulanica.world.town_people.resident_of`): a
-    society of things names a premises by its record subject, a living town by its destination."""
-    from exulanica.world.town_people import resident_of
+    """Who lives or works in a site's part, as ``(name, "lives" | "works")`` in the society's
+    order (:func:`people_in`)."""
+    return people_in(
+        state,
+        subjects={
+            f"site.structure:{identity}",
+            f"site.area:{identity}",
+            f"site.fixture:{identity}",
+        },
+        destinations={f"structure:{identity}", f"area:{identity}", f"fixture:{identity}"},
+    )
 
-    subjects = {f"site.structure:{identity}", f"site.area:{identity}", f"site.fixture:{identity}"}
-    destinations = {f"structure:{identity}", f"area:{identity}", f"fixture:{identity}"}
+
+def people_in(
+    state: Mapping[str, Any], *, subjects: set[str], destinations: set[str]
+) -> list[tuple[str, str]]:
+    """Who lives or works in any of these premises, as ``(name, "lives" | "works")`` in the
+    society's order, read from either engine that keeps residents
+    (:func:`~exulanica.world.town_people.resident_of`): a society of things names a premises by its
+    record subject, a living town by its destination."""
+    from exulanica.world.town_people import resident_of
 
     def names(premises: Mapping[str, Any] | None) -> bool:
         if premises is None:

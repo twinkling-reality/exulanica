@@ -41,6 +41,7 @@ together by :mod:`exulanica.grammar.grammars.city.document`.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final
 
@@ -62,6 +63,7 @@ from exulanica.grammar.grammars.city import (
 )
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
+    CITY_DESCRIPTOR_PATHS,
     CITY_GENERATING_VERSIONS,
     CITY_LAND_VERSIONS,
     CITY_V4_DESCRIPTOR_PATH,
@@ -78,6 +80,7 @@ from exulanica.grammar.grammars.city.generation import streetlife as streetlife_
 from exulanica.grammar.grammars.city.generation import streets as streets_generator
 from exulanica.grammar.grammars.city.generation import terrain as terrain_generator
 from exulanica.grammar.grammars.city.generation import vitrine as vitrine_generator
+from exulanica.grammar.grammars.city.generation.stage import GeneratorStage
 from exulanica.grammar.landform import LandDocument, level_land
 from exulanica.grammar.shapes import RecordShape
 
@@ -208,17 +211,37 @@ def city_grammar(grammar_version: int) -> Grammar:
     return grammar
 
 
-def city_grammar_with(grammar_version: int, *, land: LandDocument | None = None) -> Grammar:
-    """The city grammar at ``grammar_version``, laid on ``land``: a version that lays a town on its
-    land (:data:`CITY_LAND_VERSIONS`) takes it, on level land when none is given, and every other
-    version refuses it by name. With no land, the grammar itself."""
+def city_grammar_with(
+    grammar_version: int,
+    building_changes: Mapping[str, massing_generator.BuildingChange] | None = None,
+    *,
+    land: LandDocument | None = None,
+) -> Grammar:
+    """The city grammar at ``grammar_version``, laid on ``land`` and with a version's changes to its
+    buildings. A version that lays a town on its land (:data:`CITY_LAND_VERSIONS`) takes it, on
+    level land when none is given, and every other version refuses it by name. The massing stage
+    takes the building changes (removed, or standing so many storeys), every later stage running as
+    it does, so the records are the grammar's own: a neighbour's party wall follows the building
+    beside it by the facade stage's rule, not by an edit. With neither, the grammar itself."""
     if grammar_version in CITY_LAND_VERSIONS:
-        if land is None:
-            return city_grammar(grammar_version)
-        return Grammar.from_descriptor(CITY_V6_DESCRIPTOR_PATH, stages=_v6_stages(land))
-    if land is not None:
+        grammar = (
+            city_grammar(grammar_version)
+            if land is None
+            else Grammar.from_descriptor(CITY_V6_DESCRIPTOR_PATH, stages=_v6_stages(land))
+        )
+    elif land is not None:
         raise GrammarError(
             f"city grammar version {grammar_version} stands on level ground; a town on land is "
             f"version {', '.join(map(str, CITY_LAND_VERSIONS))}"
         )
-    return city_grammar(grammar_version)
+    else:
+        grammar = city_grammar(grammar_version)
+    if not building_changes:
+        return grammar
+    stages = tuple(
+        massing_generator.with_changes(stage, building_changes)
+        if isinstance(stage, GeneratorStage) and stage.stage_id == massing.STAGE_ID
+        else stage
+        for stage in grammar.stages
+    )
+    return Grammar.from_descriptor(CITY_DESCRIPTOR_PATHS[grammar_version], stages=stages)

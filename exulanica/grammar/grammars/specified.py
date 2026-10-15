@@ -22,6 +22,7 @@ from exulanica.grammar import Grammar, generate
 from exulanica.grammar.contract import Generation
 from exulanica.grammar.errors import InvalidParameterError
 from exulanica.grammar.grammars import builtin_registry
+from exulanica.grammar.grammars.city.generation.massing import BuildingChange
 from exulanica.grammar.grammars.city.generation.terrain import city_tiles
 from exulanica.grammar.parameters import CascadeBinding, ParameterValue, ResolvedParameters
 
@@ -207,8 +208,26 @@ def covered_tiles(
     return resolved, spec.coverage.tiles(values)
 
 
-def generate_specified(spec: Specification, *, seed: str, subject_identity: str) -> Generation:
-    """Generate the world a specification makes under ``seed``, for ``subject_identity``."""
-    return generate(
-        spec.grammar, seed=seed, subject_identity=subject_identity, bindings=spec.bindings
-    )
+def generate_specified(
+    spec: Specification,
+    *,
+    seed: str,
+    subject_identity: str,
+    building_changes: Mapping[str, BuildingChange] | None = None,
+) -> Generation:
+    """Generate the world a specification makes under ``seed``, for ``subject_identity``; with
+    ``building_changes`` (a city's, by building identity: removed, or so many storeys) its massing
+    stage takes them and every later stage runs as it does
+    (:func:`~exulanica.grammar.grammars.city.city_grammar_with`). A change is a version's, never a
+    binding: bindings state a whole city."""
+    grammar = spec.grammar
+    if building_changes:
+        from exulanica.grammar.grammars.city import city_grammar_with
+        from exulanica.grammar.grammars.city.descriptor import CITY_GRAMMAR_ID
+
+        if grammar.key.grammar_id != CITY_GRAMMAR_ID:
+            raise InvalidParameterError(
+                f"building changes are a city's; grammar {grammar.key.grammar_id!r} has none"
+            )
+        grammar = city_grammar_with(grammar.key.grammar_version, building_changes)
+    return generate(grammar, seed=seed, subject_identity=subject_identity, bindings=spec.bindings)

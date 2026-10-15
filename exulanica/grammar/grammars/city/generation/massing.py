@@ -42,9 +42,10 @@ lot can take.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from functools import partial
-from typing import Final
+from types import MappingProxyType
+from typing import Final, cast
 
 from exulanica.grammar.contract import StageContext
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
@@ -60,7 +61,16 @@ from exulanica.grammar.grammars.city.generation.stage import (
     prior_records,
 )
 
-__all__ = ["STAGE", "STAGE_V3", "STAGE_VERSION_3", "parts_extent", "weighted_typologies"]
+__all__ = [
+    "STAGE",
+    "STAGE_V3",
+    "STAGE_VERSION_3",
+    "BuildingChange",
+    "BuildingStoreysRefused",
+    "parts_extent",
+    "weighted_typologies",
+    "with_changes",
+]
 
 _EAST: Final = (1, 0)
 #: A block holds fewer lots than this, so a lot's draw ordinal is its block's times this
@@ -170,7 +180,37 @@ def _storey_reach(typologies: Sequence[str]) -> tuple[int, int]:
     )
 
 
-def _generate(context: StageContext, weighted: bool = False) -> Iterator[object]:
+@dataclasses.dataclass(frozen=True, slots=True)
+class BuildingChange:
+    """A person's change to one building of a made town, by the building's identity: removed, or
+    standing ``storeys`` high. A version's changes, not the grammar's: they are never bound as
+    parameters, which state a whole city."""
+
+    removed: bool = False
+    storeys: int | None = None
+
+
+class BuildingStoreysRefused(InvalidParameterError):
+    """A building given a storey count outside its lot's range: its typology's storeys within the
+    district's band, the range its own draw is held to. Refused, never clamped."""
+
+    def __init__(self, identity: str, typology: str, fewest: int, most: int, storeys: int) -> None:
+        super().__init__(
+            f"building {identity} ({typology}) stands {fewest} to {most} storeys here, "
+            f"not {storeys}"
+        )
+        self.identity = identity
+        self.typology = typology
+        self.fewest = fewest
+        self.most = most
+        self.storeys = storeys
+
+
+def _generate(
+    context: StageContext,
+    weighted: bool = False,
+    changes: Mapping[str, BuildingChange] = MappingProxyType({}),
+) -> Iterator[object]:
     lots = prior_records(context, parcels.STAGE_ID, parcels.ParcelRecord)
     weights = (
         {
@@ -214,6 +254,12 @@ def _generate(context: StageContext, weighted: bool = False) -> Iterator[object]
     )
     for lot in lots:
         if lot.lot_class != "building":
+            continue
+        identity = context.identity("building", lot.identity, 0)
+        change = changes.get(identity)
+        # A removed building leaves its lot, after the band every lot shaped: the band, and every
+        # other building's draws, stay what they were.
+        if change is not None and change.removed:
             continue
         # A building's draws are its lot's: stable whatever other lots hold.
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
@@ -259,13 +305,13 @@ def _generate(context: StageContext, weighted: bool = False) -> Iterator[object]
             )
         kind = entry("typology", typology)  # type: ignore[arg-type]
         period = entry("era", era)  # type: ignore[arg-type]
-        storeys = derived(
-            context,
-            "storeys",
-            ordinal,
-            minimum=max(kind["storeys_minimum"], band_low),  # type: ignore[arg-type]
-            maximum=min(kind["storeys_maximum"], band_high),  # type: ignore[arg-type]
-        )
+        fewest = max(cast(int, kind["storeys_minimum"]), cast(int, band_low))
+        most = min(cast(int, kind["storeys_maximum"]), cast(int, band_high))
+        storeys = derived(context, "storeys", ordinal, minimum=fewest, maximum=most)
+        if change is not None and change.storeys is not None:
+            if not fewest <= change.storeys <= most:
+                raise BuildingStoreysRefused(identity, str(typology), fewest, most, change.storeys)
+            storeys = change.storeys
         ground = derived(context, "ground_storey_height_mm", ordinal)
         upper = derived(
             context,
@@ -345,7 +391,6 @@ def _generate(context: StageContext, weighted: bool = False) -> Iterator[object]
                 ((top_ring[1][0] + top_ring[2][0]) // 2, (top_ring[1][1] + top_ring[2][1]) // 2),
                 ((top_ring[3][0] + top_ring[0][0]) // 2, (top_ring[3][1] + top_ring[0][1]) // 2),
             )
-        identity = context.identity("building", lot.identity, 0)
         draft = massing.MassingRecord(
             identity=identity,
             parcel_identity=lot.identity,
@@ -428,3 +473,15 @@ STAGE_V3: Final = GeneratorStage(
     STAGE.shapes,
     partial(_generate, weighted=True),
 )
+
+
+def with_changes(stage: GeneratorStage, changes: Mapping[str, BuildingChange]) -> GeneratorStage:
+    """``stage`` (one of this module's) taking a version's changes to its buildings, at the same id,
+    version and shapes: every later stage reads its records as it reads any massing stage's."""
+    weighted = {STAGE.stage_version: False, STAGE_V3.stage_version: True}[stage.stage_version]
+    return GeneratorStage(
+        stage.stage_id,
+        stage.stage_version,
+        stage.shapes,
+        partial(_generate, weighted=weighted, changes=MappingProxyType(dict(changes))),
+    )

@@ -57,6 +57,7 @@ from exulanica.grammar.grammars.city.document import (
     document_bytes,
     validate_city_document,
 )
+from exulanica.grammar.grammars.city.generation.massing import BuildingChange
 from exulanica.grammar.grammars.city.generation.tiles import (
     check_city_reference_closure,
     check_piece_lengths,
@@ -105,6 +106,7 @@ __all__ = [
     "compose",
     "receipt_digest_of",
     "records",
+    "records_with",
     "region_point",
     "stated_extent",
     "tile_documents",
@@ -576,6 +578,35 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
                 "generated_world_arrival_changed: receipt names another spot"
             )
     return generated
+
+
+def records_with(
+    receipt: Mapping[str, Any], changes: Mapping[str, BuildingChange]
+) -> tuple[object, ...]:
+    """The records a stored receipt generates again with a version's changes to its buildings (by
+    building identity: removed, or so many storeys): the unedited records held to the receipt first
+    (:func:`records`, the arrival with them), then the world generated again with the massing stage
+    taking the changes and every later stage running as it does. A storey count outside a lot's
+    range is refused by name (``BuildingStoreysRefused``). With no changes, :func:`records`."""
+    generated = records(receipt)
+    if not changes:
+        return generated
+    specification = receipt["specification"]
+    spec = read_specification(
+        {
+            "grammar_id": specification["grammar_id"],
+            "grammar_version": specification["grammar_version"],
+            "bindings": specification["bindings"],
+        }
+    )
+    return city_records(
+        generate_specified(
+            spec,
+            seed=receipt["seed"],
+            subject_identity=receipt["subject_identity"],
+            building_changes=changes,
+        )
+    )
 
 
 def _documents(

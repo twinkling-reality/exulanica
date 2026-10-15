@@ -37,6 +37,8 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from exulanica.canonical import sha256_of_canonical
+from exulanica.grammar.grammars.city.generation.massing import BuildingChange
 from exulanica.world.baked_tiles import current_bake
 from exulanica.world.composers import (
     ComposedWorld,
@@ -73,6 +75,7 @@ __all__ = [
     "states_records",
     "states_site",
     "town_records",
+    "town_records_with",
     "unreadable_reason",
 ]
 
@@ -132,12 +135,15 @@ _records_epoch = 0
 
 
 def forget_generated_records(digests: frozenset[str]) -> None:
-    """Evict removed worlds' derived records in this process, including late cache publication."""
+    """Evict removed worlds' derived records in this process, including late cache publication:
+    the records each receipt generates and those it generates with a version's building changes
+    (kept under the receipt digest and the changes' digest)."""
     global _records_epoch
     with _records_lock:
         _records_epoch += 1
-        for digest in digests:
-            _records_kept.pop(digest, None)
+        for key in list(_records_kept):
+            if key.split(":", 1)[0] in digests:
+                del _records_kept[key]
 
 
 class SiteRecordsElsewhere(RuntimeError):
@@ -434,6 +440,54 @@ def town_records(
                 while len(_records_kept) > _RECORDS_KEPT:
                     _records_kept.popitem(last=False)
     return GeneratedRecords(world_id, snapshot_id, digest, receipt, records)
+
+
+def town_records_with(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    changes: Mapping[str, BuildingChange],
+) -> GeneratedRecords:
+    """A made town's records with a version's changes to its buildings (by building identity:
+    removed, or so many storeys), generated again from its receipt with the massing stage taking
+    them (:func:`~exulanica.world.composers.city_grammar_town.records_with`), the unedited records
+    held to the receipt first, and kept by the receipt digest and the changes' digest. With no
+    changes, :func:`town_records`. A storey count outside a lot's range is refused by name."""
+    base = town_records(connection, workspace_id, world_id, snapshot_id)
+    if not changes:
+        return base
+    key = f"{base.receipt_sha256}:{_changes_sha256(changes)}"
+    with _records_lock:
+        epoch = _records_epoch
+        records = _records_kept.get(key)
+        if records is not None:
+            _records_kept.move_to_end(key)
+    if records is None:
+        composer = base.receipt["composer"]
+        module = composer_module(composer["key"], composer["version"])
+        records_with = getattr(module, "records_with", None)
+        if records_with is None:
+            raise InvalidStructuralData(
+                f"a world made by {composer['key']} takes no changes to its buildings"
+            )
+        records = records_with(base.receipt, changes)
+        with _records_lock:
+            if epoch == _records_epoch:
+                _records_kept[key] = records
+                while len(_records_kept) > _RECORDS_KEPT:
+                    _records_kept.popitem(last=False)
+    return GeneratedRecords(world_id, snapshot_id, base.receipt_sha256, base.receipt, records)
+
+
+def _changes_sha256(changes: Mapping[str, BuildingChange]) -> str:
+    """The digest of a version's building changes, in identity order."""
+    return sha256_of_canonical(
+        {
+            identity: {"removed": change.removed, "storeys": change.storeys}
+            for identity, change in sorted(changes.items())
+        }
+    ).hex()
 
 
 def generated_tiles(
