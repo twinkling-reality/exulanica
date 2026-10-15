@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import hashlib
 
+import pytest
 from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar.landscape import (
+    SERVED_LANDSCAPE_RULES,
     compose_volumes,
     placement_seed,
     read_landscape_document,
@@ -18,9 +20,12 @@ from exulanica.grammar.volumes import read_volume_chunk, read_volume_sheet
 from test_landscape_document import BAY
 
 SEED = hashlib.sha256(b"exulanica landscape compose test").hexdigest()
-#: The bay's volumes section under landscape rules version 1. A change that moves it is a new
-#: rules version.
-GOLDEN_SECTION = "392fc55e0d4d43bab695011827726589f955c4a8866df6fa69ff31dba616bf8e"
+#: The bay's volumes section under each landscape rules version, its volumes read and realized by
+#: the volume rules that version names. A change that moves one is a new rules version.
+GOLDEN_SECTION = {
+    1: "392fc55e0d4d43bab695011827726589f955c4a8866df6fa69ff31dba616bf8e",
+    2: "91296abf6d4b4e6188599b89e350f9649ffeb19ee36afe73d01548c8b6a7b8c5",
+}
 
 
 def test_each_placement_draws_a_seed_of_its_own_under_its_own_prefix():
@@ -48,8 +53,11 @@ def test_the_bay_realizes_each_placement_at_every_level_with_its_tops():
     assert (east.at_mm, east.yaw_mdeg) == ((90000, 50000, -3000), 45000)
 
 
-def test_the_section_names_exactly_the_bodies_and_each_reads_back_by_its_digest():
-    placed = compose_volumes(read_landscape_document(BAY), SEED)
+@pytest.mark.parametrize("version", sorted(SERVED_LANDSCAPE_RULES))
+def test_the_section_names_exactly_the_bodies_and_each_reads_back_by_its_digest(version):
+    assert set(GOLDEN_SECTION) == set(SERVED_LANDSCAPE_RULES)
+    volume_rules = SERVED_LANDSCAPE_RULES[version][1]
+    placed = compose_volumes(read_landscape_document(BAY, volume_rules=volume_rules), SEED)
     section = volumes_section(placed)
     bodies = volume_bodies(placed)
     named = {
@@ -63,7 +71,8 @@ def test_the_section_names_exactly_the_bodies_and_each_reads_back_by_its_digest(
             assert read_volume_chunk(body, digest).sha256 == digest
         else:
             assert read_volume_sheet(body, digest).sha256 == digest
-    assert sha256_of_canonical(section).hex() == GOLDEN_SECTION
+        assert body["rules_version"] == volume_rules
+    assert sha256_of_canonical(section).hex() == GOLDEN_SECTION[version]
 
 
 def test_a_coarser_finest_cell_realizes_only_the_coarser_levels():

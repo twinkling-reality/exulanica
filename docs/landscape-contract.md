@@ -56,21 +56,25 @@ millimetres and millidegrees, in the volume's own frame (east, north, up):
 | `look`, `top_look` | Catalog words for its faces (`rock`, `wall`) and its upward faces (`moss`, `grass`, `rock`, `sand`) |
 | `walk` | `tops` (its walkable tops are found) or `none` (scenery) |
 | `erosion` | `amplitude_mm`, `wavelength_mm`, `octaves`, `ridged` |
-| `strata` | `amplitude_mm`, `period_mm` |
+| `strata` | `amplitude_mm`, `period_mm`, and from catalog version 2 `spread_mm`, `relief_permille`, `offset_permille`, `tilt_mdeg`, `toward_mdeg` (how the beds vary) |
 | `parts` | 1 to 32 parts, each `id`, `shape`, `op` and the values its shape and every part state |
 
 A part states `at_mm` (three numbers), `yaw_mdeg`, `tilt_mdeg`, `toward_mdeg`, `blend_mm` and `look`,
 and its shape's own values; a `cap` states only its height, blend and look. Defaults are written in
 at reading, so a later default never changes a volume made before it, and the volume's identity is
-the SHA-256 of its canonical JSON. A volume holds no free text: its parts are named by keys.
+the SHA-256 of its canonical JSON. A volume holds no free text: its parts are named by keys. A bed
+is at least 1 m, so the strata's spread is at most the period less 1 m.
 
 ## The volume catalogs
 
-Two entry-shaped files in `assets/catalogs/volumes`, read through the grammar's catalog loader so
-every entry carries a reason and a licence: `volume-shape.v1.json` (each shape's words, the
-operations it performs, the first its default, and whether it has a placement) and
-`volume-value.v1.json` (every value's bounds, default, whether it is required, and whether it is one
-number, three numbers or a word). A catalog changes only by a new version.
+Two entry-shaped files at each version in `assets/catalogs/volumes`, read through the grammar's
+catalog loader so every entry carries a reason and a licence: `volume-shape.vN.json` (each shape's
+words, the operations it performs, the first its default, and whether it has a placement) and
+`volume-value.vN.json` (every value's bounds, default, whether it is required, and whether it is one
+number, three numbers or a word). A catalog changes only by a new version, which keeps every entry
+of the one before it. Version 2 adds the five strata values that vary the beds, each defaulting to
+level, even beds; its shapes are version 1's. A volume is read against one version (the newest,
+unless a world's rules name another) and records it.
 
 ## The field
 
@@ -84,7 +88,18 @@ integers only (no float, no `math`, no `numpy`, as the grammar package requires)
    series at 2^62, `turns.py`).
 2. Erosion: three-dimensional integer value noise on the volume's own axes (`noise3.py`), lattice
    values from SHA-256 of a seed drawn under the volume profile's prefix, times the amplitude.
-3. Strata: a triangle wave in height, so beds are level.
+3. Strata: a triangle wave across each bed, standing out at its middle and cut back at its joins.
+   Stated plainly the beds are level, each the period thick and standing out by the amplitude. The
+   version 2 values vary them: beds alternate thicker and thinner than the period, each by a drawn
+   amount from a quarter of the spread to all of it, so no two in a row are equal; each steps out by
+   a drawn share of the amplitude (`relief_permille` less at most) and is set proud or recessed
+   within what is left; each stands proud on one drawn side of the volume's own vertical axis and
+   recessed on the other (`offset_permille` of the amplitude); and the bedding planes lean by
+   `tilt_mdeg` toward the bearing `toward_mdeg`. Each bed is drawn from the seed and its index, bed
+   0 lying on the volume's own level 0, and its whole contribution stays within the amplitude, so
+   the culling margin, the extent and `air_reach` hold as they are. The relief and the offset fade
+   to nothing over the lowest quarter of the volume's height, so a recessed bed never pinches the
+   narrow foot of an island or a stack into a neck.
 4. Caps in order, each a smooth intersection with the half-space below its level, so a capped top
    stays level whatever the weathering below it.
 
@@ -104,9 +119,11 @@ one quad for each grid edge the surface crosses, turned from solid to air, owned
 holds its lower end. Neighbouring chunks therefore meet without a seam. A vertex carries its normal
 (the gradient over its cell, at 32767) and the look of the nearest added part.
 
-A chunk names the volume's digest and the digest of what it is a function of (`input_sha256`: the
-volume, the seed and the volume rules); its own identity is the SHA-256 of its canonical JSON. The
-reader refuses a chunk by path and, given a digest, any chunk but the one it names.
+A chunk names the volume's digest, the volume rules version its field was evaluated by
+(`rules_version`), and the digest of what it is a function of (`input_sha256`: the volume, the seed
+and the volume rules); its own identity is the SHA-256 of its canonical JSON. The reader reads a
+chunk of any served rules version and refuses a chunk by path and, given a digest, any chunk but
+the one it names. A top names its rules the same way.
 
 ## Walkable tops
 
@@ -157,6 +174,16 @@ moves any value, vertex or top is a new version; rules a server does not serve a
 (`volume_rules_changed`, `landscape_rules_changed`), never realized as other geometry. The tests pin
 each served version's catalogs, golden field, chunks, tops and composition.
 
+| Landscape rules | Volume rules | Volume catalogs | Beds |
+| --- | --- | --- | --- |
+| 1 | 1 | version 1 | Level and even |
+| 2 | 2 | version 2 | Level and even unless the strata vary them |
+
+New worlds are made by the newest rules. A receipt is read back under the rules it names: its
+volumes against the catalogs those name and realized by them, so a world made by landscape rules 1
+rebuilds the same volume documents, chunks and tops, each naming rules 1. A volume whose strata
+state no variation is the same rock under either volume rules version.
+
 ## A site on a landscape
 
 `POST /worlds/kinds/{kind}/worlds` takes a `landscape` instead of `land`
@@ -183,7 +210,8 @@ names, or is not the one its digest and land name, is refused by name and listed
 
 `readLandscapeDrawing` and `readVolumeChunk` (`web/packages/atlas-core/src/landscape.ts`) read the
 landscape drawing and a volume chunk with the server's bounds, each held to the digest its route and
-its drawing name. The page asks every site on land for its landscape; a 404 `landscape_unavailable`
+its drawing name; a chunk of either served volume rules version reads, since both share one chunk
+format. The page asks every site on land for its landscape; a 404 `landscape_unavailable`
 means it has none. The landscape drawing must name the site's own drawing, world and land. Each
 placed volume is drawn at one level: the finest it names that is not finer than 2 m (the
 landscape's default finest cell), else the coarsest it names (`volumeDrawnCellMm`), and only that
@@ -231,4 +259,7 @@ cannot be read does not stop the site: it opens without its volumes and the page
   sky islands, spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
 - Realized chunks and tops are kept in the kind worker's memory with the site's drawing, as a site's
   land chunks are, not in a store; a world read again later realizes them again.
+- A site world on a landscape is made, its landscape's drawing included, within the kind worker's
+  limit for making one world (15 s, `COMPOSE_SECONDS`), so that limit bounds how much rock one world
+  places: a world past it is answered `kind_work_overran` on every request.
 - A world made from a person's words never stands on a landscape: no world tool names one.

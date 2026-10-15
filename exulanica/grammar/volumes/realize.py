@@ -16,9 +16,10 @@ surface nets, in whole numbers throughout:
 * A vertex's normal is the gradient over its cell's corners, scaled to :data:`NORMAL_ONE`; its look
   is the look of the added part nearest it.
 
-A chunk is a pure function of the volume document, the seed and the volume rules, and its document
-names them by :func:`input_sha256`; its identity is the SHA-256 of its canonical JSON, so a realized
-chunk is kept and served by digest and never realized twice.
+A chunk is a pure function of the volume document, the seed and the volume rules its field is
+evaluated by, and its document names them by :func:`input_sha256` and its ``rules_version``; a
+chunk of any rules this server serves reads back. Its identity is the SHA-256 of its canonical
+JSON, so a realized chunk is kept and served by digest and never realized twice.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from exulanica.canonical import canonical_json
 from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.volumes.document import VolumeRefused
 from exulanica.grammar.volumes.field import VolumeField
-from exulanica.grammar.volumes.rules import VOLUME_RULES_VERSION
+from exulanica.grammar.volumes.rules import SERVED_VOLUME_RULES
 
 __all__ = [
     "CHUNK_MM",
@@ -85,7 +86,7 @@ def input_sha256(field: VolumeField) -> str:
             {
                 "volume_sha256": field.document.sha256,
                 "seed": field.seed.hex(),
-                "volume_rules": VOLUME_RULES_VERSION,
+                "volume_rules": field.rules,
             }
         )
     ).hexdigest()
@@ -97,6 +98,7 @@ class VolumeChunk:
 
     input_sha256: str
     volume_sha256: str
+    rules_version: int
     chunk: tuple[int, int, int]
     cell_mm: int
     positions_mm: tuple[int, ...]
@@ -110,7 +112,7 @@ class VolumeChunk:
             "profile": CHUNK_PROFILE,
             "input_sha256": self.input_sha256,
             "volume_sha256": self.volume_sha256,
-            "rules_version": VOLUME_RULES_VERSION,
+            "rules_version": self.rules_version,
             "chunk": list(self.chunk),
             "cell_mm": self.cell_mm,
             "positions_mm": list(self.positions_mm),
@@ -206,6 +208,7 @@ def realize_chunk(field: VolumeField, chunk: tuple[int, int, int], cell_mm: int)
     return VolumeChunk(
         input_sha256=input_sha256(field),
         volume_sha256=field.document.sha256,
+        rules_version=field.rules,
         chunk=chunk,
         cell_mm=cell_mm,
         positions_mm=tuple(positions),
@@ -282,9 +285,11 @@ def read_volume_chunk(raw: object, expected_sha256: str | None = None) -> Volume
             and all(ch in "0123456789abcdef" for ch in digest)
         ):
             raise VolumeRefused(f"{name} is a SHA-256 in lowercase hex", path=name)
-    if raw["rules_version"] != VOLUME_RULES_VERSION:
+    rules = raw["rules_version"]
+    if type(rules) is not int or rules not in SERVED_VOLUME_RULES:
+        served = ", ".join(str(version) for version in SERVED_VOLUME_RULES)
         raise VolumeRefused(
-            f"this server reads chunks of volume rules version {VOLUME_RULES_VERSION}",
+            f"this server reads chunks of volume rules versions {served}, got {rules!r}",
             path="rules_version",
             code="volume_rules_changed",
         )
@@ -318,6 +323,7 @@ def read_volume_chunk(raw: object, expected_sha256: str | None = None) -> Volume
     out = VolumeChunk(
         input_sha256=raw["input_sha256"],
         volume_sha256=raw["volume_sha256"],
+        rules_version=rules,
         chunk=(chunk[0], chunk[1], chunk[2]),
         cell_mm=cell,
         positions_mm=positions,

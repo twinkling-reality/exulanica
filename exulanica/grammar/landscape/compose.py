@@ -9,7 +9,8 @@ placement in the document's order:
    differently in each place, and nothing is drawn from a digest anyone can read.
 2. **Chunks** of its surface at every level the landscape states, coarsest first
    (:func:`~exulanica.grammar.volumes.realize_volume`), in the volume's own frame: the placement's
-   origin and turn place them in the world, so a chunk is the same wherever its volume stands.
+   origin and turn place them in the world, so a chunk is the same wherever its volume stands. The
+   volume is realized by the volume rules the landscape was read under.
 3. **Walkable tops** (:func:`~exulanica.grammar.volumes.volume_tops`), also in the volume's frame.
 
 The result is the drawing's ``volumes`` section, which names every chunk and top by digest, and the
@@ -82,7 +83,9 @@ def compose_volumes(landscape: LandscapeDocument, seed: str) -> tuple[PlacedVolu
     """Every placed volume of the landscape, realized under ``seed``, in the document's order."""
     placed = []
     for placement in landscape.placements:
-        field = VolumeField(placement.volume, placement_seed(seed, placement.id))
+        field = VolumeField(
+            placement.volume, placement_seed(seed, placement.id), rules=landscape.volume_rules
+        )
         chunks = tuple(chunk for cell in landscape.levels for chunk in realize_volume(field, cell))
         placed.append(
             PlacedVolume(

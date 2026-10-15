@@ -9,6 +9,7 @@ import copy
 import pytest
 from exulanica.grammar.volumes import (
     PROFILE,
+    SERVED_VOLUME_RULES,
     VolumeField,
     VolumeRefused,
     VolumeSheet,
@@ -18,17 +19,27 @@ from exulanica.grammar.volumes import (
 )
 from exulanica.grammar.volumes.sheets import CLEAR_MM, SHEET_CELL_MM
 
-from test_volume_document import STACK
-from test_volume_field import SEED
+from test_volume_field import SEED, golden_field
 
-#: The stack's walkable tops under volume rules version 1. A change that moves a top is a new
-#: rules version.
+#: The stack's walkable tops under each served volume rules version (``golden_field``). A change
+#: that moves a top is a new rules version.
 GOLDEN_TOPS = {
-    "cells": [696, 2],
-    "digests": [
-        "57541eaf8aebccb7a0959584f6b1802b1d6ca73dfcc02c741977a7024b2ae0af",
-        "47364b18e46a7752870f58d9b173241a09900d5686b3b40ef13bd49f237e6f85",
-    ],
+    1: {
+        "cells": [696, 2],
+        "digests": [
+            "57541eaf8aebccb7a0959584f6b1802b1d6ca73dfcc02c741977a7024b2ae0af",
+            "47364b18e46a7752870f58d9b173241a09900d5686b3b40ef13bd49f237e6f85",
+        ],
+    },
+    2: {
+        "cells": [654, 1, 6, 1],
+        "digests": [
+            "ae7658c7d276006780e949a11bd44b7502fbaa4ad6baff456767f1eb9c726995",
+            "92a76011f110e13f3631d9ebc34e4ff44265ec494327d0edde18cd4edb40a235",
+            "9aab992999d30e728c662d5357525ca6bfa29c7a7276a779552283e65069539b",
+            "af238f5d5a6282daea57324ef4bbbe27f169527b6759022bf9f89502b1b2a9c3",
+        ],
+    },
 }
 
 
@@ -99,11 +110,14 @@ def test_scenery_has_no_tops():
     assert volume_tops(field) == ()
 
 
-def test_the_stack_tops_are_pinned():
-    field = VolumeField(read_volume_document(STACK), SEED)
-    sheets = volume_tops(field)
-    assert [sheet.cells for sheet in sheets] == GOLDEN_TOPS["cells"]
-    assert [sheet.sha256 for sheet in sheets] == GOLDEN_TOPS["digests"]
+def test_the_stack_tops_are_pinned_and_name_their_rules():
+    assert set(GOLDEN_TOPS) == set(SERVED_VOLUME_RULES)
+    for version, golden in GOLDEN_TOPS.items():
+        sheets = volume_tops(golden_field(version))
+        assert [sheet.cells for sheet in sheets] == golden["cells"]
+        assert [sheet.sha256 for sheet in sheets] == golden["digests"]
+        assert {sheet.document()["rules_version"] for sheet in sheets} == {version}
+        assert read_volume_sheet(sheets[0].document(), sheets[0].sha256) == sheets[0]
 
 
 @pytest.fixture(scope="module")
@@ -123,7 +137,8 @@ def test_a_sheet_reads_back_only_as_the_sheet_its_digest_names(sheet):
     ("name", "value", "path", "code"),
     [
         ("profile", "exulanica.volume-sheet/v2", "profile", "volume_invalid"),
-        ("rules_version", 2, "rules_version", "volume_rules_changed"),
+        ("rules_version", 3, "rules_version", "volume_rules_changed"),
+        ("rules_version", True, "rules_version", "volume_rules_changed"),
         ("surface", "top:01", "surface", "volume_invalid"),
         ("surface", "bottom:0", "surface", "volume_invalid"),
         ("cell_mm", 500, "cell_mm", "volume_invalid"),

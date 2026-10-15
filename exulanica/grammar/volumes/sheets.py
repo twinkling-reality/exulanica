@@ -22,8 +22,9 @@ own frame, in whole numbers:
 
 Turning a sheet into exact contact geometry (``heightfield-geometry/v1``) is the walking layer's;
 this module only states where the tops are. A sheet is a pure function of the volume document, the
-seed and the volume rules, named by :func:`~exulanica.grammar.volumes.realize.input_sha256`; its
-identity is the SHA-256 of its canonical JSON.
+seed and the volume rules its field is evaluated by, named by
+:func:`~exulanica.grammar.volumes.realize.input_sha256` and its ``rules_version``; a sheet of any
+rules this server serves reads back. Its identity is the SHA-256 of its canonical JSON.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from exulanica.grammar.landform import WALK_GRADE_PERMILLE
 from exulanica.grammar.volumes.document import VolumeRefused
 from exulanica.grammar.volumes.field import VolumeField
 from exulanica.grammar.volumes.realize import input_sha256
-from exulanica.grammar.volumes.rules import VOLUME_RULES_VERSION
+from exulanica.grammar.volumes.rules import SERVED_VOLUME_RULES
 
 __all__ = [
     "CLEAR_MM",
@@ -87,6 +88,7 @@ class VolumeSheet:
 
     input_sha256: str
     volume_sha256: str
+    rules_version: int
     surface: str
     origin_mm: tuple[int, int]
     columns: int
@@ -99,7 +101,7 @@ class VolumeSheet:
             "profile": SHEET_PROFILE,
             "input_sha256": self.input_sha256,
             "volume_sha256": self.volume_sha256,
-            "rules_version": VOLUME_RULES_VERSION,
+            "rules_version": self.rules_version,
             "surface": self.surface,
             "origin_mm": list(self.origin_mm),
             "cell_mm": SHEET_CELL_MM,
@@ -222,6 +224,7 @@ def _sheet(
     return VolumeSheet(
         input_sha256=input_sha256(field),
         volume_sha256=field.document.sha256,
+        rules_version=field.rules,
         surface=f"top:{number}",
         origin_mm=(origin[0] + i0 * SHEET_CELL_MM, origin[1] + j0 * SHEET_CELL_MM),
         columns=columns,
@@ -246,9 +249,11 @@ def read_volume_sheet(raw: object, expected_sha256: str | None = None) -> Volume
             and all(ch in "0123456789abcdef" for ch in digest)
         ):
             raise VolumeRefused(f"{name} is a SHA-256 in lowercase hex", path=name)
-    if raw["rules_version"] != VOLUME_RULES_VERSION:
+    rules = raw["rules_version"]
+    if type(rules) is not int or rules not in SERVED_VOLUME_RULES:
+        served = ", ".join(str(version) for version in SERVED_VOLUME_RULES)
         raise VolumeRefused(
-            f"this server reads sheets of volume rules version {VOLUME_RULES_VERSION}",
+            f"this server reads sheets of volume rules versions {served}, got {rules!r}",
             path="rules_version",
             code="volume_rules_changed",
         )
@@ -301,6 +306,7 @@ def read_volume_sheet(raw: object, expected_sha256: str | None = None) -> Volume
     out = VolumeSheet(
         input_sha256=raw["input_sha256"],
         volume_sha256=raw["volume_sha256"],
+        rules_version=rules,
         surface=surface,
         origin_mm=(origin[0], origin[1]),
         columns=columns,

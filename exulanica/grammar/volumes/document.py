@@ -10,14 +10,17 @@ is :mod:`exulanica.grammar.volumes.field`.
 **Closed and bounded.** Top keys are ``profile``, ``id`` and ``parts``, and optionally ``look``,
 ``top_look``, ``walk``, ``erosion`` and ``strata``. A part states ``id`` and ``shape`` and only
 values its shape and every part may state; a shape without a placement (a cap) states none; a
-required value must be stated; every integer is held to its bound and every word to its words. A
-refusal names the path of what it refused, the bound it broke and a code:
+required value must be stated; every integer is held to its bound and every word to its words; a
+bed is at least 1 m, so the strata's spread is at most its period less 1 m. A refusal names the
+path of what it refused, the bound it broke and a code:
 ``volume_too_many_parts``, ``volume_part_wrong_op`` (an operation its shape does not perform, or a
 placement on a shape that has none), ``volume_rounding_too_large``, or ``volume_invalid``.
 
 **Defaults are written in.** The canonical document carries every value of the volume and of every
 part, with the catalog's defaults filled in at reading, so a later catalog default never changes a
-volume that was made before it. Its identity is the SHA-256 of its canonical JSON.
+volume that was made before it. Its identity is the SHA-256 of its canonical JSON. A volume is read
+against one version of the catalogs (the newest unless a world's rules name another) and records
+it, so the values it carries are that version's.
 
 Integers, keys and catalog words only; nothing here holds a person's words.
 """
@@ -99,6 +102,8 @@ class VolumeDocument:
     parts: tuple[VolumePart, ...]
     canonical_bytes: bytes
     sha256: str
+    #: The version of the catalogs it was read against.
+    catalog_version: int
 
     def canonical(self) -> dict[str, Any]:
         return parse_json(self.canonical_bytes.decode(), PROFILE)
@@ -269,6 +274,12 @@ def read_volume_document(raw: object, catalog: VolumeCatalog | None = None) -> V
     )
     erosion = _section(raw, "erosion", catalog)
     strata = _section(raw, "strata", catalog)
+    if "spread_mm" in strata and number(strata["spread_mm"]) > number(strata["period_mm"]) - 1000:
+        raise VolumeRefused(
+            f"strata: a bed is at least 1 m, so the spread is at most the period less 1 m "
+            f"({number(strata['period_mm']) - 1000} mm), got {strata['spread_mm']}",
+            path="strata.spread_mm",
+        )
     parts_raw = raw["parts"]
     if not isinstance(parts_raw, list):
         raise VolumeRefused("parts is a list", path="parts")
@@ -319,4 +330,5 @@ def read_volume_document(raw: object, catalog: VolumeCatalog | None = None) -> V
         parts=tuple(parts),
         canonical_bytes=encoded,
         sha256=hashlib.sha256(encoded).hexdigest(),
+        catalog_version=catalog.version,
     )

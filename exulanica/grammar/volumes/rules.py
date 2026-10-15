@@ -13,6 +13,10 @@ A change to the field, the realizer or the extraction that moves any value, vert
 version, and a change to a catalog is a new catalog version (``volume-value.v2.json``), never an
 edit of a shipped one: the tests pin both, and each served version's golden field, chunks and tops.
 New volumes name :data:`VOLUME_RULES_VERSION`.
+
+Version 1 reads the version 1 catalogs. Version 2 reads the version 2 catalogs, whose strata may
+vary the beds; a version 2 volume that states none of that variation is version 1's rock, and a
+world made by version 1 is realized by version 1 and names it in every chunk and top.
 """
 
 from __future__ import annotations
@@ -25,12 +29,18 @@ from exulanica.grammar.catalogs import catalog_digest, load_catalog
 from exulanica.grammar.volumes.catalog import CATALOG_DIRECTORY, shape_schema, value_schema
 from exulanica.grammar.volumes.document import VolumeRefused
 
-__all__ = ["SERVED_VOLUME_RULES", "VOLUME_RULES_VERSION", "check_volume_rules", "volume_rules"]
+__all__ = [
+    "SERVED_VOLUME_RULES",
+    "VOLUME_RULES_VERSION",
+    "check_volume_rules",
+    "rules_reading",
+    "volume_rules",
+]
 
 #: The rules new volumes are made by. A change to the field that moves a value is a new version.
-VOLUME_RULES_VERSION: Final = 1
+VOLUME_RULES_VERSION: Final = 2
 #: Every rules version this code makes volumes by, and the volume catalog version each reads.
-SERVED_VOLUME_RULES: Final = {1: 1}
+SERVED_VOLUME_RULES: Final = {1: 1, 2: 2}
 
 
 @functools.cache
@@ -54,6 +64,18 @@ def volume_rules(version: int | None = None) -> dict[str, Any]:
     catalog's digest. A new mapping each time, since a receipt keeps it."""
     named = VOLUME_RULES_VERSION if version is None else version
     return {"version": named, "catalogs": dict(_catalog_digests(SERVED_VOLUME_RULES[named]))}
+
+
+def rules_reading(catalog_version: int) -> int:
+    """The newest rules version that reads volumes of ``catalog_version``: the rules a volume is
+    realized by when no world's rules name them."""
+    served = [rules for rules, catalog in SERVED_VOLUME_RULES.items() if catalog == catalog_version]
+    if not served:
+        raise VolumeRefused(
+            f"no volume rules this server serves read catalog version {catalog_version}",
+            code="volume_rules_changed",
+        )
+    return max(served)
 
 
 def _said(rules: object) -> str:

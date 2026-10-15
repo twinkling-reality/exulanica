@@ -19,7 +19,9 @@ realizer meshes at.
 
 **Defaults are written in**, and every piece is carried whole with its digest, so one volume placed
 twice is the same document twice and a world rebuilds from its receipt alone. Its identity is the
-SHA-256 of its canonical JSON.
+SHA-256 of its canonical JSON. Its volumes are read against the volume catalogs of one version of
+the volume rules (the newest unless a world's landscape rules name another), which the document
+records so its volumes are realized by the same rules.
 """
 
 from __future__ import annotations
@@ -42,10 +44,14 @@ from exulanica.grammar.landscape.catalog import LandscapeCatalog, landscape_cata
 from exulanica.grammar.records import KEY_PATTERN
 from exulanica.grammar.volumes import (
     LEVELS,
+    SERVED_VOLUME_RULES,
+    VOLUME_RULES_VERSION,
     ValueBound,
+    VolumeCatalog,
     VolumeDocument,
     VolumeRefused,
     read_volume_document,
+    volume_catalog,
 )
 
 __all__ = [
@@ -89,6 +95,8 @@ class LandscapeDocument:
     placements: tuple[Placement, ...]
     canonical_bytes: bytes
     sha256: str
+    #: The volume rules its volumes were read against and are realized by.
+    volume_rules: int
 
     def canonical(self) -> dict[str, Any]:
         return parse_json(self.canonical_bytes.decode(), PROFILE)
@@ -126,7 +134,11 @@ def _stated(raw: Mapping[str, object], name: str, bound: ValueBound, path: str) 
 
 
 def _placement(
-    raw: object, index: int, bounds: Mapping[str, ValueBound], near: tuple[int, int, int, int]
+    raw: object,
+    index: int,
+    bounds: Mapping[str, ValueBound],
+    near: tuple[int, int, int, int],
+    volumes: VolumeCatalog,
 ) -> Placement:
     path = f"volumes[{index}]"
     if not isinstance(raw, dict) or not (
@@ -142,7 +154,7 @@ def _placement(
     if type(placement_id) is not str or KEY_PATTERN.fullmatch(placement_id) is None:
         raise LandscapeRefused(f"an id is a lowercase key, got {placement_id!r}", path=f"{path}.id")
     try:
-        volume = read_volume_document(raw["volume"])
+        volume = read_volume_document(raw["volume"], volumes)
     except VolumeRefused as refused:
         inner = f"{path}.volume.{refused.path}" if refused.path else f"{path}.volume"
         raise LandscapeRefused(refused.detail, path=inner, code=refused.code) from refused
@@ -165,10 +177,13 @@ def _placement(
 
 
 def read_landscape_document(
-    raw: object, catalog: LandscapeCatalog | None = None
+    raw: object, catalog: LandscapeCatalog | None = None, *, volume_rules: int | None = None
 ) -> LandscapeDocument:
-    """Admit a landscape document against the catalogs, or refuse it by path."""
+    """Admit a landscape document against the catalogs, its volumes against those of
+    ``volume_rules`` (the newest unless named), or refuse it by path."""
     catalog = catalog or landscape_catalog()
+    rules = VOLUME_RULES_VERSION if volume_rules is None else volume_rules
+    volumes = volume_catalog(SERVED_VOLUME_RULES[rules])
     if not isinstance(raw, dict) or not _REQUIRED <= set(raw) <= _REQUIRED | _OPTIONAL:
         keys = sorted(raw) if isinstance(raw, dict) else type(raw).__name__
         raise LandscapeRefused(
@@ -202,7 +217,7 @@ def read_landscape_document(
     near = near_domain(WorldFrame(width_mm=width, depth_mm=depth, seed=""))
     placements: list[Placement] = []
     for index, item in enumerate(listed):
-        placement = _placement(item, index, bounds, near)
+        placement = _placement(item, index, bounds, near, volumes)
         if any(placement.id == other.id for other in placements):
             raise LandscapeRefused(f"id {placement.id} is used twice", path=f"volumes[{index}].id")
         placements.append(placement)
@@ -230,4 +245,5 @@ def read_landscape_document(
         placements=tuple(placements),
         canonical_bytes=encoded,
         sha256=hashlib.sha256(encoded).hexdigest(),
+        volume_rules=rules,
     )

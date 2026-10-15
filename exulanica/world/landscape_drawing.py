@@ -10,8 +10,9 @@ placed round it (:mod:`exulanica.grammar.landscape`). Here:
   turned and moved to where it stands, so the site's people never meet rock their place does not
   know (``landscape_extent_not_site``, ``landscape_volume_on_site``). Volumes are scenery until
   the walking layer stands people on them.
-* :func:`receipt_landscape` reads a receipt's landscape back under the landscape rules it names and
-  holds it to its digest and to the receipt's land, or refuses by name
+* :func:`receipt_landscape` reads a receipt's landscape back under the landscape rules it names (its
+  volumes against the catalogs of the volume rules those name, and realized by them) and holds it
+  to its digest and to the receipt's land, or refuses by name
   (``generated_world_landscape_rules_changed``, ``generated_world_landscape_changed``).
 * :func:`landscape_drawing` realizes its volumes under a seed drawn from the world and the
   landscape (:func:`landscape_seed`) and names the site drawing, the land and every volume chunk
@@ -31,14 +32,16 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.grammar.landscape import (
+    SERVED_LANDSCAPE_RULES,
     LandscapeDocument,
     LandscapeRefused,
-    check_landscape_rules,
     compose_volumes,
+    landscape_catalog,
     read_landscape_document,
     volume_bodies,
     volumes_section,
 )
+from exulanica.grammar.landscape.rules import served_landscape_rules
 from exulanica.grammar.volumes import TURN_ONE, VolumeField, sin_cos
 from exulanica.world.errors import InvalidStructuralData
 
@@ -97,13 +100,16 @@ def receipt_landscape(receipt: Mapping[str, Any]) -> LandscapeDocument:
     """The landscape a version 6 receipt states, under the landscape rules it names, held to its
     digest and to the receipt's land; refused by name otherwise."""
     try:
-        check_landscape_rules(receipt.get("landscape_rules"))
+        version = served_landscape_rules(receipt.get("landscape_rules"))
     except LandscapeRefused as exc:
         raise InvalidStructuralData(
             f"generated_world_landscape_rules_changed: {exc.detail}"
         ) from exc
+    catalog_version, volume_rules = SERVED_LANDSCAPE_RULES[version]
     try:
-        landscape = read_landscape_document(receipt.get("landscape"))
+        landscape = read_landscape_document(
+            receipt.get("landscape"), landscape_catalog(catalog_version), volume_rules=volume_rules
+        )
     except LandscapeRefused as exc:
         raise InvalidStructuralData(
             f"generated_world_landscape_changed: its landscape no longer reads: {exc.detail}"

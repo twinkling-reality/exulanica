@@ -14,6 +14,10 @@ each entry carries a reason and a licence, as the landform catalogs are.
   ``volume`` (the document itself: its looks, whether it is walked, how many parts it lists),
   ``erosion`` or ``strata``.
 
+Version 2 adds five strata values that vary the beds (their thickness, how far each stands out,
+the side it stands out on, and the lean of the bedding); every one defaults to version 1's level,
+even beds, and its shapes are version 1's.
+
 A catalog changes only by a new version, and a later version keeps every entry of the one before
 it, so a volume an earlier version admits reads the same under a later one. Read on first use,
 never at import, and kept for the process.
@@ -55,8 +59,8 @@ CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[3].joinpath("assets", "catalogs", "volumes")
 )
 #: Every version of the volume catalogs this code reads, and the newest, which reads new volumes.
-CATALOG_VERSIONS: Final = (1,)
-CATALOG_VERSION: Final = 1
+CATALOG_VERSIONS: Final = (1, 2)
+CATALOG_VERSION: Final = 2
 #: What a part may do to the mass: add to it, carve from it, or cap it at a level.
 OPS: Final = ("add", "carve", "cap")
 #: The owners of values that are not a shape.
@@ -100,6 +104,8 @@ class ValueBound:
 
 @dataclass(frozen=True, slots=True)
 class VolumeCatalog:
+    #: The version both its files are, which a volume read against it records.
+    version: int
     shapes: Mapping[str, ShapeKind]
     #: Keyed by (owner, value).
     values: Mapping[tuple[str, str], ValueBound]
@@ -205,7 +211,7 @@ def load_volume_catalog(
     missing = [f"{owner}_{value}" for owner, value in _NAMED if (owner, value) not in values]
     if missing:
         raise CatalogError(f"volume-value v{version} does not bound {', '.join(missing)}")
-    return VolumeCatalog(shapes=shapes, values=values)
+    return VolumeCatalog(version=version, shapes=shapes, values=values)
 
 
 @functools.cache

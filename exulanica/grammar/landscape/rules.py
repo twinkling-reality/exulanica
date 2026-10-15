@@ -9,7 +9,8 @@ named by its own land rules beside them. Rules this code does not serve are refu
 (``landscape_rules_changed``); a landscape is never realized as other geometry.
 
 A change to the composition is a new version; a change to the volume rules or the catalog is a new
-version naming them. The tests pin each served version.
+version naming them. The tests pin each served version. Version 2 is version 1 realizing its
+volumes by volume rules 2, whose strata may vary the beds.
 """
 
 from __future__ import annotations
@@ -28,13 +29,14 @@ __all__ = [
     "SERVED_LANDSCAPE_RULES",
     "check_landscape_rules",
     "landscape_rules",
+    "served_landscape_rules",
 ]
 
 #: The rules new landscapes are made by.
-LANDSCAPE_RULES_VERSION: Final = 1
+LANDSCAPE_RULES_VERSION: Final = 2
 #: Every rules version this code makes landscapes by: the landscape catalog version it reads and
 #: the volume rules version it realizes volumes by.
-SERVED_LANDSCAPE_RULES: Final = {1: (1, 1)}
+SERVED_LANDSCAPE_RULES: Final = {1: (1, 1), 2: (1, 2)}
 
 
 @functools.cache
@@ -70,9 +72,16 @@ def _said(rules: object) -> str:
 def check_landscape_rules(named: object) -> int:
     """The landscape catalog version a landscape made by the rules ``named`` is read against, or a
     refusal of rules this code does not serve, saying both."""
-    for version, (catalog_version, _) in SERVED_LANDSCAPE_RULES.items():
+    return SERVED_LANDSCAPE_RULES[served_landscape_rules(named)][0]
+
+
+def served_landscape_rules(named: object) -> int:
+    """Which served version the rules ``named`` are (:data:`SERVED_LANDSCAPE_RULES` gives its
+    landscape catalog and volume rules), or a refusal of rules this code does not serve, saying
+    both."""
+    for version in SERVED_LANDSCAPE_RULES:
         if named == landscape_rules(version):
-            return catalog_version
+            return version
     served = ", ".join(str(version) for version in SERVED_LANDSCAPE_RULES)
     raise LandscapeRefused(
         f"this world's landscape was made by {_said(named)}; this server makes landscapes by "

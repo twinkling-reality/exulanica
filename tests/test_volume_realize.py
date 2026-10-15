@@ -13,6 +13,7 @@ from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.volumes import (
     CHUNK_MM,
     PROFILE,
+    SERVED_VOLUME_RULES,
     VolumeChunk,
     VolumeField,
     VolumeRefused,
@@ -23,14 +24,14 @@ from exulanica.grammar.volumes import (
     volume_chunks,
 )
 
-from test_volume_document import STACK
-from test_volume_field import SEED
+from test_volume_field import SEED, golden_field
 
-#: The stack's chunks at 4 m under volume rules version 1: how many hold surface, and the digest of
-#: their digests in order. A change that moves one vertex is a new rules version.
+#: The stack's chunks at 4 m under each served volume rules version (``golden_field``): how many
+#: hold surface, and the digest of their digests in order. A change that moves one vertex is a new
+#: rules version.
 GOLDEN_CHUNKS = {
-    "count": 12,
-    "digest": "b7aa34e5b2d548e8b2c3fe3652515d8b189cbb641dd4924d70cc63c9b89895f4",
+    1: {"count": 12, "digest": "b7aa34e5b2d548e8b2c3fe3652515d8b189cbb641dd4924d70cc63c9b89895f4"},
+    2: {"count": 12, "digest": "d78797a384722dca7cf50621f2c2c4d8289089b510b7454293b2cff9b98102c1"},
 }
 
 
@@ -85,17 +86,21 @@ def test_a_sphere_meshes_closed_on_its_surface_and_facing_out():
             assert nx * dx + ny * dy + nz * dz > 0
 
 
-def test_the_stack_meshes_closed_across_its_chunks_at_every_level():
-    field = VolumeField(read_volume_document(STACK), SEED)
+@pytest.mark.parametrize("version", sorted(SERVED_VOLUME_RULES))
+def test_the_stack_meshes_closed_across_its_chunks_at_every_level(version):
+    field = golden_field(version)
     for cell in (4000, 2000):
         assert_closed(realize_volume(field, cell))
 
 
-def test_the_stack_chunks_are_pinned():
-    field = VolumeField(read_volume_document(STACK), SEED)
-    chunks = realize_volume(field, 4000)
-    assert len(chunks) == GOLDEN_CHUNKS["count"]
-    assert sha256_of_canonical([chunk.sha256 for chunk in chunks]).hex() == GOLDEN_CHUNKS["digest"]
+def test_the_stack_chunks_are_pinned_and_name_their_rules():
+    assert set(GOLDEN_CHUNKS) == set(SERVED_VOLUME_RULES)
+    for version, golden in GOLDEN_CHUNKS.items():
+        chunks = realize_volume(golden_field(version), 4000)
+        assert len(chunks) == golden["count"]
+        assert sha256_of_canonical([chunk.sha256 for chunk in chunks]).hex() == golden["digest"]
+        assert {chunk.document()["rules_version"] for chunk in chunks} == {version}
+        assert read_volume_chunk(chunks[0].document(), chunks[0].sha256) == chunks[0]
 
 
 def test_space_with_no_surface_gives_an_empty_chunk_that_a_volume_leaves_out():
@@ -140,7 +145,8 @@ def _changed(chunk: VolumeChunk, name: str, value: object) -> dict:
     ("name", "value", "path", "code"),
     [
         ("profile", "exulanica.volume-chunk/v2", "profile", "volume_invalid"),
-        ("rules_version", 2, "rules_version", "volume_rules_changed"),
+        ("rules_version", 3, "rules_version", "volume_rules_changed"),
+        ("rules_version", True, "rules_version", "volume_rules_changed"),
         ("volume_sha256", "ABC", "volume_sha256", "volume_invalid"),
         ("cell_mm", 3000, "cell_mm", "volume_invalid"),
         ("cell_mm", 2000.0, "cell_mm", "volume_invalid"),

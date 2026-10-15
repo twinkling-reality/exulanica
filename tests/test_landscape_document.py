@@ -19,7 +19,13 @@ from exulanica.grammar.landscape import (
     landscape_rules,
     read_landscape_document,
 )
-from exulanica.grammar.volumes import read_volume_document, volume_rules
+from exulanica.grammar.landscape.rules import served_landscape_rules
+from exulanica.grammar.volumes import (
+    SERVED_VOLUME_RULES,
+    read_volume_document,
+    volume_catalog,
+    volume_rules,
+)
 
 CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "landscape"
 
@@ -34,7 +40,13 @@ RULES = {
             "landscape-value.v1": "26c04b3bae0d03b02fe1544cbdda2722f61036d6d7b4a6f1dbccd217e968bf31"
         },
         "volume_rules": 1,
-    }
+    },
+    2: {
+        "catalogs": {
+            "landscape-value.v1": "26c04b3bae0d03b02fe1544cbdda2722f61036d6d7b4a6f1dbccd217e968bf31"
+        },
+        "volume_rules": 2,
+    },
 }
 
 #: A small weathered stack with a level top.
@@ -59,7 +71,11 @@ BAY = {
         {"id": "east_stack", "volume": ROCK, "at_mm": [90000, 50000, -3000], "yaw_mdeg": 45000},
     ],
 }
-BAY_SHA256 = "4dfd005deec4499e5319b72eb42e22ca58ca4dd1698c118bfa2c47ded070fc53"
+#: The bay's identity with its volumes read under each volume rules version.
+BAY_SHA256 = {
+    1: "4dfd005deec4499e5319b72eb42e22ca58ca4dd1698c118bfa2c47ded070fc53",
+    2: "bc85ddd9d55a8a6b3286b624bafda7d906468155fcd93b756844dc5e8187fd52",
+}
 
 
 def refusal(raw: object) -> LandscapeRefused:
@@ -77,17 +93,21 @@ def test_the_shipped_catalog_is_never_edited_and_holds_its_defaults():
         assert bound.minimum <= bound.default <= bound.maximum
 
 
-def test_a_landscape_is_read_with_its_defaults_and_every_piece_whole_with_its_digest():
-    read = read_landscape_document(BAY)
+@pytest.mark.parametrize("rules", sorted(SERVED_VOLUME_RULES))
+def test_a_landscape_is_read_with_its_defaults_and_every_piece_whole_with_its_digest(rules):
+    read = read_landscape_document(BAY, volume_rules=rules)
+    assert read.volume_rules == rules
     canonical = read.canonical()
     assert canonical["finest_cell_mm"] == 2000 and read.levels == (4000, 2000)
-    rock = read_volume_document(ROCK)
+    rock = read_volume_document(ROCK, volume_catalog(SERVED_VOLUME_RULES[rules]))
     assert [placement["volume_sha256"] for placement in canonical["volumes"]] == [rock.sha256] * 2
     assert canonical["volumes"][0]["yaw_mdeg"] == 0
     assert canonical["volumes"][0]["volume"] == rock.canonical()
     assert canonical["land"]["ground_mm"] == 2000
-    assert read.sha256 == hashlib.sha256(read.canonical_bytes).hexdigest() == BAY_SHA256
-    assert read_landscape_document(canonical).canonical_bytes == read.canonical_bytes
+    assert read.sha256 == hashlib.sha256(read.canonical_bytes).hexdigest() == BAY_SHA256[rules]
+    again = read_landscape_document(canonical, volume_rules=rules)
+    assert again.canonical_bytes == read.canonical_bytes
+    assert read_landscape_document(BAY).volume_rules == max(SERVED_VOLUME_RULES)
 
 
 def test_a_volume_may_stand_on_the_land_beyond_the_extent_within_its_ring_of_chunks():
@@ -172,14 +192,16 @@ def test_the_landscape_rules_name_the_catalog_and_the_volume_rules():
             "catalogs": named["catalogs"],
         }
         assert check_landscape_rules(landscape_rules(version)) == SERVED_LANDSCAPE_RULES[version][0]
+        assert served_landscape_rules(landscape_rules(version)) == version
 
 
 @pytest.mark.parametrize(
     "named",
     [
         None,
-        {**landscape_rules(), "version": 2},
+        {**landscape_rules(), "version": 3},
         {**landscape_rules(), "volume_rules": {"version": 2, "catalogs": {}}},
+        {**landscape_rules(2), "volume_rules": volume_rules(1)},
         {**landscape_rules(), "catalogs": {"landscape-value.v1": "0" * 64}},
     ],
 )

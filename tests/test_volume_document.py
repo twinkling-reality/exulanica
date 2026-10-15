@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import itertools
 import json
 import shutil
 from pathlib import Path
@@ -12,6 +13,8 @@ from pathlib import Path
 import pytest
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.volumes import (
+    CATALOG_VERSION,
+    CATALOG_VERSIONS,
     PROFILE,
     SERVED_VOLUME_RULES,
     SHAPES,
@@ -32,6 +35,8 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "volumes"
 SHIPPED = {
     "volume-shape.v1.json": "a74a4ac2b8679d36caf3603c82011fd9b05ca3ca42622907402d6ed49a831e45",
     "volume-value.v1.json": "8da177cfd44b106adc05abb6852f80e3ecd9362db7eaac925b426c26347a870c",
+    "volume-shape.v2.json": "46dd7702ec5757e20426c660b11010bc1bbf1b7d965f1272bd97ec734b01073f",
+    "volume-value.v2.json": "ced8acf3b5675bd1bd43c70ce3af14f8cd29ddb32bdee2130fd055680d98287b",
 }
 
 #: Each volume rules version and the catalog digests it names.
@@ -39,6 +44,10 @@ RULES = {
     1: {
         "volume-shape.v1": "d48a201d138463faeb44b572d9eba01ee6b9be999925e3414b7ddccdda7aa196",
         "volume-value.v1": "d9614f44462693864815532efeac4de59e76718d066cfe77b17ce5494ed3f869",
+    },
+    2: {
+        "volume-shape.v2": "cc5763039e163e8358a478fb5abb63b376c1a6473b89e98cd4d94b37b055e19d",
+        "volume-value.v2": "b1879ca4841ee62a7a20cb597bd5ef76cef730498e2918b0dce6565c2a6f3cb5",
     },
 }
 
@@ -65,7 +74,11 @@ STACK = {
         {"id": "top", "shape": "cap", "height_mm": 41000, "blend_mm": 800},
     ],
 }  # fmt: skip
-STACK_SHA256 = "a3d38dc6ba7dba815092cc8868307e76cec4e12c83b4637b21e28b25b27b66bd"
+#: The stack's identity read against each catalog version: the newer carries its strata values too.
+STACK_SHA256 = {
+    1: "a3d38dc6ba7dba815092cc8868307e76cec4e12c83b4637b21e28b25b27b66bd",
+    2: "486944d84cad9c8c4ce63a5294083c89368d0a3b427fbbe79a220fb2179945ca",
+}
 
 BOULDER = {"id": "boulder", "shape": "sphere", "radius_mm": 3000}
 
@@ -110,7 +123,8 @@ def test_a_stated_document_is_read_with_its_defaults_written_in():
         "top_look": "moss",
         "walk": "tops",
         "erosion": {"amplitude_mm": 0, "wavelength_mm": 12000, "octaves": 3, "ridged": "no"},
-        "strata": {"amplitude_mm": 0, "period_mm": 3000},
+        "strata": {"amplitude_mm": 0, "period_mm": 3000, "spread_mm": 0, "relief_permille": 0,
+                   "offset_permille": 0, "tilt_mdeg": 0, "toward_mdeg": 0},
         "parts": [
             {"id": "boulder", "shape": "sphere", "op": "add", "at_mm": [0, 0, 0], "yaw_mdeg": 0,
              "tilt_mdeg": 0, "toward_mdeg": 0, "blend_mm": 0, "look": "volume",
@@ -122,10 +136,36 @@ def test_a_stated_document_is_read_with_its_defaults_written_in():
 
 
 def test_the_identity_is_the_digest_of_the_canonical_document_and_reading_it_again_keeps_it():
-    read = read_volume_document(STACK)
-    assert read.sha256 == hashlib.sha256(read.canonical_bytes).hexdigest() == STACK_SHA256
-    again = read_volume_document(read.canonical())
-    assert again.canonical_bytes == read.canonical_bytes
+    for version in CATALOG_VERSIONS:
+        catalog = volume_catalog(version)
+        read = read_volume_document(STACK, catalog)
+        assert read.sha256 == hashlib.sha256(read.canonical_bytes).hexdigest()
+        assert (read.sha256, read.catalog_version) == (STACK_SHA256[version], version)
+        again = read_volume_document(read.canonical(), catalog)
+        assert again.canonical_bytes == read.canonical_bytes
+    assert read_volume_document(STACK).catalog_version == CATALOG_VERSION
+
+
+def test_a_later_catalog_keeps_every_entry_of_the_one_before():
+    for earlier, later in itertools.pairwise(CATALOG_VERSIONS):
+        before, after = volume_catalog(earlier), volume_catalog(later)
+        assert after.shapes == before.shapes
+        assert {key: after.values[key] for key in before.values} == dict(before.values)
+
+
+def test_the_strata_vary_their_beds_only_from_catalog_version_2():
+    varied = {"amplitude_mm": 900, "period_mm": 4000, "spread_mm": 2000, "tilt_mdeg": 4000}
+    read = read_volume_document(volume(BOULDER, strata=varied))
+    assert read.strata["spread_mm"] == 2000 and read.strata["relief_permille"] == 0
+    with pytest.raises(VolumeRefused) as caught:
+        read_volume_document(volume(BOULDER, strata=varied), volume_catalog(1))
+    assert caught.value.path == "strata"
+    assert "states no spread_mm, tilt_mdeg" in caught.value.detail
+    widest = {"amplitude_mm": 900, "period_mm": 4000, "spread_mm": 3000}
+    assert read_volume_document(volume(BOULDER, strata=widest)).strata["spread_mm"] == 3000
+    too_wide = refusal(volume(BOULDER, strata={**widest, "spread_mm": 3001}))
+    assert (too_wide.path, too_wide.code) == ("strata.spread_mm", "volume_invalid")
+    assert "at least 1 m" in too_wide.detail
 
 
 def test_reading_never_changes_the_document_it_was_given():
@@ -214,6 +254,7 @@ def test_the_volume_rules_name_the_shipped_catalogs_by_digest():
     [
         None,
         {"version": 2, "catalogs": RULES[1]},
+        {"version": 3, "catalogs": RULES[2]},
         {"version": 1, "catalogs": {**RULES[1], "volume-value.v1": "0" * 64}},
         {"version": 1, "catalogs": {"volume-shape.v1": RULES[1]["volume-shape.v1"]}},
     ],
@@ -222,7 +263,8 @@ def test_rules_this_server_does_not_serve_are_refused_by_name(named):
     with pytest.raises(VolumeRefused) as caught:
         check_volume_rules(named)
     assert caught.value.code == "volume_rules_changed"
-    assert "volume rules version 1" in caught.value.detail
+    assert f"volume rules version {VOLUME_RULES_VERSION}" in caught.value.detail
+    assert "versions 1, 2" in caught.value.detail
 
 
 def _corrupt(tmp_path: Path, name: str, change) -> Path:
@@ -239,26 +281,27 @@ def _entry(entries: list, key: str) -> dict:
     return next(entry for entry in entries if entry["key"] == key)
 
 
+@pytest.mark.parametrize("version", CATALOG_VERSIONS)
 @pytest.mark.parametrize(
     ("name", "change", "words"),
     [
-        ("volume-value.v1.json", lambda e: _entry(e, "part_blend_mm").update(default=-1),
+        ("volume-value", lambda e: _entry(e, "part_blend_mm").update(default=-1),
          "default lies within"),
-        ("volume-value.v1.json", lambda e: _entry(e, "volume_walk").update(default=2),
+        ("volume-value", lambda e: _entry(e, "volume_walk").update(default=2),
          "indexes its words"),
-        ("volume-value.v1.json", lambda e: _entry(e, "sphere_radius_mm").update(owner="ball"),
+        ("volume-value", lambda e: _entry(e, "sphere_radius_mm").update(owner="ball"),
          "unknown owner"),
-        ("volume-value.v1.json", lambda e: _entry(e, "sphere_radius_mm").update(value="size_mm"),
+        ("volume-value", lambda e: _entry(e, "sphere_radius_mm").update(value="size_mm"),
          "keyed by its owner and value"),
-        ("volume-value.v1.json", lambda e: e.remove(_entry(e, "part_tilt_mdeg")),
+        ("volume-value", lambda e: e.remove(_entry(e, "part_tilt_mdeg")),
          "does not bound part_tilt_mdeg"),
-        ("volume-shape.v1.json", lambda e: _entry(e, "cap").update(ops=["cap", "add"]),
+        ("volume-shape", lambda e: _entry(e, "cap").update(ops=["cap", "add"]),
          "does nothing else"),
-        ("volume-shape.v1.json", lambda e: _entry(e, "arch").update(ops=["bend"]),
+        ("volume-shape", lambda e: _entry(e, "arch").update(ops=["bend"]),
          "distinct words"),
     ],
 )  # fmt: skip
-def test_a_catalog_that_breaks_its_own_rules_is_refused(tmp_path, name, change, words):
-    directory = _corrupt(tmp_path, name, change)
+def test_a_catalog_that_breaks_its_own_rules_is_refused(tmp_path, version, name, change, words):
+    directory = _corrupt(tmp_path, f"{name}.v{version}.json", change)
     with pytest.raises(CatalogError, match=words):
-        load_volume_catalog(directory)
+        load_volume_catalog(directory, version)

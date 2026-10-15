@@ -15,8 +15,10 @@ import type { HeightfieldDigest } from './heightfield-geometry.js';
 
 export const LANDSCAPE_DRAWING_PROFILE = 'exulanica.landscape-drawing/v1';
 export const VOLUME_CHUNK_PROFILE = 'exulanica.volume-chunk/v1';
-/** The volume rules a chunk this page reads was realized by. */
-export const VOLUME_RULES_VERSION = 1;
+/** The newest volume rules the server realizes chunks by. */
+export const VOLUME_RULES_VERSION = 2;
+/** Every volume rules version a chunk this page reads may name: they share one chunk format. */
+const VOLUME_RULES_READ: readonly number[] = Object.freeze([1, VOLUME_RULES_VERSION]);
 /** A chunk's side. */
 export const VOLUME_CHUNK_MM = 32_000;
 /** The cells a chunk is realized at, finest first: a level of detail each. */
@@ -171,7 +173,7 @@ export interface VolumeChunk {
 export function readVolumeChunk(raw: unknown, digest: HeightfieldDigest, expectedSha256?: string): VolumeChunk {
   const row = fields(raw, 'profile input_sha256 volume_sha256 rules_version chunk cell_mm positions_mm normals looks vertex_looks triangles', 'volume chunk');
   require(row['profile'] === VOLUME_CHUNK_PROFILE, 'volume chunk.profile', `is ${VOLUME_CHUNK_PROFILE}`);
-  require(row['rules_version'] === VOLUME_RULES_VERSION, 'volume chunk.rules_version', `is ${VOLUME_RULES_VERSION}, the volume rules this page reads`);
+  require(VOLUME_RULES_READ.includes(row['rules_version'] as number), 'volume chunk.rules_version', `is one of ${VOLUME_RULES_READ.join(', ')}, the volume rules this page reads`);
   const [i, j, k] = integers(row['chunk'], 3, -CHUNK_INDEX_MOST, CHUNK_INDEX_MOST, 'volume chunk.chunk');
   const cellMm = integer(row['cell_mm'], 0, VOLUME_CHUNK_MM, 'volume chunk.cell_mm');
   require(VOLUME_LEVELS_MM.includes(cellMm), 'volume chunk.cell_mm', `is one of ${VOLUME_LEVELS_MM.join(', ')}`);

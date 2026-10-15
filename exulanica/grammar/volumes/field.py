@@ -7,9 +7,20 @@ same in every process and every replay, and a realized mesh or walkable sheet bu
 **Order.** Solid parts in the document's order, each joined to what comes before it: an ``add`` by
 a smooth union, a ``carve`` by a smooth subtraction, each with its blend (the polynomial smooth
 minimum: no join where two values are a blend apart, a fillet nearer). Then erosion (fractal value
-noise on the volume's own axes times the erosion's amplitude), then strata (a triangle wave in
-height, level beds), then caps in order (a smooth intersection with the half-space below each
-level), so a capped top stays level whatever the weathering below it.
+noise on the volume's own axes times the erosion's amplitude), then strata, then caps in order (a
+smooth intersection with the half-space below each level), so a capped top stays level whatever
+the weathering below it.
+
+**Strata.** Beds are a triangle wave across each bed's thickness: a bed stands out at its middle and
+is cut back at its joins. Stated plainly they are level beds of the period's thickness, every one
+standing out by the amplitude. A volume may vary them (:class:`_Beds`): beds alternate thicker and
+thinner by a drawn amount within the spread; each steps out by a drawn share of the amplitude (the
+relief) and is set proud or recessed within what is left; each stands proud on one drawn side and
+recessed on the other (the offset, toward that side from the volume's own vertical axis); and the
+bedding planes lean by a tilt toward a bearing. Each bed is drawn from the seed and its index, bed 0
+lying on the volume's own level 0, and its whole contribution stays within the amplitude. The
+relief and the offset fade to nothing over the lowest quarter of the volume's height (its extent),
+so the narrow foot of an island or a stack is never pinched to a neck by a recessed bed.
 
 **Shapes.** In a part's own frame, standing on its base at its point: a sphere about its point; a
 box on its base, centred across; a capsule from its point to ``to_mm``, its radius tapering along
@@ -41,6 +52,7 @@ Nothing here opens a database, a store or evidence.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -57,7 +69,8 @@ from exulanica.grammar.volumes.document import (
     point,
 )
 from exulanica.grammar.volumes.noise3 import HALF, Noise3
-from exulanica.grammar.volumes.turns import TURN_ONE, Turn, turn_matrix
+from exulanica.grammar.volumes.rules import SERVED_VOLUME_RULES, rules_reading
+from exulanica.grammar.volumes.turns import TURN_ONE, Turn, sin_cos, turn_matrix
 
 __all__ = ["EXACT_MM", "FAR_MM", "SHAPES", "VolumeField", "smooth_max", "smooth_min"]
 
@@ -274,28 +287,126 @@ def _span(start: int, cell: int, count: int, low: int, high: int) -> range:
     return range(first, last)
 
 
-class VolumeField:
-    """One volume's field under one seed. ``whole`` evaluates every part at every point and
-    weathers every point: slower, and the reference the culled field is held to."""
+class _Beds:
+    """A volume's varied beds: each bed's base, thickness, relief, shift and side, drawn once per
+    bed index from the volume's seed, found by height and drawn further whenever a height lies past
+    the beds drawn so far."""
 
     __slots__ = (
+        "_bases",
+        "_beds",
+        "_first",
+        "_key",
+        "_least",
+        "_offset",
+        "_relief",
+        "_spread",
+        "bedding",
+        "period",
+    )
+
+    def __init__(self, key: bytes, strata: Mapping[str, int | str]) -> None:
+        self._key = key
+        self.period = number(strata["period_mm"])
+        self.bedding = number(strata["amplitude_mm"])
+        self._spread = number(strata["spread_mm"])
+        self._least = max(1, self._spread // 4)
+        self._relief = number(strata["relief_permille"])
+        self._offset = self.bedding * number(strata["offset_permille"]) // 1000
+        self._first = 0
+        self._bases = [0]
+        self._beds = [self._draw(0)]
+
+    def _draw(self, index: int) -> tuple[int, int, int, int, int]:
+        """Bed ``index``'s thickness, step-out, shift, and its side's cosine and sine."""
+        digest = hashlib.sha256(self._key + index.to_bytes(8, "big", signed=True)).digest()
+        a, b, c, d = (int.from_bytes(digest[at : at + 8], "big") for at in (0, 8, 16, 24))
+        thickness = self.period
+        if self._spread:
+            amount = self._least + a % (self._spread - self._least + 1)
+            thickness += amount if index % 2 == 0 else -amount
+        scale = self.bedding * (1000 - b % (self._relief + 1)) // 1000
+        room = self.bedding - scale
+        sine, cosine = sin_cos(d % 360_000)
+        return thickness, scale, c % (2 * room + 1) - room, cosine, sine
+
+    def value(self, height: int, x: int, y: int, share: int) -> int:
+        """The beds' contribution at ``height`` across the bedding, at ``(x, y)``, their variation
+        of step-out and side kept to ``share`` per thousand."""
+        bases, beds = self._bases, self._beds
+        while height < bases[0]:
+            self._first -= 1
+            bed = self._draw(self._first)
+            bases.insert(0, bases[0] - bed[0])
+            beds.insert(0, bed)
+        while height >= bases[-1] + beds[-1][0]:
+            bases.append(bases[-1] + beds[-1][0])
+            beds.append(self._draw(self._first + len(beds)))
+        at = bisect.bisect_right(bases, height) - 1
+        thickness, scale, shift, cosine, sine = beds[at]
+        offset = self._offset
+        if share < 1000:
+            scale = self.bedding - (self.bedding - scale) * share // 1000
+            shift = shift * share // 1000
+            offset = offset * share // 1000
+        rest = height - bases[at]
+        value = (abs(2 * rest - thickness) * 2 * HALF // thickness - HALF) * scale // HALF + shift
+        if offset:
+            across = integer_sqrt(x * x + y * y)
+            if across:
+                value -= offset * (x * cosine + y * sine) // (TURN_ONE * across)
+        return max(-self.bedding, min(self.bedding, value))
+
+
+#: The strata values that vary the beds; a volume stating none of them has level, even beds.
+_VARIED: Final = ("spread_mm", "relief_permille", "offset_permille", "tilt_mdeg")
+
+
+class VolumeField:
+    """One volume's field under one seed and one version of the volume rules (the newest that
+    reads the catalogs its document was read against, unless a world's rules name another).
+    ``whole`` evaluates every part at every point and weathers every point: slower, and the
+    reference the culled field is held to."""
+
+    __slots__ = (
+        "_beds",
         "_caps",
         "_erosion",
         "_erosion_gate",
+        "_floor",
         "_noise",
+        "_quarter",
         "_strata",
         "_strata_gate",
+        "_up",
         "_whole",
         "bounds",
         "document",
         "extent",
+        "rules",
         "seed",
         "slope_permille",
         "solids",
         "weathering_mm",
     )
 
-    def __init__(self, document: VolumeDocument, seed: bytes, *, whole: bool = False) -> None:
+    def __init__(
+        self,
+        document: VolumeDocument,
+        seed: bytes,
+        *,
+        whole: bool = False,
+        rules: int | None = None,
+    ) -> None:
+        named = rules_reading(document.catalog_version) if rules is None else rules
+        if SERVED_VOLUME_RULES.get(named) != document.catalog_version:
+            raise VolumeRefused(
+                f"{document.id} was read against volume catalog version "
+                f"{document.catalog_version}, which volume rules version {named} does not read",
+                code="volume_rules_changed",
+            )
+        #: The volume rules this field is evaluated by, named by every chunk and top made of it.
+        self.rules = named
         self.document = document
         self.seed = seed
         self._whole = whole
@@ -311,6 +422,25 @@ class VolumeField:
             number(erosion["wavelength_mm"]),
             number(erosion["octaves"]),
             ridged=erosion["ridged"] == "yes",
+        )
+        varied = any(number(strata.get(name, 0)) for name in _VARIED)
+        self._beds = (
+            _Beds(
+                hashlib.sha256(
+                    PROFILE.encode() + b"\x1fstrata\x1f" + seed + b"\x1f" + document.id.encode()
+                ).digest(),
+                strata,
+            )
+            if bedding and varied
+            else None
+        )
+        sin_tilt, cos_tilt = sin_cos(number(strata.get("tilt_mdeg", 0)))
+        sin_toward, cos_toward = sin_cos(number(strata.get("toward_mdeg", 0)))
+        #: The bedding's up: leaned by its tilt toward its bearing, at :data:`TURN_ONE`.
+        self._up = (
+            sin_tilt * sin_toward // TURN_ONE,
+            sin_tilt * cos_toward // TURN_ONE,
+            cos_tilt,
         )
         caps = [part for part in document.parts if part.op == "cap"]
         self._caps = tuple(
@@ -383,15 +513,24 @@ class VolumeField:
             high = (high[0], high[1], min(high[2], min(height for height, _ in self._caps)))
         #: Every solid point lies inside this box; outside it is air.
         self.extent: tuple[Point, Point] = (low, high)
+        #: Varied beds keep their variation out of the lowest quarter of the volume's height.
+        self._floor = low[2]
+        self._quarter = max(1, (high[2] - low[2]) // 4)
 
-    def _finish(self, value: int, z: int, noise: Callable[[], int]) -> int:
+    def _finish(self, value: int, x: int, y: int, z: int, noise: Callable[[], int]) -> int:
         whole = self._whole
         if self._erosion and (whole or value < self._erosion_gate):
             value += noise() * self._erosion // HALF
         bedding, period = self._strata
         if bedding and (whole or value < self._strata_gate):
-            rest = z % period
-            value += (abs(2 * rest - period) * 2 * HALF // period - HALF) * bedding // HALF
+            beds = self._beds
+            if beds is None:
+                rest = z % period
+                value += (abs(2 * rest - period) * 2 * HALF // period - HALF) * bedding // HALF
+            else:
+                up_x, up_y, up_z = self._up
+                share = min(1000, max(0, (z - self._floor) * 1000 // self._quarter))
+                value += beds.value((up_x * x + up_y * y + up_z * z) // TURN_ONE, x, y, share)
         for height, blend in self._caps:
             value = smooth_max(value, z - height, blend)
         return value
@@ -407,7 +546,7 @@ class VolumeField:
 
     def distance(self, x: int, y: int, z: int) -> int:
         """The field at one point of the volume's frame."""
-        return self._finish(self.bare(x, y, z), z, partial(self._noise.point, x, y, z))
+        return self._finish(self.bare(x, y, z), x, y, z, partial(self._noise.point, x, y, z))
 
     def air_reach(self, x: int, y: int, z: int) -> int:
         """How far round the point every point is certainly air, or zero or less where that is not
@@ -460,10 +599,10 @@ class VolumeField:
         for k in range(nz):
             z, wz = zs[k], az[k]
             for j in range(ny):
-                wy = ay[j]
+                y, wy = ys[j], ay[j]
                 for i in range(nx):
                     values[index] = self._finish(
-                        values[index], z, partial(noise.sample, ax[i], wy, wz)
+                        values[index], xs[i], y, z, partial(noise.sample, ax[i], wy, wz)
                     )
                     index += 1
         return values
