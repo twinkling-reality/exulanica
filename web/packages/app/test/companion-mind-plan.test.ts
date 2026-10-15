@@ -24,7 +24,7 @@ const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(`${repository}/web/packages/app/test/companion-plans/${name}.json`, 'utf8'));
 const plan = (name: string): ActionPlan => parseActionPlan(fixture(name));
 const MIND = 'POST /world/versions/{version_id}/models/{role_key}';
-const planner = readFileSync(`${repository}/exulanica/selection/action_plan.py`, 'utf8');
+const vocabulary = readFileSync(`${repository}/exulanica/selection/action_vocabulary.py`, 'utf8');
 
 describe('a mind chosen, as a planned step', () => {
   it('is the registry’s own action, sent to the models route with the plan’s body', () => {
@@ -63,7 +63,7 @@ describe('a mind chosen, as a planned step', () => {
 
   it('has a question for every clarification a mind choice can ask', () => {
     for (const code of ['whom_required', 'whom_ambiguous', 'mind_required', 'mind_ambiguous', 'too_many_people_for_models']) {
-      expect(planner).toContain(`"${code}"`);
+      expect(vocabulary).toContain(`"${code}"`);
       expect(PLAN_CLARIFY_WORDS[code], code).toBeTruthy();
     }
   });

@@ -18,6 +18,12 @@ written before any call. This harness sends each request to that route on a runn
 stack (``scripts/acceptance/launch.py up --workspaces 3``) and compares the answer with the
 expectation by the set's own ``expectation_rules``.
 
+The code under measurement is the Companion's planner, ``exulanica/selection/action_plan.py`` and
+the modules it is split into beside it: ``action_vocabulary.py`` (its bounds, kinds and codes),
+``action_world.py`` (the world a plan is read against), ``action_drafting.py`` (the prompts, the
+forms and the model calls) and ``action_typing.py`` (a draft read back into typed steps). A
+preregistration binds every one of them, not ``action_plan.py`` alone.
+
 It is an independent client: it imports nothing from ``exulanica``, speaks HTTP through the
 repository's standard-library developer client by way of the acceptance driver
 (``scripts/acceptance/foundation.py``), and holds no credential outside the request header. Its

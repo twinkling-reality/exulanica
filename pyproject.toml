@@ -1026,6 +1026,7 @@ source_modules = [
   "exulanica.selection.action_drafting",
   "exulanica.selection.action_outcome",
   "exulanica.selection.action_plan",
+  "exulanica.selection.action_typing",
   "exulanica.selection.action_vocabulary",
   "exulanica.selection.action_world",
   "exulanica.selection.environment_proposal",
