@@ -9,7 +9,10 @@ import { generator, seedOf } from './seeded.js';
  * What grows on the land itself: a look's `land_cover`, scattered over the near land a site stands
  * on by the surface role the land is drawn in at each point (`landBandAt`: `land`, the ground it is
  * drawn in, or a band of the land's surface catalog such as sand, planting or rock), and within each
- * rule's slope, height and reach of the place. The same every time for the same seed and land.
+ * rule's slope, height and reach of the place. A rule may gather its pieces in groves (`clump`): the
+ * groves stand on a lattice laid over the whole land, so a grove runs on across chunks, and the rule
+ * keeps its density over the land, the share it states growing in the groves and the rest between.
+ * The same every time for the same seed and land.
  *
  * Only the near chunks grow any, never the backdrop. A piece grows nowhere a site slot lies (the
  * place's own grounds grow their own cover), nowhere the land is wet (`dryAt`: the sea's edge, lakes,
@@ -69,6 +72,57 @@ export interface GrownLandCover {
 /** The side of a cell of the grid the kept-out rectangles are found by, millimetres: a bound on the work, not a look. */
 const GRID_MM = 8000;
 
+/** How many points along each side of a chunk the groves' cover is measured at: a bound on the work. */
+const GROVE_COVER_SAMPLES = 64;
+
+/** Where a rule's groves stand: whether a site point lies in one, and the side of the lattice cell each grove is placed in. */
+export interface LandCoverGroves {
+  readonly spacingMm: number;
+  inside(eastMm: number, northMm: number): boolean;
+}
+
+/**
+ * A rule's groves, or null where it states none: one grove in each cell of a square lattice over the
+ * whole land, at a point and of a radius drawn from the rule's seed for that cell. The cell's side
+ * makes groves of radii drawn evenly from the least to the most cover about the share of the land the
+ * rule states, overlaps counted as for groves placed at random (the scatter measures what they cover);
+ * a point is looked for in as many cells round its own as the most radius spans.
+ */
+export function landCoverGroves(key: string, rule: StylePackLandCover): LandCoverGroves | null {
+  const clump = rule.clump;
+  if (clump === undefined) return null;
+  const [least, most] = clump.size_mm;
+  const meanSquareMm2 = (least * least + least * most + most * most) / 3;
+  // Groves placed at random cover 1 - exp(-a) of the land where they would cover a apart.
+  const spacingMm = Math.sqrt((Math.PI * meanSquareMm2) / -Math.log(1 - clump.cover_permille / 1000));
+  const reach = Math.ceil(most / spacingMm);
+  const groves = new Map<string, readonly [number, number, number]>();
+  const grove = (i: number, j: number): readonly [number, number, number] => {
+    const at = `${String(i)},${String(j)}`;
+    let found = groves.get(at);
+    if (found === undefined) {
+      const next = generator(seedOf(rule.seed, `${key}|grove|${at}`));
+      found = [(i + next()) * spacingMm, (j + next()) * spacingMm, least + (most - least) * next()] as const;
+      groves.set(at, found);
+    }
+    return found;
+  };
+  return {
+    spacingMm,
+    inside(eastMm: number, northMm: number): boolean {
+      const i = Math.floor(eastMm / spacingMm);
+      const j = Math.floor(northMm / spacingMm);
+      for (let di = -reach; di <= reach; di += 1) {
+        for (let dj = -reach; dj <= reach; dj += 1) {
+          const [x, y, radius] = grove(i + di, j + dj);
+          if (Math.hypot(eastMm - x, northMm - y) < radius) return true;
+        }
+      }
+      return false;
+    },
+  };
+}
+
 /** The land's slope at a site point, rise per run in per mille, from central differences over one cell each way. */
 export function landSlopePermille(groundMm: (eastMm: number, northMm: number) => number, eastMm: number, northMm: number): number {
   const gx = (groundMm(eastMm + SLOPE_RUN_MM, northMm) - groundMm(eastMm - SLOPE_RUN_MM, northMm)) / (2 * SLOPE_RUN_MM);
@@ -124,8 +178,27 @@ export function growLandCover(
     const rule = landCover[key]!;
     const role = rule.role;
     const [least, most_] = rule.scale_permille;
+    // A rule with groves draws more points and keeps each by where it falls, in a grove or between,
+    // so its pieces gather as it states and its density over the land stays as it states.
+    // The groves' cover is measured over the near land, as overlapping groves cover less than they would apart.
+    const groves = landCoverGroves(key, rule);
+    let [inGroves, between] = [1, 1];
+    if (groves !== null && rule.clump !== undefined) {
+      let inside = 0;
+      for (const chunk of chunks) {
+        for (let i = 0; i < GROVE_COVER_SAMPLES; i += 1) {
+          for (let j = 0; j < GROVE_COVER_SAMPLES; j += 1) {
+            if (groves.inside((chunk.chunkX + (i + 0.5) / GROVE_COVER_SAMPLES) * LAND_CHUNK_MM, (chunk.chunkY + (j + 0.5) / GROVE_COVER_SAMPLES) * LAND_CHUNK_MM)) inside += 1;
+          }
+        }
+      }
+      const covered = Math.min(Math.max(inside / (chunks.length * GROVE_COVER_SAMPLES * GROVE_COVER_SAMPLES), 0.001), 0.999);
+      const share = rule.clump.share_permille / 1000;
+      [inGroves, between] = [share / covered, (1 - share) / (1 - covered)];
+    }
+    const drawnShare = Math.max(inGroves, between);
     for (const chunk of chunks) {
-      const count = Math.max(0, Math.round(hectares * rule.density_per_ha));
+      const count = Math.max(0, Math.round(hectares * rule.density_per_ha * drawnShare));
       const room = Math.max(0, tries - tried);
       untried += Math.max(0, count - room);
       const drawn = Math.min(count, room);
@@ -138,6 +211,7 @@ export function growLandCover(
         const yaw = next() * 2 * Math.PI;
         const scale = (least + (most_ - least) * next()) / 1000;
         const pick = next();
+        if (groves !== null && next() * drawnShare >= (groves.inside(eastMm, northMm) ? inGroves : between)) continue;
         if (rule.within_mm !== undefined && outside(placeMm, eastMm, northMm) > rule.within_mm) continue;
         if (kept(eastMm, northMm) || !land.dryAt(eastMm, northMm) || nearFall(eastMm, northMm)) continue;
         const heightMm = land.groundMm(eastMm, northMm);

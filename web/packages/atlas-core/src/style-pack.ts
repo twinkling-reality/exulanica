@@ -293,6 +293,18 @@ export interface StylePackLandCover {
   readonly slope_permille?: readonly [number, number];
   readonly height_mm?: readonly [number, number];
   readonly within_mm?: number;
+  /** Absent: the rule's pieces lie evenly over its land. */
+  readonly clump?: StylePackLandCoverClump;
+}
+
+/**
+ * Groves a land cover rule gathers its pieces in: a grove's least and most radius, about the share of
+ * the land the groves cover, and the share of the rule's pieces that grow in them (the rest between).
+ */
+export interface StylePackLandCoverClump {
+  readonly size_mm: readonly [number, number];
+  readonly cover_permille: number;
+  readonly share_permille: number;
 }
 
 /**
@@ -889,6 +901,12 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
         slope_permille: optional(pair(0, 20_000, 'must be a least and a most slope in thousandths')),
         height_mm: optional(pair(-10_000_000, 10_000_000, 'must be a least and a most height in millimetres')),
         within_mm: optional(integer(0, 4_000_000)),
+        // Added within the profile: absent, the rule's pieces lie evenly over its land.
+        clump: optional((c, q) => object(c, q, {
+          size_mm: pair(1000, 200_000, 'must be a least and a most grove radius in millimetres'),
+          cover_permille: integer(1, 999),
+          share_permille: integer(0, 1000),
+        })),
       });
     }, 16)),
     modules: record(lookRoleKey(['module', 'both']), (v, p) => object(v, p, {

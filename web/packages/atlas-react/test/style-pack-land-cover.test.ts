@@ -17,7 +17,7 @@ import {
   type LandChunk, type LandWater, type LookFamily, type StylePackLandCover, type StylePackManifest,
 } from '@exulanica/atlas-core';
 import { parseStructuredSiteDrawing, readSiteLand, siteMount, type StructuredSiteDrawing } from '../src/playcanvas/generated-site/index.js';
-import { FALL_CLEAR_MM, LAND_COVER_PLACEMENTS_MAX, LAND_COVER_TRIES_MAX, growLandCover, landSlopePermille, type LandCoverLand } from '../src/playcanvas/style-pack/land-cover.js';
+import { FALL_CLEAR_MM, LAND_COVER_PLACEMENTS_MAX, LAND_COVER_TRIES_MAX, growLandCover, landCoverGroves, landSlopePermille, type LandCoverLand } from '../src/playcanvas/style-pack/land-cover.js';
 import { packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
 
 // Relative to web/, where the suite runs.
@@ -118,6 +118,48 @@ describe('land cover\'s scatter', () => {
     expect(tried.untried).toBe(2 * perChunk(400) - 1000);
     expect(tried.points).toEqual(growLandCover({ grass: rule('land') }, LAND, PLACE).points);
     expect([LAND_COVER_PLACEMENTS_MAX, LAND_COVER_TRIES_MAX]).toEqual([60_000, 240_000]);
+  });
+});
+
+describe('land cover gathered in groves', () => {
+  /** Two level chunks, every point the land's own ground. */
+  const LEVEL: LandCoverLand = { ...LAND, groundMm: () => 20_000, surfaces: null };
+  const grove = { size_mm: [8000, 16_000] as const, cover_permille: 250, share_permille: 900 };
+  const grown = (clump: StylePackLandCover['clump'], seed = 3) => growLandCover({ grass: rule('land', { density_per_ha: 2000, seed, ...(clump === undefined ? {} : { clump }) }) }, LEVEL, PLACE);
+  const shareIn = (clump: NonNullable<StylePackLandCover['clump']>, seed = 3): number => {
+    const groves = landCoverGroves('grass', rule('land', { seed, clump }))!;
+    const points = grown(clump, seed).points;
+    return points.filter((point) => groves.inside(point.eastM * 1000, point.northM * 1000)).length / points.length;
+  };
+
+  it('grows the share it states in groves that cover about the land it states, and keeps its density over the land', () => {
+    const groves = landCoverGroves('grass', rule('land', { clump: grove }))!;
+    let inside = 0;
+    for (let east = 500; east < 256_000; east += 1000) for (let north = 500; north < 128_000; north += 1000) if (groves.inside(east, north)) inside += 1;
+    // About a quarter of the land, over the few groves two chunks hold.
+    expect(inside / (256 * 128)).toBeGreaterThan(0.215);
+    expect(inside / (256 * 128)).toBeLessThan(0.3);
+    expect(Math.abs(shareIn(grove) - 0.9)).toBeLessThan(0.02);
+    const even = grown(undefined).points.length;
+    expect(Math.abs(grown(grove).points.length - even) / even).toBeLessThan(0.02);
+  });
+
+  it('grows all in groves at a share of 1000 and none at 0, and lies evenly where it states no groves', () => {
+    expect(shareIn({ ...grove, share_permille: 1000 })).toBe(1);
+    expect(shareIn({ ...grove, share_permille: 0 })).toBe(0);
+    expect(grown(undefined).points.length).toBe(2 * perChunk(2000));
+  });
+
+  it('stands its groves on one lattice over the whole land, the same every time, elsewhere for another seed', () => {
+    // Groves cover nearly all the land where the rule says so, wider then than a lattice cell.
+    const dense = landCoverGroves('grass', rule('land', { clump: { ...grove, cover_permille: 990 } }))!;
+    expect(dense.spacingMm).toBeLessThan(16_000);
+    let inside = 0;
+    for (let east = 500; east < 128_000; east += 1000) for (let north = 500; north < 128_000; north += 1000) if (dense.inside(east, north)) inside += 1;
+    expect(inside / (128 * 128)).toBeGreaterThan(0.97);
+    expect(grown(grove)).toEqual(grown(grove));
+    expect(grown(grove, 4).points[0]).not.toEqual(grown(grove).points[0]);
+    expect(landCoverGroves('grass', rule('land'))).toBeNull();
   });
 });
 

@@ -876,21 +876,23 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
         if _KEY.fullmatch(key) is None:
             _fail("shape", path, "must be a rule key")
 
+    def pair_of(least: int, most: int, says: str) -> Reader:
+        # A least and a most within a range, the least not above the most.
+        def read(v: Any, p: str) -> list[int]:
+            if not isinstance(v, list) or len(v) != 2:
+                _fail("shape", p, says)
+            read = [_integer(least, most)(n, f"{p}[{i}]") for i, n in enumerate(v)]
+            if read[0] > read[1]:
+                _fail("range", p, "must not have its least above its most")
+            return read
+
+        return read
+
     def land_cover(value: Any, path: str) -> dict[str, Any]:
         # What grows on the near land where it is drawn in a surface role (`land`, or a band of
         # the land's surface catalog): which plant or prop pieces, how many a hectare, at what
-        # sizes, from which seed, optionally within a slope and a height and near the place.
-        def pair(least: int, most: int, says: str) -> Reader:
-            def read(v: Any, p: str) -> list[int]:
-                if not isinstance(v, list) or len(v) != 2:
-                    _fail("shape", p, says)
-                read = [_integer(least, most)(n, f"{p}[{i}]") for i, n in enumerate(v)]
-                if read[0] > read[1]:
-                    _fail("range", p, "must not have its least above its most")
-                return read
-
-            return read
-
+        # sizes, from which seed, optionally within a slope and a height and near the place, and
+        # optionally gathered in groves.
         return _object(
             value,
             path,
@@ -898,19 +900,36 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                 "role": _pattern(_KEY, "a land surface role"),
                 "pieces": _list(piece_role, 1, 8),
                 "density_per_ha": _integer(1, 400_000),
-                "scale_permille": pair(
+                "scale_permille": pair_of(
                     100, 3000, "must be a least and a most scale in thousandths"
                 ),
                 "seed": _integer(0, 2_147_483_647),
                 "slope_permille": _Optional(
-                    pair(0, 20_000, "must be a least and a most slope in thousandths")
+                    pair_of(0, 20_000, "must be a least and a most slope in thousandths")
                 ),
                 "height_mm": _Optional(
-                    pair(
+                    pair_of(
                         -10_000_000, 10_000_000, "must be a least and a most height in millimetres"
                     )
                 ),
                 "within_mm": _Optional(_integer(0, 4_000_000)),
+                # Added within the profile: absent, the rule's pieces lie evenly over its land.
+                "clump": _Optional(clump),
+            },
+        )
+
+    def clump(value: Any, path: str) -> dict[str, Any]:
+        # Groves: a grove's least and most radius, about the share of the land the groves cover,
+        # and the share of the rule's pieces that grow in them (the rest grow between).
+        return _object(
+            value,
+            path,
+            {
+                "size_mm": pair_of(
+                    1000, 200_000, "must be a least and a most grove radius in millimetres"
+                ),
+                "cover_permille": _integer(1, 999),
+                "share_permille": _integer(0, 1000),
             },
         )
 
