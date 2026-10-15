@@ -907,7 +907,7 @@ def _refuse_private_workspace_assets(
 
 
 def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
-    """A workspace holding its own looks or thing kinds cannot be seeded.
+    """A workspace holding its own looks, thing kinds or kept web pictures cannot be seeded.
 
     A look's container lives in its workspace's own ``looks`` namespace
     (:mod:`exulanica.world.thing_store`), outside the content store a seed copies from, and a look
@@ -915,12 +915,27 @@ def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID)
     with no rights check; a drafted kind holds words drafted from a person's. Their rows alone
     would restore as looks whose bytes are missing, so the export refuses, as it does for a
     workspace's own admitted assets; and so it does while the looks namespace still holds a
-    container the purge has not destroyed (migration 0172's inventory, ``look_object``).
+    container the purge has not destroyed (migration 0172's inventory, ``look_object``). A kept web
+    picture (migration 0215) is a stranger's photograph kept for one person's private world, so a
+    workspace that keeps one, or whose web pictures namespace still holds bytes, is refused too.
     """
     present = connection.execute(
         "select to_regclass('look_version') is not null as looks, "
-        "to_regclass('look_object') is not null as objects"
+        "to_regclass('look_object') is not null as objects, "
+        "to_regclass('web_picture_object') is not null as pictures"
     ).fetchone()
+    if (
+        present["pictures"]
+        and connection.execute(
+            "select exists (select 1 from web_picture_object where workspace_id = %(w)s "
+            "and purged_at is null) as held",
+            {"w": workspace_id},
+        ).fetchone()["held"]
+    ):
+        raise SeedRefused(
+            f"workspace {workspace_id} keeps pictures from the web for its own private worlds; "
+            "a seed cannot carry them"
+        )
     if not present["looks"]:
         return
     # A schema between the store and its inventory holds looks and no inventory to count.

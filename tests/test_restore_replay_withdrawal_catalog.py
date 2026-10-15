@@ -294,7 +294,7 @@ def test_every_kinds_statements_run_against_the_schema(repository, spine_schema)
                     "select set_config('exulanica.workspace_id', %s, true)",
                     (row["workspace_id"],),
                 )
-            if kind.kind in {"world_erasure", "world_kind_erasure"}:
+            if kind.kind in {"world_erasure", "world_kind_erasure", "web_picture_erasure"}:
                 # Restore installs scoped immutable erasures even when creation postdates backup.
                 connection.execute(
                     "select set_config('exulanica.workspace_id', %s, true)", (row["workspace_id"],)

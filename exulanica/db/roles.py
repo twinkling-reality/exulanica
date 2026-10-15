@@ -356,6 +356,12 @@ INSERT_ONLY_TABLES: Final = (
     # the purger writes; each refuses every update the runtime could make.
     "thing_erasure",
     "look_object",
+    # Migration 0215 appends the pictures a workspace keeps from picture searches, its web pictures
+    # namespace's inventory and each erasure of a kept picture, whose trigger deletes its record as
+    # the definer owner; only the purger marks an object purged.
+    "web_picture",
+    "web_picture_object",
+    "web_picture_erasure",
     # Migration 0173 appends a workspace's own style pack versions, their files, their withdrawals,
     # their namespace inventory and their creators' publish requests; a workspace's erasure clears
     # their uploader text in a definer run as exulanica_definer, and only the purger marks an
@@ -583,6 +589,10 @@ _PURGE_WORKSPACE_READS: Final = {
     # the same creature kept again holds the same file, and its job is skipped (worker.py).
     "look_version": ("workspace_id", "container_sha256"),
     "workspace_style_pack_blob": ("workspace_id", "content_sha256", "purged_at"),
+    "web_picture_object": ("workspace_id", "content_sha256", "purged_at"),
+    # Whether a picture the workspace still keeps names bytes a picture's erasure enqueued: the
+    # same picture kept again holds the same bytes, and its job is skipped (worker.py).
+    "web_picture": ("workspace_id", "content_sha256"),
     "scene_training_artifact": ("workspace_id", "artifact_id", "right_id"),
     "scene_training_right": ("workspace_id", "right_id", "withdrawn_at"),
 }
@@ -591,17 +601,19 @@ _PURGE_WORKSPACE_WRITES: Final = {
     "workspace_asset_blob": ("purged_at",),
     "look_object": ("purged_at",),
     "workspace_style_pack_blob": ("purged_at",),
+    "web_picture_object": ("purged_at",),
 }
 #: The destroy questions this role may ask, each revoked from PUBLIC by the migration that added
 #: it: a bake's in 0066, a withdrawn training right's in 0082, a workspace asset object's in 0126,
 #: a looks object's in 0172.
-#: Also a workspace style pack file's in 0173.
+#: Also a workspace style pack file's in 0173, and a kept web picture's in 0215.
 _PURGE_FUNCTIONS: Final = (
     ("material_bake_purge_is_authorized", "uuid,uuid,bytea"),
     ("scene_training_withdrawal_releases_artifact", "uuid,bytea"),
     ("workspace_asset_purge_is_authorized", "uuid,uuid,text"),
     ("look_purge_is_authorized", "uuid,uuid,text"),
     ("workspace_style_pack_purge_is_authorized", "uuid,uuid,text"),
+    ("web_picture_purge_is_authorized", "uuid,uuid,text"),
 )
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker

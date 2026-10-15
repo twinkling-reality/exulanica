@@ -236,6 +236,11 @@ KEPT: dict[str, str] = {
     ),
     "training_use_consent": _WORKSPACE,
     "user_annotation": _WORKSPACE,
+    "web_picture_erasure": (
+        "the erasure's own record: one row for each kept web picture erased, holding ids and its "
+        "bytes' digest, and no address or words"
+    ),
+    "web_picture_object": _STUB,
     "world_kind_erasure": (
         "immutable erasure record: document/key fingerprints retire a version through restore, "
         "without retaining its document, labels or validation report"

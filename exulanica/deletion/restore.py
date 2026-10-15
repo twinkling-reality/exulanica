@@ -307,8 +307,9 @@ def _held_open(
         if row["state"] == "done":
             continue
         # A look job waits unclaimed while a look this database holds names its bytes, because the
-        # question its claim asks refuses it (migration 0172), so it is held open as a skip is.
-        waiting = row["target_kind"] == "look" and row["state"] == "queued"
+        # question its claim asks refuses it (migration 0172), so it is held open as a skip is; a
+        # kept web picture's job the same way (0215).
+        waiting = row["target_kind"] in ("look", "web_picture") and row["state"] == "queued"
         if not waiting and (
             row["state"] != "skipped" or row["last_error"] != HELD_BY_A_LIVE_RECORD
         ):

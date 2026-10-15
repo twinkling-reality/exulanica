@@ -14,7 +14,7 @@ contract; the hosted-request boundary itself belongs to the
 | A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
 | A picture search for a creature: the person's words as its one search, the pictures it finds passed to its requester from memory and never stored | Implemented, off by default (`EXULANICA_REFERENCE_WEB_PICTURES`), offered to listed workspaces only and never on a `public` installation; no live picture search has run through the product |
-| Keeping a picture a person picks from a picture search | Not built |
+| Keeping a picture a person picks from a picture search | Storage, reading and erasure implemented (migration 0215, section 13); fetching a picked picture and its routes are not built |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
 
 ## 1. What a person gets
@@ -474,3 +474,27 @@ outgoing query, no stored row and no response, and that each guard can fail; the
 the runtime and read-only roles. Row-level security on both tables is shown as the runtime role in
 `tests/test_row_level_security.py`. The three model calls (planner, reader and picture reader) are
 registered paths of `tests/test_hosted_boundary.py`.
+
+## 13. Pictures a person keeps
+
+A person who picks a picture from a picture search, and says they may use it for their own world,
+keeps that one picture. It is kept apart from their own photographs: it is never a capture, so no
+library, admission, scene, world input, export or model hand-over that reads a person's photographs
+sees it (`exulanica/world/kept_web_pictures.py`, migration 0215).
+
+| What | How |
+| --- | --- |
+| The kept bytes | The fetched picture decoded within the photograph pipeline's pixel budget, one frame only, turned upright and written again in its own format with no metadata: no EXIF, XMP, ICC profile, text chunk or comment. Only JPEG, PNG and WebP of at most 10 MiB and 16,384 pixels a side are kept |
+| Where | By digest in the workspace's own `web-pictures` namespace of the content store, recorded in its inventory (`web_picture_object`) before the bytes are written |
+| The record | `web_picture`: the digests of what was fetched and what was kept, media type, size and pixel size, the picture's address and website, its licence where its source states one, the person's answer (`made_or_permitted`, `licence_allows` with the licence it names, or `private_world_only`), who answered, the picture search it came from, and when. Never the source's words about the picture |
+| Erasure | Asked by the person who kept the picture, or an owner: a `web_picture` tombstone and a `web_picture_erasure` row naming the picture, its bytes' digest and that tombstone, in one transaction. The row's trigger deletes the record and enqueues the bytes for `exulanica-purge`, unless another kept picture of the workspace holds the same bytes. A workspace's tombstone deletes every record and enqueues every object. A restore carries the erasure row before it replays the tombstone, which then enqueues the bytes |
+| Who reads it | Only routes that name the table, for the workspace that keeps it |
+
+**No hosted provider model ever receives a web picture**: not a vision, language or notes model,
+nor any other model reached through a provider. The one model that may read a kept picture is its
+owner's own creature job, an open-weights model run on the product's own GPU job, which is the
+reason a person keeps the picture; what that job makes stays private as the picture does. That job
+is not built.
+
+A kept picture and anything made from it stay private: a judge seed refuses a workspace that keeps
+one (`exulanica/orchestration/judge_seed.py`), and no export reads the table.

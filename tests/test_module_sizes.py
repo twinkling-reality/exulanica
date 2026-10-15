@@ -70,7 +70,11 @@ LIMITS: dict[str, tuple[int, str]] = {
         "photographs from one standpoint, joined by the rotation between them",
     ),
     "web/packages/app/src/main.ts": (2_012, "the legacy app shell's boot and world mount"),
-    "exulanica/orchestration/judge_seed.py": (2_006, "a workspace sealed into a verified archive"),
+    "exulanica/orchestration/judge_seed.py": (
+        2_021,
+        "a workspace sealed into a verified archive; its refusals include a workspace that keeps "
+        "web pictures (0215)",
+    ),
     "exulanica/grammar/grammars/city/document.py": (
         1_986,
         "a city tile document and the checks that span its records",

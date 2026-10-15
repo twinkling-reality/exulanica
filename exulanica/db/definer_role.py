@@ -524,6 +524,9 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     # world_erase_rows, made again with one statement more, deletes the characters written for a
     # world's placed beings when the world is erased whole.
     "0213": DefinerGrants(tables={"world_thing_character": frozenset(("SELECT", "DELETE"))}),
+    # A kept web picture's erasure, and its workspace's, delete its record (0215); its purge's
+    # question reads it. The queue's INSERT is 0172's.
+    "0215": DefinerGrants(tables={"web_picture": frozenset(("SELECT", "DELETE"))}),
 }
 
 

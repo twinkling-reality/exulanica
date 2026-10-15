@@ -392,8 +392,14 @@ deleted vector is absent from the index's own files before any deletion claim is
 
 The `tombstone` table (migration 0001) is workspace-scoped and holds no content, only identifiers:
 its scope (`capture`, `interval`, `entity`, `assertion`, `workspace`, and the later
-`scene_training`, `caption_search` and `creature`, whose subject is the erasure row beside it), its
-subject, who asked, when it takes effect, and when the purge completed. Migration 0074 makes a
+`scene_training`, `caption_search`, and `creature` and `web_picture`, whose subject is the erasure
+row beside it), its subject, who asked, when it takes effect, and when the purge completed. A
+`web_picture` tombstone erases one picture a person kept from a picture search (migration 0215):
+its record is deleted and its bytes, in the workspace's own web pictures namespace, are purged; a
+workspace tombstone reaches every kept picture; a restore carries the erasure row and replays the
+tombstone after it. A kept web picture is never a capture, so no capture tombstone reaches it and
+no reader of a person's own photographs sees it
+([reference notes](reference-notes-contract.md#13-pictures-a-person-keeps)). Migration 0074 makes a
 tombstone written once: every change but `purge_completed_at` is refused.
 
 Rules:

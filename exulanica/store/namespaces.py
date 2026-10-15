@@ -41,6 +41,7 @@ __all__ = [
     "MATERIAL_NAMESPACE",
     "SHARED_NAMESPACES",
     "TILE_NAMESPACE",
+    "WEB_PICTURE_NAMESPACE",
     "WORKSPACE_ASSET_NAMESPACE",
     "WORKSPACE_NAMESPACES",
     "WORKSPACE_STYLE_PACK_NAMESPACE",
@@ -49,6 +50,7 @@ __all__ = [
     "look_lock_key",
     "material_stores",
     "tile_store",
+    "web_picture_lock_key",
     "workspace_asset_lock_key",
     "workspace_style_pack_write_key",
 ]
@@ -78,6 +80,11 @@ LOOK_NAMESPACE: Final = "looks"
 #: Where each workspace's own style packs' files live (migration 0173): one namespace per workspace,
 #: apart from its assets, so each namespace's inventory accounts for exactly its own bytes.
 WORKSPACE_STYLE_PACK_NAMESPACE: Final = "workspace-style-packs"
+#: Where each workspace keeps the pictures its people picked from picture searches, by digest
+#: (migration 0215): a stranger's photographs, never captures, so no reader of a person's own
+#: photographs finds them. One namespace per workspace, so a picture is served only to the
+#: workspace that keeps its record.
+WEB_PICTURE_NAMESPACE: Final = "web-pictures"
 
 #: The namespaces holding one store for every workspace, in the order they are listed.
 SHARED_NAMESPACES: Final[tuple[str, ...]] = (
@@ -91,6 +98,7 @@ WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (
     WORKSPACE_ASSET_NAMESPACE,
     LOOK_NAMESPACE,
     WORKSPACE_STYLE_PACK_NAMESPACE,
+    WEB_PICTURE_NAMESPACE,
 )
 
 
@@ -163,6 +171,15 @@ def look_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
     container until the rows naming it commit, and the purger takes it before destroying one.
     """
     return f"look:{workspace_id}:{digest}"
+
+
+def web_picture_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
+    """The advisory lock key of one picture in one workspace's web pictures namespace.
+
+    Keyed as a look's container is, by workspace and digest. A keep holds it from recording the
+    picture until the row naming it commits, and the purger takes it before destroying one.
+    """
+    return f"web-picture:{workspace_id}:{digest}"
 
 
 def workspace_style_pack_write_key(workspace_id: uuid.UUID) -> str:

@@ -358,6 +358,18 @@
       "order": null
     },
     {
+      "kind": "web_picture_erasure",
+      "table": "web_picture_erasure",
+      "shape": "event",
+      "note": "A person erasing a picture they kept from a picture search (migration 0215): its record is deleted and its bytes purged. The row names the picture, its bytes' digest and its tombstone, and no address or words. Carried even when the backup predates the keep, so its tombstone, replayed after it, destroys bytes a restored store may still hold.",
+      "identity": ["workspace_id", "erasure_id"],
+      "withdrawn": {"column": "erased_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "web_picture", "columns": ["workspace_id", "picture_id"]},
+      "absent": "carry",
+      "order": null
+    },
+    {
       "kind": "retraction",
       "table": "retraction",
       "shape": "event",

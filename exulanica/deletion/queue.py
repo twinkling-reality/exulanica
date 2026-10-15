@@ -52,6 +52,7 @@ from exulanica.store.namespaces import (
     BLOB_NAMESPACE,
     LOOK_NAMESPACE,
     MATERIAL_NAMESPACE,
+    WEB_PICTURE_NAMESPACE,
     WORKSPACE_ASSET_NAMESPACE,
     WORKSPACE_NAMESPACES,
     WORKSPACE_STYLE_PACK_NAMESPACE,
@@ -111,7 +112,8 @@ MAX_ATTEMPTS: Final = 8
 #: admitted or prepared object's hash in the workspace's own asset namespace (migration 0126), on
 #: the same terms. Look targets name a container's hash in the workspace's own looks namespace
 #: (migration 0172), on the same terms again. Workspace style pack targets name a file's hash in
-#: its own style pack namespace (migration 0173), on the same terms.
+#: its own style pack namespace (migration 0173), on the same terms. Web picture targets name a kept
+#: picture's hash in the workspace's own web pictures namespace (migration 0215), as looks do.
 DESTROYABLE_KINDS: Final = (
     "blob",
     "artifact",
@@ -120,6 +122,7 @@ DESTROYABLE_KINDS: Final = (
     "workspace_asset",
     "look",
     "workspace_style_pack",
+    "web_picture",
 )
 
 #: The namespace each stored kind's bytes live in (:mod:`exulanica.store.namespaces`); in a
@@ -134,6 +137,7 @@ STORED_KIND_NAMESPACES: Final[Mapping[str, str]] = MappingProxyType(
         "workspace_asset": WORKSPACE_ASSET_NAMESPACE,
         "look": LOOK_NAMESPACE,
         "workspace_style_pack": WORKSPACE_STYLE_PACK_NAMESPACE,
+        "web_picture": WEB_PICTURE_NAMESPACE,
     }
 )
 
@@ -314,6 +318,13 @@ def claim_purge(
         if "workspace_style_pack" in kinds
         else ""
     )
+    # And for a workspace's kept web pictures, whose function arrives in migration 0215.
+    web_pictures = (
+        "     and (pj.target_kind <> 'web_picture' or "
+        "       web_picture_purge_is_authorized(pj.workspace_id, pj.tombstone_id, pj.target_ref)) "
+        if "web_picture" in kinds
+        else ""
+    )
     row = connection.execute(
         "update purge_job set state = 'running', attempts = attempts + 1, "
         "  attempted_at = now(), last_error = null "
@@ -328,6 +339,7 @@ def claim_purge(
         + assets
         + looks
         + style_packs
+        + web_pictures
         + "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
@@ -368,6 +380,7 @@ _LATER_QUESTIONS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "look": "look_purge_is_authorized(uuid,uuid,text)",
         "workspace_style_pack": "workspace_style_pack_purge_is_authorized(uuid,uuid,text)",
+        "web_picture": "web_picture_purge_is_authorized(uuid,uuid,text)",
     }
 )
 
@@ -465,6 +478,13 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
     if target.target_kind == "workspace_style_pack":
         connection.execute(
             "update workspace_style_pack_blob set purged_at = now() "
+            "where workspace_id = %s and content_sha256 = %s and purged_at is null",
+            (target.workspace_id, target.target_ref),
+        )
+        return
+    if target.target_kind == "web_picture":
+        connection.execute(
+            "update web_picture_object set purged_at = now() "
             "where workspace_id = %s and content_sha256 = %s and purged_at is null",
             (target.workspace_id, target.target_ref),
         )

@@ -102,6 +102,8 @@ TABLE_PRIVILEGES = {
     "thing_kind_version": {"SELECT", "DELETE"},
     "tombstone": {"SELECT"},
     "tombstone_embedding_target": {"SELECT"},
+    # A kept web picture's erasure, and its workspace's, delete its record (0215).
+    "web_picture": {"SELECT", "DELETE"},
     "world_project": {"SELECT", "UPDATE", "DELETE"},
     "world_project_item": {"SELECT", "UPDATE", "DELETE"},
     "world_project_item_revision": {"SELECT", "UPDATE", "DELETE"},
@@ -356,6 +358,9 @@ DEFINERS = {
             "tg_installation_style_pack_total()",
             "tg_workspace_style_pack_purge_on_tombstone()",
             "workspace_style_pack_purge_is_authorized(uuid,uuid,text)",
+            "tg_web_picture_erasure_erases()",
+            "tg_web_picture_erases_on_tombstone()",
+            "web_picture_purge_is_authorized(uuid,uuid,text)",
         ),
     }.items()
     for signature in signatures
