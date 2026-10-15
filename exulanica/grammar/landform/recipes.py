@@ -1,6 +1,6 @@
 """Land recipes: the land a world made from a sentence stands on, as data.
 
-``assets/catalogs/landform/landform-recipe.v1.json`` (``exulanica.landform-recipe``) lists each
+``assets/catalogs/landform/landform-recipe.vN.json`` (``exulanica.landform-recipe``) lists each
 recipe with a whole land document (``exulanica.landform/v1``), read by the landform reader as the
 catalog is read; the words a made world's card says it is set with, its preposition included
 (``title``: "on a coast, ...", "in a valley ..."); the whole words that
@@ -11,7 +11,8 @@ licence. Entries are in the order a sentence that names two is read in: the firs
 
 A recipe is chosen for a world before it is made, and the world's receipt keeps the land document
 itself, so a later version of a recipe never moves a world already made. The catalog changes by a
-new file, never by an edit of a shipped one.
+new version, never by an edit of a shipped one; new worlds read the newest. Version 2's coast pours
+a cascade from the site's sea-facing edge into the sea; version 1 stays readable.
 """
 
 from __future__ import annotations
@@ -30,11 +31,19 @@ from exulanica.grammar.landform.catalog import CATALOG_DIRECTORY
 from exulanica.grammar.landform.document import LandformRefused, read_land_document
 from exulanica.grammar.records import KEY_PATTERN
 
-__all__ = ["RECIPE_CATALOG_ID", "LandRecipe", "land_recipes", "load_land_recipes"]
+__all__ = [
+    "RECIPE_CATALOG_ID",
+    "RECIPE_VERSION",
+    "RECIPE_VERSIONS",
+    "LandRecipe",
+    "land_recipes",
+    "load_land_recipes",
+]
 
 RECIPE_CATALOG_ID: Final = "exulanica.landform-recipe"
-RECIPE_FILE: Final = "landform-recipe.v1.json"
-RECIPE_PATH: Final = CATALOG_DIRECTORY.joinpath(RECIPE_FILE)
+#: Every version of the recipe catalog this code reads, and the newest, which new worlds read.
+RECIPE_VERSIONS: Final = (1, 2)
+RECIPE_VERSION: Final = 2
 _ENVELOPE: Final = frozenset({"schema_version", "catalog_id", "catalog_version", "entries"})
 _FIELDS: Final = frozenset(
     {"key", "title", "words", "for_ground", "default", "land", "reason", "licence"}
@@ -70,17 +79,24 @@ def _keys(where: str, value: object, pattern: re.Pattern[str]) -> tuple[str, ...
     return tuple(value)
 
 
-def load_land_recipes(path: Path = RECIPE_PATH) -> tuple[LandRecipe, ...]:
-    """Every recipe, in the order a sentence is read against them, or a refusal naming the entry."""
+def load_land_recipes(
+    version: int = RECIPE_VERSION, path: Path | None = None
+) -> tuple[LandRecipe, ...]:
+    """Every recipe of ``version`` (from ``path``, else the shipped file), in the order a sentence
+    is read against them, or a refusal naming the entry."""
+    if version not in RECIPE_VERSIONS:
+        raise CatalogError(f"land recipes are versions {RECIPE_VERSIONS}, not {version}")
+    if path is None:
+        path = CATALOG_DIRECTORY.joinpath(f"landform-recipe.v{version}.json")
     document = read_json(path)
     if not isinstance(document, dict) or set(document) != _ENVELOPE:
         raise CatalogError(f"{path.name}: the envelope is exactly {sorted(_ENVELOPE)}")
     if (document["schema_version"], document["catalog_id"], document["catalog_version"]) != (
         1,
         RECIPE_CATALOG_ID,
-        1,
+        version,
     ):
-        raise CatalogError(f"{path.name} is {RECIPE_CATALOG_ID} version 1, schema 1")
+        raise CatalogError(f"{path.name} is {RECIPE_CATALOG_ID} version {version}, schema 1")
     raw_entries = document["entries"]
     if not isinstance(raw_entries, list) or not raw_entries:
         raise CatalogError(f"{path.name}: entries is a list of recipes")
@@ -125,6 +141,6 @@ def load_land_recipes(path: Path = RECIPE_PATH) -> tuple[LandRecipe, ...]:
 
 
 @functools.cache
-def land_recipes() -> tuple[LandRecipe, ...]:
-    """The shipped recipes, read once per process."""
-    return load_land_recipes()
+def land_recipes(version: int = RECIPE_VERSION) -> tuple[LandRecipe, ...]:
+    """The shipped recipes at ``version`` (the newest unless one is named), read once."""
+    return load_land_recipes(version)

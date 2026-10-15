@@ -34,6 +34,7 @@ SHIPPED = {
     "landform-feature.v1.json": "5da02f1b42b263f9d54981f34baedcd56a62af2df81c2878a94cb1f5977fbc50",
     "landform-feature.v2.json": "1cc522bbccff9650e92d7f5fd46fc7d2300318c3da5496ab4cc3eb64bb385110",
     "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
+    "landform-recipe.v2.json": "8e805cc75d229af096aa458d34b4d98e2db2e8e08ee62972dd55eecb483ffb97",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
     "landform-value.v1.json": "328c2b0f98b5fa7621a048916d774ef5de6b81cd68042bd58d4e0c77aeb9a9e6",
     "landform-value.v2.json": "9898e222ad0b12d8832b6a93da4a4c0146888cfd398e3b6a62ab09ba7b44512b",

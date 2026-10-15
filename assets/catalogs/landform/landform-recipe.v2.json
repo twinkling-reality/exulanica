@@ -1,0 +1,592 @@
+{
+ "schema_version": 1,
+ "catalog_id": "exulanica.landform-recipe",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "coast",
+   "title": "on a coast, with a terraced hill behind and water stepping down to the sea in falls",
+   "words": [
+    "sea",
+    "seaside",
+    "coast",
+    "coastal",
+    "beach",
+    "shore",
+    "bay",
+    "ocean"
+   ],
+   "for_ground": [
+    "sea"
+   ],
+   "default": false,
+   "land": {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 9000,
+    "features": [
+     {
+      "id": "tilt",
+      "kind": "tilt",
+      "side": "north",
+      "grade_permille": 30
+     },
+     {
+      "id": "hill",
+      "kind": "rise",
+      "side": "north",
+      "distance_mm": 30000,
+      "width_mm": 420000,
+      "depth_mm": 240000,
+      "height_mm": 32000,
+      "roughness_permille": 200,
+      "offset_mm": -50000
+     },
+     {
+      "id": "knoll",
+      "kind": "rise",
+      "side": "west",
+      "distance_mm": 40000,
+      "width_mm": 120000,
+      "depth_mm": 90000,
+      "height_mm": 12000,
+      "roughness_permille": 200
+     },
+     {
+      "id": "swell",
+      "kind": "undulation",
+      "amplitude_mm": 3200,
+      "wavelength_mm": 110000
+     },
+     {
+      "id": "texture",
+      "kind": "undulation",
+      "amplitude_mm": 700,
+      "wavelength_mm": 30000
+     },
+     {
+      "id": "far_hills",
+      "kind": "rise",
+      "side": "north_west",
+      "distance_mm": 520000,
+      "width_mm": 1100000,
+      "depth_mm": 500000,
+      "height_mm": 85000,
+      "roughness_permille": 450
+     },
+     {
+      "id": "east_hills",
+      "kind": "rise",
+      "side": "east",
+      "distance_mm": 380000,
+      "width_mm": 700000,
+      "depth_mm": 360000,
+      "height_mm": 55000,
+      "roughness_permille": 400
+     },
+     {
+      "id": "skyline",
+      "kind": "range",
+      "side": "north",
+      "distance_mm": 2200000,
+      "band_mm": 900000,
+      "height_mm": 380000
+     },
+     {
+      "id": "skyline_east",
+      "kind": "range",
+      "side": "north_east",
+      "distance_mm": 1600000,
+      "band_mm": 700000,
+      "height_mm": 220000,
+      "ruggedness_permille": 600,
+      "wavelength_mm": 700000
+     },
+     {
+      "id": "sea",
+      "kind": "shore",
+      "side": "south",
+      "distance_mm": 70000,
+      "beach_mm": 25000,
+      "beach_top_mm": 2500,
+      "sea_depth_mm": 14000,
+      "wander_mm": 15000
+     },
+     {
+      "id": "steps",
+      "kind": "terraces",
+      "side": "north",
+      "distance_mm": 40000,
+      "depth_mm": 110000,
+      "width_mm": 220000,
+      "tier_height_mm": 2500,
+      "offset_mm": -50000
+     },
+     {
+      "id": "falls",
+      "kind": "cascade",
+      "side": "south",
+      "offset_mm": 0,
+      "from_mm": 5000,
+      "to_mm": 80000,
+      "step_mm": 2000,
+      "width_mm": 6000
+     }
+    ]
+   },
+   "reason": "Authored for words or a setting by the sea: the land falls south through a gentle coast grade to a wide beach and the sea, a terraced hill behind the place, and from the place's sea-facing edge a cascade of level pools and falls steps down into the sea, centred so it clears a layout of any width.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "valley",
+   "title": "in a valley between two long ridges",
+   "words": [
+    "valley",
+    "dale",
+    "glen",
+    "vale"
+   ],
+   "for_ground": [],
+   "default": false,
+   "land": {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 9000,
+    "features": [
+     {
+      "id": "dale",
+      "kind": "valley",
+      "side": "north",
+      "offset_mm": 0,
+      "width_mm": 420000,
+      "floor_mm": 160000,
+      "depth_mm": 6000
+     },
+     {
+      "id": "west_wall",
+      "kind": "rise",
+      "side": "west",
+      "distance_mm": 150000,
+      "width_mm": 1400000,
+      "depth_mm": 260000,
+      "height_mm": 70000,
+      "roughness_permille": 450
+     },
+     {
+      "id": "east_wall",
+      "kind": "rise",
+      "side": "east",
+      "distance_mm": 160000,
+      "width_mm": 1400000,
+      "depth_mm": 280000,
+      "height_mm": 85000,
+      "roughness_permille": 450
+     },
+     {
+      "id": "tilt",
+      "kind": "tilt",
+      "side": "north",
+      "grade_permille": 15
+     },
+     {
+      "id": "swell",
+      "kind": "undulation",
+      "amplitude_mm": 2000,
+      "wavelength_mm": 90000
+     },
+     {
+      "id": "texture",
+      "kind": "undulation",
+      "amplitude_mm": 700,
+      "wavelength_mm": 30000
+     },
+     {
+      "id": "head",
+      "kind": "range",
+      "side": "north",
+      "distance_mm": 1400000,
+      "band_mm": 800000,
+      "height_mm": 420000,
+      "ruggedness_permille": 700
+     },
+     {
+      "id": "foot",
+      "kind": "range",
+      "side": "south",
+      "distance_mm": 2000000,
+      "band_mm": 700000,
+      "height_mm": 200000
+     }
+    ]
+   },
+   "reason": "Authored for words that name a valley: a broad floor the place stands on, long ridges rising east and west beyond the walkable land, and ranges at both ends.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "upland",
+   "title": "in the uplands, among high peaks",
+   "words": [
+    "mountain",
+    "mountains",
+    "peaks",
+    "highland",
+    "highlands",
+    "upland",
+    "uplands",
+    "alpine",
+    "fells"
+   ],
+   "for_ground": [
+    "snowfield"
+   ],
+   "default": false,
+   "land": {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 16000,
+    "features": [
+     {
+      "id": "tilt",
+      "kind": "tilt",
+      "side": "north",
+      "grade_permille": 30
+     },
+     {
+      "id": "fell",
+      "kind": "rise",
+      "side": "north",
+      "distance_mm": 120000,
+      "width_mm": 500000,
+      "depth_mm": 300000,
+      "height_mm": 50000,
+      "roughness_permille": 550,
+      "offset_mm": -40000
+     },
+     {
+      "id": "crag",
+      "kind": "rise",
+      "side": "west",
+      "distance_mm": 150000,
+      "width_mm": 200000,
+      "depth_mm": 140000,
+      "height_mm": 35000,
+      "roughness_permille": 700
+     },
+     {
+      "id": "swell",
+      "kind": "undulation",
+      "amplitude_mm": 3000,
+      "wavelength_mm": 80000
+     },
+     {
+      "id": "texture",
+      "kind": "undulation",
+      "amplitude_mm": 900,
+      "wavelength_mm": 25000
+     },
+     {
+      "id": "peaks",
+      "kind": "range",
+      "side": "north",
+      "distance_mm": 2000000,
+      "band_mm": 900000,
+      "height_mm": 650000,
+      "ruggedness_permille": 750,
+      "wavelength_mm": 600000
+     },
+     {
+      "id": "peaks_east",
+      "kind": "range",
+      "side": "north_east",
+      "distance_mm": 1700000,
+      "band_mm": 700000,
+      "height_mm": 500000,
+      "ruggedness_permille": 800,
+      "wavelength_mm": 450000
+     },
+     {
+      "id": "peaks_west",
+      "kind": "range",
+      "side": "west",
+      "distance_mm": 1500000,
+      "band_mm": 600000,
+      "height_mm": 400000,
+      "ruggedness_permille": 750
+     },
+     {
+      "id": "far_south",
+      "kind": "range",
+      "side": "south",
+      "distance_mm": 1600000,
+      "band_mm": 700000,
+      "height_mm": 300000
+     }
+    ]
+   },
+   "reason": "Authored for words or a setting of high or snowy ground: rough fells and crags near the place and peaks 1.5 to 2 km away on three sides; near land stays within 64 m of the sea, so height reads from the peaks.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "hillside",
+   "title": "on a hillside under terraced slopes",
+   "words": [
+    "hillside",
+    "hill",
+    "hills",
+    "slope",
+    "slopes"
+   ],
+   "for_ground": [],
+   "default": false,
+   "land": {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 8000,
+    "features": [
+     {
+      "id": "tilt",
+      "kind": "tilt",
+      "side": "north",
+      "grade_permille": 35
+     },
+     {
+      "id": "mountainside",
+      "kind": "rise",
+      "side": "north",
+      "distance_mm": 30000,
+      "width_mm": 600000,
+      "depth_mm": 300000,
+      "height_mm": 38000,
+      "roughness_permille": 300,
+      "offset_mm": -30000
+     },
+     {
+      "id": "mountain",
+      "kind": "rise",
+      "side": "north",
+      "distance_mm": 260000,
+      "width_mm": 900000,
+      "depth_mm": 600000,
+      "height_mm": 180000,
+      "roughness_permille": 450,
+      "offset_mm": -60000
+     },
+     {
+      "id": "steps",
+      "kind": "terraces",
+      "side": "north",
+      "distance_mm": 25000,
+      "depth_mm": 160000,
+      "width_mm": 300000,
+      "tier_height_mm": 3000,
+      "offset_mm": -30000
+     },
+     {
+      "id": "swell",
+      "kind": "undulation",
+      "amplitude_mm": 2400,
+      "wavelength_mm": 90000
+     },
+     {
+      "id": "texture",
+      "kind": "undulation",
+      "amplitude_mm": 700,
+      "wavelength_mm": 30000
+     },
+     {
+      "id": "lake",
+      "kind": "shore",
+      "side": "south",
+      "distance_mm": 220000,
+      "beach_mm": 15000,
+      "wander_mm": 20000
+     },
+     {
+      "id": "far_hills",
+      "kind": "rise",
+      "side": "north_west",
+      "distance_mm": 520000,
+      "width_mm": 1100000,
+      "depth_mm": 500000,
+      "height_mm": 85000,
+      "roughness_permille": 450
+     },
+     {
+      "id": "east_hills",
+      "kind": "rise",
+      "side": "east",
+      "distance_mm": 380000,
+      "width_mm": 700000,
+      "depth_mm": 360000,
+      "height_mm": 55000,
+      "roughness_permille": 400
+     },
+     {
+      "id": "skyline",
+      "kind": "range",
+      "side": "north",
+      "distance_mm": 2200000,
+      "band_mm": 900000,
+      "height_mm": 380000
+     },
+     {
+      "id": "skyline_east",
+      "kind": "range",
+      "side": "north_east",
+      "distance_mm": 1600000,
+      "band_mm": 700000,
+      "height_mm": 220000,
+      "ruggedness_permille": 600,
+      "wavelength_mm": 700000
+     }
+    ]
+   },
+   "reason": "Authored for words that name a hill or a slope: the place on rising ground under a terraced hillside, a mountain behind it and a lake shore far to the south.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "rolling",
+   "title": "on gentle hills, with mountains far off",
+   "words": [
+    "meadow",
+    "meadows",
+    "countryside",
+    "downs"
+   ],
+   "for_ground": [
+    "sand",
+    "wheat_fields"
+   ],
+   "default": true,
+   "land": {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 9000,
+    "features": [
+     {
+      "id": "tilt",
+      "kind": "tilt",
+      "side": "north",
+      "grade_permille": 25
+     },
+     {
+      "id": "hill",
+      "kind": "rise",
+      "side": "north",
+      "distance_mm": 40000,
+      "width_mm": 420000,
+      "depth_mm": 260000,
+      "height_mm": 24000,
+      "roughness_permille": 250,
+      "offset_mm": -40000
+     },
+     {
+      "id": "knoll",
+      "kind": "rise",
+      "side": "west",
+      "distance_mm": 40000,
+      "width_mm": 140000,
+      "depth_mm": 100000,
+      "height_mm": 10000,
+      "roughness_permille": 200
+     },
+     {
+      "id": "south_down",
+      "kind": "rise",
+      "side": "south",
+      "distance_mm": 120000,
+      "width_mm": 600000,
+      "depth_mm": 300000,
+      "height_mm": 18000,
+      "roughness_permille": 300
+     },
+     {
+      "id": "swell",
+      "kind": "undulation",
+      "amplitude_mm": 3200,
+      "wavelength_mm": 110000
+     },
+     {
+      "id": "texture",
+      "kind": "undulation",
+      "amplitude_mm": 700,
+      "wavelength_mm": 30000
+     },
+     {
+      "id": "far_hills",
+      "kind": "rise",
+      "side": "north_west",
+      "distance_mm": 520000,
+      "width_mm": 1100000,
+      "depth_mm": 500000,
+      "height_mm": 85000,
+      "roughness_permille": 450
+     },
+     {
+      "id": "east_hills",
+      "kind": "rise",
+      "side": "east",
+      "distance_mm": 380000,
+      "width_mm": 700000,
+      "depth_mm": 360000,
+      "height_mm": 55000,
+      "roughness_permille": 400
+     },
+     {
+      "id": "skyline",
+      "kind": "range",
+      "side": "north",
+      "distance_mm": 2200000,
+      "band_mm": 900000,
+      "height_mm": 380000
+     },
+     {
+      "id": "skyline_east",
+      "kind": "range",
+      "side": "north_east",
+      "distance_mm": 1600000,
+      "band_mm": 700000,
+      "height_mm": 220000,
+      "ruggedness_permille": 600,
+      "wavelength_mm": 700000
+     },
+     {
+      "id": "skyline_south",
+      "kind": "range",
+      "side": "south_west",
+      "distance_mm": 1800000,
+      "band_mm": 700000,
+      "height_mm": 200000
+     }
+    ]
+   },
+   "reason": "Authored as the land a place stands on when its words name no other: a gentle tilt, a long low hill behind, low downs to the south and far hills and ranges in haze.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  }
+ ]
+}

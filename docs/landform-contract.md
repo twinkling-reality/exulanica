@@ -72,7 +72,7 @@ offset east by `offset_mm` and north by `distance_mm`.
 
 Two catalogs in `assets/catalogs/landform/` shape land, read through the grammar's catalog loader so
 each entry carries a reason and a licence (`exulanica/grammar/landform/catalog.py`). Beside them,
-`landform-surface.v1.json` states [the land's look](#the-lands-look) and `landform-recipe.v1.json`
+`landform-surface.v1.json` states [the land's look](#the-lands-look) and `landform-recipe.vN.json`
 the [land a place made from a sentence stands on](#land-for-a-world-made-from-a-sentence):
 
 - `landform-feature.vN.json`: one entry per kind: `words` (what a person or a model reads),
@@ -297,14 +297,14 @@ appearance are; that naming is planned, not built (see [Limits](#limits)).
 Where the deployment turns it on (`EXULANICA_WORLDS_ON_LAND=on`, [deployment](deployment.md)), a
 place drafted from a person's words (`POST /worlds/drafts`,
 [world kinds](world-kinds-contract.md#a-world-made-from-a-sentence)) stands on one of the land
-recipes in [`landform-recipe.v1.json`](../assets/catalogs/landform/landform-recipe.v1.json), read by
+recipes in [`landform-recipe.v2.json`](../assets/catalogs/landform/landform-recipe.v2.json), read by
 [`recipes.py`](../exulanica/grammar/landform/recipes.py). Each recipe is a whole land document, read
 by the landform reader as the catalog is read, with the words a made world's card says of it, the
 whole words that name it in a sentence, the setting's ground parts that bring it, and a reason:
 
 | Recipe | Named by words such as | Brought by the setting | What it is |
 | --- | --- | --- | --- |
-| `coast` | sea, coast, beach, shore, bay | By the sea | A beach and the sea below, a terraced hill behind |
+| `coast` | sea, coast, beach, shore, bay | By the sea | A beach and the sea below, a terraced hill behind, and a cascade stepping down from the place's sea-facing edge into the sea |
 | `valley` | valley, dale, glen | | A broad floor between two long ridges, ranges at both ends |
 | `upland` | mountains, peaks, highlands, fells | Snowfields | Rough fells and crags, peaks 1.5 to 2 km away on three sides |
 | `hillside` | hillside, hill, slope | | Rising ground under a terraced hillside, a mountain behind |
@@ -324,7 +324,12 @@ where every word of it but the small joining words is one of the recipe's ("in a
 waits on it.
 
 The recipes are data: a new or changed recipe is a new catalog version, and a world keeps the land
-document it was made with, so a later recipe never moves it.
+document it was made with, so a later recipe never moves it. New worlds read the newest version.
+Version 2 differs from version 1 only in the coast, which gains its cascade: it starts 5 m beyond
+the place's south edge, centred, and falls in steps of at most 2 m to the sea 80 m out. A cascade's
+reach along its side is measured from the place's edge, so it clears a layout of any width and
+lies in its near land. Where the coast drops faster than the pools step, the cascade's lips stand
+as walls up to about 4 m.
 
 ## Refusals
 

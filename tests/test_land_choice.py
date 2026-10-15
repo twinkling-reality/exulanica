@@ -12,7 +12,7 @@ from exulanica.api.instance_settings import (
     SocietySettingRefused,
     _explicitly_enabled,
 )
-from exulanica.grammar.landform import land_recipes, read_land_document
+from exulanica.grammar.landform import WorldFrame, land_recipes, read_land_document, water_bodies
 from exulanica.world.composers import site_plan
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.land_choice import choose_land, said_by_land
@@ -40,6 +40,18 @@ def test_the_recipes_are_the_catalog_s_with_one_default_and_settings_that_exist(
     assert set(named) == grounds and len(named) == len(grounds), "each ground part brings one land"
     for recipe in recipes:
         assert read_land_document(recipe.land).sha256 == recipe.land_sha256
+
+
+def test_recipe_version_2_s_coast_pours_a_cascade_into_the_sea_and_version_1_reads_as_it_was():
+    first, second = land_recipes(1), land_recipes()
+    assert [recipe.key for recipe in first] == [recipe.key for recipe in second]
+    assert [new.key for old, new in zip(first, second, strict=True) if old != new] == ["coast"]
+    assert "cascade" not in {feature["kind"] for feature in first[0].land["features"]}
+    coast = read_land_document(dict(_recipe("coast").land))
+    for width, depth in ((16_000, 20_000), (256_000, 256_000)):
+        water = water_bodies(coast, WorldFrame(width_mm=width, depth_mm=depth, seed="c" * 64))
+        falls = [body for body in water if body.kind == "fall"]
+        assert falls and falls[-1].bottom_mm == 0, "it falls into the sea in front of any site"
 
 
 @pytest.mark.parametrize("key", ["coast", "valley", "upland", "hillside", "rolling"])
