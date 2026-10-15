@@ -34,6 +34,13 @@ assert.equal(nearRight.side, 'left');
 assert.equal(nearRight.x, 1500 - 80 - 388);
 assert.equal(nearRight.connector.to.x, nearRight.x + 388);
 assert.equal(nearRight.connector.elbow.x, nearRight.x + 388 + 40);
+// Beside a carried copy and its spot together, the card sits by their union and points at the copy.
+const union = { left: 700, top: 300, right: 980, bottom: 700, headY: 320, waistY: 520 };
+const copy = { left: 700, top: 400, right: 820, bottom: 700, headY: 420, waistY: 560 };
+const carried = placeBeside(union, card, viewport, { connect: copy });
+assert.equal(carried.x, 1060);
+assert.deepEqual(carried.connector.from, { x: 820, y: 455 });
+assert.deepEqual(placeBeside(union, card, viewport).connector.from, { x: 980, y: 370 });
 // With no room either side it keeps the right and is held inside the margin.
 const wide = placeBeside({ left: 60, top: 300, right: 1860, bottom: 700 }, card, viewport);
 assert.equal(wide.side, 'right');

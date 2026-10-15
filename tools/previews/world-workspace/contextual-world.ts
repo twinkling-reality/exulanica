@@ -10,6 +10,10 @@ import { DISCOVERY, attentionCandidates, inspectionReach, promptPresentation, la
 import { createReadBackoff } from './read-backoff.mjs';
 import { keepWorldInAddress, returnToFrontDoor } from './front-door.ts';
 import { keepWorldPicture } from '/src/composition/world-pictures.ts';
+import { mountCorners } from './world-corners.ts';
+import { keyWord, mountUiScale } from './world-ui.ts';
+import { worldKey, wakesHints } from './world-keys.mjs';
+import { CORNER_WORDS, NOTE_WORDS, availableHints } from './world-words.mjs';
 import './entity-sheet.css';
 import './blank-world.css';
 import './contextual-world.css';
@@ -44,25 +48,18 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   document.body.classList.add('ux-world-cleared');
   const shell = document.getElementById('shell');
   if (shell) { shell.inert = true; shell.setAttribute('aria-hidden', 'true'); }
-  const root = document.createElement('div'); root.id = 'contextual-world';
+  const root = document.createElement('div'); root.id = 'contextual-world'; root.className = 'wu-root';
   root.dataset.revision = 'center-aim-proximity-v6';
-  root.innerHTML = `<button class="cw-worlds" type="button" aria-keyshortcuts="Escape"><kbd>Esc</kbd><span>Your worlds</span></button>
-    <div class="cw-reticle" aria-label="Centre aim" role="img"><i></i><i></i><i></i><i></i></div><div class="cw-discovery" aria-label="People and things in view"></div>
+  root.innerHTML = `<div class="cw-discovery" aria-label="People and things in view"></div>
     <aside class="cw-prompt" hidden aria-label="Available action"><button class="cw-inspect" type="button"><kbd>E</kbd><span>Inspect</span></button></aside>
-    <p class="cw-guidance"><span class="cw-mouse-hint">Drag to look</span><span class="cw-walk-hint">WASD to move · E to inspect · F to fly</span></p>
-    <section class="cw-panel" hidden role="dialog" aria-modal="true" aria-labelledby="cw-panel-title"></section>
-    <p class="cw-notice" role="status" hidden></p>`;
+    <section class="cw-panel" hidden role="dialog" aria-modal="true" aria-labelledby="cw-panel-title"></section>`;
   document.body.append(root);
+  mountUiScale(root, lifetime.signal);
   root.dataset.navigation = JSON.stringify({ ground: b.worldKind.ground.form, centre: b.navigationWorld.centre,
     fieldRadius: b.navigationWorld.fieldRadius, blockers: b.navigationWorld.polygonObstacles });
   const disposeFrameMeasurement = mountFrameMeasurement(b, root);
-  if (import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1') {
-    const observerLabel = document.createElement('p'); observerLabel.className = 'cw-observer-label';
-    observerLabel.textContent = 'Pilot copy · Read only'; root.append(observerLabel);
-  }
   const $ = (selector) => root.querySelector(selector);
   const prompt = $('.cw-prompt'), discovery = $('.cw-discovery'), panel = $('.cw-panel');
-  const guidance = $('.cw-guidance'), mouseHint = $('.cw-mouse-hint'), worlds = $('.cw-worlds');
   // Your worlds: back to the front door with this world chosen, after keeping a picture of it for
   // its card, as the app does when a person leaves a world.
   let leaving = false;
@@ -71,7 +68,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     leaving = true;
     void keepWorldPicture(b, entry.entryId).catch(() => false).finally(() => returnToFrontDoor(entry.entryId));
   };
-  worlds.onclick = leaveWorld;
+  // The corners (world-corners.ts): the way out, the clock with Play and Pause, the hints for what
+  // works here, the reticle and the note.
+  // A read-only copy dims what needs the server (Play and Pause), as the offline state does.
+  const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: leaveWorld,
+    readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1' });
+  const guidance = corners.hintsRoot, worlds = corners.backRoot;
   let rows = [], inventory = null, target = null, held = null, pointer = null;
   let dragging = null, overPrompt = false, serial = 0, lastPick = 0, frameId = 0;
   const activityLabels = new Map([...Object.entries(ACTION_LABELS), ...ACTIVITY_LABELS]);
@@ -94,10 +96,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   b.controls.onInteract = null;
   b.controls.onSummon = null;
   b.controls.onCameraToggle = null;
-  // Flying (F) says its own keys in the walk hint while it lasts.
+  // Flying (F): the mode word at the top with its key, and the hints for flying while it lasts.
+  const worldHints = () => corners.worldHints(availableHints({ flying: Boolean(b.controls.flying), build: Boolean(build), history: false }));
   b.controls.onFlyChange = (flying) => {
-    const hint = root.querySelector('.cw-walk-hint');
-    if (hint) hint.textContent = flying ? 'Flying · Space up · C down · Scroll to change speed · F to land' : 'WASD to move · E to inspect · F to fly';
+    corners.mode(flying ? CORNER_WORDS.flying : null, flying ? keyWord({ keys: ['F'], word: CORNER_WORDS.land }) : null);
+    worldHints();
   };
   b.setControlsEnabled(true); b.setFreeCursorActive(false);
 
@@ -109,7 +112,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   };
   // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
   const build = send && binding && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1'
-    ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, inspecting: () => !panel.hidden }) : null;
+    ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => !panel.hidden }) : null;
+  worldHints();
   function node(tag, words = '', cls = '') {
     const item = document.createElement(tag); item.textContent = String(words); item.className = cls; return item;
   }
@@ -117,7 +121,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const item = node('button', words, cls); item.type = 'button'; item.onclick = run; return item;
   }
   function notice(words) {
-    const item = $('.cw-notice'); item.textContent = words; item.hidden = !words;
+    if (words) corners.notes.show(words); else corners.notes.clear();
   }
   async function refreshInventory() {
     if (!current()) throw Error('The world changed. Reload it before inspecting.');
@@ -338,7 +342,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   async function inspect(row = target) {
     if (!row || !panel.hidden) return;
-    if (!inspectionReach(reachDistance(row), row.key === target?.key && targetReachable)) { notice('Move closer to inspect this entity.'); return; }
+    if (!inspectionReach(reachDistance(row), row.key === target?.key && targetReachable)) { notice(NOTE_WORDS.closer); return; }
     held = row; panel.hidden = false; prompt.hidden = true; notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     if (document.pointerLockElement) document.exitPointerLock();
@@ -401,11 +405,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!dragging.moved) return;
     b.controls.state.yaw -= dx * .0022;
     b.controls.state.pitch = Math.max(-Math.PI * .49, Math.min(Math.PI * .49, b.controls.state.pitch - dy * .0022));
-    pointerIntent = false; prompt.hidden = true; mouseHint.textContent = 'Release to point'; b.invalidate();
+    pointerIntent = false; prompt.hidden = true; b.invalidate();
   }, { signal: lifetime.signal });
   document.addEventListener('mouseup', event => {
     if (!dragging) return;
-    const press = dragging; dragging = null; mouseHint.textContent = 'Drag to look';
+    const press = dragging; dragging = null;
     root.dataset.gesture = JSON.stringify({ start: [press.startX, press.startY], end: [event.clientX, event.clientY], dragged: press.moved });
     rememberView();
     if (!panel.hidden) return;
@@ -415,10 +419,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     // The centre aim controls E. Canvas clicks do not select whatever lies under a spare cursor.
   }, { capture: true, signal: lifetime.signal });
   canvas.addEventListener('contextmenu', event => event.preventDefault(), { signal: lifetime.signal });
-  window.addEventListener('blur', () => { dragging = null; pointer = null; pointerIntent = false; mouseHint.textContent = 'Drag to look'; }, { signal: lifetime.signal });
+  window.addEventListener('blur', () => { dragging = null; pointer = null; pointerIntent = false; corners.hold(false); }, { signal: lifetime.signal });
+  // Tab held shows the hints; a key that has a hint brings them back for a while.
+  window.addEventListener('keyup', event => { if (event.code === 'Tab') corners.hold(false); }, { signal: lifetime.signal });
   window.addEventListener('keydown', event => {
+    if (panel.hidden && wakesHints(event)) corners.wake();
+    if (panel.hidden && event.code === 'Tab') corners.hold(true);
     if (panel.hidden && build?.key(event)) { event.stopImmediatePropagation(); return; }
-    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (!panel.hidden && (event.metaKey || event.ctrlKey || event.altKey)) { event.stopImmediatePropagation(); return; }
     if (!panel.hidden) {
       if (entitySheet?.key(event)) { event.stopImmediatePropagation(); return; }
       if (event.code === 'Escape') { event.preventDefault(); closeInspect(); }
@@ -431,14 +439,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       }
       event.stopImmediatePropagation(); return;
     }
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code)) return;
-    // Flying: F takes off and lands; while flying, Space rises and C descends.
-    if (event.code === 'KeyF' || (b.controls.flying && ['Space', 'KeyC'].includes(event.code))) return;
-    if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); void inspect(); }
-    else if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) leaveWorld(); }
-    else if (event.code === 'Enter' && event.target?.closest?.('.cw-prompt,.cw-worlds')) return;
-    else if (event.code === 'Tab') return;
-    else if (event.code !== 'Escape') event.preventDefault();
+    // Each key's fate is world-keys.mjs's: movement goes on to the renderer, the workspace's keys
+    // act, and every other key, the old shell's among them, goes no further.
+    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock() }, Boolean(event.target?.closest?.('.cw-prompt,.wu-prompt')));
+    if (fate === 'move' || fate === 'pass') return;
+    if (fate !== 'quiet') event.preventDefault();
+    if (fate === 'inspect') void inspect();
+    else if (fate === 'leave') leaveWorld();
+    else if (fate === 'play') corners.togglePlay();
     event.stopImmediatePropagation();
   }, { capture: true, signal: lifetime.signal });
   function frame(now) {
@@ -465,8 +473,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const visible = projected && projected.z > 0 && projected.x >= 0 && projected.x <= innerWidth && projected.y >= 0 && projected.y <= innerHeight && (held || visibleMarkers.some(item => item.key === row?.key));
     const distance = point ? reachDistance(row) : Infinity;
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
-    $('.cw-reticle').hidden = !panel.hidden;
-    $('.cw-reticle').dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';
+    corners.frame(now);
+    corners.reticle.hidden = !panel.hidden;
+    corners.reticle.dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';
     root.dataset.reachable = String(targetReachable);
     root.dataset.focusDistance = Number.isFinite(distance) ? distance.toFixed(2) : '';
     if (visible) {
@@ -511,6 +520,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     stopFollowing();
     disposeFrameMeasurement();
     build?.dispose();
+    corners.dispose();
     entitySheet?.dispose(); entitySheet = null;
     lifetime.abort(); sizeObserver.disconnect(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
     b.controls.onPointerPick = priorCallbacks.pick; b.controls.onInteract = priorCallbacks.interact;

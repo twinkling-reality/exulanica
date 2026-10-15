@@ -36,9 +36,10 @@ export const BESIDE = Object.freeze({ gap: 80, inset: ANCHOR_INSET, meet: 92 });
  * bottom, headY, waistY }): `gap` to the right of the box, centred between head and waist, and
  * on the left when the right side would cross the margin. Returns the card's top left, its side,
  * and the connector: from the subject's shoulder, diagonally to the middle of the gap, then level
- * into the card's near edge.
+ * into the card's near edge. `connect` (default `bounds`) is the box the connector starts from: a
+ * card beside a carried copy and its spot together points at the copy (DESIGN's ruling L11).
  */
-export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = BESIDE.inset, meet = BESIDE.meet } = {}) {
+export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = BESIDE.inset, meet = BESIDE.meet, connect = bounds } = {}) {
   const head = Number.isFinite(bounds.headY) ? bounds.headY : bounds.top;
   const waist = Number.isFinite(bounds.waistY) ? bounds.waistY : (bounds.top + bounds.bottom) / 2;
   const fitsRight = bounds.right + gap + size.width <= viewport.width - inset;
@@ -47,7 +48,9 @@ export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = 
   const x = side === 'right' ? bounds.right + gap : bounds.left - gap - size.width;
   const at = clampToView({ x, y: (head + waist) / 2 - size.height / 2 }, size, viewport, inset);
   const towards = side === 'right' ? 1 : -1;
-  const from = { x: side === 'right' ? bounds.right : bounds.left, y: head + (waist - head) * 0.25 };
+  const fromHead = Number.isFinite(connect.headY) ? connect.headY : connect.top;
+  const fromWaist = Number.isFinite(connect.waistY) ? connect.waistY : (connect.top + connect.bottom) / 2;
+  const from = { x: side === 'right' ? connect.right : connect.left, y: fromHead + (fromWaist - fromHead) * 0.25 };
   const to = { x: side === 'right' ? at.x : at.x + size.width, y: at.y + Math.min(meet, size.height / 2) };
   const elbow = { x: to.x - towards * Math.min(gap / 2, Math.abs(to.x - from.x)), y: to.y };
   return { x: at.x, y: at.y, side, connector: { from, elbow, to } };

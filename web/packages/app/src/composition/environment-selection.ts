@@ -344,6 +344,8 @@ export interface PeopleClock {
   readonly mode: SocietyPlaybackMode | null;
   readonly speed: SocietyPlaybackSpeed | null;
   readonly minute: number | null;
+  /** The minute of the day the society's clock started at (its first minute), so a minute reads as a time of day; null while unknown. */
+  readonly startMinuteOfDay: number | null;
   readonly busy: boolean;
   /** Why one minute cannot be advanced by hand now, in the panel's own words, or null. */
   readonly advanceBlocked: string | null;
@@ -3190,6 +3192,7 @@ export function mountEnvironmentSelection(
           mode: control?.mode ?? null,
           speed: control?.speed ?? null,
           minute: view?.snapshot?.currentTick ?? control?.currentTick ?? null,
+          startMinuteOfDay: view?.snapshot?.state.start_minute_of_day ?? null,
           busy: controlBusy || view?.busy === true,
           advanceBlocked: advanceBlocked(),
           playEligible: control?.playEligible === true,

@@ -22,7 +22,9 @@
   --refused-ink: #ffc2b8;
   --glass-fill: rgba(13, 20, 27, .68);
   --glass-blur: blur(30px) saturate(120%) brightness(.92);
-  --text-shadow: 0 1px 2px rgba(0, 0, 0, .42), 0 0 22px rgba(0, 0, 0, .30);
+  /* A crisp dark halo first, so white text keeps an edge on pale sunlit ground (DESIGN's ruling L8). */
+  --text-shadow: 0 0 1px rgba(0, 0, 0, .7), 0 0 3px rgba(0, 0, 0, .4), 0 1px 2px rgba(0, 0, 0, .42), 0 0 22px rgba(0, 0, 0, .30);
+  --cap-halo: 0 0 0 1px rgba(0, 0, 0, .22);
   --rim: linear-gradient(115deg, rgba(190, 222, 230, .95), rgba(255, 255, 255, .50) 26%, rgba(255, 255, 255, .06) 52%, rgba(125, 166, 179, .70) 84%, rgba(232, 240, 237, .90));
   --scrim-tone: rgba(6, 12, 16, .30);
   --ease: cubic-bezier(.25, .46, .45, .94);
@@ -50,6 +52,9 @@
   font: 500 max(9px, calc(13 * var(--u)))/1 var(--font-mono); letter-spacing: .02em;
   background: linear-gradient(180deg, rgba(255, 255, 255, .20), rgba(255, 255, 255, .03));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30), 0 1px 4px rgba(0, 0, 0, .22); }
+/* Over the world a cap keeps a dark edge outside its white border, and its glyph takes the text halo. */
+.wu-prompt .wu-key { text-shadow: var(--text-shadow); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30), 0 1px 4px rgba(0, 0, 0, .22), var(--cap-halo); }
+.wu-glass .wu-key, .wu-page .wu-key { text-shadow: none; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30), 0 1px 4px rgba(0, 0, 0, .22); }
 .wu-key.wu-small { min-width: calc(24 * var(--u)); height: calc(24 * var(--u)); padding: 0 calc(6 * var(--u)); font-size: max(9px, calc(11 * var(--u))); border-radius: calc(6 * var(--u)); }
 .wu-key.wu-mouse { position: relative; width: calc(22 * var(--u)); min-width: calc(22 * var(--u)); padding: 0; border-radius: calc(11 * var(--u)); }
 .wu-key.wu-mouse::before { content: ''; position: absolute; top: calc(5 * var(--u)); left: 50%; width: 1.25px; height: calc(8 * var(--u)); margin-left: -.6px; background: rgba(255, 255, 255, .9); border-radius: 1px; }
@@ -72,10 +77,10 @@ span.wu-prompt { cursor: default; }
 /* ---------- Corners (5.2) ---------- */
 .wu-scrim { position: absolute; pointer-events: none; background: radial-gradient(closest-side, var(--scrim-tone), rgba(6, 12, 16, 0)); }
 .wu-scrim.wu-tl { left: calc(-120 * var(--u)); top: calc(-120 * var(--u)); width: calc(620 * var(--u)); height: calc(330 * var(--u)); }
-.wu-scrim.wu-tr { right: calc(-120 * var(--u)); top: calc(-120 * var(--u)); width: calc(640 * var(--u)); height: calc(340 * var(--u)); }
-.wu-scrim.wu-bl { left: calc(-160 * var(--u)); bottom: calc(-150 * var(--u)); width: calc(1300 * var(--u)); height: calc(330 * var(--u)); --scrim-tone: rgba(6, 12, 16, .34); }
+.wu-scrim.wu-tr { right: calc(-120 * var(--u)); top: calc(-120 * var(--u)); width: calc(640 * var(--u)); height: calc(340 * var(--u)); --scrim-tone: rgba(6, 12, 16, .44); }
+.wu-scrim.wu-bl { left: calc(-160 * var(--u)); bottom: calc(-150 * var(--u)); width: calc(1300 * var(--u)); height: calc(330 * var(--u)); --scrim-tone: rgba(6, 12, 16, .44); }
 .wu-scrim.wu-bc { left: 50%; bottom: calc(-150 * var(--u)); width: calc(1100 * var(--u)); height: calc(330 * var(--u)); transform: translateX(-50%); --scrim-tone: rgba(6, 12, 16, .34); }
-.wu-scrim.wu-tc { left: 50%; top: calc(-150 * var(--u)); width: calc(1100 * var(--u)); height: calc(330 * var(--u)); transform: translateX(-50%); --scrim-tone: rgba(6, 12, 16, .26); }
+.wu-scrim.wu-tc { left: 50%; top: calc(-150 * var(--u)); width: calc(1100 * var(--u)); height: calc(330 * var(--u)); transform: translateX(-50%); --scrim-tone: rgba(6, 12, 16, .36); }
 .wu-back { position: absolute; left: calc(40 * var(--u)); top: calc(36 * var(--u)); }
 .wu-clock { position: absolute; right: calc(40 * var(--u)); top: calc(30 * var(--u)); display: flex; align-items: center; gap: calc(22 * var(--u)); text-shadow: var(--text-shadow); }
 .wu-clock-time { display: flex; flex-direction: column; align-items: flex-end; gap: calc(6 * var(--u)); }
@@ -263,4 +268,6 @@ span.wu-prompt { cursor: default; }
 }
 @media (prefers-contrast: more) {
   .wu-root { --glass-fill: rgba(13, 20, 27, .94); --ink-2: #ffffff; --ink-3: #ffffff; }
+  /* Each corner group sits on a plate of the reduced-transparency glass (DESIGN's ruling L10). */
+  .wu-back, .wu-clock, .wu-mode, .wu-hints { padding: calc(8 * var(--u)) calc(14 * var(--u)); border-radius: calc(14 * var(--u)); background: rgba(13, 20, 27, .94); }
 }
