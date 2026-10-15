@@ -1245,7 +1245,8 @@
    "takes_photographs": false,
    "arrival": null,
    "arrival_unavailable_reason": null,
-   "arrival_scene": null
+   "arrival_scene": null,
+   "picture": null
   },
   "made": [
    {
@@ -1921,7 +1922,8 @@
    "takes_photographs": false,
    "arrival": null,
    "arrival_unavailable_reason": null,
-   "arrival_scene": null
+   "arrival_scene": null,
+   "picture": null
   },
   "made": [
    {
