@@ -139,6 +139,9 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
             "update",
         )
     },
+    # The entry's picture is read by the entry's id, as every other read of an entry is.
+    "exulanica/world/saved_entry_pictures.py::SavedEntryPictureRepository.picture"
+    " [saved_world_entry]": _BY_ENTRY,
     "exulanica/world/saved_entries.py::SavedWorldEntryRepository.holds_entry [saved_world_entry]": (
         "whether the workspace holds a saved entry in any world: the rule it answers early, a "
         "starter only in a workspace that holds none (create_starter), is the workspace's"

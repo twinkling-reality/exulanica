@@ -118,6 +118,14 @@ _STAND_INS = (
     # column is a fact, not an interpretation. It is dropped with the others, and 0126, run
     # below with every later migration, adds it again.
     "alter table world_alternate_object add column workspace_preparation_id uuid",
+    # A saved world's picture, which migration 0218 adds and the current entry read names. At 0089
+    # no world had one, so the empty view is a fact. Dropped with the others; 0218 adds it again.
+    "create view saved_world_entry_picture as select null::uuid as workspace_id,"
+    "null::uuid as entry_id,null::text as media_type,null::bytea as bytes,"
+    "null::integer as byte_size,null::text as sha256,null::integer as width,"
+    "null::integer as height,null::uuid as authored_version_id,"
+    "null::text as authored_state_sha256,null::uuid as style_version_id,"
+    "null::uuid as taken_by,null::timestamptz as taken_at where false",
 )
 
 
@@ -400,6 +408,7 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
             admin.execute("drop view world_alternate_thing")
             admin.execute("drop view thing_kind_version")
             admin.execute("drop view thing_erasure")
+            admin.execute("drop view saved_world_entry_picture")
             admin.execute("alter table world_alternate_version_edit drop column thing_id")
             admin.execute(
                 "alter table world_alternate_version_edit drop column point_map_instance_id"

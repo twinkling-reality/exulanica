@@ -128,6 +128,10 @@ RUNTIME_UPDATES: dict[str, str] = {
         "saved-world creation and explicit reconciliation move its authored/style pointers; "
         "accepted authored and style edits advance the same resume cursor under a lock"
     ),
+    "saved_world_entry_picture": (
+        "a new first view replaces the saved world's one picture: an insert that updates the row "
+        "on conflict (world/saved_entry_pictures.py keep)"
+    ),
     "world_interaction_policy_preview": "a preview is applied, discarded or made stale",
     "world_interaction_policy_proposal": "a proposal is applied, discarded or made stale",
     "world_interaction_policy_state": "the current policy version moves, under a lock",
