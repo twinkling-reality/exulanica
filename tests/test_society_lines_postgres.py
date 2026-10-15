@@ -23,6 +23,7 @@ import time
 import uuid
 
 import pytest
+from exulanica.api import decision_admission as admission_module
 from exulanica.api import decision_host as host_module
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.identity import IdentityRepository, rename_entity
@@ -156,12 +157,14 @@ def _visitor_says(world, client, line, monkeypatch):
         client.app.state.services, societies_of_things=True
     )
     services = decisions._services(client)
-    # The account holder's saved names, as the host reads them: here, one standing for any.
-    monkeypatch.setattr(
-        host_module,
-        "recognised_spans",
-        lambda text, names: [(0, len(text))] if SAVED in text else [],
-    )
+    # The account holder's saved names, as the host and its admission checks read them: here, one
+    # standing for any.
+    for module in (host_module, admission_module):
+        monkeypatch.setattr(
+            module,
+            "recognised_spans",
+            lambda text, names: [(0, len(text))] if SAVED in text else [],
+        )
     stream = things_support.MemoryCrossings()
     register_crossing_stream(stream)
     try:

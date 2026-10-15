@@ -89,10 +89,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         1_888,
         "the authored objects surface: place, move, run, remove, undo",
     ),
-    "exulanica/api/decision_host.py": (
-        1_798,
-        "the host asking the models a world's owner chose, before a society's minute",
-    ),
     "exulanica/world/society_repository.py": (1_789, "deterministic societies and their inputs"),
     "exulanica/store/object.py": (1_764, "S3-compatible content-addressed storage"),
     "exulanica/world/project_context.py": (

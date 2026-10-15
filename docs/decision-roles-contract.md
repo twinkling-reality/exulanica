@@ -80,8 +80,9 @@ applies it through its seam, and the events it records (`apply`, `events`), with
 its own checks give (`REASONS`, never one of the generic path's). An entry names a module of that
 one package by key, so catalog data never chooses an import path. Everything else is one path for
 every role: requests, receipts and their checks, the minute loop and replay
-(`exulanica/world/role_decisions.py`); the ask, its bounds and the host's decision phase
-(`exulanica/api/decision_host.py`); the owner's choices
+(`exulanica/world/role_decisions.py`); the ask and the host's decision phase
+(`exulanica/api/decision_host.py`); what the host admits before it asks, its bounds among them
+(`exulanica/api/decision_admission.py`); the owner's choices
 (`exulanica/world/society_model_choice_repository.py`); and the decision tables. The model layer
 names no role: a role's requirements reach it as a `ChosenRoleBinding`, and
 `tests/test_decision_roles.py` scans `exulanica/models` for role names.
@@ -1056,11 +1057,11 @@ admission route.
 | Part | Source | Tests |
 | --- | --- | --- |
 | Registry and adapters | `assets/catalogs/roles/decision-roles.v<N>.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
-| Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name kept, answered at once as `saved_name_withheld` and not sent; a visitor whose program a saved name keeps unasked going home after its quiet minutes; a released grant's retry) |
+| Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py` and what it may send there in `exulanica/api/decision_admission.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name kept, answered at once as `saved_name_withheld` and not sent; a visitor whose program a saved name keeps unasked going home after its quiet minutes; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
 | The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json`, `assets/catalogs/society/society-decision-action.v3.json`, `assets/catalogs/society/society-decision-policy.v3.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py`, `tests/test_society_lines.py`, `tests/test_society_lines_postgres.py` |
 | One choice among labels | `exulanica/models/choice.py` | `tests/test_model_choice.py` |
 | The owner's choice and its read | `exulanica/world/society_model_choice_repository.py`, `exulanica/api/routes/society_models.py`, migrations 0110 and 0117 | `tests/test_society_person_decisions_postgres.py`, `tests/test_decision_roles_postgres.py` |
 | Reservations, receipts and their tables | `exulanica/world/society_decision_repository.py`, migrations 0055, 0110 and 0117 | `tests/test_society_decision_migration.py`, `tests/test_person_role_goldens_postgres.py` |
-| The host's phase and spend | `exulanica/api/decision_host.py`, `exulanica/api/society_control_worker.py` | `tests/test_society_person_decisions_postgres.py`, `tests/test_society_model_actions_postgres.py` |
+| The host's phase and spend | `exulanica/api/decision_host.py`, `exulanica/api/decision_admission.py`, `exulanica/api/society_control_worker.py` | `tests/test_society_person_decisions_postgres.py`, `tests/test_society_model_actions_postgres.py` |
 | Words for reasons | `assets/catalogs/society-words/society-inhabitant-words.v2.json`, `web/packages/app/src/ui/society-models.ts` | `tests/test_companion_decision_model.py`, `web/packages/app/test/society-models-words-parity.test.ts` |

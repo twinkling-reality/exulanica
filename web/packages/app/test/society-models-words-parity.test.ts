@@ -48,10 +48,10 @@ describe('the page\'s words for the codes a person\'s decision records', () => {
   });
 
   it('has words for exactly the reasons a host asks no model and a choice is refused', () => {
-    const host = stated('exulanica/api/decision_host.py', 'HOST_REFUSALS');
+    const host = stated('exulanica/api/decision_admission.py', 'HOST_REFUSALS');
     expect(host).toContain('models_not_run_here');
     expect(Object.keys(HOST_REFUSAL_WORDS).sort()).toEqual([...host].sort());
-    const model = stated('exulanica/api/decision_host.py', 'MODEL_REFUSALS');
+    const model = stated('exulanica/api/decision_admission.py', 'MODEL_REFUSALS');
     expect(model).toContain('provider_changed');
     expect(Object.keys(MODEL_REFUSAL_WORDS).sort()).toEqual([...model].sort());
     const refusals = stated('exulanica/world/society_model_choice_repository.py', 'CHOICE_REFUSALS');
