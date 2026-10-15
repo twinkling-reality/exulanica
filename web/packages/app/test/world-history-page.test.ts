@@ -13,6 +13,7 @@ interface HistoryHost {
   read(path: string): Promise<unknown>;
   names(named: { readonly subjects: readonly string[]; readonly placed: readonly string[] }): Promise<{ subject(id: string): string; placed(id: string): string }>;
   readonly build: { undo(): Promise<string | null>; redo(): Promise<string | null> } | null;
+  readonly kindLabels: { label(kind: unknown): string | null; listen(listener: () => void): () => void };
   worldTime?(tick: number): string | null;
   open(url: string): void;
   closed(): void;
@@ -54,10 +55,21 @@ function reads(overrides: Record<string, unknown> = {}) {
   return { read, asked };
 }
 
-function host(read: HistoryHost['read'], build: HistoryHost['build'] = null): HistoryHost & { closed: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn>; names: ReturnType<typeof vi.fn> } {
+/** A made kind's labels as build-words' createKindLabels gives them: none until one lands. */
+function kindLabels() {
+  const known = new Map<string, string>(), listeners = new Set<() => void>();
+  return {
+    label: (kind: unknown) => known.get((kind as { sha256?: string })?.sha256 ?? '') ?? null,
+    listen: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    land(sha256: string, label: string) { known.set(sha256, label); for (const listener of listeners) listener(); },
+    listening: () => listeners.size,
+  };
+}
+
+function host(read: HistoryHost['read'], build: HistoryHost['build'] = null, labels = kindLabels()): HistoryHost & { closed: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn>; names: ReturnType<typeof vi.fn> } {
   const root = document.createElement('div');
   document.body.append(root);
-  return { root, worldId: WORLD, versionId: VERSION, title: 'Terraces on the bay', read, build,
+  return { root, worldId: WORLD, versionId: VERSION, title: 'Terraces on the bay', read, build, kindLabels: labels,
     names: vi.fn(async () => ({ subject: (id: string) => (id === 'teo' ? 'Teo' : 'the resident'), placed: () => 'the resident' })),
     open: vi.fn(), closed: vi.fn() };
 }
@@ -94,6 +106,49 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-history-row[aria-current="true"] .wu-what')?.textContent).toBe("Changed Teo's model to Nemotron 3 Nano 30B");
     history.key(press('KeyG'));
     expect(made.open).toHaveBeenCalledWith('https://github.com/learner/terraces-on-the-bay/pull/3');
+  });
+
+  it("says a building's storeys and a made creature's label as build mode's words do, re-wording when a label lands", async () => {
+    const heron = { kind: { source: 'workspace', sha256: 'c'.repeat(64) } };
+    const { read } = reads({
+      [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [{ thing_id: 'heron:1', ...heron }], edits: [
+        { edit_id: 'e1', kind: 'transform_element', element_id: 'part:p1', storeys: { before: null, after: 3 }, recorded_at: at(8) },
+        { edit_id: 'e2', kind: 'transform_element', element_id: 'part:p1', recorded_at: at(7) },
+        { edit_id: 'e3', kind: 'add_thing', thing_id: 'heron:1', recorded_at: at(6) },
+      ] },
+      [`/world/versions/${VERSION}/parts`]: { parts: [{ part_id: 'p1', label: 'terrace cafe' }] },
+    });
+    const labels = kindLabels();
+    const made = host(read, null, labels);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    expect(rowWords(made.root).slice(0, 3)).toEqual(['Placed the creature', 'Moved the terrace cafe', 'Set the terrace cafe to 3 storeys']);
+    // The label lands after the page opened: the rows are said again, with no new read.
+    const asked = read.mock.calls.length;
+    labels.land('c'.repeat(64), 'Long necked marsh heron');
+    expect(rowWords(made.root)[0]).toBe('Placed the long necked marsh heron');
+    expect(read.mock.calls.length).toBe(asked);
+    // Closed, the page is told of no more labels.
+    history.close();
+    expect(labels.listening()).toBe(0);
+  });
+
+  it("keeps an end mark's label inside the page's margins rather than centred over them", async () => {
+    // Text measures 200 wide, centred on its x: the first mark (x 40) would start at -60.
+    const text = Object.getPrototypeOf(document.createElementNS('http://www.w3.org/2000/svg', 'text')) as object;
+    const measured = Object.getOwnPropertyDescriptor(text, 'getBBox');
+    Object.defineProperty(text, 'getBBox', { configurable: true, value(this: SVGElement) { return { x: Number(this.getAttribute('x')) - 100, y: 0, width: 200, height: 15 }; } });
+    try {
+      const { read } = reads();
+      const made = host(read);
+      await (await module()).mountHistory(made).open();
+      const first = made.root.querySelector('.wu-tl-mark .wu-tl-label') as SVGTextElement;
+      expect(first.textContent).toBe('Created from your words');
+      expect(Number(first.getAttribute('x'))).toBe(100);
+    } finally {
+      if (measured) Object.defineProperty(text, 'getBBox', measured);
+      else delete (text as { getBBox?: unknown }).getBBox;
+    }
   });
 
   it('chooses a focused timeline mark on Enter and keeps the focus on the chosen change as it moves', async () => {

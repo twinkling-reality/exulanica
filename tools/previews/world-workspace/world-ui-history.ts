@@ -108,6 +108,24 @@ export function timeline(marks: readonly TimelineMark[], now: { readonly words: 
   return root;
 }
 
+/**
+ * Keeps every word of a drawn timeline inside its frame, 0 to 1680, the page's margins: an end mark's
+ * label is moved in from its mark rather than centred out over the margin. Text is measured, so the
+ * timeline must already be in the page; where nothing can be measured, nothing moves.
+ */
+export function keepInside(root: SVGSVGElement): void {
+  for (const words of root.querySelectorAll('text')) {
+    let box: { x: number; width: number };
+    try {
+      box = words.getBBox();
+    } catch {
+      continue;
+    }
+    const shift = box.x < 0 ? -box.x : box.x + box.width > WIDTH ? WIDTH - box.x - box.width : 0;
+    if (shift) words.setAttribute('x', String(Number(words.getAttribute('x')) + shift));
+  }
+}
+
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', words = ''): HTMLElementTagNameMap[K] {
   const made = document.createElement(tag);
   if (className) made.className = className;

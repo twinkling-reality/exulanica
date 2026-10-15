@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { changeWords, thingName } from './build-words.mjs';
 import { byDay, historyRows, timelineMarks } from './history-rows.mjs';
 import { HISTORY_WORDS, chosenLabel, cost, dayHeading, money, onGitHub, runFacts, subLine } from './history-words.mjs';
 
@@ -96,6 +97,33 @@ assert.equal(marks.find((mark) => mark.chosen).words, 'Ran 10 minutes');
 assert.deepEqual(marks.find((mark) => mark.words === 'Compared two models').branches, ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct']);
 assert.deepEqual(timelineMarks(rows, rows[rows.length - 1].id, 3).map((mark) => mark.words), ['Created from your words', "Wrote Teo's personality", "Changed Teo's model"]);
 assert.deepEqual(historyRows({}, names, wordsOf), []);
+
+// History's edit rows are build mode's changeWords, one function for the note and the row (W2): a
+// building's storeys change from the version read's storeys (W6, 10d), "Set" where it stood as made;
+// undone and done again through the undone row; a made creature by its label, "creature" until read (J20).
+const iso2 = (minute) => new Date(2026, 9, 15, 6, minute).toISOString();
+const partNamed = (id) => ({ cafe: 'terrace cafe' })[id] ?? null;
+const labelled = new Map([['c'.repeat(64), 'Long necked marsh heron']]);
+const madeThings = new Map([['heron:1', { kind: { source: 'workspace', sha256: 'c'.repeat(64) } }], ['heron:2', { kind: { source: 'workspace', sha256: 'd'.repeat(64) } }]]);
+const edited = (labelOf) => historyRows({ edits: [
+  { edit_id: 's1', kind: 'transform_element', element_id: 'part:cafe', storeys: { before: null, after: 3 }, recorded_at: iso2(7) },
+  { edit_id: 'u1', kind: 'undo', undone_edit_id: 's1', recorded_at: iso2(8) },
+  { edit_id: 'r1', kind: 'undo', undone_edit_id: 'u1', recorded_at: iso2(9) },
+  { edit_id: 's2', kind: 'transform_element', element_id: 'part:cafe', storeys: { before: 3, after: 1 }, recorded_at: iso2(10) },
+  { edit_id: 'm1', kind: 'transform_element', element_id: 'part:cafe', recorded_at: iso2(11) },
+  { edit_id: 'p1', kind: 'add_thing', thing_id: 'heron:1', recorded_at: iso2(12) },
+  { edit_id: 'p2', kind: 'add_thing', thing_id: 'heron:2', recorded_at: iso2(13) },
+] }, names, (edit, edits) => changeWords(edit, edits, (id) => (madeThings.has(id) ? thingName(madeThings.get(id), labelOf) : null), partNamed)).map((row) => row.words);
+assert.deepEqual(edited((kind) => labelled.get(kind.sha256) ?? null), [
+  'Placed the creature',
+  'Placed the long necked marsh heron',
+  'Moved the terrace cafe',
+  'Lowered the terrace cafe to 1 storey',
+  'Set the terrace cafe to 3 storeys again',
+  'Put the terrace cafe back to the storeys it was made with',
+  'Set the terrace cafe to 3 storeys',
+]);
+assert.equal(edited(() => null)[1], 'Placed the creature', 'a label not read yet');
 
 // The words are WORDS.md's: sentence case where they open a line, no banned word, no em dash.
 for (const line of Object.values(HISTORY_WORDS)) assert.doesNotMatch(line, /\b(entity|session|provider|payload|context)\b/iu, line);

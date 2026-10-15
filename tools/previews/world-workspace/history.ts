@@ -7,7 +7,7 @@ import { changeWords, thingName } from './build-words.mjs';
 import { byDay, historyRows, timelineMarks } from './history-rows.mjs';
 import { HISTORY_WORDS, chosenLabel, clockAt, dayHeading, onGitHub, subLine } from './history-words.mjs';
 import { chip, keyRow, keyWord, label, page } from './world-ui.ts';
-import { historyRow, timeline } from './world-ui-history.ts';
+import { historyRow, keepInside, timeline } from './world-ui-history.ts';
 
 /** The marks the timeline draws around the chosen change, "Now" after them. */
 const MARKS = 7;
@@ -35,6 +35,12 @@ export interface HistoryHost {
   read(path: string): Promise<any>;
   /** What these characters are called inside a sentence, as the tag and card call them (J20): a name, else "the" and its kind. */
   names(named: Named): Promise<{ subject(id: string): string; placed(id: string): string }>;
+  /**
+   * The labels of the kinds a workspace made (build-words' createKindLabels; build mode's own where
+   * it is mounted), so a made creature's rows say its label as its tag does (J20, J23): `label(kind)`
+   * is null until its read lands, and `listen` tells each one that lands.
+   */
+  readonly kindLabels: { label(kind: unknown): string | null; listen(listener: () => void): () => void };
   /** Build mode's undo and redo, each resolving after the version is read again; null where this page may not change the world. */
   readonly build: { undo(): Promise<string | null>; redo(): Promise<string | null> } | null;
   /** The world's clock for a society minute ("06:14"), where the clock is read. */
@@ -88,6 +94,16 @@ export function mountHistory(host: HistoryHost): History {
   let project: Json | null | undefined;
   let chosen: string | null = null;
   let state: 'loading' | 'ready' | 'offline' = 'loading';
+  /** What the last reads held, so the rows can be said again when a kind's label lands. */
+  let held: { readonly compose: () => any[] } | null = null;
+  let unlisten: (() => void) | null = null;
+
+  /** The rows from what was read; a made creature's label that lands later re-words them, with no new read. */
+  function compose() {
+    if (!held) return;
+    rows = held.compose();
+    if (!chosen || !rows.some((row) => row.id === chosen)) chosen = rows[0]?.id ?? null;
+  }
 
   async function reads() {
     const [view, parts, listed, models, characters, comparisons, projects, draft] = await Promise.all([
@@ -100,10 +116,11 @@ export function mountHistory(host: HistoryHost): History {
       optional(`/world/github-projects${scope}`),
       host.worldId.startsWith(GENERATED) ? optional(`/worlds/drafts/${encodeURIComponent(host.worldId.slice(GENERATED.length))}`) : null,
     ]);
-    // Placed things and made parts named as build mode names them: by kind, by the parts read's label.
+    // Placed things and made parts named as build mode names them: by kind (a made creature by its
+    // label, J20), by the parts read's label; a building's storeys change is changeWords' too (W6).
     const things = new Map<string, Json>((view.things ?? []).map((thing: Json) => [thing.thing_id, thing]));
     const partLabels = new Map<string, string>((parts?.parts ?? []).map((part: Json) => [part.part_id, part.label]));
-    const nameOf = (id: string) => (things.has(id) ? thingName(things.get(id)) : null);
+    const nameOf = (id: string) => (things.has(id) ? thingName(things.get(id), host.kindLabels.label) : null);
     const partNameOf = (id: string) => partLabels.get(id) ?? null;
     // A model by Manifest.model_name, as the model history serves it; a run reads models by id alone.
     const choices: Json[] = models?.choices ?? [];
@@ -132,7 +149,7 @@ export function mountHistory(host: HistoryHost): History {
       placed: [...new Set<string>(records.map((record) => record.placed_id))],
     });
     project = projects ? (projects.projects ?? []).find((one: Json) => one.version_id === host.versionId) ?? null : undefined;
-    rows = historyRows({
+    const listing = {
       edits: view.edits ?? [],
       runs,
       models: choices,
@@ -145,8 +162,9 @@ export function mountHistory(host: HistoryHost): History {
         spent: one.start?.spent_usd ?? null,
       })),
       creation: draft ? { at: draft.started_at, readyWorld: null, spent: draft.accounting?.reported_usd ?? null } : null,
-    }, named, (edit: Json, edits: Json[]) => changeWords(edit, edits, nameOf, partNameOf));
-    if (!chosen || !rows.some((row) => row.id === chosen)) chosen = rows[0]?.id ?? null;
+    };
+    held = { compose: () => historyRows(listing, named, (edit: Json, edits: Json[]) => changeWords(edit, edits, nameOf, partNameOf)) };
+    compose();
   }
 
   async function load() {
@@ -213,7 +231,9 @@ export function mountHistory(host: HistoryHost): History {
       list.append(label(HISTORY_WORDS.today), element('p', 'wu-body', HISTORY_WORDS.empty));
     } else {
       const placed = timelineMarks(rows, chosen, MARKS).map((mark: any) => ({ ...mark, time: clockAt(mark.at) }));
-      marks.append(timeline(placed, { words: HISTORY_WORDS.now, time: clockAt(now) }, choose));
+      const drawnTimeline = timeline(placed, { words: HISTORY_WORDS.now, time: clockAt(now) }, choose);
+      marks.append(drawnTimeline);
+      keepInside(drawnTimeline);
       for (const day of byDay(rows, (at: number) => dayHeading(at, now))) {
         const block = element('div', 'wu-history-day');
         block.append(label(day.heading));
@@ -259,10 +279,17 @@ export function mountHistory(host: HistoryHost): History {
     return view;
   }
 
+  /** Takes the page away; nothing is told of a label once it is gone. */
+  function remove() {
+    shown?.page.close();
+    shown = null;
+    unlisten?.();
+    unlisten = null;
+  }
+
   function close() {
     if (!shown) return;
-    shown.page.close();
-    shown = null;
+    remove();
     host.closed();
   }
 
@@ -286,6 +313,13 @@ export function mountHistory(host: HistoryHost): History {
       list.addEventListener('scroll', listEnd, { passive: true });
       const chosenSlot = element('div');
       made.content.replaceChildren(head, marks, list, chosenSlot, made.keys);
+      // A made creature's label that lands while the page is open re-words its rows.
+      unlisten = host.kindLabels.listen(() => {
+        if (shown && state === 'ready') {
+          compose();
+          draw();
+        }
+      });
       shown = { page: made, title, sub, marks, list, chosen: chosenSlot };
       made.open(host.root);
       // A page opens with the focus on its title, so a reader announces it (L18).
@@ -293,10 +327,7 @@ export function mountHistory(host: HistoryHost): History {
       await load();
     },
     close,
-    dispose() {
-      shown?.page.close();
-      shown = null;
-    },
+    dispose: remove,
     key(event) {
       if (!shown) return false;
       const command = event.metaKey || event.ctrlKey;

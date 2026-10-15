@@ -23,7 +23,8 @@ import { SocietyControlClient } from '/src/society-control-api.ts';
 import { pop } from './world-ui-character.ts';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
-import { placedLine } from './build-words.mjs';
+import { createKindLabels, placedLine } from './build-words.mjs';
+import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { areaBanner, keyWord, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
 import { endOpening } from './world-opening.ts';
@@ -733,6 +734,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       };
     },
     build: build ? { undo: () => build.undo(), redo: () => build.redo() } : null,
+    // Made creatures by their labels (J20): build mode's reader where it is mounted, else History's own.
+    kindLabels: build?.kindLabels ?? createKindLabels(read, kindDocumentLabel),
     worldTime(tick) {
       // The society's own first minute, as characterFacts reads it; with no society there is no clock (K5).
       const state = subjectReads.society?.state;
