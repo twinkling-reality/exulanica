@@ -17,6 +17,7 @@ import json
 from decimal import Decimal
 
 import pytest
+from exulanica.api.routes.society_models import offered_models
 from exulanica.canonical import canonical_json
 from exulanica.models import client as client_module
 from exulanica.models.budget import BudgetGuard
@@ -431,6 +432,26 @@ def test_the_shipped_laptop_model_is_offered_for_a_being_and_costs_nothing():
         # Ollama does not honour a forced call, so only a schema answers for it.
         assert set(spec.answering) == {AnsweringMechanism.JSON_SCHEMA}
         assert spec.not_offered_for_lines is None
+
+
+def test_the_models_read_says_which_offered_models_run_on_this_computer():
+    """The model list words a model on this computer "On this computer · Free" from the read's own
+    answer: the provider's, true for the shipped laptop model and false for every hosted one."""
+
+    class Services:
+        def provider_refusal(self, provider: str) -> None:
+            return None
+
+    manifest = load_manifest()
+    person = decision_roles().role("society_decision")
+    served = {
+        model["model_id"]: model["on_this_computer"]
+        for model in offered_models(person, Services(), manifest=manifest)  # type: ignore[arg-type]
+    }
+    laptop = {spec.model_id for spec in _laptop_models(manifest)}
+    assert laptop and laptop <= served.keys(), "the positive control: the laptop model is served"
+    assert served.keys() - laptop, "and a hosted model beside it"
+    assert all(served[model_id] is (model_id in laptop) for model_id in served)
 
 
 def test_the_laptop_model_s_context_holds_the_largest_request_the_contract_sends():

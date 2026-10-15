@@ -41,6 +41,9 @@ assert.equal(priceWords({ price: { input: '0.06', output: '0.24' } }), '$0.06 in
 assert.equal(priceWords({ price: { input: '0.3', output: '0.9' } }), '$0.30 in · $0.90 out');
 assert.equal(priceWords({ price: { input: '0', output: '0.00' } }), 'Free');
 assert.equal(priceWords({ price: null }), null);
+// A model its provider serves from this computer (the read's on_this_computer), DESIGN's J11.
+assert.equal(priceWords({ price: { input: '0', output: '0' }, local: true }), 'On this computer · Free');
+assert.equal(modelLine({ price: { input: '0', output: '0' }, local: true }), 'On this computer · Free');
 assert.equal(modelLine({ price: { input: '0.06', output: '0.24' } }), '$0.06 in · $0.24 out per million tokens');
 assert.equal(modelLine(null), 'No AI model · Free');
 assert.equal(routineRow(), 'No AI model · Free');

@@ -456,7 +456,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const assignable = !readOnly && Boolean(inventory && offers.has(pageView.row.key) && subjectReads.models?.takesModelChoices && assignmentSubject(inventory, pageView.row, offer ?? null));
     return {
       who: view.who, sub: pageSub(view.who.named ? view.facts?.kind ?? null : null, entry.title), assignable,
-      model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null } : null) : undefined,
+      model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null, local: served?.local === true } : null) : undefined,
       connected,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.

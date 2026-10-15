@@ -39,6 +39,8 @@ export interface SocietyModel extends NamedModelRef {
   readonly price: ModelPrice | null;
   /** Why this process asks nothing its provider serves, by code, or null when it may. */
   readonly refusal: string | null;
+  /** Whether its provider serves it from this computer, billing nothing; absent or false where a read does not say. */
+  readonly local?: boolean;
 }
 
 /** A model's served price, in US dollars per million tokens, as decimal strings. */
@@ -413,6 +415,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         mechanism: mechanism(held['mechanism']),
         price: held['usd_per_mtok'] === undefined ? null : maybe(held['usd_per_mtok'], price),
         refusal: maybe(held['refusal'], text),
+        local: held['on_this_computer'] === true,
       };
     }),
     choices: list(row['choices']).map((entry) => {

@@ -105,6 +105,13 @@ describe('reading who decides', () => {
     expect(() => parseSocietyModels(read({ latest: [{ ...read().latest[0], name: undefined }] }))).toThrow();
   });
 
+  it('reads which models run on this computer, and none from a server that does not say', () => {
+    const laptop = { ...read().models[0]!, provider: 'ollama', model_id: 'qwen3:4b', name: 'Qwen3 4B Instruct', usd_per_mtok: { input: '0', output: '0' }, on_this_computer: true };
+    const view = parseSocietyModels(read({ models: [{ ...read().models[0]!, on_this_computer: false }, laptop] }));
+    expect(view.models.map((model) => model.local)).toEqual([false, true]);
+    expect(parseSocietyModels(read()).models[0]!.local).toBe(false);
+  });
+
   it('reads where each choice comes from and each gate\'s traveller mind, and nothing from a server that predates them', () => {
     const view = parseSocietyModels(read({
       choices: [{ ...read().choices[0], from: 'travellers' }, { ...read().choices[0], subject_id: 'bea', model: null, from: 'travellers_over_bound' }],

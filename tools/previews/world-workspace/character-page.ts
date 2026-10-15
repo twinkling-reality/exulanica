@@ -28,7 +28,7 @@ export interface CharacterPageState {
   /** Whether this person may choose the character's model here (the role's write is permitted). */
   readonly assignable: boolean;
   /** The assigned model, or null for the routine; undefined while the models are read. */
-  readonly model: { readonly name: string; readonly price: unknown } | null | undefined;
+  readonly model: { readonly name: string; readonly price: unknown; readonly local?: boolean } | null | undefined;
   /** Whether a run can be asked of a model here: false where no model is connected. */
   readonly connected: boolean;
   readonly run: {

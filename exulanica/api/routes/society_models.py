@@ -263,6 +263,9 @@ def offered_models(
                 "name": manifest.model_name(spec.model_id),
                 "description": spec.description,
                 "provider_description": manifest.provider(spec.provider).description,
+                # A model its provider serves from this computer, which bills nothing and is sent
+                # no credential: the model list words it "On this computer · Free".
+                "on_this_computer": manifest.provider(spec.provider).on_this_computer,
                 "mechanism": mechanism.value,
                 "usd_per_mtok": {
                     "input": str(spec.input_usd_per_mtok),
