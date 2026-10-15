@@ -5,7 +5,9 @@ level at their own grades and terrain graded for them. These tests make a small 
 with the town composer's version 3, bake every tile it covers, and hold what the tessellator makes
 of it: every street, curb and junction the tile owns is drawn; the steps round lots at other
 heights than their footways and their neighbours are drawn by the terrain, upright, in what is
-drawn and never in what is walked; and a person on a footway beside a lot standing above it is
+drawn and never in what is walked, and every one is closed: wherever two lots at other grades share
+an edge, and wherever a footway stands above or below the lot behind it, the step stands whole
+from the lower height to the higher; and a person on a footway beside a lot standing above it is
 walked at the footway's height, not lifted toward the lot.
 """
 
@@ -16,6 +18,7 @@ import shutil
 import struct
 import subprocess
 from functools import cache
+from itertools import product
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +40,9 @@ CLI = WEB / "packages" / "loom-tess" / "src" / "node" / "cli.ts"
 WORLD = "world:generated:bake-on-land"
 #: Bakes carry a footway beside a lot this much higher before the walk beside it is sampled.
 RAISED_MM = 200
+#: Two lots' edges this near each other across are read as one edge the lots share, so lots that
+#: miss each other by a millimetre are named, where a step between them would be left out unseen.
+NEAR_MM = 50
 
 
 @cache
@@ -130,6 +136,123 @@ def test_the_steps_are_the_terrains_upright_and_drawn_but_never_walked(baked):
         # Nothing walked stands upright: no step reaches the walking surface.
         assert not any(_upright(triangle) for triangle in tile["triangles"]["nav_envelope"])
     assert steps > 0, "a town on hilly land draws no step"
+
+
+def _steps(tile: dict[str, Any]) -> list[list[list[int]]]:
+    """The terrain's upright triangles in a tile's drawing: its steps."""
+    triangles = tile["triangles"]["render_batch"]
+    return [
+        triangles[index]
+        for kind, entry in _entries(tile, "render_batch")
+        if kind == "city.terrain" and entry["state"] == "drawn"
+        for surface in entry["surfaces"]
+        if surface["orientation"] == "vertical"
+        for index in range(
+            surface["first_triangle"], surface["first_triangle"] + surface["triangle_count"]
+        )
+    ]
+
+
+def _reach(triangle: list[list[int]], axis: int, place: int) -> tuple[float, float] | None:
+    """The heights an upright triangle spans at ``place`` along ``axis``, or None off its run."""
+    heights: list[float] = []
+    for one, other in ((0, 1), (1, 2), (2, 0)):
+        a, b = triangle[one], triangle[other]
+        if a[axis] == b[axis]:
+            if a[axis] == place:
+                heights += [a[2], b[2]]
+        elif min(a[axis], b[axis]) <= place <= max(a[axis], b[axis]):
+            heights.append(a[2] + (b[2] - a[2]) * (place - a[axis]) / (b[axis] - a[axis]))
+    return (min(heights), max(heights)) if heights else None
+
+
+def _closed(
+    steps: list[list[list[int]]], axis: int, across: int, place: int, low: int, high: int
+) -> bool:
+    """Whether the steps standing on the line where the other coordinate is ``across`` close the
+    height from ``low`` to ``high`` at ``place`` along it, to the millimetre a slope rounds."""
+    reaches = sorted(
+        reach
+        for triangle in steps
+        if all(corner[1 - axis] == across for corner in triangle)
+        and (reach := _reach(triangle, axis, place)) is not None
+    )
+    top: float = low
+    for bottom, head in reaches:
+        if bottom > top + 1:
+            break
+        top = max(top, head)
+    return top >= high - 1
+
+
+def _edges(ring: tuple[tuple[int, int], ...]) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+    return [(ring[index], ring[(index + 1) % len(ring)]) for index in range(len(ring))]
+
+
+def _inside(low: int, high: int) -> list[int]:
+    """Seven places spread evenly inside ``low`` to ``high``."""
+    return [low + (high - low) * step // 8 for step in range(1, 8)]
+
+
+def test_every_step_between_lots_and_at_a_frontage_is_closed_by_the_terrain(baked):
+    """Wherever two lots at other grades share an edge, and wherever a footway stands above or
+    below the lot behind it, the terrain draws the step whole: at seven places along it, and on a
+    frontage at every point of its kerb line beside it too, where the footway bends and a step
+    missing a cut stands furthest from it, from the lower height to the higher. A step a tile
+    leaves out (beyond its patch's heights, or at a tile's edge) leaves a place open, and lots whose
+    shared edge misses by a millimetre are named."""
+    made = _town()
+    steps = [triangle for tile in baked for triangle in _steps(tile)]
+    lots = [r for r in made.records if isinstance(r, ParcelRecord)]
+    curbs = {c.identity: c for c in made.records if isinstance(c, CurbEdgeRecord)}
+    shared = 0
+    for index, one in enumerate(lots):
+        for other in lots[index + 1 :]:
+            if one.grade_elevation_mm == other.grade_elevation_mm:
+                continue
+            low, high = sorted((one.grade_elevation_mm, other.grade_elevation_mm))
+            for (a, b), (c, d) in product(_edges(one.boundary_mm), _edges(other.boundary_mm)):
+                for axis in (0, 1):
+                    if a[1 - axis] != b[1 - axis] or c[1 - axis] != d[1 - axis]:
+                        continue
+                    if abs(a[1 - axis] - c[1 - axis]) > NEAR_MM:
+                        continue
+                    start = max(min(a[axis], b[axis]), min(c[axis], d[axis]))
+                    end = min(max(a[axis], b[axis]), max(c[axis], d[axis]))
+                    if end <= start:
+                        continue
+                    shared += 1
+                    assert a[1 - axis] == c[1 - axis], (one.identity, other.identity, "miss")
+                    for place in _inside(start, end):
+                        assert _closed(steps, axis, a[1 - axis], place, low, high), (
+                            one.identity,
+                            other.identity,
+                            place,
+                        )
+    fronted = 0
+    for lot in lots:
+        for frontage in lot.frontages:
+            a, b = _edges(lot.boundary_mm)[frontage.edge_ordinal]
+            axis = 0 if a[1] == b[1] else 1
+            start, end = sorted((a[axis], b[axis]))
+            line = curbs[frontage.curb_identity].kerb_line_mm
+            bends = [point[axis] for point in line if start < point[axis] < end]
+            for place in sorted({*_inside(start, end), *bends}):
+                point = (place, a[1]) if axis == 0 else (a[0], place)
+                footway = footway_top_at(curbs[frontage.curb_identity], point)
+                if footway == lot.grade_elevation_mm:
+                    continue
+                fronted += 1
+                low, high = sorted((footway, lot.grade_elevation_mm))
+                assert _closed(steps, axis, a[1 - axis], place, low, high), (
+                    lot.identity,
+                    frontage.edge_ordinal,
+                    place,
+                    footway,
+                    lot.grade_elevation_mm,
+                )
+    assert shared > 0, "no two lots at other grades share an edge"
+    assert fronted > 0, "no footway stands off its lot's grade"
 
 
 def test_a_footway_beside_a_lot_above_it_is_walked_at_its_own_height(baked):

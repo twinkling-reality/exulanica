@@ -12,8 +12,11 @@
  *      footway's back edge (its curb's kerb line there, the line's end height past either end, where
  *      the footway is its corner's, plus the kerb and the footway's crossfall) and the lot's grade,
  *      facing the street where the lot stands higher and the lot where the footway does. The edge is
- *      cut where the kerb line bends and where the two heights cross, so each part is one plane. A
- *      frontage whose curb the tile does not carry draws none.
+ *      cut where the kerb line bends or ends (past its end the footway is level at the end's height)
+ *      and where the two heights cross, so each part is one plane. A kerb line is a run, each piece
+ *      running the way of the whole line, so no two of its points share a place along the edge; a
+ *      line with a repeated point is refused by name where its curb is read. A frontage whose curb
+ *      the tile does not carry draws none.
  *   3. Lots are rings of axis-aligned edges in the city grammar; an edge that is not is refused by
  *      name rather than clipped by a rule this module does not state. Each part of a step is drawn by
  *      the terrain patch whose tile holds it: along the edge within the tile's closed span, across it
@@ -180,9 +183,10 @@ function atFrontage(steps: Steps, lot: SteppedLot, frontage: LotFrontage, tile: 
   };
   const ordered = (left: number, right: number): boolean => (forward ? left < right : left > right);
   const places: number[] = [p[axis]!];
-  const interior = line.slice(1, -1).map((point) => point[axis]!).filter((place) => ordered(p[axis]!, place) && ordered(place, q[axis]!));
-  interior.sort((left, right) => (forward ? left - right : right - left));
-  for (const place of [...interior, q[axis]!]) {
+  // Every point of the kerb line inside the edge, its ends among them: the footway bends at each.
+  const cuts = line.map((point) => point[axis]!).filter((place) => ordered(p[axis]!, place) && ordered(place, q[axis]!));
+  cuts.sort((left, right) => (forward ? left - right : right - left));
+  for (const place of [...cuts, q[axis]!]) {
     const before = places[places.length - 1]!;
     const [z0, z1] = [subtract(footway(before), lot.gradeMm, where), subtract(footway(place), lot.gradeMm, where)];
     if (multiply(z0, z1, where) < 0) {

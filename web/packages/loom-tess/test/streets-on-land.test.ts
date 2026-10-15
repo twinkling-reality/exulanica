@@ -232,6 +232,19 @@ describe('the steps at a frontage, between a footway and the lot behind it', () 
     const feet = points(step).filter((point) => point[2] !== grade).map((point) => point[0]);
     expect(feet).toContain(70_000);
   });
+
+  it('is cut where the kerb line ends, past which the footway is level at the end\'s height', () => {
+    // A corner lot's frontage runs on past its curb's kerb line, beside the corner's own footway,
+    // and the line climbs right to its end: the step's foot follows the footway on both sides.
+    const climbing: Point[] = [[5_000, 3_500, 2_100], [75_000, 3_500, 900]];
+    const grade = backAt(climbing, 60_000);
+    const feet = points(stepsOf(climbing, 60_000, 80_000, grade)).filter((point) => point[2] !== grade);
+    expect(feet.map((point) => point[0])).toContain(75_000);
+    for (const point of feet) {
+      if (point[0] >= 75_000) expect(point[2]).toBe(900 + UP);
+      else expect(Math.abs(point[2] - backAt(climbing, point[0]))).toBeLessThanOrEqual(1);
+    }
+  });
 });
 
 describe('the steps between lots', () => {
