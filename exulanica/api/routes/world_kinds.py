@@ -1130,6 +1130,7 @@ def _site_land_document(
     from exulanica.api.world_edit import object_problem
     from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION
     from exulanica.world.object_repository import WorldObjectRepository
+    from exulanica.world.site_parts import changes_document, changes_sha256
 
     try:
         require_world(connection, session.workspace_id, world_id)
@@ -1142,15 +1143,19 @@ def _site_land_document(
         )
         if receipt["composer"] != {"key": "site-plan", "version": LAND_COMPOSER_VERSION}:
             return _problem(404, "land_unavailable", "this world stands on level ground")
+        # The land the version's drawing names: graded for its records with the changes a person
+        # made to its parts (exulanica.world.site_parts), as the drawing route reads them.
+        changes = repository.part_changes(version_id)
         worker = kind_worker()
         outcome = worker.run(
-            drawing_key(str(session.workspace_id), digest),
+            drawing_key(str(session.workspace_id), digest, changes_sha256(changes)),
             DRAWING_SECONDS,
             drawing_job,
             str(session.workspace_id),
             world_id,
             dict(receipt),
             digest,
+            changes_document(changes),
             workspace=str(session.workspace_id),
             kept=worker.drawings,
         )

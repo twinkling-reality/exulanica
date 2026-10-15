@@ -15,15 +15,16 @@ follow it, since a person's home and work name the part, not its position. A ref
 a placed thing's refused landing is: 422, its code, ``where`` and a sentence a person reads.
 
 A change is stored as an element override naming the part (``part:<identity>``) in the version's
-edit log, so ``POST .../things/undo`` and ``.../things/redo`` undo and redo it as any edit. Only a
-site on level ground with nothing standing on its parts is served (composer version 1); a world on
-land, one whose things stand on its parts and one made of terrain are refused by name.
+edit log, so ``POST .../things/undo`` and ``.../things/redo`` undo and redo it as any edit. A site
+on level ground (composer version 1) and one on land (version 5) are served; on land the land is
+graded again for the changed layout, and a change it cannot take is refused by the land grader's
+code. A world whose things stand on its parts and one made of terrain are refused by name.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Path, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
@@ -76,8 +77,10 @@ _NOT_SERVED: dict[int, str] = {
     2: "Not yet: things stand on this world's parts, so its parts are not changed yet.",
     3: "This world is made of terrain: it has no parts to change.",
     4: "This world is made of terrain: it has no parts to change.",
-    5: "Not yet: this world stands on land, and its parts are changed with its ground later.",
 }
+#: The composer versions whose parts a person may change: a site on level ground (1) and one on
+#: land (5), whose land is graded again for the changed layout.
+_SERVED: Final = frozenset({1, 5})
 
 
 class PartPoseBody(BaseModel):
@@ -130,7 +133,7 @@ class _Site:
         )
         self.receipt = dict(receipt)
         version = int(self.receipt["composer"]["version"])
-        if version != 1:
+        if version not in _SERVED:
             raise PartChangeRefused(
                 "parts_not_served",
                 {"composer_version": version},

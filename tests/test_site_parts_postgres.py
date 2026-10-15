@@ -21,6 +21,7 @@ from exulanica.world.site_parts import QUARTER_TURNS
 from exulanica.world.starter import create_starter_authorities
 from exulanica.world.worlds import AUTHORED_STARTER, new_world_id
 
+from test_site_land_postgres import LAND
 from test_society_made_world import made as imported_made  # noqa: F401
 
 pytestmark = pytest.mark.postgres
@@ -41,7 +42,7 @@ def _the_same_farm_on_every_run(monkeypatch):
     monkeypatch.setattr(saved_entries, "new_world_id", lambda kind: FARM)
 
 
-def _farm(api, *, things: bool = True) -> dict[str, Any]:
+def _farm(api, *, things: bool = True, land: dict | None = None) -> dict[str, Any]:
     api.client.app.state.services = dataclasses.replace(
         api.client.app.state.services, societies_of_things=things
     )
@@ -50,7 +51,8 @@ def _farm(api, *, things: bool = True) -> dict[str, Any]:
     document["provenance"] = {"by": "a test creator"}
     assert api.post("/worlds/kinds", {"document": document}).status_code == 201
     made_world = api.post(
-        "/worlds/kinds/fixture_farm/worlds", {"preset": "small_farm", "title": "A farm"}
+        "/worlds/kinds/fixture_farm/worlds",
+        {"preset": "small_farm", "title": "A farm", **({} if land is None else {"land": land})},
     )
     assert made_world.status_code == 201, made_world.text
     return made_world.json()
@@ -300,3 +302,36 @@ def test_a_world_not_made_from_a_kind_has_no_parts(made):
     unmade = api.get(f"/world/versions/{version_id}/parts?world_id={world_id}")
     assert unmade.status_code == 422, unmade.text
     assert unmade.json()["code"] == "parts_not_served"
+
+
+def test_on_land_a_moved_building_is_drawn_on_the_land_graded_for_the_changed_layout(made):
+    api = made
+    entry = _farm(api, land=LAND)
+    barn = _parts(api, entry)["barn"]
+    east, north = barn["centre_mm"]
+    made_drawing = api.get(_path(entry, "/site")).json()
+    assert made_drawing["profile"].endswith("/v5")
+
+    moved = _move(api, entry, barn, east - 3_000, north)
+    assert moved.status_code == 200, moved.text
+    # A building stands on its zone's graded pad: moving it leaves every chunk as it was made.
+    after_barn = api.get(_path(entry, "/site")).json()
+    assert after_barn["land"]["chunks"] == made_drawing["land"]["chunks"]
+    pond = _parts(api, entry)["pond"]
+    pond_east, pond_north = pond["centre_mm"]
+    dug = _move(api, entry, pond, pond_east - 2_000, pond_north)
+    assert dug.status_code == 200, dug.text
+    drawing = api.get(_path(entry, "/site")).json()
+    slot = next(s for s in drawing["slots"] if s["identity"] == barn["part_id"])
+    assert slot["positionMm"][:2] == [east - 3_000, north]
+    # The pond's basin moved, so the land was graded again: its chunks are not the made ones. The
+    # backdrop is the natural land, never graded, so it is not asked to change.
+    assert drawing["land"]["chunks"] != made_drawing["land"]["chunks"]
+    # Every chunk and the backdrop are served by the digests the changed drawing names.
+    for chunk in drawing["land"]["chunks"]:
+        x, y = chunk["chunk"]
+        served = api.get(_path(entry, f"/land/chunks/{x}/{y}"))
+        assert served.status_code == 200, served.text
+        assert served.headers["etag"] == f'"{chunk["sha256"]}"'
+    backdrop = api.get(_path(entry, "/land/backdrop"))
+    assert backdrop.headers["etag"] == f'"{drawing["land"]["backdrop_sha256"]}"'

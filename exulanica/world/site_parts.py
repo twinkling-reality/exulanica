@@ -49,6 +49,8 @@ from exulanica.world.errors import ThingLandingRefused
 from exulanica.world.objects import ElementOverride, Transform
 
 __all__ = [
+    "LAND_WORDS",
+    "LAND_WORDS_OTHERWISE",
     "PART_CODES",
     "PART_PREFIX",
     "QUARTER_TURNS",
@@ -86,8 +88,31 @@ PART_CODES: Final = frozenset(
         "part_strands_people",
         "part_houses_people",
         "parts_not_served",
+        # A world on land: the land grader's own codes (LAND_WORDS).
+        "landform_cut_too_deep",
+        "landform_corridor_too_steep",
+        "landform_basin_over_locked",
+        "landform_water_spills",
+        "landform_unreachable",
+        "landform_near_out_of_bounds",
+        "landform_invalid",
     }
 )
+#: The sentence a person reads when the land of a world on land cannot take a part where a change
+#: leaves it, by the land grader's own code (:mod:`exulanica.grammar.landform`). The grader's own
+#: detail goes in ``where``.
+LAND_WORDS: Final = {
+    "landform_cut_too_deep": "Not here: the ground there is too steep to level for it.",
+    "landform_corridor_too_steep": "Not here: the path to it would be too steep to walk.",
+    "landform_basin_over_locked": "Not here: a pond cannot be dug over a path or another terrace.",
+    "landform_water_spills": "Not here: water would spill out there.",
+    "landform_unreachable": "Not here: people could no longer walk to it from the entry.",
+    "landform_near_out_of_bounds": (
+        "Not here: the ground there would have to rise or fall further than this land allows."
+    ),
+}
+#: What a land code the grader adds later is said with until it has its own sentence.
+LAND_WORDS_OTHERWISE: Final = "Not here: the land cannot take it there."
 #: A quarter turn counterclockwise: the side a door faced, to the side it faces after.
 _TURNED: Final = {"north": "west", "west": "south", "south": "east", "east": "north"}
 
@@ -537,7 +562,9 @@ def check_change(
         check_site_records(changed, root_identity=root_identity)
     except InvalidRecordError as exc:
         raise PartChangeRefused(
-            "part_records_refused", where, f"Not here: the world's own rules refuse it ({exc})."
+            "part_records_refused",
+            {**where, "detail": str(exc)},
+            "Not here: the world's layout cannot take it there.",
         ) from exc
 
 

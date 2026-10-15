@@ -19,6 +19,8 @@ from exulanica.world.composers.site_plan import society_place
 from exulanica.world.kinds.samples import first_unreached
 from exulanica.world.objects import ElementOverride, Transform
 from exulanica.world.site_parts import (
+    LAND_WORDS,
+    PART_CODES,
     QUARTER_TURNS,
     PartChange,
     PartChangeRefused,
@@ -260,3 +262,82 @@ def test_the_people_a_part_houses_are_named_from_either_engine():
         "Not removed: Ada Lane 1 lives there, Bo Cole 2 works there and Cy Moss 3 lives there. "
         "The farmhouse can be moved instead."
     )
+
+
+LAND = {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 8000,
+    "features": [
+        {"id": "tilt", "kind": "tilt", "side": "north", "grade_permille": 30},
+        {"id": "sea", "kind": "shore", "side": "south", "distance_mm": 60000},
+    ],
+}
+
+
+@pytest.fixture(scope="module", name="land_farm")
+def _land_farm():  # type: ignore[no-untyped-def]
+    kind, _composed_level = _composed("farm")
+    from exulanica.world.composers import composer_module
+
+    return composer_module("site-plan", 1).compose_kind(
+        kind, kind.values(kind.presets[0][0]), "world:generated:land-parts", land=LAND
+    )
+
+
+def _part_job(composed, change: PartChange):  # type: ignore[no-untyped-def]
+    from exulanica.world.kinds.worker import part_job, site_ground_place_id
+
+    return part_job(
+        "workspace:test",
+        dict(composed.receipt),
+        composed.receipt_sha256,
+        site_ground_place_id(),
+        changes_document([change]),
+        change.identity,
+    )
+
+
+def test_every_code_the_land_grader_refuses_with_has_its_own_words():
+    import inspect
+    import re
+
+    from exulanica.grammar.landform import grading
+
+    raised = set(re.findall(r'code="(landform_[a-z_]+)"', inspect.getsource(grading)))
+    assert raised
+    assert raised <= set(LAND_WORDS)
+    assert set(LAND_WORDS) <= PART_CODES
+
+
+def test_on_land_a_moved_pond_is_graded_again_and_its_place_made(land_farm):
+    assert land_farm.receipt["composer"]["version"] == 5
+    pond = _part(land_farm, "pond")
+    east, north = pond.centre_mm
+    answer = _part_job(land_farm, PartChange(pond.identity, False, (east - 2_000, north)))
+    assert answer["status"] == "done", answer
+    assert first_unreached(answer["place"]) is None
+
+
+def test_on_land_a_change_the_land_refuses_is_answered_by_the_graders_code(land_farm, monkeypatch):
+    from exulanica.grammar.landform import LandformRefused
+    from exulanica.world import site_land
+
+    def refused(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise LandformRefused("pond p would spill over its rim", code="landform_water_spills")
+
+    monkeypatch.setattr(site_land, "site_land_of", refused)
+    pond = _part(land_farm, "pond")
+    answer = _part_job(land_farm, PartChange(pond.identity, False, pond.centre_mm))
+    assert answer["status"] == "refused"
+    assert answer["code"] == "landform_water_spills"
+    assert answer["detail"] == LAND_WORDS["landform_water_spills"]
+    assert answer["where"]["landform"] == "pond p would spill over its rim"
+
+
+def test_a_change_the_layout_cannot_take_is_refused_in_plain_words(farm):
+    pond = _part(farm, "pond")
+    with pytest.raises(PartChangeRefused) as refused:
+        _checked(farm, PartChange(pond.identity, False, pond.centre_mm, 1))
+    assert refused.value.code == "part_records_refused"
+    assert str(refused.value) == "Not here: the world's layout cannot take it there."
+    assert "access_y_mm" in refused.value.where["detail"]

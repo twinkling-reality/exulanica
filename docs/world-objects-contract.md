@@ -1223,18 +1223,25 @@ society lives or works in is not removed: the refusal names up to three of them 
 be moved instead, since a person's home and work name the part, not its position. A refusal is
 answered as a placed thing's refused landing (422, its `code`, `where` and a sentence): codes
 `part_unknown`, `part_not_changeable`, `part_outside_zone`, `part_blocked`, `part_records_refused`,
-`part_strands_people`, `part_houses_people` and `parts_not_served`. The previews answer the same
-verdicts and write nothing.
+`part_strands_people`, `part_houses_people` and `parts_not_served`. On a world on land, the land is
+graded again for the changed layout first, and a change it cannot take is refused by the land
+grader's own code (`landform_cut_too_deep`, `landform_corridor_too_steep`,
+`landform_basin_over_locked`, `landform_water_spills`, `landform_unreachable`,
+`landform_near_out_of_bounds`, or `landform_invalid` for any other), with a plain sentence and the
+grader's detail in `where`. The previews answer the same verdicts and write nothing.
 
 **What follows a kept change.** The world as it stands is the receipt's records with the version's
 changes applied, named by the digest of those changes, which keys the worker's drawing and place
-(unchanged for a world nobody changed): the site drawing (`GET .../site`), the ground a placed thing
-lands on, and the place the version's society walks, which takes the change as its next input. A
-living society's stored place is reused only for a version whose parts were never changed.
+(unchanged for a world nobody changed): the site drawing (`GET .../site`), on land its graded land
+and the chunks and backdrop the land routes serve by the digests that drawing names, the ground a
+placed thing lands on, and the place the version's society walks, which takes the change as its
+next input. A building or fixture moved inside its zone stands on that zone's graded pad, so the
+land is unchanged; moving or removing a pond grades its basin again. A living society's stored place
+is reused only for a version whose parts were never changed.
 
-**What is served.** A site on level ground with nothing standing on its parts (site-plan composer
-version 1). A world whose things stand on its parts (version 2), one on land (version 5) and one
-made of terrain are refused by name (`parts_not_served`). A version whose overrides ever named a
+**What is served.** A site on level ground (site-plan composer version 1) and a site on land
+(version 5). A world whose things stand on its parts (version 2) and one made of terrain are
+refused by name (`parts_not_served`), as is a world not made from a world kind. A version whose overrides ever named a
 part is withheld from package export as `made_part_changes`: a package's override names only
 snapshot elements. Supported placement on a version holding part changes stays refused, as with any
 source override.

@@ -524,6 +524,9 @@ def part_job(
         )
     except ThingLandingRefused as exc:
         return {"status": "refused", "code": exc.code, "where": exc.where, "detail": str(exc)}
+    graded = _graded(receipt, changed, part_id)
+    if graded is not None:
+        return graded
     placed = _placed(place_id, receipt, changed)
     if placed["status"] != "done":
         return placed
@@ -541,6 +544,41 @@ def part_job(
         "part_ids": [part.identity for part in made],
         "label": next((part.label for part in made if part.identity == part_id), ""),
     }
+
+
+def _graded(
+    receipt: Mapping[str, Any], changed: tuple[object, ...], part_id: str
+) -> dict[str, Any] | None:
+    """On a world on land, whether its land takes the changed layout: None where it does (or the
+    world stands on level ground), else the refusal by the land grader's code with a sentence a
+    person reads (:data:`~exulanica.world.site_parts.LAND_WORDS`) and the grader's own detail in
+    ``where``. The graded land is kept by the records' digest, so the drawing and the place that
+    follow read it again rather than grading twice."""
+    from exulanica.grammar.landform import LandformRefused
+    from exulanica.world.composers.site_plan import LAND_COMPOSER_VERSION, receipt_routine
+    from exulanica.world.errors import InvalidStructuralData
+    from exulanica.world.site_land import site_land_of
+    from exulanica.world.site_parts import LAND_WORDS, LAND_WORDS_OTHERWISE, PART_CODES
+
+    if receipt["composer"]["version"] != LAND_COMPOSER_VERSION:
+        return None
+    try:
+        site_land_of(
+            receipt, changed, receipt_routine(receipt).policy["footway_station_spacing_mm"]
+        )
+    except InvalidStructuralData as exc:
+        # The receipt's land no longer reads under this code (its rules or document): the world's
+        # refusal, as its records' would be, not the move's. Regenerating its records reads the
+        # same land first, so this is not met after they read.
+        return {"status": "refused", "code": "kind_place_refused", "detail": str(exc)}
+    except LandformRefused as exc:
+        return {
+            "status": "refused",
+            "code": exc.code if exc.code in PART_CODES else "landform_invalid",
+            "where": {"part_id": part_id, "landform_code": exc.code, "landform": exc.detail},
+            "detail": LAND_WORDS.get(exc.code, LAND_WORDS_OTHERWISE),
+        }
+    return None
 
 
 def parts_job(
