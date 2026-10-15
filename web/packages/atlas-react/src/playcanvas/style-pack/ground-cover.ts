@@ -1,4 +1,5 @@
 import type { LandWater, StylePackCover } from '@exulanica/atlas-core';
+import { generator, seedOf } from './seeded.js';
 
 /**
  * What grows on a made place's grounds: the plant pieces a look's `cover` names for a surface look
@@ -91,28 +92,6 @@ export function coverRuleOf(cover: Readonly<Record<string, StylePackCover>>, loo
   return cover[lookRole] ?? (drawnAs === null ? null : cover[drawnAs] ?? null);
 }
 
-/** A 32-bit hash of the rule's seed and the slot's identity: the generator's start. */
-function seedOf(seed: number, identity: string): number {
-  let h = (seed ^ 0x9e3779b9) >>> 0;
-  for (let i = 0; i < identity.length; i += 1) {
-    h = Math.imul(h ^ identity.charCodeAt(i), 0x85ebca6b) >>> 0;
-    h = (h ^ (h >>> 13)) >>> 0;
-  }
-  return h;
-}
-
-/** Mulberry32: small, fast and the same in every browser. */
-function generator(start: number): () => number {
-  let state = start >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** How many pieces `rule` grows on `slot` by its density, before anything stands on them. */
 export function coverCount(slot: CoverSlot, rule: StylePackCover): number {
   return Math.max(0, Math.round((slot.boxMm[0]! / 1000) * (slot.boxMm[1]! / 1000) * rule.density_per_100m2 / 100));
@@ -156,7 +135,7 @@ export function coverMatrix(point: CoverPoint, upM: number): Float32Array {
 }
 
 /** A slot's rectangle in plan, millimetres: west, south, east, north. */
-function rectOf(slot: CoverSlot): readonly [number, number, number, number] {
+export function slotRectMm(slot: CoverSlot): readonly [number, number, number, number] {
   const odd = slot.yawQuarterTurns % 2 !== 0;
   const east = (odd ? slot.boxMm[1]! : slot.boxMm[0]!) / 2;
   const north = (odd ? slot.boxMm[0]! : slot.boxMm[1]!) / 2;
@@ -200,7 +179,7 @@ export function growCover(
   });
   if (ruled.length === 0) return { points, slots: 0, leftOut, untried };
   // Every slot's rectangle, in the grid cells it touches.
-  const rects = slots.map(rectOf);
+  const rects = slots.map(slotRectMm);
   const grid = new Map<string, number[]>();
   rects.forEach((rect, index) => {
     for (let gx = Math.floor(rect[0] / GRID_MM); gx <= Math.floor(rect[2] / GRID_MM); gx += 1) {

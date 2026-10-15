@@ -236,7 +236,7 @@ async function siteInLook(
       ...[...setIds].map(async setId => [setId, await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256))] as const),
       ...[...packTextures].map(async key => [packTextureSetId(key), await preparePackTexture(prepared.pack, key, prepared.packFile)] as const),
     ]));
-    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish });
+    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish, ...('landSurfaces' in landOptions ? { landSurfaces: landOptions.landSurfaces } : {}) });
     return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
   };
   let choice = worldLook.worldLookChoice(search, bound);

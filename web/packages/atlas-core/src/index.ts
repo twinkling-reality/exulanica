@@ -661,6 +661,7 @@ export type {
   StylePackFacade,
   StylePackFile,
   StylePackFog,
+  StylePackLandCover,
   StylePackLicence,
   StylePackLightPreset,
   StylePackManifest,
@@ -763,7 +764,7 @@ export type { TerrainState, TerrainNavigation, TerrainGroundPose, TerrainOccupan
 
 export {
   LAND_BACKDROP_PROFILE, LAND_CELL_MM, LAND_CHUNK_MM, LAND_CHUNK_PROFILE, LAND_NEAR_BOUND_MM, LAND_SAMPLES_PER_SIDE,
-  LAND_SURFACE_CATALOG_ID, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandWeight, landChunkGeometry, landChunkLocal,
-  readLandBackdrop, readLandChunk, readLandSurfaces,
+  LAND_SURFACE_CATALOG_ID, LAND_SURFACE_GROUND, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandAt, landBandWeight,
+  landChunkGeometry, landChunkLocal, landNoiseShift, readLandBackdrop, readLandChunk, readLandSurfaces, valueNoise,
 } from './landform.js';
 export type { BackdropBlock, LandBackdrop, LandChunk, LandSurfaceBand, LandSurfaces, LandWater } from './landform.js';

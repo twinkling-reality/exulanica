@@ -223,7 +223,9 @@ edge wanders and never follows the land's one-metre grid. On the near land the b
 the base ground as it is dressed (a pack's swatch, pattern or texture, and the ground finish),
 wrapping its colour function rather than replacing it (`generated-site/land-slope.ts`), with the
 slope read from the land's own surface; on a WebGPU device the near land wears its ground alone.
-The backdrop is coloured by vertex with the same rule (`landBackdropColour`). Far ranges read as
+The backdrop is coloured by vertex with the same rule (`landBackdropColour`), and whatever reads the band
+the land is drawn in at a point on the CPU, such as a look's land cover, asks `landBandAt`, the same rule
+with the same noise (`valueNoise`), so it agrees with the shader except inside a band's ramp. Far ranges read as
 mountains only through the look's haze, which a world wears from its style pack.
 
 ## Sites on land

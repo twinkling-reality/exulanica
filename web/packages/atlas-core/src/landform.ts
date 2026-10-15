@@ -335,6 +335,46 @@ export function landBandWeight(band: LandSurfaceBand, jitter: number, slopePermi
   return bySlope * rising * falling;
 }
 
+/**
+ * Value noise in the world's metres, 0 to 1: the land surfaces' own, as the near land's shader
+ * (`exuLandNoise`) and the backdrop state it, so whatever reads the land's bands on the CPU agrees
+ * with what is drawn.
+ */
+export function valueNoise(x: number, z: number): number {
+  const hash = (a: number, b: number): number => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const i = Math.floor(x), j = Math.floor(z), tx = x - i, tz = z - j;
+  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
+  const a = hash(i, j) + (hash(i + 1, j) - hash(i, j)) * sx;
+  const b = hash(i, j + 1) + (hash(i + 1, j + 1) - hash(i, j + 1)) * sx;
+  return a + (b - a) * sz;
+}
+
+/** The surfaces' noise at a renderer point (metres east and south), -1 to 1: the shift every band's thresholds move by there. */
+export function landNoiseShift(noise: LandSurfaces['noise'], eastM: number, southM: number): number {
+  return (2 * valueNoise(eastM / noise.broadM, southM / noise.broadM) - 1) * (1 - noise.fineShare)
+    + (2 * valueNoise(eastM / noise.fineM + 17, southM / noise.fineM + 3) - 1) * noise.fineShare;
+}
+
+/** The surface role of the land where no band wins: the ground it is drawn in. */
+export const LAND_SURFACE_GROUND = 'land';
+
+/**
+ * The surface role the land is drawn in at a point, as the shader mixes it: of the bands worn there
+ * (`near` or the backdrop's, a band that needs a sea only where the land states one), in catalog
+ * order, the last whose weight reaches one half over what came before, else `LAND_SURFACE_GROUND`.
+ * The CPU twin of the near land's shader; the two can differ only inside a band's ramp.
+ */
+export function landBandAt(
+  surfaces: LandSurfaces, where: 'near' | 'backdrop', slopePermille: number, heightMm: number, shift: number, sea: boolean,
+): string {
+  let role = LAND_SURFACE_GROUND;
+  for (const band of surfaces.bands) {
+    if (!(where === 'near' ? band.near : band.backdrop) || (band.needsSea && !sea)) continue;
+    if (landBandWeight(band, surfaces.noise.jitter, slopePermille, heightMm, shift) >= 0.5) role = band.key;
+  }
+  return role;
+}
+
 /** The land's colour at a point of the backdrop, linear RGB: its open ground, then each band over it in order. */
 export function landBackdropColour(
   surfaces: LandSurfaces, ground: readonly [number, number, number], slopePermille: number, heightMm: number, shift: number, sea: boolean,

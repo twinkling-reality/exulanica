@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { pointContact, readHeightfieldGeometry } from '../src/heightfield-geometry.js';
 import {
-  LAND_CHUNK_MM, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandWeight, landChunkGeometry,
-  landChunkLocal, readLandBackdrop, readLandChunk, readLandSurfaces,
+  LAND_CHUNK_MM, LAND_SURFACE_GROUND, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandAt, landBandWeight,
+  landChunkGeometry, landChunkLocal, landNoiseShift, readLandBackdrop, readLandChunk, readLandSurfaces, valueNoise,
 } from '../src/landform.js';
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -167,5 +167,36 @@ describe("the land's own surfaces", () => {
     expect(wooded[1]!).toBeLessThan(ground[1]);
     // Near-land bands are not the backdrop's: planting is worn on the near land alone.
     expect(landBackdropColour(surfaces, ground, 550, 5_000, 0, true)).toEqual([...ground]);
+  });
+
+  it('names the surface role the land is drawn in at a point: the last band worn there by half or more, else its ground', () => {
+    expect(landBandAt(surfaces, 'near', 30, 20_000, 0, true)).toBe(LAND_SURFACE_GROUND);
+    expect(landBandAt(surfaces, 'near', 30, 800, 0, true)).toBe('sand');
+    expect(landBandAt(surfaces, 'near', 30, 800, 0, false)).toBe(LAND_SURFACE_GROUND);
+    expect(landBandAt(surfaces, 'near', 550, 5_000, 0, true)).toBe('planted');
+    expect(landBandAt(surfaces, 'near', 1500, 5_000, 0, true)).toBe('rock');
+    // A steep face is planted and rock at once; rock comes later in the catalog, so rock wins as it does when drawn.
+    expect(landBandWeight(band('planted'), surfaces.noise.jitter, 1500, 5_000, 0)).toBe(1);
+    // The backdrop's bands are its own: woods on a hillside there, planting nowhere.
+    expect(landBandAt(surfaces, 'backdrop', 400, 90_000, 0, true)).toBe('wooded');
+    expect(landBandAt(surfaces, 'backdrop', 550, 5_000, 0, true)).toBe(LAND_SURFACE_GROUND);
+    // The noise moves a threshold: a slope just under halfway into rock is rock where the noise shifts it down.
+    const halfway = band('rock').slopePermille!.reduce((a, b) => a + b) / 2;
+    expect(landBandAt(surfaces, 'near', halfway - 20, 5_000, 0, true)).toBe('planted');
+    expect(landBandAt(surfaces, 'near', halfway - 20, 5_000, -1, true)).toBe('rock');
+  });
+
+  it('shares the noise the shader draws by: 0 to 1, the same at a point every time, and a shift from -1 to 1', () => {
+    for (const [x, z] of [[0.3, 0.7], [12.5, -3.25], [-100.1, 44.9]] as const) {
+      const v = valueNoise(x, z);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+      expect(valueNoise(x, z)).toBe(v);
+      const shift = landNoiseShift(surfaces.noise, x * 1000, z * 1000);
+      expect(Math.abs(shift)).toBeLessThanOrEqual(1);
+    }
+    // At whole cells the noise is the cell's hash: fract(sin(127.1 i + 311.7 j) * 43758.5453), as exuLandHash states it.
+    const hash = (i: number, j: number) => { const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return v - Math.floor(v); };
+    expect(valueNoise(3, 5)).toBeCloseTo(hash(3, 5), 12);
   });
 });

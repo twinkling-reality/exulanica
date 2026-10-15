@@ -285,6 +285,30 @@ def test_a_cover_piece_is_admitted_textured_and_refused_by_name_as_a_palette_pie
     )
 
 
+def test_a_land_cover_piece_is_admitted_textured_and_refused_by_name_as_a_palette_piece():
+    def grown(made: Upload) -> Upload:
+        made.manifest["land_cover"] = {
+            "woods": {
+                "role": "land",
+                "pieces": ["plant.default"],
+                "density_per_ha": 40,
+                "scale_permille": [800, 1200],
+                "seed": 1,
+            }
+        }
+        return made
+
+    textured = grown(_with_textured_tree(upload()))
+    assert _admit(textured).manifest_canonical == textured.manifest_bytes
+    with pytest.raises(StylePackAdmissionRefused) as refused:
+        _admit(grown(upload()))
+    assert (refused.value.code, refused.value.path, str(refused.value)) == (
+        "style_pack_piece_refused",
+        "pieces/tree.glb",
+        "pieces/tree.glb: a land cover piece is a textured piece: land_cover is drawn instanced",
+    )
+
+
 class _Store:
     def __init__(self, files: dict[str, bytes]) -> None:
         self._by_sha = {hashlib.sha256(data).hexdigest(): data for data in files.values()}

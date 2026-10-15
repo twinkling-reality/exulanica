@@ -3,7 +3,9 @@ import {
   materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
   type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type SurfaceMaterials,
   type LandWater, type StyleSlot, type StylePackSurface, type SurfacePattern, type SurfacePatterns,
+  type LandSurfaces,
 } from '@exulanica/atlas-core';
+import { growLandCover } from './land-cover.js';
 import type { StructuredSiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import { baseGroundSlot, type SiteDresser } from '../generated-site/site-mount.js';
 import { SCENERY_STONES, SCENERY_TREES } from '../generated-site/site-scenery.js';
@@ -20,7 +22,7 @@ import { uploadPackPieces, type FetchedPieces } from './pieces.js';
 import { swatchMaterial } from './swatch-material.js';
 import { SiteTextures, packTextureSetId } from './site-textures.js';
 import { WaterRipples } from './water-material.js';
-import { coverMatrix, growCover, type CoverSlot } from './ground-cover.js';
+import { coverMatrix, growCover, slotRectMm, type CoverSlot } from './ground-cover.js';
 import { CLIMB_STANDOFF_M, growClimbers, type ClimbSlot } from './climbers.js';
 import { drawInstancedPieces, type InstancePlacement } from './instanced-pieces.js';
 import { PlantWind, windRuns } from './wind.js';
@@ -95,6 +97,8 @@ export interface SitePackDressing {
    * drifting light, and a real reflection where it states a strength. None draws them flat as before.
    */
   readonly finish?: SurfaceFinish;
+  /** The land's surface catalog the land is drawn in, so land cover grows by the role drawn at each point; none, every point is the land's own ground. */
+  readonly landSurfaces?: LandSurfaces;
   /** Told what one site's dressing drew, each time a site is dressed. */
   readonly told?: (summary: SiteDressingSummary) => void;
 }
@@ -132,6 +136,8 @@ export interface SiteDressingSummary {
   readonly facade?: { readonly walls: number; readonly materials: number };
   /** What climbs the buildings' walls, where the pack states any: its plants, the buildings growing them, the plants the guard left out. */
   readonly climb?: { readonly pieces: number; readonly buildings: number; readonly leftOut: number };
+  /** What grows on the land, where the pack states land cover: its pieces, by surface role, the pieces the guard left out and the points never tried. */
+  readonly landCover?: { readonly pieces: number; readonly byRole: Readonly<Record<string, number>>; readonly leftOut: number; readonly untried: number };
   /** How many of the pieces' materials sway, where the look states a wind and the device runs it. */
   readonly swaying?: number;
 }
@@ -436,6 +442,31 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       });
     }
     const climbers = climbPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, climbPlacements, view);
+    // What grows on the land itself, where the pack states land cover: its textured pieces over the
+    // near land by the surface role the land is drawn in at each point, kept off the place's own slots
+    // (the land under the place, its base ground, grows), instanced in cells like cover.
+    const baseSlot = baseGroundSlot(drawing);
+    const landGrown = land === undefined || Object.keys(pack.land_cover).length === 0 ? null : growLandCover(pack.land_cover, {
+      chunks: land.chunks, groundMm: land.groundMm, dryAt: land.dryAt, waters: land.section.water, surfaces: dressing.landSurfaces ?? null,
+    }, {
+      placeMm: [0, 0, drawing.extent.widthMm, drawing.extent.depthMm],
+      keepOutMm: drawing.slots.filter((slot) => slot.identity !== baseSlot?.identity).map((slot) => slotRectMm(slot as CoverSlot)),
+    });
+    const landPlacements: InstancePlacement[] = [];
+    for (const point of landGrown?.points ?? []) {
+      const chosen = variantOf(point.piece, point.pick);
+      const file = chosen === null ? undefined : chosen.module.files.get(chosen.variant.file);
+      const piece = file === undefined ? undefined : pieces.get(chosen!.module, file);
+      if (piece?.textured === undefined) continue;
+      landPlacements.push({
+        key: `land-cover:${String(chosen!.module.stated)}:${file!.sha256}`,
+        lod0: piece.textured.lod0,
+        lod1: piece.textured.lod1,
+        matrix: coverMatrix(point, point.upM),
+        heightM: piece.bounds[4] * point.scale,
+      });
+    }
+    const landCover = landPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, landPlacements, view);
     // The look's wind sways every textured piece of the families it names, the cover's and the slots'.
     const lookWind = dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.wind ?? null : null;
     const wind = lookWind === null || !windRuns(device) ? null : new PlantWind(host.app, lookWind);
@@ -638,7 +669,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     // How many grounds are drawn with a broken border.
     if (bordered.length > 0 && canvas?.dataset !== undefined) canvas.dataset['siteBorders'] = String(bordered.length);
     // How many textured pieces stand instanced, in how many cells, the site's, the scenery's, the cover's and the climbers'.
-    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null, cover, climbers].filter((one) => one !== null);
+    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null, cover, climbers, landCover].filter((one) => one !== null);
     if (instancedParts.length > 0 && canvas?.dataset !== undefined) {
       canvas.dataset['sitePieceInstances'] = JSON.stringify({
         instances: instancedParts.reduce((sum, one) => sum + one.instances, 0),
@@ -651,6 +682,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     // What climbs the walls.
     const climbSaid = climbing === null ? null : { pieces: climbPlacements.length, buildings: climbing.buildings, leftOut: climbing.leftOut };
     if (climbSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteClimb'] = JSON.stringify(climbSaid);
+    // What grows on the land.
+    const landCoverSaid = landGrown === null ? null : { pieces: landPlacements.length, byRole: landGrown.byRole, leftOut: landGrown.leftOut, untried: landGrown.untried };
+    if (landCoverSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteLandCover'] = JSON.stringify(landCoverSaid);
     if (wind !== null && canvas?.dataset !== undefined) canvas.dataset['siteWind'] = String(wind.materials);
     // How many building walls show windows (a dressed building's hidden walls not among them), and in how many materials.
     const facadeSaid = facades === null ? null : {
@@ -676,6 +710,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       borderNeighboursLeftOut,
       ...(coverSaid === null ? {} : { cover: coverSaid }),
       ...(climbSaid === null ? {} : { climb: climbSaid }),
+      ...(landCoverSaid === null ? {} : { landCover: landCoverSaid }),
       ...(wind === null ? {} : { swaying: wind.materials }),
       ...(facadeSaid === null ? {} : { facade: facadeSaid }),
     });
@@ -695,6 +730,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (finish !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFinish'];
       if (coverSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCover'];
       if (climbSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteClimb'];
+      if (landCoverSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteLandCover'];
       if (wind !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteWind'];
       if (facadeSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFacade'];
       for (const instance of facing.splice(0)) clearFacadeWall(instance);
@@ -708,6 +744,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       sceneryPieces?.dispose();
       cover?.dispose();
       climbers?.dispose();
+      landCover?.dispose();
       wind?.dispose();
       placed.dispose();
       for (const [entity, enabled] of hidden.splice(0).reverse()) entity.enabled = enabled;

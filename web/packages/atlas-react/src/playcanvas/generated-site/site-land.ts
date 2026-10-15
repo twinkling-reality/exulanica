@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import {
-  LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, landBackdropColour, readLandBackdrop, readLandChunk,
+  LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, landBackdropColour, readLandBackdrop, readLandChunk, valueNoise,
   type HeightfieldDigest, type LandBackdrop, type LandChunk, type LandSurfaces, type LandWater,
 } from '@exulanica/atlas-core';
 import { buildSurfaceMesh } from '../generated-tile/surface-mesh.js';
@@ -319,16 +319,6 @@ function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMateri
   material.metalness = 0;
   material.update();
   return material;
-}
-
-/** Value noise in the world's metres, 0 to 1: the backdrop's own, as the near land's shader states it. */
-function valueNoise(x: number, z: number): number {
-  const hash = (a: number, b: number): number => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
-  const i = Math.floor(x), j = Math.floor(z), tx = x - i, tz = z - j;
-  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
-  const a = hash(i, j) + (hash(i + 1, j) - hash(i, j)) * sx;
-  const b = hash(i, j + 1) + (hash(i + 1, j + 1) - hash(i, j + 1)) * sx;
-  return a + (b - a) * sz;
 }
 
 /**

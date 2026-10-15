@@ -854,6 +854,48 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             },
         )
 
+    def land_cover_key(key: str, path: str) -> None:
+        if _KEY.fullmatch(key) is None:
+            _fail("shape", path, "must be a rule key")
+
+    def land_cover(value: Any, path: str) -> dict[str, Any]:
+        # What grows on the near land where it is drawn in a surface role (`land`, or a band of
+        # the land's surface catalog): which plant or prop pieces, how many a hectare, at what
+        # sizes, from which seed, optionally within a slope and a height and near the place.
+        def pair(least: int, most: int, says: str) -> Reader:
+            def read(v: Any, p: str) -> list[int]:
+                if not isinstance(v, list) or len(v) != 2:
+                    _fail("shape", p, says)
+                read = [_integer(least, most)(n, f"{p}[{i}]") for i, n in enumerate(v)]
+                if read[0] > read[1]:
+                    _fail("range", p, "must not have its least above its most")
+                return read
+
+            return read
+
+        return _object(
+            value,
+            path,
+            {
+                "role": _pattern(_KEY, "a land surface role"),
+                "pieces": _list(piece_role, 1, 8),
+                "density_per_ha": _integer(1, 400_000),
+                "scale_permille": pair(
+                    100, 3000, "must be a least and a most scale in thousandths"
+                ),
+                "seed": _integer(0, 2_147_483_647),
+                "slope_permille": _Optional(
+                    pair(0, 20_000, "must be a least and a most slope in thousandths")
+                ),
+                "height_mm": _Optional(
+                    pair(
+                        -10_000_000, 10_000_000, "must be a least and a most height in millimetres"
+                    )
+                ),
+                "within_mm": _Optional(_integer(0, 4_000_000)),
+            },
+        )
+
     def preset_key(key: str, path: str) -> None:
         if _KEY.fullmatch(key) is None:
             _fail("shape", path, "must be a preset key")
@@ -1034,6 +1076,8 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             "facade": _Optional(_record(look_role_key(("surface", "both")), facade, 64)),
             # Added within the profile: a pack that grows nothing on its walls states none.
             "climb": _Optional(_record(look_role_key(("module", "both")), climb, 64)),
+            # Added within the profile: a pack written before it grows nothing on the land.
+            "land_cover": _Optional(_record(land_cover_key, land_cover, 16)),
             "modules": _record(
                 look_role_key(("module", "both")),
                 lambda v, p: _object(
@@ -1175,6 +1219,13 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             where = f"climb.{role}.pieces[{index}]"
             if split_look_role(piece, where)[0] != "plant":
                 _fail("reference", where, "a climbing piece is a plant")
+            if manifest["base"] is None and piece not in manifest["modules"]:
+                _fail("reference", where, f"names no module {json.dumps(piece)}")
+    for role, rule in manifest.get("land_cover", {}).items():
+        for index, piece in enumerate(rule["pieces"]):
+            where = f"land_cover.{role}.pieces[{index}]"
+            if split_look_role(piece, where)[0] not in ("plant", "prop"):
+                _fail("reference", where, "a land cover piece is a plant or a prop")
             if manifest["base"] is None and piece not in manifest["modules"]:
                 _fail("reference", where, f"names no module {json.dumps(piece)}")
     for name, preset in (manifest["light"] or {"presets": {}})["presets"].items():
