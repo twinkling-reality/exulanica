@@ -16,6 +16,7 @@ from typing import Any
 
 from exulanica.world_package.projects.checkpoint import changes, document
 from exulanica.world_package.projects.words import (
+    MADE_BEING,
     capital,
     model_name,
     names,
@@ -247,6 +248,9 @@ def summarize(before: Any | None, after: Any, *, quote: bool = False) -> list[st
                 lines.append(moved)
         if was["kind"] != now["kind"]:
             lines.append(f"Changed what kind of thing {name} is")
+        elif now.get("label") and not was.get("label"):
+            # A made creature's label kept for the first time (readable text turned on).
+            lines.append(f"Called the {MADE_BEING} {name}")
         if was["origin"] != now["origin"]:
             lines.append(f"Changed where {name} came from")
     lines += parts_changed(old, new)

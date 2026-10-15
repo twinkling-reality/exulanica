@@ -86,6 +86,9 @@ def document(value: Any) -> dict[str, Any]:
         result[section].sort(key=lambda item: item[key])
     _drop_absent_readable(result["decisions"])
     # Optional additions: a checkpoint without them keeps its digest.
+    for thing in result["things"]:
+        if thing.get("label") is None:
+            thing.pop("label", None)
     if result.get("characters") is not None:
         result["characters"].sort(key=lambda item: item["thing_id"])
         for character in result["characters"]:

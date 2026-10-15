@@ -26,7 +26,9 @@ from exulanica.world_package.package import scan_payload
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Name = Annotated[str, Field(min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9:._/-]+$")]
 Natural = Annotated[int, Field(ge=0)]
-Label = Annotated[str, Field(min_length=1, max_length=500)]
+#: The longest label a checkpoint keeps (a made part's, a made creature's kind's).
+LABEL_MAXIMUM: Final = 500
+Label = Annotated[str, Field(min_length=1, max_length=LABEL_MAXIMUM)]
 #: The longest world title a checkpoint keeps; capture leaves a longer one out.
 TITLE_MAXIMUM: Final = 200
 
@@ -110,6 +112,16 @@ class Thing(Closed):
     transform: Pose
     origin: Origin
     removed: bool
+    #: A creature its workspace made, called by its kind's label (its maker's words), kept only
+    #: where the project keeps readable text; never on a shipped kind, whose words are the
+    #: library's.
+    label: Label | None = None
+
+    @model_validator(mode="after")
+    def labelled(self) -> Self:
+        if self.label is not None and not isinstance(self.kind, WorkspaceKind):
+            raise ValueError("only a thing of a made kind carries its kind's label")
+        return self
 
     def native(self) -> PlacedThing:
         reference = (

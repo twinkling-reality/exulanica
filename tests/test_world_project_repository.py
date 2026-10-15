@@ -499,3 +499,27 @@ def test_a_stated_author_still_signs_and_the_person_s_git_config_is_never_read(
     assert git(folder, "log", "-1", "--format=%an").strip() == AUTHOR.name
     create(tmp_path / "default", project)
     assert git(tmp_path / "default", "log", "-1", "--format=%an").strip() != "Someone Else"
+
+
+def test_a_kind_s_bytes_leave_the_folder_with_the_last_checkpoint_that_names_them(tmp_path):
+    # A made creature whose kind was erased leaves the selection; its kind's bytes, its label
+    # among them, leave the folder in the same commit. The project's history still holds them.
+    from test_world_project_rights import made_kind, made_project
+
+    local, project, sha = made_project(tmp_path / "project", made_kind("public"))
+    kept = tmp_path / "project" / "dependencies" / sha
+    assert kept.is_file()
+    left = deepcopy(project)
+    left["things"] = [t for t in left["things"] if t["thing_id"] != "creature:1"]
+    left["dependencies"] = [d for d in left["dependencies"] if d["sha256"] != sha]
+    saved = local.save(left)
+    assert saved["committed"] and not kept.exists()
+    assert local.git("ls-files", "--", f"dependencies/{sha}").strip() == ""
+    assert local.git("status", "--porcelain").strip() == ""
+    assert local.git("show", f"HEAD~1:dependencies/{sha}")
+    # Bytes no checkpoint ever recorded are taken out without a record of them.
+    stray = tmp_path / "project" / "dependencies" / ("b" * 64)
+    stray.write_bytes(b"{}")
+    moved = deepcopy(left)
+    moved["things"][0]["transform"]["x_mm"] += 1_000
+    assert local.save(moved)["committed"] and not stray.exists()

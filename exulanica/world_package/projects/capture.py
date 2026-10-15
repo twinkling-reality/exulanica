@@ -34,11 +34,12 @@ from exulanica.world.society_decision_contract import situation
 from exulanica.world.society_things import THING_NAMESPACE
 from exulanica.world_package.projects.checkpoint import (
     ProjectError,
+    decode,
     digest,
     document,
     evidence_document,
 )
-from exulanica.world_package.projects.schema import TITLE_MAXIMUM, scan_values
+from exulanica.world_package.projects.schema import LABEL_MAXIMUM, TITLE_MAXIMUM, scan_values
 
 _SEGMENT = re.compile(r"^[A-Za-z0-9:._-]{1,200}$")
 _NAME = re.compile(r"^[a-zA-Z0-9:._/-]{1,200}$")
@@ -338,6 +339,17 @@ def _written(value: Any) -> Any:
     return value
 
 
+def _kind_label(data: bytes) -> str | None:
+    """A made kind's label as its document states it, or None where it states none a checkpoint
+    can keep (absent, empty, longer than a label, or shaped like a path or a credential)."""
+    try:
+        document = decode(data)
+    except ProjectError:
+        return None
+    label = _written(document.get("label")) if isinstance(document, dict) else None
+    return label if label is not None and len(label) <= LABEL_MAXIMUM else None
+
+
 def _title(view: Mapping[str, Any], readable: bool) -> str | None:
     """The version's title as written, kept only with readable text; a longer one than a
     checkpoint holds is left out."""
@@ -568,7 +580,7 @@ def capture(
     wrote for each selected being (its name and the words about it); without it, only each such
     record's revision, so a change is still seen. Those come from one read of the version's
     character records, or, from an API without it, from each being's card where the version has
-    a society.
+    a society. It keeps each made creature's kind's label too, from the kind bytes kept for it.
 
     A world made from a world kind also has its made parts kept, as the version has them
     (moved, turned or removed by a person); `parts_known` is what the project holds for them and
@@ -646,6 +658,11 @@ def capture(
             if digest(data) != sha:
                 raise ProjectError("world API returned kind bytes that do not match their digest")
             declare("thing-kind", data, sha, f"workspace-kind:{sha[:16]}")
+            # A made creature is called by its kind's label, its maker's words: kept with
+            # readable text alone, from the bytes just read (no other request).
+            label = _kind_label(data) if readable else None
+            if label is not None:
+                thing["label"] = label
         else:
             declare("thing-kind", None, sha, f"kind:{thing['kind']['kind']}")
 

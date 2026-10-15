@@ -743,7 +743,10 @@ garden or a farm made from a sentence) also has its made parts kept in an option
 each building, garden fixture and area a person may change, as the version has it (`part_id`,
 `kind`, `centre_mm` east and north, `quarter_turns` from how it was made, a building's
 `storeys`, `removed`), and its `label` only with readable text, since a kind made from a person's words is worded from them. A
-checkpoint without these optional fields keeps its digest.
+placed thing of a kind its workspace made (a creature drafted from a person's words) keeps its
+kind's `label` the same way, only with readable text, taken from the kind bytes the project keeps
+for it; a thing of a shipped kind carries none. A checkpoint without these optional fields keeps
+its digest.
 
 Every string in a checkpoint or evidence file is also scanned by value. A value shaped like a
 local filesystem path or a credential (token prefixes, bearer values, private key headers) is
@@ -779,7 +782,11 @@ the source record was authentic. Inference reruns are not implemented by this ad
 ### Project folders
 
 A project is a plain local git repository: `world-project.json`, `evidence/<session>.json`, an
-optional `project-link.json` and optional `dependencies/<sha256>` files. No account, remote or hook is involved. Every git call
+optional `project-link.json` and optional `dependencies/<sha256>` files. A dependency file leaves
+the folder with the last checkpoint that declares it: when a made creature's kind is erased, its
+thing leaves the next checkpoint and its kind's bytes, label included, leave the folder in the same
+commit. The project's git history still holds them, as it holds every earlier checkpoint; an
+erasure in the workspace does not reach a person's own repository. No account, remote or hook is involved. Every git call
 names the folder's own `.git` directory with environment overrides removed, so it cannot reach an
 enclosing checkout; a folder with a remote is refused.
 
@@ -806,7 +813,10 @@ diff underneath (`summary.py`, with the words of `words.py`): "Moved the knight 
 15°", "Changed Sir Pip's model to Nemotron 3 Nano 30B", "Wrote Sir Pip's personality",
 "Recorded run 2: 5 decisions". A sentence starts with what was done and holds no identity, digest
 or code: a thing is called by the name its owner wrote, where the project keeps it, else by its
-kind ("the knight", "the second knight", "the creature made in this world"), and a model by the
+kind ("the knight", "the second knight"; a made creature by its kind's label where the project
+keeps it, "the long necked marsh heron", else "the creature made in this world", which is also
+what a thing that has left the newest checkpoint is called, so a label is never written again
+after its kind is erased), and a model by the
 name the workspace gives it (`Manifest.model_name`). Living sessions are runs, numbered in the
 project in the order they opened. A commit message never quotes a personality, and a written name
 in it loses a character a commit message refuses. `history` returns the read a history panel uses, described
@@ -1134,7 +1144,8 @@ files included (`exulanica/world_package/projects/rights.py`), and refuse, writi
 - **Written words reach only a private repository.** A file carrying a `readable` record (what a
   decision was told, the labels it was offered, its choice and its line), in an evidence file or
   in the checkpoint's own records, or a checkpoint carrying the world's title, a character's
-  words or a made part's label, goes only to a repository whose visibility reads `PRIVATE`. A public or internal
+  words, a made part's label or a made creature's kind's label, goes only to a repository whose
+  visibility reads `PRIVATE`. A public or internal
   repository, or one whose visibility GitHub does not state, receives none, read again on every
   review, so a repository made public after linking is refused too. A project kept without
   readable text reaches a public repository, its characters called by their kinds.

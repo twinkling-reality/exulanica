@@ -342,3 +342,90 @@ def test_a_public_repository_calls_a_garden_fixture_a_part():
 
     fixtures = [part(n, "fixture", (n * 1_000, 0)) for n in (1, 2)]
     assert sorted(part_names([{"parts": fixtures}]).values()) == ["the part", "the second part"]
+
+
+def with_creature(project, label=None, thing_id="creature:1", sha="e" * 64):
+    """The sample world with a creature its workspace made, labelled where the project kept it."""
+    world = deepcopy(project)
+    creature = placed(world, thing_id, 3_000, kind={"source": "workspace", "sha256": sha})
+    if label is not None:
+        creature["label"] = label
+    world["things"].append(creature)
+    if all(d["sha256"] != sha for d in world["dependencies"]):
+        world["dependencies"].append(
+            {
+                "kind": "thing-kind",
+                "sha256": sha,
+                "licence": "synthetic-test-only",
+                "source_id": "workspace-kind:synthetic",
+            }
+        )
+    return world
+
+
+def test_a_made_creature_is_called_by_its_kind_s_label_where_the_project_keeps_it():
+    # J20: its maker's words, as its tag and History say it; else the fixed words (P2, W3).
+    project, _ = sample()
+    heron = {"source": "workspace", "sha256": "e" * 64}
+    moth = {"source": "workspace", "sha256": "f" * 64}
+    world = {
+        "things": [
+            {**placed(project, "made:1", kind=heron), "label": "Long necked marsh heron"},
+            {**placed(project, "made:2", kind=heron), "label": "Long necked marsh heron"},
+            {**placed(project, "made:3", kind=moth), "label": "GLOW moth of the lower pools"},
+            placed(project, "made:4", kind={"source": "workspace", "sha256": "d" * 64}),
+        ]
+    }
+    called = names([world])
+    assert called["made:1"] == "the long necked marsh heron"
+    assert called["made:2"] == "the second long necked marsh heron"
+    assert called["made:3"] == "the GLOW moth of the lower pools"
+    assert called["made:4"] == "the creature made in this world"
+
+
+def test_a_made_creature_s_label_is_never_said_again_once_its_thing_has_left():
+    # Its kind erased (the version read marks it gone) or no longer selected: the label stays in
+    # the earlier checkpoint alone and is not written into anything new.
+    project, _ = sample()
+    kept = with_creature(project, "Long necked marsh heron")
+    moved = deepcopy(kept)
+    moved["things"][-1]["transform"]["x_mm"] += 2_000
+    assert summarize(kept, moved) == ["Moved the long necked marsh heron 2 m east"]
+    left = deepcopy(kept)
+    left["things"] = left["things"][:-1]
+    lines = summarize(kept, left)
+    assert lines == ["Stopped keeping the creature made in this world in the project"]
+    assert "heron" not in " ".join(lines)
+
+
+def test_a_made_creature_s_label_kept_for_the_first_time_is_one_sentence():
+    # Readable text turned on: the commit says what changed, never "Add dependency files".
+    project, _ = sample()
+    bare, kept = with_creature(project), with_creature(project, "Long necked marsh heron")
+    said = ["Called the creature made in this world the long necked marsh heron"]
+    assert summarize(bare, kept) == said
+    assert subject(bare, kept) == said[0]
+    # Readable text turned off: the label goes unsaid, under the summary's own catch-all.
+    assert summarize(kept, bare) == ["Changed some details; the files show them"]
+
+
+def test_a_made_creature_s_label_is_written_words():
+    from exulanica.world_package.projects.checkpoint import ProjectError
+    from exulanica.world_package.projects.words import without_words
+
+    project, _ = sample()
+    bare, labelled = with_creature(project), with_creature(project, "Long necked marsh heron")
+
+    # An optional addition: a checkpoint without it keeps its digest.
+    def creature(world):
+        return next(t for t in document(world)["things"] if t["thing_id"] == "creature:1")
+
+    assert "label" not in creature(bare)
+    assert creature(labelled)["label"] == "Long necked marsh heron"
+    # Left out for a repository that is not private.
+    assert all("label" not in thing for thing in without_words(document(labelled))["things"])
+    # A shipped kind's words are the library's: no thing of one carries a label.
+    shipped = deepcopy(project)
+    shipped["things"][0]["label"] = "Long necked marsh heron"
+    with pytest.raises(ProjectError):
+        document(shipped)

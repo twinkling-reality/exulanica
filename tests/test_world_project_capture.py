@@ -176,7 +176,9 @@ class World:
         self.requests.append((handler.command, handler.path, handler.headers.get("Authorization")))
         if handler.headers.get("Authorization") != f"Bearer {TOKEN}":
             return 401, {"code": "unauthorized"}
-        if parts.path != "/world-entries" and query.get("world_id") != [WORLD]:
+        # A workspace's own kinds are read by digest, as the API serves them, with no world.
+        scoped = parts.path != "/world-entries" and not parts.path.startswith("/things/kinds/")
+        if scoped and query.get("world_id") != [WORLD]:
             return 422, {"code": "world_id"}
         if parts.path in self.refusals:
             return self.refusals[parts.path]
@@ -879,3 +881,42 @@ def test_a_made_world_with_nothing_placed_is_kept_for_its_parts_alone(world):
     world.refusals[PARTS] = (422, {"code": "parts_not_served", "detail": "not made from a kind"})
     with WorldReader(world.url, TOKEN, WORLD) as reader, pytest.raises(NothingSelectable):
         capture(reader, version_id=VERSION, project_id="project:demo", thing_ids=None)
+
+
+def with_creature(world, label):
+    """The fake world with a creature its workspace made, its kind served as the bytes it holds."""
+    kind = {"profile": "exulanica.thing-kind/v1", "kind": "made_creature", "label": label}
+    data = json.dumps(kind).encode()
+    sha = digest(data)
+    creature = placed("creature:1", "knight", 2_000)
+    creature["kind"] = {"source": "workspace", "sha256": sha}
+    world.routes[f"/world/versions/{VERSION}"]["things"].append(creature)
+    world.routes[f"/things/kinds/{sha}"] = kind
+    return sha
+
+
+def captured_creature(world, *, readable):
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        project = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1", "creature:1"],
+            include_decisions=False,
+            readable=readable,
+        ).checkpoint
+    return next(t for t in project["things"] if t["thing_id"] == "creature:1")
+
+
+def test_a_made_creature_keeps_its_kind_s_label_with_readable_text_alone(world):
+    # J20: its maker's words, from the kind bytes the capture keeps for it (no other request).
+    with_creature(world, "Long necked marsh heron")
+    assert captured_creature(world, readable=True)["label"] == "Long necked marsh heron"
+    reads = [path for _, path, _ in world.requests if path.startswith("/things/kinds/")]
+    assert len(reads) == 1
+    assert "label" not in captured_creature(world, readable=False)
+
+
+def test_a_made_kind_s_label_shaped_like_a_credential_is_left_out(world):
+    with_creature(world, "token ghp_" + "a" * 36)
+    assert "label" not in captured_creature(world, readable=True)

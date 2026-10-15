@@ -293,3 +293,20 @@ def test_a_made_part_s_label_reaches_only_a_private_repository(tmp_path):
         None,
     )
     assert result["published"] and "Puddle" not in received(repository)
+
+
+def test_a_made_creature_s_label_reaches_only_a_private_repository(tmp_path):
+    # A made creature is called by its kind's label, its maker's words (J20): written words.
+    local, project, _ = made_project(tmp_path / "made", made_kind("public"))
+    labelled = deepcopy(project)
+    creature = next(t for t in labelled["things"] if t["thing_id"] == "creature:1")
+    creature["label"] = "Long necked marsh heron"
+    creature["transform"]["x_mm"] += 2_000
+    local.save(labelled)
+    public = remote("PUBLIC")
+    with pytest.raises(Conflict, match="made creature's kind's label"):
+        RollingPullRequests(public.request).review(TARGET, local)
+    assert public.writes == []
+    private = remote("PRIVATE")
+    _, result = publish(RollingPullRequests(private.request), TARGET, local, None)
+    assert result["published"] and "Long necked marsh heron" in received(private)

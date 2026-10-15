@@ -318,6 +318,7 @@ class Project:
                     raise ProjectError("dependency files must not be symlinks")
                 target.write_bytes(data)
                 paths.append(f"{DEPENDENCY_DIR}/{sha}")
+        paths += self._prune(declared)
         if sessions:
             folder = self.folder / EVIDENCE_DIR
             if folder.is_symlink():
@@ -330,6 +331,27 @@ class Project:
                 target.write_bytes(pretty_evidence(session))
                 paths.append(f"{EVIDENCE_DIR}/{name}")
         return paths
+
+    def _prune(self, declared: set[str]) -> list[str]:
+        """Take out of the folder the dependency files the checkpoint being written no longer
+        declares (a made kind whose thing left, its kind erased or no longer selected), so a
+        kind's bytes, its label among them, leave with the last checkpoint that names them. The
+        project's git history still holds them. Answers the paths a commit records as removed."""
+        folder = self.folder / DEPENDENCY_DIR
+        if folder.is_symlink() or not folder.is_dir():
+            return []
+        removed = []
+        for path in sorted(folder.iterdir()):
+            undeclared = re.fullmatch(r"[0-9a-f]{64}", path.name) and path.name not in declared
+            if not undeclared or path.is_symlink() or not path.is_file():
+                continue
+            relative = f"{DEPENDENCY_DIR}/{path.name}"
+            tracked = bool(self.git("ls-files", "--", relative).strip())
+            path.unlink()
+            # A file never committed has nothing to record; staging its absence would fail.
+            if tracked:
+                removed.append(relative)
+        return removed
 
     def write_working(self, checkpoint: Any, evidence: Sequence[Any] = ()) -> None:
         """Show a pending selection and evidence in the folder without recording it."""

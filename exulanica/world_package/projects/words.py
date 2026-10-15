@@ -8,9 +8,9 @@ or else by its kind. Nothing here reads the network or a project folder.
 
 A name a person wrote appears only where the project kept it, which is only where it keeps
 readable text; such a project publishes only to a private repository
-(:mod:`exulanica.world_package.projects.rights`). Without it a character is called by its kind,
-and a being of a made kind, whose label is drafted from a person's words, "the creature made in
-this world".
+(:mod:`exulanica.world_package.projects.rights`). There a being of a made kind is called by its
+kind's label, drafted from its maker's words (ruling J20); without it, a character is called by
+its kind, and a being of a made kind "the creature made in this world".
 """
 
 from __future__ import annotations
@@ -82,10 +82,18 @@ def model_name(model_id: str) -> str:
     return load_manifest().model_name(model_id)
 
 
-def _kind_noun(kind: Mapping[str, Any]) -> str:
-    """A thing's kind as a noun: a shipped kind's label, a made kind's fixed words."""
+def in_sentence(label: str) -> str:
+    """A label as a sentence says it: its first letter lowered, unless its first word is all
+    capitals (as build mode's words say it)."""
+    first = label.split()[0] if label.split() else label
+    return label if len(first) > 1 and first == first.upper() else label[:1].lower() + label[1:]
+
+
+def _kind_noun(kind: Mapping[str, Any], label: str | None = None) -> str:
+    """A thing's kind as a noun: a shipped kind's label; a made kind's own label (its maker's
+    words, ruling J20) where the project keeps it, else fixed words."""
     if kind.get("source") == "workspace":
-        return MADE_BEING
+        return in_sentence(label.strip()) if label and label.strip() else MADE_BEING
     try:
         reference = ThingKindReference(kind["kind"], kind["version"], kind["sha256"])
         label = str(shipped_kind(reference).document["label"])
@@ -102,15 +110,20 @@ def written_name(character: Mapping[str, Any] | None) -> str | None:
 
 def names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
     """What each thing of these checkpoints is called, the later checkpoint's words first: the
-    name its owner wrote, else "the" and its kind, with "the second ..." where several things of
-    one kind are unnamed (in the order of their identities, which are never shown)."""
+    name its owner wrote, else "the" and its kind (a made creature's kind's label where the
+    project keeps it), with "the second ..." where several things of one kind are unnamed (in the
+    order of their identities, which are never shown). A made kind's label is said only for a
+    thing the newest checkpoint still holds: once its thing has left (its kind erased, or no
+    longer selected), the label is never written again."""
     things: dict[str, Mapping[str, Any]] = {}
     characters: dict[str, Mapping[str, Any]] = {}
+    newest: set[str] = set()
     for world in worlds:
         if world is None:
             continue
         things.update({thing["thing_id"]: thing for thing in world["things"]})
         characters.update({c["thing_id"]: c for c in world.get("characters") or []})
+        newest = {thing["thing_id"] for thing in world["things"]}
     called: dict[str, str] = {}
     unnamed: dict[str, list[str]] = {}
     for thing_id in sorted(things):
@@ -118,7 +131,9 @@ def names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
         if name is not None:
             called[thing_id] = name
         else:
-            unnamed.setdefault(_kind_noun(things[thing_id]["kind"]), []).append(thing_id)
+            thing = things[thing_id]
+            label = thing.get("label") if thing_id in newest else None
+            unnamed.setdefault(_kind_noun(thing["kind"], label), []).append(thing_id)
     for noun, ids in unnamed.items():
         for index, thing_id in enumerate(ids):
             if index == 0:
@@ -177,8 +192,12 @@ def quoted(text: str) -> str:
 
 def without_words(world: Mapping[str, Any]) -> dict[str, Any]:
     """A checkpoint with every word a person wrote left out (its title, its characters' names
-    and personalities, its made parts' labels), as a repository that is not private is told it."""
+    and personalities, its made parts' labels, its made creatures' kinds' labels), as a
+    repository that is not private is told it."""
     kept = {key: value for key, value in world.items() if key != "title"}
+    kept["things"] = [
+        {key: value for key, value in thing.items() if key != "label"} for thing in world["things"]
+    ]
     if world.get("characters") is not None:
         kept["characters"] = [
             {key: value for key, value in c.items() if key != "words"} for c in world["characters"]
