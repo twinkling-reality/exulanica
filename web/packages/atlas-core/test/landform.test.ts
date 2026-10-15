@@ -80,11 +80,33 @@ describe('the backdrop', () => {
   });
 
   it('reads its water and refuses a backdrop that does not rise along its axes', () => {
-    expect(backdrop.water).toEqual([]);
+    // The fixture's only water is its cascade.
+    expect(new Set(backdrop.water.map((body) => body.kind))).toEqual(new Set(['pool', 'fall']));
     const reversed = { ...fixture.backdrop, x_mm: [...fixture.backdrop.x_mm].reverse() };
     expect(() => readLandBackdrop(reversed, digest)).toThrow(LandformError);
     const sea = { ...fixture.backdrop, water: [{ id: 'sea', kind: 'sea', level_mm: 0, side: 'south' }] };
     expect(readLandBackdrop(sea, digest).water).toEqual([{ id: 'sea', kind: 'sea', levelMm: 0, side: 'south' }]);
+  });
+  it("reads a cascade's pools and the falls between them, and refuses a fall that does not fall", () => {
+    const pools = backdrop.water.filter((body) => body.kind === 'pool');
+    const falls = backdrop.water.flatMap((body) => (body.kind === 'fall' ? [body] : []));
+    expect(pools.length).toBeGreaterThan(1);
+    expect(falls).toHaveLength(pools.length - 1);
+    for (const [i, fall] of falls.entries()) {
+      expect([fall.levelMm, fall.bottomMm, fall.side]).toEqual([pools[i]!.levelMm, pools[i + 1]!.levelMm, 'south']);
+      expect(fall.rectMm[1]).toBe(fall.rectMm[3]);
+    }
+    const raw = JSON.parse(JSON.stringify(fixture.backdrop)) as { water: Record<string, unknown>[] };
+    const fall = raw.water.find((body) => body['kind'] === 'fall')!;
+    for (const [change, where] of [
+      [{ bottom_mm: fall['level_mm'] }, 'bottom_mm'],
+      [{ side: 'south_west' }, 'side'],
+      [{ rect_mm: [0, 0, 1000, 1000] }, 'rect_mm'],
+      [{ kind: 'stream' }, 'kind'],
+    ] as const) {
+      const broken = { ...raw, water: raw.water.map((body) => (body === fall ? { ...body, ...change } : body)) };
+      expect(() => readLandBackdrop(broken, digest)).toThrow(where);
+    }
   });
 });
 

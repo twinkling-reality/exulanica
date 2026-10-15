@@ -218,7 +218,10 @@ function point(value: unknown, what: string): readonly [number, number] {
 
 const WATER_FIELDS: Readonly<Record<string, string>> = {
   sea: 'id kind level_mm side', lake: 'id kind level_mm centre_mm radius_mm', pond: 'id kind level_mm rect_mm',
+  pool: 'id kind level_mm rect_mm', fall: 'id kind level_mm bottom_mm rect_mm side',
 };
+/** The sides a cascade's fall may fall toward. */
+const FALL_SIDES: readonly string[] = ['north', 'east', 'south', 'west'];
 
 /** The land section of a site on land: its chunks and backdrop by digest, and its water. */
 function landSection(value: unknown): SiteLandSection {
@@ -239,13 +242,25 @@ function landSection(value: unknown): SiteLandSection {
     water: Object.freeze(water.map((one, index): LandWater => {
       const kind = object(one, `land water ${index}`)['kind'];
       const fields = typeof kind === 'string' ? WATER_FIELDS[kind] : undefined;
-      if (fields === undefined) fail(`The site drawing's land water ${index} is not sea, lake or pond.`);
+      if (fields === undefined) fail(`The site drawing's land water ${index} is not sea, lake, pond, pool or fall.`);
       const body = closed(one, fields, `land water ${index}`);
       const id = text(body['id'], `land water ${index} id`), levelMm = integer(body['level_mm'], `land water ${index} level`);
       if (kind === 'sea') return Object.freeze({ id, kind, levelMm, side: text(body['side'], `land water ${index} side`) });
       if (kind === 'lake') return Object.freeze({ id, kind, levelMm, centreMm: point(body['centre_mm'], `land water ${index} centre`), radiusMm: integer(body['radius_mm'], `land water ${index} radius`) });
-      const [x0, y0, x1, y1] = rect(body['rect_mm'], `land water ${index} rectangle`);
-      return Object.freeze({ id, kind: 'pond' as const, levelMm, rectMm: Object.freeze([x0, y0, x1, y1] as const) });
+      if (kind !== 'fall') {
+        const [x0, y0, x1, y1] = rect(body['rect_mm'], `land water ${index} rectangle`);
+        return Object.freeze({ id, kind: kind as 'pond' | 'pool', levelMm, rectMm: Object.freeze([x0, y0, x1, y1] as const) });
+      }
+      const line = body['rect_mm'];
+      if (!Array.isArray(line) || line.length !== 4) fail(`The site drawing's land water ${index} line is not four numbers.`);
+      const [x0, y0, x1, y1] = line.map((v) => integer(v, `land water ${index} line`)) as [number, number, number, number];
+      if (!((x0 === x1 && y0 < y1) || (y0 === y1 && x0 < x1))) fail(`The site drawing's land water ${index} is a fall that is not a line across its channel.`);
+      const rectMm = Object.freeze([x0, y0, x1, y1] as const);
+      const bottomMm = integer(body['bottom_mm'], `land water ${index} bottom`);
+      if (bottomMm >= levelMm) fail(`The site drawing's land water ${index} is a fall that does not fall.`);
+      const side = text(body['side'], `land water ${index} side`);
+      if (!FALL_SIDES.includes(side)) fail(`The site drawing's land water ${index} falls toward ${side}, not north, east, south or west.`);
+      return Object.freeze({ id, kind: 'fall' as const, levelMm, bottomMm, rectMm, side: side as 'north' | 'east' | 'south' | 'west' });
     })),
   });
 }

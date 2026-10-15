@@ -62,6 +62,11 @@ const backdropDocument = (): Record<string, unknown> => ({
 });
 const chunks = (): Map<string, unknown> => new Map([['-1,0', chunkDocument(-1, 0)], ['0,0', chunkDocument(0, 0)]]);
 
+/** A cascade's water over the fixture's land, as the server lists it: two pools and the fall between. */
+const POOL = { id: 'falls pool 0', kind: 'pool', level_mm: 9000, rect_mm: [-20_000, 40_000, -16_000, 60_000] };
+const FALL = { id: 'falls fall 0', kind: 'fall', level_mm: 9000, bottom_mm: 7000, rect_mm: [-20_000, 38_000, -16_000, 38_000], side: 'south' };
+const LOWER = { id: 'falls pool 1', kind: 'pool', level_mm: 7000, rect_mm: [-20_000, 20_000, -16_000, 36_000] };
+
 function landOf(drawing: StructuredSiteDrawing): SiteLand {
   return readSiteLand(drawing, chunks(), backdropDocument(), sha256, 1234);
 }
@@ -114,7 +119,10 @@ describe('reading a site on land', () => {
     ['chunks of another size', (d: Record<string, unknown>) => { (d['land'] as Record<string, unknown>)['chunk_mm'] = 64_000; }, 'are not 128000 mm'],
     ['a chunk named twice', (d: Record<string, unknown>) => { const land = d['land'] as { chunks: unknown[] }; land.chunks.push(land.chunks[0]); }, 'states a chunk twice'],
     ['a digest that is not one', (d: Record<string, unknown>) => { (d['land'] as Record<string, unknown>)['backdrop_sha256'] = 'f00d'; }, 'not a SHA-256 digest'],
-    ['water of another kind', (d: Record<string, unknown>) => { ((d['land'] as { water: Record<string, unknown>[] }).water[0]!)['kind'] = 'river'; }, 'not sea, lake or pond'],
+    ['water of another kind', (d: Record<string, unknown>) => { ((d['land'] as { water: Record<string, unknown>[] }).water[0]!)['kind'] = 'river'; }, 'not sea, lake, pond, pool or fall'],
+    ['a fall that does not fall', (d: Record<string, unknown>) => { (d['land'] as { water: unknown[] }).water.push({ ...FALL, bottom_mm: 9000 }); }, 'does not fall'],
+    ['a fall with depth', (d: Record<string, unknown>) => { (d['land'] as { water: unknown[] }).water.push({ ...FALL, rect_mm: [-20_000, 37_000, -16_000, 38_000] }); }, 'not a line across its channel'],
+    ['a fall toward a corner', (d: Record<string, unknown>) => { (d['land'] as { water: unknown[] }).water.push({ ...FALL, side: 'south_east' }); }, 'not north, east, south or west'],
     ['no land at all', (d: Record<string, unknown>) => { delete d['land']; }, "land is not an object"],
   ])('refuses %s by name', (_name, change, words) => {
     const document = served();
@@ -233,6 +241,40 @@ describe('drawing a site on land', () => {
     drawn.destroy();
     // The water's material is its maker's to free; the land frees its own plain water.
     expect(destroyed).toBe(0);
+  });
+
+  it("draws a cascade's pools level and its falls upright, facing where they fall, and hands both to the water's finish", () => {
+    const document = served();
+    (document['land'] as { water: unknown[] }).water.push(POOL, FALL, LOWER);
+    const cascade = parseStructuredSiteDrawing(document);
+    const land = landOf(cascade);
+    expect(land.dryAt(-18_000, 50_000)).toBe(false);
+    expect(land.dryAt(-25_000, 50_000)).toBe(true);
+    const { app } = nullApp();
+    const drawn = drawSiteLand(app.graphicsDevice, land, new pc.StandardMaterial(), [0.4, 0.5, 0.3]);
+    expect(drawn.water.map((one) => one.body.kind)).toEqual(['sea', 'pool', 'fall', 'pool']);
+    const [, pool, fall] = drawn.water;
+    for (const point of pointsOf(pool!.instance)) {
+      expect(point.y).toBeCloseTo(9);
+      expect(point.x).toBeGreaterThanOrEqual(-20.001);
+      expect(point.x).toBeLessThanOrEqual(-15.999);
+      expect(-point.z).toBeGreaterThanOrEqual(39.999);
+      expect(-point.z).toBeLessThanOrEqual(60.001);
+    }
+    const sheet = pointsOf(fall!.instance);
+    expect(Math.min(...sheet.map((point) => point.y))).toBeCloseTo(7);
+    expect(Math.max(...sheet.map((point) => point.y))).toBeCloseTo(9);
+    for (const point of sheet) expect(point.z).toBeCloseTo(-38);
+    // It faces south, the way it falls, so it is seen from below.
+    const facing = fall!.instance.node.getWorldTransform().transformVector(pc.Vec3.UP, new pc.Vec3());
+    expect([facing.x, facing.y, facing.z].map((v) => Math.round(v))).toEqual([0, 0, 1]);
+    const given = new pc.StandardMaterial();
+    const asked: string[] = [];
+    drawn.wearWater((body) => { asked.push(body.kind); return body.kind === 'fall' ? given : null; });
+    expect(asked).toEqual(['sea', 'pool', 'fall', 'pool']);
+    expect(fall!.instance.material).toBe(given);
+    expect(pool!.instance.material).not.toBe(given);
+    drawn.destroy();
   });
 
   it('draws the land in place of the base ground and the flat plane beyond, out to its horizon, and takes it all away', () => {

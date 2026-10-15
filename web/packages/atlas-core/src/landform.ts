@@ -134,10 +134,22 @@ export function landChunkLocal(chunk: LandChunk, eastMm: number, northMm: number
   return [eastMm - chunk.chunkX * LAND_CHUNK_MM, chunk.chunkY * LAND_CHUNK_MM - northMm];
 }
 
+/**
+ * Water over the land: the sea at the datum on a side, a lake in a basin, a pond a layout grades,
+ * or a cascade's pools and the falls between them. A fall is a sheet on the line `rectMm` (as
+ * long as its channel is wide, of no depth), from `levelMm` down to `bottomMm`, falling toward a
+ * main side.
+ */
 export type LandWater =
   | { readonly id: string; readonly kind: 'sea'; readonly levelMm: number; readonly side: string }
   | { readonly id: string; readonly kind: 'lake'; readonly levelMm: number; readonly centreMm: readonly [number, number]; readonly radiusMm: number }
-  | { readonly id: string; readonly kind: 'pond'; readonly levelMm: number; readonly rectMm: readonly [number, number, number, number] };
+  | { readonly id: string; readonly kind: 'pond' | 'pool'; readonly levelMm: number; readonly rectMm: readonly [number, number, number, number] }
+  | {
+    readonly id: string; readonly kind: 'fall'; readonly levelMm: number; readonly bottomMm: number;
+    readonly rectMm: readonly [number, number, number, number]; readonly side: 'north' | 'east' | 'south' | 'west';
+  };
+
+const FALL_SIDES: readonly string[] = ['north', 'east', 'south', 'west'];
 
 function readWater(raw: unknown, where: string): LandWater {
   require(raw !== null && typeof raw === 'object' && !Array.isArray(raw), where, 'is an object');
@@ -153,10 +165,22 @@ function readWater(raw: unknown, where: string): LandWater {
     const [x, y] = integers(row['centre_mm'], 2, -bound, bound, `${where}.centre_mm`);
     return Object.freeze({ id: String(row['id']), kind, levelMm: integer(row['level_mm'], -bound, bound, `${where}.level_mm`), centreMm: [x!, y!] as const, radiusMm: integer(row['radius_mm'], 1, bound, `${where}.radius_mm`) });
   }
-  require(kind === 'pond', `${where}.kind`, 'is sea, lake or pond');
+  if (kind === 'fall') {
+    const row = fields(raw, 'id kind level_mm bottom_mm rect_mm side', where);
+    const [x0, y0, x1, y1] = integers(row['rect_mm'], 4, -bound, bound, `${where}.rect_mm`);
+    require(x0 === x1 || y0 === y1, `${where}.rect_mm`, 'is a line across its channel');
+    const levelMm = integer(row['level_mm'], -bound, bound, `${where}.level_mm`);
+    const bottomMm = integer(row['bottom_mm'], -bound, levelMm - 1, `${where}.bottom_mm`);
+    require(typeof row['side'] === 'string' && FALL_SIDES.includes(row['side']), `${where}.side`, 'is north, east, south or west');
+    return Object.freeze({
+      id: String(row['id']), kind, levelMm, bottomMm, rectMm: [x0!, y0!, x1!, y1!] as const,
+      side: row['side'] as 'north' | 'east' | 'south' | 'west',
+    });
+  }
+  require(kind === 'pond' || kind === 'pool', `${where}.kind`, 'is sea, lake, pond, pool or fall');
   const row = fields(raw, 'id kind level_mm rect_mm', where);
   const [x0, y0, x1, y1] = integers(row['rect_mm'], 4, -bound, bound, `${where}.rect_mm`);
-  return Object.freeze({ id: String(row['id']), kind: 'pond' as const, levelMm: integer(row['level_mm'], -bound, bound, `${where}.level_mm`), rectMm: [x0!, y0!, x1!, y1!] as const });
+  return Object.freeze({ id: String(row['id']), kind: kind as 'pond' | 'pool', levelMm: integer(row['level_mm'], -bound, bound, `${where}.level_mm`), rectMm: [x0!, y0!, x1!, y1!] as const });
 }
 
 export interface LandBackdrop {

@@ -89,7 +89,7 @@ function underWater(water: readonly LandWater[], eastMm: number, northMm: number
   for (const body of water) {
     if (body.kind === 'sea' && groundMm < body.levelMm + DRY_ABOVE_SEA_MM) return true;
     if (body.kind === 'lake' && Math.hypot(eastMm - body.centreMm[0], northMm - body.centreMm[1]) <= body.radiusMm) return true;
-    if (body.kind === 'pond' && eastMm >= body.rectMm[0] && eastMm <= body.rectMm[2] && northMm >= body.rectMm[1] && northMm <= body.rectMm[3]) return true;
+    if ((body.kind === 'pond' || body.kind === 'pool') && eastMm >= body.rectMm[0] && eastMm <= body.rectMm[2] && northMm >= body.rectMm[1] && northMm <= body.rectMm[3]) return true;
   }
   return false;
 }
@@ -248,6 +248,37 @@ export function drapeSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSit
   };
 }
 
+/**
+ * Where a body of the land's water is drawn, as a plane: its middle (metres, the scene's frame),
+ * its half extents along the plane's own two axes, and the turn that stands a fall upright. The
+ * sea is as wide as the backdrop reaches; a lake is the square round its basin; a cascade's pool is
+ * its rectangle; a fall is a sheet across its channel from its top down to its bottom, facing the
+ * side it falls toward, so it is seen from below.
+ */
+export function waterPlane(body: LandWater, reachM: number): {
+  readonly at: readonly [number, number, number]; readonly half: readonly [number, number];
+  readonly turn: readonly [number, number, number];
+} {
+  if (body.kind === 'sea') return { at: [0, body.levelMm / 1000, 0], half: [reachM, reachM], turn: [0, 0, 0] };
+  if (body.kind === 'lake') {
+    const r = body.radiusMm / 1000;
+    return { at: [body.centreMm[0] / 1000, body.levelMm / 1000, -body.centreMm[1] / 1000], half: [r, r], turn: [0, 0, 0] };
+  }
+  const [x0, y0, x1, y1] = body.rectMm;
+  const middle: readonly [number, number] = [(x0 + x1) / 2000, -(y0 + y1) / 2000];
+  if (body.kind !== 'fall') {
+    return { at: [middle[0], body.levelMm / 1000, middle[1]], half: [(x1 - x0) / 2000, (y1 - y0) / 2000], turn: [0, 0, 0] };
+  }
+  const halfHeight = (body.levelMm - body.bottomMm) / 2000;
+  const height = (body.levelMm + body.bottomMm) / 2000;
+  // The plane faces up (+y); a fall's face turns toward its side: south is +z, north -z, east +x.
+  const across = y0 === y1;
+  const turn: readonly [number, number, number] = body.side === 'south' ? [90, 0, 0] : body.side === 'north' ? [-90, 0, 0]
+    : body.side === 'east' ? [0, 0, -90] : [0, 0, 90];
+  const half: readonly [number, number] = across ? [(x1 - x0) / 2000, halfHeight] : [halfHeight, (y1 - y0) / 2000];
+  return { at: [middle[0], height, middle[1]], half, turn };
+}
+
 /** What drawing a site's land put in the scene, and how to dress it and take it away. */
 export interface DrawnSiteLand {
   readonly root: pc.Entity;
@@ -264,11 +295,13 @@ export interface DrawnSiteLand {
    */
   wear(material: pc.Material): void;
   surfaces(): void;
-  /** The sea and the lakes as drawn, each with its body; a pond is a site slot, not here. */
+  /** The sea, the lakes and a cascade's pools and falls as drawn, each with its body; a pond is a
+   * site slot, not here. */
   readonly water: readonly { readonly instance: pc.MeshInstance; readonly body: LandWater }[];
   /**
-   * Wear each sea and lake in the material the callback gives for its body (the look's water, as a
-   * dresser makes it), or keep plain water where it gives none. The materials stay the caller's.
+   * Wear each sea, lake, pool and fall in the material the callback gives for its body (the look's
+   * water, as a dresser makes it), or keep plain water where it gives none. The materials stay the
+   * caller's.
    */
   wearWater(material: (body: LandWater) => pc.Material | null): void;
   destroy(): void;
@@ -404,13 +437,14 @@ export function drawSiteLand(
   const waters: { readonly instance: pc.MeshInstance; readonly body: LandWater }[] = [];
   for (const body of land.section.water) {
     if (body.kind === 'pond') continue;
-    const [x, z, half] = body.kind === 'sea' ? [0, 0, reach] : [body.centreMm[0] / 1000, -body.centreMm[1] / 1000, body.radiusMm / 1000];
-    const mesh = pc.Mesh.fromGeometry(device, new pc.PlaneGeometry({ halfExtents: new pc.Vec2(half, half) }));
+    const placed = waterPlane(body, reach);
+    const mesh = pc.Mesh.fromGeometry(device, new pc.PlaneGeometry({ halfExtents: new pc.Vec2(placed.half[0], placed.half[1]) }));
     meshes.push(mesh);
     const surface = new pc.MeshInstance(mesh, water);
     waters.push({ instance: surface, body });
     const entity = new pc.Entity(`site-land:water:${body.id}`);
-    entity.setLocalPosition(x, body.levelMm / 1000, z);
+    entity.setLocalPosition(placed.at[0], placed.at[1], placed.at[2]);
+    entity.setLocalEulerAngles(placed.turn[0], placed.turn[1], placed.turn[2]);
     entity.addComponent('render', { meshInstances: [surface], castShadows: false, receiveShadows: true });
     root.addChild(entity);
     draws += 1;

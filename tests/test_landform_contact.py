@@ -104,20 +104,26 @@ VECTOR_LAND = {
         {"id": "swell", "kind": "undulation", "amplitude_mm": 1200, "wavelength_mm": 25000},
         {"id": "skyline", "kind": "range", "side": "north", "distance_mm": 900000,
          "band_mm": 400000, "height_mm": 200000},
+        # Stepping south through the corner chunk and ending on land: pools, falls and a last pool.
+        {"id": "falls", "kind": "cascade", "side": "south", "offset_mm": -100000,
+         "from_mm": 10000, "to_mm": 100000, "width_mm": 4000, "step_mm": 1500},
     ],
 }  # fmt: skip
 
 
 def conformance() -> dict:
     """The cross-language vectors: one chunk at the near land's south-west corner, a small
-    backdrop, and exact heights at points the browser's reader is held to."""
+    backdrop, and exact heights at points the browser's reader is held to, three of them in a
+    cascade's channel, on its lip and on a sill."""
     land = read_land_document(VECTOR_LAND)
     chunk = realize_chunk(land, VECTOR_FRAME, -1, -1)
     backdrop = realize_backdrop(land, VECTOR_FRAME, reach_mm=600_000)
     x0, y0 = -CHUNK_MM, -CHUNK_MM
     points = [(x0, y0), (0, 0), (x0 + 1, y0 + 2), (x0 + 64_500, y0 + 64_250),
               (x0 + 64_250, y0 + 64_500), (x0 + 100_333, y0 + 7_777), (-1, -1),
-              (x0 + 12_000, y0 + 127_999), (x0 + 127_000, y0 + 500), (x0 + 3, y0 + 3)]  # fmt: skip
+              (x0 + 12_000, y0 + 127_999), (x0 + 127_000, y0 + 500), (x0 + 3, y0 + 3),
+              (x0 + 68_000, y0 + 100_000), (x0 + 65_500, y0 + 100_000),
+              (x0 + 68_250, y0 + 104_000)]  # fmt: skip
     return {
         "profile": "exulanica.landform-conformance/v1",
         "note": "Made by conformance() in tests/test_landform_contact.py; that test holds this "
