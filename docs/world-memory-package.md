@@ -980,7 +980,8 @@ regenerated from the committed files on every review and ends
 with their digests. What the files cannot support (requests no minute took up, receipts older
 files lack) is named as unavailable, never shown as zero. Labels, spoken lines and situations
 appear only when the repository's visibility reads `PRIVATE`; a public or internal repository gets
-option numbers and codes only, and the review digest binds which. The generated text passes the
+option numbers and codes only, and the review digest binds which. The files follow the same rule
+(below, "What reaches a repository"). The generated text passes the
 value scan and stays within 60,000 characters, below the 65,536 GitHub is reported to accept
 (its pull request API page states no limit); it leaves out decision lines first, then older
 sessions' detail, and says so, never the counts or the model table. When the
@@ -1041,9 +1042,30 @@ A failed or timed-out request is not automatically retried because its outcome m
 read the branch again before preparing a new review. The transport uses
 [`gh api` structured input](https://cli.github.com/manual/gh_api), never shell interpolation.
 
-Review every selected value and its publication rights before publishing. Selected identifiers
-and evidence digests can still be private. Local saves, GitHub access and native world
-permissions are separate. Publication cannot recall copies already fetched by others.
+**What reaches a repository.** Before anything is written, `review-branch`, `publish-branch`,
+`review` and `publish` check every file each commit would send, earlier unpublished checkpoints'
+files included (`exulanica/world_package/projects/rights.py`), and refuse, writing nothing:
+
+- **Written words reach only a private repository.** A file carrying a `readable` record (what a
+  decision was told, the labels it was offered, its choice and its line), in an evidence file or
+  in the checkpoint's own records, goes only to a repository whose visibility reads `PRIVATE`. A
+  public or internal repository, or one whose visibility GitHub does not state, receives none,
+  read again on every review, so a repository made public after linking is refused too. A project
+  kept without readable records reaches a public repository, told in option numbers and codes.
+- **A thing goes only where its origin allows.** Each thing kind the published checkpoint names is
+  published only where its origin record lets it be shown ([things contract](things-contract.md)):
+  `public` anywhere, `private` (its own workspace) and `restricted` (never in a public artefact)
+  only to a private repository; the record cannot say `public` of a person's upload, their own
+  work or a private licence. A shipped kind's record is read from the installed library and a
+  made kind's from the bytes the project keeps for it under `dependencies/`; a made kind whose
+  bytes are missing, or held under another digest, is refused, since its rights cannot be read.
+  The single-file transport carries no kind bytes, so it publishes no made thing.
+
+Identifiers are not read as words: a thing's placed id is its author's text, and selected
+identifiers and evidence digests can still be private. Review every selected value and its
+publication rights before publishing. Local saves, GitHub access and native world permissions are
+separate. Publication cannot recall copies already fetched by others, nor what an earlier
+publication already sent to a repository made public since.
 
 Synthetic tests cover native selection, project folders, append-only evidence, plain-word
 summaries, capture against a fake World API, automatic tracking and following with a fake clock,

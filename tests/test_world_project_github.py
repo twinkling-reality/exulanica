@@ -77,6 +77,8 @@ class Server:
         self.owner = "learner"
         self.writes = []
         self.move_during_write = False
+        #: Repository.visibility, as the rolling branch read's fake states it.
+        self.visibility = "PRIVATE"
 
     def request(self, query, variables):
         if query.startswith("query"):
@@ -89,6 +91,7 @@ class Server:
                     "viewerPermission": "ADMIN",
                     "isArchived": False,
                     "isDisabled": False,
+                    "visibility": self.visibility,
                     "ref": {
                         "target": {
                             "oid": self.head,
@@ -724,21 +727,28 @@ def test_visibility_decides_whether_the_request_reads_labels_or_codes(tmp_path):
 
     from test_world_project_insight import session
 
-    local, _, _ = local_project(tmp_path)
-    world, evidence = session(count=2)
-    local.save(world, evidence=[{**evidence, "session_id": "session:labelled"}])
     target = BranchTarget("learner/world", "main", "exulanica/world")
+    reviews = {}
+    for readable in (True, False):
+        local, _, _ = local_project(tmp_path / str(readable))
+        world, evidence = session(count=2, readable=readable)
+        local.save(world, evidence=[{**evidence, "session_id": "session:labelled"}])
+        reviews[readable] = local
     remote = Repository()
     client = RollingPullRequests(remote.request)
-    private = client.review(target, local)
+    private = client.review(target, reviews[True])
     assert private["text"] == "readable"
     assert "\u201crest by the well\u201d" in private["body"]
     assert "What the beings did" in private["body"]
     remote.visibility = "PUBLIC"
-    public = client.review(target, local)
+    # A project holding written words reaches no public repository at all
+    # (test_world_project_rights); one without them is told in codes.
+    with pytest.raises(Conflict, match="written words"):
+        client.review(target, reviews[True])
+    public = client.review(target, reviews[False])
     assert public["text"] == "codes"
-    assert "rest by the well" not in public["body"] and "option 2 (go)" in public["body"]
+    assert "option 2 (go)" in public["body"]
     assert public["review_sha256"] != private["review_sha256"]
     remote.visibility = "INTERNAL"
-    assert client.review(target, local)["text"] == "codes"
+    assert client.review(target, reviews[False])["text"] == "codes"
     assert remote.writes == []

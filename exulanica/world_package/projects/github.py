@@ -1,7 +1,9 @@
 """Explicit GitHub checkpoint transport using gh and atomic expected-head publication.
 
 Only world-project.json is read or written. No checkout discovery, directory traversal, git
-staging, hooks, force updates or repository creation is part of this adapter.
+staging, hooks, force updates or repository creation is part of this adapter. Every publication
+first passes :func:`exulanica.world_package.projects.rights.check` over each file it would send:
+written words and things their origin keeps private reach only a private repository.
 """
 
 from __future__ import annotations
@@ -36,13 +38,14 @@ from exulanica.world_package.projects.repository import (
     published_part,
     published_through,
 )
+from exulanica.world_package.projects.rights import check as check_rights
 from exulanica.world_package.projects.summary import evidence_summary, summarize
 
 PROJECT_PATH = "world-project.json"
 _QUERY = """query($owner:String!, $name:String!, $ref:String!) {
   viewer { login }
   repository(owner:$owner, name:$name) {
-    nameWithOwner viewerPermission isArchived isDisabled owner { login }
+    nameWithOwner viewerPermission isArchived isDisabled visibility owner { login }
     ref(qualifiedName:$ref) {
       target { ... on Commit { oid file(path:"world-project.json") {
         mode object { ... on Blob { text byteSize isTruncated } }
@@ -80,6 +83,8 @@ class Snapshot:
     head: str
     checkpoint: dict[str, Any] | None
     writable_owned: bool
+    #: PUBLIC, PRIVATE or INTERNAL; a visibility GitHub does not state reads as public.
+    visibility: str = "PUBLIC"
 
 
 def _missing_file(path: list[Any]) -> bool:
@@ -220,7 +225,13 @@ class GitHubProjects:
                 and not repo["isArchived"]
                 and not repo["isDisabled"]
             )
-            return Snapshot(head, checkpoint, writable)
+            visibility = repo.get("visibility")
+            return Snapshot(
+                head,
+                checkpoint,
+                writable,
+                visibility if isinstance(visibility, str) else "PUBLIC",
+            )
         except (KeyError, TypeError, AttributeError) as exc:
             raise ProjectError("GitHub returned incomplete repository metadata") from exc
 
@@ -233,6 +244,8 @@ class GitHubProjects:
         snapshot = self.read(target)
         if not snapshot.writable_owned:
             raise ProjectError("publication requires a writable repository owned by the CLI user")
+        # A single file carries no made kind's bytes: a made thing's rights cannot be read here.
+        check_rights({PROJECT_PATH: pretty(selected)}, snapshot.visibility, {})
         if snapshot.checkpoint is not None and (
             selected["project_id"] != snapshot.checkpoint["project_id"]
             or selected["source"]["world_id"] != snapshot.checkpoint["source"]["world_id"]
@@ -542,6 +555,10 @@ class RollingPullRequests:
                 raise Conflict("remote branch belongs to another project or source world")
         append_only(_sessions(current), sessions)
         steps = self._steps(project, current, message)
+        # Every file each commit would send, earlier checkpoints' too, before anything is sent.
+        kinds = project.dependencies()
+        for files in (local, *(changed for _, changed in steps)):
+            check_rights(files, remote.visibility, kinds)
         base_world = _world(remote.base_files)
         words = summarize(base_world, world)
         evidence = evidence_summary(_sessions(remote.base_files), sessions)
