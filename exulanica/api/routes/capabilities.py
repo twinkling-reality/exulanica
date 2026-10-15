@@ -695,6 +695,10 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "a read-only preview of a made part's removal for the workspace's build mode; no "
             "Companion plan step prepares through it"
         ),
+        ("POST", "/world/versions/{version_id}/society/decisions/{request_id}/asks"): (
+            "asks another model a recorded decision again and keeps its answer beside the "
+            "original, never applied; it changes nothing a version action reads"
+        ),
         ("POST", "/world/versions/{version_id}/things/on-support/preview"): (
             "validates a chosen passive rigid kind, exact source support and authored base; "
             "the version read does not enumerate source-bound placement candidates"

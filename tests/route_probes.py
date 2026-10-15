@@ -606,6 +606,16 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "base_state_sha256": _ZERO_DIGEST,
         },
     },
+    "POST /world/versions/{version_id}/society/decisions/{request_id}/asks": {
+        **_IN_WORLD,
+        "json": {
+            "model": {
+                "provider": "nebius_token_factory",
+                "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+            },
+            "bound_usd": "0.01",
+        },
+    },
     "POST /world/versions/{version_id}/society/experiments": {
         **_IN_WORLD,
         "json": {

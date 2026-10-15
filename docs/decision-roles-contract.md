@@ -953,6 +953,45 @@ goes on through `resume_minutes`: every minute whose receipts it recorded is ans
 as a replay answers, and only the later minutes are asked, so nothing recorded is asked again; a
 stored request the loop does not rebuild stops it by name.
 
+## The same decision, asked of another model
+
+A recorded decision may be asked again of another model, to see what that model would have done
+at the same moment. Its answer is kept beside the original and never applied
+(`exulanica/world/society_decision_asks.py`, `exulanica/api/decision_asks.py`, migration
+"a recorded moment is asked of another model").
+
+`POST /world/versions/{version_id}/society/decisions/{request_id}/asks?world_id=W`
+(`world.write` and `model.invoke`) takes `{model: {provider, model_id}, bound_usd,
+idempotency_key?}`. It reads the request and its receipt as the decision read does, then proves
+the request can be sent again exactly as the first model read it:
+
+- its role, from the contract the request recorded;
+- the role's terms for its context still carry the request's prompt version;
+- the contract at the request's catalog versions is the one it recorded;
+- the role's first messages for the context, by the mechanism the first model answered by, still
+  digest to the receipt's `messages_sha256`.
+
+Each check refuses with 409 `decision_not_reproducible`; a request no model answered is 409
+`decision_not_answered`. The model is held to what a person may choose for the role, as the
+choice route holds it (409 with the choice's refusal code, `model_not_declared` among them), and
+every option the request offered must be sent to it as it was (409 `not_the_same_request`). The
+bound is at least what one ask of the model may reserve and at most 0.10 USD (422
+`bound_out_of_range`). The model is then asked once, by its own answering mechanism, through the
+live ask (its retries and line rules included), under the workspace's rules for a person's
+decisions. The bound is a part of the process's budget and, under durable spending, a bound of
+the workspace's grant keyed `decision-ask:<ask_id>`, so it never meets the society's own keys.
+
+The answer is recorded as a live answer is (status, reason, the proposal it chose and the
+provider's record of its calls, tokens, cost and latency) with the digest of what this ask sent and
+of what the first model was sent, and answered 201. A model that answers by another mechanism is
+sent the same messages but for the words describing how to answer, which `same_messages` says. A
+repeated idempotency key answers the first ask and asks nothing. Nothing of the society changes: no
+input, request, receipt, transition or minute reads an ask.
+
+`GET .../asks` (`world.read`) answers the original (its model, served model, choice, kind, line,
+cost and tokens) and every ask, oldest first, each with `same_choice` and `same_kind`. Asks are
+deleted only with their society, by its erasure, its world's or its workspace's tombstone.
+
 ## Model discovery and admission preflight
 
 `GET /models`, with `world.read`, serves `exulanica.model-discovery/v1`: models ordered by

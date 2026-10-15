@@ -3931,6 +3931,176 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/decisions/{request_id}/asks": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Ask Decision Again",
+    "description": "Ask another model a recorded decision again, once, never applying its answer.",
+    "operationId": "ask_decision_again_world_versions__version_id__society_decisions__request_id__asks_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Request Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AskBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Ask Decision Again World Versions  Version Id  Society Decisions  Request Id  Asks Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Read Decision Asks",
+    "description": "The original answer of a recorded decision, and every ask beside it.",
+    "operationId": "read_decision_asks_world_versions__version_id__society_decisions__request_id__asks_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Request Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Decision Asks World Versions  Version Id  Society Decisions  Request Id  Asks Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/models": {
    "get": {
     "tags": [
@@ -28064,6 +28234,45 @@
     "title": "ArrivalDescriptor",
     "description": "Region-local opening pose and exact source under the versioned display policy."
    },
+   "AskBody": {
+    "properties": {
+     "model": {
+      "$ref": "#/components/schemas/ModelBody"
+     },
+     "bound_usd": {
+      "anyOf": [
+       {
+        "type": "number",
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,4}|(?=[\\d.]{1,13}0*$)\\d{0,4}\\.\\d{0,8}0*$)"
+       }
+      ],
+      "title": "Bound Usd"
+     },
+     "idempotency_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "model",
+     "bound_usd"
+    ],
+    "title": "AskBody"
+   },
    "AssertionRow": {
     "properties": {
      "assertion_id": {
@@ -35998,6 +36207,29 @@
      "decisions_per_hour"
     ],
     "title": "MindsBudgetBody"
+   },
+   "ModelBody": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Provider"
+     },
+     "model_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Model Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "provider",
+     "model_id"
+    ],
+    "title": "ModelBody"
    },
    "ModelCallView": {
     "properties": {

@@ -123,6 +123,7 @@ from exulanica.api.routes import (
     society_actions,
     society_comparisons,
     society_control,
+    society_decision_asks,
     society_district,
     society_experiments,
     society_models,
@@ -557,6 +558,7 @@ def create_app(
     app.include_router(society_actions.router)
     app.include_router(society_control.router)
     app.include_router(society_comparisons.router)
+    app.include_router(society_decision_asks.router)
     app.include_router(society_models.router)
     app.include_router(society_play.router)
     app.include_router(society_district.router)

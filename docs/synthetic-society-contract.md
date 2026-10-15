@@ -1131,8 +1131,8 @@ by the next), so a line blanked in one of them would break every record after it
 and a `society_erasure` row naming the society and that tombstone (migration "a society is erased
 whole"). The row's trigger, a definer owned by `exulanica_definer`, withdraws the Companion's
 answers that cited the society's world version, their text kept, and deletes every row that
-records the society, children first: its inputs, requests, receipts, transitions and their
-bindings, action requests, events, presences, choices and the answers of the people who play its
+records the society, children first: its inputs, requests, the asks of its requests of other
+models, receipts, transitions and their bindings, action requests, events, presences, choices and the answers of the people who play its
 beings; its playback control and receipts; its world clock with the clock's receipts, sealed
 traffic minutes and crossing occupancy; its inhabitants' appearance revisions; its asks to outside
 programs with their answers and its crossings with their bindings; and the comparisons and

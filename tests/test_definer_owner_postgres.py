@@ -104,6 +104,8 @@ TABLE_PRIVILEGES = {
     "tombstone_embedding_target": {"SELECT"},
     # A kept web picture's erasure, and its workspace's, delete its record (0215).
     "web_picture": {"SELECT", "DELETE"},
+    # society_erase_rows deletes the asks of a society's recorded decisions (0216).
+    "world_society_decision_ask": {"SELECT", "DELETE"},
     "world_project": {"SELECT", "UPDATE", "DELETE"},
     "world_project_item": {"SELECT", "UPDATE", "DELETE"},
     "world_project_item_revision": {"SELECT", "UPDATE", "DELETE"},

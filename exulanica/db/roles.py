@@ -316,6 +316,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0213 appends who a world's owner wrote each placed being to be and refuses every
     # update of one; only a world's erasure deletes one.
     "world_thing_character",
+    # Migration 0216 appends each recorded decision asked again of another model and refuses every
+    # update of one; only its society's erasure deletes one.
+    "world_society_decision_ask",
     # Migration 0190 appends what a world may spend on its beings' model minds and refuses every
     # update and delete of one.
     "world_minds_budget",

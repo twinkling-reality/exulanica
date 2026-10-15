@@ -527,6 +527,9 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     # A kept web picture's erasure, and its workspace's, delete its record (0215); its purge's
     # question reads it. The queue's INSERT is 0172's.
     "0215": DefinerGrants(tables={"web_picture": frozenset(("SELECT", "DELETE"))}),
+    # society_erase_rows, made again with one statement more, deletes the asks of a society's
+    # recorded decisions before the requests they name (0216).
+    "0216": DefinerGrants(tables={"world_society_decision_ask": frozenset(("SELECT", "DELETE"))}),
 }
 
 
