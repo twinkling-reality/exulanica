@@ -318,7 +318,7 @@ def test_submit_refuses_a_worst_case_over_the_bound() -> None:
     assert short[short.index("--timeout") + 1] == "3600s" and "STOP_SECONDS=900" in short
     with pytest.raises(Refused):
         _arguments(timeout_seconds=900, bound_cents=179)
-    with pytest.raises(Refused, match="route A, B or C"):
+    with pytest.raises(Refused, match="route A, B, C or P"):
         _arguments(route="S")
 
 
@@ -434,7 +434,7 @@ def test_the_lock_file_the_entry_script_installs_is_in_the_archive_by_exact_name
     lock_path = lock_line.split('"')[1]
     with tarfile.open(fileobj=io.BytesIO(nebius.code_archive(repository))) as tar:
         members = set(tar.getnames())
-    for route in ("A", "B", "C"):
+    for route in ("A", "B", "C", "P"):
         resolved = subprocess.run(
             ["sh", "-c", f'ROUTE={route}; code=.; {route_line}; printf "%s" "{lock_path}"'],
             capture_output=True,

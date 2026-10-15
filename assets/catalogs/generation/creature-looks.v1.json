@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "catalog_id": "creature-looks",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "whole-body",
+      "words": "{appearance}. One whole creature with all of its body in view, seen from the front left and a little above, alone against a plain white background, soft even light, a smooth solid figure with gentle shading.",
+      "reason": "Route P's first framing: one figure alone on white, its whole body in view, so the cut-out takes all of it and the 3D model has every limb to fit; no colour words, which belong to the recipe and the colour step. Measured on 15 October 2026 on a development set of models made from pictures, ten in this wording and ten in the limbs-apart wording from the same descriptions: six of the ten in this wording fitted the plan's skeleton with moving chains, against five of ten in the other.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica creature looks from measured runs; see the entry reason"
+      }
+    },
+    {
+      "key": "limbs-apart",
+      "words": "{appearance}. One whole creature with all of its body in view, its legs a little apart and its arms, wings, fins or tentacles held a little away from its body, seen from the front left and a little above, alone against a plain white background, soft even light, a smooth solid figure with gentle shading.",
+      "reason": "The whole-body framing asking for limbs held away from the body, for a model whose limbs would otherwise merge with its body. Measured on 15 October 2026 on the same development set: five of ten fitted with moving chains, against six of ten in the whole-body wording, so it is an alternative to try, not the first framing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica creature looks from measured runs; see the entry reason"
+      }
+    }
+  ]
+}

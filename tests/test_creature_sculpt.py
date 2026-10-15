@@ -116,9 +116,11 @@ def test_a_sketch_filled_and_rigged_is_a_skinned_look_the_product_reads(name, sc
         assert read.rest_m[f"bone:{bone}"] == pytest.approx((-x, z, y), abs=1e-6)
 
 
-def _requested(name: str, *, sketch_of: str | None = None) -> tuple[bytes, bytes]:
+def _requested(
+    name: str, *, sketch_of: str | None = None, picture: bytes | None = None
+) -> tuple[bytes, bytes]:
     """A creature's look request and the sketch container it names: by default its own sketch,
-    or another creature's, so its body is not its plan's."""
+    or another creature's, so its body is not its plan's; with a kept ``picture``, v2."""
     from exulanica.things.catalogs import read_body_plan
     from exulanica.things.creature_looks import creature_look_request
 
@@ -137,8 +139,30 @@ def _requested(name: str, *, sketch_of: str | None = None) -> tuple[bytes, bytes
         origin=AUTHORED,
     )
     return creature_look_request(
-        built=built, recipe=recipe, plan_sha256=plan.sha256, sketch=container
+        built=built, recipe=recipe, plan_sha256=plan.sha256, sketch=container, picture=picture
     ), container
+
+
+def test_a_request_with_a_kept_picture_is_v2_and_one_without_is_v1_as_before(sculpt):
+    """Route P makes a model from a picture kept with the creature: the request names it by
+    digest and length, and the job's reader takes both versions."""
+    import hashlib
+    import json
+
+    from exulanica_appearance.creatures.request import read_request
+
+    picture = b"a kept picture's bytes"
+    plain, _ = _requested("horse")
+    kept, _ = _requested("horse", picture=picture)
+    v1, v2 = json.loads(plain), json.loads(kept)
+    assert v1["profile"] == "exulanica.creature-look-request/v1" and "picture" not in v1
+    assert v2.pop("picture") == {"sha256": hashlib.sha256(picture).hexdigest(), "bytes": 22}
+    assert v2.pop("profile") == "exulanica.creature-look-request/v2"
+    v1.pop("profile")
+    assert v2 == v1
+    assert read_request(plain).picture_sha256 is None
+    read = read_request(kept)
+    assert (read.picture_sha256, read.picture_bytes) == (hashlib.sha256(picture).hexdigest(), 22)
 
 
 def test_the_creature_job_with_stand_in_models_writes_looks_the_product_reads(sculpt, tmp_path):

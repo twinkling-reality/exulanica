@@ -20,6 +20,8 @@
     assets nebius stage|submit|status|fetch|cancel|clear|usage ...   on this Mac
     creatures dry-run --repository ROOT --staged DIR --out DIR   a staged creature job, stand-in models
     creatures run ...   on the rented machine, from container/assets/job.sh (route C)
+    creatures pictures --code DIR --job FILE --requests DIR --pictures DIR --out DIR
+                  (--weights DIR | --stand-in) [--started-at EPOCH]   route P's pictures and models
     creatures fit --repository ROOT --request FILE --cutout FILE --model FILE --up=+Z --front=-Y
                   --simplifier quadric|stand-in --out DIR   route P's fit of one model, on a CPU
 
@@ -366,14 +368,19 @@ def _assets_nebius(args: argparse.Namespace) -> int:
             region=args.region,
             cutouts=Path(args.cutouts) if args.cutouts else None,
             sketches=Path(args.sketches) if args.sketches else None,
+            pictures=Path(args.pictures) if args.pictures else None,
         )
     elif args.step == "submit":
-        from exulanica_appearance.creatures.job import JOB_PROFILE, read_creature_job
+        from exulanica_appearance.creatures import job as creature_job
+        from exulanica_appearance.creatures import pictures
 
         raw = Path(args.job).read_bytes()
+        profile = json.loads(raw).get("profile")
         job = (
-            read_creature_job(raw)
-            if json.loads(raw).get("profile") == JOB_PROFILE
+            creature_job.read_creature_job(raw)
+            if profile == creature_job.JOB_PROFILE
+            else pictures.read_picture_job(raw)
+            if profile == pictures.JOB_PROFILE
             else read_job(raw)
         )
         result = nebius.submit(
@@ -603,6 +610,44 @@ def _creatures_run(args: argparse.Namespace) -> int:
     )
 
 
+def _creatures_pictures(args: argparse.Namespace) -> int:
+    import time
+
+    from exulanica_appearance.canonical import sha256_hex
+    from exulanica_appearance.creatures.pictures import (
+        StandIn,
+        prepare_picture_job,
+        run_picture_job,
+    )
+
+    kept = Path(args.pictures)
+    pictures = {}
+    for path in sorted(kept.glob("*.png")) if kept.is_dir() else []:
+        data = path.read_bytes()
+        pictures[sha256_hex(data)] = data
+    # Every item is checked before a model is loaded.
+    prepared = prepare_picture_job(
+        job_raw=Path(args.job).read_bytes(),
+        requests=[path.read_bytes() for path in sorted(Path(args.requests).glob("*.json"))],
+        pictures=pictures,
+        repository=Path(args.code),
+    )
+    if args.stand_in:
+        backend = StandIn()
+    else:
+        from exulanica_appearance.assets.remote import backend_for
+
+        backend = backend_for("A", Path(args.weights))
+    # job.sh's start, as seconds since the epoch, on this process's own clock.
+    started = (
+        time.monotonic() - (time.time() - args.started_at) if args.started_at is not None else None
+    )
+    results = run_picture_job(prepared, backend, Path(args.out), started=started)
+    print(json.dumps(results, indent=1, sort_keys=True))
+    made = all(item["outcome"] == "made" for item in results["items"])
+    return 0 if made and results["stopped"] is None else REFUSED
+
+
 def _creatures_fit(args: argparse.Namespace) -> int:
     from exulanica_pieces.canonical import canonical_bytes, sha256_hex
     from exulanica_pieces.colour import read_table
@@ -770,6 +815,7 @@ def main(argv: list[str] | None = None) -> int:
         nebius_stage.add_argument(name, required=True)
     nebius_stage.add_argument("--cutouts")
     nebius_stage.add_argument("--sketches")
+    nebius_stage.add_argument("--pictures")
     nebius_submit = on_nebius.add_parser("submit")
     for name in (
         "--job", "--job-sha256", "--code-sha256", "--bucket-id", "--subnet-id", "--platform",
@@ -849,6 +895,14 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("--code", "--upstream", "--job", "--requests", "--sketches", "--weights", "--out"):
         creatures_run.add_argument(name, required=True)
     creatures_run.set_defaults(run=_creatures_run)
+    creatures_pictures = creatures.add_parser("pictures")
+    for name in ("--code", "--job", "--requests", "--pictures", "--out"):
+        creatures_pictures.add_argument(name, required=True)
+    drawn_by = creatures_pictures.add_mutually_exclusive_group(required=True)
+    drawn_by.add_argument("--weights")
+    drawn_by.add_argument("--stand-in", action="store_true")
+    creatures_pictures.add_argument("--started-at", type=int, default=None)
+    creatures_pictures.set_defaults(run=_creatures_pictures)
     creatures_fit = creatures.add_parser("fit")
     for name in ("--repository", "--request", "--cutout", "--model", "--up", "--front", "--out"):
         creatures_fit.add_argument(name, required=True)

@@ -42,13 +42,15 @@ __all__ = [
     "weights_directory",
 ]
 
+#: Route A's three: a concept picture, its cut-out and its 3D model.
+_ROUTE_A: Final = (
+    "Tongyi-MAI__Z-Image-Turbo@f332072aa78b.json",
+    "ZhengPeng7__BiRefNet@e2bf8e4460fc.json",
+    "microsoft__TRELLIS-image-large@25e0d31ffbeb.json",
+)
 #: The weights manifests each route loads, by file name under ml/appearance/weights.
 ROUTE_WEIGHTS: Final = {
-    "A": (
-        "Tongyi-MAI__Z-Image-Turbo@f332072aa78b.json",
-        "ZhengPeng7__BiRefNet@e2bf8e4460fc.json",
-        "microsoft__TRELLIS-image-large@25e0d31ffbeb.json",
-    ),
+    "A": _ROUTE_A,
     # Route B starts from route A's cut-outs: it makes no concept picture or cut-out of its own.
     "B": ("stepfun-ai__Step1X-3D@bf7084495b3a.json",),
     # Route C draws a creature's concept picture following its plan's sketch (Z-Image with the
@@ -59,6 +61,10 @@ ROUTE_WEIGHTS: Final = {
         "ZhengPeng7__BiRefNet@e2bf8e4460fc.json",
         "microsoft__TRELLIS-image-large@25e0d31ffbeb.json",
     ),
+    # Route P (picture-led creatures) draws with route A's three: a concept from a creature's
+    # words, or the picture kept with it, its cut-out and its 3D model. The fit runs on a CPU
+    # after the fetch (creatures/fit.py), so it loads nothing here.
+    "P": _ROUTE_A,
 }
 COMPONENTS_PROFILE: Final = "exulanica.generated-asset-components/v1"
 
@@ -215,7 +221,7 @@ def prepare(
     ]
     trees = fetch_upstream(sources, route, upstream)
     report: dict[str, Any] = {"route": route, "trees": trees, "weights": {}}
-    if route in ("A", "C"):
+    if route in ("A", "C", "P"):
         report["dinov2_checkpoint"] = _torch_hub(sources, upstream, torch_home)
     for name in ROUTE_WEIGHTS[route]:
         raw = (code / "ml/appearance/weights" / name).read_bytes()

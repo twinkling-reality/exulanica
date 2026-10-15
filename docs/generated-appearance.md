@@ -667,6 +667,43 @@ in TRELLIS's frame, as the second stage gives a mesh, and runs every later step.
 - **The look follows the sketch.** Read from the contact sheet: a mesh keeps the sketch's flat
   segments, and its colours, sampled from the decoded Gaussians, are duller than the concept's.
 
+**Route P: a creature's look made from a picture.** Route C bends a model to the plan's sketch;
+route P keeps the model's own shape and fits the plan's skeleton into it. It runs in two places:
+
+- **The paid step** ([`pictures.py`](../ml/appearance/exulanica_appearance/creatures/pictures.py),
+  `creatures pictures`, entry script route P) draws with route A's three models and makes, per
+  item, a picture, its cut-out and the 3D model, written once each, and nothing else. The picture
+  is a concept drawn from the request's appearance words in a framing of
+  [`creature-looks.v1.json`](../assets/catalogs/generation/creature-looks.v1.json) (no structure
+  control, no colour words), or the picture kept with the creature, which an
+  `exulanica.creature-look-request/v2` names by digest and which travels beside it. Every item is
+  checked before a model loads: its request and picture are given, its framing is the catalog's
+  (the job names the catalog's digest), and its prompt holds no numeral. The run stops before an
+  item whose estimate, half as much again, would pass the job's stop, counted from the job's
+  start, setup included. A route P job runs alone, never in a session.
+- **The fit** ([`fit.py`](../ml/appearance/exulanica_appearance/creatures/fit.py), `creatures fit`)
+  needs no GPU, so it runs after the fetch and no paid minute is spent on it. It reads the whole
+  model's inside on a grid, its hollows filled; finds the model's limbs on a curve skeleton; reads
+  the facing from the model's mirror plane; scales it to the plan's height, or by length for a plan
+  at least eight times longer than tall; lays each chain along a limb (a leg must reach the ground,
+  a sided chain stays on its side, and a chain with no limb is kept still, except a leg, which is
+  refused by name); skins the model by bone heat; checks the rig with a two-voxel allowance; moves
+  the model's colours toward its picture's in OKLab within a bound, kept only when they come
+  closer; and writes the skinned container, read back by the product's reader, with a receipt.
+
+**Status of route P:** built as code, not yet run as built on a rented machine and not judged in a
+pre-registered trial. On a development set of 22 models made from pictures by the same three models
+on Nebius AI Cloud, 11 passed the fit's checks with chains that move. The refusals were a model with no
+legs in its picture, legs that do not reach the ground, legs too thin for the grid, a leg whose swing
+moved the other leg, and a bone mostly outside the body. Counts the words ask for are not always
+drawn (two heads drawn as one, four arms as two), so a pre-registered trial counts a missing chain
+as not looking like its words.
+
+**Route P's open parts:** a picture showing a person must be refused before a request names it, and
+no local detector does that yet, so only concepts drawn from words, or a picture the person kept
+with the right to send it to a model, may be named; the server's look job, a kind wearing its made
+look, and their erasure are planned.
+
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (benches, seating planters, and lamp posts,
 whose 250 mm deep box no generated post has filled), a shopfront request shaped for a shallow fill

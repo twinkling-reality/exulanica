@@ -63,6 +63,7 @@ __all__ = [
 IMAGE: Final = "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254"
 #: What the job's code archive holds, relative to the repository root.
 _CODE: Final = (
+    "assets/catalogs/generation/creature-looks.v1.json",
     "assets/colour",
     "assets/style-packs/piece-budgets.v1.json",
     "exulanica_pieces",
@@ -166,10 +167,12 @@ def stage(
     region: str,
     cutouts: Path | None = None,
     sketches: Path | None = None,
+    pictures: Path | None = None,
 ) -> dict[str, Any]:
     """Copy everything the job reads to ``s3://<bucket>/runs/<job sha256>/``, and any cut-outs
     an item names to ``out/inputs/``, where every job writes its own and route B reads them. A
-    creature job (route C) also reads its requests' sketch containers, from ``sketches/``."""
+    creature job (route C) also reads its requests' sketch containers, from ``sketches/``; a
+    creature picture job (route P) the pictures its v2 requests name, from ``pictures/``."""
     job_raw = job.read_bytes()
     job_sha256 = sha256_hex(job_raw)
     code = code_archive(repository)
@@ -188,6 +191,11 @@ def stage(
         for path in sorted(sketches.glob("*.glb")):
             (staging / "sketches" / path.name).write_bytes(path.read_bytes())
             files[f"sketches/{path.name}"] = sha256_hex(path.read_bytes())
+    if pictures is not None:
+        (staging / "pictures").mkdir(parents=True, exist_ok=True)
+        for path in sorted(pictures.glob("*.png")):
+            (staging / "pictures" / path.name).write_bytes(path.read_bytes())
+            files[f"pictures/{path.name}"] = sha256_hex(path.read_bytes())
     _aws(
         region,
         [
@@ -245,8 +253,8 @@ def submit_arguments(
     check as its script, which relies on the service splitting ``--args`` as a shell does; the
     sessions measured so far ran a single path there, so this form is verified only by the next
     live session (contract: generated pieces, 5.1)."""
-    if route not in ("A", "B", "C"):
-        raise Refused("a job on the rented machine takes route A, B or C")
+    if route not in ("A", "B", "C", "P"):
+        raise Refused("a job on the rented machine takes route A, B, C or P")
     if mode not in ("job", "session"):
         raise Refused("a submission runs one job or a session")
     # The service's shortest timeout is one hour, so a shorter stop still risks an hour; the

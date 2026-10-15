@@ -7,6 +7,10 @@ frame, the sketch container's digest and length (the container travels beside th
 recipe's appearance words and its colours by role. No account, workspace or person's words: the
 appearance words are the recipe's, drafted and checked. The product's request writer and this
 reader meet only at the document, so neither imports the other.
+
+``exulanica.creature-look-request/v2`` is v1 and a picture kept with the creature, named by its
+digest and length (the picture travels beside the request, as the sketch does): route P makes the
+3D model from that picture instead of a concept drawn from the words. v1 is still read.
 """
 
 from __future__ import annotations
@@ -19,9 +23,17 @@ from typing import Any, Final
 
 import numpy as np
 
-__all__ = ["COLOUR_ROLES", "REQUEST_PROFILE", "CreatureRequest", "RequestRefused", "read_request"]
+__all__ = [
+    "COLOUR_ROLES",
+    "REQUEST_PROFILE",
+    "REQUEST_PROFILE_V2",
+    "CreatureRequest",
+    "RequestRefused",
+    "read_request",
+]
 
 REQUEST_PROFILE: Final = "exulanica.creature-look-request/v1"
+REQUEST_PROFILE_V2: Final = "exulanica.creature-look-request/v2"
 COLOUR_ROLES: Final = ("body", "belly", "accent", "eyes")
 _BONE: Final = re.compile(r"[a-z][A-Za-z0-9]{0,47}")
 _HEX: Final = re.compile(r"[0-9a-f]{64}")
@@ -51,6 +63,9 @@ class CreatureRequest:
     appearance: str
     colour_words: Mapping[str, str]
     colours: Mapping[str, tuple[int, int, int]]
+    #: A v2 request's kept picture (a PNG beside the request), by digest and length; None in v1.
+    picture_sha256: str | None = None
+    picture_bytes: int | None = None
 
 
 def _point(value: Any, where: str) -> np.ndarray:
@@ -70,9 +85,12 @@ def read_request(raw: bytes) -> CreatureRequest:
         document = json.loads(raw)
     except ValueError as exc:
         raise RequestRefused(f"the request is not JSON: {exc}") from exc
-    if not isinstance(document, dict) or document.get("profile") != REQUEST_PROFILE:
-        raise RequestRefused(f"the request's profile is {REQUEST_PROFILE}")
+    profiles = (REQUEST_PROFILE, REQUEST_PROFILE_V2)
+    if not isinstance(document, dict) or document.get("profile") not in profiles:
+        raise RequestRefused(f"the request's profile is {' or '.join(profiles)}")
     expected = {"profile", "plan", "rest", "sketch", "appearance", "colours"}
+    if document["profile"] == REQUEST_PROFILE_V2:
+        expected.add("picture")
     if set(document) != expected:
         raise RequestRefused(f"the request holds exactly {sorted(expected)}")
     plan = document["plan"]
@@ -152,6 +170,17 @@ def read_request(raw: bytes) -> CreatureRequest:
         or sketch["bytes"] < 1
     ):
         raise RequestRefused("sketch holds the container's sha256 and its length in bytes")
+    picture = document.get("picture")
+    if picture is not None and (
+        not isinstance(picture, dict)
+        or set(picture) != {"sha256", "bytes"}
+        or not isinstance(picture["sha256"], str)
+        or not _HEX.fullmatch(picture["sha256"])
+        or not isinstance(picture["bytes"], int)
+        or isinstance(picture["bytes"], bool)
+        or picture["bytes"] < 1
+    ):
+        raise RequestRefused("picture holds the kept picture's sha256 and its length in bytes")
     appearance = document["appearance"]
     if not isinstance(appearance, str) or not 12 <= len(appearance) <= 200:
         raise RequestRefused("appearance is 12 to 200 characters")
@@ -194,4 +223,6 @@ def read_request(raw: bytes) -> CreatureRequest:
         appearance=appearance,
         colour_words=words,
         colours=srgb,
+        picture_sha256=picture["sha256"] if picture is not None else None,
+        picture_bytes=picture["bytes"] if picture is not None else None,
     )

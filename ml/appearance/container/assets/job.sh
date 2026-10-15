@@ -5,7 +5,7 @@
 #   sh /opt/job.sh   (the container's copy of runs/<job or session sha256>/job.sh, run only once
 #                     it is the JOB_SCRIPT_SHA256 the submit command pinned)
 #
-# Environment, set by the submit command: ROUTE (A, B or C), JOB (the job record's sha256, or in
+# Environment, set by the submit command: ROUTE (A, B, C or P), JOB (the job record's sha256, or in
 # a session the session record's), CODE_SHA256 (the staged code archive's), STOP_SECONDS (the job
 # record's stop, or the session's hard stop) and MODE: "job" runs one staged job; "session" loads
 # the route once and serves the bucket's queue until its idle stop, a stop marker or its hard stop
@@ -14,8 +14,10 @@
 set -eu
 # The job record's stop (150 per cent of its estimate) bounds the whole job, setup included; the
 # service's own timeout is at least an hour and is only the backstop.
+# STARTED_AT, the job's start in seconds since the epoch, lets a creature picture job stop before
+# an item it could not finish inside that bound.
 if [ -z "${UNDER_STOP:-}" ]; then
-  UNDER_STOP=1 exec timeout --signal=TERM --kill-after=60 "$STOP_SECONDS" sh "$0"
+  UNDER_STOP=1 STARTED_AT=$(date +%s) exec timeout --signal=TERM --kill-after=60 "$STOP_SECONDS" sh "$0"
 fi
 data=/mnt/data
 run="$data/runs/$JOB"
@@ -24,11 +26,13 @@ run="$data/runs/$JOB"
 # bucket only through "publish": each finished file written once, every minute and at exit.
 work=/opt/work
 mkdir -p "$work/out"
-case "$ROUTE" in A|B|C) ;; *) echo "ROUTE is A, B or C" >&2; exit 2 ;; esac
+case "$ROUTE" in A|B|C|P) ;; *) echo "ROUTE is A, B, C or P" >&2; exit 2 ;; esac
 mode=${MODE:-job}
 case "$mode" in job|session) ;; *) echo "MODE is job or session" >&2; exit 2 ;; esac
-# File names are lower case, and the job's file system tells the cases apart.
-route=$(printf '%s' "$ROUTE" | tr ABC abc)
+if [ "$ROUTE" = P ] && [ "$mode" = session ]; then echo "route P runs one job" >&2; exit 2; fi
+# File names are lower case, and the job's file system tells the cases apart. Route P draws with
+# route A's models, so it installs route A's lock file.
+route=$(printf '%s' "$ROUTE" | tr ABCP abca)
 
 echo "phase code $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Every file this machine runs or trusts is copied to its own disk first and checked there, so the
@@ -94,7 +98,7 @@ echo "phase run $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONUNBUFFERED=1
 standins="$code/ml/appearance/container/assets/standins"
 case "$ROUTE" in
-  A|C) upstream="/opt/upstream/trellis:/opt/upstream/utils3d" ;;
+  A|C|P) upstream="/opt/upstream/trellis:/opt/upstream/utils3d" ;;
   B) upstream="/opt/upstream/step1x" ;;
 esac
 if [ "$mode" = session ]; then
@@ -106,6 +110,11 @@ elif [ "$ROUTE" = C ]; then
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance creatures run \
     --code "$code" --upstream /opt/upstream --job "$stage/job.json" --requests "$run/requests" \
     --sketches "$run/sketches" --weights "$work/weights" --out "$work/out"
+elif [ "$ROUTE" = P ]; then
+  # A creature picture job: each item's picture, cut-out and 3D model; the fit runs after the fetch.
+  PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance creatures pictures \
+    --code "$code" --job "$stage/job.json" --requests "$run/requests" --pictures "$run/pictures" \
+    --weights "$work/weights" --out "$work/out" --started-at "$STARTED_AT"
 else
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
     --code "$code" --route "$ROUTE" --job "$stage/job.json" --requests "$run/requests" \
