@@ -17,10 +17,12 @@ import { canonicalJson, chunkHeightMm, readLandChunk, readLandSurfaces, readRoof
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
+  attachLandRound,
   baseGroundSlot,
   drawSiteLand,
   drawSiteScenery,
   parseStructuredSiteDrawing,
+  readLandSection,
   readSiteLand,
   shapeRoofs,
   siteMount,
@@ -141,7 +143,7 @@ describe('reading a site on land', () => {
     expect(() => readSiteLand(drawing, changed, backdropDocument(), sha256)).toThrow('is the document its digest names');
     const missing = chunks();
     missing.delete('-1,0');
-    expect(() => readSiteLand(drawing, missing, backdropDocument(), sha256)).toThrow('(-1, 0) its drawing names was not served');
+    expect(() => readSiteLand(drawing, missing, backdropDocument(), sha256)).toThrow('(-1, 0) its land section names was not served');
     const far = backdropDocument();
     (far['height_mm'] as number[])[0] = 0;
     expect(() => readSiteLand(drawing, chunks(), far, sha256)).toThrow('is the document its digest names');
@@ -321,6 +323,31 @@ describe('drawing a site on land', () => {
     expect(lowest).toBeCloseTo(land.groundMm(30_000, 40_000) / 1000, 5);
     expect(trees.groundMm).toBe(land.groundMm);
     trees.destroy();
+  });
+});
+
+describe('the land round a town on its land', () => {
+  const drawing = parseStructuredSiteDrawing(served());
+
+  it("is read from its own section as a site's is, drawn round the town's tiles and never under them, and taken away", () => {
+    const section = drawing.land!;
+    const land = readLandSection(section, chunks(), backdropDocument(), sha256, 99);
+    expect(land.chunks.map((chunk) => [chunk.chunkX, chunk.chunkY])).toEqual([[-1, 0], [0, 0]]);
+    expect(land.servedBytes).toBe(99);
+    const missing = chunks();
+    missing.delete('0,0');
+    expect(() => readLandSection(section, missing, backdropDocument(), sha256)).toThrow('(0, 0) its land section names was not served');
+    const { app, camera, environmentRoot } = nullApp();
+    const farBefore = camera.camera!.farClip;
+    // The town's one tile covers chunk (0, 0): the land is drawn round it, with its backdrop and sea.
+    const round = attachLandRound({ app, camera, environmentRoot }, land, (x, y) => x === 0 && y === 0, SURFACES);
+    const drawn = environmentRoot.findByName('site-land') as pc.Entity;
+    expect(drawn.children.map((child) => child.name)).toEqual(['site-land:chunk:-1:0', 'site-land:backdrop', 'site-land:water:sea']);
+    expect(round.drawn.ground).toHaveLength(1);
+    expect(camera.camera!.farClip).toBeGreaterThan(400 * Math.SQRT2);
+    round.dispose();
+    expect(environmentRoot.findByName('site-land')).toBeNull();
+    expect(camera.camera!.farClip).toBe(farBefore);
   });
 });
 

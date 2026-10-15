@@ -324,8 +324,16 @@ since a town's land is graded before its buildings and no change to them moves i
 the tiles are the town's terrain records' heights. The chunk and backdrop routes serve its documents
 by those digests, and the saved entry's `generated_ground.land_sha256` names its land. A town on
 level ground answers 404 `land_unavailable`; a site states its land in its drawing, and the section
-route answers it 404 `unknown_reference`. The browser draws a town's tiles but not the land round
-them, so the setting stays off until it does.
+route answers it 404 `unknown_reference`.
+
+The page draws a town on land with its land round it
+([`town-land.ts`](../web/packages/app/src/composition/town-land.ts)). It reads the land section,
+held to its entity tag, its world and the digest the entry names, and every chunk and the backdrop
+by the digests the section names, and draws the near chunks no tile covers (chunk (x, y) lies under
+tile (x, y)), the backdrop and the water, in place of the look's flat plane beyond the tiles. Land
+that cannot be read is not stood in for: the world does not open. The town's people stand on the
+ground its tiles walk, and on the land where they walk none. A person walks the town's tiles; the
+land round them is seen, not walked.
 
 ## A world's land rules
 
@@ -428,8 +436,8 @@ as walls up to about 4 m.
 ## Limits
 
 - Only a place drafted from words stands on land, and only where the deployment turns it on; no
-  page asks for land otherwise. A town is made on land only there too, and the browser draws its
-  tiles without the land round them.
+  page asks for land otherwise. A town is made on land only there too, and a person walks its
+  tiles alone: the land round them is seen, not walked.
 - Walkable land stays within 64 m above or below the sea, so "high ground" cannot be high: an
   upland is a place among peaks, not a place on a high plateau. Raising the bound is a change to
   the land rules.

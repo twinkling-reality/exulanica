@@ -252,6 +252,11 @@ export interface GeneratedGround {
    * receipt records them; null for a world of a recipe that recorded none.
    */
   readonly values: Readonly<Record<string, number | string>> | null;
+  /**
+   * The digest of the land a town made on its land stands on, which its land section names
+   * (`./composition/town-land.ts`); absent for a town on level ground.
+   */
+  readonly landSha256?: string;
 }
 
 /** A world made from a world kind, as its saved entry declares it. */
@@ -1153,6 +1158,7 @@ function parseGeneratedGround(value: unknown): GeneratedGround | null {
     ]) as GeneratedGround['arrivalFacingMm'],
     specification,
     values,
+    ...(row['land_sha256'] === undefined || row['land_sha256'] === null ? {} : { landSha256: sha256(row['land_sha256'], 'land digest') }),
     tiles: Object.freeze(tiles.map((tile: unknown) => {
       const one = record(tile, 'generated tile');
       const state = one['state'];

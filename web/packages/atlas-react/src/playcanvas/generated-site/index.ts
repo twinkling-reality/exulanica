@@ -19,10 +19,10 @@ export type {
   SiteSlot,
   SiteUvFrame,
 } from './site-drawing.js';
-export { SITE_DRAWING_PROFILE, SITE_DRAWING_TERRAIN_PROFILE, SITE_DRAWING_DRESSED_TERRAIN_PROFILE, SITE_DRAWING_LAND_PROFILE, isTerrainSiteDrawing, SiteDrawingError, parseSiteDrawing, parseStructuredSiteDrawing } from './site-drawing.js';
+export { SITE_DRAWING_PROFILE, SITE_DRAWING_TERRAIN_PROFILE, SITE_DRAWING_DRESSED_TERRAIN_PROFILE, SITE_DRAWING_LAND_PROFILE, isTerrainSiteDrawing, SiteDrawingError, parseSiteDrawing, parseSiteLandSection, parseStructuredSiteDrawing } from './site-drawing.js';
 export { SITE_WALKER_RADIUS_M, siteLandSurface, siteNavigationWorld, siteStart, siteSurface } from './site-navigation.js';
 export type { DrapedSlots, DrawnSiteLand, SiteLand } from './site-land.js';
-export { drapeSiteSlots, drawSiteLand, readSiteLand } from './site-land.js';
+export { LAND_GROUND_RGB, attachLandRound, drapeSiteSlots, drawSiteLand, readLandSection, readSiteLand } from './site-land.js';
 export type { DrawnSiteVolumes, SiteVolume, SiteVolumes } from './site-volumes.js';
 export { VOLUME_ROCK_RGB, drawSiteVolumes, readSiteVolumes, siteVolumeChunks, volumeChunkVertices, volumeOriginM } from './site-volumes.js';
 export type { DrawnSiteSlots } from './site-primitives.js';

@@ -20,6 +20,11 @@
  * tree pit's carve: a person then opens on the nearest drawn ground (`groundNear`), rather than on
  * none, which the walk would recover to the first tile's middle.
  *
+ * A town made on its land is drawn with its land round it (`./town-land.ts`): its land section and
+ * every chunk and the backdrop it names are read beside the tiles and held to their digests, and
+ * the near land no tile covers, the backdrop and the water are drawn with the tiles, in place of the
+ * look's flat plane beyond them. A town on level ground reads none of it.
+ *
  * Every generated world the page opens also draws its own traffic while its tiles are attached
  * (`withTraffic` in `tile-traffic.ts`), read through the world's version
  * (`GET /world/versions/{version}/traffic`). A world whose roads hold no traffic is refused by name,
@@ -39,6 +44,7 @@
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import { rememberTownFurniture } from './town-furniture.js';
+import { furnitureOnLand, loadTownLand, rememberTownLand, withTownLand, withoutEdge } from './town-land.js';
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -95,12 +101,15 @@ const TRAFFIC_NOT_LOADED = 'traffic_not_loaded';
  * there is not what a town's opening depends on: where the records cannot be read here, none is
  * kept and people are drawn as they are with no seat.
  */
+/** A piece of a town's street furniture as its tile states it: its record's height among the rest. */
+type StatedFurniture = StreetFurniture & { readonly zMm?: number };
+
 function streetFurnitureOfTown(
-  route: { readonly streetFurnitureOf?: (bytes: Uint8Array) => readonly StreetFurniture[] },
+  route: { readonly streetFurnitureOf?: (bytes: Uint8Array) => readonly StatedFurniture[] },
   containers: readonly { readonly bytes: Uint8Array }[],
-): readonly StreetFurniture[] {
+): readonly StatedFurniture[] {
   try {
-    const kept = new Map<string, StreetFurniture>();
+    const kept = new Map<string, StatedFurniture>();
     for (const { bytes } of containers) {
       for (const item of route.streetFurnitureOf?.(bytes) ?? []) if (!kept.has(item.identity)) kept.set(item.identity, item);
     }
@@ -330,13 +339,23 @@ export async function loadGeneratedWorld(
     import('@exulanica/atlas-core'),
     committedTextureLibrary(),
   ]);
-  const containers = await Promise.all(ground.tiles.map(async (tile) => ({
-    name: tile.bakedTileId!,
-    bytes: await worldTileBytes(access, entry, tile.bakedTileId!),
-  })));
+  // A town on its land is drawn with its land round it, read beside its tiles (`./town-land.ts`).
+  const [containers, town] = await Promise.all([
+    Promise.all(ground.tiles.map(async (tile) => ({
+      name: tile.bakedTileId!,
+      bytes: await worldTileBytes(access, entry, tile.bakedTileId!),
+    }))),
+    ground.landSha256 === undefined ? null : loadTownLand(access, entry, ground.landSha256),
+  ]);
+  rememberTownLand(entry.entryId, town);
+  /** The tiles as drawn: on land, with the land round them and no flat plane beyond them. */
+  const onLand = (tile: LoadedGeneratedTile): LoadedGeneratedTile => (town === null ? tile : withTownLand(tile, town, ground.tiles));
+  const edged = <Look extends object>(look: Look): Look => (town === null ? look : withoutEdge(look));
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
-  const furniture = streetFurnitureOfTown(route, containers);
+  // On its land a town's people stand in a region at the land's datum, its furniture at its own heights.
+  const read = streetFurnitureOfTown(route, containers);
+  const furniture = town === null ? read : furnitureOnLand(read);
   rememberTownFurniture(entry.entryId, furniture);
   const [worldLook, { RENDER_BUDGET: renderBudget }] = await Promise.all([import('../world-look.js'), import('../render-budget.js')]);
   type Prepared = import('../world-look.js').PreparedWorldLook;
@@ -384,7 +403,7 @@ export async function loadGeneratedWorld(
     manifest: parseTextureSetManifest(library.textureManifest),
     fetchSet: (set) => library.textureSet(set.contentSha256),
     ...(neighbours.length === 0 ? {} : { neighbours }),
-    ...(prepared === null ? {} : { look: prepared.look }),
+    ...(prepared === null ? {} : { look: edged(prepared.look) }),
     renderBudget,
   });
   const drawn = dressedIn(plain, prepared);
@@ -421,7 +440,7 @@ export async function loadGeneratedWorld(
     pitch: 0,
   };
   return {
-    tile: { ...loaded, start },
+    tile: { ...onLand(loaded), start },
     ground,
     look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason, ...settingOf(prepared) },
     bodies: drawn.bodies,
@@ -431,9 +450,9 @@ export async function loadGeneratedWorld(
       const nextPrepared = await prepare(next);
       // A look is read only when tiles are attached, so the tiles as loaded are drawn again in the
       // new pack's light: nothing is fetched, verified or decoded a second time.
-      const again = dressedIn(plain.inLook(nextPrepared?.look ?? route.TILE_LOOK_V1), nextPrepared);
+      const again = dressedIn(plain.inLook(edged(nextPrepared?.look ?? route.TILE_LOOK_V1)), nextPrepared);
       return {
-        tile: { ...again.tile, start },
+        tile: { ...onLand(again.tile), start },
         bodies: again.bodies,
         look: { pack: next.packId, source: next.source, drawn: nextPrepared !== null, reason: null, ...settingOf(nextPrepared) },
       };

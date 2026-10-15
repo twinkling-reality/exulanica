@@ -10,7 +10,7 @@ import { budgetedLook } from '../generated-tile/budgeted-look.js';
 import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type TerrainSiteDrawing, type SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, slotColour, type DrawnSiteSlots } from './site-primitives.js';
-import { drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
+import { LAND_GROUND_RGB, drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
 import { VOLUME_ROCK_RGB, drawSiteVolumes, type SiteVolumes } from './site-volumes.js';
 import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
@@ -143,9 +143,6 @@ export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null 
     && slot.boxMm[0] === widthMm && slot.boxMm[1] === depthMm
     && slot.positionMm[0] * 2 === widthMm && slot.positionMm[1] * 2 === depthMm && (slot.positionMm[2] === 0 || slot.drape === true)) ?? null;
 }
-
-/** The base ground's colour for a site on land with none, the engine's own ground colour. */
-const LAND_GROUND_RGB = [0.47, 0.56, 0.33] as const;
 
 /** The mount for a checked site drawing. */
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {

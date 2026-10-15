@@ -258,8 +258,11 @@ const WATER_FIELDS: Readonly<Record<string, string>> = {
 /** The sides a cascade's fall may fall toward. */
 const FALL_SIDES: readonly string[] = ['north', 'east', 'south', 'west'];
 
-/** The land section of a site on land: its chunks and backdrop by digest, and its water. */
-function landSection(value: unknown): SiteLandSection {
+/**
+ * The land section of a site on land, or of a town on its land (`exulanica.town-land/v1`): its
+ * chunks and backdrop by digest, and its water, every field closed.
+ */
+export function parseSiteLandSection(value: unknown): SiteLandSection {
   const row = closed(value, 'land_sha256 chunk_mm chunks backdrop_sha256 water', 'land');
   if (row['chunk_mm'] !== LAND_CHUNK_MM) fail(`The site drawing's land chunks are not ${LAND_CHUNK_MM} mm.`);
   const chunks = row['chunks'], water = row['water'];
@@ -338,7 +341,7 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
         || binding[text(supportRaw['entry_node_id'], 'support entry node')] !== entrySurface) fail('The site support entry/place binding is invalid.');
   }
   const read = slots.map((one, index) => slot(one, index, onLand));
-  const land = onLand ? landSection(body['land']) : undefined;
+  const land = onLand ? parseSiteLandSection(body['land']) : undefined;
   // Network supports are canonical walking geometry. Draw their exact top planes in the same dresser.
   if (support !== undefined) for (const surface of support.document.surfaces) {
     if (surface.surface_id === support.entry.surfaceId) continue;

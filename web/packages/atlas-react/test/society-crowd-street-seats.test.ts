@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
-import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
+import { SocietyCrowd, type CrowdGround } from '../src/playcanvas/society/crowd.js';
 import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
 import { farAppearance, postureSeatMetres } from '../src/playcanvas/character/far.js';
 import { inhabitantLookOf } from '../src/playcanvas/character/inhabitant.js';
@@ -52,7 +52,7 @@ const state = (inhabitants: OwnedSocietyState['inhabitants']): OwnedSocietyState
   profile: 'exulanica-society/v5', society_id: 'society', branch_id: 'branch', tick: 1, inhabitants,
 });
 
-function setup(inhabitants: OwnedSocietyState['inhabitants'], layout: SeatingLayout | null) {
+function setup(inhabitants: OwnedSocietyState['inhabitants'], layout: SeatingLayout | null, ground?: CrowdGround) {
   const canvas = document.createElement('canvas');
   const device = new pc.NullGraphicsDevice(canvas);
   const app = new pc.AppBase(canvas);
@@ -75,7 +75,7 @@ function setup(inhabitants: OwnedSocietyState['inhabitants'], layout: SeatingLay
       destroy: () => entity.destroy(),
     };
   };
-  const crowd = new SocietyCrowd(device, root, { factory });
+  const crowd = new SocietyCrowd(device, root, ground === undefined ? { factory } : { factory, ground });
   crowd.set(state(inhabitants), [10, -20], { nowMs: 0, intervalMs: 60_000 }, layout);
   let now = 0;
   for (let frame = 0; frame < 4 * 60; frame += 1) crowd.update((now += 1000 / 60));
@@ -103,6 +103,17 @@ describe('a town resident resting on a street bench', () => {
     expect(pose).toMatchObject({ activity: 'rest', seated: true, groundY: 0 });
     expect(crowd.seatedOn('resting')).toBe(true);
     expect(crowd.seatingMisses.filter((miss) => miss.reason !== 'activity-has-no-facing')).toEqual([]);
+    done();
+  });
+
+  it("on a town on its land, sits on the bench at the bench's own height, not at the land's datum", () => {
+    // A town on land: its people's region stands at the land's datum and they walk on the land, 17 m
+    // up here, and the bench's base stands at its record's own height there.
+    const raised: SeatingLayout = { ...TOWN, streetFurniture: [{ ...BENCH, baseMm: 17_000 }] };
+    const { last, done } = setup([resident('resting', SEAT_MM, 'rest')], raised, () => 17);
+    const pose = last('resting');
+    expect(pose.position[1]).toBeCloseTo(17 + liftOf('resting'), 9);
+    expect(pose).toMatchObject({ activity: 'rest', seated: true });
     done();
   });
 

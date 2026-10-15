@@ -93,6 +93,7 @@ import {
 import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
 import { townFurniture } from './town-furniture.js';
+import { townGround } from './town-land.js';
 import { onSiteSeatsChanged, siteSeats } from './site-furniture.js';
 import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
@@ -2698,13 +2699,12 @@ export function mountEnvironmentSelection(
     const generated = entry.generatedGround ?? entry.generatedSite ?? null;
     if (generated != null) {
       const { regionId, arrivalMm } = generated;
-      // A site on land stands its people on its land, its region at the land's datum.
+      // A site on land stands its people on its land, and a town on its land on the ground its tiles
+      // walk (`townGround`), each region at the land's datum; elsewhere they stand at the arrival's height.
       const drawn = binding?.worldKind?.ground;
-      const land = entry.generatedSite != null && drawn?.form === 'generated-site' ? drawn.site.land : undefined;
-      return binding?.generatedTile == null || (land === undefined
-        ? hostGeneratedSociety(binding, regionId, arrivalMm[1])
-        : hostGeneratedSociety(binding, regionId, arrivalMm[1], land.groundM)) === null
-        ? null : regionId;
+      const ground = entry.generatedSite != null && drawn?.form === 'generated-site' ? drawn.site.land?.groundM
+        : drawn?.form === 'generated-tile' ? townGround(entry.entryId, drawn.tile.navigationWorld) : undefined;
+      return binding?.generatedTile == null || hostGeneratedSociety(binding, regionId, arrivalMm[1], ground) === null ? null : regionId;
     }
     if (entry.declaredFloor == null || binding === undefined) return null;
     const client = deps.societyClient ?? new SocietyClient({ ...deps.credentials, worldId: entry.worldId });

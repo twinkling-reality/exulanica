@@ -3,6 +3,7 @@ import {
   LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, landBackdropColour, readLandBackdrop, readLandChunk, valueNoise,
   type HeightfieldDigest, type LandBackdrop, type LandChunk, type LandSurfaces, type LandWater,
 } from '@exulanica/atlas-core';
+import type { GeneratedTileHost } from '../generated-tile/binding-contract.js';
 import { buildSurfaceMesh } from '../generated-tile/surface-mesh.js';
 import { landSurfaceMaterial } from './land-slope.js';
 import type { SiteLandSection, SiteSlot, StructuredSiteDrawing } from './site-drawing.js';
@@ -24,6 +25,8 @@ import type { DrawnSiteSlots } from './site-primitives.js';
  * takes a ground function is handed none.
  */
 
+/** The ground land wears where nothing it stands for is drawn: a site's with no base ground, and a town's. */
+export const LAND_GROUND_RGB = [0.47, 0.56, 0.33] as const;
 /** Plain water where the drawing's own water material is not handed over. */
 const PLAIN_WATER: readonly [number, number, number] = [0.24, 0.42, 0.55];
 /** Scenery stands only on land at least this far above the sea's level. */
@@ -108,9 +111,24 @@ export function readSiteLand(
 ): SiteLand {
   const section = drawing.land;
   if (section === undefined) throw new Error('The site drawing states no land.');
+  return readLandSection(section, chunks, backdrop, digest, servedBytes);
+}
+
+/**
+ * Read land from the documents served for its section, a site's drawing's or a town's own: every
+ * chunk it names, by place, and its backdrop, each held to the digest the section names. Refuses
+ * (throws) a chunk missing or not the one named, and a backdrop not the one named.
+ */
+export function readLandSection(
+  section: SiteLandSection,
+  chunks: ReadonlyMap<string, unknown>,
+  backdrop: unknown,
+  digest: HeightfieldDigest,
+  servedBytes = 0,
+): SiteLand {
   const read = section.chunks.map(({ chunk: [x, y], sha256 }) => {
     const raw = chunks.get(`${x},${y}`);
-    if (raw === undefined) throw new Error(`The land chunk (${x}, ${y}) its drawing names was not served.`);
+    if (raw === undefined) throw new Error(`The land chunk (${x}, ${y}) its land section names was not served.`);
     const one = readLandChunk(raw, digest, sha256);
     if (one.chunkX !== x || one.chunkY !== y) throw new Error(`The land chunk served for (${x}, ${y}) states another place.`);
     return one;
@@ -325,8 +343,9 @@ function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMateri
  * Draw a site's land under a new root: each near chunk as one mesh in `groundMaterial` (the site's
  * base ground as drawn) with the land's own surfaces laid over it, the backdrop in blocks a
  * renderer can cull, coloured by the same surfaces over `groundRgb`, and the sea and lakes at their
- * levels. With no `surfaces` the land wears its ground alone. Nothing here casts a shadow; the near
- * land receives them.
+ * levels. With no `surfaces` the land wears its ground alone. A near chunk `leaveOut` names is not
+ * drawn: a town's tiles draw the land under them. Nothing here casts a shadow; the near land
+ * receives them.
  */
 export function drawSiteLand(
   device: pc.GraphicsDevice,
@@ -334,6 +353,7 @@ export function drawSiteLand(
   groundMaterial: pc.Material,
   groundRgb: Rgb,
   surfaces: LandSurfaces | null = null,
+  options: { readonly leaveOut?: (chunkX: number, chunkY: number) => boolean } = {},
 ): DrawnSiteLand {
   const root = new pc.Entity('site-land');
   const meshes: pc.Mesh[] = [];
@@ -363,6 +383,7 @@ export function drawSiteLand(
     draws += instances.length;
   };
   for (const chunk of land.chunks) {
+    if (options.leaveOut?.(chunk.chunkX, chunk.chunkY) === true) continue;
     const n = chunk.samplesPerSide, positions: number[] = [], surfaceMm: number[] = [];
     for (let j = 0; j < n; j += 1) for (let i = 0; i < n; i += 1) {
       const east = chunk.chunkX * LAND_CHUNK_MM + i * chunk.cellMm, north = chunk.chunkY * LAND_CHUNK_MM + j * chunk.cellMm;
@@ -463,6 +484,40 @@ export function drawSiteLand(
       root.destroy();
       for (const mesh of meshes) mesh.destroy();
       for (const material of made) material.destroy();
+    },
+  };
+}
+
+/**
+ * Draw the land round a town made on its land, under the host's environment root: every near chunk
+ * its tiles do not cover (`covered` names those they do) in the land's plain ground with its
+ * surfaces over it, the backdrop and the water, with the camera seeing as far as the backdrop
+ * reaches. Disposing takes it all away and gives the camera back its far plane.
+ */
+export function attachLandRound(
+  host: GeneratedTileHost,
+  land: SiteLand,
+  covered: (chunkX: number, chunkY: number) => boolean,
+  surfaces: LandSurfaces | null,
+): { readonly drawn: DrawnSiteLand; dispose(): void } {
+  const plain = new pc.StandardMaterial();
+  plain.name = 'town-land:ground';
+  plain.diffuse = new pc.Color(...LAND_GROUND_RGB);
+  plain.update();
+  const drawn = drawSiteLand(host.app.graphicsDevice, land, plain, LAND_GROUND_RGB, surfaces, { leaveOut: covered });
+  host.environmentRoot.addChild(drawn.root);
+  const camera = host.camera.camera;
+  const far = camera?.farClip;
+  if (camera != null) camera.farClip = Math.max(camera.farClip, drawn.reachM);
+  let disposed = false;
+  return {
+    drawn,
+    dispose(): void {
+      if (disposed) return;
+      disposed = true;
+      drawn.destroy();
+      plain.destroy();
+      if (camera != null && far !== undefined) camera.farClip = far;
     },
   };
 }

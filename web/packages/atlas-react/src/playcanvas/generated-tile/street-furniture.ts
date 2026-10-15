@@ -11,7 +11,8 @@
  *
  * The tile frame is x east, y north, z up in millimetres, and a town's society states positions
  * east and south, so a record's `y` and its direction's `dy` change sign on the way out, as
- * `tileToRenderer` does for the scene.
+ * `tileToRenderer` does for the scene. The record's `z` is the height its base stands at above the
+ * town's datum, kept as stated: which height a reader seats people from is the reader's frame.
  */
 import { decodedContainer } from './decoded-container.js';
 
@@ -36,6 +37,8 @@ export interface StatedStreetFurniture {
   /** Its direction, east and south; its parts' `left` is to the left of it. */
   readonly facing: readonly [number, number];
   readonly parts: readonly StatedFurniturePart[];
+  /** The height its base stands at above the town's datum, where its record states one. */
+  readonly zMm?: number;
 }
 
 const whole = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
@@ -50,7 +53,7 @@ export function streetFurnitureOf(bytes: Uint8Array): StatedStreetFurniture[] {
   for (const record of decodedContainer(bytes).header.records) {
     if (record.kind !== STREET_FURNITURE_KIND || record.identity === '' || furniture.has(record.identity)) continue;
     const fields = record.fields;
-    const x = whole(fields['x_mm']), y = whole(fields['y_mm']);
+    const x = whole(fields['x_mm']), y = whole(fields['y_mm']), z = whole(fields['z_mm']);
     const dx = whole(fields['facing_dx_mm']), dy = whole(fields['facing_dy_mm']);
     const stated = fields['parts'];
     if (x === null || y === null || dx === null || dy === null || (dx === 0 && dy === 0) || !Array.isArray(stated)) continue;
@@ -67,7 +70,7 @@ export function streetFurnitureOf(bytes: Uint8Array): StatedStreetFurniture[] {
     }
     if (parts.length !== stated.length) continue;
     // North is the society's negative south, for the point and for the direction alike.
-    furniture.set(record.identity, { identity: record.identity, eastMm: x, southMm: -y, facing: [dx, -dy], parts });
+    furniture.set(record.identity, { identity: record.identity, eastMm: x, southMm: -y, facing: [dx, -dy], parts, ...(z === null ? {} : { zMm: z }) });
   }
   return [...furniture.values()];
 }

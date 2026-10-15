@@ -10,7 +10,7 @@ import {
  * The conformance tile's container against the document it was baked from
  * (packages/loom-tess/test/fixtures/tile-conformance.json): every piece of street furniture the
  * document states is read out of the container at the document's own figures, carried from the
- * tile's east and north into the society's east and south.
+ * tile's east and north into the society's east and south, and its base's height kept as stated.
  */
 interface StatedPart {
   readonly offset_x_mm: number; readonly offset_y_mm: number; readonly offset_z_mm: number;
@@ -19,7 +19,7 @@ interface StatedPart {
 interface StatedRecord {
   readonly kind: string;
   readonly fields: {
-    readonly identity: string; readonly x_mm: number; readonly y_mm: number;
+    readonly identity: string; readonly x_mm: number; readonly y_mm: number; readonly z_mm: number;
     readonly facing_dx_mm: number; readonly facing_dy_mm: number; readonly parts: readonly StatedPart[];
   };
 }
@@ -44,6 +44,8 @@ describe('a town tile\'s street furniture', () => {
       expect(item.eastMm).toBe(record.fields.x_mm);
       // North in the tile is negative south in the society's plan.
       expect(item.southMm).toBe(-record.fields.y_mm);
+      // Its base's height above the town's datum, as stated: a reader chooses the frame it seats in.
+      expect(item.zMm).toBe(record.fields.z_mm);
       expect(item.facing[0]).toBe(record.fields.facing_dx_mm);
       expect(item.facing[1] + record.fields.facing_dy_mm).toBe(0);
       expect(item.parts).toEqual(record.fields.parts.map((part) => ({

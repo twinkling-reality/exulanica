@@ -69,8 +69,9 @@ export interface StreetFurniturePart {
 
 /**
  * A piece of street furniture a generated town's own records state: where its base stands in the
- * society root's plan (millimetres east and south), the way it faces there, and its parts. The
- * town's records, not a catalog of kinds, say what it is made of, so what is read here is geometry.
+ * society root's plan (millimetres east and south), how high above the root, the way it faces
+ * there, and its parts. The town's records, not a catalog of kinds, say what it is made of, so what
+ * is read here is geometry.
  */
 export interface StreetFurniture {
   /** The record's identity. */
@@ -80,6 +81,12 @@ export interface StreetFurniture {
   /** Its direction in the plan, east and south, of any nonzero length; its parts' `left` is to the left of it. */
   readonly facing: readonly [number, number];
   readonly parts: readonly StreetFurniturePart[];
+  /**
+   * How far its base stands above the society root, millimetres: a town on its land's furniture
+   * stands at its own height over a root at the land's datum. Absent, at the root, as a level
+   * town's furniture is read.
+   */
+  readonly baseMm?: number;
 }
 
 /** What the drawn version and the society's consumed input say a person can use. */
@@ -394,7 +401,7 @@ export function streetSeatDrawing(
       placeIndex: Math.round(a),
       facing,
       seat: {
-        position: [positionMm[0] / MILLIMETRES_PER_METRE, top / MILLIMETRES_PER_METRE, positionMm[1] / MILLIMETRES_PER_METRE],
+        position: [positionMm[0] / MILLIMETRES_PER_METRE, ((item.baseMm ?? 0) + top) / MILLIMETRES_PER_METRE, positionMm[1] / MILLIMETRES_PER_METRE],
         facing,
       },
       ...(forward === null ? { facesAsHeld: true } : {}),
