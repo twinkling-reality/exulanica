@@ -313,9 +313,19 @@ worlds on land, a town drafted from a sentence ([below](#land-for-a-world-made-f
 `POST /worlds/kinds/town/worlds` with `land` make one, trying one identity; elsewhere the route
 answers 422 `landform_not_served`. The tessellator bakes a town on land: its street lines bend in
 height at the mouths, and its terrain closes the steps round lots at other heights than their
-footways and their neighbours ([loom-tess](../web/packages/loom-tess/README.md)). The browser draws
-a town's tiles but not the land round them (the near land beyond them, the backdrop and the sea), so
-the setting stays off until it does.
+footways and their neighbours ([loom-tess](../web/packages/loom-tess/README.md)).
+
+The land round a town on land is served as a site's is. `GET /world/versions/{version_id}/land`
+(world read) answers its land section (`exulanica.town-land/v1`): the land document's digest, every
+near chunk (the town's tiles and one ring round them) and the backdrop by their digests, and the
+land's own water. It is made in the kind worker from the town's receipt, graded for its records as
+its terrain stage graded them (`city_grammar_town.graded_land`), and kept by the receipt alone,
+since a town's land is graded before its buildings and no change to them moves it; the chunks under
+the tiles are the town's terrain records' heights. The chunk and backdrop routes serve its documents
+by those digests, and the saved entry's `generated_ground.land_sha256` names its land. A town on
+level ground answers 404 `land_unavailable`; a site states its land in its drawing, and the section
+route answers it 404 `unknown_reference`. The browser draws a town's tiles but not the land round
+them, so the setting stays off until it does.
 
 ## A world's land rules
 

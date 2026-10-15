@@ -176,6 +176,10 @@ class GeneratedGroundView(BaseModel):
     #: integer or a choice key: the preset's values with those asked for in their place, as the
     #: receipt records them. Null for a world of a version 1 recipe, which recorded none.
     values: dict[str, int | str] | None = None
+    #: The digest of the land a town made on its land stands on: its land section
+    #: (``GET /world/versions/{version_id}/land``) names it, with the chunks, backdrop and water
+    #: drawn round the town. Null for a town on level ground.
+    land_sha256: str | None = None
 
 
 class GeneratedSiteView(BaseModel):

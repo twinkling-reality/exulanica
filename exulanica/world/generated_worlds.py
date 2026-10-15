@@ -575,6 +575,9 @@ class GeneratedGround:
     #: specification file and recorded no values.
     specification: str | None = None
     values: Mapping[str, int | str] | None = None
+    #: The digest of the land document a town made on its land stands on, which its land section
+    #: (``GET /world/versions/{version_id}/land``) names; None for a town on level ground.
+    land_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -702,4 +705,5 @@ def generated_ground(
         tiles=generated_tiles(connection, workspace_id, world_id, snapshot_id, changes),
         specification=None if values is None else recipe["specification"],
         values=None if values is None else MappingProxyType(dict(sorted(values.items()))),
+        land_sha256=receipt.get("land_sha256"),
     )

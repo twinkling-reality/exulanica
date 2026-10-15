@@ -79,7 +79,10 @@ inputs is a separate action. A new world made from them is
 `POST /worlds/generated` with `recipe` set to `generated_ground.recipe_key` and these `values`, and
 the earlier world, its people, runs and comparisons stay bound to its own receipt. A world made
 from a version 1 recipe, which named a whole specification file and recorded no values, states
-both as null.
+both as null. `generated_ground.land_sha256` is the digest of the land document a town made on its
+land stands on, read from its receipt, which its land section
+(`GET /world/versions/{version_id}/land`, [landform contract](landform-contract.md#towns-on-land))
+names; null for a town on level ground.
 
 A world generated from a recipe is read through its receipt. When the receipt no longer generates
 what it recorded, reads return `availability: unavailable`, no `generated_ground`, and the reason

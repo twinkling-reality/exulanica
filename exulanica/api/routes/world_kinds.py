@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import math
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Final, Literal
 
@@ -72,7 +73,7 @@ from exulanica.selection.world_drafting import sendable
 from exulanica.world import draft_admission
 from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
 from exulanica.world.errors import InvalidStructuralData
-from exulanica.world.generated_worlds import generation_receipt, states_site
+from exulanica.world.generated_worlds import generation_receipt, states_records, states_site
 from exulanica.world.kind_draft_jobs import KindDraftRepository
 from exulanica.world.kinds.document import (
     KIND_CODES,
@@ -102,6 +103,8 @@ from exulanica.world.kinds.worker import (
     drawing_job,
     drawing_key,
     kind_worker,
+    town_land_job,
+    town_land_key,
 )
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
 from exulanica.world.world_draft_jobs import WorldDraftRefused
@@ -1144,11 +1147,15 @@ def _site_drawn(
     world_id: str,
     versions: tuple[int, ...],
     unavailable: tuple[str, str],
+    *,
+    not_a_site: Callable[[Any], dict[str, Any] | Response] | None = None,
 ) -> dict[str, Any] | Response:
     """What the kind worker made with a site world's drawing (its land documents, and on a
     landscape the landscape's drawing and documents), for a world whose site-plan composer version
     is one of ``versions``; else the problem the route answers (``unavailable`` its code and
-    sentence where the version is another)."""
+    sentence where the version is another). A world that is no site is answered by
+    ``not_a_site``, handed the version's snapshot, where it is given: a site is read first and pays
+    no other read."""
     from exulanica.api.world_edit import object_problem
     from exulanica.world.object_repository import WorldObjectRepository
     from exulanica.world.site_parts import changes_document, changes_sha256
@@ -1158,6 +1165,8 @@ def _site_drawn(
         repository = WorldObjectRepository(connection, session.workspace_id, world_id=world_id)
         snapshot_id = repository.edit_base_row(version_id)["source_snapshot_id"]
         if not states_site(connection, session.workspace_id, world_id, snapshot_id):
+            if not_a_site is not None:
+                return not_a_site(snapshot_id)
             return _problem(404, "unknown_reference", "this world is not made from a world kind")
         digest, receipt = generation_receipt(
             connection, session.workspace_id, world_id, snapshot_id
@@ -1198,6 +1207,63 @@ def _site_drawn(
         return problem
 
 
+def _town_land(
+    version_id: uuid.UUID,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    snapshot_id: Any = None,
+) -> dict[str, Any] | Response | None:
+    """What the kind worker made of a town on its land's land (its section, and every chunk and the
+    backdrop the section names), for a world a recipe's composer composed; else the problem the
+    route answers (404 ``land_unavailable`` for a town on level ground). None for any other world.
+    ``snapshot_id`` is the version's, where the site rules have read it already."""
+    from exulanica.api.world_edit import object_problem
+    from exulanica.world.composers.city_grammar_town import COMPOSER_KEY, ON_LAND_VERSIONS
+    from exulanica.world.object_repository import WorldObjectRepository
+
+    try:
+        if snapshot_id is None:
+            require_world(connection, session.workspace_id, world_id)
+            repository = WorldObjectRepository(connection, session.workspace_id, world_id=world_id)
+            snapshot_id = repository.edit_base_row(version_id)["source_snapshot_id"]
+        if not states_records(connection, session.workspace_id, world_id, snapshot_id):
+            return None
+        digest, receipt = generation_receipt(
+            connection, session.workspace_id, world_id, snapshot_id
+        )
+        composer = receipt["composer"]
+        if composer.get("key") != COMPOSER_KEY or composer.get("version") not in ON_LAND_VERSIONS:
+            return _problem(404, "land_unavailable", "this world stands on level ground")
+        workspace = str(session.workspace_id)
+        worker = kind_worker()
+        outcome = worker.run(
+            town_land_key(workspace, digest),
+            DRAWING_SECONDS,
+            town_land_job,
+            world_id,
+            dict(receipt),
+            digest,
+            workspace=workspace,
+            kept=worker.drawings,
+        )
+        if outcome.status != "done" or outcome.value is None:
+            return _waiting(outcome, kept=True)
+        answer = outcome.value
+        if answer["status"] == "refused":
+            return _problem(409, "generated_world_unreadable", answer["detail"])
+        return answer
+    except KindWorkWaiting as exc:
+        return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
+    except InvalidStructuralData as exc:
+        return _problem(409, "generated_world_unreadable", str(exc))
+    except Exception as exc:
+        problem = object_problem(exc)
+        if problem is None:
+            raise
+        return problem
+
+
 def _site_land_document(
     version_id: uuid.UUID,
     connection: Any,
@@ -1207,8 +1273,14 @@ def _site_land_document(
 ) -> Response:
     """Serve one of a site world's land documents (``pick`` is ``backdrop`` or ``x,y`` for a
     chunk), made with its drawing in the kind worker and kept beside it, by the digest the drawing
-    names."""
+    names; or a town on its land's, made and kept with its land section (:func:`_town_land`)."""
     from exulanica.world.composers.site_plan import ON_LAND_VERSIONS
+
+    def town(snapshot_id: Any) -> dict[str, Any] | Response:
+        found = _town_land(version_id, connection, session, world_id, snapshot_id)
+        if found is None:
+            return _problem(404, "unknown_reference", "this world is not made from a world kind")
+        return found
 
     answer = _site_drawn(
         version_id,
@@ -1217,6 +1289,7 @@ def _site_land_document(
         world_id,
         ON_LAND_VERSIONS,
         ("land_unavailable", "this world stands on level ground"),
+        not_a_site=town,
     )
     if isinstance(answer, Response):
         return answer
@@ -1244,8 +1317,10 @@ def read_site_land_chunk(
     world_id: WorldId,
 ) -> Response:
     """Serve one chunk of a site world's graded land (``exulanica.landform-chunk/v1``), held to the
-    digest its drawing (``exulanica.site-drawing/v5``) names. A level world answers 404
-    ``land_unavailable``; a chunk the land does not hold 404 ``land_chunk_unavailable``."""
+    digest its drawing (``exulanica.site-drawing/v5``) names, or of a town on its land's, held to
+    the digest its land section (``GET /world/versions/{version_id}/land``) names. A level world
+    answers 404 ``land_unavailable``; a chunk the land does not hold 404
+    ``land_chunk_unavailable``."""
     return _site_land_document(version_id, connection, session, world_id, f"{chunk_x},{chunk_y}")
 
 
@@ -1260,8 +1335,39 @@ def read_site_land_backdrop(
     world_id: WorldId,
 ) -> Response:
     """Serve a site world's backdrop (``exulanica.landform-backdrop/v1``), held to the digest its
-    drawing names. A level world answers 404 ``land_unavailable``."""
+    drawing names, or a town on its land's, held to the digest its land section names. A level
+    world answers 404 ``land_unavailable``."""
     return _site_land_document(version_id, connection, session, world_id, "backdrop")
+
+
+@site_router.get(
+    "/versions/{version_id}/land",
+    summary="A town on its land's land: the chunks, backdrop and water drawn round it.",
+)
+def read_town_land(
+    version_id: uuid.UUID,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve the land a town made on its land stands on (``exulanica.town-land/v1``): the digest of
+    its land document, and of every chunk (``/land/chunks/{chunk_x}/{chunk_y}``) and the backdrop
+    (``/land/backdrop``) round it, and its water, made in the kind worker and kept by the town's
+    receipt, with its own digest as the entity tag. A town on level ground answers 404
+    ``land_unavailable``; a site states its land in its drawing and any other world states none,
+    404 ``unknown_reference``."""
+    town = _town_land(version_id, connection, session, world_id)
+    if town is None:
+        return _problem(
+            404, "unknown_reference", "only a town states its land here; a site's drawing names it"
+        )
+    if isinstance(town, Response):
+        return town
+    return Response(
+        content=town["body"],
+        media_type="application/json",
+        headers={**_HEADERS, "ETag": f'"{town["sha256"]}"'},
+    )
 
 
 def _site_landscape_document(

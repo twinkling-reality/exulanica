@@ -78,6 +78,7 @@ from exulanica.grammar.grammars.city.generation.tiles import (
     tile_document,
     tile_record,
 )
+from exulanica.grammar.grammars.city.land import near_land, town_frame, town_land_plan
 from exulanica.grammar.grammars.city.streets import StreetSegmentRecord
 from exulanica.grammar.grammars.city.tile import tile_inputs_digest
 from exulanica.grammar.grammars.specified import (
@@ -91,9 +92,11 @@ from exulanica.grammar.grammars.specified import (
 from exulanica.grammar.landform import (
     LandDocument,
     LandformRefused,
+    grade_land,
     land_rules,
     landform_catalog,
     read_land_document,
+    water_bodies,
 )
 from exulanica.grammar.migration import ParameterMigration
 from exulanica.world.composers import (
@@ -106,7 +109,7 @@ from exulanica.world.composers import (
     seed_candidate,
 )
 from exulanica.world.errors import InvalidStructuralData
-from exulanica.world.site_land import check_receipt_land_rules
+from exulanica.world.site_land import SiteLand, check_receipt_land_rules
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, RoutineModel, load_routine_model
 from exulanica.world.society_city_place import city_navigation
 from exulanica.world.society_grounds import (
@@ -126,9 +129,11 @@ __all__ = [
     "DESTINATION_ID",
     "GRAMMAR_VERSIONS",
     "LAND_COMPOSER_VERSION",
+    "ON_LAND_VERSIONS",
     "REGION_ID",
     "TILE_MODULE",
     "compose",
+    "graded_land",
     "on_land",
     "receipt_digest_of",
     "receipt_land",
@@ -144,6 +149,9 @@ COMPOSER_KEY: Final = "city-grammar-town"
 COMPOSER_VERSIONS: Final = (1, 2, 3)
 #: The version that lays a town on its land (the module docstring's last section).
 LAND_COMPOSER_VERSION: Final = 3
+#: Every version whose towns stand on their land: what a reader of a town's land asks of its
+#: receipt, so a later version on land is read as one rather than as a town on level ground.
+ON_LAND_VERSIONS: Final = (LAND_COMPOSER_VERSION,)
 #: The versions a person arrives by version 2's rules: on a footway spot clear of furniture, trees
 #: and resident starts, under the routine and arrival policy the receipt pins.
 _ARRIVING_ON_FOOTWAYS: Final = (2, LAND_COMPOSER_VERSION)
@@ -603,7 +611,7 @@ def _version(receipt: Mapping[str, Any]) -> int:
             "generated_world_grammar_changed: this world was generated under city grammar "
             f"version {version}, which this server does not generate"
         )
-    on_land = receipt.get("composer", {}).get("version") == LAND_COMPOSER_VERSION
+    on_land = receipt.get("composer", {}).get("version") in ON_LAND_VERSIONS
     if on_land != (version in CITY_LAND_VERSIONS):
         raise InvalidStructuralData(
             "generated_world_grammar_changed: this world's receipt names city grammar version "
@@ -625,7 +633,7 @@ def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> N
         raise InvalidStructuralData(
             "generated_world_arrival_policy_changed: town arrival policy differs"
         )
-    if composer["version"] == LAND_COMPOSER_VERSION:
+    if composer["version"] in ON_LAND_VERSIONS:
         receipt_land(receipt)
     elif {"land", "land_sha256", "land_rules"} & set(receipt):
         raise InvalidStructuralData(
@@ -696,6 +704,37 @@ def _receipt_specification(
             "one its receipt names"
         )
     return spec, land
+
+
+def _fixed(name: str) -> int:
+    """A grading figure the version that lays a town on its land states fixed, as its terrain stage
+    reads it."""
+    spec = CITY_SURFACES[_LAND_GRAMMAR_VERSION].parameters.get(name)
+    if spec.minimum != spec.maximum:
+        raise InvalidStructuralData(f"generated_world_grammar_changed: {name} is not fixed")
+    return int(spec.minimum)
+
+
+def graded_land(receipt: Mapping[str, Any], generated: Sequence[object]) -> SiteLand:
+    """The land a town on its land stands on, graded for its ``generated`` records as its terrain
+    stage graded it (``city.land.town_land_plan`` on the land its receipt names, framed by its seed,
+    the land's own water held): the chunks under its tiles are its terrain records' heights, and the
+    ring of chunks round them, the backdrop and the water are the land drawn round the town."""
+    land = receipt_land(receipt)
+    frame = town_frame(generated, str(receipt["seed"]))
+    own = water_bodies(land, frame)
+    plan = town_land_plan(
+        generated,
+        bank_grade_permille=_fixed("bank_grade_permille"),
+        cut_fill_most_mm=_fixed("cut_fill_most_mm"),
+    )
+    try:
+        graded = grade_land(near_land(land, frame), plan, water=own)
+    except LandformRefused as exc:
+        raise InvalidStructuralData(
+            f"generated_world_land_changed: its land no longer grades for its records: {exc.detail}"
+        ) from exc
+    return SiteLand(land, frame, graded, own)
 
 
 def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:

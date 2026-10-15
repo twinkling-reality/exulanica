@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import json
 from functools import cache
 
 import pytest
@@ -146,3 +147,24 @@ def test_a_town_on_land_names_the_land_grammar_and_a_level_one_names_no_land():
     level = compose_generated_world(town_recipe("small_town"), WORLD).receipt
     with pytest.raises(InvalidStructuralData, match="generated_world_land_changed"):
         town.tile_inputs({**level, "land": LANDS["coast"]})
+
+
+def test_the_land_drawn_round_a_town_is_the_land_its_terrain_was_graded_from():
+    """The chunks under a town's tiles are its terrain records' heights to the millimetre, so the
+    land the browser draws round the town meets its tiles; the ring round them, the backdrop and
+    the land's own water come from the same grading, framed by the town's own seed."""
+    made = _made()
+    land = town.graded_land(made.receipt, made.records)
+    documents = land.documents()
+    section = land.drawing_section()
+    terrain = [r for r in made.records if isinstance(r, TerrainRecord)]
+    assert terrain
+    for patch in terrain:
+        chunk = json.loads(documents["chunks"][f"{patch.tile_x},{patch.tile_y}"]["body"])
+        assert tuple(chunk["height_mm"]) == patch.height_mm, (patch.tile_x, patch.tile_y)
+    under = {(patch.tile_x, patch.tile_y) for patch in terrain}
+    named = {tuple(chunk["chunk"]) for chunk in section["chunks"]}
+    assert under < named, "the near land rings the town's tiles"
+    assert section["land_sha256"] == made.receipt["land_sha256"]
+    assert land.frame.seed == made.receipt["seed"]
+    assert {body["kind"] for body in section["water"]} >= {"sea"}, "the coast's town has its sea"

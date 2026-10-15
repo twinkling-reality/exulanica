@@ -1475,6 +1475,17 @@ export const API_SCHEMA: ApiSpec = {
             }
           ],
           "title": "Values"
+        },
+        "land_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Land Sha256"
         }
       },
       "additionalProperties": false,

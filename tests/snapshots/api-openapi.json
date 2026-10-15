@@ -23998,7 +23998,7 @@
      "world"
     ],
     "summary": "One 128 m chunk of a site world's land, by its place on the city's tile grid.",
-    "description": "Serve one chunk of a site world's graded land (``exulanica.landform-chunk/v1``), held to the\ndigest its drawing (``exulanica.site-drawing/v5``) names. A level world answers 404\n``land_unavailable``; a chunk the land does not hold 404 ``land_chunk_unavailable``.",
+    "description": "Serve one chunk of a site world's graded land (``exulanica.landform-chunk/v1``), held to the\ndigest its drawing (``exulanica.site-drawing/v5``) names, or of a town on its land's, held to\nthe digest its land section (``GET /world/versions/{version_id}/land``) names. A level world\nanswers 404 ``land_unavailable``; a chunk the land does not hold 404\n``land_chunk_unavailable``.",
     "operationId": "read_site_land_chunk_world_versions__version_id__land_chunks__chunk_x___chunk_y__get",
     "parameters": [
      {
@@ -24089,8 +24089,77 @@
      "world"
     ],
     "summary": "A site world's land drawn to the horizon, never walked.",
-    "description": "Serve a site world's backdrop (``exulanica.landform-backdrop/v1``), held to the digest its\ndrawing names. A level world answers 404 ``land_unavailable``.",
+    "description": "Serve a site world's backdrop (``exulanica.landform-backdrop/v1``), held to the digest its\ndrawing names, or a town on its land's, held to the digest its land section names. A level\nworld answers 404 ``land_unavailable``.",
     "operationId": "read_site_land_backdrop_world_versions__version_id__land_backdrop_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/land": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "A town on its land's land: the chunks, backdrop and water drawn round it.",
+    "description": "Serve the land a town made on its land stands on (``exulanica.town-land/v1``): the digest of\nits land document, and of every chunk (``/land/chunks/{chunk_x}/{chunk_y}``) and the backdrop\n(``/land/backdrop``) round it, and its water, made in the kind worker and kept by the town's\nreceipt, with its own digest as the entity tag. A town on level ground answers 404\n``land_unavailable``; a site states its land in its drawing and any other world states none,\n404 ``unknown_reference``.",
+    "operationId": "read_town_land_world_versions__version_id__land_get",
     "parameters": [
      {
       "name": "version_id",
@@ -33974,6 +34043,17 @@
        }
       ],
       "title": "Values"
+     },
+     "land_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Land Sha256"
      }
     },
     "additionalProperties": false,

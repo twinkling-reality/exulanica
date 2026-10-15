@@ -9,6 +9,7 @@ the generation the real jobs run is tested through the routes in test_world_kind
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -214,7 +215,8 @@ def test_erased_receipts_drop_their_caches_and_late_compositions_only(monkeypatc
     erased_key = worker_module.drawing_key("ours", erased)
     other_key = worker_module.drawing_key("ours", other)
     foreign_key = worker_module.drawing_key("theirs", erased)
-    for key in (erased_key, other_key, foreign_key):
+    town_key = worker_module.town_land_key("ours", erased)
+    for key in (erased_key, other_key, foreign_key, town_key):
         worker.drawings.put(key, {"body": key})
     place = worker_module.place_key("ours", erased, "place:1")
     worker.places.put(place, {"place": "private"})
@@ -228,6 +230,7 @@ def test_erased_receipts_drop_their_caches_and_late_compositions_only(monkeypatc
     composer.keep()
     pool.futures[0].set_result({"place": "private late result"})
     assert worker.drawings.get(erased_key) is None
+    assert worker.drawings.get(town_key) is None
     assert worker.places.get(place) is None
     assert worker.places.get(running_key) is None
     assert worker.drawings.get(other_key) == {"body": other_key}
@@ -334,6 +337,35 @@ def test_a_world_on_land_is_drawn_with_its_chunks_and_backdrop_and_a_refused_lan
         "detail": "land states -1, outside 0 to 40000",
         "path": "ground_mm",
     }
+
+
+def test_a_town_on_land_s_land_names_by_digest_every_chunk_and_the_backdrop_it_is_given_with():
+    from exulanica.grammar.landform import land_recipes
+    from exulanica.world.composers import city_grammar_town as town
+    from exulanica.world.generated_worlds import compose_generated_world
+    from exulanica.world.world_recipes import town_recipe
+
+    [coast] = [recipe for recipe in land_recipes() if recipe.key == "coast"]
+    world_id = "world:generated:worker-town-land"
+    on_land = town.on_land(town_recipe("small_town"), dict(coast.land))
+    made = compose_generated_world(on_land, world_id)
+    answer = worker_module.town_land_job(world_id, dict(made.receipt), made.receipt_sha256)
+    assert answer["status"] == "done"
+    section = json.loads(answer["body"])
+    assert section["profile"] == worker_module.TOWN_LAND_PROFILE
+    assert (section["world_id"], section["receipt_sha256"]) == (world_id, made.receipt_sha256)
+    assert hashlib.sha256(answer["body"]).hexdigest() == answer["sha256"]
+    land = answer["land"]
+    named = {f"{c['chunk'][0]},{c['chunk'][1]}": c["sha256"] for c in section["land"]["chunks"]}
+    assert named == {key: chunk["sha256"] for key, chunk in land["chunks"].items()}
+    assert section["land"]["backdrop_sha256"] == land["backdrop"]["sha256"]
+    for document in (*land["chunks"].values(), land["backdrop"]):
+        assert hashlib.sha256(document["body"].encode("utf-8")).hexdigest() == document["sha256"]
+    # A town on level ground states no land, and its receipt is refused by name.
+    level = compose_generated_world(town_recipe("small_town"), world_id)
+    refused = worker_module.town_land_job(world_id, dict(level.receipt), level.receipt_sha256)
+    assert refused["status"] == "refused"
+    assert refused["detail"].startswith("generated_world_land_changed")
 
 
 def test_a_worker_process_that_dies_answers_unavailable_and_the_next_job_starts_a_new_one():

@@ -1900,7 +1900,8 @@
      "typology_weight_mansion_block_permille": 500,
      "typology_weight_rowhouse_permille": 500,
      "typology_weight_shophouse_permille": 500
-    }
+    },
+    "land_sha256": null
    },
    "generated_site": null,
    "generated_terrain": null,

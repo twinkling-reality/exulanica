@@ -749,6 +749,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/flight",
     "GET /world/versions/{version_id}/inventory",
     "POST /world/versions/{version_id}/inventory/query",
+    "GET /world/versions/{version_id}/land",
     "GET /world/versions/{version_id}/land/backdrop",
     "GET /world/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}",
     "GET /world/versions/{version_id}/landscape",

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import copy
 import functools
+import hashlib
 import json
 import logging
 import threading
@@ -210,6 +211,12 @@ def drawing_key(workspace: str, receipt_sha256: str, parts_sha256: str = "") -> 
     is empty, and leaves the key as it was, for a world nobody changed."""
     key = f"drawing:{workspace}:{receipt_sha256}"
     return f"{key}:{parts_sha256}" if parts_sha256 else key
+
+
+def town_land_key(workspace: str, receipt_sha256: str) -> str:
+    """Where a town on its land's land is kept: by its workspace and its receipt alone, since a
+    town's land is graded before its buildings and no change to them moves it."""
+    return f"town-land:{workspace}:{receipt_sha256}"
 
 
 def place_key(workspace: str, receipt_sha256: str, place_id: str, parts_sha256: str = "") -> str:
@@ -513,6 +520,38 @@ def drawing_job(
     return {"status": "done", **_drawn(world_id, receipt, receipt_sha256, found)}
 
 
+#: The profile of a town on its land's land section (``GET /world/versions/{version_id}/land``).
+TOWN_LAND_PROFILE: Final = "exulanica.town-land/v1"
+
+
+def town_land_job(world_id: str, receipt: dict[str, Any], receipt_sha256: str) -> dict[str, Any]:
+    """A town on its land's land, from the records its receipt generates again: its section (the
+    chunks, backdrop and water it names, as the bytes a response carries, and their digest) and
+    every chunk and the backdrop it names, or the reason it cannot be read."""
+    from exulanica.canonical import canonical_json
+    from exulanica.world.composers.city_grammar_town import graded_land, records
+    from exulanica.world.errors import InvalidStructuralData
+
+    try:
+        land = graded_land(receipt, records(receipt))
+    except InvalidStructuralData as exc:
+        return {"status": "refused", "detail": str(exc)}
+    body = canonical_json(
+        {
+            "profile": TOWN_LAND_PROFILE,
+            "world_id": world_id,
+            "receipt_sha256": receipt_sha256,
+            "land": land.drawing_section(),
+        }
+    )
+    return {
+        "status": "done",
+        "body": body,
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "land": land.documents(),
+    }
+
+
 def place_job(
     workspace: str,
     receipt: dict[str, Any],
@@ -730,7 +769,10 @@ class KindWorker:
             return
         with self._lock:
             self._epoch += 1
-            self.drawings.forget(tuple(drawing_key(workspace, digest) for digest in digests))
+            self.drawings.forget(
+                tuple(drawing_key(workspace, digest) for digest in digests)
+                + tuple(town_land_key(workspace, digest) for digest in digests)
+            )
             self.checks.forget((f"terrain-coverage:v1:{workspace}:",))
             self.places.forget(tuple(f"place:{workspace}:{digest}:" for digest in digests))
             executor, self._executor = self._executor, None
