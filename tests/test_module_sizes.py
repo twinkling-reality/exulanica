@@ -94,7 +94,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         1_939,
         "reopening a personal world at a saved state, and making a town on its land",
     ),
-    "exulanica/traffic/simulation.py": (1_915, "the traffic simulation's pure step"),
     "exulanica/world/society_authored_ground.py": (
         1_914,
         "the society projection of a saved world that has no district",

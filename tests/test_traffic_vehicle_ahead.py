@@ -4,7 +4,7 @@ In a generated market town at a 600 second departure window, a car was admitted 
 while a bicycle leaving a cycle stand stood on the lane between the car and its stop line. The
 bicycle then reached the line and waited for room beyond the junction that the car's reservation
 held, the car waited behind the bicycle, the queue behind them grew, and nothing moved after
-second 751 (finding 87). The rule in ``exulanica/traffic/simulation.py`` (``_vehicle_ahead``):
+second 751 (finding 87). The rule in ``exulanica/traffic/admission.py`` (``_vehicle_ahead``):
 a vehicle with another vehicle ahead of it before the stop line, one that holds no reservation of
 that junction, is not admitted, and a reservation whose holder can still stop is revoked while one
 is there, so it waits outside the junction.
@@ -19,7 +19,7 @@ import dataclasses
 from typing import Any
 
 import pytest
-from exulanica.traffic import simulation
+from exulanica.traffic import admission, simulation
 from exulanica.world import traffic_episodes
 from exulanica.world.generated_worlds import compose_generated_world
 from exulanica.world.traffic_episodes import prepared, traffic_input
@@ -86,7 +86,7 @@ def _episode(monkeypatch, guard) -> tuple[dict[str, Any], int, list[dict[str, An
         return step
 
     monkeypatch.setattr(traffic_episodes, "_DEPARTURE", DEPARTURE_STEPS)
-    monkeypatch.setattr(simulation, "_vehicle_ahead", counted)
+    monkeypatch.setattr(admission, "_vehicle_ahead", counted)
     monkeypatch.setattr(traffic_episodes, "advance_traffic", advance)
     _states, _trips, summary = traffic_episodes._home_trip_rule(value, prepared(value), 0)
     return summary, held, revoked
@@ -100,7 +100,7 @@ def _stalled(summary: dict[str, Any]) -> int:
 
 @pytest.mark.parametrize("arm", ["rule switched off", "rule"])
 def test_a_vehicle_behind_one_it_cannot_pass_waits_outside_the_junction(monkeypatch, arm):
-    real = simulation._vehicle_ahead
+    real = admission._vehicle_ahead
     if arm == "rule switched off":
         # The control: without the rule the measured town locks, so the town still exercises the
         # defect the rule removes.

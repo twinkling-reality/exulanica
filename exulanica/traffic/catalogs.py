@@ -73,7 +73,7 @@ CATALOG_DIRECTORY: Final = (
 
 #: The movements a lane connection can make, in the city vocabulary's spelling.
 TURNS: Final = ("left", "straight", "right", "u_turn")
-#: How a junction decides who goes. Each is implemented in :mod:`exulanica.traffic.simulation`.
+#: How a junction decides who goes. Each is implemented in :mod:`exulanica.traffic.admission`.
 POLICY_RULES: Final = ("signal", "priority", "all_way_stop", "uncontrolled")
 ARRIVAL_ORDERS: Final = ("not_applicable", "first_stopped_first_served")
 APPROACH_CONTROLS: Final = ("priority", "signal", "stop", "yield")

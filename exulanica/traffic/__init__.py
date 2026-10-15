@@ -25,8 +25,9 @@ receipt binding the previous and next state digests, the inputs consumed and the
 ``network``
     The compiler: records and catalogs in, a checked network with conflict zones out, or a
     refusal that says why.
-``inputs``, ``simulation``
-    The input contracts and the step.
+``inputs``, ``state``, ``simulation``, ``admission``
+    The input contracts, the state a second reads and writes, the step, and who may pass a
+    junction stop line.
 ``checks``
     Mechanical checks of every transition, written apart from the step.
 ``metrics``, ``presentation``

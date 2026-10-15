@@ -679,7 +679,8 @@ changes those two files.
 | `exulanica/traffic/catalogs.py` | Loading and checking the six catalogs. |
 | `exulanica/traffic/network.py` | The compiler and its refusals. |
 | `exulanica/traffic/geometry.py`, `kinematics.py`, `signals.py`, `routing.py` | Integer geometry, the safety rule, signal indications and routing. |
-| `exulanica/traffic/inputs.py`, `simulation.py` | The input contracts and the step. |
+| `exulanica/traffic/inputs.py`, `state.py`, `simulation.py` | The input contracts, the state a second reads and writes, and the step. |
+| `exulanica/traffic/admission.py` | Who may pass a junction stop line, by the junction's rule. |
 | `exulanica/traffic/checks.py` | The transition checker. |
 | `exulanica/traffic/metrics.py`, `presentation.py` | The metrics report and the presentation records. |
 | `exulanica/world/traffic_host.py`, `traffic_episodes.py`, `episode_worker.py` | The road source, clock, fleet, trip rule, episodes, windows and their worker. |
