@@ -86,6 +86,15 @@ describe('reading a site drawing', () => {
     expect('structure' in parseStructuredSiteDrawing(served()).slots[1]!).toBe(false);
   });
 
+  it("reads a building's own storey height, and states none where the drawing states none", () => {
+    const document = built();
+    (document['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 2400;
+    const drawing = parseStructuredSiteDrawing(document);
+    expect(drawing.slots.find((one) => one.identity === 'shed')!.storeyHeightMm).toBe(2400);
+    expect(drawing.slots.filter((one) => one.storeyHeightMm !== undefined)).toHaveLength(1);
+    expect(parseStructuredSiteDrawing(built()).slots.some((one) => 'storeyHeightMm' in one)).toBe(false);
+  });
+
   it.each([
     ['another profile', (d: Record<string, unknown>) => { d['profile'] = 'exulanica.site-drawing/unsupported'; }, 'is not exulanica.site-drawing/v1'],
     ['a float', (d: Record<string, unknown>) => { (d['arrival'] as { positionMm: number[] }).positionMm[0] = 0.5; }, 'not a whole number'],
@@ -96,6 +105,10 @@ describe('reading a site drawing', () => {
     ['a structure that is not text', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[])[1]!['structure'] = 7; }, 'slot 1 structure is not text'],
     ['a structure the drawing has no slot for', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[])[1]!['structure'] = 'barn'; }, 'is a piece of barn, which is no slot of the drawing'],
     ['a building that is a piece of another', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['structure'] = 'bench'; }, "slot shed is a building's own slot and a piece of another"],
+    ['a storey height on a slot that is no building', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[])[1]!['storeyHeightMm'] = 2400; }, "states a storey height, and only a building's own slot does"],
+    ['a storey height that is not a whole number', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 1200.5; }, 'storey height is not a whole number'],
+    ["a storey height that does not divide the building's height", (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 1000; }, 'storey height does not divide its 2400 mm height'],
+    ['a storey height of nothing', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['storeyHeightMm'] = 0; }, 'storey height does not divide its 2400 mm height'],
   ])('refuses %s by name', (_name, change, words) => {
     const document = built();
     change(document);

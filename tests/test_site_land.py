@@ -15,6 +15,7 @@ from exulanica.grammar.grammars.site.records import (
     SiteAreaRecord,
     SiteExtentRecord,
     SitePathRecord,
+    SiteStructureRecord,
     SiteWallRecord,
     SiteZoneRecord,
 )
@@ -299,6 +300,19 @@ def test_what_the_land_leaves_level_is_draped_and_the_rest_stands_level(
         if slot.get("drape") or slot["lookRole"].startswith("water."):
             continue
         assert _leaves_level(graded, slot) <= 50, (slot["identity"], slot["lookRole"])
+
+
+def test_a_building_on_land_states_its_storey_height_as_on_level_ground() -> None:
+    world = made("farm")
+    storeys = {
+        record.identity: record.storey_height_mm
+        for record in world.records
+        if isinstance(record, SiteStructureRecord)
+    }
+    drawing = drawn(world)
+    assert drawing["profile"] == LAND_DRAWING_PROFILE
+    stated = {s["identity"]: s["storeyHeightMm"] for s in drawing["slots"] if "storeyHeightMm" in s}
+    assert storeys and stated == storeys
 
 
 def test_a_pond_stands_in_its_basin_at_its_level() -> None:

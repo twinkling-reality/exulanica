@@ -330,7 +330,10 @@ the records its receipt generates again ([`site_drawing.py`](../exulanica/world/
   same pixels. A slot that is a piece of a building (its walls, lintels and doors,
   its roof, its rooms' floors and the fixtures in its rooms) states `structure`, the identity of
   the building's own slot, so a pack that fills that slot with one piece for the whole building
-  can show or hide the building's own pieces together; a slot of no building states none;
+  can show or hide the building's own pieces together; a slot of no building states none. A
+  building's own slot also states its storey height (`storeyHeightMm`), of which its height is a
+  whole number, so what dresses its walls, such as a facade's rows of windows, follows its
+  storeys; no other slot states it, and a reader given a drawing without it uses its own default;
 - **walk**: the floor a person exploring stands on and the boxes they keep out of (wall pieces,
   blocking fixtures and water);
 - **seats**: each seat's height;

@@ -65,6 +65,13 @@ export interface SiteSlot {
    * slot with one piece hides the building's envelope (`site-dresser.ts`). Absent on everything else.
    */
   readonly structure?: string;
+  /**
+   * A building's own storey height, in millimetres, of which its height is a whole number: stated
+   * only on a building's own slot (family `structure`), so what dresses its walls (a facade's rows
+   * of windows) follows its storeys. Absent on every other slot, and in a drawing served before it
+   * was stated.
+   */
+  readonly storeyHeightMm?: number;
 }
 
 /** What a site on land states of its land: each chunk's place and digest, the backdrop's and the water's. */
@@ -183,6 +190,11 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
   const uv = row['uvFrame'];
   const frame = uv === undefined ? undefined : object(uv, `slot ${index} uv frame`);
   const structure = row['structure'] === undefined ? undefined : text(row['structure'], `slot ${index} structure`);
+  const storeyHeight = row['storeyHeightMm'] === undefined ? undefined : integer(row['storeyHeightMm'], `slot ${index} storey height`);
+  if (storeyHeight !== undefined) {
+    if (parts[1] !== 'structure') fail(`The site drawing's slot ${index} states a storey height, and only a building's own slot does.`);
+    if (storeyHeight <= 0 || box[2] % storeyHeight !== 0) fail(`The site drawing's slot ${index} storey height does not divide its ${box[2]} mm height.`);
+  }
   return Object.freeze({
     identity: text(row['identity'], `slot ${index} identity`),
     part: text(row['part'], `slot ${index} part`),
@@ -207,6 +219,7 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
       }),
     ...(drape === true ? { drape: true as const } : {}),
     ...(structure === undefined ? {} : { structure }),
+    ...(storeyHeight === undefined ? {} : { storeyHeightMm: storeyHeight }),
   });
 }
 

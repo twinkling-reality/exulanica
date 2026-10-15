@@ -12,10 +12,11 @@ millimetres from the site's south-west corner; the region's east is x and its so
   (``contain``, ``fill``, ``tile`` or ``surface``, the look-family catalog's), the engine's own
   primitive when no pack dresses it (``box``, ``plane``, ``gable`` or ``none``), and for a
   surface its UV frame: an origin and two in-plane axes each 1,000 mm long, so a material is laid
-  at physical scale. Grounds, paths, areas and floors are planes stacked a few millimetres apart
-  so none fights another for the same pixels; walls are boxes between their openings, with a
-  lintel over each door; a door is a fill slot drawn by a pack or left open; a roof is a slab or a
-  gable over its structure;
+  at physical scale; a building's own slot also states its storey height (``storeyHeightMm``), of
+  which its height is a whole number. Grounds, paths, areas and floors are planes stacked a few
+  millimetres apart so none fights another for the same pixels; walls are boxes between their
+  openings, with a lintel over each door; a door is a fill slot drawn by a pack or left open; a
+  roof is a slab or a gable over its structure;
 * **walk**: the level floor a person exploring stands on and the boxes they keep out of (wall
   pieces, blocking fixtures and water), so a person walks into a structure through its door and
   round its furniture, never through a wall;
@@ -309,21 +310,23 @@ def _site_drawing_v1(
                 (record.min_y_mm + record.max_y_mm) // 2,
             )
             label = labels.get(record.part_key, "")
-            slots.append(
-                _slot(
-                    record.identity,
-                    record.part_key,
-                    record.look_family,
-                    record.look_leaf,
-                    (middle[0], middle[1], 0),
-                    {"north": 0, "west": 1, "south": 2, "east": 3}[record.door_facing],
-                    (width, depth, height)
-                    if record.door_facing in ("north", "south")
-                    else (depth, width, height),
-                    "none",
-                    label=label,
-                )
+            building = _slot(
+                record.identity,
+                record.part_key,
+                record.look_family,
+                record.look_leaf,
+                (middle[0], middle[1], 0),
+                {"north": 0, "west": 1, "south": 2, "east": 3}[record.door_facing],
+                (width, depth, height)
+                if record.door_facing in ("north", "south")
+                else (depth, width, height),
+                "none",
+                label=label,
             )
+            # The building's own storey height, so what dresses its walls (a facade's rows of
+            # windows) follows its storeys; its height is a whole number of them.
+            building["storeyHeightMm"] = record.storey_height_mm
+            slots.append(building)
             span = min(width, depth)
             rise = (
                 ROOF_SLAB_MM

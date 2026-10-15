@@ -312,3 +312,27 @@ def test_every_piece_of_a_building_states_its_building_and_nothing_else_does(nam
         assert families.count("wall") >= 4
     # A place inside one building (the cafe) has no building of its own, so nothing states one.
     assert bool(buildings) == any("structure" in slot for slot in slots)
+
+
+@pytest.mark.parametrize("name", ["farm", "cafe", "site"])
+def test_a_building_s_own_slot_states_its_storey_height_and_nothing_else_does(name: str) -> None:
+    _kind, composed = _composed(name)
+    drawing = site_drawing(
+        world_id="world:generated:test",
+        receipt=composed.receipt,
+        receipt_sha256=composed.receipt_sha256,
+        records=composed.records,
+    )
+    # Each building's storeys, worked here from the records, not from the drawing.
+    buildings = {
+        record.identity: (record.storeys, record.storey_height_mm)
+        for record in composed.records
+        if isinstance(record, SiteStructureRecord)
+    }
+    stating = {slot["identity"]: slot for slot in drawing["slots"] if "storeyHeightMm" in slot}
+    assert stating.keys() == buildings.keys()
+    for identity, (storeys, storey_height) in buildings.items():
+        slot = stating[identity]
+        assert slot["lookRole"].split(".")[0] == "structure"
+        assert slot["storeyHeightMm"] == storey_height
+        assert slot["boxMm"][2] == storeys * storey_height
