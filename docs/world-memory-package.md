@@ -1004,7 +1004,7 @@ it spent of the most it could spend, then why it ended in the society's own word
 (`SESSION_CLOSED_WORDS`, `exulanica/world/society_sessions.py`); under it each character with
 each model it was asked under, and its decisions: the minute, what it chose of how many choices,
 and the verdict in the browser's choice account words
-(`assets/catalogs/roles/choice-account-words.v1.json`). "How each model did" is a table by model
+(`assets/catalogs/roles/choice-account-words.v2.json`). "How each model did" is a table by model
 over every run of the request: characters, decisions, done, repeated choices, time to answer in
 seconds, and what it spent (`exulanica/world/decision_measures.py`: counts out of totals, "not
 enough yet" below a measure's minimum sample, spending computed from reported use, never a

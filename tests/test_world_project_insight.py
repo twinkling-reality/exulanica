@@ -16,7 +16,7 @@ from exulanica.world_package.projects.insight import (
 from test_world_project import sample
 from test_world_project_repository import evidence_from
 
-CATALOG = Path(__file__).resolve().parents[1] / "assets/catalogs/roles/choice-account-words.v1.json"
+CATALOG = Path(__file__).resolve().parents[1] / "assets/catalogs/roles/choice-account-words.v2.json"
 
 
 def _set(catalog, key, words):
@@ -77,28 +77,29 @@ def session(
 
 def test_verdict_words_follow_the_choice_account():
     words = choice_words()
-    assert verdict(receipt(), words) == "Applied in minute 2."
+    assert verdict(receipt(), words) == "Done in minute 2."
     assert verdict(None, words) == "No answer is recorded yet."
-    assert verdict(receipt(disposition=None), words) == "Accepted; no minute has acted on it yet."
+    assert verdict(receipt(disposition=None), words) == "Chosen; no minute has acted on it yet."
     stale = verdict(receipt(disposition="stale", minute=7), words)
-    assert stale.startswith("Not applied: the world had moved on before minute 7")
+    assert stale.startswith("Not done: the world had moved on before minute 7")
     refused = verdict(receipt(status="rejected", reason="never_heard_of_it"), words)
-    assert refused == "Refused: of a reason recorded as never_heard_of_it."
+    # A reason with no words is in the record alone: no code in the sentence.
+    assert refused == "Refused: the reason is only in the record."
     untaken = verdict({**receipt(status="unavailable"), "consumed_tick": None}, words)
     assert untaken.endswith("No minute has taken it up yet.")
     # A reason with words in the society words catalog reads in those words.
     timed_out = verdict({**receipt(status="unavailable", reason="model_timed_out")}, words)
     assert (
-        timed_out == "No usable answer: it did not answer in time. Its routine acted in minute 2."
+        timed_out == "No usable answer: it did not answer in time. The routine acted in minute 2."
     )
 
 
 def test_the_words_come_from_the_shared_catalog(tmp_path):
     changed = json.loads(CATALOG.read_text(encoding="utf-8"))
-    _set(changed, "verdict.applied", "Done in minute {minute}.")
+    _set(changed, "verdict.applied", "Finished in minute {minute}.")
     path = tmp_path / "catalog.json"
     path.write_text(json.dumps(changed), encoding="utf-8")
-    assert verdict(receipt(), choice_words(path)) == "Done in minute 2."
+    assert verdict(receipt(), choice_words(path)) == "Finished in minute 2."
     assert changed["verdict_order"] == [
         "awaiting_answer",
         "refused",
@@ -114,12 +115,12 @@ def test_private_repositories_read_the_chosen_words_and_public_ones_none():
     world, evidence = session()
     private = "\n".join(insight(world, {"session-one.json": evidence}, readable=True))
     public = "\n".join(insight(world, {"session-one.json": evidence}, readable=False))
-    assert "Minute 1: chose \u201crest by the well\u201d, from 2 choices. Applied in minute 2." in (
+    assert "Minute 1: chose \u201crest by the well\u201d, from 2 choices. Done in minute 2." in (
         private
     )
     for text in ("rest by the well", "Time to sit", "plain armour", "(go)", "option 2"):
         assert text not in public
-    assert "Minute 1: chose one of 2 choices. Applied in minute 2." in public
+    assert "Minute 1: chose one of 2 choices. Done in minute 2." in public
     for text in (private, public):
         assert "- The knight, with synthetic-model: 6 decisions, 6 done" in text
         assert "| synthetic-model | The knight | 6 | 6 of 6 |" in text

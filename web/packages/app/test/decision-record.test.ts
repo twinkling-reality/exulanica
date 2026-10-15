@@ -2,7 +2,7 @@
 // engine and the minute did with it, what the being's events record after it, and what the call
 // cost. Records here are written by hand in the decision route's and the events route's shapes.
 import { describe, expect, it } from 'vitest';
-import accountWordsText from '../../../../assets/catalogs/roles/choice-account-words.v1.json?raw';
+import accountWordsText from '../../../../assets/catalogs/roles/choice-account-words.v2.json?raw';
 import {
   ACCOUNT_WORDS, VERDICT_ORDER, choiceAccount, choiceTimeline, decisionChange, explainDecisionRecord,
   knownDecisions, parseDecisionEvents, rewind, type DecisionEvent,
@@ -79,7 +79,7 @@ describe('a recorded decision, explained', () => {
     expect(view.chosen).toBe('resting, 60 m away (1)');
     expect(view.options.filter((option) => option.chosen).map((option) => option.label)).toEqual(['resting, 60 m away (1)']);
     expect(view.answer).toBe('The engine accepted the answer: it chose one of the things they could do.');
-    expect(view.applied).toBe('Applied in minute 4.');
+    expect(view.applied).toBe('Done in minute 4.');
     expect(view.appliedAt).toBe(4);
     expect(view.changed).toEqual([
       'Walked about 60 m along its recorded path (40 m in minute 4, 20 m in minute 5), ending about 42 m in a straight line from where it started.',
@@ -120,7 +120,7 @@ describe('a recorded decision, explained', () => {
   it('records a wait as staying put, with waiting a valid answer', () => {
     const events = page([event(4, 'decision_applied', { request_id: 'wait', disposition: 'applied', reason: 'validated_choice' })]);
     const view = explainDecisionRecord(answered('wait', 'wait here a minute'), null, events);
-    expect(view.applied).toBe('Applied in minute 4.');
+    expect(view.applied).toBe('Done in minute 4.');
     expect(view.changed).toEqual(['No movement was recorded for it from minute 4 in the minutes read since: it stayed where it was.']);
     expect(view.limits).toContain('Waiting is a valid answer: it chose to stay where it was for the minute.');
   });
@@ -128,7 +128,7 @@ describe('a recorded decision, explained', () => {
   it('says why a minute did not apply an accepted answer, and that the routine decided that minute', () => {
     const events = page([event(4, 'decision_applied', { request_id: 'go', disposition: 'rejected', reason: 'place_taken_this_minute' })]);
     const view = explainDecisionRecord(answered('go', 'resting, 60 m away (1)'), null, events);
-    expect(view.applied).toBe('Not applied in minute 4, because someone else took that place first, so its routine decided that minute.');
+    expect(view.applied).toBe('Not applied in minute 4, because someone else took that place first, so the routine decided that minute.');
     expect(view.appliedAt).toBeNull();
     expect(view.changed).toEqual(['Nothing changed in the world from this answer.']);
   });
@@ -199,7 +199,7 @@ describe('a choice told in four parts with one verdict', () => {
     expect(account.parts[1].lines).toEqual(['It answered “resting, 60 m away (1)”.', 'It proposed to say: “Off to rest.”']);
     expect(account.parts[2].records).toEqual([{ kind: 'receipt', id: 'go', sha256: 'receipt-go' }]);
     expect(account.parts[3].records[0]).toEqual({ kind: 'event', id: 'event-go', sha256: null });
-    expect(account.verdict).toEqual({ kind: 'applied', reason: 'validated_choice', words: 'Applied in minute 4.' });
+    expect(account.verdict).toEqual({ kind: 'applied', reason: 'validated_choice', words: 'Done in minute 4.' });
     expect(account.decisionSeq).toBe(1);
     expect(account.inferred).toEqual([]);
   });
@@ -215,10 +215,10 @@ describe('a choice told in four parts with one verdict', () => {
     expect(verdict(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' })).words)
       .toBe('No usable answer: it did not answer in time. No minute has taken it up yet.');
     expect(verdict(stored('a', null, 1, { status: 'unavailable', reason: 'model_timed_out' }), page([closed(4, 'a', 1, 'unavailable', 'model_timed_out')])).words)
-      .toBe('No usable answer: it did not answer in time. Its routine acted in minute 4.');
+      .toBe('No usable answer: it did not answer in time. The routine acted in minute 4.');
     expect(verdict(stored('a', 'wait here a minute', 1), page([closed(4, 'a', 1, 'stale', 'decision_context_changed')])).kind).toBe('stale');
     expect(verdict(stored('a', 'wait here a minute', 1), page([closed(4, 'a', 1, 'rejected', 'place_taken_this_minute')]))).toEqual({
-      kind: 'not_applied', reason: 'place_taken_this_minute', words: 'Accepted but not applied in minute 4: someone else took that place first.',
+      kind: 'not_applied', reason: 'place_taken_this_minute', words: 'Chosen but not done in minute 4: someone else took that place first.',
     });
     expect(verdict(stored('a', 'wait here a minute', 1)).kind).toBe('pending');
     // A missing answer is observed, never reported.

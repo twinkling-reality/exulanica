@@ -14,7 +14,7 @@
 import type { PersonDecision, SocietyDecisionDetail } from './society-models-api.js';
 import { DECISION_WORDS, outcomeWords } from './society-inhabitant-words.js';
 import { ACTION_LABELS, ACTIVITY_LABELS } from './society-activity-words.js';
-import accountWordsText from '../../../../assets/catalogs/roles/choice-account-words.v1.json?raw';
+import accountWordsText from '../../../../assets/catalogs/roles/choice-account-words.v2.json?raw';
 
 interface AccountWordsEntry { readonly key: string; readonly kind: string; readonly code: string; readonly words: string }
 const accountCatalog = JSON.parse(accountWordsText) as {
@@ -26,7 +26,7 @@ const accountTable = (kind: string): Readonly<Record<string, string>> =>
 
 /**
  * The verdict words of a choice's account, shared with the server's pull request insight
- * (`assets/catalogs/roles/choice-account-words.v1.json`), so both say the same thing.
+ * (`assets/catalogs/roles/choice-account-words.v2.json`), so both say the same thing.
  */
 export const ACCOUNT_WORDS = {
   verdict_order: accountCatalog.verdict_order,
@@ -346,10 +346,10 @@ function appliedWords(
       ? 'Not applied yet: no minute has acted on it.'
       : 'Nothing was applied from it. No minute has taken it up yet.';
   }
-  if (!accepted) return `Nothing was applied from it. Minute ${consumedAt} went on without it, so its routine decided that minute.`;
-  if (disposition === 'applied') return `Applied in minute ${consumedAt}.`;
+  if (!accepted) return `Nothing was applied from it. Minute ${consumedAt} went on without it, so the routine decided that minute.`;
+  if (disposition === 'applied') return fill(ACCOUNT_WORDS.verdicts['applied'] ?? '', { minute: consumedAt });
   if (disposition === 'superseded') return `Not applied in minute ${consumedAt}, because ${why(reason)}, and that came first.`;
-  return `Not applied in minute ${consumedAt}, because ${why(reason)}, so its routine decided that minute.`;
+  return `Not applied in minute ${consumedAt}, because ${why(reason)}, so the routine decided that minute.`;
 }
 
 function costWords(provider: Held | null): string {

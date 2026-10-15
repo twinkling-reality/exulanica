@@ -36,7 +36,7 @@ from exulanica.world_package.projects.words import (
 )
 
 CATALOG: Final = (
-    Path(__file__).resolve().parents[3] / "assets/catalogs/roles/choice-account-words.v1.json"
+    Path(__file__).resolve().parents[3] / "assets/catalogs/roles/choice-account-words.v2.json"
 )
 VERDICT_ORDER: Final = (
     "awaiting_answer",
