@@ -114,10 +114,19 @@ export interface ThingGhost {
   readonly refused: boolean;
 }
 
-/** The refusal tint of a ghost, added as its light: a warm red that reads on paving, grass and water. */
-const REFUSED_GLOW = new pc.Color(0.7, 0.12, 0.08);
-/** How much of a ghost is drawn: a dither, as a fading representation is, so it never sorts against the world. */
-const GHOST_OPACITY = 0.45;
+/**
+ * A ghost's own light, the in-world design's see-through copy (WORKSPACE-DESIGN-v2 5.15): white
+ * where it may stand, the design's refused coral (#ff8f7e) where the world refused the spot. It is
+ * drawn unlit, so it reads the same on paving, grass and water, by day and by night.
+ */
+const GHOST_LIGHT = new pc.Color(1, 1, 1);
+const REFUSED_LIGHT = new pc.Color(1, 0x8f / 255, 0x7e / 255);
+/**
+ * How much of a ghost is drawn: a dither, as a fading representation is, so it never sorts against
+ * the world; a refused copy a little more, so its tint reads.
+ */
+const GHOST_OPACITY = 0.3;
+const REFUSED_OPACITY = 0.4;
 
 export interface ThingMiss {
   readonly placedId: string;
@@ -325,10 +334,17 @@ export class ThingLayer {
           // posed by its original's bones, so it would stand where the original stands: not drawn.
           if (!(instance.material instanceof pc.StandardMaterial) || instance.skinInstance != null) { instance.visible = false; continue; }
           const material = instance.material.clone();
-          material.opacity = GHOST_OPACITY;
+          // A light copy, not the thing's own surface: no maps or vertex colours, its colour its light.
+          material.useLighting = false;
+          material.diffuse = pc.Color.BLACK;
+          material.diffuseMap = null;
+          material.diffuseVertexColor = false;
+          material.emissive = ghost.refused ? REFUSED_LIGHT : GHOST_LIGHT;
+          material.emissiveMap = null;
+          material.emissiveVertexColor = false;
+          material.opacity = ghost.refused ? REFUSED_OPACITY : GHOST_OPACITY;
           material.opacityDither = pc.DITHER_IGNNOISE;
           material.opacityShadowDither = pc.DITHER_IGNNOISE;
-          if (ghost.refused) material.emissive = REFUSED_GLOW;
           material.update();
           instance.material = material;
           materials.push(material);

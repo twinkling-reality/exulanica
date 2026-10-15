@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { MAX_YAW, changeWords, keyAction, moveWords, movedNote, placedLine, redoRefusalWords, redoneNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote, whenWords } from './build-words.mjs';
+import { HISTORY, MAX_YAW, buildHints, cardPrompts, changeWords, clockWords, dayWords, keyAction, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
@@ -12,7 +12,10 @@ assert.equal(refusalWords('thing_landing_blocked', 'That spot is in the water ba
 assert.equal(refusalWords('stale_object_base', 'base state 0000 is stale'), 'Someone changed this world a moment ago. Look again and try once more.');
 assert.equal(refusalWords('something_new', 'it_was_refused'), 'That could not be done. Nothing changed.');
 assert.equal(refusalWords('http_404', 'Not Found'), 'That could not be done. Nothing changed.');
-for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), removeQuestion('well'), removedNote('well')]) assert.doesNotMatch(words, /_|[0-9a-f]{12}/);
+for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), removeTitle('well'), removeLine(), removedNote('well')]) assert.doesNotMatch(words, /_|[0-9a-f]{12}/);
+// The remove question as the card draws it: the question, then what it does.
+assert.equal(removeTitle('bench'), 'Remove the bench?');
+assert.equal(removeLine(), 'Nobody can use it from the next minute.');
 
 // What an undo did, from its preview.
 const well = { kind: { kind: 'well', version: 2 } };
@@ -133,8 +136,33 @@ assert.deepEqual(log.map(edit => changeWords(edit, log, name)), [
 ]);
 for (const edit of log) assert.doesNotMatch(changeWords(edit, log, name), /_|well:1|gone:1/u);
 // When, in plain words.
-const now = Date.parse('2026-10-14T16:30:00Z');
-assert.equal(whenWords('2026-10-14T16:29:40Z', now), 'just now');
-assert.equal(whenWords('2026-10-14T16:26:00Z', now), '4 min ago');
-assert.equal(whenWords('not a time', now), '');
+// History's time column: the clock time in this browser's zone, as the page's mono column holds it.
+const recorded = new Date(2026, 9, 14, 7, 5);
+assert.equal(clockWords(recorded.toISOString()), '07:05');
+assert.equal(clockWords('not a time'), '');
+// History's day headings: today's changes under "Today", earlier ones under their date.
+assert.equal(dayWords(new Date(2026, 9, 14, 7, 5).toISOString(), new Date(2026, 9, 14, 23, 0).getTime()), 'Today');
+assert.equal(dayWords(new Date(2026, 9, 13, 22, 40).toISOString(), new Date(2026, 9, 14, 0, 10).getTime()), '13 Oct');
+assert.equal(dayWords('not a time', Date.now()), '');
+// The keys build mode offers, in the design's words and order (WORDS.md, frames 13 and 14).
+const said = (list) => list.map(({ keys, word }) => [Array.isArray(keys) ? keys.join(' ') : keys, word]);
+assert.deepEqual(said(buildHints({ moving: false })), [['mouse-click', 'Select'], ['Tab', 'Next'], ['⌘Z', 'Undo'], ['H', 'History']]);
+assert.deepEqual(said(buildHints({ moving: true })), [['mouse', 'Drag to move'], ['[ ]', 'Turn'], ['Alt', 'Free']]);
+// The card's prompts in each state (frames 13 to 16), each pressing what its key does.
+assert.deepEqual(said(cardPrompts({})), [['mouse', 'Drag to move'], ['[ ]', 'Turn'], ['Del', 'Remove']]);
+assert.deepEqual(said(cardPrompts({ moving: true, ready: true })), [['Enter', 'Keep'], ['Esc', 'Put it back']]);
+assert.equal(cardPrompts({ moving: true, ready: false })[0].disabled, true);
+assert.deepEqual(said(cardPrompts({ moving: true, refused: true })), [['Esc', 'Put it back']]);
+assert.deepEqual(said(cardPrompts({ confirming: true })), [['Enter', 'Remove'], ['Esc', 'Keep it']]);
+const keyOf = { Enter: 'Enter', Esc: 'Escape', Del: 'Delete', '[ ]': 'BracketRight' };
+const flagsOf = (state) => ({ on: true, selected: true, confirming: false, moving: false, ready: false, busy: false, changes: false, focused: false, ...state });
+for (const state of [{}, { moving: true, ready: true }, { moving: true, refused: true }, { confirming: true }]) {
+  for (const prompt of cardPrompts(state)) {
+    if (!prompt.action || prompt.disabled) continue;
+    const code = keyOf[Array.isArray(prompt.keys) ? prompt.keys.join(' ') : prompt.keys];
+    assert.equal(keyAction(flagsOf(state), { code, key: '', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false }), prompt.action, `${prompt.word} presses what its key does`);
+  }
+}
+assert.equal(nothingInView(), 'No placed things in view. Walk closer to one.');
+assert.deepEqual({ ...HISTORY }, { title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
 console.log('Build words checks passed: names by kind, refusals as sentences, undo notes, move words, snapping, redo, the changes list, keys per state.');

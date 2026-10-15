@@ -35,9 +35,14 @@ export function refusalWords(code, detail) {
   return Object.hasOwn(REFUSALS, code) ? REFUSALS[code] : 'That could not be done. Nothing changed.';
 }
 
-/** What removing a thing will do, said before it is done. */
-export function removeQuestion(name) {
-  return `Remove the ${name}? Nobody can use it from the next minute.`;
+/** The question before a thing is removed, the card's title. */
+export function removeTitle(name) {
+  return `Remove the ${name}?`;
+}
+
+/** What removing a thing will do, the line under the question. */
+export function removeLine() {
+  return 'Nobody can use it from the next minute.';
 }
 
 /** What was done, said after it is kept. */
@@ -104,13 +109,20 @@ export function changeWords(edit, edits, nameOf) {
   return `Took back: ${words.charAt(0).toLowerCase()}${words.slice(1)}`;
 }
 
-/** How long ago a change was, from its recorded time: "just now", "4 min ago", else the hour. */
-export function whenWords(recordedAt, now) {
+const MONTHS = Object.freeze(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+
+/** The day a change was recorded, as History's list heads it: "Today", else "13 Oct". */
+export function dayWords(recordedAt, now) {
+  const at = new Date(Date.parse(recordedAt)), today = new Date(now);
+  if (!Number.isFinite(at.getTime())) return '';
+  const same = at.getFullYear() === today.getFullYear() && at.getMonth() === today.getMonth() && at.getDate() === today.getDate();
+  return same ? HISTORY.today : `${at.getDate()} ${MONTHS[at.getMonth()]}`;
+}
+
+/** When a change was recorded, as History's time column says it: the clock time, "18:02". */
+export function clockWords(recordedAt) {
   const at = Date.parse(recordedAt);
   if (!Number.isFinite(at)) return '';
-  const minutes = Math.floor((now - at) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
   const time = new Date(at);
   return `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
 }
@@ -154,6 +166,59 @@ export function placedLine() {
 /** What keeping a move will do, said before it is kept. */
 export function keepLine() {
   return 'People who use it go to the new spot from the next minute.';
+}
+
+/** Said when Tab finds nothing to choose. */
+export function nothingInView() {
+  return 'No placed things in view. Walk closer to one.';
+}
+
+/** The History page while it lists only build mode's changes (until it shows runs and models too). */
+export const HISTORY = Object.freeze({ title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
+
+/**
+ * The keys build mode offers in its state `{ moving }`, as its hints draw them, bottom left: each
+ * the caps drawn, its word and the shortcut a reader is told.
+ */
+export function buildHints(state) {
+  if (state.moving) {
+    return [
+      { keys: 'mouse', word: 'Drag to move' },
+      { keys: ['[', ']'], word: 'Turn', shortcut: '[ ]' },
+      { keys: ['Alt'], word: 'Free', shortcut: 'Alt' },
+    ];
+  }
+  return [
+    { keys: 'mouse-click', word: 'Select' },
+    { keys: ['Tab'], word: 'Next', shortcut: 'Tab' },
+    { keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z' },
+    { keys: ['H'], word: 'History', shortcut: 'H' },
+  ];
+}
+
+/**
+ * The prompts on the chosen thing's card in build mode's state `{ moving, ready, confirming }`, each
+ * with the action pressing it does (keyAction's names; none for a prompt that only says how):
+ * chosen, Drag to move, Turn and Remove; moving, Keep (dimmed until the server says it may stand
+ * there) and Put it back; refused, Put it back alone; a question, Remove and Keep it.
+ */
+export function cardPrompts(state) {
+  if (state.confirming) {
+    return [
+      { keys: ['Enter'], word: 'Remove', shortcut: 'Enter', action: 'confirm' },
+      { keys: ['Esc'], word: 'Keep it', shortcut: 'Escape', action: 'cancel' },
+    ];
+  }
+  if (state.moving) {
+    const back = { keys: ['Esc'], word: 'Put it back', shortcut: 'Escape', action: 'put-back' };
+    if (state.refused) return [back];
+    return [{ keys: ['Enter'], word: 'Keep', shortcut: 'Enter', action: 'keep', disabled: !state.ready }, back];
+  }
+  return [
+    { keys: 'mouse', word: 'Drag to move' },
+    { keys: ['[', ']'], word: 'Turn', shortcut: '[ ]', action: 'turn-right' },
+    { keys: ['Del'], word: 'Remove', shortcut: 'Delete', action: 'remove' },
+  ];
 }
 
 /** The largest yaw a pose may state (one revolution, in microradians, as the server bounds it). */

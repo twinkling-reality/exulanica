@@ -12,7 +12,7 @@ import { servedLibrary, until } from './things-fixtures.js';
  * its version now puts it, a thing brought back is drawn, while the minutes drawn still show it as it
  * was before the edit; a minute that took the edit in draws it again. A being stays the crowd's to
  * draw. An editor's see-through copy of a placed thing is drawn apart from it, never picked, throws
- * no shadow, and is tinted where the world refused the spot.
+ * no shadow, and is drawn as a light copy, coral where the world refused the spot.
  */
 
 function instance(look: LookDrawing) {
@@ -224,7 +224,7 @@ describe('an editor\'s see-through copy of a placed thing', () => {
     const original = (layer.figureOf('well')!.root.findComponents('render') as pc.RenderComponent[]).flatMap((render) => render.meshInstances);
     expect(drawn.length).toBeGreaterThan(0);
     for (const one of drawn) {
-      expect((one.material as pc.StandardMaterial).opacity).toBeCloseTo(0.45, 6);
+      expect((one.material as pc.StandardMaterial).opacity).toBeCloseTo(0.3, 6);
       expect(original.some((other) => other.material === one.material)).toBe(false);
     }
     for (const one of original) expect((one.material as pc.StandardMaterial).opacity).toBe(1);
@@ -237,15 +237,23 @@ describe('an editor\'s see-through copy of a placed thing', () => {
     expect(region.findByName('thing-ghost:well')).toBeNull();
   });
 
-  it('is tinted where the world refused the spot', async () => {
+  it('is a light copy, drawn unlit, and coral where the world refused the spot', async () => {
     const { layer, region } = await drawnWell();
+    const materials = () => ((region.findByName('thing-ghost:well') as pc.Entity).findComponents('render') as pc.RenderComponent[])
+      .flatMap((render) => render.meshInstances).map((one) => one.material as pc.StandardMaterial);
+    const light = (material: pc.StandardMaterial) => [material.emissive.r, material.emissive.g, material.emissive.b].map((v) => Math.round(v * 255));
     layer.setGhost({ placedId: 'well', xMm: 9000, yMm: 0, zMm: 1000, yawMicroradians: 0, refused: false });
-    const plain = (region.findByName('thing-ghost:well') as pc.Entity).findComponents('render') as pc.RenderComponent[];
-    const calm = plain.flatMap((render) => render.meshInstances).map((one) => (one.material as pc.StandardMaterial).emissive.r);
+    for (const material of materials()) {
+      expect(material.useLighting).toBe(false);
+      expect(material.diffuseMap).toBeNull();
+      expect(light(material)).toEqual([255, 255, 255]);
+      expect(material.opacity).toBeCloseTo(0.3, 6);
+    }
     layer.setGhost({ placedId: 'well', xMm: 9000, yMm: 0, zMm: 1000, yawMicroradians: 0, refused: true });
-    const refused = (region.findByName('thing-ghost:well') as pc.Entity).findComponents('render') as pc.RenderComponent[];
-    const tinted = refused.flatMap((render) => render.meshInstances).map((one) => (one.material as pc.StandardMaterial).emissive.r);
-    expect(tinted.every((red, index) => red > calm[index]!)).toBe(true);
+    for (const material of materials()) {
+      expect(light(material)).toEqual([0xff, 0x8f, 0x7e]);
+      expect(material.opacity).toBeCloseTo(0.4, 6);
+    }
     expect(region.findByName('thing-ghost:well')).not.toBeNull();
   });
 });
