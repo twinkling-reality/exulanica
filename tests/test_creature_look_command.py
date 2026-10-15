@@ -153,6 +153,11 @@ def test_a_run_stages_the_asked_looks_and_admits_what_the_fit_made(
             staged["run_id"],
             item["request_sha256"],
         )
+    # The fit reads and writes meshes with numpy, which only the reconstruction extra installs;
+    # without it the staging above has still run.
+    pytest.importorskip(
+        "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+    )
     document = _fits_by_stand_in(run, fits, monkeypatch)
     assert [entry["outcome"] for entry in document["requests"].values()] == ["passed"] * 2
     capsys.readouterr()
