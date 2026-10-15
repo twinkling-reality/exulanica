@@ -1227,8 +1227,9 @@ answered as a placed thing's refused landing (422, its `code`, `where` and a sen
 graded again for the changed layout first, and a change it cannot take is refused by the land
 grader's own code (`landform_cut_too_deep`, `landform_corridor_too_steep`,
 `landform_basin_over_locked`, `landform_water_spills`, `landform_unreachable`,
-`landform_near_out_of_bounds`, or `landform_invalid` for any other), with a plain sentence and the
-grader's detail in `where`. The previews answer the same verdicts and write nothing.
+`landform_near_out_of_bounds`, `landform_cascade_crossed`, or `landform_invalid` for any other),
+with a plain sentence and the grader's detail in `where`. The previews answer the same verdicts and
+write nothing.
 
 **What follows a kept change.** The world as it stands is the receipt's records with the version's
 changes applied, named by the digest of those changes, which keys the worker's drawing and place

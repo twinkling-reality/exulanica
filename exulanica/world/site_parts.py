@@ -95,6 +95,7 @@ PART_CODES: Final = frozenset(
         "landform_water_spills",
         "landform_unreachable",
         "landform_near_out_of_bounds",
+        "landform_cascade_crossed",
         "landform_invalid",
     }
 )
@@ -107,6 +108,7 @@ LAND_WORDS: Final = {
     "landform_basin_over_locked": "Not here: a pond cannot be dug over a path or another terrace.",
     "landform_water_spills": "Not here: water would spill out there.",
     "landform_unreachable": "Not here: people could no longer walk to it from the entry.",
+    "landform_cascade_crossed": "Not here: it would cross the falling water.",
     "landform_near_out_of_bounds": (
         "Not here: the ground there would have to rise or fall further than this land allows."
     ),
