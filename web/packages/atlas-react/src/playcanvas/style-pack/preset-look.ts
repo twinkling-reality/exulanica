@@ -38,6 +38,7 @@ export function renderLookOfPreset(
   edge: StylePackManifest['edge'],
   version = 1,
   water?: StylePackManifest['water'],
+  fallingWater?: StylePackManifest['falling_water'],
 ): RenderLook {
   const sky = preset.sky;
   const haze = preset.haze;
@@ -187,6 +188,17 @@ export function renderLookOfPreset(
             reachM: water.caustics.reach_mm / 1000,
           },
         }),
+      },
+    }),
+    ...(fallingWater === undefined ? {} : {
+      fallingWater: {
+        streakSpeedMps: fallingWater.streak_speed_mm_per_s / 1000,
+        streakWidthM: fallingWater.streak_width_mm / 1000,
+        streakLengthM: fallingWater.streak_length_mm / 1000,
+        streakContrast: fallingWater.streak_contrast_permille / 1000,
+        aeration: fallingWater.aeration_permille / 1000,
+        foamHeightM: fallingWater.foam_height_mm / 1000,
+        foam: linearRgb(fallingWater.foam),
       },
     }),
     unavailable: TILE_LOOK_V1.unavailable,

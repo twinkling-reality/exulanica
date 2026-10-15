@@ -49,6 +49,7 @@ is the text as stored, in the order it is stored.
 | `shading` | `pbr`, `toon` with its bands, or `flat`, and an ink colour or none |
 | `edge` | The ground beyond the world: a colour, how far below the tiles it lies, how far it reaches |
 | `water` | Optional: how the pack finishes water under physically based shading: a shallow and a deep colour, absorption per kilometre for each colour channel, the depth over which the colour turns from shallow to deep, the width of the foam where water meets what stands in it, and the strength of its reflection. Optionally, its ripple (`ripples`: one to four octaves of drifting noise, each an angle, a cell, a tilt and a drift along its own axes, and the cells a pixel over which each fades; absent, the ripple every water carries today) and its caustics (`caustics`: the light the waves gather on what lies under shallow water, its strength, cell, pace and the depth it fades over; absent, none). Absent, as in every pack written before it, water is drawn as its surface states; nearer packs of a chain replace a base's finish whole |
+| `falling_water` | Optional: how the pack finishes a sheet of falling water (a cascade's fall on a site on land), in any shading model: how fast its streaks move down it (`streak_speed_mm_per_s`), how wide and how long a streak is (`streak_width_mm`, `streak_length_mm`), how far a streak lightens or darkens the water's colour (`streak_contrast_permille`), how white the sheet is with the air in it (`aeration_permille`), and how high the foam stands where it lands and its colour (`foam_height_mm`, `foam`). Absent, as in every pack written before it, the page's defaults finish it (`FALLING_WATER_DEFAULTS` in `generated-tile/look.ts`); nearer packs of a chain replace a base's whole |
 | `palette` | At most 64 swatches, each a distinct sRGB colour with roughness, metalness and emission |
 | `look_family_catalog` | Optional retained appearance catalog pin, `{version, sha256}`; the digest names the exact catalog file bytes. Absence retains version 1 and adds nothing to the manifest's canonical bytes |
 | `surfaces` | A look role of a surface family to a swatch, a texture set or one of the pack's own textures, with an optional swatch for upward faces |
@@ -356,6 +357,15 @@ colour, and thin water foams against what stands in it. It is blended over the d
 one transmittance (the mean of the three channels' absorption), so it needs no copy of the scene's
 colour; the per-channel tint of the seabed is approximated by that mean. It is GLSL only: on a
 WebGPU device the finish is not applied and the water keeps its ripples.
+
+A cascade on a site on land states level pools and the upright falls between them. A pool wears the
+pack's `water.pool` where it states one, else its lake's water (`water.lake`, then `water.default`),
+and is finished as a lake is (the `water` finish by its own depth, else the surface finish's sea), with
+the ripples of a pond: it lies within the site, near. A fall wears `water.fall`, else the lake's water,
+and is finished in its colour as a sheet: streaks drawn down it at the look's pace and foam where it
+lands, from `falling_water` or the page's defaults, with no depth and no ripple normals. Colour only,
+in every shading model, and cosmetic like the ripples: the water does not move and the walk is the
+land's. The fall finish is GLSL only: on a WebGPU device a fall keeps its pack's flat colour.
 
 The optional `?measure=1` review mode records a bounded frame-interval sample, draw calls, canvas
 resolution, graphics backend, camera position and facing, and accounted texture bytes on the canvas. Frame intervals are not

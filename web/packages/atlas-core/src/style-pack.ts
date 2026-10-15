@@ -154,6 +154,17 @@ export interface StylePackCaustics {
   readonly reach_mm: number;
 }
 
+/** How a pack finishes a sheet of falling water: streaks moving down it, and foam where it lands. */
+export interface StylePackFallingWater {
+  readonly streak_speed_mm_per_s: number;
+  readonly streak_width_mm: number;
+  readonly streak_length_mm: number;
+  readonly streak_contrast_permille: number;
+  readonly aeration_permille: number;
+  readonly foam_height_mm: number;
+  readonly foam: Srgb8;
+}
+
 export type StylePackFog =
   | { readonly kind: 'linear'; readonly start_mm: number; readonly end_mm: number; readonly colour: Srgb8 }
   | { readonly kind: 'exp2'; readonly density_micro: number; readonly colour: Srgb8 };
@@ -342,6 +353,8 @@ export interface StylePackManifest {
   readonly edge: { readonly ground: Srgb8; readonly drop_mm: number; readonly reach_mm: number } | null;
   /** Absent in a pack written before it: water is drawn as its surface states. */
   readonly water?: StylePackWater;
+  /** Absent in a pack written before it: falling water is finished as the page's defaults do. */
+  readonly falling_water?: StylePackFallingWater;
   readonly palette: { readonly encoding: typeof STYLE_PACK_COLOUR_ENCODING; readonly swatches: readonly StylePackSwatch[] };
   readonly look_family_catalog?: { readonly version: number; readonly sha256: string };
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
@@ -672,6 +685,16 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
         reach_mm: integer(100, 10_000),
       })),
     })),
+    // Added within the profile: a pack written before it finishes falling water as the page's defaults do.
+    falling_water: optional((v, p) => object(v, p, {
+      streak_speed_mm_per_s: integer(200, 20_000),
+      streak_width_mm: integer(20, 2000),
+      streak_length_mm: integer(100, 20_000),
+      streak_contrast_permille: permille(0, 1000),
+      aeration_permille: permille(0, 1000),
+      foam_height_mm: integer(0, 5000),
+      foam: srgb8,
+    })),
     palette: (v, p) => object(v, p, {
       encoding: literal(STYLE_PACK_COLOUR_ENCODING),
       swatches: list((s, q) => object(s, q, {
@@ -955,6 +978,8 @@ export interface ResolvedStylePack {
   readonly edge: StylePackManifest['edge'];
   /** The nearest water finish the chain states; absent when none does. */
   readonly water?: StylePackWater;
+  /** The nearest falling water finish the chain states; absent when none does. */
+  readonly falling_water?: StylePackFallingWater;
   readonly swatches: ReadonlyMap<string, StylePackSwatch>;
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
   /** Each texture the chain carries, nearest first, with the files of the manifest that carries it. */
@@ -1020,6 +1045,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   let shading: StylePackManifest['shading'] = null;
   let edge: StylePackManifest['edge'] | undefined;
   let water: StylePackWater | undefined;
+  let fallingWater: StylePackFallingWater | undefined;
   for (let index = chain.length - 1; index >= 0; index -= 1) {
     const manifest = chain[index]!;
     for (const swatch of manifest.palette.swatches) swatches.set(swatch.key, swatch);
@@ -1033,8 +1059,12 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     if (manifest.shading !== null) shading = manifest.shading;
     if (manifest.base === null || manifest.edge !== null) edge = manifest.edge;
     if (manifest.water !== undefined) water = manifest.water;
+    if (manifest.falling_water !== undefined) fallingWater = manifest.falling_water;
   }
-  return { chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }), swatches, surfaces, textures, cover, facade, modules };
+  return {
+    chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }),
+    ...(fallingWater === undefined ? {} : { falling_water: fallingWater }), swatches, surfaces, textures, cover, facade, modules,
+  };
 }
 
 /** A slot as a world kind states it: millimetres, base centre, front +y, up +z. */

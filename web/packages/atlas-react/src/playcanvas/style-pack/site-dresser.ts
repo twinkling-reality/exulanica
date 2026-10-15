@@ -14,6 +14,7 @@ import { applyBorder, bordersRun, clearPlaneBorder, setPlaneBorder } from './bor
 import { applyGroundFinish, applySeaFinish, applyWaterFinish, finishRuns, setFinishWaters, waterRectOf, type SurfaceFinish, type WaterRect } from './ground-finish.js';
 import { PlanarReflection } from './planar-reflection.js';
 import { dressSlots, type PieceSlot } from './dresser.js';
+import { applyFallFinish } from './fall-finish.js';
 import { applyPattern } from './pattern-material.js';
 import { uploadPackPieces, type FetchedPieces } from './pieces.js';
 import { swatchMaterial } from './swatch-material.js';
@@ -24,7 +25,7 @@ import { drawInstancedPieces, type InstancePlacement } from './instanced-pieces.
 import { PlantWind, windRuns } from './wind.js';
 import { applyFacadeFinish, clearFacadeWall, facadeApplied, facadeFronts, facadeRuns, facadeWears, litShareOf, setFacadeWall, type FacadeFront } from './facade-finish.js';
 import type { PreparedTextureSet } from '../generated-tile/texture-materials.js';
-import { TILE_LOOK_V1, isRenderLook, type TileLook } from '../generated-tile/look.js';
+import { FALLING_WATER_DEFAULTS, TILE_LOOK_V1, isRenderLook, type TileLook } from '../generated-tile/look.js';
 import { seatGeometry, type SeatGeometry } from '../generated-site/site-seating.js';
 
 /**
@@ -181,6 +182,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const water = new WaterRipples(host.app, host.camera);
     // A look's water finish, when it states one; otherwise water keeps its ripples alone.
     const waterFinish = dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.water ?? null : null;
+    const fallingWater = (dressing.look !== undefined && isRenderLook(dressing.look) ? dressing.look.fallingWater : undefined) ?? FALLING_WATER_DEFAULTS;
     // The surface finish, on the device it is written for; the materials it was set into, by kind.
     const finish = dressing.finish !== undefined && finishRuns(device) ? dressing.finish : null;
     const finishedGrounds = new Set<pc.StandardMaterial>();
@@ -445,24 +447,39 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       undressed += 1;
     }
 
-    // A site on land's sea and lakes, in the pack's water as its ponds are, with the look's water
-    // over it: the look's own depth water where it states one, else the finish with the land's own
-    // depth. Made here, with everything else the dresser makes, so their time is kept from the start.
+    // A site on land's sea, lakes and cascades, in the pack's water as its ponds are, with the look's
+    // water over it: the look's own depth water where it states one, else the finish with the land's
+    // own depth; a fall, the look's falling water. Made here, with everything else the dresser makes,
+    // so their time is kept from the start.
     const landWaters = new Map<string, pc.StandardMaterial>();
+    const resolveWater = (identity: string, lookRole: string) => {
+      const role: StyleSlot = { identity, lookRole, positionMm: [0, 0, 0], yawQuarterTurns: 0, boxMm: [0, 0, 0] };
+      return catalog === null ? resolveLookRole(pack, role, families, 'surface') : resolveSurfaceLookRole(pack, role, families, 'surface', catalog);
+    };
     for (const body of land?.section.water ?? []) {
       if (body.kind === 'pond') continue;
-      const role: StyleSlot = { identity: `site-land:water:${body.id}`, lookRole: `water.${body.kind}`, positionMm: [0, 0, 0], yawQuarterTurns: 0, boxMm: [0, 0, 0] };
-      const resolved = catalog === null ? resolveLookRole(pack, role, families, 'surface') : resolveSurfaceLookRole(pack, role, families, 'surface', catalog);
+      const identity = `site-land:water:${body.id}`;
+      // A cascade's pool and fall are the lake's water where the look states none of their own.
+      const own = resolveWater(identity, `water.${body.kind}`);
+      const resolved = (body.kind === 'pool' || body.kind === 'fall') && own?.role !== `water.${body.kind}`
+        ? resolveWater(identity, 'water.lake') : own;
       const swatch = resolved?.kind === 'material' ? { swatch: resolved.material.swatch, up: null }
         : resolved?.kind === 'surface' && resolved.swatch !== null ? { swatch: resolved.swatch, up: resolved.up } : null;
       if (swatch === null) continue;
       const material = swatchMaterial(swatch.swatch, swatch.up, shading, `style-pack:land-water:${body.kind}:${body.id}`);
       made.push(material);
-      // No ripple normals here, under the look's depth finish or the surface finish: a lake or a sea is
-      // seen from afar, where ripples read as glints. The finish's drift and sheen move its colour.
-      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish, { ripples: false });
-      if (!byDepth && finish !== null && applySeaFinish(device, material, finish)) water.animate(material);
       landWaters.set(body.id, material);
+      if (body.kind === 'fall') {
+        // A sheet standing upright: streaks down it and foam where it lands, no depth and no ripples.
+        const place = { bottomM: body.bottomMm / 1000, acrossEast: body.side === 'north' || body.side === 'south' };
+        if (applyFallFinish(device, material, fallingWater, place)) water.animate(material);
+        continue;
+      }
+      // No ripple normals on a lake or the sea, under the look's depth finish or the surface finish:
+      // each is seen from afar, where ripples read as glints, and the finish's drift and sheen move
+      // its colour. A pool lies within the site, near, and keeps the noise ripple a pond has.
+      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish, { ripples: body.kind === 'pool' });
+      if (!byDepth && finish !== null && applySeaFinish(device, material, finish)) water.animate(material);
     }
 
     // Where the site's waters are, from the engine's bounds of their planes as drawn (before any border

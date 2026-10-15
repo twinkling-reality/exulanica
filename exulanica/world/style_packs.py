@@ -496,6 +496,23 @@ def _wind(value: Any, path: str) -> dict[str, Any]:
     )
 
 
+def _falling_water(value: Any, path: str) -> dict[str, Any]:
+    # How a sheet of falling water is finished: streaks moving down it, and foam where it lands.
+    return _object(
+        value,
+        path,
+        {
+            "streak_speed_mm_per_s": _integer(200, 20_000),
+            "streak_width_mm": _integer(20, 2000),
+            "streak_length_mm": _integer(100, 20_000),
+            "streak_contrast_permille": _integer(0, 1000),
+            "aeration_permille": _integer(0, 1000),
+            "foam_height_mm": _integer(0, 5000),
+            "foam": _srgb8,
+        },
+    )
+
+
 def _light_preset(value: Any, path: str) -> dict[str, Any]:
     clouds = _nullable(
         lambda c, q: _object(
@@ -952,6 +969,9 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             ),
             # Added within the profile: a pack written before it draws water as its surface states.
             "water": _Optional(_water),
+            # Added within the profile: a pack written before it has its falling water finished
+            # by the page's defaults.
+            "falling_water": _Optional(_falling_water),
             "palette": lambda v, p: _object(
                 v,
                 p,

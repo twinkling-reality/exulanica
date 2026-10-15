@@ -490,6 +490,43 @@ export interface RenderCaustics {
   readonly reachM: number;
 }
 
+/** How a sheet of falling water is finished, in any shading model: streaks down it, foam where it lands. */
+export interface RenderFallingWater {
+  /** How fast the streaks move down the sheet, metres a second. */
+  readonly streakSpeedMps: number;
+  /** How wide a streak is across the sheet, and how long down it, metres. */
+  readonly streakWidthM: number;
+  readonly streakLengthM: number;
+  /** How far a streak lightens or darkens the water's own colour, 0 to 1. */
+  readonly streakContrast: number;
+  /** How white the falling sheet is, 0 (the water's own colour) to 1 (the foam's): water torn into air. */
+  readonly aeration: number;
+  /** How high the foam stands above where the water lands, metres. */
+  readonly foamHeightM: number;
+  /** The foam's linear colour. */
+  readonly foam: Rgb;
+}
+
+/**
+ * Falling water where a look states none: chosen by eye on a 3 m fall seen from a pool's edge. Water
+ * falling 3 m reaches about 7.7 m a second, but a streak is a pattern on a sheet, and at that pace it
+ * reads as a flicker: 3.5 m a second reads as falling. A streak about a hand's width is visible across
+ * a 6 m channel from 20 m without becoming stripes, and eight times as long, so it reads as water drawn
+ * down and not as rain; streaks a third lighter or darker; the sheet more than half white, since a fall
+ * is water torn into air, the lake's own deep colour on it reads as a dark curtain, and an upright sheet
+ * is lit as a wall is (0.45 still read grey-blue in the lab); foam a little under a metre, white with the
+ * faint blue of the water (sRGB 232, 240, 242).
+ */
+export const FALLING_WATER_DEFAULTS: RenderFallingWater = Object.freeze({
+  streakSpeedMps: 3.5,
+  streakWidthM: 0.3,
+  streakLengthM: 2.4,
+  streakContrast: 0.35,
+  aeration: 0.6,
+  foamHeightM: 0.9,
+  foam: Object.freeze([0.807, 0.871, 0.888] as const),
+});
+
 export type RenderFog =
   | { readonly kind: 'linear'; readonly startM: number; readonly endM: number; readonly colour: Rgb }
   | { readonly kind: 'exp2'; readonly density: number; readonly colour: Rgb };
@@ -570,6 +607,8 @@ export interface RenderLook {
   readonly litWindows?: number;
   /** Absent: water is drawn as its surface states. */
   readonly water?: RenderWater;
+  /** Absent: falling water is finished as `FALLING_WATER_DEFAULTS` states. */
+  readonly fallingWater?: RenderFallingWater;
   readonly unavailable: TileLookV1['unavailable'];
 }
 
@@ -666,6 +705,9 @@ const RENDER_SHAPE: Shape = obj({
       fadeTo: num(0.02, 4),
     })),
     caustics: optional(obj({ strength: num(0, 2), cellM: num(0.1, 10), pace: num(0, 10), reachM: num(0.1, 10) })),
+  })),
+  fallingWater: optional(obj({
+    streakSpeedMps: num(0.2, 20), streakWidthM: num(0.02, 2), streakLengthM: num(0.1, 20), streakContrast: num(0, 1), aeration: num(0, 1), foamHeightM: num(0, 5), foam: rgb,
   })),
   unavailable: tileField('unavailable'),
 });

@@ -187,6 +187,7 @@ function host(listStatus = 200, served: string = DRAWING) {
 }
 
 describe('the look a site world is drawn in', () => {
+  // A 30 s bound: loading the default pack and its dresser takes 4 to 5 s on a busy machine, against the 5 s default.
   it('is the pack the host lists as its default, whose light lights the site and whose dresser dresses it', async () => {
     vi.stubGlobal('fetch', host().fetched);
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
@@ -209,7 +210,7 @@ describe('the look a site world is drawn in', () => {
     expect(dressers.asked.at(-1)).toMatchObject({ materials: SURFACE_MATERIALS, patterns: SURFACE_PATTERNS, borders: GROUND_BORDERS });
     expect(GROUND_BORDERS.byMaterial.get('lake')?.lies).toBe('under');
     expect(ROOF_FORMS.byMaterial.get('canvas')?.ridge?.eaves).toBe('ground');
-  });
+  }, 30_000);
 
   it('is the workspace\'s own look on the library pack it is drawn on, where the world\'s appearance names one', async () => {
     // A look of the workspace's own: one generated piece (the cozy town's tree file standing in for

@@ -415,7 +415,7 @@ export async function prepareWorldLook(
       drawnSetting = { drawn: false, reason: error instanceof Error ? error.message : String(error) };
     }
   }
-  const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge, 1, pack.water);
+  const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge, 1, pack.water, pack.falling_water);
   const table = (JSON.parse(colourTableText) as { values: number[] }).values;
   const own = new Set(isOwn ? read.files.map((file) => file.sha256) : []);
   const packFile = (file: StylePackFile): Promise<Uint8Array<ArrayBuffer>> => (
