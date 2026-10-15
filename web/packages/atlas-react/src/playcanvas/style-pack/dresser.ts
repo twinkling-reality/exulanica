@@ -1,5 +1,8 @@
 import * as pc from 'playcanvas';
-import { resolveLookRole, stretchCoordinate, type AxisStretch, type LookFamily, type ResolvedStylePack } from '@exulanica/atlas-core';
+import {
+  PIECE_DRAWING_DEFAULTS, repeatCoordinate, repeatPart, resolveLookRole, stretchCoordinate,
+  type AxisRepeat, type AxisStretch, type LookFamily, type ResolvedStylePack,
+} from '@exulanica/atlas-core';
 import type { RenderShading } from '../generated-tile/look.js';
 import type { LoadedPieceGroup, LoadedTexturedLevels, PackPieces } from './pieces.js';
 import { drawInstancedPieces, type InstancePlacement, type InstancedDressing, type InstancedView } from './instanced-pieces.js';
@@ -13,8 +16,12 @@ import { swatchMaterial } from './swatch-material.js';
  * +Z front, pivot at its base centre. A piece stands in its slot by the rotation that turns its +Z
  * to the slot's front about the vertical, which takes glTF +X to the slot's right as a viewer facing
  * the front sees it; never a reflection. The family's fit (`fit` in the pack module) scales each
- * axis, or stretches a stated zone so a frame keeps its bars whatever the hole; a tiled family
- * repeats the piece along the width.
+ * axis, stretches a stated zone so a frame keeps its bars whatever the hole, or repeats a stated
+ * zone so a building keeps its bays and storeys whatever its box; a tiled family repeats the piece
+ * along the width. A repeated zone is baked copy by copy: each triangle belongs, by its centroid, to
+ * the part below the zone, the zone or the part above it on each repeating axis (the server holds
+ * every triangle to one part), and a triangle of the zone is copied once for each copy. A slot whose
+ * copies would bake more triangles than the drawing's `repeatedTrianglesMost` keeps its primitive.
  *
  * Every slot's piece is moved into place here, once, and the triangles of every slot that share a
  * swatch become one mesh, so a town's six hundred windows are a draw per swatch. Normals follow each
@@ -24,8 +31,8 @@ import { swatchMaterial } from './swatch-material.js';
  * A textured piece (`pieces.ts`) is not baked: it is drawn instanced (`instanced-pieces.ts`) by the
  * matrix `placementMatrix` makes, the same transform the bake applies to each corner, so it stands
  * exactly where a palette piece would. It stands whole on its base: a draped slot's piece is not
- * bent to the land under each of its points, as a palette piece's is, and a stretch zone is not
- * drawn (the server refuses one on a textured piece; a slot asking for one is left undressed).
+ * bent to the land under each of its points, as a palette piece's is, and a stretch or repeat zone
+ * is not drawn (the server refuses one on a textured piece; a slot asking for one is left undressed).
  *
  * A slot the pack does not dress, or that no variant fits, is returned by identity for the caller
  * to draw as it would without a pack. Nothing here changes what a slot is, what collides or where
@@ -108,24 +115,37 @@ function placedTriangles(levels: LoadedTexturedLevels, matrix: Float32Array, bat
 
 const PREFIX = 'style-pack:';
 
-/** Where one axis of a piece lands: scaled about the pivot, or stretched from the low face. */
+/** Where one axis of a piece lands: scaled about the pivot, or stretched or repeated from the low face. */
 interface AxisPlacement {
   readonly scale: number;
   readonly stretch: AxisStretch | null;
+  readonly repeat: AxisRepeat | null;
   /** Millimetres from the pivot to the piece's low face on this axis (0 for height). */
   readonly lowMm: number;
   /** Millimetres from the pivot to the slot's low face on this axis. */
   readonly boxLowMm: number;
 }
 
-/** A coordinate in metres along one axis, placed. */
-function placeAxis(axis: AxisPlacement, value: number): number {
+/** A coordinate in metres along one axis, placed: of a triangle in `part` and `copy` where the axis repeats. */
+function placeAxis(axis: AxisPlacement, value: number, part: -1 | 0 | 1, copy: number): number {
+  if (axis.repeat !== null) return (repeatCoordinate(axis.repeat, value * 1000 - axis.lowMm, part, copy) + axis.boxLowMm) / 1000;
   if (axis.stretch === null) return value * axis.scale;
   return (stretchCoordinate(axis.stretch, value * 1000 - axis.lowMm) + axis.boxLowMm) / 1000;
 }
 
+/** The part of a repeating axis a triangle with its centroid at `value` belongs to; -1 where the axis does not repeat. */
+function partOf(axis: AxisPlacement, value: number): -1 | 0 | 1 {
+  return axis.repeat === null ? -1 : repeatPart(axis.repeat, value * 1000 - axis.lowMm);
+}
+
+/** How many times a triangle in `part` is drawn on one axis. */
+function copiesOf(axis: AxisPlacement, part: -1 | 0 | 1): number {
+  return axis.repeat !== null && part === 0 ? axis.repeat.copies : 1;
+}
+
 /** How much one axis is drawn out around a point, for turning its normals. */
 function axisFactor(axis: AxisPlacement, value: number): number {
+  if (axis.repeat !== null) return partOf(axis, value) === 0 ? axis.repeat.scale : 1;
   if (axis.stretch === null) return axis.scale;
   const p = value * 1000 - axis.lowMm;
   return p > axis.stretch.low && p < axis.stretch.high ? axis.stretch.length / (axis.stretch.high - axis.stretch.low) : 1;
@@ -159,6 +179,7 @@ export function dressSlots(
   let device: pc.GraphicsDevice | null = null;
   const local = [0, 0, 0];
   const normal = [0, 0, 0];
+  const repeatedMost = (view?.drawing ?? PIECE_DRAWING_DEFAULTS).repeatedTrianglesMost;
   for (const slot of slots) {
     const captured = capture?.identities.has(slot.identity) ? new SwatchBatch() : null;
     let captureRefused = false;
@@ -172,8 +193,8 @@ export function dressSlots(
     const [w, d] = module.variants[dressing.variant]!.size_mm;
     const [bw, bd] = slot.boxMm;
     if (piece.textured !== undefined) {
-      // Drawn instanced, never stretched: a slot that asks a textured piece to stretch keeps its primitive.
-      if (dressing.stretch.some((axis) => axis !== null)) {
+      // Drawn instanced, never stretched or repeated: a slot that asks a textured piece to keeps its primitive.
+      if (dressing.stretch.some((axis) => axis !== null) || dressing.repeat.some((axis) => axis !== null)) {
         undressed.push(slot.identity);
         continue;
       }
@@ -207,10 +228,16 @@ export function dressSlots(
     }
     // glTF axes x (width), y (height), z (depth); height's low face is the pivot itself.
     const axes: AxisPlacement[] = [
-      { scale: dressing.scale[0], stretch: dressing.stretch[0], lowMm: -w / 2, boxLowMm: -bw / 2 },
-      { scale: dressing.scale[1], stretch: dressing.stretch[1], lowMm: 0, boxLowMm: 0 },
-      { scale: dressing.scale[2], stretch: dressing.stretch[2], lowMm: -d / 2, boxLowMm: -bd / 2 },
+      { scale: dressing.scale[0], stretch: dressing.stretch[0], repeat: dressing.repeat[0], lowMm: -w / 2, boxLowMm: -bw / 2 },
+      { scale: dressing.scale[1], stretch: dressing.stretch[1], repeat: dressing.repeat[1], lowMm: 0, boxLowMm: 0 },
+      { scale: dressing.scale[2], stretch: dressing.stretch[2], repeat: dressing.repeat[2], lowMm: -d / 2, boxLowMm: -bd / 2 },
     ];
+    // A piece that repeats is held to the drawing's bound before any of it is baked.
+    if (dressing.repeat.some((axis) => axis !== null)
+      && piece.groups.reduce((sum, group) => sum + bakedTriangles(group, axes), 0) * dressing.copies > repeatedMost) {
+      undressed.push(slot.identity);
+      continue;
+    }
     // The slot's front (east, north) is the piece's +Z, and the piece's +X is (-north, east): the
     // right of a viewer facing the front.
     const [frontEast, frontNorth] = slot.front;
@@ -301,7 +328,24 @@ export function dressSlots(
   };
 }
 
-/** One piece group's triangles, placed: each corner moved, each normal turned by its triangle's stretch. */
+/** How many triangles a group bakes on `axes`: each counted once for every copy it is drawn in. */
+function bakedTriangles(group: LoadedPieceGroup, axes: readonly AxisPlacement[]): number {
+  const { positions, indices } = group;
+  let count = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    let copies = 1;
+    for (let a = 0; a < 3; a += 1) {
+      if (axes[a]!.repeat === null) continue;
+      let centroid = 0;
+      for (let k = 0; k < 3; k += 1) centroid += positions[indices[t + k]! * 3 + a]! / 3;
+      copies *= copiesOf(axes[a]!, partOf(axes[a]!, centroid));
+    }
+    count += copies;
+  }
+  return count;
+}
+
+/** One piece group's triangles, placed: each corner moved, each normal turned by its triangle's stretch or repeat. */
 function bake(
   group: LoadedPieceGroup,
   axes: readonly AxisPlacement[],
@@ -328,21 +372,32 @@ function bake(
     const fx = axisFactor(axes[0]!, cx);
     const fy = axisFactor(axes[1]!, cy);
     const fz = axisFactor(axes[2]!, cz);
-    for (let k = 0; k < 3; k += 1) {
-      const v = indices[t + k]!;
-      local[0] = placeAxis(axes[0]!, positions[v * 3]!) + shift;
-      local[1] = placeAxis(axes[1]!, positions[v * 3 + 1]!);
-      local[2] = placeAxis(axes[2]!, positions[v * 3 + 2]!);
-      toRenderer(local[0]!, local[1]!, local[2]!, normal, true);
-      if (lift !== null) normal[1] = normal[1]! + lift(normal[0]!, normal[2]!);
-      batch.positions.push(normal[0]!, normal[1]!, normal[2]!);
-      // A normal under a stretch turns by the inverse of the draw-out on each axis.
-      const nx = normals[v * 3]! / fx;
-      const ny = normals[v * 3 + 1]! / fy;
-      const nz = normals[v * 3 + 2]! / fz;
-      const length = Math.hypot(nx, ny, nz);
-      toRenderer(nx / length, ny / length, nz / length, normal, false);
-      batch.normals.push(normal[0]!, normal[1]!, normal[2]!);
+    // The part of each repeating axis the triangle lies in, and so how many copies it is drawn in.
+    const px = partOf(axes[0]!, cx);
+    const py = partOf(axes[1]!, cy);
+    const pz = partOf(axes[2]!, cz);
+    const [nxCopies, nyCopies, nzCopies] = [copiesOf(axes[0]!, px), copiesOf(axes[1]!, py), copiesOf(axes[2]!, pz)];
+    for (let ix = 0; ix < nxCopies; ix += 1) {
+      for (let iy = 0; iy < nyCopies; iy += 1) {
+        for (let iz = 0; iz < nzCopies; iz += 1) {
+          for (let k = 0; k < 3; k += 1) {
+            const v = indices[t + k]!;
+            local[0] = placeAxis(axes[0]!, positions[v * 3]!, px, ix) + shift;
+            local[1] = placeAxis(axes[1]!, positions[v * 3 + 1]!, py, iy);
+            local[2] = placeAxis(axes[2]!, positions[v * 3 + 2]!, pz, iz);
+            toRenderer(local[0]!, local[1]!, local[2]!, normal, true);
+            if (lift !== null) normal[1] = normal[1]! + lift(normal[0]!, normal[2]!);
+            batch.positions.push(normal[0]!, normal[1]!, normal[2]!);
+            // A normal under a stretch or a repeat turns by the inverse of the draw-out on each axis.
+            const nx = normals[v * 3]! / fx;
+            const ny = normals[v * 3 + 1]! / fy;
+            const nz = normals[v * 3 + 2]! / fz;
+            const length = Math.hypot(nx, ny, nz);
+            toRenderer(nx / length, ny / length, nz / length, normal, false);
+            batch.normals.push(normal[0]!, normal[1]!, normal[2]!);
+          }
+        }
+      }
     }
   }
 }

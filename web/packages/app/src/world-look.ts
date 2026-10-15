@@ -38,6 +38,7 @@ import { accessHeaders, type Credentials } from './config.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import lookFamilyText from '../../../../assets/catalogs/world-kinds/look-family.v1.json?raw';
 import lookFamilyV2Text from '../../../../assets/catalogs/world-kinds/look-family.v2.json?raw';
+import lookFamilyV3Text from '../../../../assets/catalogs/world-kinds/look-family.v3.json?raw';
 import townRolesText from '../../../../assets/style-packs/town-look-roles.v1.json?raw';
 import colourTableText from '../../../../assets/colour/srgb8-linear16.v1.json?raw';
 import settingRulesText from '../../../../assets/style-packs/settings/setting-rules.v1.json?raw';
@@ -381,7 +382,7 @@ export async function prepareWorldLook(
     }
   }
   const legacyFamilies = lookFamilies();
-  const familyCatalogs = new Map(await Promise.all(([ [1, lookFamilyText], [2, lookFamilyV2Text] ] as const).map(async ([version, text]) => [version, { sha256: hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), families: lookFamilies(text) }] as const)));
+  const familyCatalogs = new Map(await Promise.all(([ [1, lookFamilyText], [2, lookFamilyV2Text], [3, lookFamilyV3Text] ] as const).map(async ([version, text]) => [version, { sha256: hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), families: lookFamilies(text) }] as const)));
   const textureSets = new Set(parseTextureSetManifest(textureManifest).byId.keys());
   const context = { families: legacyFamilies, textureSets, familyCatalogs };
   const read = readStylePackManifest(manifest as Parameters<typeof readStylePackManifest>[0], context);

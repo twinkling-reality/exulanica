@@ -82,6 +82,33 @@ def test_retained_v2_pin_is_exact_file_bytes_and_only_changes_roof_fit():
     assert second == first
 
 
+def test_retained_v3_is_exact_file_bytes_and_only_lets_a_structure_meet_its_box():
+    raw = (ROOT / "assets/catalogs/world-kinds/look-family.v3.json").read_bytes()
+    assert CONTEXT.family_catalogs[3].sha256 == hashlib.sha256(raw).hexdigest()
+    second = json.loads((ROOT / "assets/catalogs/world-kinds/look-family.v2.json").read_bytes())
+    third = json.loads(raw)
+    third["catalog_version"] = 2
+    structure = next(entry for entry in second["entries"] if entry["key"] == "structure")
+    for entry in third["entries"]:
+        if entry["key"] == "structure":
+            assert (
+                entry["fit"],
+                entry["fill_minimum_permille"],
+                entry["fill_maximum_permille"],
+            ) == (
+                "fill",
+                800,
+                1250,
+            )
+            entry.update(
+                {
+                    key: structure[key]
+                    for key in ("fit", "fill_minimum_permille", "fill_maximum_permille", "reason")
+                }
+            )
+    assert third == second
+
+
 @pytest.mark.parametrize(
     ("pin", "reason", "path"),
     [

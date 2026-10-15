@@ -646,6 +646,8 @@ export {
 } from './texture-set.js';
 
 export type {
+  AxisRepeat,
+  AxisRepeats,
   AxisStretch,
   AxisStretches,
   Dressing,
@@ -675,6 +677,7 @@ export {
   STYLE_PACK_COLOUR_ENCODING,
   STYLE_PACK_IMAGE_MEDIA_TYPES,
   STYLE_PACK_LICENCES,
+  STYLE_PACK_MAX_REPEAT_COPIES,
   STYLE_PACK_MAX_TOTAL_BYTES,
   STYLE_PACK_ORIGINS,
   STYLE_PACK_OWN_WORK,
@@ -685,6 +688,8 @@ export {
   canonicalStylePackBytes,
   fit,
   readStylePackManifest,
+  repeatCoordinate,
+  repeatPart,
   resolveLookRole,
   resolveStylePack,
   stylePackFamilies,

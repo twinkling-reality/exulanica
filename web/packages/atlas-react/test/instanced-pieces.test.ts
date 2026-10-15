@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
-import { readStylePackManifest, resolveStylePack, type LookFamily, type StylePackFile } from '@exulanica/atlas-core';
+import { PIECE_DRAWING_DEFAULTS, readStylePackManifest, resolveStylePack, type LookFamily, type StylePackFile } from '@exulanica/atlas-core';
 import { dressSlots, fetchPackPieces, growByPlaced, uploadPackPieces, type PieceSlot } from '../src/playcanvas/style-pack/index.js';
 
 // Relative to web/, where the suite runs.
@@ -254,7 +254,7 @@ describe('textured pieces drawn instanced', () => {
     const root = new pc.Entity('root');
     host.root.addChild(root);
     const before = (host as unknown as { _callbacks: Map<string, unknown[]> })._callbacks.get('update')?.length ?? 0;
-    const drawing = { lod1BeyondPerMetre: 9, hysteresisPermille: 100, shadowReachM: 11, cellSizeM: 48 };
+    const drawing = { ...PIECE_DRAWING_DEFAULTS, lod1BeyondPerMetre: 9, hysteresisPermille: 100, shadowReachM: 11, cellSizeM: 48 };
     // One car at the origin, 1.5 m tall: its second level from 13.5 m, its first again under 12.15 m.
     const dressing = dressSlots(root, [SLOTS[0]!], pack, families, pieces, SHADING, undefined, undefined, { app: host, camera, drawing });
     const instanced = dressing.instanced!;

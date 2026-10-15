@@ -85,6 +85,13 @@ fit from `surface` to uniform `contain` within the served roof slot. A pack opts
 the kind catalog, a saved canonical drawing, support or navigation. A roof module still needs to
 respect the roof envelope and usable openings; selecting a catalog is not a clearance proof.
 
+Appearance catalog version 3 retains version 2 and changes the structure family's fit from uniform
+`contain` to `fill`, from 800 to 1,250 per mille: a building's piece meets the box the world made on
+each axis, by repeating the bays or storeys its variant states, by stretching a plain run it states,
+or scaled within those bounds, so a dressed building stands as large as the building people walk
+round. A slot no variant meets keeps the engine's own building. A pack opts in through the same pin;
+a pack pinned to version 1 or 2 reads as it was made.
+
 | Dressing | Families | What the pack supplies |
 | --- | --- | --- |
 | Surface | ground, path, road, water, wall | A swatch, a texture set or the pack's own texture |
@@ -139,7 +146,7 @@ mirrors).
 | Fit | Rule |
 | --- | --- |
 | Contain | One uniform scale, the tightest axis's, so the piece lies inside the box |
-| Fill | Each axis meets the box: by its stretch zone where the variant states one, else scaled within the family's bounds (800 to 1250 per mille for doors and windows); a box that leaves a zone no length, or a scale outside the bounds, passes to the next variant, then none |
+| Fill | Each axis meets the box: by its repeat zone where the variant states one, by its stretch zone where it states one, else scaled within the family's bounds (800 to 1250 per mille for doors, windows and, in catalog version 3, structures); a box that leaves a zone no length, a repeat whose copies fall outside the bounds, or a scale outside them, passes to the next variant, then none |
 | Tile | Copies along the width, as many as the width holds rounded, each scaled to share it exactly |
 | Surface | A material, never a piece |
 
@@ -151,6 +158,19 @@ run from 300 to 4000 mm wide, 500 to 5000 mm tall and 120 to 250 mm deep, more t
 piece could meet within the bounds. A zone lies within the piece with its low below its high, and
 only a fill family's piece states one. A normal in a zone turns by the inverse of the zone's
 draw-out, so a slanted face stays lit as its shape says.
+
+A fill variant may instead state a repeat zone per axis (`repeat_mm`, optional, in the same order
+and units; an axis stretches or repeats, not both). The zone's content is drawn a whole number of
+times, every copy scaled alike so the piece meets the box exactly: the count is the one whose copy
+scale is nearest 1 by ratio (the fewer copies on a tie), at most 64 an axis, and every copy lies
+within the family's bounds, else the variant does not fit. What lies below the zone keeps its place
+and what lies above it follows the last copy, so a building keeps its end walls, ground storey and
+cornice and repeats its bays across and its storeys up: a front of 600 mm ends about a 3.8 m bay
+meets a 20 m box with five bays at 989 per mille. A variant with no `repeat_mm` repeats nothing,
+and its manifest keeps its bytes. Every triangle of a repeating piece lies wholly below, inside or
+above each zone on its axis (the check holds this, section 11), so the page assigns each triangle
+by its centroid and the copies join without a crack; a triangle of two zones is drawn once for
+every pair of copies. A normal in a copy turns by the inverse of the copy's scale.
 
 ## 4. Palette and colour
 
@@ -189,7 +209,7 @@ readers hold it to the same rules and refuse the rest by name (`readTexturedPiec
   picture probe (`style_packs.probe_pack_image`, the walk section 11.1 describes), every buffer view
   read whole by an image or byte for byte by an accessor.
 
-A textured piece states no stretch zone: it is drawn whole (section 7). A textured first level's
+A textured piece states no stretch or repeat zone: it is drawn whole (section 7). A textured first level's
 second level is textured too. The page reads `isTexturedPiece` (the container holds images) to
 choose the reader; a piece is one or the other, never both.
 
@@ -218,8 +238,8 @@ it, then the rules across sections, and refuses with the first fault by reason a
 | Reason | What it refuses |
 | --- | --- |
 | `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, text holding a lone surrogate, a control character or a bidirectional control character, a file whose media type is not its extension's, a texture's picture that is not a JPEG or a PNG |
-| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a preview over 512 KiB, a texture's picture over 4 MiB, a texture repeating over less than 100 mm, a pack drawing with more than 64 pictures (its textures' and its pieces' together), a cover's least scale above its most, a wind swaying no family |
-| `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, texture, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill, cover on a role that is not a surface, a cover piece that is not a plant or (with no base) not one of the pack's modules, a wind swaying a family the context does not know |
+| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch or repeat zone outside its piece or of no length, a preview over 512 KiB, a texture's picture over 4 MiB, a texture repeating over less than 100 mm, a pack drawing with more than 64 pictures (its textures' and its pieces' together), a cover's least scale above its most, a wind swaying no family |
+| `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, texture, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch or a repeat on a piece of a family that is not fill, cover on a role that is not a surface, a cover piece that is not a plant or (with no base) not one of the pack's modules, a wind swaying a family the context does not know |
 | `duplicate` | Two swatches of one key or one colour, two files of one path |
 | `licence` | CC-BY-4.0 without attribution, attribution on CC0-1.0, the own-work id on a pack that is not uploaded or with an attribution |
 
@@ -247,8 +267,8 @@ down puts every material back and removes every piece.
 | Light | The pack's default preset, in its whole-number units, becomes the tiles' render look (`renderLookOfPreset`); what a pack does not choose, such as shadow map sizes, is the engine's |
 | Surfaces | Each texture set a town is drawn with takes the look role `assets/style-packs/town-look-roles.v1.json` names: the family of the first grammar surface role the material catalog lists for the set's material, then the material's key. The pack resolves it as a surface only; a swatch replaces the set's material, a texture set keeps the set's own, and either may colour the set's upward faces with an up swatch (`dressTownSurfaces`) |
 | Windows | One slot per opening a facade the tile owns cuts, read with the tessellator's own rules (`openingSlots`): the hole's width and reveal, its height to the head or to an arched head's springing line, its base centre set in half the reveal, its front the face's outward side; its look role `window.<head treatment>` |
-| Pieces | A pack's pieces are fetched, held to the size and digest their manifest states, read as palette pieces and uploaded once (`fetchPackPieces`, `uploadPackPieces`); every slot's piece is placed by its fit and baked with the others into one mesh per swatch (`dressSlots`) |
-| Textured pieces | A textured piece (section 4.1) is fetched with its variant's second level, held to its manifest the same way; each picture is decoded once by its digest, and the upload makes one texture per picture and use (colour in sRGB, a normal map linear) and one material per material of each level, in the pack's shading, all destroyed with the drawing. It is not baked: `placementMatrix` gives the transform the bake applies to a corner, and the pieces of one file are drawn instanced in square cells of the ground (`drawInstancedPieces`), one draw per cell, level and material, culled by the cell's own bounds in the camera and in every shadow cascade. A cell draws the second level beyond a distance proportional to its tallest piece and returns to the first only a share nearer (hysteresis); only the first level casts shadows, and only within a reach. Those four figures (distance per metre of height, hysteresis, shadow reach, cell size) are `atlas-core/src/piece-drawing.ts`'s, defaults with their reasons, beside the render budget. A textured piece stands whole on its base: on a draped slot it is not bent to the land under each of its points, and a slot asking it to stretch keeps its primitive. A seat's contact copy is its placed triangles either way |
+| Pieces | A pack's pieces are fetched, held to the size and digest their manifest states, read as palette pieces and uploaded once (`fetchPackPieces`, `uploadPackPieces`); every slot's piece is placed by its fit and baked with the others into one mesh per swatch (`dressSlots`). A repeat zone is baked copy by copy; a slot whose copies would bake more triangles than the drawing's `repeatedTrianglesMost` (`atlas-core/src/piece-drawing.ts`, by default 80,000, four structure pieces at their family's budget) keeps its primitive |
+| Textured pieces | A textured piece (section 4.1) is fetched with its variant's second level, held to its manifest the same way; each picture is decoded once by its digest, and the upload makes one texture per picture and use (colour in sRGB, a normal map linear) and one material per material of each level, in the pack's shading, all destroyed with the drawing. It is not baked: `placementMatrix` gives the transform the bake applies to a corner, and the pieces of one file are drawn instanced in square cells of the ground (`drawInstancedPieces`), one draw per cell, level and material, culled by the cell's own bounds in the camera and in every shadow cascade. A cell draws the second level beyond a distance proportional to its tallest piece and returns to the first only a share nearer (hysteresis); only the first level casts shadows, and only within a reach. Those four figures (distance per metre of height, hysteresis, shadow reach, cell size) are `atlas-core/src/piece-drawing.ts`'s, defaults with their reasons, beside the render budget. A textured piece stands whole on its base: on a draped slot it is not bent to the land under each of its points, and a slot asking it to stretch or repeat keeps its primitive. A seat's contact copy is its placed triangles either way |
 | Vehicles | A traffic vehicle's body is the pack's piece for `vehicle.<body family>`, chosen by the vehicle's id, contained in the record's own size; its `vehicle_body` swatch takes the vehicle's colour as the pack states it (`vehicle_red`); a body family the pack does not dress keeps the traffic's boxes (`packVehicleBodies`) |
 | Ink | A shading that draws ink outlines the tiles' opaque surfaces and the pack's baked pieces (`attachTileInk`) |
 
@@ -676,7 +696,7 @@ first refusal:
 | The manifest's bytes: at most 256 KiB, the declared digest and size, UTF-8 JSON with no duplicate key, no `NaN` or `Infinity`, at most 32 deep, and exactly its canonical bytes | 422 `content_digest_mismatch` or `invalid_style_data` |
 | The manifest, through the reader (section 6), then origin `uploaded`, an id outside `exulanica.` and not beginning `erased.` (the ids an erasure gives), the declaration's licence and attribution, and a base that is a library version or one of the workspace's own versions that may be worn | 422 `invalid_style_data` with its `path`, `licence_mismatch`, or `style_pack_base_unavailable` |
 | The parts: exactly the manifest's files, each at its listed size and digest, a piece within its family's file size before it is opened | 422 `invalid_style_pack_body`, `content_digest_mismatch` or `over_budget` |
-| Each piece's profile (`exulanica/world/style_pack_pieces.py`): an `exulanica.static-glb/v1` container with one buffer, the binary chunk that buffer and at most three zero bytes, every buffer view packed tightly, used and read byte for byte by its accessors, no `extras`, no images, textures or samplers in a palette piece, a textured piece as section 4.1 states with each picture walked to its end, names and `asset.generator` at most 64 plain characters, `asset` holding nothing else; and its family's triangles (a second level of detail a quarter of the first's), materials and, for a textured piece, texture side, no stretch zone and a textured second level, from accessor counts; the pictures of every piece and texture at most 64 together; every piece a cover rule names textured | 422 `style_pack_piece_refused` or `over_budget`, with the piece's `path` |
+| Each piece's profile (`exulanica/world/style_pack_pieces.py`): an `exulanica.static-glb/v1` container with one buffer, the binary chunk that buffer and at most three zero bytes, every buffer view packed tightly, used and read byte for byte by its accessors, no `extras`, no images, textures or samplers in a palette piece, a textured piece as section 4.1 states with each picture walked to its end, names and `asset.generator` at most 64 plain characters, `asset` holding nothing else; and its family's triangles (a second level of detail a quarter of the first's), materials and, for a textured piece, texture side, no stretch or repeat zone and a textured second level, from accessor counts; the pictures of every piece and texture at most 64 together; every piece a cover rule names textured | 422 `style_pack_piece_refused` or `over_budget`, with the piece's `path` |
 | The preview, walked to its end without decoding (`exulanica/world/style_pack_preview.py`) | 422 `style_pack_preview_refused` |
 | Each texture's pictures, walked the same way (`style_packs.probe_pack_image`, JPEG and PNG only, at most 2,048 pixels a side), its maps one size | 422 `style_pack_texture_refused` |
 
@@ -695,7 +715,9 @@ version, 410 for a withdrawn one, and 429 `style_pack_quota_exceeded` at a bound
 `workspace` or `installation` for the attempts). Its check then runs off-request, in the asset
 preparation process after each of its passes (`exulanica/world/style_pack_checks.py`): every
 triangle of every piece read for its colour, as the browser reads a piece, and held to the pack's
-palette or a palette in its base chain; at most 120 s a version, past which it is `interrupted`, and
+palette or a palette in its base chain, and a palette piece whose variant repeats a zone held to
+that zone: a triangle that crosses one of its edges by more than half a millimetre refuses the
+version (`crosses_repeat_zone`, naming the triangle and the edge); at most 120 s a version, past which it is `interrupted`, and
 three attempts, after which it is `interrupted` too. A version that passes is ready.
 
 | Route | Answer |

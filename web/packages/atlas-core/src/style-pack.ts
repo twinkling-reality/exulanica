@@ -57,6 +57,11 @@ export const STYLE_PACK_SHADING_MODELS = ['pbr', 'toon', 'flat'] as const;
 export const STYLE_PACK_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 export const STYLE_PACK_MAX_SWATCHES = 64;
 export const STYLE_PACK_MAX_VARIANTS = 8;
+/**
+ * The most copies a repeat zone is drawn on one axis: a forty-storey building of the taller kind
+ * bounds at its own storey height takes forty, with room for a bay a little under its authored width.
+ */
+export const STYLE_PACK_MAX_REPEAT_COPIES = 64;
 export const STYLE_PACK_MAX_PRESETS = 6;
 export const STYLE_PACK_MAX_FILES = 512;
 
@@ -250,6 +255,14 @@ export interface StylePackVariant {
   readonly stretch_mm: readonly [StretchZone | null, StretchZone | null, StretchZone | null];
   /** The share of a wind's sway the variant's pieces take, per mille; absent, the whole of it. */
   readonly sway_permille?: number;
+  /**
+   * Per axis of `size_mm`: null, or the zone `[low, high]` whose content is drawn a whole number of
+   * times to meet a fill slot, every copy scaled alike, in millimetres from the piece's low face on
+   * that axis (left, back, base); what lies below `low` keeps its place and what lies above `high`
+   * follows the last copy, so a building repeats its bays and storeys. Absent: no axis repeats. An
+   * axis stretches or repeats, not both.
+   */
+  readonly repeat_mm?: readonly [StretchZone | null, StretchZone | null, StretchZone | null];
 }
 
 export type StretchZone = readonly [number, number];
@@ -536,6 +549,15 @@ export function splitLookRole(role: string, path: string): { family: string; lea
  * need the whole manifest (references between sections, duplicates, the budget of the files
  * together) follow the shape checks, in a fixed order, so both readers name the same first fault.
  */
+/** A zone or null for each of width, depth and height: a stretch's or a repeat's. */
+const zones = (value: Json, path: string): (number[] | null)[] => {
+  if (!Array.isArray(value) || value.length !== 3) return fail('shape', path, 'must be a zone or null for width, depth and height');
+  return value.map((zone, i) => nullable((z, q) => {
+    if (!Array.isArray(z) || z.length !== 2) return fail('shape', q, 'must be a low and a high in millimetres');
+    return z.map((n, k) => integer(0, 50_000)(n, `${q}[${k}]`));
+  })(zone, `${path}[${i}]`));
+};
+
 export function readStylePackManifest(value: Json, context: StylePackContext): StylePackManifest {
   let families = context.legacyFamilies ?? context.families;
   const lookRoleKey = (dressings: readonly LookFamily['dressing'][]) => (key: string, path: string): void => {
@@ -666,15 +688,11 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
           if (!Array.isArray(s) || s.length !== 3) return fail('shape', r, 'must be width, depth and height in millimetres');
           return s.map((n, i) => integer(1, 50_000)(n, `${r}[${i}]`));
         },
-        stretch_mm: (s, r) => {
-          if (!Array.isArray(s) || s.length !== 3) return fail('shape', r, 'must be a zone or null for width, depth and height');
-          return s.map((zone, i) => nullable((z, q) => {
-            if (!Array.isArray(z) || z.length !== 2) return fail('shape', q, 'must be a low and a high in millimetres');
-            return z.map((n, k) => integer(0, 50_000)(n, `${q}[${k}]`));
-          })(zone, `${r}[${i}]`));
-        },
+        stretch_mm: zones,
         // Added within the profile: absent, the variant's pieces take the whole of a wind's sway.
         sway_permille: optional(integer(0, 4000)),
+        // Added within the profile: a variant that repeats nothing states none.
+        repeat_mm: optional(zones),
       }), 1, STYLE_PACK_MAX_VARIANTS),
     }), 512),
     files: list((v, p) => object(v, p, {
@@ -769,6 +787,18 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
           fail('range', `modules.${role}.variants[${index}].stretch_mm[${axis}]`, 'must lie within the piece, low below high');
         }
       });
+      const repeat = variant.repeat_mm;
+      if (repeat !== undefined) {
+        const where = `modules.${role}.variants[${index}].repeat_mm`;
+        if (repeat.some((zone) => zone !== null) && context.families.get(splitLookRole(role, 'modules').family)?.fit !== 'fill') {
+          fail('reference', where, 'repeats only a piece of a fill family');
+        }
+        repeat.forEach((zone, axis) => {
+          if (zone === null) return;
+          if (!(zone[0] < zone[1] && zone[1] <= variant.size_mm[axis]!)) fail('range', `${where}[${axis}]`, 'must lie within the piece, low below high');
+          if (variant.stretch_mm[axis] !== null) fail('shape', `${where}[${axis}]`, 'an axis stretches or repeats, not both');
+        });
+      }
     });
   }
   const preview = manifest.preview ?? null;
@@ -941,6 +971,8 @@ export type Dressing =
       readonly scale: readonly [number, number, number];
       /** Where the piece stretches, on glTF axes x, y, z. */
       readonly stretch: AxisStretches;
+      /** Where the piece repeats a zone, on glTF axes x, y, z. */
+      readonly repeat: AxisRepeats;
       /** For a tiled family: how many copies run along the slot's width, centred. */
       readonly copies: number;
     };
@@ -963,6 +995,59 @@ export function stretchCoordinate(stretch: AxisStretch, p: number): number {
   if (p <= stretch.low) return p;
   if (p >= stretch.high) return p + stretch.length - (stretch.high - stretch.low);
   return stretch.low + ((p - stretch.low) * stretch.length) / (stretch.high - stretch.low);
+}
+
+/**
+ * A repeated axis: the zone between `low` and `high` (millimetres from the piece's low face on the
+ * axis) is drawn `copies` times, the first from `low`, each `scale` of the zone's length; what lies
+ * above `high` follows the last copy, so the piece meets `box`.
+ */
+export interface AxisRepeat {
+  readonly low: number;
+  readonly high: number;
+  readonly copies: number;
+  readonly scale: number;
+  readonly box: number;
+}
+
+export type AxisRepeats = readonly [AxisRepeat | null, AxisRepeat | null, AxisRepeat | null];
+
+/**
+ * The part of a repeated axis a triangle belongs to, by its centroid `p` (millimetres from the
+ * piece's low face): below the zone (-1), inside it (0) or above it (1). The server holds every
+ * triangle of a repeating piece to one part, so its centroid names the part of each corner.
+ */
+export function repeatPart(repeat: AxisRepeat, p: number): -1 | 0 | 1 {
+  return p < repeat.low ? -1 : p > repeat.high ? 1 : 0;
+}
+
+/**
+ * Where a corner at `p` (millimetres from the piece's low face) of a triangle in `part` lands in its
+ * slot: below the zone in place, inside it in copy `copy` (from 0), above it after the last copy.
+ */
+export function repeatCoordinate(repeat: AxisRepeat, p: number, part: -1 | 0 | 1, copy: number): number {
+  const length = repeat.high - repeat.low;
+  if (part < 0) return p;
+  if (part > 0) return p + (repeat.copies * repeat.scale - 1) * length;
+  return repeat.low + (copy * length + (p - repeat.low)) * repeat.scale;
+}
+
+/**
+ * How many copies of a zone `length` long fill `room`, each scaled alike: the count whose scale is
+ * nearest 1 by ratio (the fewer on a tie), at most `STYLE_PACK_MAX_REPEAT_COPIES`; null when no count
+ * leaves the copies within the family's bounds.
+ */
+function repeatCopies(family: LookFamily, room: number, length: number): { readonly copies: number; readonly scale: number } | null {
+  if (!(room > 0)) return null;
+  const ideal = room / length;
+  const counts = [...new Set([Math.floor(ideal), Math.ceil(ideal)].map((n) => Math.min(STYLE_PACK_MAX_REPEAT_COPIES, Math.max(1, n))))];
+  let best: { copies: number; scale: number } | null = null;
+  for (const copies of counts) {
+    const scale = room / (copies * length);
+    if (best === null || Math.abs(Math.log(scale)) < Math.abs(Math.log(best.scale))) best = { copies, scale };
+  }
+  const ok = best!.scale * 1000 >= family.fillMinimumPermille && best!.scale * 1000 <= family.fillMaximumPermille;
+  return ok ? best : null;
 }
 
 /** FNV-1a over UTF-8: the variant a part's identity picks, the same in every runtime. */
@@ -1012,13 +1097,13 @@ export function resolveLookRole(
       for (let step = 0; step < count; step += 1) {
         const index = (first + step) % count;
         const variant = module.variants[index]!;
-        const fitted = fit(kind, variant.size_mm, slot.boxMm, variant.stretch_mm);
+        const fitted = fit(kind, variant.size_mm, slot.boxMm, variant.stretch_mm, variant.repeat_mm);
         if (fitted === null) continue;
         return {
           kind: 'module', role, variant: index,
           file: module.files.get(variant.file)!,
           lod1: variant.lod1 === null ? null : module.files.get(variant.lod1)!,
-          scale: fitted.scale, stretch: fitted.stretch, copies: fitted.copies,
+          scale: fitted.scale, stretch: fitted.stretch, repeat: fitted.repeat, copies: fitted.copies,
         };
       }
     }
@@ -1028,44 +1113,55 @@ export function resolveLookRole(
 
 /**
  * How a piece of `size` (width, depth, height) meets a slot's box (width, depth, height): uniform
- * to fit inside (contain); each axis to the box (fill), by its stretch zone where the variant states
+ * to fit inside (contain); each axis to the box (fill), by repeating its repeat zone where the
+ * variant states one, every copy within the family's bounds, by its stretch zone where it states
  * one and the box leaves the zone some length, else by scaling within the family's bounds; copies
- * along the width, each scaled to share it exactly (tile). Scales and stretches are on glTF axes:
- * x width, y height, z depth.
+ * along the width, each scaled to share it exactly (tile). Scales, stretches and repeats are on glTF
+ * axes: x width, y height, z depth.
  */
 export function fit(
   family: LookFamily,
   size: readonly [number, number, number],
   box: readonly [number, number, number],
   stretch: StylePackVariant['stretch_mm'] = [null, null, null],
-): { readonly scale: readonly [number, number, number]; readonly stretch: AxisStretches; readonly copies: number } | null {
+  repeat: StylePackVariant['repeat_mm'] = [null, null, null],
+): { readonly scale: readonly [number, number, number]; readonly stretch: AxisStretches; readonly repeat: AxisRepeats; readonly copies: number } | null {
   const [w, d, h] = size;
   const [bw, bd, bh] = box;
   const none = [null, null, null] as const;
   switch (family.fit) {
     case 'contain': {
       const s = Math.min(bw / w, bd / d, bh / h);
-      return { scale: [s, s, s], stretch: none, copies: 1 };
+      return { scale: [s, s, s], stretch: none, repeat: none, copies: 1 };
     }
     case 'fill': {
       // glTF axis order (x width, y height, z depth) over the size order (width, depth, height).
       const axes = [0, 2, 1].map((i) => {
+        const step = repeat[i]!;
+        if (step !== null) {
+          const length = step[1] - step[0];
+          const copied = repeatCopies(family, box[i]! - (size[i]! - length), length);
+          return copied === null ? null : { scale: 1, stretch: null, repeat: { low: step[0], high: step[1], copies: copied.copies, scale: copied.scale, box: box[i]! } };
+        }
         const zone = stretch[i]!;
         const length = zone === null ? 0 : box[i]! - (zone[0] + size[i]! - zone[1]);
-        if (zone !== null) return length > 0 ? { scale: 1, stretch: { low: zone[0], high: zone[1], length, box: box[i]! } } : null;
+        if (zone !== null) return length > 0 ? { scale: 1, stretch: { low: zone[0], high: zone[1], length, box: box[i]! }, repeat: null } : null;
         const scale = box[i]! / size[i]!;
         const ok = scale * 1000 >= family.fillMinimumPermille && scale * 1000 <= family.fillMaximumPermille;
-        return ok ? { scale, stretch: null } : null;
+        return ok ? { scale, stretch: null, repeat: null } : null;
       });
       if (axes.some((axis) => axis === null)) return null;
-      const [x, y, z] = axes as { scale: number; stretch: AxisStretch | null }[];
-      return { scale: [x!.scale, y!.scale, z!.scale], stretch: [x!.stretch, y!.stretch, z!.stretch], copies: 1 };
+      const [x, y, z] = axes as { scale: number; stretch: AxisStretch | null; repeat: AxisRepeat | null }[];
+      return {
+        scale: [x!.scale, y!.scale, z!.scale], stretch: [x!.stretch, y!.stretch, z!.stretch],
+        repeat: [x!.repeat, y!.repeat, z!.repeat], copies: 1,
+      };
     }
     case 'tile': {
       const copies = Math.max(1, Math.round(bw / w));
       const sx = bw / (copies * w);
       const s = Math.min(bd / d, bh / h, 1);
-      return { scale: [sx, s, s], stretch: none, copies };
+      return { scale: [sx, s, s], stretch: none, repeat: none, copies };
     }
     default:
       return null;

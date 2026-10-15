@@ -2,11 +2,14 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  STYLE_PACK_MAX_REPEAT_COPIES,
   StylePackRefusal,
   canonicalJson,
   canonicalStylePackBytes,
   fit,
   readStylePackManifest,
+  repeatCoordinate,
+  repeatPart,
   resolveLookRole,
   resolveStylePack,
   stretchCoordinate,
@@ -52,6 +55,38 @@ describe('the shared style pack cases', () => {
   it('runs a valid and a refused case of every reason', () => {
     const reasons = new Set(CASES.cases.map((c) => c.expect.refusal ?? 'valid'));
     expect([...reasons].sort()).toEqual(['duplicate', 'licence', 'range', 'reference', 'shape', 'valid']);
+  });
+});
+
+describe('a variant that repeats a zone', () => {
+  const base = CASES.cases[0]!;
+  const window = (stretch: unknown, repeat: unknown): unknown => {
+    const manifest = structuredClone(base.manifest) as { modules: Record<string, { variants: Record<string, unknown>[] }> };
+    Object.assign(manifest.modules['window.default']!.variants[0]!, { stretch_mm: stretch, repeat_mm: repeat });
+    return manifest;
+  };
+  const refusal = (manifest: unknown): { reason: string; path: string } | null => {
+    try {
+      readStylePackManifest(manifest, context);
+      return null;
+    } catch (error) {
+      if (!(error instanceof StylePackRefusal)) throw error;
+      return { reason: error.reason, path: error.path };
+    }
+  };
+  it('is read on a fill family, and a variant stating none keeps its bytes', () => {
+    const read = readStylePackManifest(window([null, [40, 80], null], [[60, 940], null, [60, 1540]]), context);
+    expect(read.modules['window.default']!.variants[0]!.repeat_mm).toEqual([[60, 940], null, [60, 1540]]);
+    expect(sha256(canonicalStylePackBytes(readStylePackManifest(base.manifest, context)))).toBe(base.expect.sha256);
+  });
+  it('is refused as the Python reader refuses it, by reason and path', () => {
+    const car = structuredClone(base.manifest) as { modules: Record<string, { variants: Record<string, unknown>[] }> };
+    car.modules['vehicle.car']!.variants[0]!['repeat_mm'] = [[500, 3700], null, null];
+    expect(refusal(car)).toEqual({ reason: 'reference', path: 'modules.vehicle.car.variants[0].repeat_mm' });
+    expect(refusal(window([null, [40, 80], null], [[60, 1100], null, null]))).toEqual({ reason: 'range', path: 'modules.window.default.variants[0].repeat_mm[0]' });
+    expect(refusal(window([null, [40, 80], null], [[500, 500], null, null]))).toEqual({ reason: 'range', path: 'modules.window.default.variants[0].repeat_mm[0]' });
+    expect(refusal(window([null, [40, 80], null], [null, [40, 80], null]))).toEqual({ reason: 'shape', path: 'modules.window.default.variants[0].repeat_mm[1]' });
+    expect(refusal(window([null, [40, 80], null], [[60, 940]]))).toEqual({ reason: 'shape', path: 'modules.window.default.variants[0].repeat_mm' });
   });
 });
 
@@ -145,17 +180,17 @@ describe('fitting a piece to a slot', () => {
   const fill: LookFamily = { fit: 'fill', dressing: 'module', fillMinimumPermille: 800, fillMaximumPermille: 1250 };
   const tile: LookFamily = { fit: 'tile', dressing: 'module', fillMinimumPermille: 0, fillMaximumPermille: 0 };
   it('contains uniformly by the tightest axis', () => {
-    expect(fit(contain, [2000, 1000, 1000], [1000, 1000, 1000])).toEqual({ scale: [0.5, 0.5, 0.5], stretch: [null, null, null], copies: 1 });
+    expect(fit(contain, [2000, 1000, 1000], [1000, 1000, 1000])).toEqual({ scale: [0.5, 0.5, 0.5], stretch: [null, null, null], repeat: [null, null, null], copies: 1 });
   });
   it('fills each axis within 0.8 to 1.25, else refuses', () => {
-    expect(fit(fill, [1000, 100, 2000], [1200, 100, 1800])).toEqual({ scale: [1.2, 0.9, 1], stretch: [null, null, null], copies: 1 });
+    expect(fit(fill, [1000, 100, 2000], [1200, 100, 1800])).toEqual({ scale: [1.2, 0.9, 1], stretch: [null, null, null], repeat: [null, null, null], copies: 1 });
     expect(fit(fill, [1000, 100, 2000], [1300, 100, 1800])).toBeNull();
     expect(fit(fill, [1000, 100, 2000], [1000, 79, 2000])).toBeNull();
   });
   it('stretches a stated zone to any length the slot leaves it, and scales the other axes within bounds', () => {
     // Width stretches between 100 and 900; depth and height scale.
     expect(fit(fill, [1000, 100, 2000], [3000, 110, 1800], [[100, 900], null, null])).toEqual({
-      scale: [1, 0.9, 1.1], stretch: [{ low: 100, high: 900, length: 2800, box: 3000 }, null, null], copies: 1,
+      scale: [1, 0.9, 1.1], stretch: [{ low: 100, high: 900, length: 2800, box: 3000 }, null, null], repeat: [null, null, null], copies: 1,
     });
     // A slot narrower than the fixed 200 mm, or exactly that, leaves the zone no length.
     expect(fit(fill, [1000, 100, 2000], [200, 100, 2000], [[100, 900], null, null])).toBeNull();
@@ -166,8 +201,44 @@ describe('fitting a piece to a slot', () => {
     const stretch = { low: 100, high: 900, length: 2800, box: 3000 };
     expect([0, 100, 500, 900, 1000].map((p) => stretchCoordinate(stretch, p))).toEqual([0, 100, 1500, 2900, 3000]);
   });
+  it('repeats a zone as many whole times as leaves each copy nearest its own size, within bounds', () => {
+    // A 5 m piece whose middle 3.8 m repeats (600 mm ends): 20 m leaves 18.8 m, 4.95 zones, so five
+    // copies at 0.989 rather than four at 1.237; depth and height scale.
+    const fitted = fit(fill, [5000, 100, 2000], [20000, 110, 1800], [null, null, null], [[600, 4400], null, null])!;
+    expect(fitted.scale).toEqual([1, 0.9, 1.1]);
+    expect(fitted.stretch).toEqual([null, null, null]);
+    expect(fitted.repeat[0]).toMatchObject({ low: 600, high: 4400, copies: 5, box: 20000 });
+    expect(fitted.repeat[0]!.scale).toBeCloseTo(18800 / 19000, 12);
+    expect(fitted.repeat.slice(1)).toEqual([null, null]);
+    // Height repeats on glTF y: size and box index 2.
+    expect(fit(fill, [5000, 100, 2000], [5000, 100, 6000], [null, null, null], [null, null, [500, 1500]])!.repeat)
+      .toMatchObject([null, { copies: 5, scale: 1 }, null]);
+    // A box no larger than the fixed ends leaves the zone no room; one copy at half its size is past the bound.
+    expect(fit(fill, [5000, 100, 2000], [1200, 100, 2000], [null, null, null], [[600, 4400], null, null])).toBeNull();
+    expect(fit(fill, [5000, 100, 2000], [3200, 100, 2000], [null, null, null], [[600, 4400], null, null])).toBeNull();
+    // The repeat leaves the other axes to their own rule: 1300 deep against 100 is still refused.
+    expect(fit(fill, [5000, 100, 2000], [20000, 1300, 2000], [null, null, null], [[600, 4400], null, null])).toBeNull();
+  });
+  it('draws a zone at most the profile\'s number of times', () => {
+    // A 100 mm zone in 7 m of room takes the most copies, 64, each 1.094 long; in 10 m, 64 would be 1.56: refused.
+    expect(fit(fill, [300, 100, 2000], [7200, 100, 2000], [null, null, null], [[100, 200], null, null])!.repeat[0])
+      .toMatchObject({ copies: STYLE_PACK_MAX_REPEAT_COPIES });
+    expect(fit(fill, [300, 100, 2000], [10200, 100, 2000], [null, null, null], [[100, 200], null, null])).toBeNull();
+  });
+  it('places each part of a repeated axis: below in place, each copy along, above after the last', () => {
+    const repeat = { low: 600, high: 4400, copies: 5, scale: 18800 / 19000, box: 20000 };
+    expect([0, 599, 600, 4400, 4401].map((p) => repeatPart(repeat, p))).toEqual([-1, -1, 0, 0, 1]);
+    expect(repeatCoordinate(repeat, 0, -1, 0)).toBe(0);
+    expect(repeatCoordinate(repeat, 600, 0, 0)).toBeCloseTo(600, 9);
+    // The last copy's high edge and the part above it meet at the same place: no gap, no overlap.
+    expect(repeatCoordinate(repeat, 4400, 0, 4)).toBeCloseTo(19400, 9);
+    expect(repeatCoordinate(repeat, 4400, 1, 0)).toBeCloseTo(19400, 9);
+    expect(repeatCoordinate(repeat, 5000, 1, 0)).toBeCloseTo(20000, 9);
+    // Copy k's low edge is copy k-1's high edge.
+    expect(repeatCoordinate(repeat, 600, 0, 3)).toBeCloseTo(repeatCoordinate(repeat, 4400, 0, 2), 9);
+  });
   it('tiles copies along the width, each scaled to share it exactly', () => {
     // 4,500 mm of fence from 1,000 mm panels: 5 copies (4.5 rounds to 5... by Math.round: 5), each 0.9 wide.
-    expect(fit(tile, [1000, 50, 1200], [4500, 50, 1200])).toEqual({ scale: [0.9, 1, 1], stretch: [null, null, null], copies: 5 });
+    expect(fit(tile, [1000, 50, 1200], [4500, 50, 1200])).toEqual({ scale: [0.9, 1, 1], stretch: [null, null, null], repeat: [null, null, null], copies: 5 });
   });
 });

@@ -4,9 +4,11 @@ An upload is admitted on everything that needs no accessor data (:mod:`exulanica
 .style_pack_admission`). What does, reading every vertex colour of every piece, runs here: the
 check worker claims a waiting version's check, reads each listed piece from the workspace's own
 namespace, and holds every triangle to one colour of the pack's palette, or of a pack in its base
-chain, through :func:`exulanica.world.style_pack_pieces.read_palette_piece`. A textured piece is
-read through :func:`~exulanica.world.style_pack_pieces.read_textured_piece` instead: it is drawn in
-its own images, not the palette. A version passes and becomes ready, or fails ``refused`` naming
+chain, through :func:`exulanica.world.style_pack_pieces.read_palette_piece`, and a palette piece
+whose variant repeats a zone to that zone
+(:func:`~exulanica.world.style_pack_pieces.check_repeat_zones`). A textured piece is read through
+:func:`~exulanica.world.style_pack_pieces.read_textured_piece` instead: it is drawn in its own
+images, not the palette. A version passes and becomes ready, or fails ``refused`` naming
 the piece and what it found, or ``interrupted`` when its time bound ran out, which a repeat of the
 upload may ask again. It runs in the asset preparation
 process (:mod:`exulanica.world.asset_preparation_command`), which holds the runtime role, the
@@ -35,6 +37,7 @@ from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.style_pack_pieces import (
     PieceOutOfBounds,
     StylePieceRefused,
+    check_repeat_zones,
     hold_pieces,
     is_textured_piece,
     piece_roles,
@@ -158,6 +161,12 @@ def check_version(
         return "base_unavailable", "a pack this one is drawn on could not be read", {}
     report: dict[str, Any] = {"pieces": {}}
     read: dict[str, bytes] = {}
+    # Each piece's variant, for the zones a palette piece repeats.
+    variants = (
+        {}
+        if record.manifest_canonical is None
+        else piece_roles(json.loads(record.manifest_canonical))
+    )
     if record.origin == "generated":
         held = _hold_generated(
             repository,
@@ -195,6 +204,8 @@ def check_version(
                 }
                 continue
             piece = read_palette_piece(data, table)
+            if file.path in variants:
+                check_repeat_zones(data, variants[file.path][1])
         except StylePieceRefused as refused:
             return "refused", f"{file.path}: {refused.reason}: {refused}", report
         foreign = sorted(piece.colours - palette)

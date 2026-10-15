@@ -948,6 +948,9 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                                     # Added within the profile: the share of a wind's sway the
                                     # variant's pieces take; absent, the whole of it.
                                     "sway_permille": _Optional(_integer(0, 4000)),
+                                    # Added within the profile: a variant that repeats nothing
+                                    # states none.
+                                    "repeat_mm": _Optional(stretch),
                                 },
                             ),
                             1,
@@ -1105,6 +1108,20 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             for axis, z in enumerate(variant["stretch_mm"]):
                 if z is not None and not z[0] < z[1] <= variant["size_mm"][axis]:
                     _fail("range", f"{where}[{axis}]", "must lie within the piece, low below high")
+            repeat = variant.get("repeat_mm")
+            if repeat is not None:
+                where = f"modules.{role}.variants[{index}].repeat_mm"
+                if any(z is not None for z in repeat) and (family is None or family.fit != "fill"):
+                    _fail("reference", where, "repeats only a piece of a fill family")
+                for axis, z in enumerate(repeat):
+                    if z is None:
+                        continue
+                    if not z[0] < z[1] <= variant["size_mm"][axis]:
+                        _fail(
+                            "range", f"{where}[{axis}]", "must lie within the piece, low below high"
+                        )
+                    if variant["stretch_mm"][axis] is not None:
+                        _fail("shape", f"{where}[{axis}]", "an axis stretches or repeats, not both")
     preview = manifest.get("preview")
     if preview is not None:
         if preview not in listed:
@@ -1204,12 +1221,13 @@ def load_context(root: Path) -> StylePackContext:
     """Legacy families, retained appearance catalogs and texture ids from trusted ``root``.
 
     Only these explicit retained filenames are registered, never a manifest-supplied path or a
-    latest-version glob. The optional v2 file allows minimal legacy fixture roots to keep working.
+    latest-version glob. The optional v2 and v3 files allow minimal legacy fixture roots to keep
+    working.
     """
     catalogs: dict[int, LookFamilyCatalog] = {}
-    for version in (1, 2):
+    for version in (1, 2, 3):
         path = root / f"assets/catalogs/world-kinds/look-family.v{version}.json"
-        if version == 2 and not path.exists():
+        if version > 1 and not path.exists():
             continue
         raw = path.read_bytes()
         catalog = json.loads(raw)

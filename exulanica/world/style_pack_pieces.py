@@ -16,7 +16,9 @@ steps, so nothing a piece carries is hidden and nothing expensive runs in a requ
    browser's reader does (``web/packages/atlas-core/src/style-piece.ts``): one primitive of
    triangles with ``POSITION``, ``NORMAL`` and ``COLOR_0`` (``VEC4`` unsigned-short normalized,
    alpha 65535, each RGB a value of the colour table ``exulanica.srgb8-linear16/v1``), and each
-   triangle one colour. The caller holds the colours to the pack's palette.
+   triangle one colour. The caller holds the colours to the pack's palette, and a palette piece
+   whose variant repeats a zone to that zone (:func:`check_repeat_zones`: no triangle crosses its
+   edges, so the copies the page draws join without a crack).
 
 A piece whose container holds images is a textured piece (``docs/style-pack-contract.md``,
 section 4): one mesh drawn by one node with no transform, each primitive triangles with float
@@ -30,8 +32,8 @@ the accessor data the way the browser's reader does
 
 Both refuse with :class:`StylePieceRefused`, by reason and message. :func:`hold_pieces` holds each
 piece a manifest lists to the profile and its family's budget (a textured piece's images to the
-family's texture side, its variant to no stretch zone, its second level textured too, and the
-pack's pictures, its textures' and its pieces', to the shared count), the one place both the
+family's texture side, its variant to no stretch or repeat zone, its second level textured too, and
+the pack's pictures, its textures' and its pieces', to the shared count), the one place both the
 upload's admission and the check of a look made of generated pieces ask it.
 """
 
@@ -59,6 +61,7 @@ __all__ = [
     "StylePieceRefused",
     "TexturedPiece",
     "check_piece_profile",
+    "check_repeat_zones",
     "hold_pieces",
     "is_textured_piece",
     "piece_roles",
@@ -68,6 +71,9 @@ __all__ = [
 
 #: A name or a generator, at most, in characters.
 NAME_MAX: Final = 64
+#: How far, in metres, a corner may lie past a repeat zone's edge and its triangle still count as on
+#: one side: half a millimetre, below the millimetre a zone is stated in.
+REPEAT_EDGE_TOLERANCE_M: Final = 0.0005
 
 _FLOAT: Final = 5126
 _USHORT: Final = 5123
@@ -343,6 +349,12 @@ def hold_pieces(
                     "a textured piece states no stretch zone: it is drawn whole",
                     path,
                 )
+            if any(zone is not None for zone in variant.get("repeat_mm") or ()):
+                raise PieceOutOfBounds(
+                    "style_pack_piece_refused",
+                    "a textured piece states no repeat zone: it is drawn whole",
+                    path,
+                )
             embedded += len(profile.image_sizes)
         measured[path] = profile.triangles
     try:
@@ -490,6 +502,56 @@ def read_palette_piece(payload: bytes, table: Sequence[int]) -> PalettePiece:
     if not used:
         raise _refuse("not_a_palette_piece", "a palette piece holds at least one triangle")
     return PalettePiece(triangles=len(corners) // 3, colours=frozenset(used))
+
+
+def check_repeat_zones(payload: bytes, variant: Mapping[str, Any]) -> None:
+    """Hold a palette piece to its variant's repeat zones: on each axis that repeats, every triangle
+    lies wholly below the zone, inside it or above it, within :data:`REPEAT_EDGE_TOLERANCE_M`.
+
+    The page draws a zone's triangles once a copy and moves what lies above it, choosing each
+    triangle's part by its centroid, so a triangle across an edge would be torn between copies. The
+    zone is millimetres from the piece's low face on the axis (``size_mm``'s order: width, depth,
+    height); the piece is glTF metres, +Y up, centred on X and Z, its base on Y = 0. The payload is
+    a piece :func:`read_palette_piece` has read."""
+    repeat = variant.get("repeat_mm")
+    if repeat is None or all(zone is None for zone in repeat):
+        return
+    document, bin_chunk = _glb_chunks(payload, "not_a_palette_piece")
+    primitive = document["meshes"][0]["primitives"][0]
+    accessors = document["accessors"]
+    views = document["bufferViews"]
+
+    def data(item: Mapping[str, Any], size: int) -> bytes:
+        view = views[item["bufferView"]]
+        start = int(view.get("byteOffset", 0)) + int(item.get("byteOffset", 0))
+        return bin_chunk[start : start + int(item["count"]) * size]
+
+    position = accessors[primitive["attributes"]["POSITION"]]
+    indices = accessors[primitive["indices"]]
+    points = struct.unpack(f"<{int(position['count']) * 3}f", data(position, 12))
+    index_format = "H" if indices["componentType"] == _USHORT else "I"
+    corners = struct.unpack(
+        f"<{indices['count']}{index_format}", data(indices, 2 if index_format == "H" else 4)
+    )
+    width, depth, _height = variant["size_mm"]
+    # size_mm's axes (width, depth, height) on glTF x, z and y, each from the piece's low face.
+    for axis, (component, low_face, name) in enumerate(
+        ((0, -width / 2000, "width"), (2, -depth / 2000, "depth"), (1, 0.0, "height"))
+    ):
+        zone = repeat[axis]
+        if zone is None:
+            continue
+        edges = (low_face + zone[0] / 1000, low_face + zone[1] / 1000)
+        for first in range(0, len(corners), 3):
+            values = [points[corners[first + k] * 3 + component] for k in range(3)]
+            least, most = min(values), max(values)
+            for edge in edges:
+                if least < edge - REPEAT_EDGE_TOLERANCE_M and most > edge + REPEAT_EDGE_TOLERANCE_M:
+                    raise _refuse(
+                        "crosses_repeat_zone",
+                        f"triangle {first // 3} crosses the {name} repeat zone's edge at "
+                        f"{round((edge - low_face) * 1000)} mm",
+                    )
 
 
 def _glb_chunks(payload: bytes, not_a: str) -> tuple[dict[str, Any], bytes]:

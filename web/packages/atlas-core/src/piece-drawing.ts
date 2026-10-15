@@ -1,5 +1,5 @@
 /**
- * How textured pieces are drawn: the figures their instanced drawing spends, beside the render budget.
+ * How pieces are drawn: the figures their drawing spends, beside the render budget.
  *
  * A textured piece (`textured-piece.ts`) is drawn instanced: the pieces of one file stand in square
  * cells of the ground, each cell drawn at one level of detail, chosen by its distance from the
@@ -16,6 +16,9 @@
  *   camera; the second level never casts. Shadows are the costliest part of cut-out leaves.
  * - `cellSizeM`: the side of a cell; each cell is one draw per piece, level and material, culled by
  *   its own bounds in the camera and in each shadow cascade.
+ * - `repeatedTrianglesMost`: a palette piece that repeats its bays or storeys to meet a slot
+ *   (`repeat_mm`) is baked copy by copy; a slot whose copies would bake more triangles than this
+ *   keeps the engine's own primitive, so no box asks the bake for more than a few whole pieces.
  *
  * The render budget catalog will state these per scene form (MOTION's version); until it does, a
  * caller passes none and the defaults hold. Pure: no DOM, no renderer.
@@ -26,6 +29,7 @@ export interface PieceDrawing {
   readonly hysteresisPermille: number;
   readonly shadowReachM: number;
   readonly cellSizeM: number;
+  readonly repeatedTrianglesMost: number;
 }
 
 /** Today's figures, each with its reason. */
@@ -41,6 +45,9 @@ export const PIECE_DRAWING_DEFAULTS: PieceDrawing = Object.freeze({
   // draws at a near view, 128 m 52 cells and 554, 256 m 25 cells and 496 with more triangles near
   // the camera; 128 m holds a site in a few cells and still culls what lies behind the camera.
   cellSizeM: 128,
+  // Four structure pieces at their family's budget (20,000 triangles each). A 36 m block of five
+  // storeys over a ground storey and nine bays bakes about 4,000; a forty-storey tower about 12,000.
+  repeatedTrianglesMost: 80_000,
 });
 
 /** The range each figure may take. */
@@ -49,6 +56,7 @@ export const PIECE_DRAWING_RANGES = Object.freeze({
   hysteresisPermille: Object.freeze({ least: 0, most: 500 }),
   shadowReachM: Object.freeze({ least: 0, most: 400 }),
   cellSizeM: Object.freeze({ least: 8, most: 512 }),
+  repeatedTrianglesMost: Object.freeze({ least: 0, most: 1_000_000 }),
 });
 
 /**
