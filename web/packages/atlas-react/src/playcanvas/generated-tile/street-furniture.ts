@@ -13,7 +13,7 @@
  * east and south, so a record's `y` and its direction's `dy` change sign on the way out, as
  * `tileToRenderer` does for the scene.
  */
-import { decodeOwd } from '@exulanica/loom-tess/core';
+import { decodedContainer } from './decoded-container.js';
 
 /** The record kind a tile states its street furniture under. */
 export const STREET_FURNITURE_KIND = 'city.street_furniture';
@@ -47,7 +47,7 @@ const whole = (value: unknown): number | null => (typeof value === 'number' && N
  */
 export function streetFurnitureOf(bytes: Uint8Array): StatedStreetFurniture[] {
   const furniture = new Map<string, StatedStreetFurniture>();
-  for (const record of decodeOwd(bytes).header.records) {
+  for (const record of decodedContainer(bytes).header.records) {
     if (record.kind !== STREET_FURNITURE_KIND || record.identity === '' || furniture.has(record.identity)) continue;
     const fields = record.fields;
     const x = whole(fields['x_mm']), y = whole(fields['y_mm']);
@@ -89,7 +89,7 @@ export interface StatedDoor {
  * lot, not a footway, and is left out, as is a record that states no threshold.
  */
 export function doorsOf(bytes: Uint8Array): StatedDoor[] {
-  return doorsOfRecords(decodeOwd(bytes).header.records);
+  return doorsOfRecords(decodedContainer(bytes).header.records);
 }
 
 /** The same of a tile's records as read: `doorsOf` is this over a container's own. */
@@ -119,7 +119,7 @@ export const STREET_TREE_KIND = 'city.street_tree';
  * the parts and above each record's own base, so no kind of furniture is named here.
  */
 export function sightBlockersOf(bytes: Uint8Array, heightMm: number): (readonly (readonly [number, number])[])[] {
-  return sightBlockersOfRecords(decodeOwd(bytes).header.records, heightMm);
+  return sightBlockersOfRecords(decodedContainer(bytes).header.records, heightMm);
 }
 
 /** The same of a tile's records as read: `sightBlockersOf` is this over a container's own. */

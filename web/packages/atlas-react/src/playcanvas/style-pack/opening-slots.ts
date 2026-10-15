@@ -1,4 +1,5 @@
-import { decodeOwd, facadeFrame, facadeOpenings, faceLayout, type FacadeFields, type MassingFields } from '@exulanica/loom-tess/core';
+import { facadeFrame, facadeOpenings, faceLayout, type FacadeFields, type MassingFields } from '@exulanica/loom-tess/core';
+import { decodedContainer } from '../generated-tile/decoded-container.js';
 
 /**
  * Where a town's windows are: one slot per opening a facade cuts, for whatever dresses it.
@@ -87,5 +88,5 @@ export function openingSlots(records: readonly SlotRecord[]): OpeningSlot[] {
 
 /** The window slots of the facades each tile container owns, read with the tessellator's own decoder. */
 export function containerOpeningSlots(containers: readonly Uint8Array[]): OpeningSlot[] {
-  return openingSlots(containers.flatMap((bytes) => decodeOwd(bytes).header.records));
+  return openingSlots(containers.flatMap((bytes) => decodedContainer(bytes).header.records));
 }

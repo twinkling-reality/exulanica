@@ -242,8 +242,10 @@ its version (`GET /world/versions/{version_id}/tiles/{tile_id}/bytes`), are held
 is decoded, which checks its layout, and is not baked a third time on the page: that bake was most of
 the wait before a town appeared, about 11 s a tile on the development machine under load. What the page
 then no longer checks itself is that the geometry it decoded is what the tile's records bake to; the
-server's agreeing bakes are what say so. Either way there is no second reader and nothing is
-repaired. The container is tess's `owd/3`. It refuses a page with no `crypto.subtle`, a tile that
+server's agreeing bakes are what say so. A page decodes each container once and its readers share
+that decode: the street furniture, doors, sight blockers and a look's window slots read from it, and so
+does the runtime for a tile held by agreeing server bakes (`decoded-container.ts`). Either way there is
+no second reader and nothing is repaired. The container is tess's `owd/3`. It refuses a page with no `crypto.subtle`, a tile that
 fails verification or does not decode, a grammar frame other than `city_local` (section 5 has the
 capsule it also reads), and a tile with no `render_batch`, no surface coordinates or no drawn range.
 

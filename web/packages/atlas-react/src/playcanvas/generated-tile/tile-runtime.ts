@@ -7,7 +7,6 @@ import {
   OwdError,
   absoluteSurfaceCoordinates,
   absoluteVertices,
-  decodeOwd,
   verifyOwd,
   type DecodedOwd,
   type DecodedProjection,
@@ -24,6 +23,7 @@ import type {
   GeneratedTileMetrics,
   GeneratedTileMount,
 } from './binding-contract.js';
+import { decodedContainer } from './decoded-container.js';
 import { applyTileEnvironment } from './environment.js';
 import { budgetedLook } from './budgeted-look.js';
 import { obstructionRings, type ObstructionRings } from './obstruction-rings.js';
@@ -564,7 +564,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   }
   const sha256 = async (bytes: Uint8Array): Promise<string> => hexOf(await digest.digest('SHA-256', bytes));
   const held = async (bytes: Uint8Array): Promise<DecodedOwd> =>
-    (sources.proof === 'agreeing-server-bakes' ? decodeOwd(bytes) : verifyOwd(bytes, sha256));
+    (sources.proof === 'agreeing-server-bakes' ? decodedContainer(bytes) : verifyOwd(bytes, sha256));
   let decoded: DecodedOwd;
   try {
     decoded = await held(sources.bytes);
