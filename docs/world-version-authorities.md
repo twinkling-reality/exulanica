@@ -24,7 +24,7 @@ planes separate. The browser half of appearance is the
 | Authority | Implementation | Current pointer |
 | --- | --- | --- |
 | Structure | migration `0020_durable_spatial_authority.sql`, `exulanica/world/structure.py`, `exulanica/world/structure_repository.py` | `world_structure_state` |
-| Appearance | migrations `0017_adaptive_world_styles.sql`, `0023_frontend_world_recipe_contract.sql` and `0111_an_open_style_preview_expires.sql`, `exulanica/world/repository.py`, `exulanica/world/style-registry.v1.json` | `world_style_state` |
+| Appearance | migrations `0017_adaptive_world_styles.sql`, `0023_frontend_world_recipe_contract.sql` and `0111_an_open_style_preview_expires.sql`, `exulanica/world/repository.py` and its parts `style_repository_packs.py`, `style_repository_checks.py` and `style_repository_sources.py`, `exulanica/world/style-registry.v1.json` | `world_style_state` |
 | Comfort settings | migration `0021_interaction_policy_versions.sql`, `exulanica/world/interaction.py`, `exulanica/world/interaction_repository.py`, `exulanica/world/interaction-policy-registry.v1.json` | `world_interaction_policy_state` |
 
 All three follow the same rules:

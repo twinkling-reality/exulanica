@@ -62,7 +62,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         2_257,
         "a visual gate record built from measured inputs",
     ),
-    "exulanica/world/repository.py": (2_225, "protected world topology and appearance versions"),
     "exulanica/graph/reconstruction_scenes.py": (
         2_185,
         "validated multi-photograph reconstruction scenes for the graph snapshot",

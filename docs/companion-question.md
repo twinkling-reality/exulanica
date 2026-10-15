@@ -597,9 +597,9 @@ evidence and its form has no field for a reference, under its own prompt version
 (`proposal-authored-1`, so the evidence drafter's measured wording and `proposal-4` are unchanged).
 The proposal and the version applied from it record the basis (`appearance_basis`). The world style
 authority refuses a Companion proposal drawn from evidence without a reference and a design choice
-with any (`_validate_proposal_provenance` in `exulanica/world/repository.py`), and migration 0128's
-check holds the same rule in the database, so choosing a basis in a request cannot bypass either
-rule. Other origins state no basis.
+with any (`_validate_proposal_provenance` in `exulanica/world/style_repository_checks.py`), and
+migration 0128's check holds the same rule in the database, so choosing a basis in a request cannot
+bypass either rule. Other origins state no basis.
 
 The drafter's schema derives from the registry's profiles, controls, ranges and choices. It states
 each range control as the values on its grid rather than as a number between two bounds: as a
