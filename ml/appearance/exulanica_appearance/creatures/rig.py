@@ -35,6 +35,7 @@ from exulanica_appearance.creatures.geometry import voxel_inside
 
 __all__ = [
     "CHAIN_ROLES",
+    "FITTED_TOLERANCE_VOXELS",
     "INSIDE_SHARE",
     "JOINT_MOVE_SHARE",
     "LEAKED_SHARE",
@@ -65,6 +66,10 @@ INSIDE_SHARE: Final = 0.75
 #: A fitted joint may lie at most this share of its bone's length from the plan's (two voxels at
 #: least): further, and the mesh's limb is not where the plan put it.
 JOINT_MOVE_SHARE: Final = 0.5
+
+#: For a fitted skeleton, a joint or a point along a bone within this many voxels of the inside
+#: counts as inside.
+FITTED_TOLERANCE_VOXELS: Final = 2
 
 _INFLUENCES: Final = 4
 #: Chamfer costs for a face, edge and corner neighbour: thirds of a voxel, within eight per cent of
@@ -142,6 +147,21 @@ def _chamfer_depth(grid: np.ndarray) -> np.ndarray:
                 view[better] = candidate[better]
                 changed = True
     return distance / 3.0
+
+
+def _grown(inside: Inside, voxels: int) -> Inside:
+    """The inside grown by ``voxels`` toward each voxel's face neighbours."""
+    grid = inside.grid
+    for _ in range(voxels):
+        grown = grid.copy()
+        grown[1:] |= grid[:-1]
+        grown[:-1] |= grid[1:]
+        grown[:, 1:] |= grid[:, :-1]
+        grown[:, :-1] |= grid[:, 1:]
+        grown[:, :, 1:] |= grid[:, :, :-1]
+        grown[:, :, :-1] |= grid[:, :, 1:]
+        grid = grown
+    return Inside(grid, inside.origin, inside.voxel, inside.depth)
 
 
 def inside_of(positions: np.ndarray, triangles: np.ndarray, voxel: float) -> Inside:
@@ -442,12 +462,22 @@ def check_rig(
     chains: Sequence[Mapping[str, Any]],
     inside: Inside,
     size: float,
+    fitted: bool = False,
 ) -> RigChecks:
     """Every rule of the rig, or :class:`RigRefused` naming the first it breaks. Every measure is
     taken whichever rule breaks, and a refusal carries them all, so a refused rig's record says
     how far from the plan it was and not only where it first failed. ``plan_joints`` are the
     plan's rest joints, ``joints`` and ``ends`` the fitted ones, ``size`` the body's largest
-    extent (metres)."""
+    extent (metres).
+
+    ``fitted`` is a skeleton laid in a model made from a picture (``embed.py``) rather than the
+    plan's joints moved into a model made inside the plan's sketch: its joints are where the
+    model's limbs are, so their distance from the plan's is measured and not judged; a joint or a
+    bone's point counts as inside within FITTED_TOLERANCE_VOXELS of the inside, as a limb one or
+    two voxels across holds the straight bone laid down it only so; and a limb moves the body when
+    any bone of its chain does, as a plan's long chain laid along a short limb leaves bones too
+    short to hold any vertex alone."""
+    held = inside if not fitted else _grown(inside, FITTED_TOLERANCE_VOXELS)
     broken: list[tuple[str, str]] = []
     if indices.shape[1] > _INFLUENCES or not np.allclose(weights.sum(axis=1), 1.0, atol=1e-3):
         broken.append(("rig_weights_not_whole", "four influences a vertex, summing to one"))
@@ -456,12 +486,12 @@ def check_rig(
     moved_m: dict[str, float] = {}
     for bone in bones:
         point = np.asarray(joints[bone], dtype=np.float64)
-        if not inside.holds(point[None])[0]:
+        if not held.holds(point[None])[0]:
             broken.append(("rig_joint_outside", f"joint {bone} lies outside the body"))
         planned = np.asarray(plan_joints[bone], dtype=np.float64)
         moved_m[bone] = float(np.linalg.norm(point - planned))
         bone_length = float(np.linalg.norm(np.asarray(ends[bone], dtype=np.float64) - point))
-        if moved_m[bone] > max(JOINT_MOVE_SHARE * bone_length, 2 * inside.voxel):
+        if not fitted and moved_m[bone] > max(JOINT_MOVE_SHARE * bone_length, 2 * inside.voxel):
             broken.append(
                 (
                     "rig_joint_far_from_plan",
@@ -473,7 +503,7 @@ def check_rig(
         start = np.asarray(joints[bone], dtype=np.float64)
         end = np.asarray(ends[bone], dtype=np.float64)
         samples = start + (end - start) * (np.arange(9)[:, None] / 8)
-        inside_share[bone] = float(inside.holds(samples).mean())
+        inside_share[bone] = float(held.holds(samples).mean())
         if inside_share[bone] < INSIDE_SHARE:
             broken.append(("rig_bone_outside", f"bone {bone} lies mostly outside the body"))
     moved_vertices = {
@@ -482,6 +512,12 @@ def check_rig(
     }
     for chain in chains:
         if chain["role"] not in CHAIN_ROLES:
+            continue
+        if fitted:
+            if all(moved_vertices[bone] == 0 for bone in chain["bones"]):
+                broken.append(
+                    ("rig_bone_moves_nothing", f"chain {chain['key']} moves none of the body")
+                )
             continue
         for bone in chain["bones"]:
             if moved_vertices[bone] == 0:

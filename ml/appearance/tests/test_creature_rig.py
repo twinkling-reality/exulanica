@@ -16,6 +16,7 @@ import pytest
 from exulanica_appearance.creatures.geometry import voxel_inside, voxel_surface
 from exulanica_appearance.creatures.rig import (
     CHAIN_ROLES,
+    FITTED_TOLERANCE_VOXELS,
     LEAKED_SHARE,
     RigRefused,
     _laplacian,
@@ -107,7 +108,7 @@ def _rig(boxes=BOXES):
     return positions, faces, inside, joints, ends, indices, weights
 
 
-def _check(positions, inside, joints, ends, indices, weights):
+def _check(positions, inside, joints, ends, indices, weights, *, fitted=False):
     return check_rig(
         positions=positions,
         indices=indices,
@@ -120,6 +121,7 @@ def _check(positions, inside, joints, ends, indices, weights):
         chains=CHAINS,
         inside=inside,
         size=SIZE,
+        fitted=fitted,
     )
 
 
@@ -191,6 +193,41 @@ def test_weights_that_leave_a_limb_bone_nothing_are_refused(rigged):
     whole[:, 0] = 1.0
     with pytest.raises(RigRefused, match="rig_bone_moves_nothing"):
         _check(positions, inside, joints, ends, rooted, whole)
+
+
+def test_a_fitted_skeleton_is_measured_against_the_plan_not_judged_and_held_within_two_voxels(
+    rigged,
+):
+    positions, _faces, inside, joints, ends, indices, weights = rigged
+    # The knee 25 mm past its leg's side (the leg is 100 mm across), within the two voxels of 20 mm
+    # a straight bone laid down a model's thin limb can stray: refused for a plan-guided rig, held
+    # for a fitted one.
+    off = np.array([0.075, 0.0, 0.0])
+    moved = dict(joints, leg1Left2=joints["leg1Left2"] + off)
+    moved_ends = dict(ends, leg1Left1=ends["leg1Left1"] + off)
+    assert 0.075 - 0.05 < FITTED_TOLERANCE_VOXELS * VOXEL
+    with pytest.raises(
+        RigRefused, match="rig_joint_outside|rig_joint_far_from_plan|rig_bone_outside"
+    ):
+        _check(positions, inside, moved, moved_ends, indices, weights)
+    checks = _check(positions, inside, moved, moved_ends, indices, weights, fitted=True)
+    # Its distance from the plan is still measured and recorded.
+    assert checks.joint_moved_m["leg1Left2"] > 0.07
+
+
+def test_a_fitted_chain_moves_the_body_when_any_of_its_bones_does(rigged):
+    positions, _faces, inside, joints, ends, indices, weights = rigged
+    # Every vertex the knee's bone held handed to the hip's: the knee's bone moves nothing alone.
+    knee, hip = NAMES.index("leg1Left2"), NAMES.index("leg1Left1")
+    handed = np.where(indices == knee, hip, indices)
+    with pytest.raises(RigRefused, match="rig_bone_moves_nothing: bone leg1Left2"):
+        _check(positions, inside, joints, ends, handed, weights)
+    _check(positions, inside, joints, ends, handed, weights, fitted=True)
+    # A chain none of whose bones moves anything is refused by name, fitted or not.
+    body = NAMES.index("hips")
+    nothing = np.where((indices == knee) | (indices == hip), body, indices)
+    with pytest.raises(RigRefused, match="rig_bone_moves_nothing: chain leg1Left"):
+        _check(positions, inside, joints, ends, nothing, weights, fitted=True)
 
 
 def test_the_heat_solver_without_scipy_agrees_with_a_dense_solve(monkeypatch):
