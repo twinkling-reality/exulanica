@@ -38,6 +38,9 @@ import { ASK_ASPECTS, askEntityCompanion, askWords } from './entity-companion.mj
 import { choiceAccount, parseDecisionEvents } from '/src/decision-record.ts';
 import { CompanionAskClient } from '/src/companion-ask-api.ts';
 import { drawSimulated } from '/src/companion-simulated.ts';
+import { DecisionAsksClient } from '/src/society-decision-asks-api.ts';
+import { openComparePage } from './compare-page.ts';
+import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import './blank-world.css';
 import './contextual-world.css';
 
@@ -481,9 +484,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,
       editing: pageView.editing ? { session: pageView.editing.session, refusal: pageView.editing.refusal, busy: pageView.editing.busy } : null,
       choosing: pageView.choosing ? { choices, focus: pageView.choosing.focus, refusal: pageView.choosing.refusal, busy: pageView.choosing.busy } : null,
+      canCompare: comparable(pageView) && (pageView.did ?? []).some(modelAnswered),
+      compare: pageView.compare ? compareState(view.who) : null,
     };
   }
-  function drawPage() { if (pageView) { pageView.page.draw(pageState()); if (pageView.decision) pageView.decision.page.draw(decisionState()); } }
+  function drawPage() {
+    if (!pageView) return;
+    pageView.page.draw(pageState());
+    if (pageView.decision) pageView.decision.page.draw(decisionState());
+    if (pageView.comparison) pageView.comparison.page.draw(comparisonState());
+  }
   /** The page's rows: the character's recorded events, read when the page opens and every few seconds. */
   async function readDid() {
     const showing = pageView;
@@ -520,7 +530,15 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function pageAct(action, index) {
     if (!pageView) return;
     const choosing = pageView.choosing, editing = pageView.editing;
-    if (action === 'back') { if (editing) { pageView.editing = null; drawPage(); } else if (choosing) { pageView.choosing = null; drawPage(); } else if (pageView.ask) { pageView.ask = null; drawPage(); } else closePage(); }
+    const compare = pageView.compare;
+    if (action === 'back') {
+      if (compare?.asking) { compare.asking.stop = true; drawPage(); }
+      else if (compare) { pageView.compare = null; drawPage(); }
+      else if (editing) { pageView.editing = null; drawPage(); } else if (choosing) { pageView.choosing = null; drawPage(); } else if (pageView.ask) { pageView.ask = null; drawPage(); } else closePage();
+    }
+    else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: 0, offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
+    else if (action === 'compareChoose' && compare && !compare.asking) { compare.focus = index; readOffer(pageView); drawPage(); }
+    else if (action === 'compareStart' && compare && !compare.asking) void compareAsk(pageView);
     else if (action === 'row' && pageView.did?.[index]) { pageView.didFocus = index; drawPage(); }
     else if (action === 'inspect' && !choosing && !pageView.ask) void openDecision(index ?? pageView.didFocus);
     else if (action === 'ask' && !readOnly && !choosing) { pageView.ask = { focus: 0, busy: false, asked: null, answer: null, failure: null, serial: 0 }; drawPage(); }
@@ -645,6 +663,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!decision) return;
     if (action === 'back') { if (decision.record) { decision.record = false; drawPage(); } else closeDecision(); }
     else if (action === 'record' && decision.detail) { decision.record = !decision.record; drawPage(); }
+    else if (action === 'compare' && comparable(pageView) && modelAnswered(pageView.did?.[decision.rowIndex])) {
+      // The same flow for this one moment, on the character's page (C1).
+      const requestId = decision.requestId;
+      closeDecision();
+      pageAct('compare', requestId);
+    }
     else if (action === 'earlier' || action === 'later') {
       const order = decisionRows(pageView), here = order.indexOf(decision.rowIndex);
       const next = here < 0 ? undefined : order[here + (action === 'earlier' ? 1 : -1)];
@@ -655,7 +679,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const showing = pageView, decision = showing.decision, view = subjectView(showing.row), who = view.who;
     const order = decisionRows(showing), here = order.indexOf(decision.rowIndex);
     const blank = { over: '', title: '', model: null, done: null, verdict: null, toldLabel: toldLabel(who), told: decision.failure ? [] : null,
-      choicesLabel: '', choices: [], earlier: here >= 0 && here < order.length - 1, later: here > 0, record: null, failure: decision.failure };
+      choicesLabel: '', choices: [], earlier: here >= 0 && here < order.length - 1, later: here > 0, record: null, failure: decision.failure,
+      canCompare: comparable(showing) && modelAnswered(showing.did?.[decision.rowIndex]) };
     const detail = decision.detail;
     if (!detail) return blank;
     const request = detail.request, receipt = detail.decision, context = request.context ?? null;
@@ -679,6 +704,179 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       choicesLabel: choicesLabel(who, choices.length), choices,
       record: decision.record ? JSON.stringify({ request, decision: receipt }, null, 2) : null };
   }
+  // Compare (frames 12a and 12b, rulings C1 and C2): a character's recorded decisions asked again,
+  // exactly as asked, of a chosen model and once more of the model that answered each. The count and
+  // the bounds are the server's offer; each ask is one D1 ask; nothing is applied.
+  const decisionAsks = new DecisionAsksClient(credentials);
+  const modelKey = (model) => model ? `${model.provider}/${model.modelId}` : '';
+  /** The models to ask beside the recorded one: every model offered here but the character's own. */
+  function compareModels(row) {
+    if (!subjectReads.models) return null;
+    const own = modelOf(row).model;
+    return orderedModels(subjectReads.models.models).filter(item => !item.refusal && !(own && item.provider === own.provider && item.modelId === own.modelId));
+  }
+  /** [C] is drawn only where it works (C4, K6): a model to ask beside the character's own, and a decision a model answered. */
+  const comparable = (showing) => !readOnly && Boolean(showing && compareModels(showing.row)?.length);
+  const modelAnswered = (row) => Boolean(row?.requestId && row?.model);
+  function readOffer(showing) {
+    const compare = showing?.compare, model = compareModels(showing.row)?.[compare.focus];
+    if (!model || compare.offers.has(modelKey(model))) return;
+    const held = { offer: null, failed: false };
+    compare.offers.set(modelKey(model), held);
+    // One moment's offer names it, so a decision of any age is asked like any other (C4).
+    decisionAsks.offer(entry.authoredVersionId, showing.row.scene.id, { provider: model.provider, modelId: model.modelId }, compare.single)
+      .then(offer => { held.offer = offer; }, () => { held.failed = true; compare.offers.delete(modelKey(model)); })
+      .finally(() => { if (showing === pageView) drawPage(); });
+  }
+  /** The offer's decisions this comparison asks: every one offered, or the one moment a decision named. */
+  const comparedDecisions = (compare, offer) => (offer?.decisions ?? []).filter(decision => decision.askUsd !== null && (compare.single === null || decision.requestId === compare.single));
+  const boundOf = (decisions) => decisions.reduce((sum, decision) => sum + Number(decision.askUsd.chosen) + Number(decision.askUsd.again ?? 0), 0);
+  function compareState(who) {
+    const compare = pageView.compare;
+    const models = compareModels(pageView.row);
+    const model = models?.[compare.focus] ?? null;
+    const held = model ? compare.offers.get(modelKey(model)) : null;
+    const offer = held?.offer ?? null;
+    const decisions = comparedDecisions(compare, offer);
+    const recorded = decisions.at(-1)?.model ?? null;
+    const recordedName = recorded ? modelName({ provider: recorded.provider, model_id: recorded.modelId }) ?? recorded.modelId : modelOf(pageView.row).model?.name ?? '';
+    const most = boundOf(decisions);
+    const note = offer?.refusal ? modelRefusalWords(offer.refusal, who) : held?.failed ? CHARACTER_WORDS.askFailed : null;
+    // Nothing to ask of any model (C4): none offered, or every one refused; the line stands alone.
+    const single = compare.single !== null;
+    const offered = (offer?.decisions ?? []).filter(decision => !single || decision.requestId === compare.single);
+    const nothing = !offer || offer.refusal || decisions.length ? null
+      : offered.length || single ? cannotAskAgain(who, single) : nothingToAsk(who);
+    return {
+      nothing,
+      big: offer && decisions.length ? askLine(who, decisions.length, compare.single !== null) : '',
+      explain: offer && decisions.length ? explanation(who, recordedName) : '',
+      choices: models ? models.map(item => ({ model: item, current: false })) : null,
+      focus: compare.focus,
+      figure: compare.asking ? askingWords(compare.asking.done, compare.asking.total, compare.asking.spent, most) : offer && decisions.length ? atMost(most) : null,
+      asking: Boolean(compare.asking),
+      note,
+      canStart: Boolean(offer && decisions.length && !offer.refusal && !compare.asking),
+    };
+  }
+  /** Ask each offered decision of the chosen model and once more of its own, one at a time, then show what came back. */
+  async function compareAsk(showing) {
+    const compare = showing.compare, model = compareModels(showing.row)?.[compare.focus];
+    const offer = model ? compare.offers.get(modelKey(model))?.offer : null;
+    const decisions = comparedDecisions(compare, offer);
+    if (!model || !decisions.length || offer.refusal) return;
+    const chosen = { provider: model.provider, modelId: model.modelId };
+    const steps = decisions.flatMap(decision => [
+      { decision, which: 'other', model: chosen, bound: decision.askUsd.chosen, key: crypto.randomUUID() },
+      ...(decision.askUsd.again !== null && decision.model ? [{ decision, which: 'again', model: decision.model, bound: decision.askUsd.again, key: crypto.randomUUID() }] : []),
+    ]);
+    compare.asking = { done: 0, total: steps.length, spent: 0, stop: false };
+    compare.answers = new Map();
+    drawPage();
+    for (const step of steps) {
+      if (compare.asking.stop || showing !== pageView) break;
+      try {
+        const answer = await decisionAsks.ask(entry.authoredVersionId, step.decision.requestId, step.model, step.bound, step.key);
+        const pair = compare.answers.get(step.decision.requestId) ?? {};
+        pair[step.which] = answer;
+        compare.answers.set(step.decision.requestId, pair);
+        compare.asking.spent += Number(answer.costUsd) || 0;
+      } catch { break; /* A refused ask ends the asking; what came back is shown (C2). */ }
+      compare.asking.done += 1;
+      if (showing === pageView) drawPage();
+    }
+    if (showing !== pageView) return;
+    openComparison(showing, { decisions, answers: compare.answers, other: model, single: compare.single !== null });
+  }
+  function openComparison(showing, { decisions, answers, other, single }) {
+    showing.compare = null;
+    const moments = compareMoments(decisions, answers);
+    const page = openComparePage(root, action => comparisonAct(action));
+    // The recorded model by the name the models read gives it: the newest moment's.
+    const recorded = decisions.at(-1)?.model ?? null;
+    const recordedName = recorded ? modelName({ provider: recorded.provider, model_id: recorded.modelId }) ?? recorded.modelId : modelOf(showing.row).model?.name ?? '';
+    // The recorded model's own asks were all refused (each decision's again refusal): it could not be asked again (C3).
+    const againRefused = decisions.every(decision => decision.askUsd?.again === null);
+    showing.comparison = { page, moments, other, single: single || moments.length === 1, againRefused, recordedName, focus: Math.max(0, moments.length - 1), details: new Map(), busy: false };
+    showing.page.hide(true);
+    // Who a line was said to is in the decision's own options: read once a moment.
+    for (const moment of moments) {
+      modelsClient.readDecision(entry.authoredVersionId, moment.requestId).then(detail => {
+        if (showing.comparison) { showing.comparison.details.set(moment.requestId, detail); if (showing === pageView) drawPage(); }
+      }, () => {});
+    }
+    drawPage();
+  }
+  function closeComparison() {
+    const showing = pageView;
+    if (!showing?.comparison) return;
+    showing.comparison.page.close(); showing.comparison = null;
+    showing.page.hide(false); drawPage();
+  }
+  /** Who an option said a line to, by the option the decision offered under that label. */
+  function saidTo(detail, chose) {
+    const option = (detail?.request?.context?.options ?? []).find(item => item.label === chose);
+    return option?.addressee_id ? personName(option.addressee_id) : null;
+  }
+  function comparisonState() {
+    const showing = pageView, comparison = showing.comparison, view = subjectView(showing.row), who = view.who;
+    const { moments, other, single, focus } = comparison;
+    const start = view.facts?.startMinute ?? null;
+    const at = moment => moment ? worldTime(moment.tick, start) : null;
+    const first = at(moments[0]), last = at(moments.at(-1));
+    const recordedName = comparison.recordedName;
+    const otherName = other.name;
+    const moment = moments[focus] ?? null;
+    const detail = moment ? comparison.details.get(moment.requestId) : null;
+    const words = answer => answer.asked || answer.recorded ? choseWords({ chose: answer.chose, line: answer.line, to: answer.line ? saidTo(detail, answer.chose) : null }) ?? '' : COMPARE_WORDS.notAsked;
+    const step = Math.max(1, Math.ceil(moments.length / 4));
+    const times = moments.flatMap((item, index) => (index % step === 0 || index === moments.length - 1) && at(item) ? [{ index, text: at(item).hhmm }] : []);
+    return {
+      over: resultOver({ who, count: moments.length, from: first?.hhmm ?? null, to: last?.hhmm ?? null, day: first?.day ?? null }),
+      title: resultTitle(who, moments.length, single),
+      sub: single ? COMPARE_WORDS.sameMoment(who) : COMPARE_WORDS.sameMoments(who),
+      spent: spentAsking(spentOf(moments)),
+      moment: moment ? {
+        label: atMoment(at(moment)?.hhmm ?? null, focus, moments.length),
+        rows: [
+          { model: recordedName, again: false, what: words({ ...moment.recorded, recorded: true }), tag: answerTag({ recorded: true }) },
+          { model: otherName, again: false, what: words(moment.other), tag: answerTag(moment.other) },
+          { model: againName(recordedName), again: true, what: words(moment.again), tag: answerTag(moment.again) },
+        ],
+      } : null,
+      eachChose: single ? [] : whatEachChose({ recordedName, otherName, other: sameCounts(moments, 'other'), again: sameCounts(moments, 'again'), count: moments.length, againRefused: comparison.againRefused }),
+      lanes: single ? [] : [
+        { name: recordedName, faint: false, marks: laneMarks(moments, 'recorded') },
+        { name: otherName, faint: false, marks: laneMarks(moments, 'other') },
+        { name: againName(recordedName), faint: true, marks: laneMarks(moments, 'again') },
+      ],
+      times: single ? [] : times,
+      focus,
+      use: pageState().assignable && !comparison.busy ? useFor(otherName, who) : null,
+    };
+  }
+  function comparisonAct(action) {
+    const comparison = pageView?.comparison;
+    if (!comparison) return;
+    if (action === 'back') closeComparison();
+    else if ((action === 'earlier' || action === 'later') && !comparison.single) {
+      comparison.focus = Math.max(0, Math.min(comparison.moments.length - 1, comparison.focus + (action === 'earlier' ? -1 : 1)));
+      drawPage();
+    }
+    else if (action === 'use' && !comparison.busy && pageState().assignable) void useCompared(pageView);
+  }
+  /** Use the asked model for the character (frame 12b's Enter), as Choose a model does. */
+  async function useCompared(showing) {
+    const comparison = showing.comparison;
+    comparison.busy = true; drawPage();
+    try {
+      const { verified } = await recordEntityModel({ entry, subjectId: showing.row.scene.id, selected: comparison.other, key: crypto.randomUUID(), refresh: () => refreshSubject(showing.row), client: modelsClient, current: () => showing === pageView && current() });
+      subjectReads.models = verified;
+      if (showing === pageView) { showing.run.shown = runWatch.limits(verified); closeComparison(); }
+    } catch (error) {
+      if (showing === pageView) worldNotes.show(modelRefusalWords(error.code ?? 'stale', subjectView(showing.row).who));
+    } finally { if (showing.comparison) { showing.comparison.busy = false; drawPage(); } }
+  }
   /** The character's page (Enter): over the world, which keeps drawing, with the camera framing the character. */
   async function openPage(row) {
     if (!row || row.scene.type !== 'being' || pageShown()) return;
@@ -687,7 +885,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const page = openCharacterPage(root, (action, index) => pageAct(action, index));
     // Only a being its owner placed can have a personality: its inventory reference is the placed thing.
     const placedId = row.reference?.source === 'authored-thing' ? row.reference.id : null;
-    pageView = { page, row, did: null, didFocus: null, events: [], ask: null, decision: null, choosing: null, personality: null, editing: null, placedId, run: { busy: false, refusal: null, shown: runWatch.limits(subjectReads.models) }, before: { pose: { ...b.controls.state }, hold: b.controls.hold }, ease: null };
+    pageView = { page, row, did: null, didFocus: null, events: [], ask: null, decision: null, compare: null, comparison: null, choosing: null, personality: null, editing: null, placedId, run: { busy: false, refusal: null, shown: runWatch.limits(subjectReads.models) }, before: { pose: { ...b.controls.state }, hold: b.controls.hold }, ease: null };
     presence.setCovered(true); notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     guidance.hidden = true; worlds.hidden = true;
@@ -704,8 +902,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   function closePage() {
     if (!pageView) return;
-    const { page, before, decision } = pageView;
-    pageView = null; page.close(); decision?.page.close();
+    const { page, before, decision, comparison } = pageView;
+    pageView = null; page.close(); decision?.page.close(); comparison?.page.close();
     b.controls.setView(before.pose, before.hold); b.invalidate();
     canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
     guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
@@ -803,12 +1001,41 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // A page: Esc back, M model, N personality, R run or stop; while choosing a model, arrows and
       // Enter; while writing a personality, Enter saves, Esc cancels and every other key types.
       const choosing = pageView.choosing, ask = pageView.ask, decision = pageView.decision;
+      const comparison = pageView.comparison, compare = pageView.compare;
+      if (comparison) {
+        // Compare's result (12b): the arrows step the moments, Enter uses the asked model, Esc goes back.
+        if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) comparisonAct('back'); }
+        else if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') { event.preventDefault(); comparisonAct(event.code === 'ArrowLeft' ? 'earlier' : 'later'); }
+        else if (event.code === 'Enter' && event.target?.closest?.('.wu-page button')) return;
+        else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); comparisonAct('use'); }
+        else if (event.code === 'Tab') return;
+        else event.preventDefault();
+        event.stopImmediatePropagation(); return;
+      }
+      if (compare) {
+        // Compare's question (12a): the arrows choose the model, Enter asks, Esc goes back, or stops while asking.
+        // With nothing to ask, only Esc (C4).
+        const nothing = Boolean(pageState().compare?.nothing);
+        if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) pageAct('back'); }
+        else if (nothing && event.code !== 'Tab') event.preventDefault();
+        else if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && !compare.asking) {
+          event.preventDefault();
+          const last = (compareModels(pageView.row)?.length ?? 1) - 1;
+          pageAct('compareChoose', Math.max(0, Math.min(last, compare.focus + (event.code === 'ArrowUp' ? -1 : 1))));
+        }
+        else if (event.code === 'Enter' && event.target?.closest?.('.wu-page button')) return;
+        else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('compareStart'); }
+        else if (event.code === 'Tab') return;
+        else event.preventDefault();
+        event.stopImmediatePropagation(); return;
+      }
       if (decision) {
         // A decision: Esc back (from the record to the decision, then to the page), the arrows step
         // through the character's decisions, J shows the record, which the arrows then scroll.
         if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) decisionAct('back'); }
         else if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') { event.preventDefault(); if (!event.repeat) decisionAct(event.code === 'ArrowLeft' ? 'earlier' : 'later'); }
         else if (event.code === 'KeyJ' && !event.repeat) { event.preventDefault(); decisionAct('record'); }
+        else if (event.code === 'KeyC' && !event.repeat) { event.preventDefault(); decisionAct('compare'); }
         else if (decision.record && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(event.code)) return;
         else if (event.code === 'Tab') return;
         else event.preventDefault();
@@ -833,6 +1060,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       else if (event.code === 'KeyN' && !choosing && !event.repeat) { event.preventDefault(); pageAct('personality'); }
       else if (event.code === 'KeyM' && !choosing && !event.repeat) { event.preventDefault(); pageAct('model'); }
       else if (event.code === 'KeyR' && !choosing && !event.repeat) { event.preventDefault(); pageAct(runWatch.run ? 'stop' : 'run'); }
+      else if (event.code === 'KeyC' && !choosing && !event.repeat && pageState().canCompare) { event.preventDefault(); pageAct('compare'); }
       else if (event.code === 'KeyQ' && !choosing && !event.repeat) { event.preventDefault(); pageAct('ask'); }
       else if (!choosing && (event.code === 'ArrowUp' || event.code === 'ArrowDown') && pageView.did?.length) {
         event.preventDefault();
@@ -956,7 +1184,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     presence.dispose();
     runWatch.dispose();
     corners.dispose();
-    if (pageView) { pageView.page.close(); pageView.decision?.page.close(); pageView = null; }
+    if (pageView) { pageView.page.close(); pageView.decision?.page.close(); pageView.comparison?.page.close(); pageView = null; }
     otherPage?.dispose(); otherPage = null;
     lifetime.abort(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
     b.controls.onPointerPick = priorCallbacks.pick; b.controls.onInteract = priorCallbacks.interact;

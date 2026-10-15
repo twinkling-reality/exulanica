@@ -25,7 +25,8 @@
 .wu-char-head { position: absolute; left: calc(900 * var(--u)); top: calc(104 * var(--u)); width: calc(900 * var(--u)); }
 .wu-char-left { position: absolute; left: calc(900 * var(--u)); top: calc(300 * var(--u)); width: calc(440 * var(--u)); transition: opacity var(--t-hover) var(--ease); }
 .wu-char-right { position: absolute; left: calc(1420 * var(--u)); top: calc(300 * var(--u)); width: calc(420 * var(--u)); }
-.wu-char-right.wu-choosing { left: calc(1380 * var(--u)); width: calc(470 * var(--u)); }
+/* Held inside the page's right margin (72u), not a fixed width from its left, so it fits a narrower screen (L19). */
+.wu-char-right.wu-choosing { left: calc(1380 * var(--u)); right: calc(72 * var(--u)); width: auto; }
 .wu-char-block + .wu-char-block { margin-top: calc(46 * var(--u)); }
 .wu-char-block > .wu-small-text { margin: calc(12 * var(--u)) 0 0; }
 .wu-char-left.wu-choosing > .wu-char-block:not([data-section="model"]) { opacity: .38; }
@@ -92,3 +93,44 @@
 .wu-ask-answer { margin-top: calc(24 * var(--u)); }
 .wu-ask-asked { margin: 0 0 calc(10 * var(--u)); }
 .wu-ask-line { margin: 0 0 calc(12 * var(--u)); font: 400 calc(18 * var(--u))/1.5 var(--font-sans); }
+
+/* A character's decisions asked again (frames 12a and 12b, rulings C1 and C2), in reference pixels. */
+.wu-cmp-head { position: absolute; left: calc(900 * var(--u)); top: calc(96 * var(--u)); right: calc(80 * var(--u)); }
+.wu-cmp-head .wu-page-sub { margin-top: calc(12 * var(--u)); }
+.wu-cmp-spent { margin: calc(8 * var(--u)) 0 0; }
+/* Compare's columns end at the page's right margin (72u), as the band does (L19). */
+.wu-cmp-moment { position: absolute; left: calc(900 * var(--u)); top: calc(340 * var(--u)); right: calc(72 * var(--u)); }
+.wu-cmp-row { display: grid; grid-template-columns: calc(228 * var(--u)) 1fr calc(112 * var(--u)); align-items: center; gap: 0 calc(18 * var(--u)); min-height: calc(52 * var(--u)); }
+.wu-cmp-row + .wu-cmp-row { border-top: 1px solid rgba(255, 255, 255, .08); }
+.wu-cmp-what { font: 400 calc(19 * var(--u))/1.35 var(--font-sans); }
+.wu-cmp-again .wu-cmp-what { color: var(--ink-2); }
+.wu-cmp-tag { font: 500 max(12px, calc(12.5 * var(--u)))/1 var(--font-sans); text-align: right; color: var(--ink-3); }
+.wu-cmp-tag.wu-cmp-differs { color: var(--live); }
+.wu-cmp-each { position: absolute; left: calc(900 * var(--u)); top: calc(582 * var(--u)); right: calc(72 * var(--u)); }
+.wu-cmp-each-line { margin: 0; font: 400 calc(17 * var(--u))/1.45 var(--font-sans); }
+.wu-cmp-each-faint { margin: calc(6 * var(--u)) 0 0; }
+.wu-cmp-band { position: absolute; left: calc(900 * var(--u)); right: calc(72 * var(--u)); bottom: calc(104 * var(--u)); height: calc(196 * var(--u)); padding: calc(22 * var(--u)) calc(30 * var(--u)) calc(18 * var(--u)); border-radius: calc(22 * var(--u)); box-sizing: border-box; }
+.wu-cmp-band-inner { position: relative; }
+.wu-cmp-lane { display: grid; grid-template-columns: calc(228 * var(--u)) 1fr; align-items: center; height: calc(36 * var(--u)); }
+.wu-cmp-lane + .wu-cmp-lane { margin-top: calc(6 * var(--u)); }
+.wu-cmp-lane-name { font: 450 max(12px, calc(15 * var(--u)))/1.2 var(--font-sans); }
+.wu-cmp-faint .wu-cmp-lane-name { color: var(--ink-3); }
+.wu-cmp-track { position: relative; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .22); }
+.wu-cmp-mark { position: absolute; top: calc(-6 * var(--u)); width: calc(14 * var(--u)); height: calc(14 * var(--u)); margin-left: calc(-7 * var(--u)); border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(191, 233, 240, .9); }
+.wu-cmp-mark.wu-cmp-said { background: var(--live); }
+.wu-cmp-mark.wu-cmp-diff { box-shadow: 0 0 0 2px rgba(11, 18, 25, .9), 0 0 0 3.5px var(--live), 0 0 12px rgba(191, 233, 240, .9); }
+.wu-cmp-mark.wu-cmp-hollow { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .6); }
+.wu-cmp-faint .wu-cmp-mark { top: calc(-4 * var(--u)); width: calc(10 * var(--u)); height: calc(10 * var(--u)); margin-left: calc(-5 * var(--u)); background: rgba(255, 255, 255, .45); box-shadow: none; }
+.wu-cmp-faint .wu-cmp-mark.wu-cmp-diff { box-shadow: 0 0 0 2px rgba(11, 18, 25, .9), 0 0 0 3.5px var(--live); }
+.wu-cmp-faint .wu-cmp-mark.wu-cmp-hollow { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .45); }
+.wu-cmp-axis { display: grid; grid-template-columns: calc(228 * var(--u)) 1fr; margin-top: calc(12 * var(--u)); }
+.wu-cmp-ticks { position: relative; height: calc(13 * var(--u)); font: 400 max(12px, calc(12.5 * var(--u)))/1 var(--font-mono); color: var(--ink-3); }
+.wu-cmp-ticks span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.wu-cmp-playhead { position: absolute; top: 2px; bottom: calc(30 * var(--u)); width: 2px; left: calc(228 * var(--u) + (100% - 228 * var(--u)) * var(--at, 0) - 1px); background: #fff; box-shadow: 0 0 12px rgba(191, 233, 240, 1); }
+/* 12a: the question in the right column; while the asks run the rows and the orb dim (C2). */
+.wu-cmp-ask .wu-big { margin: calc(4 * var(--u)) 0 calc(10 * var(--u)); }
+.wu-cmp-ask .wu-cmp-explain { margin: 0 0 calc(22 * var(--u)); max-width: calc(470 * var(--u)); }
+.wu-cmp-ask .wu-orb-row { margin-top: calc(28 * var(--u)); }
+.wu-cmp-nothing { margin: calc(10 * var(--u)) 0 0; max-width: calc(470 * var(--u)); }
+.wu-cmp-ask[data-asking] .wu-model-rows { opacity: .38; }
+@media (prefers-reduced-motion: reduce) { .wu-cmp-playhead { transition: none; } }

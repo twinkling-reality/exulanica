@@ -5,6 +5,7 @@
 import { chip, keyRow, keyWord, label, page, type Page } from './world-ui.ts';
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { DECISION_WORDS } from './decision-words.mjs';
+import { COMPARE_WORDS } from './compare-words.mjs';
 
 export interface DecisionPageState {
   /** "06:52 · Day 1 · Teo said to Ines". */
@@ -27,6 +28,8 @@ export interface DecisionPageState {
   readonly record: string | null;
   /** Why the record could not be read, or null. */
   readonly failure: string | null;
+  /** Whether [C] Compare this moment is offered (C1). */
+  readonly canCompare: boolean;
 }
 
 export interface DecisionPage {
@@ -102,6 +105,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
       const keys = [
         ...(state.earlier || state.later ? [keyWord({ keys: ['←', '→'], word: DECISION_WORDS.earlierLater, shortcut: 'ArrowLeft ArrowRight' })] : []),
         ...(state.title ? [keyWord({ keys: ['J'], word: DECISION_WORDS.fullRecord, shortcut: 'J', onPress: () => act('record') })] : []),
+        ...(state.title && state.canCompare && state.record === null ? [keyWord({ keys: ['C'], word: COMPARE_WORDS.compareThisMoment, shortcut: 'C', onPress: () => act('compare') })] : []),
         keyWord({ keys: ['Esc'], word: CHARACTER_WORDS.back, shortcut: 'Escape', onPress: () => act('back') }),
       ];
       sheet.keys.replaceChildren(...keyRow(keys).children);

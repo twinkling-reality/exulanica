@@ -5,6 +5,7 @@
 import { chip, keyRow, keyWord, label, orb, page, type Page } from './world-ui.ts';
 import { CHARACTER_WORDS, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach } from './personality-words.mjs';
+import { COMPARE_WORDS } from './compare-words.mjs';
 
 type Who = ReturnType<typeof called>;
 
@@ -68,6 +69,27 @@ export interface CharacterPageState {
   readonly editing: { readonly session: string; readonly refusal: string | null; readonly busy: boolean } | null;
   /** The model list while choosing, or null. */
   readonly choosing: { readonly choices: readonly ModelChoice[] | null; readonly focus: number; readonly refusal: string | null; readonly busy: boolean } | null;
+  /** Whether [C] Compare is offered (frame 12a). */
+  readonly canCompare: boolean;
+  /**
+   * The question before a comparison (frame 12a, rulings C1 and C2), in the right column in place of
+   * the rows, or null. Its Big line, explanation and figures are the server's offer, worded.
+   */
+  readonly compare: {
+    /** With nothing to ask of any model (C4), the one line drawn alone: no rows, orb or arrows. */
+    readonly nothing: string | null;
+    readonly big: string;
+    readonly explain: string;
+    /** The models to ask beside the recorded one: neither Routine nor the character's own. */
+    readonly choices: readonly ModelChoice[] | null;
+    readonly focus: number;
+    /** "At most $0.01", or while the asks run "Asking 5 of 24 · $0.0008 of $0.01"; null while the offer is read. */
+    readonly figure: string | null;
+    readonly asking: boolean;
+    /** Why the chosen model may not be asked, or that the offer could not be read, in words. */
+    readonly note: string | null;
+    readonly canStart: boolean;
+  } | null;
 }
 
 export interface CharacterPage {
@@ -117,7 +139,7 @@ export function openCharacterPage(host: HTMLElement, act: (action: string, value
       head.append(title, element('p', 'wu-page-sub', state.sub));
       sheet.root.setAttribute('aria-label', state.who.title);
 
-      const left = element('div', state.choosing ? 'wu-char-left wu-choosing' : 'wu-char-left');
+      const left = element('div', state.choosing || state.compare ? 'wu-char-left wu-choosing' : 'wu-char-left');
       if (state.editing && state.personality) editor = drawEditor(left, state, act);
       const personality = state.personality && !state.editing ? element('section', 'wu-char-block') : null;
       if (personality && state.personality) {
@@ -162,10 +184,59 @@ export function openCharacterPage(host: HTMLElement, act: (action: string, value
         refused.setAttribute('role', 'status');
         run.append(refused);
       }
-      if (!state.editing) left.append(model, run);
+      if (!state.editing) left.append(model, ...(state.compare ? [] : [run]));
 
-      const right = element('section', state.choosing ? 'wu-char-right wu-choosing' : state.editing ? 'wu-char-right wu-dim' : 'wu-char-right');
-      if (state.choosing) {
+      const right = element('section', state.choosing || state.compare ? 'wu-char-right wu-choosing' : state.editing ? 'wu-char-right wu-dim' : 'wu-char-right');
+      if (state.compare) {
+        const compare = state.compare;
+        right.classList.add('wu-cmp-ask');
+        if (compare.asking) right.dataset['asking'] = '';
+        right.append(label(COMPARE_WORDS.compare));
+        if (compare.nothing) {
+          // Nothing to ask of any model (C4): the line alone.
+          const line = element('p', 'wu-small-text wu-cmp-nothing', compare.nothing);
+          line.setAttribute('role', 'status');
+          right.append(line);
+        } else {
+          right.append(element('p', 'wu-big', compare.big), element('p', 'wu-small-text wu-cmp-explain', compare.explain));
+          if (!compare.choices) right.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
+          else {
+            right.append(element('div', 'wu-model-head wu-small-text wu-faint', CHARACTER_WORDS.perMillion));
+            const list = element('ul', 'wu-model-rows');
+            list.setAttribute('role', 'listbox');
+            list.setAttribute('aria-label', COMPARE_WORDS.compare);
+            compare.choices.forEach((choice, index) => {
+              const item = element('li', 'wu-model-row');
+              item.setAttribute('role', 'option');
+              item.setAttribute('aria-selected', String(index === compare.focus));
+              item.append(element('span', 'wu-model-name', choice.model?.name ?? ''), element('span', 'wu-model-price', choice.model ? priceWords(choice.model) ?? '' : ''));
+              if (!compare.asking) item.addEventListener('click', () => act('compareChoose', index));
+              list.append(item);
+            });
+            right.append(list);
+          }
+          if (compare.note) {
+            const note = element('p', 'wu-small-text wu-refused', compare.note);
+            note.setAttribute('role', 'status');
+            right.append(note);
+          } else {
+            const row = element('div', 'wu-orb-row');
+            const button = orb({ word: COMPARE_WORDS.compare, onPress: () => act('compareStart'), disabled: !compare.canStart });
+            button.dataset['focusKey'] = 'compare';
+            if (!compare.canStart) button.tabIndex = -1;
+            const words = element('div');
+            // The figure wraps only between its parts, never inside a figure (as the Run line, J9).
+            const figure = element('p', 'wu-big');
+            (compare.figure ?? '').split(' \u00b7 ').forEach((part, index) => {
+              if (index) figure.append(' \u00b7 ');
+              figure.append(element('span', 'wu-nowrap', part));
+            });
+            words.append(figure, element('p', 'wu-small-text', COMPARE_WORDS.askedOnce));
+            row.append(button, words);
+            right.append(row);
+          }
+        }
+      } else if (state.choosing) {
         right.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.pickingSpendsNothing));
         if (!state.choosing.choices) right.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
         else {
@@ -244,7 +315,13 @@ export function openCharacterPage(host: HTMLElement, act: (action: string, value
       }
       content.prepend(head, left, right);
 
-      const keys = state.choosing
+      const keys = state.compare
+        ? (state.compare.asking ? [keyWord({ keys: ['Esc'], word: COMPARE_WORDS.stop, shortcut: 'Escape', onPress: () => act('back') })]
+          : state.compare.nothing ? [keyWord({ keys: ['Esc'], word: CHARACTER_WORDS.back, shortcut: 'Escape', onPress: () => act('back') })]
+          : [keyWord({ keys: ['↑', '↓'], word: CHARACTER_WORDS.choose, shortcut: 'ArrowUp ArrowDown' }),
+            ...(state.compare.note ? [] : [keyWord({ keys: ['Enter'], word: COMPARE_WORDS.compare, shortcut: 'Enter', onPress: () => act('compareStart'), disabled: !state.compare.canStart })]),
+            keyWord({ keys: ['Esc'], word: CHARACTER_WORDS.back, shortcut: 'Escape', onPress: () => act('back') })])
+        : state.choosing
         ? [keyWord({ keys: ['↑', '↓'], word: CHARACTER_WORDS.choose, shortcut: 'ArrowUp ArrowDown' }),
           keyWord({ keys: ['Enter'], word: CHARACTER_WORDS.useThisModel, shortcut: 'Enter', onPress: () => act('use'), disabled: state.choosing.busy || !state.choosing.choices }),
           keyWord({ keys: ['Esc'], word: CHARACTER_WORDS.back, shortcut: 'Escape', onPress: () => act('back') })]
@@ -255,6 +332,7 @@ export function openCharacterPage(host: HTMLElement, act: (action: string, value
         : [...(state.assignable ? [keyWord({ keys: ['M'], word: CHARACTER_WORDS.model, shortcut: 'M', onPress: () => act('model') })] : []),
           ...(state.personality ? [keyWord({ keys: ['N'], word: PERSONALITY_WORDS.label, shortcut: 'N', onPress: () => act('personality') })] : []),
           ...(offered ? [keyWord({ keys: ['R'], word: state.run.open ? CHARACTER_WORDS.stop : CHARACTER_WORDS.run, shortcut: 'R', onPress: () => act(state.run.open ? 'stop' : 'run'), disabled: state.run.busy })] : []),
+          ...(state.canCompare ? [keyWord({ keys: ['C'], word: COMPARE_WORDS.compare, shortcut: 'C', onPress: () => act('compare') })] : []),
           ...(state.canAsk ? [keyWord({ keys: ['Q'], word: CHARACTER_WORDS.ask, shortcut: 'Q', onPress: () => act('ask') })] : []),
           keyWord({ keys: ['Esc'], word: CHARACTER_WORDS.back, shortcut: 'Escape', onPress: () => act('back') })];
       keys.forEach((prompt, index) => { prompt.dataset['focusKey'] = 'key-' + index; });
