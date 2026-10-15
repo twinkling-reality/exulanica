@@ -23,6 +23,7 @@ from exulanica.models.transport import HttpResponse
 from exulanica.selection.creature_drafting import (
     CHECK_SENTENCES,
     CreatureDraftRefusalCode,
+    assembled_form,
     creature_drafting_prompt,
     draft_creature,
     draft_form,
@@ -130,7 +131,7 @@ def test_a_creature_that_passes_is_drafted_once_with_its_provenance():
     by = kind.document["origin"]["by"]
     instructions = _sent(transport, 0)[0]["content"]
     assert by["model_id"] == MODEL
-    assert by["prompt_version"] == "creature-drafting-1"
+    assert by["prompt_version"] == "creature-drafting-3"
     assert by["prompt_sha256"] == hashlib.sha256(instructions.encode("utf-8")).hexdigest()
     assert by["words_sha256"] == hashlib.sha256(DESCRIPTION.encode("utf-8")).hexdigest()
     assert DESCRIPTION not in json.dumps(dict(kind.document))
@@ -153,7 +154,7 @@ def test_reference_notes_are_separate_untrusted_input_and_exact_lineage():
     assert messages[1]["content"] == f'The description:\n"""{DESCRIPTION}"""\n\n{block}'
     for document in (outcome.creature.plan_document, outcome.creature.kind.document):
         origin = document["origin"]
-        assert origin["by"]["prompt_version"] == "creature-drafting-2"
+        assert origin["by"]["prompt_version"] == "creature-drafting-4"
         assert origin["by"]["words_sha256"] == hashlib.sha256(DESCRIPTION.encode()).hexdigest()
         assert "c" * 64 in origin["lineage"]["ingredients"]
         assert block not in json.dumps(dict(document))
@@ -274,3 +275,26 @@ def test_a_place_in_a_document_reads_as_the_field_of_the_form(where, field):
         "offers": ["hear"],
     }
     assert form_where(where, assembled) == field
+
+
+def test_a_creature_s_label_is_at_most_32_letters_as_its_plan_s_key_is():
+    """The label, spaces as underscores, is the body plan's key, whose limit is 32 characters: the
+    form, its words and the assembly all hold a label to it, so a model is never asked for a name
+    the body would refuse."""
+    from exulanica.things.creatures import CreatureRefused, assemble_creature
+
+    from test_creature_bodies import BY
+
+    longest = "long necked two headed bog heron"
+    assert len(longest) == 32
+    grammar = body_grammar()
+    pattern = draft_form(grammar, thing_catalogs()).model_json_schema()["properties"]["label"][
+        "pattern"
+    ]
+    assert re.fullmatch(pattern, longest) and not re.fullmatch(pattern, longest + "s")
+    assert "2 to 32 letters" in creature_drafting_prompt().instructions
+    made = assemble_creature(assembled_form(form_of("horse", label=longest), grammar), by=BY)
+    assert made.plan_document["key"] == longest.replace(" ", "_")
+    with pytest.raises(CreatureRefused) as refused:
+        assemble_creature(assembled_form(form_of("horse", label=longest + "s"), grammar), by=BY)
+    assert (refused.value.code, refused.value.where) == ("thing_kind_invalid", "label")

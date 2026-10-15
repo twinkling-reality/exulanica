@@ -24,7 +24,9 @@ a sketch look and a thing kind, each held to its own reader, which decide:
 *   **What it records.** The kind's and plan's origins name the model that answered, the prompt's
     version, the SHA-256 of the instructions sent and of the words sent, never the words.
 
-The words the model is asked with are data (``creature-drafting.v1.json`` beside this module).
+The words the model is asked with are data (``creature-drafting.v3.json`` beside this module, and
+``creature-drafting.v4.json`` when reference notes come with the words; versions 1 and 2, which
+allowed a label of 40 letters, are kept as the words earlier drafts were asked with).
 Pure apart from the model client: nothing is read from a connection and nothing is written.
 """
 
@@ -79,8 +81,8 @@ __all__ = [
     "render_instructions",
 ]
 
-PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v1.json")
-_REFERENCE_PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v2.json")
+PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v3.json")
+_REFERENCE_PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v4.json")
 #: The manifest role a creature is drafted under, bound to the models the drafter's pre-registered
 #: measurement chose (docs/evaluation/2026-10-07-creature-drafter-timings.json).
 DRAFTER_ROLE: Final = Role.CREATURE_DRAFTER
@@ -96,7 +98,9 @@ CHECK_SENTENCES: Final[Mapping[str, str]] = {
 }
 #: Abilities a routine may weigh: the creature's abilities but saying, which only a mind does.
 _ROUTINE_ABILITIES: Final = tuple(ability for ability in CREATURE_ABILITIES if ability != "say")
-_LABEL_PATTERN: Final = r"^[a-z][a-z ]{0,38}[a-z]$"
+#: A creature's label is its body plan's key with spaces as underscores (creatures.creature_key),
+#: and a plan's key is at most 32 characters, so a label is too.
+_LABEL_PATTERN: Final = r"^[a-z][a-z ]{0,30}[a-z]$"
 
 
 class CreatureDraftRefusalCode(StrEnum):

@@ -110,7 +110,8 @@ CREATURE_CODES: Final = (
         "movements and colours the instructions name.",
     ),
 )
-_LABEL: Final = re.compile(r"[a-z][a-z ]{0,38}[a-z]")
+#: At most 32 characters: the label, spaces as underscores, is the body plan's key, which is.
+_LABEL: Final = re.compile(r"[a-z][a-z ]{0,30}[a-z]")
 _ROUTINE_REASON: Final = (
     "Drafted with the creature: the weights the drafting model gave its abilities, which its "
     "routine draws among whenever no mind is choosing for it."
@@ -258,7 +259,7 @@ def assemble_creature(
     label = _form_value(form, "label")
     if type(label) is not str or _LABEL.fullmatch(label) is None:
         raise _refuse(
-            "thing_kind_invalid", "label", "is lowercase words and spaces, 2 to 40 letters"
+            "thing_kind_invalid", "label", "is lowercase words and spaces, 2 to 32 letters"
         )
     key = creature_key(label)
     shipped = {kind for kind, _version in shipped_thing_kinds()} | {
