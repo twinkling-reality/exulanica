@@ -91,7 +91,13 @@ def document(value: Any) -> dict[str, Any]:
         for character in result["characters"]:
             if character.get("words") is None:
                 character.pop("words", None)
-    for key in ("title", "characters"):
+    if result.get("parts") is not None:
+        result["parts"].sort(key=lambda item: item["part_id"])
+        for part in result["parts"]:
+            for key in ("label", "storeys"):
+                if part.get(key) is None:
+                    part.pop(key, None)
+    for key in ("title", "characters", "parts"):
         if result.get(key) is None:
             result.pop(key, None)
     return result

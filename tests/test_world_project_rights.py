@@ -266,3 +266,30 @@ def test_the_single_file_transport_holds_the_same_rules(tmp_path):
     server.visibility = "PRIVATE"
     assert client.review(FILE_TARGET, worded, "Add the world")["checkpoint_sha256"]
     assert server.writes == []
+
+
+def test_a_made_part_s_label_reaches_only_a_private_repository(tmp_path):
+    project, _ = sample()
+    labelled = {
+        "part_id": "0190a1b2-c3d4-4e5f-8a9b-000000000001",
+        "kind": "fixture",
+        "centre_mm": [3_000, 4_000],
+        "quarter_turns": 0,
+        "removed": False,
+        "label": "Puddle's pond",
+    }
+    create(tmp_path / "labelled", {**project, "parts": [labelled]}, author=AUTHOR)
+    repository = remote("PUBLIC")
+    with pytest.raises(Conflict, match="made part's label"):
+        RollingPullRequests(repository.request).review(
+            TARGET, Project(tmp_path / "labelled", author=AUTHOR)
+        )
+    bare = {key: value for key, value in labelled.items() if key != "label"}
+    create(tmp_path / "bare", {**project, "parts": [bare]}, author=AUTHOR)
+    _, result = publish(
+        RollingPullRequests(repository.request),
+        TARGET,
+        Project(tmp_path / "bare", author=AUTHOR),
+        None,
+    )
+    assert result["published"] and "Puddle" not in received(repository)

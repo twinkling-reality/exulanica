@@ -167,6 +167,8 @@ class World:
             ("events", "cursor-2"): {"events": oldest, "next": None},
         }
         self.requests = []
+        #: Paths the fake answers with a refusal: path to (status, body).
+        self.refusals = {}
 
     def answer(self, handler):
         parts = urlsplit(handler.path)
@@ -176,6 +178,8 @@ class World:
             return 401, {"code": "unauthorized"}
         if parts.path != "/world-entries" and query.get("world_id") != [WORLD]:
             return 422, {"code": "world_id"}
+        if parts.path in self.refusals:
+            return self.refusals[parts.path]
         if parts.path.endswith("/society/events"):
             return 200, self.routes[("events", query.get("before", [None])[0])]
         prefix = f"/world/versions/{VERSION}/society/decisions/"
@@ -749,3 +753,113 @@ def test_one_read_of_the_version_s_characters_replaces_the_cards(world):
     paths = [path.split("?")[0] for _, path, _ in world.requests]
     assert paths.count(f"/world/versions/{VERSION}/things/characters") == 1
     assert not any("/society/things/" in path for path in paths)
+
+
+PARTS = f"/world/versions/{VERSION}/parts"
+
+
+def made(world, *, removed=()):
+    """A site world's parts read: a building, a fixture and an area, and the removed ones."""
+    standing = [
+        ("0190a1b2-c3d4-4e5f-8a9b-000000000001", "building", "Tea house", (12_000, 8_000), 0),
+        ("0190a1b2-c3d4-4e5f-8a9b-000000000002", "fixture", "Bench", (3_000, 4_000), 1),
+        ("0190a1b2-c3d4-4e5f-8a9b-000000000003", "area", "Lower pools", (20_000, 2_000), 0),
+    ]
+    world.routes[PARTS] = {
+        "profile": "exulanica.site-parts/v1",
+        "world_id": WORLD,
+        "version_id": VERSION,
+        "parts": [
+            {
+                "part_id": part_id,
+                "kind": kind,
+                "part_key": label.lower().replace(" ", "_"),
+                "label": label,
+                "zone_id": "0190a1b2-c3d4-4e5f-8a9b-0000000000ff",
+                "zone_label": "Garden",
+                "centre_mm": list(centre),
+                "size_mm": [2_000, 1_000],
+                "quarter_turns": turns,
+            }
+            | ({"storeys": 2} if kind == "building" else {"storeys": None})
+            for part_id, kind, label, centre, turns in standing
+            if part_id not in removed
+        ],
+        "changes": [
+            {"identity": part_id, "removed": True, "centre_mm": None, "quarter_turns": 0}
+            for part_id in removed
+        ],
+    }
+
+
+def parts_read(world):
+    return [path for _, path, _ in world.requests if path.split("?")[0] == PARTS]
+
+
+def captured(world, *, readable=True, known=None):
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        return capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            include_decisions=False,
+            readable=readable,
+            parts_known=known,
+        ).checkpoint
+
+
+def test_a_made_world_s_parts_are_kept_as_the_version_has_them(world):
+    made(world, removed=("0190a1b2-c3d4-4e5f-8a9b-000000000003",))
+    project = captured(world)
+    assert project["parts"] == [
+        {
+            "part_id": "0190a1b2-c3d4-4e5f-8a9b-000000000001",
+            "kind": "building",
+            "centre_mm": [12_000, 8_000],
+            "quarter_turns": 0,
+            "removed": False,
+            "label": "Tea house",
+            "storeys": 2,
+        },
+        {
+            "part_id": "0190a1b2-c3d4-4e5f-8a9b-000000000002",
+            "kind": "fixture",
+            "centre_mm": [3_000, 4_000],
+            "quarter_turns": 1,
+            "removed": False,
+            "label": "Bench",
+        },
+        {
+            "part_id": "0190a1b2-c3d4-4e5f-8a9b-000000000003",
+            "kind": None,
+            "centre_mm": None,
+            "quarter_turns": 0,
+            "removed": True,
+        },
+    ]
+    # Without readable text no label is kept: a world made from words was worded from them.
+    bare = captured(world, readable=False)
+    assert all("label" not in part for part in bare["parts"])
+    assert "Tea house" not in canonical_json(bare).decode()
+
+
+def test_a_world_not_made_from_a_kind_keeps_no_parts_and_one_still_drawing_is_tried_again(world):
+    world.refusals[PARTS] = (422, {"code": "parts_not_served", "detail": "not made from a kind"})
+    assert "parts" not in captured(world)
+    world.refusals[PARTS] = (503, {"code": "kind_work_busy", "detail": "still drawing"})
+    with pytest.raises(ProjectError, match="503"):
+        captured(world)
+
+
+def test_parts_are_read_again_only_when_the_version_changed(world):
+    made(world)
+    first = captured(world)
+    known = {"state_sha256": "a" * 64, "parts": first["parts"]}
+    reads = len(parts_read(world))
+    assert captured(world, known=known)["parts"] == first["parts"]
+    assert len(parts_read(world)) == reads  # the same version state: the project's own parts
+    # Another state, or the label setting changed: read again.
+    captured(world, known={**known, "state_sha256": "b" * 64})
+    captured(world, readable=False, known=known)
+    assert len(parts_read(world)) == reads + 2

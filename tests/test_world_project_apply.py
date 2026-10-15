@@ -80,6 +80,8 @@ class World:
         self.writes = []
         self.refuse_next = None
         self.kinds = set()
+        #: Each version's made parts as the parts read answers them; absent: not made from a kind.
+        self.parts = {}
         self.add(SOURCE, "Garden", [thing("knight:1", "knight"), thing("bench:1", "bench", 3000)])
 
     def add(self, version_id, title, things):
@@ -106,6 +108,11 @@ class World:
                 return httpx.Response(200 if held else 404, json={"code": "unknown_reference"})
             if path == "/world/versions":
                 return httpx.Response(200, json=list(self.versions.values()))
+            if path.endswith("/parts"):
+                held = self.parts.get(path.split("/")[3])
+                if held is None:
+                    return httpx.Response(422, json={"code": "parts_not_served"})
+                return httpx.Response(200, json=held)
             return httpx.Response(200, json=self.versions[path.rsplit("/", 1)[1]])
         body = json.loads(request.content)
         self.writes.append((path, body))
@@ -453,4 +460,31 @@ def test_a_kind_this_workspace_does_not_hold_is_refused_before_any_write():
         ]
         world.kinds.add("e" * 64)
         assert review(client, merged, "main")["changes"] == ["add the creature made in this world"]
+    assert world.writes == []
+
+
+def test_a_made_world_s_part_changes_are_listed_and_not_applied():
+    world = World()
+    bench, pond = (
+        {"part_id": "0190a1b2-c3d4-4e5f-8a9b-000000000001", "kind": "fixture", "label": "Bench"},
+        {"part_id": "0190a1b2-c3d4-4e5f-8a9b-000000000002", "kind": "area", "label": "Pond"},
+    )
+    world.parts[SOURCE] = {
+        "profile": "exulanica.site-parts/v1",
+        "parts": [
+            {**bench, "centre_mm": [3_000, 4_000], "quarter_turns": 0},
+            {**pond, "centre_mm": [9_000, 1_000], "quarter_turns": 0},
+        ],
+        "changes": [],
+    }
+    project = edited(world)
+    project["parts"] = [
+        {**bench, "centre_mm": [5_000, 4_000], "quarter_turns": 0, "removed": False},
+        {**pond, "kind": None, "centre_mm": None, "quarter_turns": 0, "removed": True},
+    ]
+    del project["parts"][1]["label"]
+    merged = read_merged("learner/world", 7, GitHub(project).request)
+    with reader(world) as client:
+        planned = review(client, merged, "main")
+    assert planned["not_applied"]["parts"] == ["Moved the bench 2 m east", "Removed the pond"]
     assert world.writes == []

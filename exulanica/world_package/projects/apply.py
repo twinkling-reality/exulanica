@@ -4,7 +4,8 @@ The new version is branched from the version the project was captured from, thro
 API's own routes, and titled with the repository, merge commit and pull request it came from.
 Only placed things change: additions, moves and turns within a region, and removals. Model
 assignments are reported for after the world is started, personalities are reported for the
-world's owner to write, and evidence is never applied. The
+world's owner to write, a made world's part changes are listed against the version as it reads
+now (they are made in build mode), and evidence is never applied. The
 source version is never edited, and nothing is written unless a bound review is allowed.
 """
 
@@ -14,10 +15,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from exulanica.canonical import canonical_json
-from exulanica.world_package.projects.capture import WorldReader, segment
+from exulanica.world_package.projects.capture import WorldReader, read_parts, segment
 from exulanica.world_package.projects.checkpoint import Conflict, ProjectError, digest, document
 from exulanica.world_package.projects.github import MergedPullRequest
-from exulanica.world_package.projects.summary import movement
+from exulanica.world_package.projects.summary import movement, parts_changed
 from exulanica.world_package.projects.words import model_name, names, possessive
 
 POSE = ("x_mm", "y_mm", "z_mm", "yaw_microradians")
@@ -150,6 +151,16 @@ def review(reader: WorldReader, merged: MergedPullRequest, base: str) -> dict[st
         f"{model_name(model['model_id'])} after the world is started"
         for model in world["models"]
     ]
+    # A made world's parts are changed in build mode: what the project holds of them is listed
+    # against the version as it reads now, and not applied yet.
+    parts = []
+    if world.get("parts") is not None:
+        held = read_parts(
+            reader,
+            segment(target["version_id"]),
+            readable=any("label" in part for part in world["parts"]),
+        )
+        parts = parts_changed({"parts": held or []}, world, kept=False)
     # Who a character is reaches its model's input, so it is never taken from a merge: the
     # world's owner writes it in the world.
     personalities = [
@@ -176,6 +187,7 @@ def review(reader: WorldReader, merged: MergedPullRequest, base: str) -> dict[st
         "not_applied": {
             "model_assignments": pending,
             "personalities": personalities,
+            "parts": parts,
             "evidence_sessions": sorted(merged.sessions),
         },
         "running_world_edited": False,

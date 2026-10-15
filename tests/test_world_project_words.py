@@ -247,3 +247,70 @@ def test_a_pull_request_shows_no_identity_digest_or_code(tmp_path, readable):
         assert title == "Changes to this world"
         assert "- Wrote the knight's personality" in visible
         assert "Sir Pip" not in body and "Guards the well" not in body
+
+
+def parted(project, *parts):
+    return edited(project, parts=[dict(part) for part in parts])
+
+
+def part(ordinal, kind, centre=(4_000, 3_000), turns=0, label=None, removed=False):
+    entry = {
+        "part_id": f"0190a1b2-c3d4-4e5f-8a9b-00000000000{ordinal}",
+        "kind": None if removed else kind,
+        "centre_mm": None if removed else list(centre),
+        "quarter_turns": turns,
+        "removed": removed,
+    }
+    if label is not None and not removed:
+        entry["label"] = label
+    return entry
+
+
+def test_a_made_world_s_parts_read_in_build_mode_s_words():
+    project, _ = sample()
+    bench, pool = part(1, "fixture", label="Bench"), part(2, "area", (9_000, 1_000), label="Pond")
+    before = parted(project, bench, pool)
+    assert summarize(project, before) == ["Kept the 2 parts this world was made with"]
+    moved = parted(project, {**bench, "centre_mm": [6_000, 3_000], "quarter_turns": 1}, pool)
+    assert summarize(before, moved) == ["Moved the bench 2 m east, turned 90°"]
+    turned = parted(project, {**bench, "quarter_turns": 2}, pool)
+    assert summarize(before, turned) == ["Turned the bench round"]
+    gone = parted(project, bench, part(2, "area", removed=True))
+    assert summarize(before, gone) == ["Removed the pond"]
+    assert summarize(gone, before) == ["Put the pond back"]
+
+
+def test_a_public_repository_calls_a_made_part_by_its_kind():
+    from exulanica.world_package.projects.words import without_words
+
+    project, _ = sample()
+    halls = [part(n, "building", (n * 10_000, 0), label="Tea house") for n in (1, 2)]
+    before = parted(project, *halls)
+    after = parted(project, halls[0], {**halls[1], "centre_mm": [20_000, -3_000]})
+    assert summarize(before, after) == ["Moved the second tea house 3 m south"]
+    assert summarize(without_words(before), without_words(after)) == [
+        "Moved the second building 3 m south"
+    ]
+
+
+def test_an_edit_of_the_same_version_is_said_by_what_it_changed_alone():
+    project, _ = sample()
+    moved = deepcopy(project)
+    moved["things"][0]["transform"]["x_mm"] = 2000
+    moved["source"]["state_sha256"] = "c" * 64  # every edit changes the version's state
+    assert summarize(project, moved) == ["Moved the knight 2 m east"]
+    other = deepcopy(moved)
+    other["source"]["version_id"] = "version:another"
+    assert summarize(moved, other) == ["Followed another version of the world"]
+
+
+def test_a_made_building_raised_or_lowered_says_its_storeys():
+    project, _ = sample()
+    hall = {**part(1, "building", label="Tea house"), "storeys": 2}
+    before = parted(project, hall)
+    assert summarize(before, parted(project, {**hall, "storeys": 4})) == [
+        "Raised the tea house to 4 storeys"
+    ]
+    assert summarize(before, parted(project, {**hall, "storeys": 1})) == [
+        "Lowered the tea house to 1 storey"
+    ]

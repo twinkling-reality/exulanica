@@ -667,3 +667,34 @@ def test_a_folder_linked_to_publish_on_its_own_is_published_after_each_checkpoin
         assert moves == ["Moved the knight 2 m east"] * 3
     finally:
         follower.close()
+
+
+def test_a_made_world_s_parts_are_read_again_only_when_its_version_changes(world, token, tmp_path):
+    from test_world_project_capture import PARTS, made
+
+    made(world)
+    projects = tmp_path / "projects"
+    folder = follow(world, token, projects / "demo", "--no-sessions")
+    assert len(Project(folder).at("HEAD")["parts"]) == 3
+    clock = Clock()
+    follower = Follower(projects, base_url=world.url, token=TOKEN, clock=clock)
+
+    def reads():
+        return sum(1 for _, path, _ in world.requests if path.split("?")[0] == PARTS)
+
+    try:
+        before = reads()
+        for _ in range(3):
+            assert poll(follower, clock).get("demo", {"state": "clean"})["state"] == "clean"
+        assert reads() == before  # the version did not change: the project's own parts
+        # A person moves the bench: the version's state changes, and the parts are read again.
+        bench = world.routes[PARTS]["parts"][1]
+        bench["centre_mm"] = [5_000, 4_000]
+        world.routes[f"/world/versions/{VERSION}"]["state_sha256"] = "c" * 64
+        assert poll(follower, clock)["demo"]["state"] == "settling"
+        assert reads() == before + 1
+        assert Project(folder).timeline()["pending"] == [
+            "Moved the thing made with this world 2 m east"
+        ]
+    finally:
+        follower.close()

@@ -738,8 +738,12 @@ A checkpoint may also keep who the world's owner wrote each selected being to be
 project keeps readable text, its `words` as written (`name` and `about`, both null where the
 newest record clears the character), held to the character module's own line rule and bounds.
 With readable text it also keeps the version's `title` as written. Without readable text only the
-revision is kept, so a change is still seen and no word is. A checkpoint without these optional
-fields keeps its digest.
+revision is kept, so a change is still seen and no word is. A world made from a world kind (a
+garden or a farm made from a sentence) also has its made parts kept in an optional `parts` list:
+each building, garden fixture and area a person may change, as the version has it (`part_id`,
+`kind`, `centre_mm` east and north, `quarter_turns` from how it was made, a building's
+`storeys`, `removed`), and its `label` only with readable text, since a kind made from a person's words is worded from them. A
+checkpoint without these optional fields keeps its digest.
 
 Every string in a checkpoint or evidence file is also scanned by value. A value shaped like a
 local filesystem path or a credential (token prefixes, bearer values, private key headers) is
@@ -859,7 +863,11 @@ kind its workspace made, or of a shipped kind whose class is `being`) come from 
 version's character records (`GET /world/versions/{version}/things/characters`, in the
 [things contract](things-contract.md#who-a-placed-being-is)); an API that does not serve it is asked
 each being's card instead where the version has a society
-(`GET /world/versions/{version}/society/things/{subject}`).
+(`GET /world/versions/{version}/society/things/{subject}`). A world made from a world kind has its
+parts read (`GET /world/versions/{version}/parts`, the [made parts read](world-objects-contract.md#15-a-site-worlds-made-parts)) only when
+the version's state differs from the one the project holds them for, since a part's change is an
+edit of the version; a world not made from a kind (422 `parts_not_served`) keeps none, and one
+still drawing them (503) is tried again at the next poll, never taken for having none.
 The bearer is read from a file into memory and sent only in the request header.
 Every request passes through the egress check held to the one origin the caller names
 ([security floor](security-floor.md)); plain http is accepted only for `localhost`, and redirects
@@ -1074,7 +1082,10 @@ workspace does not hold, since no route does those. A merge that changes only ev
 nothing. Model assignments are listed as to assign after the world is started: a new version has
 no society until it is started, and recording an assignment authorizes later model spending.
 Personalities are listed for the world's owner to write in the world: who a character is reaches
-its model's input, so a merge never writes one. Evidence, the link and dependency files are never
+its model's input, so a merge never writes one. A made world's part changes are listed against the
+version as it reads now ("Moved the bench 2 m east", "Raised the tea house to 4 storeys", "Removed
+the pond") for a person to make in
+build mode; replaying them on a new version waits for a test that a part's change holds there. Evidence, the link and dependency files are never
 applied.
 
 `apply` needs `--allow-world-write` and the review digest, which binds the merge commit, the edits,
@@ -1111,8 +1122,8 @@ files included (`exulanica/world_package/projects/rights.py`), and refuse, writi
 
 - **Written words reach only a private repository.** A file carrying a `readable` record (what a
   decision was told, the labels it was offered, its choice and its line), in an evidence file or
-  in the checkpoint's own records, or a checkpoint carrying the world's title or a character's
-  words, goes only to a repository whose visibility reads `PRIVATE`. A public or internal
+  in the checkpoint's own records, or a checkpoint carrying the world's title, a character's
+  words or a made part's label, goes only to a repository whose visibility reads `PRIVATE`. A public or internal
   repository, or one whose visibility GitHub does not state, receives none, read again on every
   review, so a repository made public after linking is refused too. A project kept without
   readable text reaches a public repository, its characters called by their kinds.

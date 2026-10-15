@@ -19,6 +19,7 @@ from exulanica.world_package.projects.words import (
     capital,
     model_name,
     names,
+    part_names,
     plural,
     possessive,
     quoted,
@@ -64,6 +65,56 @@ def turn(before: dict[str, Any], after: dict[str, Any]) -> str | None:
     if degrees == 180:
         return "round"
     return f"{degrees}°" if degrees else "slightly"
+
+
+def _part_turn(before: int, after: int) -> str | None:
+    """A made part turns in whole quarter turns: "90°" either way, half a turn "round"."""
+    quarters = (after - before) % 4
+    return {0: None, 1: "90°", 2: "round", 3: "90°"}[quarters]
+
+
+def parts_changed(
+    old: Mapping[str, Any] | None, new: Mapping[str, Any], *, kept: bool = True
+) -> list[str]:
+    """Build mode's words for a made world's parts: moved, turned, raised or lowered, removed and
+    put back. With
+    `kept`, a checkpoint that keeps its parts for the first time says so in one sentence."""
+    after = {p["part_id"]: p for p in new.get("parts") or []}
+    if not after:
+        return []
+    before = {p["part_id"]: p for p in (old or {}).get("parts") or []}
+    if not before:
+        standing = sum(1 for p in after.values() if not p["removed"])
+        return [f"Kept the {plural(standing, 'part')} this world was made with"] if kept else []
+    called = part_names([old, new])
+    lines = []
+    for part_id in sorted(after):
+        was, now = before.get(part_id), after[part_id]
+        if was is None or was == now:
+            continue
+        name = called[part_id]
+        if now["removed"] != was["removed"]:
+            lines.append(f"Removed {name}" if now["removed"] else f"Put {name} back")
+            continue
+        if now["removed"]:
+            continue
+        moved = []
+        for axis, positive, negative in ((0, "east", "west"), (1, "north", "south")):
+            delta = now["centre_mm"][axis] - was["centre_mm"][axis]
+            if delta:
+                moved.append(f"{metres(delta)} {positive if delta > 0 else negative}")
+        turned = _part_turn(was["quarter_turns"], now["quarter_turns"])
+        if moved:
+            lines.append(
+                f"Moved {name} {' and '.join(moved)}" + (f", turned {turned}" if turned else "")
+            )
+        elif turned:
+            lines.append(f"Turned {name} {turned}")
+        storeys = (was.get("storeys"), now.get("storeys"))
+        if None not in storeys and storeys[0] != storeys[1]:
+            verb = "Raised" if storeys[1] > storeys[0] else "Lowered"
+            lines.append(f"{verb} {name} to {plural(storeys[1], 'storey')}")
+    return lines
 
 
 def _moved(name: str, before: dict[str, Any], after: dict[str, Any]) -> str | None:
@@ -149,6 +200,7 @@ def summarize(before: Any | None, after: Any, *, quote: bool = False) -> list[st
     if old is None:
         return [
             f"Started the project with {plural(len(new['things']), 'thing')}",
+            *parts_changed(None, new),
             *_characters(None, new, called, quote),
             *_models(None, new, called),
             *(
@@ -162,7 +214,9 @@ def summarize(before: Any | None, after: Any, *, quote: bool = False) -> list[st
         lines.append("Renamed the project")
     if old["forked_from"] != new["forked_from"] and new["forked_from"] is not None:
         lines.append("Started this project as a copy of another")
-    if old["source"] != new["source"]:
+    # Every edit changes the version's state: only another version is worth a sentence; the edit
+    # itself is said by what it changed.
+    if old["source"]["version_id"] != new["source"]["version_id"]:
         lines.append("Followed another version of the world")
     if old.get("title") != new.get("title") and new.get("title") is not None:
         lines.append(
@@ -192,6 +246,7 @@ def summarize(before: Any | None, after: Any, *, quote: bool = False) -> list[st
             lines.append(f"Changed what kind of thing {name} is")
         if was["origin"] != now["origin"]:
             lines.append(f"Changed where {name} came from")
+    lines += parts_changed(old, new)
     lines += _characters(old, new, called, quote)
     lines += _models(old, new, called)
 

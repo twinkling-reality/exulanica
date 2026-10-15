@@ -25,6 +25,12 @@ from exulanica.world.placed_things import ThingKindReference, shipped_kind
 
 #: What a being of a kind its workspace made is called where no name is kept.
 MADE_BEING: Final = "creature made in this world"
+#: What a part a world was made with is called where its label is not kept, by its kind.
+PART_NOUNS: Final = {
+    "building": "building",
+    "fixture": "thing made with this world",
+    "area": "area",
+}
 #: The smallest amount said in dollars and cents to four places.
 SMALLEST: Final = Decimal("0.0001")
 _ORDINALS: Final = (
@@ -121,6 +127,32 @@ def names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
     return called
 
 
+def part_names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
+    """What each made part of these checkpoints is called: "the" and its label where the project
+    keeps it, else its kind ("the building", "the second area"); an earlier checkpoint names a
+    part a later one keeps as removed."""
+    parts: dict[str, Mapping[str, Any]] = {}
+    for world in worlds:
+        for part in (world or {}).get("parts") or []:
+            known = parts.get(part["part_id"])
+            parts[part["part_id"]] = part if part["kind"] is not None or known is None else known
+    called: dict[str, str] = {}
+    by_noun: dict[str, list[str]] = {}
+    for part_id in sorted(parts):
+        part = parts[part_id]
+        label = part.get("label")
+        noun = (
+            label[:1].lower() + label[1:]
+            if label
+            else PART_NOUNS.get(part["kind"] or "", "part made with this world")
+        )
+        by_noun.setdefault(noun, []).append(part_id)
+    for noun, ids in by_noun.items():
+        for index, part_id in enumerate(ids):
+            called[part_id] = f"the {noun}" if index == 0 else f"the {_ordinal(index + 1)} {noun}"
+    return called
+
+
 def _ordinal(number: int) -> str:
     if 2 <= number <= len(_ORDINALS) + 1:
         return _ORDINALS[number - 2]
@@ -146,10 +178,14 @@ def quoted(text: str) -> str:
 
 def without_words(world: Mapping[str, Any]) -> dict[str, Any]:
     """A checkpoint with every word a person wrote left out (its title, its characters' names
-    and personalities), as a repository that is not private is told it."""
+    and personalities, its made parts' labels), as a repository that is not private is told it."""
     kept = {key: value for key, value in world.items() if key != "title"}
     if world.get("characters") is not None:
         kept["characters"] = [
             {key: value for key, value in c.items() if key != "words"} for c in world["characters"]
+        ]
+    if world.get("parts") is not None:
+        kept["parts"] = [
+            {key: value for key, value in part.items() if key != "label"} for part in world["parts"]
         ]
     return kept

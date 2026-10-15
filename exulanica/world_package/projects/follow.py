@@ -255,6 +255,7 @@ def read_world(
     listing = sessions_listing(reader, version)
     session = None
     revisions: dict[tuple[str, str, str], str] = {}
+    parts_known: dict[str, Any] | None = None
     if project is not None:
         # The revision the project knows last: pending in the folder, else its last commit.
         try:
@@ -264,6 +265,9 @@ def read_world(
         revisions = {
             (m["thing_id"], m["provider"], m["model_id"]): m["revision"] for m in world["models"]
         }
+        # A made world's parts change only with its version: read again only when it changed.
+        if world.get("parts") is not None:
+            parts_known = {"state_sha256": world["source"]["state_sha256"], "parts": world["parts"]}
         if listing is not None and settings["sessions"] is not None:
             try:
                 session = due_session(
@@ -285,6 +289,7 @@ def read_world(
         readable=settings["readable"],
         living_session=session,
         revisions=revisions,
+        parts_known=parts_known,
         now=now,
     )
     if session is not None and captured.evidence is None and passed is not None:

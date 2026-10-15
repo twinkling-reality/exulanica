@@ -164,6 +164,21 @@ class WorldReader:
             return None
         return self._decoded(route, self._ok(route, response))
 
+    def json_unless_refused(self, route: str, path: str, code: str, **params: Any) -> Any:
+        """As `json_if_found`, except that the world's refusal named `code` (422) is None too:
+        what is read does not exist for this world."""
+        response = self._send(route, path, {"world_id": self.world_id, **params})
+        if response.status_code == 404:
+            return None
+        if response.status_code == 422:
+            try:
+                answered = response.json()
+            except ValueError:
+                answered = None
+            if isinstance(answered, dict) and answered.get("code") == code:
+                return None
+        return self._decoded(route, self._ok(route, response))
+
     def raw(self, route: str, path: str) -> bytes:
         return self._get(route, path, {}).content
 
@@ -398,6 +413,69 @@ def _characters(
     return found
 
 
+def _parts(
+    reader: WorldReader,
+    version: str,
+    state_sha256: str,
+    readable: bool,
+    known: Mapping[str, Any] | None,
+) -> list[dict[str, Any]] | None:
+    """A site world's made parts as the version has them, or None where it was not made from a
+    world kind (422 ``parts_not_served``). Read again only when the version's state differs from
+    the one the project holds them for, since a part's change is an edit of the version; while
+    the world is still drawing them the read fails, to be tried at the next poll, and is never
+    taken for no parts. Labels only with readable text: a world made from a person's words is
+    worded from them. An API that serves no parts read (404) is read as a world with none."""
+    if (
+        known is not None
+        and known.get("state_sha256") == state_sha256
+        and isinstance(known.get("parts"), list)
+        # Labels are kept with readable text and only with it: a change of that setting reads
+        # the parts again.
+        and readable == any("label" in p for p in known["parts"])
+    ):
+        return [dict(part) for part in known["parts"]]
+    return read_parts(reader, version, readable=readable)
+
+
+def read_parts(reader: WorldReader, version: str, *, readable: bool) -> list[dict[str, Any]] | None:
+    """One read of a version's made parts as a checkpoint keeps them, or None where it has
+    none."""
+    answered = reader.json_unless_refused(
+        "GET parts", f"/world/versions/{version}/parts", "parts_not_served"
+    )
+    if answered is None:
+        return None
+    standing = []
+    for part in answered["parts"]:
+        entry: dict[str, Any] = {
+            "part_id": part["part_id"],
+            "kind": part["kind"],
+            "centre_mm": [int(part["centre_mm"][0]), int(part["centre_mm"][1])],
+            "quarter_turns": int(part["quarter_turns"]),
+            "removed": False,
+        }
+        label = _written(part.get("label")) if readable else None
+        if label is not None:
+            entry["label"] = label[:500]
+        if type(part.get("storeys")) is int and part["kind"] == "building":
+            entry["storeys"] = part["storeys"]
+        standing.append(entry)
+    held = {part["part_id"] for part in standing}
+    removed = [
+        {
+            "part_id": change["identity"],
+            "kind": None,
+            "centre_mm": None,
+            "quarter_turns": int(change["quarter_turns"]),
+            "removed": True,
+        }
+        for change in answered["changes"]
+        if change.get("removed") and change["identity"] not in held
+    ]
+    return standing + removed
+
+
 def _instant(value: str) -> str:
     """A UTC instant to the second, in the evidence format's one spelling."""
     return datetime.fromisoformat(value).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -466,6 +544,7 @@ def capture(
     session_id: str | None = None,
     living_session: str | None = None,
     revisions: Mapping[tuple[str, str, str], str] | None = None,
+    parts_known: Mapping[str, Any] | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     progress: Callable[[str], None] | None = None,
 ) -> Capture:
@@ -489,6 +568,10 @@ def capture(
     record's revision, so a change is still seen. Those come from one read of the version's
     character records, or, from an API without it, from each being's card where the version has
     a society.
+
+    A world made from a world kind also has its made parts kept, as the version has them
+    (moved, turned or removed by a person); `parts_known` is what the project holds for them and
+    the version state it holds them for, so they are read again only when the version changed.
     """
     note = progress or (lambda _: None)
     version = segment(version_id)
@@ -736,6 +819,7 @@ def capture(
             bindings_used[decision["binding_sha256"]] = binding
 
     characters = _characters(reader, version, things, readable, cards=include_models)
+    parts = _parts(reader, version, view["state_sha256"], readable, parts_known)
     source = {
         "world_id": reader.world_id,
         "version_id": version_id,
@@ -778,6 +862,7 @@ def capture(
             "decisions": decisions,
             **({"title": title} if (title := _title(view, readable)) is not None else {}),
             **({"characters": characters} if characters else {}),
+            **({"parts": parts} if parts is not None else {}),
         }
     )
     return Capture(

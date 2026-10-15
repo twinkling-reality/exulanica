@@ -167,6 +167,33 @@ class Character(Closed):
     words: CharacterWords | None = None
 
 
+class Part(Closed):
+    """A part a site world was made with, as the version has it: standing at its centre (east,
+    north, millimetres) turned a whole number of quarter turns from how it was made, a building
+    with its storeys, or removed.
+    Its label only where the project keeps readable text: a world made from a person's words was
+    worded from them. A part removed before the project kept it is known by its identity alone."""
+
+    part_id: Name
+    kind: Literal["building", "fixture", "area"] | None
+    centre_mm: Annotated[list[int], Field(min_length=2, max_length=2)] | None
+    quarter_turns: Annotated[int, Field(ge=0, le=3)]
+    removed: bool
+    label: Label | None = None
+    #: How many storeys a building stands, where the parts read states it.
+    storeys: Annotated[int, Field(ge=1, le=64)] | None = None
+
+    @model_validator(mode="after")
+    def standing(self) -> Self:
+        if self.removed != (self.centre_mm is None):
+            raise ValueError("a standing part has its centre, and only a standing one")
+        if self.storeys is not None and self.kind != "building":
+            raise ValueError("only a standing building has storeys")
+        if not self.removed and self.kind is None:
+            raise ValueError("a standing part says what kind of part it is")
+        return self
+
+
 class Option(Closed):
     option_id: Name
     action: Name
@@ -369,6 +396,8 @@ class Checkpoint(Closed):
     title: Annotated[str, Field(min_length=1, max_length=TITLE_MAXIMUM)] | None = None
     #: The selected beings whose owner wrote who they are.
     characters: Annotated[list[Character], Field(max_length=256)] | None = None
+    #: A site world's made parts as the version has them, where it was made from a world kind.
+    parts: Annotated[list[Part], Field(max_length=2_048)] | None = None
 
     @model_validator(mode="after")
     def references(self) -> Self:
@@ -378,6 +407,7 @@ class Checkpoint(Closed):
         unique(self.region_ids, "region")
         unique([t.thing_id for t in self.things], "thing")
         unique([c.thing_id for c in self.characters or []], "character")
+        unique([p.part_id for p in self.parts or []], "part")
         unique([m.thing_id for m in self.models], "model assignment")
         unique([d.record_id for d in self.decisions], "decision")
         unique([d.sha256 for d in self.dependencies], "dependency")
