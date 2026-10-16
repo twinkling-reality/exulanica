@@ -423,6 +423,15 @@ off the site and are named by their own drawing, `exulanica.landscape-drawing/v1
 the site's. The application draws them round the site in rock
 ([landscape contract](landscape-contract.md#readers-in-the-browser)).
 
+A site made on a placed volume's top (composer version 7, [landscape
+contract](landscape-contract.md#a-site-on-a-volumes-top)) serves `exulanica.site-drawing/v6`:
+version 5's slots, drape and arrival standing on the volume's graded top, and a `top` section in
+place of `land` naming the graded top by digest (`exulanica.site-top/v1`, served by
+`GET /world/versions/{version_id}/land/top`), the landscape and placement, the site's corner in the
+volume's frame, the water on the top and the cells drawn as land. It has no land chunks or
+backdrop. Its landscape is drawn as `exulanica.landscape-drawing/v2`, with the land below the
+volume served by digest. The application does not draw version 6 yet.
+
 A style pack dresses a slot by its look role and never changes it. Nothing in the drawing decides a
 look.
 
@@ -470,18 +479,21 @@ stages.
 | `POST /worlds/kinds/{kind}/worlds` | world write | Makes a world of a kind with a preset, values and a title, and saves its entry; the latest version unless one is named; a body over 16,384 bytes is refused 413 before it is read; 503 when the worker cannot answer in time |
 | `GET /world/versions/{version_id}/site` | world read | The drawing, served only to the world whose snapshot names its receipt, with its digest as the entity tag; made in the kind worker and kept, 503 with a `Retry-After` while it cannot be |
 | `GET /world/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}` | world read | One chunk of a site's graded land (`exulanica.landform-chunk/v1`), with its digest as the entity tag, made and kept with the drawing; 404 `land_unavailable` for a level world, 404 `land_chunk_unavailable` for a chunk the land does not hold |
-| `GET /world/versions/{version_id}/land/backdrop` | world read | The site's land drawn to the horizon (`exulanica.landform-backdrop/v1`), with its digest as the entity tag; 404 `land_unavailable` for a level world |
+| `GET /world/versions/{version_id}/land/backdrop` | world read | The site's land drawn to the horizon (`exulanica.landform-backdrop/v1`), with its digest as the entity tag; 404 `land_unavailable` for a level world or a world on a volume's top |
+| `GET /world/versions/{version_id}/land/top` | world read | The graded top a site on a placed volume's top stands on (`exulanica.site-top/v1`), with its digest as the entity tag, made and kept with the drawing; 404 `land_unavailable` for a level world or a world on land |
 | `GET /world/versions/{version_id}/land` | world read | A town on its land's land section (`exulanica.town-land/v1`): the digests of its chunks and backdrop, served by the two routes above, and its water, with its digest as the entity tag, made in the kind worker and kept by the town's receipt ([landform contract](landform-contract.md#towns-on-land)); 404 `land_unavailable` for a town on level ground, 404 `unknown_reference` for any other world |
-| `GET /world/versions/{version_id}/landscape` | world read | A site on a landscape: its landscape drawing (`exulanica.landscape-drawing/v1`), with its digest as the entity tag, made in the kind worker after the site's drawing and kept, 503 with a `Retry-After` while it cannot be; 404 `landscape_unavailable` for a world on no landscape |
+| `GET /world/versions/{version_id}/landscape` | world read | A site on a landscape: its landscape drawing (`exulanica.landscape-drawing/v1`, or `/v2` for a site on a volume's top), with its digest as the entity tag, made in the kind worker after the site's drawing and kept, 503 with a `Retry-After` while it cannot be; 404 `landscape_unavailable` for a world on no landscape |
 | `GET /world/versions/{version_id}/landscape/chunk?sha256=` | world read | One chunk of a placed volume's surface (`exulanica.volume-chunk/v1`) the landscape drawing names by that digest; 404 `landscape_document_unavailable` for a digest it does not name as a chunk |
 | `GET /world/versions/{version_id}/landscape/top?sha256=` | world read | One walkable top of a placed volume (`exulanica.volume-sheet/v1`) the landscape drawing names by that digest; 404 `landscape_document_unavailable` otherwise |
+| `GET /world/versions/{version_id}/landscape/ground?sha256=` | world read | A world on a volume's top: one chunk (`exulanica.landform-chunk/v1`) or the backdrop (`exulanica.landform-backdrop/v1`) of the land below it, which its landscape drawing (`exulanica.landscape-drawing/v2`) names by that digest; 404 `landscape_document_unavailable` otherwise |
 
 Making a world answers 404 for an unknown kind or preset, 422 for a value the kind does not offer
 (naming the key, the value and the range) or an empty title, 422 for a `land` document the landform
 catalog refuses (naming its `path`) and 422 `landform_not_served` for land asked with a support
 declaration or of the town where the deployment makes no worlds on land (`EXULANICA_WORLDS_ON_LAND`),
 422 for a `landscape` document refused by its readers or that does not fit its site (naming its
-`path` and code, [landscape contract](landscape-contract.md#refusals)) and 422
+`path` and code, [landscape contract](landscape-contract.md#refusals), a kind whose people come
+from homes off the site or a site off a volume's top or its rock among them) and 422
 `landscape_not_served` for a landscape asked of the town or beside land or a support declaration,
 409 with every refusal when no candidate makes a world people can live in (on land, when no
 candidate's layout the land can take; a town on land tries one identity), 409 when the workspace holds as many generated worlds

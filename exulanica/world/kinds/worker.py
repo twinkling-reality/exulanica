@@ -531,40 +531,50 @@ def drawing_job(
     return {"status": "done", **_drawn(world_id, receipt, receipt_sha256, found)}
 
 
+#: Which landscape route serves a document the landscape drawing names, by its profile.
+_LANDSCAPE_DOCUMENTS: Final = {
+    "exulanica.volume-chunk/v1": "chunks",
+    "exulanica.volume-sheet/v1": "tops",
+    "exulanica.landform-chunk/v1": "ground",
+    "exulanica.landform-backdrop/v1": "ground",
+}
+
+
 def landscape_job(
-    world_id: str, receipt: dict[str, Any], receipt_sha256: str, site_drawing_sha256: str
+    world_id: str,
+    receipt: dict[str, Any],
+    receipt_sha256: str,
+    site_drawing_sha256: str,
+    top: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A site on a landscape's landscape drawing, naming the site's drawing by
-    ``site_drawing_sha256``: its volumes realized from the receipt alone, the drawing as the bytes
-    a response carries with its digest, and every chunk and top it names as bytes by its digest
-    (``chunks``, ``tops``), which the landscape routes serve; or the reason the receipt's
-    landscape no longer reads."""
+    ``site_drawing_sha256``: its volumes realized from the receipt alone (a site on a volume's top
+    capping that volume by ``top``, the graded top kept with its site drawing), the drawing as the
+    bytes a response carries with its digest, and every document it names as bytes by its digest
+    (``chunks`` and ``tops`` of its volumes, and ``ground``, the land under a site on a volume's
+    top), which the landscape routes serve; or the reason the receipt's landscape no longer
+    reads."""
     from exulanica.world.errors import InvalidStructuralData
     from exulanica.world.landscape_drawing import landscape_drawing, landscape_drawing_sha256
 
     try:
         landscape, bodies = landscape_drawing(
-            world_id, receipt, receipt_sha256, site_drawing_sha256
+            world_id, receipt, receipt_sha256, site_drawing_sha256, top
         )
     except InvalidStructuralData as exc:
         return {"status": "refused", "detail": str(exc)}
+    served: dict[str, dict[str, bytes]] = {kind: {} for kind in ("chunks", "tops", "ground")}
+    for digest, document in bodies.items():
+        served[_LANDSCAPE_DOCUMENTS[document["profile"]]][digest] = json.dumps(
+            document, separators=(",", ":")
+        ).encode("utf-8")
     return {
         "status": "done",
         "body": json.dumps(
             landscape, ensure_ascii=False, allow_nan=False, separators=(",", ":")
         ).encode("utf-8"),
         "sha256": landscape_drawing_sha256(landscape),
-        **{
-            kind: {
-                digest: json.dumps(document, separators=(",", ":")).encode("utf-8")
-                for digest, document in bodies.items()
-                if document["profile"] == profile
-            }
-            for kind, profile in (
-                ("chunks", "exulanica.volume-chunk/v1"),
-                ("tops", "exulanica.volume-sheet/v1"),
-            )
-        },
+        **served,
     }
 
 
@@ -683,29 +693,39 @@ def part_job(
 def _graded(
     receipt: Mapping[str, Any], changed: tuple[object, ...], part_id: str
 ) -> dict[str, Any] | None:
-    """On a world on land, whether its land takes the changed layout: None where it does (or the
-    world stands on level ground), else the refusal by the land grader's code with a sentence a
-    person reads (:data:`~exulanica.world.site_parts.LAND_WORDS`) and the grader's own detail in
-    ``where``. The graded land is kept by the records' digest, so the drawing and the place that
-    follow read it again rather than grading twice."""
+    """On a world on land, whether its land takes the changed layout, and on a world on a volume's
+    top whether its graded top still stands on the volume's rock: None where it does (or the world
+    stands on level ground), else the refusal by the land grader's or the rock rule's code with a
+    sentence a person reads (:data:`~exulanica.world.site_parts.LAND_WORDS`) and the grader's own
+    detail in ``where``. The graded land is kept by the records' digest, so the drawing and the
+    place that follow read it again rather than grading twice."""
+    from exulanica.grammar.grammars.site.records import SiteExtentRecord
     from exulanica.grammar.landform import LandformRefused
+    from exulanica.grammar.landscape import LandscapeRefused
     from exulanica.world.composers.site_plan import ON_LAND_VERSIONS, receipt_routine
     from exulanica.world.errors import InvalidStructuralData
     from exulanica.world.site_land import site_land_of
+    from exulanica.world.site_on_top import TopWorld, check_on_rock
     from exulanica.world.site_parts import LAND_WORDS, LAND_WORDS_OTHERWISE, PART_CODES
 
     if receipt["composer"]["version"] not in ON_LAND_VERSIONS:
         return None
     try:
-        site_land_of(
+        ground = site_land_of(
             receipt, changed, receipt_routine(receipt).policy["footway_station_spacing_mm"]
         )
+        if isinstance(ground, TopWorld):
+            # A world on a volume's top: the changed ground must still stand on its rock.
+            extent = next(r for r in changed if isinstance(r, SiteExtentRecord))
+            check_on_rock(
+                ground.field, ground.site.on, extent.width_mm, extent.depth_mm, ground.height_at
+            )
     except InvalidStructuralData as exc:
         # The receipt's land no longer reads under this code (its rules or document): the world's
         # refusal, as its records' would be, not the move's. Regenerating its records reads the
         # same land first, so this is not met after they read.
         return {"status": "refused", "code": "kind_place_refused", "detail": str(exc)}
-    except LandformRefused as exc:
+    except (LandformRefused, LandscapeRefused) as exc:
         return {
             "status": "refused",
             "code": exc.code if exc.code in PART_CODES else "landform_invalid",

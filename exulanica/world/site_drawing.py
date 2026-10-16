@@ -39,6 +39,14 @@ building and its rooms stand level on their terrace), the arrival at its height,
 land's digest, each 128 m chunk's place and digest, the backdrop's digest and the water over the
 land. The chunks and the backdrop themselves are served by digest
 (:mod:`exulanica.world.site_land`).
+
+A site laid out on a placed volume's top (composer version 7) serves
+``exulanica.site-drawing/v6``: version 5's slots, drape and arrival standing on the graded top, with
+``top`` in place of ``land`` (:meth:`~exulanica.world.site_on_top.TopWorld.drawing_section`): the
+graded top's digest, served by digest as ``exulanica.site-top/v1``, the landscape and placement it
+is a top of, the site's corner in the volume's frame, the water on it and the cells drawn as land,
+as runs. The page draws those cells as it draws land, dressed by the pack as land is, and the
+volume's own rock draws the rest of the top to its rim and the rim's face below it.
 Every earlier version is unchanged.
 """
 
@@ -66,6 +74,7 @@ __all__ = [
     "DRAWING_PROFILE",
     "LAND_DRAWING_PROFILE",
     "LAYER_MM",
+    "TOP_DRAWING_PROFILE",
     "site_drawing",
     "site_drawing_sha256",
 ]
@@ -76,6 +85,8 @@ DRAWING_PROFILE: Final = "exulanica.site-drawing/v1"
 #: the drawing they serve.
 LAND_DRAWING_COMPOSER_VERSIONS: Final = (5, 6)
 LAND_DRAWING_PROFILE: Final = "exulanica.site-drawing/v5"
+#: The drawing a site on a placed volume's top serves (``site_plan.TOP_COMPOSER_VERSION``).
+TOP_DRAWING_PROFILE: Final = "exulanica.site-drawing/v6"
 #: How far above the ground each kind of surface lies, so planes never share a height.
 LAYER_MM: Final = {"ground": 0, "zone": 6, "path": 12, "area": 18, "floor": 24}
 #: A flat roof's slab, and a gable's rise per millimetre of its span (seven twentieths, a pitch
@@ -497,7 +508,9 @@ def site_drawing(
 
         drawing["profile"] = "exulanica.site-drawing/v2"
         drawing["support"] = receipt_support(receipt, tuple(records)).adapter_document()
-    if receipt["composer"]["version"] in LAND_DRAWING_COMPOSER_VERSIONS:
+    from exulanica.world.composers.site_plan import TOP_COMPOSER_VERSION
+
+    if receipt["composer"]["version"] in (*LAND_DRAWING_COMPOSER_VERSIONS, TOP_COMPOSER_VERSION):
         _on_land(drawing, receipt, records)
     return drawing
 
@@ -505,8 +518,10 @@ def site_drawing(
 def _on_land(
     drawing: dict[str, Any], receipt: Mapping[str, Any], records: Sequence[object]
 ) -> None:
-    """Stand a version 1 drawing on its graded land, as ``exulanica.site-drawing/v5``."""
+    """Stand a version 1 drawing on its graded land, as ``exulanica.site-drawing/v5``, or on the
+    graded top of the volume it stands on, as ``exulanica.site-drawing/v6``."""
     from exulanica.world.composers.site_plan import receipt_land
+    from exulanica.world.site_on_top import TopWorld
 
     land = receipt_land(receipt, tuple(records))
     extent = next(r for r in records if isinstance(r, SiteExtentRecord))
@@ -539,5 +554,9 @@ def _on_land(
         slot["positionMm"] = [x, y, land.height_at(x, y) + z]
     east, north = receipt["arrival"]["position_mm"]
     drawing["arrival"]["positionMm"] = [east, north, land.height_at(east, north)]
+    if isinstance(land, TopWorld):
+        drawing["profile"] = TOP_DRAWING_PROFILE
+        drawing["top"] = land.drawing_section()
+        return
     drawing["profile"] = LAND_DRAWING_PROFILE
     drawing["land"] = land.drawing_section()

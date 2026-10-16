@@ -21,7 +21,9 @@ world it made as a structural snapshot and a receipt:
   earlier refusal; the seed; the subject identity; the generation's output digest; and where a
   person arrives. The element's streaming key names the receipt's digest, so the snapshot binds it.
 * **Where a person arrives**: on the spine, :data:`ARRIVAL_INSIDE_MM` in from the entry, facing
-  into the site.
+  into the site; on a volume's top (version 7), on the open top outside the gate, facing the
+  nearest open rim away from the site (:func:`~exulanica.world.site_on_top.arrival_beyond_gate`,
+  :func:`~exulanica.world.site_on_top.open_rim_facing`).
 
 A receipt whose kind document, routine catalogs or grammar no longer read the same, or whose records
 come out otherwise, is refused by name (``generated_world_*``), never generated into something else.
@@ -34,7 +36,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.grammar.errors import InvalidParameterError
 from exulanica.grammar.grammars.site import (
@@ -52,7 +54,12 @@ from exulanica.grammar.grammars.site.records import (
     SitePathRecord,
 )
 from exulanica.grammar.landform import LandformRefused, land_rules, read_land_document
-from exulanica.grammar.landscape import LandscapeRefused, check_volumes_apart, landscape_rules
+from exulanica.grammar.landscape import (
+    LandscapeDocument,
+    LandscapeRefused,
+    check_volumes_apart,
+    landscape_rules,
+)
 from exulanica.world.composers import (
     RECEIPT_PROFILE,
     ComposedWorld,
@@ -77,6 +84,17 @@ from exulanica.world.landscape_drawing import (
     receipt_landscape,
 )
 from exulanica.world.site_land import SiteLand, check_receipt_land_rules, site_land_of
+from exulanica.world.site_on_top import (
+    AWAY_FROM_SITE,
+    arrival_beyond_gate,
+    check_on_rock,
+    natural_top,
+    on_top,
+    open_rim_facing,
+    top_field,
+    top_rules,
+)
+from exulanica.world.site_top import TOP_DATUM, OnTop, site_top
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_site_place import (
     CAPSULE_RADIUS_MM,
@@ -88,6 +106,9 @@ from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_S
 from exulanica.world.structure import SpatialCandidate
 from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
 
+if TYPE_CHECKING:
+    from exulanica.world.site_on_top import TopWorld
+
 __all__ = [
     "ARRIVAL_INSIDE_MM",
     "COMPOSER_KEY",
@@ -95,10 +116,12 @@ __all__ = [
     "DESTINATION_ID",
     "ELEMENT_ID",
     "LANDSCAPE_COMPOSER_VERSION",
+    "LANDSCAPE_VERSIONS",
     "LAND_COMPOSER_VERSION",
     "ON_LAND_VERSIONS",
     "REGION_ID",
     "SITE_MODULE",
+    "TOP_COMPOSER_VERSION",
     "check_receipt",
     "compose",
     "compose_kind",
@@ -120,14 +143,21 @@ LAND_COMPOSER_VERSION: Final = 5
 #: The composer version of a site laid out on a landscape: version 5's receipt, its land the
 #: landscape's, and the landscape document with its digest and the landscape rules beside it.
 LANDSCAPE_COMPOSER_VERSION: Final = 6
+#: The composer version of a site laid out on a placed volume's top in a landscape: version 6's
+#: receipt, its landscape stating the site, and its land the volume's top land under the land
+#: rules the landscape's volume rules name for a top land.
+TOP_COMPOSER_VERSION: Final = 7
 #: The versions whose site is laid out on land, graded and drawn on it.
-ON_LAND_VERSIONS: Final = (LAND_COMPOSER_VERSION, LANDSCAPE_COMPOSER_VERSION)
+ON_LAND_VERSIONS: Final = (LAND_COMPOSER_VERSION, LANDSCAPE_COMPOSER_VERSION, TOP_COMPOSER_VERSION)
+#: The versions whose receipt carries a landscape.
+LANDSCAPE_VERSIONS: Final = (LANDSCAPE_COMPOSER_VERSION, TOP_COMPOSER_VERSION)
 COMPOSER_VERSIONS: Final = (
     1,
     2,
     *TERRAIN_COMPOSER_VERSIONS,
     LAND_COMPOSER_VERSION,
     LANDSCAPE_COMPOSER_VERSION,
+    TOP_COMPOSER_VERSION,
 )
 REGION_ID: Final = "region:generated"
 DESTINATION_ID: Final = "destination:region:generated"
@@ -369,7 +399,14 @@ def compose_kind(
     (:func:`~exulanica.world.landscape_drawing.place_landscape_on_site`) and their rock apart,
     realized as its drawing realizes it (:func:`~exulanica.grammar.landscape.check_volumes_apart`,
     held for new worlds only: a receipt is never held to it), or it is refused as
-    :class:`~exulanica.grammar.landscape.LandscapeRefused`. Refused as
+    :class:`~exulanica.grammar.landscape.LandscapeRefused`. With a landscape that states a ``site``
+    on a placed volume's top, the site is laid out and graded on that top instead
+    (:mod:`exulanica.world.site_on_top`), as composer version :data:`TOP_COMPOSER_VERSION`: a kind
+    whose people come in from homes off the site is refused, since nothing lies beyond a top; the
+    kind's plan is held inside the top's square and on its rock before any candidate is laid out,
+    and the kept candidate's graded top on the rock again; its land is the volume's top land, and a
+    person arrives on the open top outside the site's gate, facing the nearest open rim away from
+    the site. Refused as
     :func:`~exulanica.world.kinds.samples.compose_site` refuses
     (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate named)."""
     if base_routine is None:
@@ -380,6 +417,7 @@ def compose_kind(
     routine = overlay_routine(base_routine, overlay)
     document = None
     stated_landscape = None
+    on: OnTop | None = None
     if landscape is not None:
         if land is not None or support is not None:
             raise LandscapeRefused(
@@ -389,14 +427,10 @@ def compose_kind(
                 code="landscape_not_served",
             )
         stated_landscape = read_site_landscape(landscape)
-        if stated_landscape.site is not None:
-            raise LandscapeRefused(
-                "a site is not laid out on a volume's top yet: a site on a landscape stands on "
-                "its land",
-                path="landscape.site",
-                code="landscape_not_served",
-            )
-        document = stated_landscape.land
+        if stated_landscape.site is None:
+            document = stated_landscape.land
+        else:
+            on = _held_on_top(kind, values, world_id, stated_landscape)
     if land is not None:
         if support is not None:
             raise LandformRefused(
@@ -405,8 +439,24 @@ def compose_kind(
                 code="landform_not_served",
             )
         document = read_land_document(land)
-    world = compose_site(kind, values, world_id, routine=routine, land=document)
+    world = compose_site(kind, values, world_id, routine=routine, land=document, top=on)
     arrival = _arrival(world)
+    on_top_up_mm = 0
+    if on is not None and stated_landscape is not None:
+        top = site_top(on, world.records, routine.policy["footway_station_spacing_mm"])
+        placement, _ = on_top(stated_landscape, on.rules_version)
+        capped = top_field(
+            stated_landscape, placement, landscape_seed(world_id, stated_landscape.sha256), top
+        )
+        sized = next(r for r in world.records if isinstance(r, SiteExtentRecord))
+        check_on_rock(capped, on, sized.width_mm, sized.depth_mm, top.height_at)
+        # A person arrives on the open top outside the gate, the site behind them, facing the rim.
+        arrival["position_mm"] = arrival_beyond_gate(capped, on, top, sized.entry_x_mm)
+        facing = open_rim_facing(
+            capped, on, top, arrival["position_mm"], world.records, AWAY_FROM_SITE
+        )
+        arrival["facing_mm"] = facing if facing is not None else [0, -1000]
+        on_top_up_mm = top.height_at(*arrival["position_mm"])
     receipt = {
         "profile": RECEIPT_PROFILE,
         "world_id": world_id,
@@ -449,9 +499,16 @@ def compose_kind(
         composer_version = LAND_COMPOSER_VERSION
         graded = site_land_of(receipt, world.records, routine.policy["footway_station_spacing_mm"])
         up_mm = graded.height_at(*arrival["position_mm"])
+    if on is not None:
+        receipt["land"] = on.top.land.canonical()
+        receipt["land_sha256"] = on.top.land.sha256
+        receipt["land_rules"] = land_rules(on.rules_version)
+        composer_version = TOP_COMPOSER_VERSION
+        up_mm = on_top_up_mm
     if stated_landscape is not None:
-        extent = next(r for r in world.records if isinstance(r, SiteExtentRecord))
-        place_landscape_on_site(stated_landscape, extent.width_mm, extent.depth_mm)
+        if on is None:
+            extent = next(r for r in world.records if isinstance(r, SiteExtentRecord))
+            place_landscape_on_site(stated_landscape, extent.width_mm, extent.depth_mm)
         try:
             check_volumes_apart(stated_landscape, landscape_seed(world_id, stated_landscape.sha256))
         except LandscapeRefused as refused:
@@ -461,8 +518,9 @@ def compose_kind(
         receipt["landscape"] = stated_landscape.canonical()
         receipt["landscape_sha256"] = stated_landscape.sha256
         receipt["landscape_rules"] = landscape_rules()
-        receipt["composer"]["version"] = LANDSCAPE_COMPOSER_VERSION
-        composer_version = LANDSCAPE_COMPOSER_VERSION
+        if on is None:
+            composer_version = LANDSCAPE_COMPOSER_VERSION
+        receipt["composer"]["version"] = composer_version
     if support is not None:
         from exulanica.world.site_drawing import _site_drawing_v1
         from exulanica.world.support_site import BASE_SURFACE, attach_site_support
@@ -503,6 +561,47 @@ def compose_kind(
         records=world.records,
         place=None if place_id is None else _placed_at(supported_place, place_id),
     )
+
+
+def _held_on_top(
+    kind: KindDocument, values: Mapping[str, int], world_id: str, landscape: LandscapeDocument
+) -> OnTop:
+    """Where a landscape's site stands on a placed volume's top, once the kind is held to it: a
+    kind whose people come in from homes off the site is refused (nothing lies beyond a top), and
+    the site its plan states, grown by its margin, must lie inside the top's square and on its
+    rock under the natural top, before any candidate is laid out."""
+    society = kind.society(values)
+    if society.offsite_residents:
+        raise LandscapeRefused(
+            f"this kind brings {society.offsite_residents} people in from homes off the site "
+            f"({society.offsite_home.label}), and a site on a volume's top has nothing beyond it "
+            "for them to come from",
+            path="landscape.site",
+            code="landscape_site_offsite_homes",
+        )
+    placement, on = on_top(landscape, top_rules(landscape))
+    try:
+        plan = kind.plan(values)
+    except (InvalidParameterError, KindRefused):
+        # The site's own refusal names it when the site is laid out.
+        return on
+    side, (east, north) = on.top.side_mm, on.at_mm
+    half = side // 2
+    if not (
+        -half <= east
+        and east + plan.width_mm <= half
+        and -half <= north
+        and north + plan.depth_mm <= half
+    ):
+        raise LandscapeRefused(
+            f"the site, {plan.width_mm} by {plan.depth_mm} mm from ({east}, {north}), does not lie "
+            f"inside {placement.id}'s top, {-half} to {half} east and north",
+            path="landscape.site",
+            code="landscape_site_outside_top",
+        )
+    natural = top_field(landscape, placement, landscape_seed(world_id, landscape.sha256))
+    check_on_rock(natural, on, plan.width_mm, plan.depth_mm, natural_top(on))
+    return on
 
 
 def _placed_at(place: Mapping[str, Any], place_id: str) -> dict[str, Any]:
@@ -578,11 +677,11 @@ def check_receipt(receipt: Mapping[str, Any]) -> None:
         raise InvalidStructuralData(
             "generated_world_land_rules_changed: composer/land rules binding mismatch"
         )
-    if (composer["version"] == LANDSCAPE_COMPOSER_VERSION) != ("landscape" in receipt):
+    if (composer["version"] in LANDSCAPE_VERSIONS) != ("landscape" in receipt):
         raise InvalidStructuralData(
             "generated_world_landscape_changed: composer/landscape binding mismatch"
         )
-    if composer["version"] == LANDSCAPE_COMPOSER_VERSION:
+    if composer["version"] in LANDSCAPE_VERSIONS:
         receipt_landscape(receipt)
     elif "landscape_rules" in receipt:
         raise InvalidStructuralData(
@@ -687,9 +786,10 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
     return generated
 
 
-def receipt_land(receipt: Mapping[str, Any], generated: tuple[object, ...]) -> SiteLand:
-    """The graded land a version 5 or 6 receipt states for its regenerated records, or refused by
-    name when its land no longer reads or no longer takes its layout."""
+def receipt_land(receipt: Mapping[str, Any], generated: tuple[object, ...]) -> SiteLand | TopWorld:
+    """The graded land a version 5 or 6 receipt states for its regenerated records, or the graded
+    top a version 7 receipt's world stands on, or refused by name when its land no longer reads or
+    no longer takes its layout."""
     try:
         return site_land_of(
             receipt, generated, receipt_routine(receipt).policy["footway_station_spacing_mm"]
@@ -721,6 +821,7 @@ def society_place(
         routine=receipt_routine(receipt),
         node_limit=load_kind_catalogs().bound("walking_nodes")[1],
         ground=ground,
+        datum=TOP_DATUM if receipt["composer"]["version"] == TOP_COMPOSER_VERSION else None,
     )
 
 

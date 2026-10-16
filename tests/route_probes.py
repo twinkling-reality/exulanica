@@ -506,9 +506,13 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             },
         },
     },
-    # A landscape's chunk and top are named by a digest in the query; the version's lookup comes
-    # first, so these reach it. What the routes serve is tests/test_landscape_routes_postgres.py.
+    # A landscape's chunk, top and ground document are named by a digest in the query; the
+    # version's lookup comes first, so these reach it. What the routes serve is
+    # tests/test_landscape_routes_postgres.py and tests/test_site_on_island_postgres.py.
     "GET /world/versions/{version_id}/landscape/chunk": {
+        "params": {"world_id": FIXTURE_WORLD_ID, "sha256": _ZERO_DIGEST}
+    },
+    "GET /world/versions/{version_id}/landscape/ground": {
         "params": {"world_id": FIXTURE_WORLD_ID, "sha256": _ZERO_DIGEST}
     },
     "GET /world/versions/{version_id}/landscape/top": {

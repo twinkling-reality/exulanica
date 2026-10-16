@@ -26603,6 +26603,79 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/land/top",
+    "method": "get",
+    "id": "read_site_land_top_world_versions__version_id__land_top_get",
+    "title": "The graded top of the volume a site world stands on.",
+    "description": "Serve the graded top a site world laid out on a placed volume's top stands on\n(``exulanica.site-top/v1``: its heights on the 1 m lattice in the site's frame and the water on\nthem), held to the digest its drawing (``exulanica.site-drawing/v6``) names. A level world\nanswers 404 ``land_unavailable``, and so does a world on land, which has chunks instead.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/land",
     "method": "get",
     "id": "read_town_land_world_versions__version_id__land_get",
@@ -26837,6 +26910,89 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "id": "read_site_landscape_top_world_versions__version_id__landscape_top_get",
     "title": "One walkable top of a placed volume, by the digest the landscape drawing names.",
     "description": "Serve one walkable top (``exulanica.volume-sheet/v1``) the world's landscape drawing names\nby ``sha256``; a digest it does not name 404 ``landscape_document_unavailable``.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "sha256",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/landscape/ground",
+    "method": "get",
+    "id": "read_site_landscape_ground_world_versions__version_id__landscape_ground_get",
+    "title": "One chunk or the backdrop of the land under a world on a volume's top, by digest.",
+    "description": "Serve one chunk (``exulanica.landform-chunk/v1``) or the backdrop\n(``exulanica.landform-backdrop/v1``) of the land a world on a placed volume's top floats over,\nwhich its landscape drawing (``exulanica.landscape-drawing/v2``) names by ``sha256`` in its\n``ground``; a digest it does not name 404 ``landscape_document_unavailable``.",
     "group": "world",
     "permission": {
       "requires": [

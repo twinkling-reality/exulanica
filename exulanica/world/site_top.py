@@ -49,9 +49,11 @@ from exulanica.grammar.landform import (
 from exulanica.grammar.volumes import TopLand, realize_top_land, top_land_frame
 from exulanica.world.site_land import graded_height_at, records_digest, site_grading
 
-__all__ = ["SITE_TOP_PROFILE", "OnTop", "SiteTop", "site_top"]
+__all__ = ["SITE_TOP_PROFILE", "TOP_DATUM", "OnTop", "SiteTop", "site_top"]
 
 SITE_TOP_PROFILE: Final = "exulanica.site-top/v1"
+#: What a place's heights stand above on a site laid out on a volume's top.
+TOP_DATUM: Final = "site_local z, above the level 0 of the volume the site stands on"
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,0 +1,267 @@
+{
+  "profile": "exulanica.world-kind/v1",
+  "kind": "fixture_hamlet",
+  "version": 1,
+  "label": "A test hamlet",
+  "summary": "A hand-written test fixture: two cottages either side of a track and a vegetable stall, everyone living there.",
+  "origin": "authored",
+  "provenance": {
+    "by": "Exulanica tests"
+  },
+  "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+  },
+  "generator": {
+    "key": "site-plan",
+    "version": 1
+  },
+  "site": {
+    "enclosure": "open",
+    "width_mm": 22000,
+    "depth_mm": 22000,
+    "ground": "ground.grass",
+    "spine": "farm_track",
+    "boundary": "fence",
+    "entry_width_mm": 3000
+  },
+  "society": {
+    "employment_permille": 500,
+    "offsite_residents": 0
+  },
+  "parameters": [
+    {
+      "key": "benches",
+      "label": "How many benches",
+      "minimum": 1,
+      "maximum": 2,
+      "step": 1,
+      "reason": "Test fixture."
+    }
+  ],
+  "presets": [
+    {
+      "key": "small_hamlet",
+      "label": "A small hamlet",
+      "values": {
+        "benches": 1
+      }
+    }
+  ],
+  "use_classes": [
+    {
+      "key": "stall",
+      "label": "stall",
+      "kind": "workplace",
+      "role_key": "stallholder",
+      "role_label": "stallholder",
+      "staff_per_unit": 1,
+      "visitor_capacity": 2,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "visit"
+      ],
+      "opening_minute": 480,
+      "closing_minute": 1080,
+      "shifts": [
+        "day"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "key": "farm_track",
+      "label": "farm track",
+      "description": "a gravel track",
+      "form": "path",
+      "roles": [
+        "path",
+        "road"
+      ],
+      "look": "path.track",
+      "use_class": "",
+      "width_mm": 3000
+    },
+    {
+      "key": "fence",
+      "label": "fence",
+      "description": "a timber post and rail fence",
+      "form": "boundary",
+      "roles": [
+        "boundary"
+      ],
+      "look": "boundary.fence_wood",
+      "use_class": "",
+      "height_mm": 1200,
+      "thickness_mm": 100,
+      "gate_width_mm": 3000
+    },
+    {
+      "key": "cottage",
+      "label": "cottage",
+      "description": "a small stone cottage",
+      "form": "structure",
+      "roles": [
+        "home"
+      ],
+      "look": "structure.cottage",
+      "use_class": "",
+      "width_mm": {
+        "from": 6000,
+        "to": 7000
+      },
+      "depth_mm": {
+        "from": 4500,
+        "to": 5000
+      },
+      "storeys": 1,
+      "storey_height_mm": 2800,
+      "roof_form": "gable",
+      "roof_look": "roof.tile",
+      "wall_look": "wall.stone",
+      "door_width_mm": 1000,
+      "rooms": [
+        {
+          "part": "kitchen",
+          "count": 1
+        },
+        {
+          "part": "bedroom",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "key": "kitchen",
+      "label": "kitchen",
+      "description": "",
+      "form": "room",
+      "roles": [
+        "home"
+      ],
+      "look": "ground.floor_tile",
+      "use_class": "",
+      "share": 1,
+      "holds": []
+    },
+    {
+      "key": "bedroom",
+      "label": "bedroom",
+      "description": "",
+      "form": "room",
+      "roles": [
+        "home"
+      ],
+      "look": "ground.floor_wood",
+      "use_class": "",
+      "share": 1,
+      "holds": [
+        {
+          "part": "bed",
+          "count": 1,
+          "pattern": "back_wall"
+        }
+      ]
+    },
+    {
+      "key": "bed",
+      "label": "bed",
+      "description": "a single bed",
+      "form": "fixture",
+      "roles": [
+        "bed"
+      ],
+      "look": "fixture.bed",
+      "use_class": "",
+      "width_mm": 1000,
+      "depth_mm": 2000,
+      "height_mm": 600,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 1,
+      "blocks": 1
+    },
+    {
+      "key": "bench",
+      "label": "bench",
+      "description": "a weathered wooden bench",
+      "form": "fixture",
+      "roles": [
+        "seat"
+      ],
+      "look": "fixture.bench",
+      "use_class": "",
+      "width_mm": 1800,
+      "depth_mm": 500,
+      "height_mm": 900,
+      "seats": 2,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "stall",
+      "label": "stall",
+      "description": "a vegetable stall",
+      "form": "fixture",
+      "roles": [
+        "workplace"
+      ],
+      "look": "fixture.stall",
+      "use_class": "stall",
+      "width_mm": 2000,
+      "depth_mm": 1000,
+      "height_mm": 2200,
+      "seats": 0,
+      "stands": 2,
+      "sleepers": 0,
+      "blocks": 1
+    }
+  ],
+  "zones": [
+    {
+      "key": "west_yard",
+      "label": "west yard",
+      "placement": "left",
+      "share": 500,
+      "ground": "ground.gravel",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "cottage",
+          "count": 1,
+          "pattern": "row"
+        },
+        {
+          "part": "bench",
+          "count": {
+            "parameter": "benches"
+          },
+          "pattern": "row"
+        }
+      ]
+    },
+    {
+      "key": "east_yard",
+      "label": "east yard",
+      "placement": "right",
+      "share": 500,
+      "ground": "ground.gravel",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "cottage",
+          "count": 1,
+          "pattern": "row"
+        },
+        {
+          "part": "stall",
+          "count": 1,
+          "pattern": "scatter"
+        }
+      ]
+    }
+  ]
+}

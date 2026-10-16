@@ -1206,6 +1206,7 @@ def _site_drawn(
                 dict(receipt),
                 digest,
                 outcome.value["sha256"],
+                outcome.value.get("land", {}).get("top"),
                 workspace=workspace,
                 kept=worker.landscapes,
             )
@@ -1290,9 +1291,11 @@ def _site_land_document(
     world_id: str,
     pick: str,
 ) -> Response:
-    """Serve one of a site world's land documents (``pick`` is ``backdrop`` or ``x,y`` for a
-    chunk), made with its drawing in the kind worker and kept beside it, by the digest the drawing
-    names; or a town on its land's, made and kept with its land section (:func:`_town_land`)."""
+    """Serve one of a site world's land documents (``pick`` is ``backdrop``, ``top`` or ``x,y`` for
+    a chunk), made with its drawing in the kind worker and kept beside it, by the digest the
+    drawing names; or a town on its land's, made and kept with its land section
+    (:func:`_town_land`). A site on a volume's top keeps its graded top and no chunk or backdrop; a
+    site or town on land keeps no top."""
     from exulanica.world.composers.site_plan import ON_LAND_VERSIONS
 
     def town(snapshot_id: Any) -> dict[str, Any] | Response:
@@ -1313,7 +1316,13 @@ def _site_land_document(
     if isinstance(answer, Response):
         return answer
     land = answer["land"]
-    found = land["backdrop"] if pick == "backdrop" else land["chunks"].get(pick)
+    if pick in ("backdrop", "top"):
+        found = land.get(pick)
+        if found is None:
+            stands = "on land, not on a volume's top" if pick == "top" else "on a volume's top"
+            return _problem(404, "land_unavailable", f"this world stands {stands}: no {pick}")
+    else:
+        found = land["chunks"].get(pick)
     if found is None:
         return _problem(404, "land_chunk_unavailable", f"this world's land has no chunk {pick}")
     return Response(
@@ -1360,6 +1369,23 @@ def read_site_land_backdrop(
 
 
 @site_router.get(
+    "/versions/{version_id}/land/top",
+    summary="The graded top of the volume a site world stands on.",
+)
+def read_site_land_top(
+    version_id: uuid.UUID,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve the graded top a site world laid out on a placed volume's top stands on
+    (``exulanica.site-top/v1``: its heights on the 1 m lattice in the site's frame and the water on
+    them), held to the digest its drawing (``exulanica.site-drawing/v6``) names. A level world
+    answers 404 ``land_unavailable``, and so does a world on land, which has chunks instead."""
+    return _site_land_document(version_id, connection, session, world_id, "top")
+
+
+@site_router.get(
     "/versions/{version_id}/land",
     summary="A town on its land's land: the chunks, backdrop and water drawn round it.",
 )
@@ -1389,6 +1415,10 @@ def read_town_land(
     )
 
 
+#: What each kind of landscape document is called in a refusal.
+_LANDSCAPE_WORDS: Final = {"chunks": "chunk", "tops": "top", "ground": "ground chunk or backdrop"}
+
+
 def _site_landscape_document(
     version_id: uuid.UUID,
     connection: Any,
@@ -1396,17 +1426,17 @@ def _site_landscape_document(
     world_id: str,
     pick: tuple[str, str] | None,
 ) -> Response:
-    """Serve a site world's landscape drawing, or (``pick`` a document kind, ``chunks`` or
-    ``tops``, and a digest) one document it names, made in the kind worker after its site's
+    """Serve a site world's landscape drawing, or (``pick`` a document kind, ``chunks``, ``tops``
+    or ``ground``, and a digest) one document it names, made in the kind worker after its site's
     drawing, in a job of its own."""
-    from exulanica.world.composers.site_plan import LANDSCAPE_COMPOSER_VERSION
+    from exulanica.world.composers.site_plan import LANDSCAPE_VERSIONS
 
     landscape = _site_drawn(
         version_id,
         connection,
         session,
         world_id,
-        (LANDSCAPE_COMPOSER_VERSION,),
+        LANDSCAPE_VERSIONS,
         ("landscape_unavailable", "this world stands on no landscape"),
         landscape=True,
     )
@@ -1421,7 +1451,7 @@ def _site_landscape_document(
             return _problem(
                 404,
                 "landscape_document_unavailable",
-                f"this world's landscape names no {kind[:-1]} {digest}",
+                f"this world's landscape names no {_LANDSCAPE_WORDS[kind]} {digest}",
             )
     return Response(
         content=body,
@@ -1476,3 +1506,21 @@ def read_site_landscape_top(
     """Serve one walkable top (``exulanica.volume-sheet/v1``) the world's landscape drawing names
     by ``sha256``; a digest it does not name 404 ``landscape_document_unavailable``."""
     return _site_landscape_document(version_id, connection, session, world_id, ("tops", sha256))
+
+
+@site_router.get(
+    "/versions/{version_id}/landscape/ground",
+    summary="One chunk or the backdrop of the land under a world on a volume's top, by digest.",
+)
+def read_site_landscape_ground(
+    version_id: uuid.UUID,
+    sha256: Annotated[str, Query(pattern="^[0-9a-f]{64}$")],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Serve one chunk (``exulanica.landform-chunk/v1``) or the backdrop
+    (``exulanica.landform-backdrop/v1``) of the land a world on a placed volume's top floats over,
+    which its landscape drawing (``exulanica.landscape-drawing/v2``) names by ``sha256`` in its
+    ``ground``; a digest it does not name 404 ``landscape_document_unavailable``."""
+    return _site_landscape_document(version_id, connection, session, world_id, ("ground", sha256))

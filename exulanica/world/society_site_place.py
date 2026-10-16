@@ -707,6 +707,7 @@ def place_from_site_records(
     input_seq: int = 1,
     node_limit: int | None = None,
     ground: Callable[[int, int], int] | None = None,
+    datum: str | None = None,
 ) -> dict[str, Any]:
     """Derive the place a site's records and its society's uses support, sealed by its digest.
 
@@ -714,7 +715,8 @@ def place_from_site_records(
     would hold more places than that, rather than after the whole graph is built. With ``ground``
     (a site on land), every node and spot stands at the height it gives in millimetres above the
     land's datum, and no walking edge climbs more than one kerb step; without it the place is the
-    level site's, byte for byte."""
+    level site's, byte for byte. ``datum`` says what the heights ``ground`` gives stand above where
+    that is not the land's datum (a site on a volume's top stands above the volume's level 0)."""
     extent = next(r for r in records if isinstance(r, SiteExtentRecord))
     paths = [r for r in records if isinstance(r, SitePathRecord)]
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
@@ -1144,7 +1146,7 @@ def place_from_site_records(
             "datum": (
                 "site_local z, the level ground every site stands on"
                 if ground is None
-                else "site_local z, above the land's datum, the sea's level"
+                else datum or "site_local z, above the land's datum, the sea's level"
             ),
         },
         "routine_sha256": routine.sha256,

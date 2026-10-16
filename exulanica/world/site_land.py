@@ -49,7 +49,7 @@ import functools
 import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.grammar.grammars.site.records import (
@@ -84,6 +84,9 @@ from exulanica.grammar.landform import (
 from exulanica.grammar.landform.catalog import grading_figures
 from exulanica.grammar.landform.rules import GRADING_OF_LAND_RULES
 from exulanica.world.society_place import STEP_LIMIT_MM
+
+if TYPE_CHECKING:
+    from exulanica.world.site_on_top import TopWorld
 
 __all__ = [
     "POND_IDS_BY_ZONE",
@@ -363,10 +366,18 @@ def check_receipt_land_rules(receipt: Mapping[str, Any]) -> int:
 
 def site_land_of(
     receipt: Mapping[str, Any], records: Sequence[object], station_mm: int
-) -> SiteLand:
-    """The graded land a version 5 receipt states, for its regenerated records, under the land
+) -> SiteLand | TopWorld:
+    """The graded land a version 5 or 6 receipt states, for its regenerated records, under the land
     rules the receipt names, its land document read again and held to the digest the receipt
-    names."""
+    names; for a version 7 receipt, the placed volume's top graded for them
+    (:func:`~exulanica.world.site_on_top.top_world_of`)."""
+    from exulanica.world.composers.site_plan import TOP_COMPOSER_VERSION
+
+    if receipt["composer"]["version"] == TOP_COMPOSER_VERSION:
+        from exulanica.world.site_on_top import top_world_of
+
+        check_receipt_land_rules(receipt)
+        return top_world_of(receipt, records, station_mm)
     land = read_land_document(receipt["land"], landform_catalog(check_receipt_land_rules(receipt)))
     if land.sha256 != receipt["land_sha256"]:
         from exulanica.world.errors import InvalidStructuralData

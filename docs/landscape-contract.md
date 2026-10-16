@@ -6,8 +6,10 @@ be stated as data, read against its catalogs, evaluated as an exact integer fiel
 and searched for walkable tops in Python; a landscape places volumes on an unchanged land and
 realizes each under a seed of its own. A site world can be laid out on a landscape through its
 route, kept under the receipt check every site world meets, and its landscape's drawing, chunks and
-tops are served by digest. The application draws a site's volumes round it in rock; people do not
-walk on them, and a world made from a person's words never stands on a landscape.
+tops are served by digest. A site world can also be laid out on a placed volume's top, a sky
+island's, and is kept and drawn there by its site drawing; the application does not draw it yet.
+The application draws a site's volumes round it in rock; people do not walk on them, and a world
+made from a person's words never stands on a landscape.
 
 This document owns the volume document (`exulanica.volume/v1`), the landscape document
 (`exulanica.landscape/v1`), their catalogs, the volume field, the chunk (`exulanica.volume-chunk/v1`)
@@ -30,6 +32,7 @@ belongs to the [world kinds contract](world-kinds-contract.md).
 - [Volume rules and landscape rules](#volume-rules-and-landscape-rules)
 - [A site on a landscape](#a-site-on-a-landscape)
 - [Grading a site on a volume's top](#grading-a-site-on-a-volumes-top)
+- [A site on a volume's top](#a-site-on-a-volumes-top)
 - [Readers in the browser](#readers-in-the-browser)
 - [Sky islands](#sky-islands)
 - [Refusals](#refusals)
@@ -193,8 +196,8 @@ A `site` names a placement whose volume states a top land (`landscape_site_unkno
 `landscape_site_no_top_land`), and its corner stands at whole metres inside that top land's square
 (`landscape_site_outside_top`), each refused by its path under `site`. The canonical form writes
 `site`, with its bound, only where it is stated, so a landscape without one keeps the identity it
-had under version 1. No site is laid out on a volume's top yet: the site composer refuses a
-landscape that states one (`landscape_not_served`, path `landscape.site`).
+had under version 1. A landscape that states a site makes a world on that volume's top
+([a site on a volume's top](#a-site-on-a-volumes-top)).
 
 ## Realizing a landscape's volumes
 
@@ -374,7 +377,7 @@ names, or is not the one its digest and land name, is refused by name and listed
 ## Grading a site on a volume's top
 
 `site_top` (`exulanica/world/site_top.py`) grades a volume's top land for a site laid out on it, as
-a site's land is graded; no route or composer uses it yet, so no world stands on a volume's top. The
+a site's land is graded. The
 site keeps its own frame: its south-west corner stands at a whole-metre point of the volume's
 frame, and its height zero is the volume's level 0, the top land's datum, whatever the volume's
 altitude. The natural top is the same realization the field caps the rock by
@@ -390,8 +393,65 @@ graded heights from the south-west corner, rows from the south, and the water st
 A site that does not lie inside the square, or not at whole metres, is refused
 (`landscape_site_outside_top`), and so is a top whose land has a shore
 (`landscape_site_top_has_sea`: the sea is the ground's); every refusal of the grader holds as on
-land. Whether the rock under a graded top holds it, where a fill rises above the natural top, is
-not checked here.
+land. Whether the rock under a graded top holds it is the world's check below.
+
+## A site on a volume's top
+
+`POST /worlds/kinds/{kind}/worlds` with a `landscape` that states a `site` makes the world on that
+placed volume's top (site-plan composer version 7, `exulanica/world/site_on_top.py`). The site
+keeps its own frame, which is the world's: its height zero is the volume's level 0, so the volume's
+altitude enters no height the world states, and the place its people walk says so in its frame's
+datum. In order:
+
+1. A kind whose people come in from homes off the site is refused
+   (`landscape_site_offsite_homes`): nothing lies beyond a top for them to come from.
+2. The site the kind's plan states must lie inside the top's square (`landscape_site_outside_top`)
+   and, grown by 1 m, have rock 1 m under the natural top at every lattice point
+   (`landscape_site_not_on_rock`), both before any candidate is laid out. The field is the
+   volume's as the landscape realizes it: the placement's seed under the world's landscape seed.
+3. Each candidate is laid out and graded on the top as `site_top` grades it; the kept candidate's
+   graded top caps the volume's field in place of its land's own (given heights, as the volume
+   field takes them), and the same rock rule is held on it.
+4. A person arrives on the open top outside the site's gate in its south edge, between the gate
+   and the rim: the first of 3, 2.5, 2 and 1.5 m beyond the gate with rock 1 m under the top there
+   and a metre either side and beyond, or in the gate's opening where the site fills the top. They
+   face the nearest open rim away from the site: of the bearings 10 degrees apart from east
+   through south to west, the one whose rock ends nearest within 10 to 25 m (else the open rim
+   nearest that range), walked in half-metre steps over nothing taller than eye height (1.6 m: a
+   building, a wall or fixture that tall, or ground rising so far); straight out of the gate where
+   no rim is open. The site and its fence are behind them. Both are stored with the arrival.
+
+The receipt is version 6's with the land the volume's top land, its digest and the land rules the
+volume rules name for a top land (land rules 3), never the newest; the landscape and its rules
+beside them, and the landscape states the site. A receipt reads its top back from the landscape
+and is refused by name (`generated_world_landscape_changed`) where its landscape's site and its
+composer disagree or its land is not the named volume's top land. The landscape's other volumes
+stand apart as for version 6; the volume the site stands on is the world's ground and no other
+check of extent or of volumes off the site applies.
+
+The world's drawing is `exulanica.site-drawing/v6` ([world kinds
+contract](world-kinds-contract.md)): version 5's slots, drape and arrival standing on the graded
+top, with a `top` section in place of `land`: the graded top's digest, the landscape's digest, the
+placement and the site's corner in the volume's frame, the water on the top, and `rock_cells`, the
+graded lattice's cells (rows from the south, from its south-west corner, as runs `[row, first,
+last]`) whose four corners have rock 1 m under the top. The graded top itself
+(`exulanica.site-top/v1`) is kept with the drawing and served by its digest
+(`GET /world/versions/{version_id}/land/top`); such a world has no land chunks or backdrop. A part
+change that leaves the graded top off the rock is refused as a grading refusal is
+(`landscape_site_not_on_rock`).
+
+Its landscape is drawn as `exulanica.landscape-drawing/v2` (version 1 stays for a site on the
+landscape's land), in the same job and under the same seed: version 1's fields and `volumes`, the
+volume the site stands on realized with the graded top as its cap (read from the site's kept
+`exulanica.site-top/v1` and held to its digest, which the drawing names as `top_sha256`, so each of
+that volume's chunks and tops names it in its `input_sha256`; its land is the top land, as the
+receipt's is), `site_frame` (the placement, the site's south-west corner in the landscape's frame,
+`at_mm + R(yaw) (site corner)`, and the placement's turn: a page whose frame is the site's places the
+landscape at its inverse), and `ground`: the landscape's own land, ungraded, in the landscape's
+frame over its extent and one ring of chunks, realized under the seed a world's land is, as 128 m
+land chunks, a backdrop and the water on it, the ground or sea the volume floats over. Its chunks
+and backdrop are served by digest (`GET /world/versions/{version_id}/landscape/ground?sha256=`). The
+page does not draw a world on a top yet.
 
 ## Readers in the browser
 
@@ -513,7 +573,7 @@ made volumes by digest.
 | `landscape_rules_changed` | A receipt names landscape rules this server does not serve |
 | `landscape_extent_not_site` | A site's landscape states another extent than the site's |
 | `landscape_volume_on_site` | A placed volume reaches onto the site it is placed round |
-| `landscape_not_served` | A landscape asked of the town, or beside land or a support declaration, or stating a site on a volume's top |
+| `landscape_not_served` | A landscape asked of the town, or beside land or a support declaration |
 | `landscape_unavailable` | A landscape route asked of a world on no landscape (404) |
 | `landscape_document_unavailable` | A chunk or top the world's landscape drawing does not name (404) |
 | `generated_world_landscape_rules_changed` | A receipt names landscape rules this server does not serve, or names them on a world on no landscape; the world is listed unavailable |
@@ -532,6 +592,8 @@ made volumes by digest.
 | `landscape_site_no_top_land` | A landscape's site names a placement whose volume states no top land (path `site.on`) |
 | `landscape_site_outside_top` | A site on a volume's top does not lie inside its square, or not at whole metres (path `site.at_mm` in a landscape) |
 | `landscape_site_top_has_sea` | A site is graded on a top whose land has a shore |
+| `landscape_site_offsite_homes` | A world on a volume's top is asked of a kind whose people come in from homes off the site (path `landscape.site`) |
+| `landscape_site_not_on_rock` | A site on a volume's top, grown by 1 m, has no rock 1 m under its natural or graded top somewhere, or a part change would leave it so (path `landscape.site`) |
 | `landscape_arrival_not_ground` | The arrival a landscape's surfaces are reached from is not walkable ground |
 
 ## Limits
@@ -547,8 +609,12 @@ made volumes by digest.
   look's ground, with no texture yet (the surface material catalog has no moss: a moss top takes
   what the look gives a ground it has no material for, or the rock where it gives none), and are
   not walked by
-  people; they stand only off a site;
-  sky islands, spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
+  people; they stand off a site, or carry it on their top;
+  spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
+- A world on a volume's top stands on one volume's top, its people held to the site's rectangle;
+  only kinds whose people all live on the site can stand there, and the page does not draw it yet.
+  Its landscape drawing realizes the ground below as a site's land is realized, a few seconds more
+  than a site on land's.
 - Realized chunks and tops are kept in the kind worker's memory with the landscape's drawing, in a
   keep of their own beside the site drawings, not in a store; a world read again after they are
   let go realizes them again.

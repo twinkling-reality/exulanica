@@ -40,7 +40,7 @@ from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused
 from exulanica.world.kinds.routine import kind_routine
 from exulanica.world.site_land import land_seed, site_land
-from exulanica.world.site_top import OnTop, site_top
+from exulanica.world.site_top import TOP_DATUM, OnTop, site_top
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_place import validate_place
 from exulanica.world.society_site_place import (
@@ -309,6 +309,7 @@ def compose_site(
                 routine=routine,
                 node_limit=bounds["walking_nodes"][1],
                 ground=ground,
+                datum=TOP_DATUM if top is not None else None,
             )
         except GraphOverBudget as exc:
             refused.append(

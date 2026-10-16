@@ -10,7 +10,9 @@ placement in the document's order:
 2. **Chunks** of its surface at every level the landscape states, coarsest first
    (:func:`~exulanica.grammar.volumes.realize_volume`), in the volume's own frame: the placement's
    origin and turn place them in the world, so a chunk is the same wherever its volume stands. The
-   volume is realized by the volume rules the landscape was read under.
+   volume is realized by the volume rules the landscape was read under, its top capped by the
+   heights given for that placement where some are (a site's graded top), which every chunk and
+   top it makes names.
 3. **Walkable tops** (:func:`~exulanica.grammar.volumes.volume_tops`), also in the volume's frame.
 
 The result is the drawing's ``volumes`` section, which names every chunk and top by digest, and the
@@ -21,11 +23,13 @@ volumes meet, which top is walked is the walking layer's to say.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.grammar.landscape.document import LandscapeDocument
 from exulanica.grammar.volumes import (
+    TopHeights,
     VolumeChunk,
     VolumeField,
     VolumeSheet,
@@ -79,12 +83,19 @@ class PlacedVolume:
         }
 
 
-def compose_volumes(landscape: LandscapeDocument, seed: str) -> tuple[PlacedVolume, ...]:
-    """Every placed volume of the landscape, realized under ``seed``, in the document's order."""
+def compose_volumes(
+    landscape: LandscapeDocument, seed: str, tops: Mapping[str, TopHeights] | None = None
+) -> tuple[PlacedVolume, ...]:
+    """Every placed volume of the landscape, realized under ``seed``, in the document's order, a
+    placement named in ``tops`` capped by the heights given for it."""
+    given = tops or {}
     placed = []
     for placement in landscape.placements:
         field = VolumeField(
-            placement.volume, placement_seed(seed, placement.id), rules=landscape.volume_rules
+            placement.volume,
+            placement_seed(seed, placement.id),
+            rules=landscape.volume_rules,
+            top=given.get(placement.id),
         )
         chunks = tuple(chunk for cell in landscape.levels for chunk in realize_volume(field, cell))
         placed.append(

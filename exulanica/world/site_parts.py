@@ -105,6 +105,8 @@ PART_CODES: Final = frozenset(
         "landform_near_out_of_bounds",
         "landform_cascade_crossed",
         "landform_invalid",
+        # A world on a volume's top: no rock under its graded ground.
+        "landscape_site_not_on_rock",
     }
 )
 #: The sentence a person reads when the land of a world on land cannot take a part where a change
@@ -120,6 +122,7 @@ LAND_WORDS: Final = {
     "landform_near_out_of_bounds": (
         "Not here: the ground there would have to rise or fall further than this land allows."
     ),
+    "landscape_site_not_on_rock": "Not here: there would be no rock under the ground there.",
 }
 #: What a land code the grader adds later is said with until it has its own sentence.
 LAND_WORDS_OTHERWISE: Final = "Not here: the land cannot take it there."

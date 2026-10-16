@@ -84,6 +84,11 @@ LIMITS: dict[str, tuple[int, str]] = {
         1_520,
         "the world view's host: its corners, people, speech, building and History hooks",
     ),
+    "exulanica/api/routes/world_kinds.py": (
+        1_526,
+        "the world kinds library, its drafts and the worlds made of it, and a site world's "
+        "drawing, land, graded top and landscape reads",
+    ),
     "exulanica/world/society_catalogs.py": (1_509, "the living society routine model as data"),
 }
 

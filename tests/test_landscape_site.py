@@ -1,7 +1,7 @@
 """A site on a volume's top, stated in a landscape: read against landscape catalog version 2 under
-landscape rules 4 and refused by path, written into the canonical form only where it is stated so
-every landscape without one keeps its identity, and refused by the site composer, which does not
-lay a site out on a volume's top yet."""
+landscape rules 4 and refused by path, and written into the canonical form only where it is stated
+so every landscape without one keeps its identity. A world made on the top is
+``tests/test_site_on_island.py``'s."""
 
 from __future__ import annotations
 
@@ -12,10 +12,8 @@ from exulanica.grammar.landscape import (
     landscape_catalog,
     read_landscape_document,
 )
-from exulanica.world.composers import site_plan
 
 from test_landscape_document import BAY, BAY_SHA256
-from test_site_land import kind
 from test_volume_top_land import GENTLE, mesa
 
 #: The bay with a 60 m block whose top is a gentle hill, standing 20 m above the sea's level.
@@ -82,15 +80,3 @@ def test_the_first_catalog_states_no_site():
     refused = refusal({**TOPPED, "site": SITE}, version=1)
     assert (refused.path, refused.code) == ("site", "landscape_invalid")
     assert "catalog version 2 or later" in refused.detail
-
-
-def test_the_site_composer_refuses_a_site_on_a_top_until_it_lays_one_out():
-    found = kind("cafe")
-    with pytest.raises(LandscapeRefused) as caught:
-        site_plan.compose_kind(
-            found,
-            found.values(found.presets[0][0]),
-            "world:generated:on-top",
-            landscape={**TOPPED, "site": SITE},
-        )
-    assert (caught.value.code, caught.value.path) == ("landscape_not_served", "landscape.site")
