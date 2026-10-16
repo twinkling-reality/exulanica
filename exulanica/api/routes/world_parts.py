@@ -1,8 +1,9 @@
-"""The parts a site world was made with, changed by a person: listed, moved, turned and removed.
+"""The parts a made world was made with, changed by a person: listed, moved, turned and removed.
 
-``GET .../parts`` answers every part of the version's site world a person may change (each
-building, each fixture of a garden area, each area), as it stands with the version's changes, with
-its words and its garden area (:mod:`exulanica.world.site_parts`). ``POST .../parts/{part_id}/move``
+``GET .../parts`` answers every part of the version's world a person may change, as it stands with
+the version's changes: a site world's buildings, fixtures of a garden area and areas, with their
+words and garden area (:mod:`exulanica.world.site_parts`), or a made town's buildings
+(``exulanica.town-parts/v1``, below). ``POST .../parts/{part_id}/move``
 stands a part at a new centre, turned a whole number of quarter turns from how it was made;
 ``POST .../parts/{part_id}/remove`` removes it; ``POST .../parts/{part_id}/storeys`` stands a
 building taller or lower, within the storeys the kind bounds catalog its world was made under
@@ -20,6 +21,17 @@ edit log, so ``POST .../things/undo`` and ``.../things/redo`` undo and redo it a
 on level ground (composer version 1) and one on land (version 5) are served; on land the land is
 graded again for the changed layout, and a change it cannot take is refused by the land grader's
 code. A world whose things stand on its parts and one made of terrain are refused by name.
+
+A made town's building is removed, or stood taller or lower, through the same two routes and their
+previews (:mod:`exulanica.world.town_parts`): the city grammar makes the town again with the
+version's changes and this one (:func:`~exulanica.world.generated_worlds.town_records_with`), and a
+storey count outside the lot's range is the grammar's refusal, in words. A removal is refused while
+anybody lives or works in any of the building's premises, and a lowering when it takes away a
+premises somebody lives or works in, naming them; a storeys preview says what the change would be
+(``landing.said``: taller adds homes nobody lives in yet). A building is not moved: it stands on its
+lot. A kept change queues a bake of every tile it alters, in the edit's transaction
+(:func:`~exulanica.world.version_tiles.queue_version_bakes`). The parts read lists the town's
+buildings as the version's changes leave them, a removed one left out.
 """
 
 from __future__ import annotations
@@ -45,8 +57,17 @@ from exulanica.api.world_edit import (
 )
 from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView
+from exulanica.grammar.errors import GrammarError
+from exulanica.grammar.grammars.city.generation.massing import BuildingStoreysRefused
+from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.errors import InvalidObjectData, InvalidStructuralData, UnknownWorldResource
-from exulanica.world.generated_worlds import generation_receipt, states_site
+from exulanica.world.generated_worlds import (
+    generation_receipt,
+    states_records,
+    states_site,
+    town_records,
+    town_records_with,
+)
 from exulanica.world.kinds.worker import (
     PLACE_SECONDS,
     KindWorkWaiting,
@@ -72,6 +93,16 @@ from exulanica.world.site_parts import (
     refused_people_words,
 )
 from exulanica.world.society import UnknownSociety
+from exulanica.world.town_parts import (
+    building_changes,
+    people_of_building,
+    people_refusal,
+    premises_taken,
+    storeys_refusal,
+    storeys_words,
+    town_buildings,
+)
+from exulanica.world.version_tiles import changed_tiles, queue_version_bakes, version_changes
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -119,7 +150,20 @@ class MovePartPreviewBody(ThingEditPreviewBody):
 PartId = Annotated[str, Path(min_length=36, max_length=36, pattern=r"^[0-9a-f-]{36}$")]
 
 
-class _Site:
+class _Changed:
+    """The changes a version holds to its world's parts, and one more."""
+
+    changes: tuple[PartChange, ...]
+
+    def with_change(self, change: PartChange) -> tuple[PartChange, ...]:
+        return (*(c for c in self.changes if c.identity != change.identity), change)
+
+    def current(self, part_id: str) -> PartChange | None:
+        """The change the version holds for this part, or None."""
+        return next((c for c in self.changes if c.identity == part_id), None)
+
+
+class _Site(_Changed):
     """The version's site world as a part change reads it: its receipt, and the changes it holds."""
 
     def __init__(self, repository: WorldObjectRepository, version_id: uuid.UUID) -> None:
@@ -145,15 +189,75 @@ class _Site:
         self.workspace = str(repository.workspace_id)
         self.changes = repository.part_changes(version_id)
 
-    def with_change(self, change: PartChange) -> tuple[PartChange, ...]:
-        return (*(c for c in self.changes if c.identity != change.identity), change)
 
-    def current(self, part_id: str) -> PartChange | None:
-        """The change the version holds for this part, or None."""
-        return next((c for c in self.changes if c.identity == part_id), None)
+class _Town(_Changed):
+    """The version's made town as a building change reads it: its records as its receipt makes
+    them, and the changes the version holds."""
+
+    def __init__(
+        self, repository: WorldObjectRepository, version_id: uuid.UUID, snapshot_id: uuid.UUID
+    ) -> None:
+        self.connection = repository.connection
+        self.workspace_id = repository.workspace_id
+        self.world_id = repository.world_id
+        self.snapshot_id = snapshot_id
+        self.version_id = version_id
+        self.made = town_records(self.connection, self.workspace_id, self.world_id, snapshot_id)
+        self.changes = repository.part_changes(version_id)
+
+    def records(
+        self, changes: tuple[PartChange, ...], part_id: str, *, tiles: bool = False
+    ) -> tuple[object, ...]:
+        """The town's records with ``changes``, made by its grammar; a change the grammar refuses
+        is refused in words, by the part it names. With ``tiles``, the tiles the changes alter are
+        found too, refused where their documents are, and kept for the queue a write makes."""
+        found = building_changes(changes)
+        try:
+            records = town_records_with(
+                self.connection, self.workspace_id, self.world_id, self.snapshot_id, found
+            ).records
+            if tiles:
+                changed_tiles(
+                    self.connection, self.workspace_id, self.world_id, self.snapshot_id, found
+                )
+        except BuildingStoreysRefused as exc:
+            raise storeys_refusal(exc) from exc
+        except GrammarError as exc:
+            raise PartChangeRefused(
+                "part_records_refused",
+                {"part_id": part_id, "detail": str(exc)},
+                "Not changed: the town cannot be made with it.",
+            ) from exc
+        return tuple(records)
+
+    def queue(self) -> None:
+        """Queue a bake of every tile the version's kept changes alter, in the caller's
+        transaction."""
+        changes = version_changes(
+            self.connection, self.workspace_id, self.world_id, self.snapshot_id, self.version_id
+        )
+        queue_version_bakes(
+            self.connection,
+            self.workspace_id,
+            self.world_id,
+            self.snapshot_id,
+            self.version_id,
+            changes,
+        )
 
 
-def _moved_change(site: _Site, part_id: str, pose: PartPoseBody) -> PartChange:
+def _world(repository: WorldObjectRepository, version_id: uuid.UUID) -> _Site | _Town:
+    """The version's world as a part change reads it: a made town, or else a site world (any
+    other world is refused by name there)."""
+    snapshot_id = repository.edit_base_row(version_id)["source_snapshot_id"]
+    if states_records(
+        repository.connection, repository.workspace_id, repository.world_id, snapshot_id
+    ):
+        return _Town(repository, version_id, snapshot_id)
+    return _Site(repository, version_id)
+
+
+def _moved_change(site: _Changed, part_id: str, pose: PartPoseBody) -> PartChange:
     """A move or turn of ``part_id``, keeping the storeys the version states for it."""
     current = site.current(part_id)
     return dataclasses.replace(
@@ -161,14 +265,50 @@ def _moved_change(site: _Site, part_id: str, pose: PartPoseBody) -> PartChange:
     )
 
 
-def _storeys_change(site: _Site, part_id: str, storeys: int) -> PartChange:
+def _storeys_change(site: _Changed, part_id: str, storeys: int) -> PartChange:
     """``part_id`` standing ``storeys`` high, keeping where the version stands it."""
     current = site.current(part_id)
     kept = PartChange(part_id, False) if current is None or current.removed else current
     return dataclasses.replace(kept, storeys=storeys)
 
 
-def _check(site: _Site, change: PartChange) -> dict[str, Any]:
+def _check(world: _Site | _Town, change: PartChange) -> dict[str, Any]:
+    """The verdict on ``change`` made to the version's world: the part's words, the world's
+    changeable parts, and for a made town what the change takes away; or the refusal raised."""
+    if isinstance(world, _Town):
+        return _town_check(world, change)
+    return _site_check(world, change)
+
+
+def _town_check(town: _Town, change: PartChange) -> dict[str, Any]:
+    """The town made again with ``change``: refused where its grammar refuses it, else the
+    building's words, the town's buildings, the storeys it stood and the premises the change
+    takes away (those it held as made or as the version holds it, and holds no longer)."""
+    buildings = {building.identity: building for building in town_buildings(town.made.records)}
+    building = buildings.get(change.identity)
+    if building is None:
+        raise PartChangeRefused(
+            "part_unknown", {"part_id": change.identity}, "This world has no such part."
+        )
+    before = town.records(town.changes, change.identity)
+    after = town.records(town.with_change(change), change.identity, tiles=True)
+    stood = next(
+        (b.storeys for b in town_buildings(before) if b.identity == change.identity),
+        building.storeys,
+    )
+    taken = sorted(
+        set(premises_taken(town.made.records, after, change.identity))
+        | set(premises_taken(before, after, change.identity))
+    )
+    return {
+        "label": building.label,
+        "part_ids": list(buildings),
+        "storeys": stood,
+        "premises_taken": taken,
+    }
+
+
+def _site_check(site: _Site, change: PartChange) -> dict[str, Any]:
     """The kind worker's verdict on ``change`` made to ``site``: the place its people would walk,
     the part's words and the world's changeable parts, kept for the society to read under the
     changed world's key; or the refusal raised."""
@@ -204,6 +344,41 @@ def _check(site: _Site, change: PartChange) -> dict[str, Any]:
     return answer
 
 
+def _state(
+    request: Request, repository: WorldObjectRepository, session: Any, version_id: uuid.UUID
+) -> Any:
+    """The version's society's state, or None where the version has no society."""
+    society = _society(repository.connection, session, request, repository.world_id)
+    try:
+        return society.snapshot(version_id)["state"]
+    except UnknownSociety:
+        return None
+
+
+def _town_people(
+    request: Request,
+    repository: WorldObjectRepository,
+    session: Any,
+    version_id: uuid.UUID,
+    change: PartChange,
+    answer: dict[str, Any],
+) -> None:
+    """Refuse a town's change that takes away a premises somebody of the version's society lives
+    or works in (all of a removed building's, a lowered one's upper premises), by name."""
+    if not answer["premises_taken"]:
+        return
+    state = _state(request, repository, session, version_id)
+    if state is None:
+        return
+    people = people_of_building(state, answer["premises_taken"])
+    if people:
+        raise people_refusal(
+            people,
+            building=change.identity,
+            storeys=None if change.removed else change.storeys,
+        )
+
+
 def _people(
     request: Request,
     repository: WorldObjectRepository,
@@ -213,10 +388,8 @@ def _people(
     label: str,
 ) -> None:
     """Refuse removing a part somebody of the version's society lives or works in, by name."""
-    society = _society(repository.connection, session, request, repository.world_id)
-    try:
-        state = society.snapshot(version_id)["state"]
-    except UnknownSociety:
+    state = _state(request, repository, session, version_id)
+    if state is None:
         return
     people = people_of_part(state, part_id)
     if people:
@@ -248,7 +421,9 @@ def read_parts(
     version_id: uuid.UUID, repository: ReadObjects, world_id: WorldId
 ) -> Response | dict[str, object]:
     def read() -> dict[str, object]:
-        site = _Site(repository, version_id)
+        site = _world(repository, version_id)
+        if isinstance(site, _Town):
+            return _town_parts(site, world_id, version_id)
         changes = changes_document(site.changes)
         worker = kind_worker()
         outcome = worker.run(
@@ -278,12 +453,71 @@ def read_parts(
     return _answered(read)
 
 
+def _town_parts(town: _Town, world_id: str, version_id: uuid.UUID) -> dict[str, object]:
+    """A made town's buildings as the version's changes leave them: a removed one is left out."""
+    records = town.records(town.changes, "")
+    return {
+        "profile": "exulanica.town-parts/v1",
+        "world_id": world_id,
+        "version_id": str(version_id),
+        "parts": [building.document() for building in town_buildings(records)],
+        "changes": changes_document(town.changes),
+    }
+
+
+def _held(
+    request: Request,
+    repository: WorldObjectRepository,
+    session: Any,
+    version_id: uuid.UUID,
+    world: _Site | _Town,
+    change: PartChange,
+    answer: dict[str, Any],
+) -> None:
+    """Refuse a change for the people of the version's society it would leave without their home
+    or their work: a site part removed, or a town's premises taken away (:func:`_town_people`)."""
+    if isinstance(world, _Town):
+        _town_people(request, repository, session, version_id, change, answer)
+    elif change.removed:
+        _people(request, repository, session, version_id, change.identity, answer["label"])
+
+
+def _kept(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    body: EntryBoundEditBody,
+    actor: uuid.UUID,
+    world: _Site | _Town,
+    change: PartChange,
+    answer: dict[str, Any],
+) -> Callable[[], AlternateVersion]:
+    """The write of a checked change: its override in the version's edit log and, for a made town,
+    a bake queued for every tile the version's changes now alter, in the same transaction."""
+
+    def keep() -> AlternateVersion:
+        version = repository.set_part_change(
+            version_id,
+            part_override(change),
+            base_state_sha256=body.base_state_sha256,
+            actor=actor,
+            part_ids=frozenset(answer["part_ids"]),
+        )
+        if isinstance(world, _Town):
+            world.queue()
+        return version
+
+    return keep
+
+
+Checked = tuple[_Site | _Town, PartChange, dict[str, Any]]
+
+
 def _move(
     repository: WorldObjectRepository, version_id: uuid.UUID, part_id: str, pose: PartPoseBody
-) -> tuple[PartChange, dict[str, Any]]:
-    site = _Site(repository, version_id)
-    change = _moved_change(site, part_id, pose)
-    return change, _check(site, change)
+) -> Checked:
+    world = _world(repository, version_id)
+    change = _moved_change(world, part_id, pose)
+    return world, change, _check(world, change)
 
 
 @router.post(
@@ -302,19 +536,12 @@ def move_part(
     checked = _answered(lambda: _move(repository, version_id, part_id, body.pose))
     if isinstance(checked, Response):
         return checked
-    change, answer = checked
     return commit_edit(
         request,
         repository,
         version_id,
         body,
-        lambda: repository.set_part_change(
-            version_id,
-            part_override(change),
-            base_state_sha256=body.base_state_sha256,
-            actor=session.actor,
-            part_ids=frozenset(answer["part_ids"]),
-        ),
+        _kept(repository, version_id, body, session.actor, *checked),
     )
 
 
@@ -344,11 +571,12 @@ def _removal(
     session: Any,
     version_id: uuid.UUID,
     part_id: str,
-) -> tuple[PartChange, dict[str, Any]]:
+) -> Checked:
+    world = _world(repository, version_id)
     change = PartChange(part_id, True)
-    answer = _check(_Site(repository, version_id), change)
-    _people(request, repository, session, version_id, part_id, answer["label"])
-    return change, answer
+    answer = _check(world, change)
+    _held(request, repository, session, version_id, world, change, answer)
+    return world, change, answer
 
 
 @router.post(
@@ -367,19 +595,12 @@ def remove_part(
     checked = _answered(lambda: _removal(request, repository, session, version_id, part_id))
     if isinstance(checked, Response):
         return checked
-    change, answer = checked
     return commit_edit(
         request,
         repository,
         version_id,
         body,
-        lambda: repository.set_part_change(
-            version_id,
-            part_override(change),
-            base_state_sha256=body.base_state_sha256,
-            actor=session.actor,
-            part_ids=frozenset(answer["part_ids"]),
-        ),
+        _kept(repository, version_id, body, session.actor, *checked),
     )
 
 
@@ -404,7 +625,9 @@ def remove_part_preview(
             body.base_state_sha256,
             "remove_part",
             lambda _site: PartChange(part_id, True),
-            people=lambda label: _people(request, repository, session, version_id, part_id, label),
+            held=lambda world, change, answer: _held(
+                request, repository, session, version_id, world, change, answer
+            ),
         )
     )
 
@@ -418,11 +641,18 @@ class PartStoreysPreviewBody(ThingEditPreviewBody):
 
 
 def _storeys(
-    repository: WorldObjectRepository, version_id: uuid.UUID, part_id: str, storeys: int
-) -> tuple[PartChange, dict[str, Any]]:
-    site = _Site(repository, version_id)
-    change = _storeys_change(site, part_id, storeys)
-    return change, _check(site, change)
+    request: Request,
+    repository: WorldObjectRepository,
+    session: Any,
+    version_id: uuid.UUID,
+    part_id: str,
+    storeys: int,
+) -> Checked:
+    world = _world(repository, version_id)
+    change = _storeys_change(world, part_id, storeys)
+    answer = _check(world, change)
+    _held(request, repository, session, version_id, world, change, answer)
+    return world, change, answer
 
 
 @router.post(
@@ -438,22 +668,17 @@ def part_storeys(
     session: CurrentSession,
     request: Request,
 ) -> Response | AlternateVersionView:
-    checked = _answered(lambda: _storeys(repository, version_id, part_id, body.storeys))
+    checked = _answered(
+        lambda: _storeys(request, repository, session, version_id, part_id, body.storeys)
+    )
     if isinstance(checked, Response):
         return checked
-    change, answer = checked
     return commit_edit(
         request,
         repository,
         version_id,
         body,
-        lambda: repository.set_part_change(
-            version_id,
-            part_override(change),
-            base_state_sha256=body.base_state_sha256,
-            actor=session.actor,
-            part_ids=frozenset(answer["part_ids"]),
-        ),
+        _kept(repository, version_id, body, session.actor, *checked),
     )
 
 
@@ -467,6 +692,8 @@ def part_storeys_preview(
     part_id: PartId,
     body: PartStoreysPreviewBody,
     repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
 ) -> Response | dict[str, object]:
     return _answered(
         lambda: _preview(
@@ -476,6 +703,9 @@ def part_storeys_preview(
             body.base_state_sha256,
             "part_storeys",
             lambda site: _storeys_change(site, part_id, body.storeys),
+            held=lambda world, change, answer: _held(
+                request, repository, session, version_id, world, change, answer
+            ),
         )
     )
 
@@ -486,26 +716,30 @@ def _preview(
     part_id: str,
     base_state_sha256: str,
     kind: Literal["move_part", "remove_part", "part_storeys"],
-    make: Callable[[_Site], PartChange],
+    make: Callable[[_Changed], PartChange],
     *,
-    people: Any = None,
+    held: Callable[[_Site | _Town, PartChange, dict[str, Any]], None] | None = None,
 ) -> dict[str, object]:
-    """A move's, a removal's or a storeys change's preview: the worker's verdict, then the
-    repository's read-only checks; a refusal of either is the preview's ``blocked_reason`` with its
-    words and ``where``."""
+    """A move's, a removal's or a storeys change's preview: the verdict on the world's records and
+    its people, then the repository's read-only checks; a refusal of either is the preview's
+    ``blocked_reason`` with its words and ``where``. A made town's storeys change that may be kept
+    says what it would be (``landing.said``)."""
     change = PartChange(part_id, True)
     refusal: PartChangeRefused | None = None
     part_ids: frozenset[str] = frozenset()
+    said: str | None = None
     try:
-        site = _Site(repository, version_id)
-        change = make(site)
-        answer = _check(site, change)
+        world = _world(repository, version_id)
+        change = make(world)
+        answer = _check(world, change)
         part_ids = frozenset(answer["part_ids"])
-        if people is not None:
-            people(answer["label"])
+        if held is not None:
+            held(world, change, answer)
+        if isinstance(world, _Town) and change.storeys is not None:
+            said = storeys_words(answer["storeys"], change.storeys)
     except PartChangeRefused as exc:
         refusal = exc
-    return preview_part_change(
+    document = preview_part_change(
         repository,
         version_id,
         kind,
@@ -514,3 +748,6 @@ def _preview(
         part_ids=part_ids,
         refusal=refusal,
     ).document()
+    if said is not None and document["availability"] == "ready":
+        document["landing"] = {**document["landing"], "said": said}
+    return document

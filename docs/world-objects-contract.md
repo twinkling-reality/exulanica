@@ -1257,12 +1257,28 @@ is reused only for a version whose parts were never changed.
 
 **What is served.** A site on level ground (site-plan composer version 1) and a site on land
 (version 5). A world whose things stand on its parts (version 2) and one made of terrain are
-refused by name (`parts_not_served`), as is a world not made from a world kind. A version whose overrides ever named a
+refused by name (`parts_not_served`), as is a world neither made from a world kind nor a made town. A version whose overrides ever named a
 part is withheld from package export as `made_part_changes`: a package's override names only
 snapshot elements. Supported placement on a version holding part changes stays refused, as with any
 source override. A made town's buildings take the same overrides (removed, or so many storeys), and
 the town's tiles as a version's changes leave them are its workspace's own
 ([generated tile runtime, section 7.3](generated-tile-runtime.md#73-a-saved-worlds-own-tiles)).
+
+**A made town's buildings.** The parts read and the `remove` and `storeys` routes and their previews
+serve a made town's buildings (the city grammar's `city.massing` records, by identity). The grammar
+makes the town again from its receipt with the version's changes and this one, so a neighbour's
+party wall follows by the grammar's own rule; the parts read lists the buildings as the changes
+leave them (`exulanica.town-parts/v1`: identity, typology and its words, storeys, premises). A storey
+count outside the lot's range (its typology's storeys within the district's band) is refused in words
+(`part_storeys_refused`: "Not taller: a shophouse here has at most 4 storeys."), and a move is refused
+(`part_not_changeable`): a town's building stands on its lot. A removal is refused while anybody of
+the version's society lives or works in any of the building's premises, and a lowering when it takes
+away a premises somebody lives or works in, naming them as above (`part_houses_people`: "Not removed:
+Ines lives there."). A taller building's new homes stay empty, since a town's people are counted when
+its society is made; a storeys preview that may be kept says what it would be (`landing.said`:
+"Taller: 4 storeys. Nobody lives in the new homes yet."). A kept change queues, in the edit's
+transaction, a bake of every tile the version's changes alter whose bake is neither stored nor
+already queued. The society over a changed town reads the town as made, not as its changes leave it.
 
 ## Bounded scene-extraction preparation
 

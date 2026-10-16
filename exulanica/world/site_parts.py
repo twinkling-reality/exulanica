@@ -70,6 +70,7 @@ __all__ = [
     "part_override",
     "people_in",
     "people_of_part",
+    "people_there",
     "receipt_storeys_bound",
     "refused_people_words",
 ]
@@ -727,10 +728,15 @@ _NAMED_MOST: Final = 3
 
 
 def refused_people_words(label: str, people: Sequence[tuple[str | None, str]]) -> str:
-    """The sentence a removal refused for its people reads: who lives there, then who works there,
-    those who may be named by name (three at most) and the rest counted, each verb agreeing with who
-    does it: "Ines and Teo work there", "2 people work there", "Ines and 2 more work there",
-    "1 person lives there and 2 people work there"."""
+    """The sentence a removal refused for its people reads: who is there
+    (:func:`people_there`), then the offer of a move."""
+    return f"Not removed: {people_there(people)}. The {label} can be moved instead."
+
+
+def people_there(people: Sequence[tuple[str | None, str]]) -> str:
+    """Who lives there, then who works there, those who may be named by name (three at most) and
+    the rest counted, each verb agreeing with who does it: "Ines and Teo work there", "2 people
+    work there", "Ines and 2 more work there", "1 person lives there and 2 people work there"."""
     said: list[str] = []
     names_left = _NAMED_MOST
     for verb, plural in (("lives", "live"), ("works", "work")):
@@ -748,4 +754,4 @@ def refused_people_words(label: str, people: Sequence[tuple[str | None, str]]) -
             said.append(f"{who} {verb if len(named) == 1 else plural} there")
         else:
             said.append(f"{', '.join(named)} and {rest} more {plural} there")
-    return f"Not removed: {' and '.join(said)}. The {label} can be moved instead."
+    return " and ".join(said)

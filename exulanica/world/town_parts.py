@@ -33,14 +33,21 @@ from exulanica.grammar.grammars.city.generation.massing import (
 from exulanica.grammar.grammars.city.generation.stage import entry
 from exulanica.grammar.grammars.city.massing import MassingRecord
 from exulanica.grammar.grammars.city.premises import PremisesRecord
-from exulanica.world.site_parts import PartChange, PartChangeRefused, people_in
+from exulanica.world.site_parts import (
+    PartChange,
+    PartChangeRefused,
+    people_in,
+    people_there,
+)
 
 __all__ = [
     "TownBuilding",
     "building_changes",
     "people_of_building",
+    "people_refusal",
     "premises_taken",
     "storeys_refusal",
+    "storeys_words",
     "town_buildings",
 ]
 
@@ -156,3 +163,36 @@ def premises_taken(
             and record.identity not in held
         )
     )
+
+
+def people_refusal(
+    people: Sequence[tuple[str | None, str]],
+    *,
+    building: str,
+    storeys: int | None,
+) -> PartChangeRefused:
+    """A removal (``storeys`` None), or a lowering to ``storeys``, refused for the people who live
+    or work in the premises it takes away: "Not removed: Ines lives there." or "Not lower: Ines and
+    2 more work there, in the storeys it would lose." Who is there is said as a site part's refusal
+    says it (:func:`~exulanica.world.site_parts.people_there`), without its offer of a move: a
+    town's building stands on its lot."""
+    who = people_there(people)
+    where: dict[str, Any] = {"part_id": building, "people": [name for name, _verb in people]}
+    if storeys is None:
+        return PartChangeRefused("part_houses_people", where, f"Not removed: {who}.")
+    return PartChangeRefused(
+        "part_houses_people",
+        {**where, "storeys": storeys},
+        f"Not lower: {who}, in the storeys it would lose.",
+    )
+
+
+def storeys_words(before: int, after: int) -> str:
+    """What a building standing ``after`` storeys instead of ``before`` is said with: taller adds
+    homes nobody lives in, since a town's people are counted once, when its society is made."""
+    count = f"{after} {'storey' if after == 1 else 'storeys'}"
+    if after > before:
+        return f"Taller: {count}. Nobody lives in the new homes yet."
+    if after < before:
+        return f"Lower: {count}."
+    return f"As it is: {count}."
