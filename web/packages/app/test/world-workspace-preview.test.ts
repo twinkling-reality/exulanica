@@ -101,7 +101,7 @@ describe('the world workspace preview\'s edits to this app', () => {
 
 describe('the world workspace preview\'s own checks', () => {
   // Each script asserts at its top level; importing it runs it, and a failed assertion fails here.
-  it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-words.mjs', 'verify-compare-words.mjs', 'verify-personality-words.mjs', 'verify-read-backoff.mjs', 'verify-entity-activity.mjs', 'verify-front-door.mjs', 'verify-build-words.mjs', 'verify-world-ui.mjs', 'verify-world-corners.mjs', 'verify-character-words.mjs', 'verify-character-view.mjs', 'verify-run-words.mjs', 'verify-entity-run.mjs', 'verify-entity-assignment.mjs', 'verify-world-opening.mjs', 'verify-history.mjs', 'verify-world-screen.mjs', 'verify-create-words.mjs', 'verify-create-steps.mjs', 'verify-talk-words.mjs', 'verify-talk-pops.mjs', 'verify-talk-scene.mjs'])('%s passes', async (script) => {
+  it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-words.mjs', 'verify-compare-words.mjs', 'verify-personality-words.mjs', 'verify-read-backoff.mjs', 'verify-entity-activity.mjs', 'verify-front-door.mjs', 'verify-build-words.mjs', 'verify-world-ui.mjs', 'verify-world-corners.mjs', 'verify-character-words.mjs', 'verify-character-view.mjs', 'verify-run-words.mjs', 'verify-entity-run.mjs', 'verify-entity-assignment.mjs', 'verify-world-opening.mjs', 'verify-history.mjs', 'verify-world-screen.mjs', 'verify-create-words.mjs', 'verify-create-steps.mjs', 'verify-talk-words.mjs', 'verify-talk-pops.mjs', 'verify-talk-scene.mjs', 'verify-moment-framing.mjs'])('%s passes', async (script) => {
     await expect(preview(script)).resolves.toBeDefined();
   });
 });

@@ -228,6 +228,11 @@ export class AuthoredRegionSociety {
     return this.crowd.heightOf(id);
   }
 
+  /** Which way an inhabitant faces as drawn, in world space (`SocietyCrowd.headingOf`), or null. */
+  headingOf(id: string): number | null {
+    return this.crowd.headingOf(id);
+  }
+
   /** Where an inhabitant's feet are drawn, in world space (`SocietyCrowd.groundOf`), or false when not drawn outdoors. */
   groundOf(id: string, out: pc.Vec3): boolean {
     return this.crowd.groundOf(id, out);

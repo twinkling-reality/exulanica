@@ -916,6 +916,23 @@ export class SocietyCrowd {
   }
 
   /**
+   * Which way an inhabitant faces as drawn now (a near figure while it is still turning faces as it is
+   * drawn, not as it will be), in world space: radians about +Y with -Z forward (the
+   * renderable's convention), turned as the region is turned into the world. Null when they are not
+   * drawn outdoors now.
+   */
+  headingOf(id: string): number | null {
+    const walker = this.drawnOutdoors(id);
+    if (walker === null) return null;
+    // As drawn: a near figure's own facing (it turns toward the walker's over a few frames), else
+    // the walker's. The region's forward, -Z turned by it, through the root's world turn (column major).
+    const facing = this.near.get(id)?.facing ?? walker.facing;
+    const m = this.root.getWorldTransform().data;
+    const x = -Math.sin(facing), z = -Math.cos(facing);
+    return Math.atan2(-(m[0]! * x + m[8]! * z), -(m[2]! * x + m[10]! * z));
+  }
+
+  /**
    * How tall an inhabitant stands as drawn, in metres: the height of the box they are drawn and
    * picked by. Null when they are not drawn outdoors now.
    */

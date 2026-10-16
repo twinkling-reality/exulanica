@@ -40,14 +40,25 @@ function stored(entryId: string): string | null {
 /** The server's pictures this page has read and checked: each entry's digest and object URL. */
 const served = new Map<string, { readonly sha256: string; readonly url: string }>();
 
-/** The picture a card shows for `entry`, or null. */
-export function worldPicture(entry: SavedWorldEntry): string | null {
+/** The size a world's first view is kept at, by the server and in this browser. */
+export const FIRST_VIEW_SIZE: readonly [number, number] = Object.freeze([WIDTH, HEIGHT] as const);
+
+/**
+ * A picture of `entry`'s world itself: the server's current one this page has read, else the one
+ * this browser kept; never the stock picture of its kind. Null where neither is held.
+ */
+export function ownWorldPicture(entry: SavedWorldEntry): string | null {
   const kept = entry.picture;
   if (kept?.current === true) {
     const read = served.get(entry.entryId);
     if (read?.sha256 === kept.sha256) return read.url;
   }
-  const own = stored(entry.entryId);
+  return stored(entry.entryId);
+}
+
+/** The picture a card shows for `entry`, or null. */
+export function worldPicture(entry: SavedWorldEntry): string | null {
+  const own = ownWorldPicture(entry);
   if (own !== null) return own;
   const recipe = entry.generatedGround?.recipeKey ?? null;
   return recipe === null ? null : recipePicture(recipe);
@@ -140,12 +151,19 @@ export function holdsWorld(data: ArrayLike<number>, check = FRAME_CHECK): boolea
   return samples > 0 && high - low >= check.flatRange && washed / samples < check.washedShare;
 }
 
+/** A frame's size, pixels: the card's unless another is asked for (a History moment, a portrait). */
+export interface FrameSize { readonly width: number; readonly height: number }
+
 /**
  * A frame of the world the renderer draws, read right after its next draw, the only moment its
- * drawing buffer still holds the frame, at the card's size. The renderer draws only frames it is
- * asked for, so one is asked for. Resolves null for a frame that holds no drawn world, or none.
+ * drawing buffer still holds the frame, at the card's size or `size` (the middle of the frame at its
+ * proportions). The renderer draws only frames it is asked for, so one is asked for. Resolves null
+ * for a frame that holds no drawn world (`check`), or none.
  */
-function takeFrame(source: PictureSource): Promise<HTMLCanvasElement | null> {
+export function takeFrame(
+  source: PictureSource, size: FrameSize = { width: WIDTH, height: HEIGHT }, check: typeof FRAME_CHECK = FRAME_CHECK,
+): Promise<HTMLCanvasElement | null> {
+  const { width: WIDTH_, height: HEIGHT_ } = size;
   return new Promise((resolve) => {
     let settled = false;
     const finish = (frame: HTMLCanvasElement | null): void => {
@@ -160,16 +178,16 @@ function takeFrame(source: PictureSource): Promise<HTMLCanvasElement | null> {
         const canvas = source.app.graphicsDevice.canvas;
         if (canvas.width === 0 || canvas.height === 0) return finish(null);
         const frame = document.createElement('canvas');
-        frame.width = WIDTH;
-        frame.height = HEIGHT;
+        frame.width = WIDTH_;
+        frame.height = HEIGHT_;
         const context = frame.getContext('2d');
         if (context === null) return finish(null);
-        // Cover: the middle of the frame at the card's proportions.
-        const scale = Math.max(WIDTH / canvas.width, HEIGHT / canvas.height);
-        const sw = WIDTH / scale;
-        const sh = HEIGHT / scale;
-        context.drawImage(canvas, (canvas.width - sw) / 2, (canvas.height - sh) / 2, sw, sh, 0, 0, WIDTH, HEIGHT);
-        finish(holdsWorld(context.getImageData(0, 0, WIDTH, HEIGHT).data) ? frame : null);
+        // Cover: the middle of the frame at the size's proportions.
+        const scale = Math.max(WIDTH_ / canvas.width, HEIGHT_ / canvas.height);
+        const sw = WIDTH_ / scale;
+        const sh = HEIGHT_ / scale;
+        context.drawImage(canvas, (canvas.width - sw) / 2, (canvas.height - sh) / 2, sw, sh, 0, 0, WIDTH_, HEIGHT_);
+        finish(holdsWorld(context.getImageData(0, 0, WIDTH_, HEIGHT_).data, check) ? frame : null);
       } catch {
         finish(null);
       }
@@ -226,6 +244,13 @@ export function jpegWithoutMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<
   return out;
 }
 
+/** A frame as the JPEG the server keeps: encoded at `quality`, with no metadata (null where the browser makes none). */
+export async function frameJpeg(frame: HTMLCanvasElement, quality = QUALITY): Promise<Blob | null> {
+  const encoded = await new Promise<Blob | null>((resolve) => frame.toBlob(resolve, 'image/jpeg', quality));
+  if (encoded === null) return null;
+  return new Blob([jpegWithoutMetadata(new Uint8Array(await encoded.arrayBuffer()))], { type: 'image/jpeg' });
+}
+
 /** The first views this page has put, by entry and what they show, so one is put once. */
 const put = new Set<string>();
 
@@ -279,9 +304,8 @@ export async function keepFirstViewPicture(
   const shows = `${entry.entryId} ${entry.authoredVersionId} ${entry.authoredStateSha256} ${entry.styleVersionId}`;
   if (entry.picture?.current === true || !mayPutPicture(entry) || put.has(shows)) return null;
   put.add(shows);
-  const encoded = await new Promise<Blob | null>((resolve) => frame.toBlob(resolve, 'image/jpeg', QUALITY));
-  if (encoded === null) return null;
-  const bytes = new Blob([jpegWithoutMetadata(new Uint8Array(await encoded.arrayBuffer()))], { type: 'image/jpeg' });
+  const bytes = await frameJpeg(frame);
+  if (bytes === null) return null;
   try {
     const kept = await server.putPicture(entry, bytes);
     if (kept.sha256 === await digestOf(bytes)) hold(entry.entryId, kept.sha256, bytes);

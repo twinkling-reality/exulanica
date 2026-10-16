@@ -34,6 +34,17 @@ export function openWorldAddress(href, entryId) {
   return worldAddress(entryId, current.origin);
 }
 
+/**
+ * A History moment drawn for its picture: the saved world `entryId`, read-only as a scene preview,
+ * its people placed as the moment `key` (in this tab's session storage) recorded them.
+ */
+export function momentPreviewAddress(entryId, key, origin) {
+  const target = new URL(worldAddress(entryId, origin));
+  target.searchParams.set('capture', '1');
+  target.searchParams.set('moment', key);
+  return target.href;
+}
+
 /** The live background for the chosen world: the same saved world, drawn read-only. */
 export function scenePreviewAddress(entryId, origin) {
   const target = new URL(worldAddress(entryId, origin));

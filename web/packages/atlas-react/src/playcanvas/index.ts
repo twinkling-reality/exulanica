@@ -199,6 +199,7 @@ export type {
 } from './representation-runtime.js';
 export { RepresentationRuntime } from './representation-runtime.js';
 export { CharacterPreview } from './character-preview.js';
+export { StaticMeshPicker } from './mesh-picking.js';
 export { FirstPersonGesture, type FirstPersonGestureDescriptor } from './first-person-gesture.js';
 export type { NativeCharacterDescriptor, NativeCharacterAppearance } from './native-character.js';
 export type { CharacterByteLoader } from './native-character-pool.js';

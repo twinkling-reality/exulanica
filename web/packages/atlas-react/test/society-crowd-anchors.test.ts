@@ -90,6 +90,14 @@ describe('where a mark over a person hangs', () => {
     expect(crowd.heightOf('villager-far')).toBe(crowd.farAppearance('villager-far').heightMetres);
     expect(crowd.heightOf('indoors-1')).toBeNull();
     expect(crowd.heightOf('nobody')).toBeNull();
+    // Which way each faces in the world: the knight's facing in the region, turned with it a quarter
+    // turn; none for one not drawn outdoors.
+    const held = crowd as unknown as { near: Map<string, { facing: number }>; walkers: Map<string, { facing: number }> };
+    const local = held.near.get('knight-1')?.facing ?? held.walkers.get('knight-1')!.facing;
+    const turned = Math.atan2(Math.cos(local), -Math.sin(local));
+    expect(Math.cos(crowd.headingOf('knight-1')! - turned)).toBeCloseTo(1, 9);
+    expect(crowd.headingOf('indoors-1')).toBeNull();
+    expect(crowd.headingOf('nobody')).toBeNull();
   });
 
   it('hangs no mark over a person while their figure is hidden', () => {
