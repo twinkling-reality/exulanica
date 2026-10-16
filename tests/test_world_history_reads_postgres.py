@@ -81,7 +81,13 @@ def test_where_the_world_is_kept_on_github_reads_the_configured_directory_alone(
     path = "/world/github-projects" + _query(entry)
     assert api.get(path).json()["projects"] == []  # no directory configured
     projects = tmp_path / "projects"
-    for name, world_id in (("kept", entry["world_id"]), ("other", "world:another")):
+    # The third is another workspace's project of a world under the same id: its version is not
+    # one this workspace holds, so it is never answered here.
+    for name, world_id, version_id in (
+        ("kept", entry["world_id"], entry["authored_version_id"]),
+        ("other", "world:another", entry["authored_version_id"]),
+        ("elsewhere", entry["world_id"], str(uuid.uuid4())),
+    ):
         folder = projects / name
         folder.mkdir(parents=True)
         write_status(
@@ -89,7 +95,7 @@ def test_where_the_world_is_kept_on_github_reads_the_configured_directory_alone(
             {
                 "profile": "exulanica.world-project-status/v1",
                 "world_id": world_id,
-                "version_id": entry["authored_version_id"],
+                "version_id": version_id,
                 "written_at": "2026-10-15T01:00:00Z",
                 "checkpoints": 2,
                 "last_checkpoint_at": "2026-10-15T00:59:00Z",
@@ -102,7 +108,10 @@ def test_where_the_world_is_kept_on_github_reads_the_configured_directory_alone(
     read = api.get(path)
     assert read.status_code == 200, read.text
     [kept] = read.json()["projects"]
-    assert kept["world_id"] == entry["world_id"]
+    assert (kept["world_id"], kept["version_id"]) == (
+        entry["world_id"],
+        entry["authored_version_id"],
+    )
     assert kept["link"] == {"repository": "learner/world", "publish": "automatic"}
     assert str(projects) not in read.text  # no path is ever answered
 
