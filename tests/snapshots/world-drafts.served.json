@@ -1192,7 +1192,7 @@
    ]
   },
   "state": "ready",
-  "description": "",
+  "description": "a small farm with a farmhouse, a barn and a duck pond",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
   "poll_after_seconds": null,
@@ -1832,7 +1832,7 @@
    ]
   },
   "state": "ready",
-  "description": "",
+  "description": "a quiet town with two cafes and low buildings",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
   "poll_after_seconds": null,

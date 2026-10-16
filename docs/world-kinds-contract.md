@@ -685,7 +685,14 @@ sent remains recorded. `POST /selection/world-drafts/outcome` reads the authorit
 result matching the prepared request; a client-supplied success grants nothing.
 
 **What is kept of the words.** The full sentence is stored in `world_draft_input` while work is
-pending and removed when an outcome is recorded. Progress and result records retain selected
+pending and removed when an outcome is recorded. A draft that made its world first keeps the
+sentence with that world (`world_made_from`, migration 0222), so the world's History can quote
+back what the person typed to make it; the draft read (`GET /worlds/drafts/{draft_id}`, for the
+person who started it) answers it as `description`. It is the person's own words: read by its
+workspace alone, deleted with the world's erasure or the workspace's, and never part of a world
+package, a reviewer seed or a world's project: a source test holds that nothing in
+`exulanica/world_package` reads it, and the reviewer seed (`exulanica-seed`) classifies its table
+as one it never carries. A draft that made no world keeps nothing of the sentence. Progress and result records retain selected
 omission/look/setting phrases for readback until world or workspace erasure. Those erasures
 cancel work, delete draft content and clear its job payload; start timing and financial identifiers
 remain without a content fingerprint. A backup restore reapplies those erasures and grants no
@@ -695,6 +702,7 @@ world keeps that was written from the words:
 
 | Where | What |
 | --- | --- |
+| The sentence the world was made from (`world_made_from`), kept once at the draft's end | The person's whole sentence, as typed; served only by the draft read to the person who started it; erased with the world |
 | The world's receipt (`world_generation_receipt`), appended once and never changed | For a place, the whole kind document: its key, label and summary, every part's and use's key and label, and `provenance.words_sha256`, the SHA-256 of the words as sent. The label and summary may repeat the words closely. For a town, its preset and values only |
 | The saved entry's title (`saved_world_entry`) and the first version's title (`world_alternate_version`) | For a place, the same label. A town's are its preset's label, which is not the person's |
 | The world's structure records (`world_structure_snapshot` and the element tables under it) | For a place, the document's part keys and look roles. A town's records are the city grammar's, generated from its preset, values and seed |

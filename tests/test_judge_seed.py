@@ -49,6 +49,7 @@ from exulanica.orchestration.judge_seed import (
     JUDGE_PERMISSIONS,
     JUDGE_ROLE,
     JUDGE_WRITE_TABLES,
+    NEVER_EXPORTED_TABLES,
     REACHED_TABLES,
     SeedRefused,
     classify_tables,
@@ -257,6 +258,7 @@ def test_every_base_table_is_classified(seeded):
     assert set(buckets["global"]) == set(GLOBAL_TABLES)
     assert set(buckets["instance"]) == set(INSTANCE_TABLES)
     assert set(buckets["reached"]) == set(REACHED_TABLES)
+    assert set(buckets["never_exported"]) == set(NEVER_EXPORTED_TABLES)
 
 
 def test_a_table_nobody_classified_fails_the_export(seeded, store, tmp_path, monkeypatch):
@@ -283,6 +285,72 @@ def test_the_instance_tables_are_never_carried(seeded, store, tmp_path):
     carried = {value["table"] for value in manifest.rows.values()}
     assert carried.isdisjoint(INSTANCE_TABLES)
     assert carried.isdisjoint(GLOBAL_TABLES)
+
+
+def test_a_seed_never_carries_the_sentence_a_world_was_made_from(seeded, store, tmp_path):
+    """The sentence a person typed to make a world stays with that world (migration 0222).
+
+    One workspace is exported before and after its made world keeps the sentence: the two
+    archives' rows are the same, the draft's start is carried in both, and no row file holds a
+    byte of the sentence. The rows are written for a new workspace inside a savepoint that is
+    rolled back, and the shared schema keeps none of them.
+    """
+    holder, actor = uuid.uuid4(), uuid.uuid4()
+    draft_id = uuid.uuid4()
+    world_id = f"world:generated:{draft_id}"
+    sentence = "a lighthouse on a grey rock with a keeper who grows tomatoes"
+    admin = seeded.connection
+    assert "world_made_from" in classify_tables(admin)["never_exported"]
+    with admin.transaction():
+        for name, value in (
+            ("exulanica.workspace_id", str(holder)),
+            ("exulanica.world_draft_actor", str(actor)),
+            ("exulanica.world_draft_starts_maximum", "5"),
+        ):
+            admin.execute("select set_config(%s, %s, true)", (name, value))
+        job = admin.execute(
+            "insert into job (workspace_id, kind, payload) values (%s, 'world_draft', %s) "
+            "returning job_id",
+            (holder, Jsonb({"draft_id": str(draft_id), "world_id": world_id})),
+        ).fetchone()["job_id"]
+        admin.execute(
+            "insert into world_draft_start (workspace_id, draft_id, request_id, actor_id, job_id, "
+            "world_id, guest) values (%s, %s, %s, %s, %s, %s, false)",
+            (holder, draft_id, uuid.uuid4(), actor, job, world_id),
+        )
+
+        def exported(name):
+            destination = tmp_path / name
+            manifest = export_seed(
+                admin, store, workspace_id=holder, destination=destination, created_at=_CREATED_AT
+            )
+            return destination, manifest
+
+        _without, before = exported("without")
+        admin.execute(
+            "insert into world_made_from (workspace_id, draft_id, world_id, sentence) "
+            "values (%s, %s, %s, %s)",
+            (holder, draft_id, world_id, sentence),
+        )
+        # Positive control: the source holds the sentence the seed is asked to leave behind.
+        assert admin.execute(
+            "select sentence from world_made_from where workspace_id = %s", (holder,)
+        ).fetchall() == [{"sentence": sentence}]
+        destination, after = exported("with")
+        assert after.rows == before.rows
+        carried = {value["table"]: value["rows"] for value in after.rows.values()}
+        assert carried["world_draft_start"] == 1
+        assert "world_made_from" not in carried
+        offenders = [
+            path.name
+            for path in sorted((destination / "rows").glob("*.copy"))
+            if sentence.encode() in path.read_bytes()
+        ]
+        assert offenders == []
+        raise psycopg.Rollback()
+    assert not admin.execute(
+        "select 1 from world_draft_start where workspace_id = %s", (holder,)
+    ).fetchall()
 
 
 def test_an_incomplete_source_is_refused_unless_the_caller_says_otherwise(seeded, tmp_path):

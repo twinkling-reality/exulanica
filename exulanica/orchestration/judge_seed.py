@@ -96,6 +96,7 @@ __all__ = [
     "JUDGE_PERMISSIONS",
     "JUDGE_ROLE",
     "JUDGE_WRITE_TABLES",
+    "NEVER_EXPORTED_TABLES",
     "REACHED_TABLES",
     "SEED_FORMAT_VERSION",
     "WORKSPACE_ROW_PREDICATES",
@@ -302,6 +303,15 @@ REACHED_TABLES: Final[Mapping[str, str]] = {
     ),
 }
 
+#: Workspace tables a seed never carries, although each names the workspace, with the reason.
+#:
+#: Named rather than left to the ``workspace_id`` rule, because that rule carries every table a
+#: migration adds: a table that must stay on its own server is refused a place in the archive here,
+#: by name, and the stale check below fails the export if one is renamed or dropped.
+NEVER_EXPORTED_TABLES: Final[Mapping[str, str]] = {
+    "world_made_from": "the sentence a person typed to make a world stays with that world",
+}
+
 
 # ---------------------------------------------------------------------------------------------
 # Classification, exhaustive over the live schema
@@ -313,7 +323,8 @@ def classify_tables(connection: psycopg.Connection) -> dict[str, tuple[str, ...]
 
     Buckets are ``workspace`` (filtered on ``workspace_id``), ``reached`` (filtered by an explicit
     predicate in :data:`REACHED_TABLES`), ``global`` (migration-provided, not carried),
-    ``instance`` (per-deployment, not carried) and ``partition`` (per-workspace embedding
+    ``instance`` (per-deployment, not carried), ``never_exported`` (the workspace's own, kept on
+    its server: :data:`NEVER_EXPORTED_TABLES`) and ``partition`` (per-workspace embedding
     partitions, created by :func:`provision_workspace` rather than loaded).
 
     **Exhaustive on purpose, and this is the whole safety argument for the export.** A migration
@@ -337,6 +348,7 @@ def classify_tables(connection: psycopg.Connection) -> dict[str, tuple[str, ...]
         "reached": [],
         "global": [],
         "instance": [],
+        "never_exported": [],
         "partition": [],
     }
     unclassified: list[str] = []
@@ -348,6 +360,8 @@ def classify_tables(connection: psycopg.Connection) -> dict[str, tuple[str, ...]
             buckets["instance"].append(name)
         elif name in GLOBAL_TABLES:
             buckets["global"].append(name)
+        elif name in NEVER_EXPORTED_TABLES:
+            buckets["never_exported"].append(name)
         elif name in REACHED_TABLES:
             buckets["reached"].append(name)
         elif row["has_workspace"]:
@@ -362,7 +376,9 @@ def classify_tables(connection: psycopg.Connection) -> dict[str, tuple[str, ...]
             f"{', '.join(sorted(unclassified))}. Add each to GLOBAL_TABLES, INSTANCE_TABLES or "
             "REACHED_TABLES in exulanica/orchestration/judge_seed.py, with the reason."
         )
-    named = set(GLOBAL_TABLES) | set(INSTANCE_TABLES) | set(REACHED_TABLES)
+    named = (
+        set(GLOBAL_TABLES) | set(INSTANCE_TABLES) | set(REACHED_TABLES) | set(NEVER_EXPORTED_TABLES)
+    )
     missing = named - {name for values in buckets.values() for name in values}
     if missing:
         raise SeedRefused(

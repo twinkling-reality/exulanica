@@ -95,6 +95,7 @@ def test_v2_world_removal_and_restore_erase_receipt_and_omissions_preserve_libra
         response = client.get(draft_path, headers=headers)
         assert response.status_code == 200, response.text
         assert response.json()["left_out"] == ["a flying boat"]
+        assert "a flying boat" in response.json()["description"]  # The made world kept it (0222).
         response = client.delete(f"/worlds/{entry.world_id}", headers=headers)
         assert response.status_code == 204, response.text
         response = client.get(draft_path, headers=headers)
@@ -115,6 +116,7 @@ def test_v2_world_removal_and_restore_erase_receipt_and_omissions_preserve_libra
                 "world_draft_progress",
                 "world_draft_attempt",
                 "world_draft_outcome",
+                "world_made_from",
             ):
                 assert not connection.execute(f"select 1 from {table}").fetchall()
             assert connection.execute("select * from world_draft_start").fetchall() == anchors

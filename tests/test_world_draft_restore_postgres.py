@@ -85,6 +85,7 @@ def test_restore_replays_erasure_of_draft_content_without_refunding_spend(
     source, marker = _seal(tmp_path)
     _restore(purged, dump, blobs)
     assert bench.query("select 1 from world_draft_request")  # Positive control: backup held words.
+    assert bench.query("select 1 from world_made_from")  # And the made world's sentence.
     _replay(source, marker)
     verify_restore(purged.database(), marker)
     for table in (
@@ -93,6 +94,7 @@ def test_restore_replays_erasure_of_draft_content_without_refunding_spend(
         "world_draft_progress",
         "world_draft_attempt",
         "world_draft_outcome",
+        "world_made_from",
     ):
         assert bench.query(f"select 1 from {table}") == []
     assert bench.query("select * from world_draft_start") == anchors

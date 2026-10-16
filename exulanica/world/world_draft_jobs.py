@@ -71,11 +71,14 @@ class WorldDraftRepository:
     def get(self, actor: uuid.UUID, draft_id: uuid.UUID) -> dict:
         row = self.connection.execute(
             "select s.*,j.state,j.attempts,j.failure_class, "
-            "r.terms_sha256,r.document as definition, i.description, o.document as outcome, "
+            "r.terms_sha256,r.document as definition, "
+            # A draft that made its world keeps its sentence with it (0222) once its input is gone.
+            "coalesce(i.description, m.sentence) as description, o.document as outcome, "
             "(select p.document from world_draft_progress p where p.workspace_id=s.workspace_id "
             "and p.draft_id=s.draft_id order by event_seq desc limit 1) as progress "
             "from world_draft_start s join world_draft_request r using(workspace_id,draft_id) "
             "left join world_draft_input i using(workspace_id,draft_id) "
+            "left join world_made_from m using(workspace_id,draft_id) "
             "left join world_draft_outcome o using(workspace_id,draft_id) "
             "join job j on j.job_id=s.job_id "
             "where s.workspace_id=%s and s.actor_id=%s and s.draft_id=%s",
@@ -354,6 +357,9 @@ class WorldDraftRepository:
                     claimed.job_id,
                 ),
             )
+            # A draft that made its world keeps its sentence with that world; then the draft's
+            # input is forgotten, as for every draft that ends.
+            self.connection.execute("select world_draft_keep_sentence(%s)", (claimed.draft_id,))
             self.connection.execute("select world_draft_forget_input(%s)", (claimed.draft_id,))
 
     def accounting(self, actor: uuid.UUID, draft_id: uuid.UUID) -> dict[str, Any]:

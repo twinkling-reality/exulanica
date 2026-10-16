@@ -175,6 +175,9 @@ READ_ONLY_TABLES: Final = (
     "generation_session",
     # Erasure alone creates immutable recovery obligations; progress is appended separately.
     "piece_erasure_settlement",
+    # Migration 0222: the sentence a made world was made from. A draft's end keeps it through
+    # world_draft_keep_sentence, and only an erasure deletes it; the runtime reads it.
+    "world_made_from",
 )
 
 #: What the runtime may call on migration 0124's durable spending: admit, dispatch and settle an
@@ -810,6 +813,7 @@ def provision_runtime_role(
                 schema,
                 role_name,
                 (
+                    ("world_draft_keep_sentence", "uuid"),
                     ("world_draft_forget_input", "uuid"),
                     ("kind_draft_forget_input", "uuid"),
                     ("kind_draft_prune", ""),

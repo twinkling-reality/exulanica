@@ -260,8 +260,10 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
         transport.release.set()
         ended = _ended(client, body["draft_id"])
         assert ended["state"] == "ready", ended
-        # A draft that ended keeps none of the words a person typed.
-        assert ended["description"] == ""
+        # The ended draft forgets the words; the world it made keeps the sentence, and the draft
+        # read answers it from there (0222).
+        assert ended["description"] == FARM_WORDS
+        assert (_count(client, "world_draft_input"), _count(client, "world_made_from")) == (0, 1)
         assert ended["tool"] == {"key": "place", "chosen_by": "model"}
         entry = ended["entry"]
         assert entry["source_kind"] == "generated" and entry["generated_site"] is not None
@@ -544,6 +546,8 @@ def test_a_draft_no_brief_makes_a_place_of_is_refused_by_name_and_writes_nothing
         assert ended["refusal"]["code"] == "kind_not_drafted"
         assert ended["refusal"]["code"] in {code["code"] for code in ended["refusals"]}
         assert ended["entry"] is None and ended["made"] == []
+        # A draft that made no world keeps no sentence: it is forgotten as before (0222).
+        assert ended["description"] == "" and _count(client, "world_made_from") == 0
         # Every call it made is still shown: the chooser's and each of the drafter's attempts.
         assert len(ended["execution"]["calls"]) == 4
         assert _count(client, "world_identity") == before

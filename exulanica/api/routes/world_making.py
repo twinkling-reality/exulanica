@@ -6,7 +6,9 @@ the tool that can make the place, drafts with that tool's drafter and makes the 
 person meets no kind, preset or value on the way in. ``GET /worlds/drafts/{draft_id}`` reads where
 it has got to, for the person who started it only: ``choosing``, ``drafting``, ``making``, then
 ``ready`` with the saved world, each part that was made and the words that were left out, or
-``refused`` by name; either way with what it cost. ``GET /worlds/drafts`` says, before a word is
+``refused`` by name; either way with what it cost. A ready draft's ``description`` is the sentence
+the world was made from, kept with that world (migration 0222) until the world is erased; a draft
+that made no world answers it empty once it ends. ``GET /worlds/drafts`` says, before a word is
 typed, whether a draft would be taken from this person now and what one may spend: the most times
 it asks a model, how many of the hour's starts are left, and the person's own draft still running.
 

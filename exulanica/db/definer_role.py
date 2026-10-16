@@ -552,6 +552,9 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     # society_erase_rows, made again with one statement more, deletes a society's moments before
     # the events they are anchored on (0221).
     "0221": DefinerGrants(tables={"world_society_moment": frozenset(("SELECT", "DELETE"))}),
+    # A draft that made its world keeps its sentence with it; the world's erasure, and its
+    # workspace's, delete it (0222).
+    "0222": DefinerGrants(tables={"world_made_from": frozenset(("SELECT", "INSERT", "DELETE"))}),
 }
 
 

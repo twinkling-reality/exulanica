@@ -98,7 +98,12 @@ def test_companion_proposal_is_readonly_yes_uses_native_job_and_same_key_replays
     assert result["entry"]["world_id"] == f"world:generated:{ident}"
     assert result["accounting"]["reported_usd"] != "0"
     assert result["accounting"]["unknown_liability_usd"] == "0"
-    assert result["description"] == ""
+    # The draft's input is forgotten, and the world it made keeps the sentence (0222).
+    assert result["description"] == native.TOWN_WORDS
+    assert bench.query("select 1 from world_draft_input") == []
+    assert bench.query("select world_id, sentence from world_made_from") == [
+        {"world_id": f"world:generated:{ident}", "sentence": native.TOWN_WORDS}
+    ]
     outcome = client.post("/selection/world-drafts/outcome", headers=HEADERS, json={"plan": plan})
     assert outcome.status_code == 200, outcome.text
     assert outcome.json()["state"] == "ready"
@@ -214,6 +219,7 @@ def test_erasure_forgets_content_hides_key_and_keeps_financial_ids(native_draft,
         "from spending_reservation order by reservation_id"
     )
     before = len(transport.requests)
+    assert bench.query("select 1 from world_made_from")  # Positive control: the world kept it.
     with bench.runtime.session(workspace) as connection:
         if scope == "world":
             erase_world(connection, workspace, result["entry"]["world_id"], erased_by=actor)
@@ -229,6 +235,7 @@ def test_erasure_forgets_content_hides_key_and_keeps_financial_ids(native_draft,
             "world_draft_progress",
             "world_draft_attempt",
             "world_draft_outcome",
+            "world_made_from",
         ):
             assert connection.execute(f"select 1 from {table}").fetchall() == []
         (anchor,) = connection.execute("select * from world_draft_start").fetchall()

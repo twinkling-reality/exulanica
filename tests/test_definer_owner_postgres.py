@@ -61,6 +61,8 @@ TABLE_PRIVILEGES = {
     "world_draft_progress": {"SELECT", "DELETE"},
     "world_draft_attempt": {"SELECT", "DELETE"},
     "world_draft_outcome": {"SELECT", "DELETE"},
+    # 0222: a made world's sentence, kept at its draft's end and deleted only by erasure.
+    "world_made_from": {"SELECT", "INSERT", "DELETE"},
     "capture": {"SELECT"},
     "capture_reconstruction_authorization": {"SELECT"},
     "personal_model_right": {"INSERT"},
@@ -362,6 +364,8 @@ DEFINERS = {
             "tg_world_draft_person_quota()",
             "tg_world_draft_erasure()",
             "world_draft_forget_input(uuid)",
+            "world_draft_keep_sentence(uuid)",
+            "tg_world_made_from_erasure()",
             "draft_person_allowance(uuid,integer)",
             "kind_draft_forget_input(uuid)",
             "kind_draft_prune()",

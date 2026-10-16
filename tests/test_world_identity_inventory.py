@@ -105,9 +105,13 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         "a preworld draft is found by workspace, actor and idempotency request id; its reserved "
         "generated identity is returned, before any world need exist"
     ),
-    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.get [world_draft_start]": (
+    (
+        "exulanica/world/world_draft_jobs.py::WorldDraftRepository.get "
+        "[world_draft_start, world_made_from]"
+    ): (
         "a preworld draft and its outcome are read by workspace, actor and draft id; joined "
-        "request, input, progress and outcome rows belong to that draft"
+        "request, input, progress and outcome rows, and the sentence its made world keeps, belong "
+        "to that draft"
     ),
     "exulanica/world/draft_admission.py::allowance [world_draft_start]": (
         "native-kind and world drafts share preworld admission; the active-job read binds "
