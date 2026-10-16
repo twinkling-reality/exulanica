@@ -78,7 +78,7 @@ vi.mock('../src/door-bridges-api.js', () => ({
 }));
 
 const WORLD = 'world:authored:saved';
-const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v4.json`, 'utf8')) as
+const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v5.json`, 'utf8')) as
   { entries: { kind: string; code: string; words: string }[] };
 /** Why an event happened, as the words catalog says it. */
 const because = (code: string): string => catalog.entries.find((entry) => entry.kind === 'event_reason' && entry.code === code)!.words;
@@ -361,7 +361,7 @@ describe('a visitor of a kind its workspace made', () => {
 
 describe('why a visitor its own program decides for did something', () => {
   it('credits its own program, never a model, where a world-run being and a placed one credit their model', async () => {
-    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v4.json`, 'utf8')) as
+    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v5.json`, 'utf8')) as
       { entries: { kind: string; code: string; words: string }[] };
     const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
     const chose = { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'chosen_by_their_model' };
@@ -394,7 +394,7 @@ describe('why a visitor its own program decides for did something', () => {
 
 describe('why one of the world\'s own people a grant hands to an outside program did something', () => {
   it('credits that program, never a model, as the models read lists them', async () => {
-    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v4.json`, 'utf8')) as
+    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v5.json`, 'utf8')) as
       { entries: { kind: string; code: string; words: string }[] };
     const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
     const because = (reason: string) => words('phrase', 'because').replace('{reason}', reason);
@@ -477,15 +477,15 @@ describe('what a person who came in from outside is, in Selected', () => {
       pick.dispatchEvent(new Event('change'));
       return shown.at(-1)!.about.note.description;
     };
-    expect(whatOf('visitor-1')).toBe(fill(words('what_crossed_program'), { role: 'steward', from: 'Block Game' }));
-    expect(whatOf('visitor-2')).toBe(fill(words('what_crossed_world'), { role: 'steward', from: 'Block Game' }));
+    expect(whatOf('visitor-1')).toBe(fill(words('what_crossed_program'), { Role: 'Steward', role: 'steward', from: 'Block Game' }));
+    expect(whatOf('visitor-2')).toBe(fill(words('what_crossed_world'), { Role: 'Steward', role: 'steward', from: 'Block Game' }));
     // A bridge the door does not list is not guessed at.
-    expect(whatOf('visitor-3')).toBe(fill(words('what_crossed_program'), { role: 'steward', from: words('from_outside') }));
+    expect(whatOf('visitor-3')).toBe(fill(words('what_crossed_program'), { Role: 'Steward', role: 'steward', from: words('from_outside') }));
     for (const id of ['visitor-1', 'visitor-2', 'visitor-3']) {
-      expect(whatOf(id)).not.toBe(fill(words('what'), { role: 'steward' }));
+      expect(whatOf(id)).not.toBe(fill(words('what'), { Role: 'Steward', role: 'steward' }));
       expect(whatOf(id)).not.toMatch(/simulated/u);
     }
-    expect(whatOf('knight-0')).toBe(fill(words('what'), { role: 'steward' }));
+    expect(whatOf('knight-0')).toBe(fill(words('what'), { Role: 'Steward', role: 'steward' }));
     mounted.dispose();
   });
 });

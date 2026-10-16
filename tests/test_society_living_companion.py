@@ -67,7 +67,8 @@ def test_living_words_name_work_and_reason_from_recorded_fields():
     )
     assert (said.who, said.what, said.doing, said.why) == (
         "Resident 7",
-        "A simulated shopkeeper in this town. They have a home and an assigned workplace.",
+        "Shopkeeper in this town, invented for this world. "
+        "They have a home and an assigned workplace.",
         "walking to work",
         "Their work shift is due.",
     )

@@ -475,7 +475,7 @@ def test_what_happened_is_composed_from_event_lines_alone_through_the_policy(wor
     planner, composer = _sent(transport)
     # Positive controls: the planner was told people are in view, and the composer got lines.
     assert "simulated people are in view" in planner
-    assert "Simulated minute" in composer and "[inhabitant A]" in composer
+    assert re.search(r"Minute \d+: \[inhabitant A\]", composer)
     for sent in (planner, composer):
         assert not {part for part in _parts(_names(snapshot)) if part in sent}
         assert SAVED_SURNAME not in sent and "Maria" not in sent
@@ -484,7 +484,7 @@ def test_what_happened_is_composed_from_event_lines_alone_through_the_policy(wor
     clauses = body["answer"]["clauses"]
     assert body["deterministic"] is False
     assert "not times of day" in clauses[0]["text"]
-    assert clauses[1]["text"] == "Here is what the simulation recorded."
+    assert clauses[1]["text"] == "Here is what this world recorded."
     # The chosen line, in the words it was sent in, cited to it.
     assert clauses[2]["text"] == transport.chosen[0] and clauses[2]["type"] == "simulation"
     assert body["simulation"][clauses[2]["citations"][0]]["line"] == transport.chosen[0]

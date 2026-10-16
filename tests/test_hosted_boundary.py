@@ -855,7 +855,7 @@ class _lent:
 SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "planner": (run_ask, "running club shirt"),
     "composer": (run_ask, "RUNNING CLUB"),
-    "society composer": (run_society_question, "Simulated minute"),
+    "society composer": (run_society_question, "Minute "),
     "query embedding": (run_supplied_plan, "running club"),
     "request classifier": (run_appearance, "make the horizon softer"),
     "appearance drafter": (run_appearance, "THE REVIEWED CATALOGUE"),

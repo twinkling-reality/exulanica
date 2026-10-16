@@ -1,5 +1,5 @@
 {
-  "about": "Cases both readers of society-inhabitant-words.v1.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
+  "about": "Cases both readers of society-inhabitant-words.v5.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
   "places": {
     "target:bench": "Bench 2",
     "target:pillar": "Pillar"
@@ -20,7 +20,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       }
@@ -35,7 +35,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       },
@@ -57,7 +57,7 @@
       },
       "expected": {
         "who": "Someone",
-        "what": "A simulated inhabitant, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Inhabitant invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
         "why": "Because they have only just arrived."
       }
@@ -82,7 +82,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
         "why": "Because every place they could use is taken."
       }
@@ -103,7 +103,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
         "why": "Because their kind does none of the things people do here."
       }
@@ -128,7 +128,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a spot to stand a while.",
         "why": "Because they chose to stop and stand a while."
       }
@@ -154,7 +154,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking over to talk with Bela Ash 2.",
         "why": "Because they met someone and stopped to talk."
       }
@@ -180,7 +180,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking over to talk with someone nearby.",
         "why": "Because they met someone and stopped to talk."
       }
@@ -205,7 +205,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a free spot nearby.",
         "why": "Because they have finished there, and someone else may need the place."
       }
@@ -230,7 +230,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a free spot nearby.",
         "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
       }
@@ -255,7 +255,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to Bench 2 to rest.",
         "why": "Because they need a rest, and it is the nearest place to rest they have not just used."
       }
@@ -280,7 +280,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to Pillar to visit.",
         "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
       }
@@ -305,7 +305,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a place that is no longer there to visit.",
         "why": "Because they are rested enough to look around, and chose this place."
       }
@@ -330,8 +330,8 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Resting at Bench 2, one more simulated minute.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Resting at Bench 2, one more minute.",
         "why": "Because they chose to sit a while."
       }
     },
@@ -355,8 +355,8 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Visiting Pillar, 4 more simulated minutes.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Visiting Pillar, 4 more minutes.",
         "why": "Because they are rested enough to look around, and chose this place."
       }
     },
@@ -380,7 +380,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Just finished resting at Bench 2.",
         "why": "Because they need a rest, and it is the nearest place to rest they have not just used."
       }
@@ -405,7 +405,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Just finished visiting Pillar.",
         "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
       }
@@ -430,8 +430,8 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Standing a while, 2 more simulated minutes.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing a while, 2 more minutes.",
         "why": "Because they chose to stop and stand a while."
       }
     },
@@ -455,8 +455,8 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Standing a while, 2 more simulated minutes.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing a while, 2 more minutes.",
         "why": "Because the model you chose for them picked it."
       }
     },
@@ -480,7 +480,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Just finished standing a while.",
         "why": "Because they have been at it as long as they meant to."
       }
@@ -506,8 +506,8 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Talking with Bela Ash 2, 3 more simulated minutes.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Talking with Bela Ash 2, 3 more minutes.",
         "why": "Because they met someone and stopped to talk."
       }
     },
@@ -532,8 +532,8 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Talking with Bela Ash 2, 3 more simulated minutes.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Talking with Bela Ash 2, 3 more minutes.",
         "why": "Because the model you chose for them picked it."
       }
     },
@@ -558,7 +558,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting for Bela Ash 2, to talk.",
         "why": "Because the person they are meeting is still on the way."
       }
@@ -584,7 +584,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting for Bela Ash 2, to talk.",
         "why": "Because the person they are meeting is still on the way."
       }
@@ -610,7 +610,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Just finished talking with Bela Ash 2.",
         "why": "Because the person they were talking with left."
       }
@@ -631,7 +631,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing aside.",
         "why": "Because they stepped out of the way."
       }
@@ -656,7 +656,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
         "why": "Because you asked them to go there."
       }
@@ -677,7 +677,7 @@
       },
       "expected": {
         "who": "Ari Ash 1",
-        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
         "why": "Because the reason is only in the record."
       }
@@ -706,7 +706,37 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "waiting for the next choice",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living idle, a role of two words",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "office worker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "idle",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "idle",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Office worker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "waiting for the next choice",
         "why": "Their routine chose this to meet a need."
       },
@@ -736,8 +766,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "eating at home",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living eat at home, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "eat_at_home",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "eat_at_home",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished eating at home",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -766,8 +827,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "eating out",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living eat out, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "eat_out",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "eat_out",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished eating out",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -796,8 +888,70 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "resting",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living rest, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "rest",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "rest",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished resting",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living, an unknown activity just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "juggle",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "juggle",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "between things",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -826,8 +980,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "shopping",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living shop, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "shop",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "shop",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished shopping",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -856,8 +1041,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "sleeping at home",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living sleep, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "sleep",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "sleep",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just got up at home",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -886,8 +1102,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "spending time at home",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living stay home, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "stay_home",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "stay_home",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished spending time at home",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -916,8 +1163,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "taking a walk",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living stroll, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "stroll",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "stroll",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished a walk",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -946,8 +1224,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "visiting a place",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living visit, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "visit",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "visit",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished a visit",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -976,8 +1285,39 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "working",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living work, just finished",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "work",
+          "reason": "most_pressing_need",
+          "status": "completed"
+        },
+        "goal": {
+          "activity": "work",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
+        "doing": "just finished work",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -1006,7 +1346,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "carrying out an activity",
         "why": "Their routine chose this to meet a need."
       },
@@ -1036,7 +1376,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking home to eat",
         "why": "Their routine chose this to meet a need."
       },
@@ -1066,7 +1406,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to a meal",
         "why": "Their routine chose this to meet a need."
       },
@@ -1096,7 +1436,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to a place to rest",
         "why": "Their routine chose this to meet a need."
       },
@@ -1126,7 +1466,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to shop",
         "why": "Their routine chose this to meet a need."
       },
@@ -1156,7 +1496,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking home to sleep",
         "why": "Their routine chose this to meet a need."
       },
@@ -1186,7 +1526,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "going home",
         "why": "Their routine chose this to meet a need."
       },
@@ -1216,7 +1556,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "taking a walk",
         "why": "Their routine chose this to meet a need."
       },
@@ -1246,7 +1586,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to visit a place",
         "why": "Their routine chose this to meet a need."
       },
@@ -1276,7 +1616,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to work",
         "why": "Their work shift is due."
       },
@@ -1306,7 +1646,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking through town",
         "why": "Their routine chose this to meet a need."
       },
@@ -1341,7 +1681,7 @@
       },
       "expected": {
         "who": "Resident 1",
-        "what": "A simulated farmhand on this farm. They have a home and an assigned workplace.",
+        "what": "Farmhand on this farm, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking across the farm",
         "why": "Their routine chose this to meet a need."
       },
@@ -1374,7 +1714,7 @@
       },
       "expected": {
         "who": "Resident 3",
-        "what": "A simulated builder at this building site. They have an assigned workplace and no recorded home.",
+        "what": "Builder at this building site, invented for this world. They have an assigned workplace and no recorded home.",
         "doing": "walking to work",
         "why": "Their work shift is due."
       },
@@ -1405,7 +1745,7 @@
       },
       "expected": {
         "who": "Resident 2",
-        "what": "A simulated resident at {role}'s yard. They have a home and no assigned workplace.",
+        "what": "Resident at {role}'s yard, invented for this world. They have a home and no assigned workplace.",
         "doing": "walking round {here}",
         "why": "Their routine chose this to meet a need."
       },
@@ -1425,7 +1765,7 @@
       },
       "expected": {
         "who": "Visitor 1",
-        "what": "A traveller who came in from Block Game, not invented for this world: this world decides what they do here.",
+        "what": "Traveller who came in from Block Game, not invented for this world: this world decides what they do here.",
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       }
@@ -1443,7 +1783,7 @@
       },
       "expected": {
         "who": "Visitor 1",
-        "what": "A traveller who came in from Block Game, not invented for this world: the program they came with decides what they do here.",
+        "what": "Traveller who came in from Block Game, not invented for this world: the program they came with decides what they do here.",
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       }
@@ -1462,7 +1802,7 @@
       },
       "expected": {
         "who": "Visitor 1",
-        "what": "A traveller who came in from outside this world, not invented for this world: the program they came with decides what they do here.",
+        "what": "Traveller who came in from outside this world, not invented for this world: the program they came with decides what they do here.",
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       }
@@ -1481,7 +1821,7 @@
       },
       "expected": {
         "who": "Visitor 1",
-        "what": "A simulated traveller, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Traveller invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       }
@@ -1502,7 +1842,7 @@
       },
       "expected": {
         "who": "Someone",
-        "what": "A simulated inhabitant, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Inhabitant invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
         "why": "Because their routine chose to wait."
       }
@@ -1523,7 +1863,7 @@
       },
       "expected": {
         "who": "Someone",
-        "what": "A simulated inhabitant, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "what": "Inhabitant invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
         "why": "Because their routine has no preferred activity available here."
       }

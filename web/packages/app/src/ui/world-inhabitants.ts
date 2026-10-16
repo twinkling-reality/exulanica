@@ -368,6 +368,8 @@ export function inhabitantWords(
   listed: ReadonlyMap<string, SocietyPlaceName | null> | null = null,
   /** Set where a person plays this being (`inhabitantWordsFrom`). */
   playedByPerson = false,
+  /** `still: false` for a surface in the world, which says the activity alone (`inhabitantWordsFrom`). */
+  options: { readonly still?: boolean } = {},
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
@@ -380,6 +382,7 @@ export function inhabitantWords(
     decidedFromOutside,
     bridgeLabel,
     playedByPerson,
+    options,
   );
 }
 

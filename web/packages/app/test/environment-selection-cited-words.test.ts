@@ -104,7 +104,7 @@ async function mount(held: SocietySnapshot) {
 
 const cited = {
   token: 'EVENTAAAA1', resultKind: 'simulation_event' as const, versionId: 'version', inhabitantId: 'person-0',
-  eventId: 'event-1', tick: 3, line: 'Simulated minute 3: [inhabitant A] began what they came to do, because they have arrived.',
+  eventId: 'event-1', tick: 3, line: 'Minute 3: [inhabitant A] began what they came to do, because they have arrived.',
 };
 const references = { inhabitants: { '[inhabitant A]': { versionId: 'version', inhabitantId: 'person-0' } } };
 
@@ -112,7 +112,7 @@ describe('a Companion citation opened in the inspector', () => {
   it('shows the cited words beside the person it names, drawn from the society shown', async () => {
     const { mounted, activity } = await mount(society(standing, standing));
     mounted.showSimulation(cited, references);
-    expect(activity()).toContain('From the simulation: Simulated minute 3: Ada began what they came to do');
+    expect(activity()).toContain('From this world: Minute 3: Ada began what they came to do');
     mounted.dispose();
   });
 
@@ -121,7 +121,7 @@ describe('a Companion citation opened in the inspector', () => {
     mounted.showSimulation(cited, references);
     pick('person-1');
     pick('person-0');
-    expect(activity()).toBe('Standing a while, 3 more simulated minutes. Because they chose to stop and stand a while.');
+    expect(activity()).toBe('Standing a while, 3 more minutes. Because they chose to stop and stand a while.');
     mounted.dispose();
   });
 });

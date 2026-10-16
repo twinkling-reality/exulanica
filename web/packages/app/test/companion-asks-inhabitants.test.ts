@@ -55,7 +55,7 @@ const whyBody = {
     EVENTAAAA1: {
       truth_class: 'simulation', result_kind: 'simulation_event', version_id: VERSION,
       inhabitant_id: ARI, event_id: EVENT, tick: 5,
-      line: 'Simulated minute 5: [inhabitant A] chose where to go next, because they need a rest.',
+      line: 'Minute 5: [inhabitant A] chose where to go next, because they need a rest.',
       personal_visit_evidence: false,
     },
   },
@@ -203,7 +203,7 @@ describe('asking about the people in a world', () => {
       SOCIETY,
     );
     expect(pieces.map((piece) => piece.text).join('')).toBe(
-      'A simulated person this page is not showing waited at a place that is no longer there.',
+      'A person this page is not showing waited at a place that is no longer there.',
     );
   });
 
@@ -220,8 +220,8 @@ describe('asking about the people in a world', () => {
     rail.renderAnswer(answer, () => undefined);
     const chips = [...rail.root.querySelectorAll<HTMLButtonElement>('.companion-simulation-chip')];
     expect(chips.map((chip) => [chip.textContent, chip.dataset['truthClass']])).toEqual([
-      ['Simulation, minute 6', 'simulation'],
-      ['Simulation, minute 5', 'simulation'],
+      ['This world, minute 6', 'simulation'],
+      ['This world, minute 5', 'simulation'],
     ]);
     // No photograph chip: nothing here is a photograph.
     expect(rail.root.querySelector('.companion-evidence-chip')).toBeNull();

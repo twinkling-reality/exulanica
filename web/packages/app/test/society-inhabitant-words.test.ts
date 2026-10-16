@@ -24,7 +24,7 @@ const CASES = JSON.parse(
   readonly cases: readonly Case[];
 };
 const CATALOG = JSON.parse(
-  readFileSync(new URL('../../../../assets/catalogs/society-words/society-inhabitant-words.v4.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../../assets/catalogs/society-words/society-inhabitant-words.v5.json', import.meta.url), 'utf8'),
 ) as { readonly entries: readonly { readonly kind: string; readonly code: string; readonly words: string }[] };
 
 describe('a simulated person in words, as the server says them', () => {
@@ -41,7 +41,7 @@ describe('a simulated person in words, as the server says them', () => {
         tick: 0, input_seq: 1, input_sha256: digest, inhabitants: [person] } });
     expect(inhabitantWordsFrom(saved.state.inhabitants[0]!, () => null, () => null, saved.state.profile))
       .toEqual({ who: 'Ari Ash 1',
-        what: 'A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.',
+        what: 'Walker invented for this world: not anyone you know, and nothing they do is a memory.',
         doing: 'Standing, deciding where to go.', why: 'Because they have only just arrived.' });
   });
   it('describes a living resident without an identifier or a need level', () => {
@@ -53,7 +53,7 @@ describe('a simulated person in words, as the server says them', () => {
       goal: { activity: 'work', reason: 'shift_due' },
     }, 6);
     expect(said).toEqual({
-      who: 'Resident 7', what: 'A simulated shopkeeper in this town. They have a home and an assigned workplace.',
+      who: 'Resident 7', what: 'Shopkeeper in this town, invented for this world. They have a home and an assigned workplace.',
       doing: 'walking to work', why: 'Their work shift is due.',
     });
     expect(JSON.stringify(said)).not.toMatch(/of 1000|premises:|[0-9a-f]{8}-[0-9a-f]{4}/);
@@ -81,6 +81,17 @@ describe('a simulated person in words, as the server says them', () => {
       );
       expect(said, held.case).toEqual(held.expected);
     }
+  });
+
+  it('says the activity alone where a surface in the world asks, never its minutes left', () => {
+    const held = CASES.cases.find((candidate) => candidate.case === 'standing a while')!;
+    const words = (still: boolean) => inhabitantWordsFrom(held.person, (targetId) => CASES.places[targetId] ?? null,
+      (id) => CASES.people[id] ?? null, held.profile ?? null, null, false, null, false, { still });
+    // The positive control: the inspector says the minutes left, the case's own words.
+    expect(words(true).doing).toBe(held.expected.doing);
+    expect(held.expected.doing).toMatch(/, \d+ more minutes\.$/);
+    expect(words(false).doing).toBe('Standing a while.');
+    expect({ ...words(false), doing: held.expected.doing }).toEqual(held.expected);
   });
 
   it('reads its reason words from the catalog, not from a copy', () => {
@@ -162,19 +173,19 @@ describe('a person who came in from outside', () => {
 
   it('says the world decides, or the program they came with, from their arrival', () => {
     expect(words({ came_by: 'crossed', crossing: { bridge: 'blockgame', decided_by: 'world' } }).what)
-      .toBe(fill(phrase('what_crossed_world'), { role: 'traveller', from: 'Block Game' }));
+      .toBe(fill(phrase('what_crossed_world'), { Role: 'Traveller', role: 'traveller', from: 'Block Game' }));
     expect(words({ came_by: 'crossed', crossing: { bridge: 'blockgame' } }).what)
-      .toBe(fill(phrase('what_crossed_program'), { role: 'traveller', from: 'Block Game' }));
+      .toBe(fill(phrase('what_crossed_program'), { Role: 'Traveller', role: 'traveller', from: 'Block Game' }));
     // A bridge the door does not list, or no writer at all, is not guessed at.
     expect(words({ came_by: 'crossed', crossing: { bridge: 'elsewhere' } }).what)
-      .toBe(fill(phrase('what_crossed_program'), { role: 'traveller', from: phrase('from_outside') }));
+      .toBe(fill(phrase('what_crossed_program'), { Role: 'Traveller', role: 'traveller', from: phrase('from_outside') }));
     expect(inhabitantWordsFrom(person({ came_by: 'crossed', crossing: { bridge: 'blockgame' } }), () => null, () => null).what)
-      .toBe(fill(phrase('what_crossed_program'), { role: 'traveller', from: phrase('from_outside') }));
+      .toBe(fill(phrase('what_crossed_program'), { Role: 'Traveller', role: 'traveller', from: phrase('from_outside') }));
   });
 
   it('changes nothing else, and nothing for anyone who did not cross', () => {
     const plain = words({ came_by: 'placed' });
-    expect(plain.what).toBe(fill(phrase('what'), { role: 'traveller' }));
+    expect(plain.what).toBe(fill(phrase('what'), { Role: 'Traveller', role: 'traveller' }));
     expect(words({}).what).toBe(plain.what);
     // Only how they came decides: a crossing record on anyone who did not cross is not read.
     expect(words({ came_by: 'placed', crossing: { bridge: 'blockgame' } }).what).toBe(plain.what);

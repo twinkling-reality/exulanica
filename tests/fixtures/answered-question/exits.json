@@ -354,7 +354,7 @@
         [
           "simulation_event",
           40,
-          "Simulated minute 40: [inhabitant A] finished talking, because they have been at it as long as they meant to. They were with [inhabitant B]."
+          "Minute 40: [inhabitant A] finished talking, because they have been at it as long as they meant to. They were with [inhabitant B]."
         ]
       ]
     }

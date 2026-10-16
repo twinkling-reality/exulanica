@@ -27,6 +27,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from exulanica.selection import inhabitant_words
 from exulanica.world import society_things
 from exulanica.world.crossings import CrossingRefused, check_crossing
 from exulanica.world.deciders import arrival_deciders, decided_from_outside
@@ -425,9 +426,8 @@ def test_the_state_check_holds_each_person_to_its_kind_and_its_movement(change, 
         validate_things_state(broken)
 
 
-WORDS = Path(__file__).resolve().parents[1] / (
-    "assets/catalogs/society-words/society-inhabitant-words.v1.json"
-)
+#: The words catalog the Companion and the inspector read, so its newest version is the one held.
+WORDS = inhabitant_words.CATALOG_PATH
 
 
 def _emitted() -> tuple[set[str], set[str]]:

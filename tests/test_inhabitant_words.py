@@ -2,7 +2,7 @@
 
 The inspector (``web/packages/app/src/society-inhabitant-words.ts``) and the Companion
 (``exulanica/selection/inhabitant_words.py``) read
-``assets/catalogs/society-words/society-inhabitant-words.v4.json`` and choose among its words by
+``assets/catalogs/society-words/society-inhabitant-words.v5.json`` and choose among its words by
 the same rule. Both run ``tests/fixtures/society-inhabitant-words/cases.json``; this file runs it
 for the server, and ``web/packages/app/test/society-inhabitant-words.test.ts`` for the page. A
 change to either side's choice, or to the words, fails one of them.
@@ -142,3 +142,37 @@ def test_the_catalog_refuses_an_entry_it_would_misread(tmp_path):
         path.write_text(json.dumps(broken), encoding="utf-8")
         with pytest.raises(WordsCatalogRefused, match=message):
             inhabitant_words_catalog(path)
+
+
+def test_every_living_activity_has_its_finished_words():
+    """A living town's activity that has ended is said as ended."""
+    doing = inhabitant_words_catalog().tables["doing"]
+    living = {
+        code[len("living_") :]
+        for code in doing
+        if code.startswith("living_")
+        and not code.startswith(("living_heading_", "living_finished_"))
+        and "@" not in code
+        and code != "living_idle"
+    }
+    finished = {
+        code[len("living_finished_") :]: words
+        for code, words in doing.items()
+        if code.startswith("living_finished_")
+    }
+    assert living, "the positive control: the catalog has living activities"
+    assert living <= finished.keys()
+
+
+def test_no_words_call_anyone_or_anything_simulated():
+    """The words say a person is invented for this world in the world's own voice, never that a
+    person, a day or a minute is simulated, or that what happens is a simulation."""
+    said = [
+        (kind, code, words)
+        for kind, table in inhabitant_words_catalog().tables.items()
+        for code, words in table.items()
+    ]
+    # The positive control: the scan reads the who-is-this words and the minute's line.
+    assert {("phrase", "what"), ("line", "event")} <= {(kind, code) for kind, code, _ in said}
+    says = re.compile(r"(?<![-\w])simulat(?:ed|ion)(?![-\w])", re.IGNORECASE)
+    assert [entry for entry in said if says.search(json.dumps(entry[2]))] == []

@@ -500,9 +500,9 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const inspector = mounted.root.querySelector<HTMLElement>('.living-world-inspector')!;
     expect(inspector.querySelector('h3')?.textContent).toBe('Person 0');
     expect(inspector.querySelector('p')?.textContent).toBe(
-      'A simulated steward, invented for this world: not anyone you know, and nothing they do is a memory.');
+      'Steward invented for this world: not anyone you know, and nothing they do is a memory.');
     expect(inspector.querySelector('.living-world-activity')?.textContent)
-      .toBe('Resting at Marker plate 1, 2 more simulated minutes. Because you asked them to go there.');
+      .toBe('Resting at Marker plate 1, 2 more minutes. Because you asked them to go there.');
     // The recorded explanation and how the person is drawn stay below, in the details.
     const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(details).toContainEqual(['Recorded by the engine', 'Person 0 (simulated) rests at the plate.']);

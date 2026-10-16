@@ -242,7 +242,7 @@ describe('who a person is and what they are doing, in words', () => {
   it('names places by the titles of the person\'s objects and turns reason codes into words', () => {
     expect(words({})).toEqual({
       who: 'Ada',
-      what: 'A simulated steward, invented for this world: not anyone you know, and nothing they do is a memory.',
+      what: 'Steward invented for this world: not anyone you know, and nothing they do is a memory.',
       doing: 'Standing, deciding where to go.',
       why: 'Because they have only just arrived.',
     });
@@ -256,7 +256,7 @@ describe('who a person is and what they are doing, in words', () => {
       goal: { kind: 'rest', target_id: 't-bench', reason: 'remembered_target_selected' },
       action: { kind: 'rest', status: 'active', target_id: 't-bench', remaining_ticks: 1, reason: 'arrived_at_access_node' },
     });
-    expect(`${resting.doing} ${resting.why}`).toBe('Resting at Bench, one more simulated minute. Because you asked them to go there.');
+    expect(`${resting.doing} ${resting.why}`).toBe('Resting at Bench, one more minute. Because you asked them to go there.');
     const blocked = words({
       goal: { kind: 'visit', target_id: 't-gone', reason: 'visit_place' },
       action: { kind: 'idle', status: 'blocked', target_id: 't-gone', remaining_ticks: 0, reason: 'no_room_at_destination' },

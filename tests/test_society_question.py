@@ -639,7 +639,7 @@ def test_a_composed_answer_is_the_chosen_lines_each_in_its_own_words_in_the_list
     assert clauses[0].text.startswith("The simulation counts minutes, not times of day.")
     assert "These lines are from its minute" in clauses[0].text
     assert clauses[1].text == (
-        "The simulation records who talked with whom, and never what they said."
+        "This world records who talked with whom, and never what they said."
     )
     # Every sentence is a line's own words or code's: no text of the model's anywhere.
     lines = {item.line for item in said.packet.items}
@@ -866,7 +866,7 @@ def test_with_one_line_the_fixed_words_say_one_line_and_show_it():
 
 def test_no_refusal_or_note_carries_a_bracketed_label_the_page_would_draw_as_a_person():
     """The page draws every bracketed label as a person or a place, so a refusal that named one
-    would be drawn as "a simulated person this page is not showing"."""
+    would be drawn as "a person this page is not showing"."""
     from exulanica.selection import question, society_question
 
     texts = [
@@ -942,7 +942,15 @@ def test_who_someone_who_came_in_from_outside_is_says_where_they_came_from(bridg
     )
     text = _texts(_answer(scene, SocietyScope.SELECTED, SocietyAspect.WHO).answer)
     origin = _phrase("from_outside") if came_from is None else came_from
-    said = _phrase("what_crossed_world").replace("{role}", person["role"]).replace("{from}", origin)
+    role = person["role"]
+    # The sentence opens with the role itself: "Walker who came in from ...".
+    opening = role[:1].upper() + role[1:]
+    said = (
+        _phrase("what_crossed_world")
+        .replace("{Role}", opening)
+        .replace("{role}", role)
+        .replace("{from}", origin)
+    )
     assert said in text
     # The positive control: the same person, had they not crossed, is said as before.
     plain = _texts(
@@ -950,7 +958,8 @@ def test_who_someone_who_came_in_from_outside_is_says_where_they_came_from(bridg
             _scene(selected=uuid.UUID(person["id"])), SocietyScope.SELECTED, SocietyAspect.WHO
         ).answer
     )
-    assert _phrase("what").replace("{role}", person["role"]) in plain and said not in plain
+    plain_what = _phrase("what").replace("{Role}", opening).replace("{role}", role)
+    assert plain_what in plain and said not in plain
 
 
 def test_the_question_route_hands_the_companion_the_bridge_labels_the_page_reads():

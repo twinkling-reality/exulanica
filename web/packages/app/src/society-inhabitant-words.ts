@@ -1,6 +1,6 @@
 /**
  * Who a simulated person is and what they are doing, in words, read from the one data file the
- * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v4.json`.
+ * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v5.json`.
  *
  * The choice of sentence for a state is code here and in `exulanica/selection/inhabitant_words.py`,
  * and both run the same cases (`tests/fixtures/society-inhabitant-words/cases.json`), so the
@@ -8,7 +8,7 @@
  * sentence here says what anybody talked about.
  */
 
-import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v4.json?raw';
+import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v5.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 import { societyEngine } from './society-engines.js';
@@ -89,7 +89,11 @@ function words(kind: Kind, code: string): string {
 }
 
 const fill = (template: string, values: Readonly<Record<string, string | number>>): string =>
-  template.replace(/\{([a-z_]+)\}/g, (whole, name: string) => (name in values ? String(values[name]) : whole));
+  template.replace(/\{([A-Za-z_]+)\}/g, (whole, name: string) => (name in values ? String(values[name]) : whole));
+
+/** A role as a sentence says it ("office worker") and as one opens with it ("Office worker"). */
+const roleSlots = (role: string): { role: string; Role: string } =>
+  ({ role, Role: role.charAt(0).toUpperCase() + role.slice(1) });
 
 /**
  * Why a person is doing what they do, by the engine's reason code: exactly the codes
@@ -183,13 +187,18 @@ export function inhabitantWordsFrom(
    * model. The server's Companion reads the same from the minute's decision event.
    */
   playedByPerson = false,
+  /**
+   * `still: false` leaves out how many more minutes an activity takes ("Standing a while", not "Standing a while,
+   * 4 more minutes"): every surface in the world says the activity alone; the inspector says it.
+   */
+  { still: withStill = true }: { readonly still?: boolean } = {},
 ): InhabitantWords {
   const living = person as unknown as {
     readonly ordinal?: number;
     readonly role?: { readonly label?: string } | null;
     readonly home?: unknown;
     readonly work?: unknown;
-    readonly action?: { readonly kind: string; readonly reason: string } | null;
+    readonly action?: { readonly kind: string; readonly reason: string; readonly status?: string } | null;
     readonly goal?: { readonly activity: string; readonly reason?: string } | null;
   };
   if (profile !== null && societyEngine(profile).stateFamily === 'living') {
@@ -208,9 +217,9 @@ export function inhabitantWordsFrom(
   const role = person.role ?? words('phrase', 'role_unknown');
   const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
   const what = crossing === null
-    ? fill(words('phrase', 'what'), { role })
+    ? fill(words('phrase', 'what'), roleSlots(role))
     : fill(words('phrase', crossing.decided_by === 'world' ? 'what_crossed_world' : 'what_crossed_program'), {
-      role, from: bridgeLabel?.(crossing.bridge) ?? words('phrase', 'from_outside'),
+      ...roleSlots(role), from: bridgeLabel?.(crossing.bridge) ?? words('phrase', 'from_outside'),
     });
   const action = person.action ?? undefined;
   const goal = person.goal !== null && typeof person.goal === 'object' && 'kind' in person.goal ? (person.goal as WordedGoal) : null;
@@ -218,7 +227,7 @@ export function inhabitantWordsFrom(
   const where = (targetId: string | null | undefined): string =>
     targetId ? place(targetId) ?? words('phrase', 'place_gone') : words('phrase', 'place_none');
   const remaining = action.remaining_ticks ?? 0;
-  const still = !remaining ? '' : remaining === 1 ? words('phrase', 'still_one') : fill(words('phrase', 'still_many'), { count: remaining });
+  const still = !withStill || !remaining ? '' : remaining === 1 ? words('phrase', 'still_one') : fill(words('phrase', 'still_many'), { count: remaining });
   const met = (goal?.partner_id ? partner(goal.partner_id) : null) ?? words('phrase', 'partner_unknown');
   const completed = action.status === 'completed';
   let chosen: string;
@@ -262,7 +271,7 @@ export function livingInhabitantWords(
     readonly role?: string | null;
     readonly has_home?: boolean;
     readonly has_work?: boolean;
-    readonly action?: { readonly kind: string; readonly reason: string } | null;
+    readonly action?: { readonly kind: string; readonly reason: string; readonly status?: string } | null;
     readonly goal?: { readonly activity: string; readonly reason?: string } | null;
   },
   ordinal: number,
@@ -278,9 +287,14 @@ export function livingInhabitantWords(
   const kind = person.action?.kind ?? 'idle';
   const activity = person.goal?.activity;
   const heading = `living_heading_${activity}` in TABLES.doing ? `living_heading_${activity}` : 'living_heading_unknown';
+  // An activity that has just ended is said as ended ("just finished resting"), by its kind's finished words, or
+  // the unknown kind's for a kind with no words of its own.
+  const finished = person.action?.status === 'completed'
+    ? TABLES.doing[`living_finished_${kind}`] ?? (TABLES.doing[`living_${kind}`] === undefined ? TABLES.doing.living_finished_unknown : undefined)
+    : undefined;
   const doing = kind === 'move'
     ? grounded('doing', heading)
-    : TABLES.doing[`living_${kind}`] ?? words('doing', 'living_unknown');
+    : finished ?? TABLES.doing[`living_${kind}`] ?? words('doing', 'living_unknown');
   const reason = person.goal?.reason ?? person.action?.reason;
   const home = person.has_home === true;
   const work = person.has_work === true;
@@ -293,7 +307,7 @@ export function livingInhabitantWords(
     : 'living_why_other';
   return {
     who: fill(words('phrase', 'living_who'), { number: ordinal + 1 }),
-    what: grounded('phrase', whatKey, { role: person.role ?? 'resident' }),
+    what: grounded('phrase', whatKey, roleSlots(person.role ?? 'resident')),
     doing,
     why: words('phrase', key),
   };

@@ -329,7 +329,7 @@ A site's place states the kind's place words (`words`: `here`, `around`), which 
 does. People are told and spoken of in them: a person asked to choose is told it is a given
 minute "on this farm" rather than "in the town"; the inspector and the Companion read the words
 the inhabitant words catalog keys by the society ground `generated_site`
-("A simulated farmhand on this farm.", "walking across the farm"), served with the society's
+("Farmhand on this farm, invented for this world.", "walking across the farm"), served with the society's
 places as `place_words`. A world's saved entry serves `society_engine`, the engine its people are
 brought in with, which the page reads rather than deriving from the entry's shape.
 

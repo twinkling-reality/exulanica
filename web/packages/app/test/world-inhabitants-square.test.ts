@@ -79,7 +79,7 @@ describe('what the inspector says of each new behaviour', () => {
       action: { kind: 'talk', status: 'active', target_id: null, remaining_ticks: 4, reason: 'waiting_for_partner' },
     })), person('b', 'Bo', talk('a'))])).toBe('Waiting for Bo, to talk. Because the person they are meeting is still on the way.');
     expect(words([person('a', 'Ada', talk('b')), person('b', 'Bo', talk('a'))]))
-      .toBe('Talking with Bo, 3 more simulated minutes. Because they met someone and stopped to talk.');
+      .toBe('Talking with Bo, 3 more minutes. Because they met someone and stopped to talk.');
     expect(words([person('a', 'Ada', talk('b', {
       action: { kind: 'talk', status: 'completed', target_id: null, remaining_ticks: 0, reason: 'reviewed_duration_elapsed' },
     })), person('b', 'Bo', talk('a'))])).toBe('Just finished talking with Bo. Because they have been at it as long as they meant to.');
@@ -88,7 +88,7 @@ describe('what the inspector says of each new behaviour', () => {
     })), person('b', 'Bo')])).toBe('Just finished talking with Bo. Because the person they were talking with left.');
     // Without the people to name them from, the other person is somebody nearby, never guessed.
     const snapshot = read([person('a', 'Ada', talk('b')), person('b', 'Bo', talk('a'))]);
-    expect(inhabitantWords(snapshot.state.inhabitants[0]!, []).doing).toBe('Talking with someone nearby, 3 more simulated minutes.');
+    expect(inhabitantWords(snapshot.state.inhabitants[0]!, []).doing).toBe('Talking with someone nearby, 3 more minutes.');
   });
 
   it('says someone is standing a while, and walking to stand, in words', () => {
@@ -98,7 +98,7 @@ describe('what the inspector says of each new behaviour', () => {
     expect(standing({ kind: 'move', status: 'active', target_id: null, remaining_ticks: 0, reason: 'following_reachable_route' }))
       .toBe('Walking to a spot to stand a while. Because they chose to stop and stand a while.');
     expect(standing({ kind: 'stand', status: 'active', target_id: null, remaining_ticks: 1, reason: 'standing_a_while' }))
-      .toBe('Standing a while, one more simulated minute. Because they chose to stop and stand a while.');
+      .toBe('Standing a while, one more minute. Because they chose to stop and stand a while.');
     expect(standing({ kind: 'stand', status: 'completed', target_id: null, remaining_ticks: 0, reason: 'reviewed_duration_elapsed' }))
       .toBe('Just finished standing a while. Because they have been at it as long as they meant to.');
   });
@@ -108,6 +108,6 @@ describe('what the inspector says of each new behaviour', () => {
       goal: { kind: 'rest', target_id: 't-bench', reason: 'sitting_a_while' },
       action: { kind: 'rest', status: 'active', target_id: 't-bench', remaining_ticks: 7, reason: 'arrived_at_access_node' },
     })]);
-    expect(sitting).toBe('Resting at Bench, 7 more simulated minutes. Because they chose to sit a while.');
+    expect(sitting).toBe('Resting at Bench, 7 more minutes. Because they chose to sit a while.');
   });
 });

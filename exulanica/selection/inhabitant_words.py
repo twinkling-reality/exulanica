@@ -1,7 +1,7 @@
 """Who a simulated person is and what they are doing, in the words the inspector uses.
 
 The words are one data file,
-``assets/catalogs/society-words/society-inhabitant-words.v4.json``, which the browser's inspector
+``assets/catalogs/society-words/society-inhabitant-words.v5.json``, which the browser's inspector
 reads too (``web/packages/app/src/society-inhabitant-words.ts``). The choice of sentence for a
 state is code on both sides, and both are held to one set of cases,
 ``tests/fixtures/society-inhabitant-words/cases.json``, which ``tests/test_inhabitant_words.py`` and
@@ -45,7 +45,7 @@ CATALOG_PATH: Final = (
     / "assets"
     / "catalogs"
     / "society-words"
-    / "society-inhabitant-words.v4.json"
+    / "society-inhabitant-words.v5.json"
 )
 
 ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
@@ -180,12 +180,17 @@ def inhabitant_words_catalog(path: Path = CATALOG_PATH) -> InhabitantWordsCatalo
     )
 
 
-_SLOT: Final = re.compile(r"\{([a-z_]+)\}")
+_SLOT: Final = re.compile(r"\{([A-Za-z_]+)\}")
 
 
 def _fill(template: str, values: Mapping[str, str]) -> str:
     """``template`` with each ``{name}`` slot given in ``values`` filled, in one pass."""
     return _SLOT.sub(lambda found: values.get(found.group(1), found.group(0)), template)
+
+
+def _role_slots(role: str) -> dict[str, str]:
+    """A role as a sentence says it ("office worker") and as one opens with it ("Office worker")."""
+    return {"role": role, "Role": role[:1].upper() + role[1:]}
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,8 +254,19 @@ def _living_inhabitant_words(
             heading = "living_heading_unknown"
         doing = ground("doing", heading)
     else:
-        doing = catalog.tables["doing"].get(kind and f"living_{kind}") or catalog.words(
-            "doing", "living_unknown"
+        doings = catalog.tables["doing"]
+        # An activity that has just ended is said as ended ("just finished resting"), by its kind's
+        # finished words, or the unknown kind's for a kind with no words of its own.
+        finished = (
+            doings.get(f"living_finished_{kind}")
+            or (None if f"living_{kind}" in doings else doings.get("living_finished_unknown"))
+            if action.get("status") == "completed"
+            else None
+        )
+        doing = (
+            finished
+            or doings.get(kind and f"living_{kind}")
+            or catalog.words("doing", "living_unknown")
         )
     reason = goal.get("reason") if isinstance(goal, Mapping) else action.get("reason")
     reason_key = (
@@ -266,7 +282,7 @@ def _living_inhabitant_words(
     )
     return InhabitantWords(
         who=phrase["living_who"].format(number=ordinal + 1),
-        what=ground("phrase", what_key, role=role_label),
+        what=ground("phrase", what_key, **_role_slots(role_label)),
         doing=doing,
         why=phrase[reason_key],
     )
@@ -305,13 +321,13 @@ def inhabitant_words(
     # Only how they came decides: a crossing record on anyone who did not cross is not read.
     crossing = person.get("crossing") if person.get("came_by") == "crossed" else None
     if crossing is None:
-        what = phrase["what"].format(role=role)
+        what = _fill(phrase["what"], _role_slots(role))
     else:
         label = None if bridge_label is None else bridge_label(crossing["bridge"])
         decided = "world" if crossing.get("decided_by") == "world" else "program"
         what = _fill(
             phrase[f"what_crossed_{decided}"],
-            {"role": role, "from": phrase["from_outside"] if label is None else label},
+            {**_role_slots(role), "from": phrase["from_outside"] if label is None else label},
         )
     action = person.get("action")
     goal = person.get("goal")

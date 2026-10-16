@@ -172,9 +172,8 @@ export function characterFacts(snapshot: SocietySnapshot | null, subjectId: stri
       doing = livingInhabitantWords({ role, has_home: held.has_home === true, has_work: held.has_work === true, action: person.action ?? null, goal }, ordinal).doing;
     } else {
       const listed = new Map((snapshot.places?.targets ?? []).filter(target => target.enabled).map(target => [target.targetId, target.place ?? null] as const));
-      // In the world the activity words stand alone (J31): no count of the minutes still to go.
-      const now = person.action ? { ...person, action: { ...person.action, remaining_ticks: 0 } } : person;
-      doing = inhabitantWords(now, [], inhabitants, profile, false, null, listed, playedByPerson).doing;
+      // In the world the activity is said alone, never how many minutes it has left.
+      doing = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson, { still: false }).doing;
     }
   } catch { doing = null; }
   const state = snapshot.state as unknown as { readonly start_minute_of_day?: unknown; readonly clock?: { readonly start_minute_of_day?: unknown } | null };
