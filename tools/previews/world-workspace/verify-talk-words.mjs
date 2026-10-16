@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { SCENE_WORDS, chosePop, dayWord, heardRow, orbLetter, plateTo, saidPop, saidRow, speechLabel, togetherNames } from './talk-words.mjs';
+import { SCENE_WORDS, chosePop, dayWord, heardRow, knownWho, orbLetter, plateTo, saidPop, saidRow, speechLabel, togetherNames } from './talk-words.mjs';
 
 const ines = called({ name: 'Ines' }), resident = called({ kind: 'resident' });
+
+// Who (J20): the tag's words where they name the person; else their name in the society read; the kind only
+// where no name is known.
+assert.equal(knownWho(called({ kind: 'cook' }), 'Ines').start, 'Ines');
+assert.equal(knownWho(called({ kind: 'cook' }), 'Ines').named, true);
+assert.equal(knownWho(ines, 'Teo').start, 'Ines');
+assert.equal(knownWho(resident, null).within, 'the resident');
+assert.equal(knownWho(resident, '  ').within, 'the resident');
 
 // A pop (T1): a line in quotes, an action with a capital.
 assert.equal(saidPop(' Morning, Teo. '), '\u201cMorning, Teo.\u201d');

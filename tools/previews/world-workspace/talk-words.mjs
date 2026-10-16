@@ -4,10 +4,17 @@
 // character-words.mjs's called(). The lines are the society's own words, never written here.
 // verify-talk-words.mjs holds these.
 
-import { CHARACTER_WORDS, possessive } from './character-words.mjs';
+import { CHARACTER_WORDS, called, possessive } from './character-words.mjs';
 
 const plain = value => typeof value === 'string' && value.trim() ? value.trim() : null;
 const quote = line => `\u201c${plain(line) ?? ''}\u201d`;
+
+/**
+ * Who a line, a name over someone or the talking scene calls a person: `who` as the tag calls them (J20), unless it
+ * calls them by their kind and `name` (their name in the society read) is known, so nobody is "the cook" while
+ * their offer is still being read or gives no name of its own.
+ */
+export const knownWho = (who, name) => who.named || !plain(name) ? who : called({ name });
 
 /** A said line's pop: the line in quotes (T1). */
 export const saidPop = line => quote(line);

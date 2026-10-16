@@ -24,7 +24,7 @@ import { SocietyControlClient } from '/src/society-control-api.ts';
 import { edgeInset, nameOver, speech, talkScene } from './world-ui-talk.ts';
 import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs';
 import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
-import { SCENE_WORDS, dayWord, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
+import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
@@ -254,10 +254,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   /** A character's row by its society id. */
   const beingRow = (id) => rows.find(item => item.scene?.type === 'being' && item.scene.id === id) ?? null;
-  /** A person as the tag and card call them (J20), by society id: from their offer, else "the" and their kind. */
+  const personName = (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? selection.societyNames?.()?.people.get(id) ?? null;
+  /** A person as the tag and card call them (J20), by society id: from their offer, else their society name, else "the" and their kind. */
   function whoOf(id) {
     const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null;
-    return row ? subjectWho(row, offers.get(row.key)?.offer ?? null, kind) : called({ name: null, kind });
+    return knownWho(row ? subjectWho(row, offers.get(row.key)?.offer ?? null, kind) : called({ name: null, kind }), personName(id));
   }
   const popScale = () => Number.parseFloat(root.style.getPropertyValue('--ui-scale')) || 1;
   /**
@@ -807,7 +808,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   // Ask (8.6): the Companion's three questions, answered from this world's records alone.
   const companionClient = new CompanionAskClient(credentials);
-  const personName = (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? selection.societyNames?.()?.people.get(id) ?? null;
   async function askQuestion(index) {
     const showing = pageView, ask = showing?.ask, aspect = ASK_ASPECTS[index];
     if (!ask || ask.busy || !aspect) return;
