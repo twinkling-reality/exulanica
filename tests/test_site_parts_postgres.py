@@ -421,3 +421,47 @@ def test_a_storeys_change_alone_gives_the_society_the_same_walking_place(made):
     # ... and only the ground storey is walked: the people's nodes and edges are the made ones.
     assert taken["navigation"]["nodes"] == made_input["navigation"]["nodes"]
     assert taken["navigation"]["edges"] == made_input["navigation"]["edges"]
+
+
+def test_a_part_s_changes_hold_on_a_version_branched_from_the_made_one(made):
+    """A version branched from the made world's own takes each part change through the same routes
+    (a move, a turn, a storeys change, a removal), and the version it was branched from keeps its
+    parts as they were made: the path a project's part changes are applied by."""
+    api = made
+    entry = _farm(api)
+    made_parts = _parts(api, entry)
+    branched = api.post(
+        f"/world/versions?world_id={entry['world_id']}",
+        {"title": "A branch", "parent_version_id": entry["authored_version_id"]},
+    )
+    assert branched.status_code == 201, branched.text
+    branch = {**entry, "authored_version_id": branched.json()["version_id"]}
+    assert _parts(api, branch) == made_parts
+    barn, bench = made_parts["barn"], made_parts["bench"]
+    east, north = barn["centre_mm"]
+    made_slot = _drawn(api, branch, barn["part_id"])
+
+    moved = _move(api, branch, barn, east - 3_000, north)
+    assert moved.status_code == 200, moved.text
+    turned = _move(api, branch, barn, east - 3_000, north, 2)
+    assert turned.status_code == 200, turned.text
+    taller = _storeys(api, branch, barn, barn["storeys"] + 1)
+    assert taller.status_code == 200, taller.text
+    removed = api.post(
+        _path(branch, f"/parts/{bench['part_id']}/remove"),
+        {"base_state_sha256": _base(api, branch)},
+    )
+    assert removed.status_code == 200, removed.text
+
+    parts = _parts(api, branch)
+    assert parts["barn"]["centre_mm"] == [east - 3_000, north]
+    assert parts["barn"]["storeys"] == barn["storeys"] + 1
+    assert bench["part_id"] not in {part["part_id"] for part in parts.values()}
+    slot = _drawn(api, branch, barn["part_id"])
+    assert slot["positionMm"] != made_slot["positionMm"] and slot != made_slot
+    overrides = {o["element_id"]: o for o in removed.json()["element_overrides"]}
+    override = overrides[f"part:{barn['part_id']}"]
+    assert override["storeys"] == barn["storeys"] + 1 and override["transform"] is not None
+    # The version it was branched from is as it was made.
+    assert _parts(api, entry) == made_parts
+    assert _drawn(api, entry, barn["part_id"]) == made_slot
