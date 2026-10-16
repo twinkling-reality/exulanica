@@ -157,11 +157,20 @@ belongs on one.
 A person's own install keeps its worlds' projects with no command of theirs: the launcher's
 `up --personal` sets the projects directory to `~/Exulanica/projects` (made at 0700, never a link,
 outside every checkout and run; a directory another account owns or may write is refused, since the
-worker starts whatever project folder or request it finds there) and starts the project worker beside the API with a token of its
-own that grants `world.read` alone, so pressing K in a world's History is the whole act
+worker starts whatever project folder or request it finds there) and starts the project worker
+beside the API with a token of its own that grants `world.read` alone, so a request to keep a world
+(`POST /world/github-projects`) is the whole act
 ([following a world](world-memory-package.md#following-a-world)). `keep-projects` does the same
 once for an install already running, `restart-api` starts a stopped worker again (unless that
-restart revokes the worker's own token), and `--no-projects` keeps none. Nothing reaches GitHub until a repository is linked.
+restart revokes the worker's own token), and `--no-projects` keeps none.
+
+Nothing reaches GitHub until the person links a repository or asks for a kept project to be put in
+a new private repository of theirs (`POST /world/github-projects/publications`, then their yes to
+its review). The project worker does that with the GitHub CLI on the same computer, signed in once
+as the person (`gh auth login`, with the `repo` scope it needs to create a private repository and
+open a pull request in it). The CLI keeps the sign-in in the system's credential store; Exulanica
+never sees, stores or passes a token, and the API never runs the CLI. Without the CLI, or signed
+out, the request is refused as `gh_missing` or `not_signed_in` and nothing is made.
 
 ## 4. The content store
 
