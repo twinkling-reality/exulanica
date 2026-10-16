@@ -1215,15 +1215,20 @@ def test_the_project_worker_reads_the_slot_api_at_localhost_with_the_read_only_t
 def test_a_projects_directory_is_its_own_outside_the_checkout_and_the_run(tmp_path, temporary):
     worktree = _checkout(tmp_path / "checkout")
     projects = tmp_path / "projects"
-    projects.mkdir()
+    projects.mkdir(mode=0o700)
     assert LAUNCH.projects_directory(projects, worktree) == projects.resolve()
     link = tmp_path / "linked"
     link.symlink_to(projects)
-    (worktree / "inside").mkdir()
+    (worktree / "inside").mkdir(mode=0o700)
     run = LAUNCH.state_dir(worktree)
     run.mkdir(parents=True)
     (tmp_path / "file").write_text("")
-    for refused in (tmp_path / "missing", tmp_path / "file", link, worktree / "inside", run):
+    # Another account that may write the directory could plant a project or request in it.
+    shared = tmp_path / "shared"
+    shared.mkdir(mode=0o700)
+    shared.chmod(0o770)
+    refusals = (tmp_path / "missing", tmp_path / "file", link, worktree / "inside", run, shared)
+    for refused in refusals:
         assert _refusal(LAUNCH.projects_directory, refused, worktree) == "projects-directory"
 
 
@@ -1270,3 +1275,140 @@ def test_down_stops_the_project_worker_alone_and_waits_its_finish_before_any_kil
     sent.clear()
     LAUNCH.stop_project_worker(state)
     assert sent == []
+
+
+# -- a person's own install keeps its world projects ----------------------------------------------
+
+
+def test_a_personal_install_keeps_projects_by_default_in_its_own_home(
+    tmp_path, temporary, monkeypatch
+):
+    worktree, home = _checkout(tmp_path / "checkout"), tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    parser = LAUNCH.build_parser()
+
+    def parsed(*flags):
+        return parser.parse_args(["up", "--worktree", str(worktree), *flags])
+
+    # An acceptance run starts no follower unasked and makes nothing in the home directory.
+    assert LAUNCH.chosen_projects(parsed(), worktree) is None
+    assert not LAUNCH.wants_read_only_token(parsed()) and not (home / "Exulanica").exists()
+    kept = LAUNCH.chosen_projects(parsed("--personal"), worktree)
+    assert kept == (home / "Exulanica" / "projects").resolve()
+    assert kept.stat().st_mode & 0o777 == 0o700
+    assert LAUNCH.wants_read_only_token(parsed("--personal"))
+    off = parsed("--personal", "--no-projects")
+    assert LAUNCH.chosen_projects(off, worktree) is None and not LAUNCH.wants_read_only_token(off)
+    assert _refusal(LAUNCH.chosen_projects, parsed("--no-projects"), worktree) == "projects-shape"
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(mode=0o700)
+    assert LAUNCH.chosen_projects(parsed("--personal", "--projects", str(elsewhere)), worktree) == (
+        elsewhere.resolve()
+    )
+    contrary = parsed("--no-projects", "--projects", str(elsewhere))
+    assert _refusal(LAUNCH.chosen_projects, contrary, worktree) == "projects-shape"
+    # A link in the person's home is refused as a named directory's would be.
+    kept.rmdir()
+    kept.symlink_to(elsewhere)
+    assert _refusal(LAUNCH.chosen_projects, parsed("--personal"), worktree) == "projects-directory"
+    # So is a file in its place, by name.
+    kept.unlink()
+    kept.write_text("")
+    assert _refusal(LAUNCH.chosen_projects, parsed("--personal"), worktree) == "projects-directory"
+
+
+def _running_run(worktree: Path, run_dir: Path, **recorded) -> Path:
+    """A run that is up, as its state file records it."""
+    state = {**_recorded_run(run_dir, **recorded), "run_dir": str(run_dir), "pids": {}}
+    state_file = LAUNCH.state_dir(worktree) / "state.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps(state))
+    return state_file
+
+
+def test_keep_projects_gives_a_running_install_its_projects_once(tmp_path, temporary, monkeypatch):
+    worktree, home = _checkout(tmp_path / "checkout"), tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    keep = LAUNCH.build_parser().parse_args(["keep-projects", "--worktree", str(worktree)])
+    assert _refusal(LAUNCH.keep_projects, keep) == "no-state"
+    run_dir = tmp_path / "run"
+    state_file = _running_run(worktree, run_dir)
+    restarts: list = []
+    monkeypatch.setattr(LAUNCH, "restart_api", restarts.append)
+
+    LAUNCH.keep_projects(keep)
+
+    state = json.loads(state_file.read_text())
+    assert state["project_worker"]["projects"] == str((home / "Exulanica" / "projects").resolve())
+    # The follower reads with a token of its own, world.read alone, which a restart rebuilds.
+    token = run_dir / "token-read"
+    assert token.stat().st_mode & 0o777 == 0o600
+    assert token.read_text() not in ("", "primary-token")
+    assert LAUNCH.recorded_grants(state, run_dir)["token-read"]["permissions"] == ["world.read"]
+    assert [(r.api, r.revoke) for r in restarts] == [("primary", None)]
+    assert _refusal(LAUNCH.keep_projects, keep) == "projects-kept"
+
+
+def test_keep_projects_refuses_a_directory_up_would_refuse(tmp_path, temporary, monkeypatch):
+    worktree = _checkout(tmp_path / "checkout")
+    state_file = _running_run(worktree, tmp_path / "run")
+    restarts: list = []
+    monkeypatch.setattr(LAUNCH, "restart_api", restarts.append)
+    projects = tmp_path / "projects"
+    projects.mkdir(mode=0o700)
+    link = tmp_path / "linked"
+    link.symlink_to(projects)
+    (worktree / "inside").mkdir(mode=0o700)
+    shared = tmp_path / "shared"
+    shared.mkdir(mode=0o700)
+    shared.chmod(0o770)
+    for refused in (link, worktree / "inside", shared):
+        keep = LAUNCH.build_parser().parse_args(
+            ["keep-projects", "--worktree", str(worktree), "--projects", str(refused)]
+        )
+        assert _refusal(LAUNCH.keep_projects, keep) == "projects-directory"
+    state = json.loads(state_file.read_text())
+    assert "project_worker" not in state and "read_only_token" not in state and restarts == []
+
+
+def test_keep_projects_keeps_a_run_s_own_read_token(tmp_path, temporary, monkeypatch):
+    worktree, elsewhere = _checkout(tmp_path / "checkout"), tmp_path / "elsewhere"
+    elsewhere.mkdir(mode=0o700)
+    state_file = _running_run(worktree, tmp_path / "run", read_only=True)
+    monkeypatch.setattr(LAUNCH, "restart_api", lambda arguments: None)
+    LAUNCH.keep_projects(
+        LAUNCH.build_parser().parse_args(
+            ["keep-projects", "--worktree", str(worktree), "--projects", str(elsewhere)]
+        )
+    )
+    state = json.loads(state_file.read_text())
+    assert (tmp_path / "run" / "token-read").read_text() == "read-token"
+    assert state["read_only_token"]["actor"] == "r1"
+    assert state["project_worker"]["projects"] == str(elsewhere.resolve())
+
+
+def test_a_restart_starts_a_stopped_follower_and_leaves_a_running_one(tmp_path, monkeypatch):
+    commands = {4242: "python -m exulanica.orchestration.project_worker --projects p"}
+    monkeypatch.setattr(LAUNCH, "command_of", lambda pid: commands.get(pid, ""))
+    started: list = []
+
+    def start(python, worktree, projects, api_port, token_file, logs, state, state_file):
+        started.append((projects, api_port, token_file))
+        state["pids"]["project_worker"] = 5151
+
+    monkeypatch.setattr(LAUNCH, "start_project_worker", start)
+    state = _recorded_run(tmp_path / "run", read_only=True)
+    state["pids"] = {}
+    up = (tmp_path, state, tmp_path / "state.json", tmp_path / "logs", 19431)
+
+    assert LAUNCH.keep_follower_up(*up) is None  # a run that keeps no projects
+    state["project_worker"] = {"projects": "/kept", "finish_seconds": 20}
+    state["pids"]["project_worker"] = 4242
+    assert LAUNCH.keep_follower_up(*up) is None and started == []  # still running
+    commands.clear()
+    # A restart that revokes the follower's own token starts no follower to be refused.
+    assert LAUNCH.keep_follower_up(*up, "token-read") is None and started == []
+    assert LAUNCH.keep_follower_up(*up) == 5151
+    assert started == [(Path("/kept"), 19431, tmp_path / "run" / "token-read")]

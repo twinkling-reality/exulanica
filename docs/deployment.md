@@ -112,7 +112,7 @@ boundary ([security floor](security-floor.md)).
 | Character catalogs | `exulanica-character-catalog publish --apply` | Publishes the character catalogs the code carries, after `exulanica-db`, into the store the API serves | 5.2.1 |
 | Derivative worker | `exulanica-derivative-worker` | Drains the photograph derivative queue | 5.2.2 |
 | Playback worker | `exulanica-playback-worker` | Plays the societies the API leaves to it and seals their coupled traffic | 5.1.5, 5.2.12 |
-| Project worker | `exulanica-project-worker` | Keeps the world projects a person follows current, beside the API on their own computer, reading the World API by GET alone; the acceptance launcher starts it with `--projects` | [Following a world](world-memory-package.md#following-a-world) |
+| Project worker | `exulanica-project-worker` | Keeps the world projects a person follows current, beside the API on their own computer, reading the World API by GET alone; the acceptance launcher starts it with `--projects`, by default for a person's own install (`--personal`), and again on a restart where it has stopped | [Following a world](world-memory-package.md#following-a-world) |
 | Scene worker | `exulanica-scene-worker` | Recovers camera poses and publishes scenes for queued scene jobs | 5.2.3 |
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |
@@ -153,6 +153,15 @@ The servers `scripts/test_postgres.py` starts, for the test suite and for `serve
 they run with `fsync` off in the system temporary directory and refuse a data directory the personal
 database command made ([development setup](development-setup.md)). Nothing that should be kept
 belongs on one.
+
+A person's own install keeps its worlds' projects with no command of theirs: the launcher's
+`up --personal` sets the projects directory to `~/Exulanica/projects` (made at 0700, never a link,
+outside every checkout and run; a directory another account owns or may write is refused, since the
+worker starts whatever project folder or request it finds there) and starts the project worker beside the API with a token of its
+own that grants `world.read` alone, so pressing K in a world's History is the whole act
+([following a world](world-memory-package.md#following-a-world)). `keep-projects` does the same
+once for an install already running, `restart-api` starts a stopped worker again (unless that
+restart revokes the worker's own token), and `--no-projects` keeps none. Nothing reaches GitHub until a repository is linked.
 
 ## 4. The content store
 
@@ -348,7 +357,7 @@ Where a table says "no default", the process refuses to start without the settin
 | `EXULANICA_GOOGLE_CLIENT_ID`, `EXULANICA_GOOGLE_CLIENT_SECRET`, `EXULANICA_GOOGLE_CALLBACK_URI`, `EXULANICA_GOOGLE_RETURN_URIS`, `EXULANICA_ACCOUNT_BROWSER_ORIGINS`, `EXULANICA_ACCOUNT_DATABASE_URL` | Google sign-in and browser accounts (5.1.4) | Optional, all six or none: a partial set stops startup |
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES`, `EXULANICA_SOCIETY_TICK_INTERVAL_MS`, `EXULANICA_SOCIETY_CONTROL_WORKER` | Society playback (5.1.5) | Playback is off by default |
 | `EXULANICA_API_THREADS`, `EXULANICA_API_REQUESTS`, `EXULANICA_API_UPLOADS`, `EXULANICA_API_STREAMS`, `EXULANICA_API_WORKSPACE_REQUESTS`, `EXULANICA_API_WORKSPACE_UPLOADS`, `EXULANICA_API_WORKSPACE_STREAMS`, `EXULANICA_API_DECODES`, `EXULANICA_INTAKE_QUEUED_JOBS` | How much work this process accepts at once (5.4) | 40, 24, 2, 128, 12, 1, 8, 2 and 4. A value that is not a whole number, is outside its bounds, gives a workspace more than its class, or leaves fewer than four threads beside the admitted requests stops startup with the setting named |
-| `EXULANICA_PROJECTS_DIRECTORY` | Where the API reads which GitHub projects keep a world (`GET /world/github-projects`, [Following a world](world-memory-package.md#following-a-world)): the directory the project worker follows on a personal install, whose folders each hold the `project-status.json` the worker writes. The API also writes a person's requests to keep a world (`POST /world/github-projects`) into its `.requests` folder, which the worker takes, so the API's process must be able to write there | Optional, and unset in a hosted deployment, which keeps no person's projects: the read then answers no project and a request is refused 409 `projects_not_kept`. The acceptance launcher sets it with `--projects`. A folder that is a link, or whose status is missing, too large or not one, is passed over; a `.requests` folder that is a link is never written |
+| `EXULANICA_PROJECTS_DIRECTORY` | Where the API reads which GitHub projects keep a world (`GET /world/github-projects`, [Following a world](world-memory-package.md#following-a-world)): the directory the project worker follows on a personal install, whose folders each hold the `project-status.json` the worker writes. The API also writes a person's requests to keep a world (`POST /world/github-projects`) into its `.requests` folder, which the worker takes, so the API's process must be able to write there | Optional, and unset in a hosted deployment, which keeps no person's projects: the read then answers no project and a request is refused 409 `projects_not_kept`. The acceptance launcher sets it with `--projects`, and for a person's own install (`--personal`) to `~/Exulanica/projects` unless `--no-projects`. A folder that is a link, or whose status is missing, too large or not one, is passed over; a `.requests` folder that is a link is never written |
 | `EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS` | Whether `POST /workspace-style-packs` takes a creator's style pack ([style pack contract](style-pack-contract.md#11-a-workspaces-own-packs)) | `off`: the route answers 503 `style_pack_uploads_off`. `on` turns uploads on; any other value stops startup. It switches every pack upload off at once. Where sign-in is open to everyone, a browser session still uploads only with its account's creator grant (5.1.4) |
 
 #### 5.1.1 The database roles

@@ -8,8 +8,10 @@
                                                 [--read-only-token] [--scripted-model PLAN]
                                                 [--no-derivative-worker --depth-worker]
                                                 [--database-latency]
+                                                [--personal [--no-projects]] [--projects DIR]
     python3 scripts/acceptance/launch.py status --worktree PATH
     python3 scripts/acceptance/launch.py restart-api --worktree PATH [--revoke TOKEN_FILE]
+    python3 scripts/acceptance/launch.py keep-projects --worktree PATH [--projects DIR]
     python3 scripts/acceptance/launch.py down   --worktree PATH
 
 ``--worktree`` names any checkout of this repository, a linked worktree or a plain clone, with its
@@ -79,6 +81,12 @@ starts exactly what it always did:
   was not given), checks its startup event, and ``down`` stops it with SIGTERM alone, waiting its
   finish deadline before anything is killed, so each followed project records what is pending.
   The directory must exist, be no link, and lie outside the checkout and the run's directory.
+- ``--personal`` marks the run as a person's own install: its world projects are kept by default,
+  in ``~/Exulanica/projects`` (made at 0700 when absent, never a link) unless ``--projects DIR``
+  names another or ``--no-projects`` turns them off, so a person keeps a world in a project from
+  its History with no command. A run without it starts no follower unasked. Either way the
+  directory must be the person's own and writable by nobody else, since the follower starts
+  whatever project folder or request it finds there.
 - ``--door-bridges FILE`` admits the outside programs a JSON array of bridge declarations names
   (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
   the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
@@ -136,7 +144,14 @@ starts exactly what it always did:
 grants, rebuilt from the run's token files and recorded state, so a client can reopen its work from a
 fresh process. ``--revoke NAME`` leaves the named token file's grant out of the restarted API, so a
 client can be shown that a withdrawn credential is refused while the rest of the run continues.
-Each restart is recorded in the run state with its time, process and any revoked grant.
+Each restart is recorded in the run state with its time, process and any revoked grant. In a run
+that keeps world projects, a follower that has stopped is started again once the API answers.
+
+``keep-projects`` gives a run that is already up its world projects, once (a person's own install
+started before ``--personal``): the directory as ``up`` resolves it, ``~/Exulanica/projects`` by
+default, ``token-read`` minted where the run has none, then ``restart-api``, which starts the
+follower. It refuses a run that already keeps projects. It restarts the first API alone: in a run
+with ``--second-api``, ``restart-api --api second`` then serves the projects there too.
 
 ``down`` stops only what this launcher started, checked by process id and command line, and never
 deletes a database cluster or a run record. Run state lives in the system temporary directory.
@@ -149,6 +164,7 @@ is missing (see ``REFUSALS``).
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -210,6 +226,9 @@ PROJECT_WORKER_START_SECONDS = 30
 PROJECT_WORKER_FINISH_SECONDS = 20
 #: How long ``down`` waits past that deadline for the worker to exit before it is killed.
 PROJECT_WORKER_GRACE_SECONDS = 10
+#: Where a person's own install keeps its world projects, under their home directory, unless
+#: ``--projects`` names another: outside every checkout and run, which ``down`` may remove.
+PERSONAL_PROJECTS = ("Exulanica", "projects")
 
 #: Where run state and run records live, under the system temporary directory: disposable, and
 #: never inside a checkout.
@@ -315,6 +334,9 @@ REFUSALS = {
     "projects-directory": "--projects names an existing directory of its own, no link, outside "
     "the checkout and the run's directory",
     "project-worker-startup": "the project worker did not report a startup",
+    "projects-shape": "--no-projects turns off a personal install's world projects: it needs "
+    "--personal and refuses --projects",
+    "projects-kept": "the run already keeps world projects; restart-api keeps its follower up",
     "database-latency-shape": "--database-latency takes the slot's spare port, which "
     "--second-api also takes",
     "latency-proxy-startup": "the database latency proxy did not report a startup",
@@ -1203,11 +1225,15 @@ def start_depth_worker(
 
 
 def projects_directory(path: Path, worktree: Path) -> Path:
-    """The directory ``--projects`` names, resolved, or a refusal: it must exist, be no link,
-    and lie outside the checkout and the run state, which ``down`` and a new run may remove."""
+    """The directory ``--projects`` names, resolved, or a refusal: it must exist, be no link, be
+    the person's own and writable by nobody else (the follower starts what it finds there), and
+    lie outside the checkout and the run state, which ``down`` and a new run may remove."""
     absolute = Path(os.path.abspath(path))
     if absolute.is_symlink() or not absolute.is_dir():
         refuse("projects-directory", "the directory does not exist or is a link")
+    held = absolute.stat()
+    if held.st_uid != os.getuid() or held.st_mode & 0o022:
+        refuse("projects-directory", "the directory is another account's or others may write it")
     resolved = absolute.resolve()
     for holder in (worktree.resolve(), state_dir(worktree).parent.resolve()):
         if resolved == holder or holder in resolved.parents:
@@ -1215,9 +1241,42 @@ def projects_directory(path: Path, worktree: Path) -> Path:
     return resolved
 
 
+def personal_projects_directory() -> Path:
+    """A person's own install's projects directory, ``~/Exulanica/projects``, made at 0700 when
+    absent; a link or a file there is refused, as for ``--projects``."""
+    path = Path.home().joinpath(*PERSONAL_PROJECTS)
+    if not path.is_symlink() and not path.exists():
+        # A file in the way is left for projects_directory to refuse by name.
+        with contextlib.suppress(OSError):
+            path.mkdir(mode=0o700, parents=True)
+    return path
+
+
+def chosen_projects(arguments: argparse.Namespace, worktree: Path) -> Path | None:
+    """The projects directory ``up`` follows: ``--projects``, else a personal install's own
+    unless ``--no-projects``, else none."""
+    if arguments.no_projects:
+        if arguments.projects is not None or not arguments.personal:
+            refuse("projects-shape", REFUSALS["projects-shape"])
+        return None
+    if arguments.projects is not None:
+        return projects_directory(arguments.projects, worktree)
+    if arguments.personal:
+        return projects_directory(personal_projects_directory(), worktree)
+    return None
+
+
 def wants_read_only_token(arguments: argparse.Namespace) -> bool:
     """Whether the run writes ``token-read``: asked for, or needed by the project worker."""
-    return bool(arguments.read_only_token or arguments.projects is not None)
+    keeps = arguments.projects is not None or (arguments.personal and not arguments.no_projects)
+    return bool(arguments.read_only_token or keeps)
+
+
+def project_worker_running(state: Mapping[str, object]) -> bool:
+    """Whether the run's project worker is still the process its pid names."""
+    pids = state.get("pids")
+    pid = pids.get("project_worker") if isinstance(pids, Mapping) else None
+    return pid is not None and PROJECT_WORKER_MODULE in (command_of(int(pid)) or "")
 
 
 def project_worker_command(
@@ -1634,9 +1693,7 @@ def up(arguments: argparse.Namespace) -> None:
         refuse("database-latency-shape", REFUSALS["database-latency-shape"])
     if arguments.depth_worker and not arguments.no_derivative_worker:
         refuse("depth-worker-shape", REFUSALS["depth-worker-shape"])
-    projects = (
-        None if arguments.projects is None else projects_directory(arguments.projects, worktree)
-    )
+    projects = chosen_projects(arguments, worktree)
     if arguments.scripted_model is not None:
         if arguments.model:
             refuse("scripted-with-model", REFUSALS["scripted-with-model"])
@@ -1962,6 +2019,7 @@ def up(arguments: argparse.Namespace) -> None:
             "derivative_worker": "off" if arguments.no_derivative_worker else "in-process",
             "model": bool(arguments.model),
             "worlds_held": arguments.worlds_held,
+            "personal": bool(arguments.personal),
             "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
             "actor": actor,
@@ -2327,7 +2385,80 @@ def restart_api(arguments: argparse.Namespace) -> None:
     healthz, _ = wait_http(f"http://127.0.0.1:{chosen[port_role]}/healthz", API_START_SECONDS)
     restart["healthz"] = healthz
     write_state(state_file, state)
+    started = (
+        None
+        if second
+        else keep_follower_up(worktree, state, state_file, logs, chosen["api"], revoked)
+    )
+    if started is not None:
+        restart["project_worker"] = started
+        write_state(state_file, state)
     print(json.dumps(restart, indent=2))
+
+
+def keep_follower_up(
+    worktree: Path,
+    state: dict,
+    state_file: Path,
+    logs: Path,
+    api_port: int,
+    revoked: str | None = None,
+) -> int | None:
+    """Where the run keeps world projects and its follower has stopped, start it again with
+    the same directory and token, and answer its process; else None, leaving a running one be,
+    and starting none whose token this restart just revoked."""
+    worker = state.get("project_worker")
+    if not isinstance(worker, Mapping) or project_worker_running(state):
+        return None
+    token_file = Path(str(state["read_only_token"]["token_file"]))
+    if token_file.name == revoked:
+        return None
+    start_project_worker(
+        worktree / ".venv" / "bin" / "python",
+        worktree,
+        Path(str(worker["projects"])),
+        api_port,
+        token_file,
+        logs,
+        state,
+        state_file,
+    )
+    return int(state["pids"]["project_worker"])
+
+
+def keep_projects(arguments: argparse.Namespace) -> None:
+    """Give a run that is already up its world projects, once: the directory resolved as ``up``
+    resolves it (a person's own by default), ``token-read`` minted for the follower where the run
+    has none, both recorded, then the first API restarted with the directory, which starts the
+    follower. Afterwards the run is as if it had been started with ``--projects``, except that a
+    second API serves the projects only after its own ``restart-api --api second``."""
+    worktree = recorded_checkout(arguments.worktree)
+    state_file = state_dir(worktree) / "state.json"
+    if not state_file.exists():
+        refuse("no-state", str(state_file))
+    state = json.loads(state_file.read_text())
+    if isinstance(state.get("project_worker"), Mapping):
+        refuse("projects-kept", REFUSALS["projects-kept"])
+    projects = projects_directory(
+        arguments.projects if arguments.projects is not None else personal_projects_directory(),
+        worktree,
+    )
+    if not isinstance(state.get("read_only_token"), Mapping):
+        read_only_file = Path(state["run_dir"]) / "token-read"
+        read_only_file.write_text(secrets.token_urlsafe(48))
+        read_only_file.chmod(0o600)
+        state["read_only_token"] = {
+            "token_file": str(read_only_file),
+            "workspace_id": state["workspace_id"],
+            "actor": str(uuid.uuid4()),
+            "permissions": list(READ_ONLY_PERMISSIONS),
+        }
+    state["project_worker"] = {
+        "projects": str(projects),
+        "finish_seconds": PROJECT_WORKER_FINISH_SECONDS,
+    }
+    write_state(state_file, state)
+    restart_api(argparse.Namespace(worktree=arguments.worktree, api="primary", revoke=None))
 
 
 def recorded_checkout(path: str) -> Path:
@@ -2384,7 +2515,7 @@ def down(arguments: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("up", "status", "down", "restart-api"):
+    for name in ("up", "status", "down", "restart-api", "keep-projects"):
         command = commands.add_parser(name)
         command.add_argument("--worktree", required=True, help="the checkout to run")
         if name == "restart-api":
@@ -2398,6 +2529,13 @@ def build_parser() -> argparse.ArgumentParser:
                 "--revoke",
                 metavar="TOKEN_FILE",
                 help="leave this token file's grant out of the restarted API (default: none)",
+            )
+        if name == "keep-projects":
+            command.add_argument(
+                "--projects",
+                type=Path,
+                default=None,
+                help="the directory to follow (default: ~/Exulanica/projects)",
             )
         if name == "up":
             command.add_argument("--slot", type=int, default=0, help="the port slot, 0 to 6")
@@ -2486,6 +2624,17 @@ def build_parser() -> argparse.ArgumentParser:
                 type=Path,
                 default=None,
                 help="follow the world projects in this directory beside the API",
+            )
+            command.add_argument(
+                "--personal",
+                action="store_true",
+                help="a person's own install: keep its world projects by default, in "
+                "~/Exulanica/projects unless --projects names another",
+            )
+            command.add_argument(
+                "--no-projects",
+                action="store_true",
+                help="with --personal, keep no world projects (refused without --personal)",
             )
             command.add_argument(
                 "--database-latency",
@@ -2585,7 +2734,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if shutil.which("lsof") is None:
             refuse("lsof-missing", REFUSALS["lsof-missing"])
-        commands = {"up": up, "status": status, "down": down, "restart-api": restart_api}
+        commands = {
+            "up": up,
+            "status": status,
+            "down": down,
+            "restart-api": restart_api,
+            "keep-projects": keep_projects,
+        }
         commands[arguments.command](arguments)
     except Refused as refused:
         print(f"refused ({refused.name}): {refused.detail}", file=sys.stderr)
