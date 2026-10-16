@@ -10,12 +10,13 @@ import { keepWorldPicture } from '/src/composition/world-pictures.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
+import { SAID_READ, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, questionGroup } from './character-group.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { WATCH_MS, mountRunWatch } from './run-watch.ts';
-import { runLength, runRefusalWords, runningLine, whoDecides } from './run-words.mjs';
+import { runLength, runRefusalWords, runningLine, timeLeft, whoDecides } from './run-words.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
 import { assignmentSubject } from './entity-properties.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -488,14 +489,44 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   function release() {
     stopFollowing();
-    ++serial; held = null; root.dataset.held = '';
-    presence.choose(null);
+    ++serial; held = null; picker.drop(); root.dataset.held = '';
+    presence.choose(null); presence.group(null);
   }
   // A run (run-watch.ts): the strip, Stop and the ended note.
   const readOnly = import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1';
   const modelName = (model) => subjectReads.models?.models.find(item => item.provider === model?.provider && item.modelId === (model?.model_id ?? model?.modelId))?.name ?? null;
   const eventsPath = (kinds, extra = '') => '/world/versions/' + encodeURIComponent(entry.authoredVersionId) + '/society/events?world_id=' + encodeURIComponent(entry.worldId)
     + kinds.map(kind => '&kinds=' + kind).join('') + extra;
+  // The chosen character's last line said (J30), read from the said events once chosen and every few seconds.
+  const saidLines = keepLastSaid({ readPage: (before) => read(eventsPath(['said'], '&limit=' + SAID_READ.limit + (before ? '&before=' + encodeURIComponent(before) : ''))) });
+  /** What a chosen character's group says (J30, character-group.mjs) from what the page holds now; the Run question (r08) while asking. */
+  function chosenGroup(row, now) {
+    const view = subjectView(row), { connected } = modelOf(row);
+    const offer = offers.get(row.key)?.offer ?? null;
+    const assignable = !readOnly && Boolean(inventory && offer && subjectReads.models?.takesModelChoices && assignmentSubject(inventory, row, offer));
+    // Someone else the group names (the run's other askers, a line's listener), as their own tag calls them (J20): their
+    // offer is read once, so a person with a name is named here as everywhere else.
+    const named = (id) => { const other = beingRow(id); if (other && !offers.has(other.key) && readBackoff.ready(other.key, performance.now())) void entityOffer(other).catch(() => {}); return whoOf(id); };
+    const picking = picker.of(row);
+    if (picking) return modelGroup({ who: view.who, models: subjectReads.models?.models ?? [], current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy });
+    if (asking) {
+      // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
+      const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
+      return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : named(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
+        model: view.model, limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && (subjectReads.models?.models.length ?? 0) > 1 });
+    }
+    const said = saidLines.of(row.scene.id, now);
+    return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? named(said.to) : null, startMinute: view.facts?.startMinute ?? null,
+      decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable,
+      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading });
+  }
+  let groupActions = new Set(), groupFirst = 0;
+  // Choose a model in the group (r07, character-group.mjs): the page's own write; the Run question then asks again.
+  const picker = modelPicker({ models: () => subjectReads.models?.models ?? [], currentOf: (row) => modelOf(row).model,
+    write: async (row, selected, key) => (await recordEntityModel({ entry, subjectId: row.scene.id, selected, key, refresh: () => refreshSubject(row),
+      client: modelsClient, current: () => picker.of(row) !== null && held === row && current() })).verified,
+    refusal: (error, row) => modelRefusalWords(error.code ?? 'stale', subjectView(row).who),
+    onUsed: (verified) => { subjectReads.models = verified; if (asking) { asking.shown = runWatch.limits(verified); asking.refusal = null; } } });
   const runWatch = mountRunWatch({ host: root, notes: worldNotes, entry, credentials, isCurrent: current, readOnly,
     onChange: () => { if (pageView) drawPage(); },
   });
@@ -578,11 +609,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     asking = { refusal: null, busy: false, shown: runWatch.limits(subjectReads.models) };
     drawQuestion();
   }
-  function drawQuestion() {
-    if (!asking || !held) { presence.ask(null); return; }
-    const view = subjectView(held);
-    presence.ask(runQuestion({ who: view.who, model: view.model, limits: asking.shown, refusal: asking.refusal, busy: asking.busy }));
-  }
+  // The Run question is the chosen character's group in its question state (r08): chosenGroup draws it each frame.
+  function drawQuestion() { presence.ask(null); }
   async function startNow(showing) {
     const { model } = modelOf(held);
     if (!held || !model || showing.busy) return;
@@ -614,6 +642,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function act(action) {
     if (!held) return;
     if (action === 'details') void openPage(held);
+    else if (action === 'model' && held.scene.type === 'being' && !readOnly && subjectReads.models) picker.open(held);
+    else if (action.startsWith('use:')) void picker.use(Number(action.slice(4)));
     else if (action === 'follow' && held.scene.type === 'being') followView.toggle();
     else if (action === 'run') askRun();
     else if (action === 'stop') void stopNow();
@@ -1258,11 +1288,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       else event.preventDefault();
       event.stopImmediatePropagation(); return;
     }
+    // The model list (r07) keeps its keys; movement still moves.
+    const listed = held ? picker.key(event, groupFirst, Boolean((event.target as Element | null)?.closest?.('.cw-beside button'))) : false;
+    if (listed === 'pass') return;
+    if (listed) { event.stopImmediatePropagation(); return; }
     if (asking) {
       // The question before a run keeps its answers together: Enter runs, Esc puts it away, P pauses first.
       if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); if (!event.target?.closest?.('.cw-beside button')) questionAct('run'); else return; }
       else if (event.code === 'Escape' && !event.repeat) { event.preventDefault(); questionAct('back'); }
       else if (event.code === 'KeyP' && asking.refusal === 'society_not_paused' && !event.repeat) { event.preventDefault(); questionAct('pause'); }
+      else if (event.code === 'KeyM' && groupActions.has('model') && !event.repeat) { event.preventDefault(); act('model'); }
       else if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Tab'].includes(event.code)) return;
       else event.preventDefault();
       event.stopImmediatePropagation(); return;
@@ -1278,6 +1313,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (event.code === 'Enter' && being) { event.preventDefault(); if (!event.repeat) act('details'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyR' && being) { event.preventDefault(); if (!event.repeat) act(runWatch.run ? 'stop' : 'run'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
+      if (event.code === 'KeyM' && being && groupActions.has('model')) { event.preventDefault(); if (!event.repeat) act('model'); event.stopImmediatePropagation(); return; }
     }
     const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn() }, Boolean(event.target?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
@@ -1313,8 +1349,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const distance = targetFrame ? reachDistance(target) : Infinity;
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
     corners.frame(now);
-    // The Back corner says Back while something is chosen, and hides its Esc while a question shows its own.
-    if (!build?.active()) corners.back(asking ? null : held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own
+    // The Back corner says Back while something is chosen, the Run question and the model list included (r07, r08):
+    // they are the group's own states, and Esc goes back from them.
+    if (!build?.active()) corners.back(held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own
     corners.reticle.hidden = pageShown();
     corners.reticle.dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';
     root.dataset.reachable = String(targetReachable);
@@ -1341,8 +1378,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     // and the card beside it while it is seen, placed from the ring's projected ellipse; both follow it.
     if (held) {
       const view = subjectView(held), { connected } = modelOf(held);
-      presence.choose(chosenCard({ who: view.who, being: view.being, doing: view.doing, decision: view.decision, model: view.model ?? null, decider: view.decider ?? null, deciderChose: view.deciderChose === true,
-        running: Boolean(runWatch.run), connected, following: followView.active(), reading: view.reading && view.being, thingLine: view.thingLine ?? null }));
+      // A chosen character: the group beside them (J30); a chosen thing keeps its card.
+      const grouped = view.being ? chosenGroup(held, now) : null;
+      groupActions = new Set(grouped?.rows.map(row => row.action) ?? []); groupFirst = grouped?.list?.first ?? 0;
+      presence.group(grouped);
+      presence.choose(view.being ? null : chosenCard({ who: view.who, being: view.being, doing: view.doing, decision: view.decision, model: view.model ?? null, decider: view.decider ?? null, deciderChose: view.deciderChose === true,
+        running: Boolean(runWatch.run), connected, following: followView.active(), reading: false, thingLine: view.thingLine ?? null }));
       const heldFrame = screenFrame(held);
       const ring = heldFrame ? ringAt(heldFrame) : null;
       // The talking scene draws no ring (r24): it marks whoever speaks with its dot instead.
@@ -1353,7 +1394,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         // ring's radius either side, so the card keeps clear of the shoulder as frame 05 does.
         const half = ring.rx * BODY_HALF_WIDTH;
         presence.place({ bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
-          headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x) });
+          headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x), head: { x: heldFrame.headInView ? heldFrame.overhead.x : ring.x, y: headY } });
       } else presence.place(null);
     } else groundRing.hide();
     // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4): within hearing,
@@ -1486,6 +1527,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   };
   const retrying = window.setInterval(() => { if (inventoryFailures > 0 && readBackoff.ready('world-inventory', performance.now())) void readInventory(); }, 500);
   lifetime.signal.addEventListener('abort', () => clearInterval(retrying), { once: true });
+  // People brought in (K13) are in the world's read from then on: read it again so they can be looked at and chosen.
+  corners.people.onChange(() => { if (selection.people?.clock().society === 'present') void readInventory(); });
   await readInventory();
   canvas.focus({ preventScroll: true }); frameId = requestAnimationFrame(frame);
   // Arriving (frame 02): the opening gives way, and the world's name shows once with who lives here.

@@ -343,6 +343,17 @@ choice came to. Another surface opens the panel with its subjects chosen through
 the world's environment selection, as a person would choose them. What each model decided, and how
 the panel's models decide, follow below it.
 
+In the world workspace a chosen person shows beside them, joined to their head by a thin line, on one
+soft shade with no card (`tools/previews/world-workspace/character-group.mjs`): their name, what they are
+doing, the last line they said with to whom and when (read from the society's said events), the keys
+that work for them now (their day; letting their model decide, or stopping it while a run is on;
+choosing a model where they have none and the page may choose one; following them) and, as small
+print, who decides for them. R asks the run's question in the same place: how long it runs, whose
+models it asks, the model and the most it may spend. M lists the models the server offers there too,
+in its order with their prices and Routine last, and a number or Enter gives the person that model by
+the same write the character page uses. Looking at someone before choosing them shows one soft label
+over their head: their name, what they are doing and [E] Inspect.
+
 People come into a saved world only when its owner asks (Bring people in). The page creates its society
 with the engine the world's entry states at that moment (`society_engine` on `GET
 /world-entries/{entry_id}`, read again then, so a thing placed since the world opened counts): on a

@@ -1,11 +1,10 @@
-// Beside a character or thing in the world (DESIGN's frames 04, 05 and 08): the name tag and the
-// [E] Inspect prompt while it is looked at, the card beside it once it is chosen, and the question
-// before a run. It only draws; character-view.mjs decides what it says and contextual-world.ts places
-// it each frame from the projected points. The ring at a chosen character's feet is drawn in the
+// Beside a character or thing in the world (DESIGN's redraws r04, r05, r07 and r08): one soft label over
+// the head while it is looked at (r04), the group beside a chosen character (character-group.ts: J30, its
+// model list and its Run question) or the card beside a chosen thing. It only draws; character-group.mjs and
+// character-view.mjs decide what it says and contextual-world.ts places it each frame from the projected points. The ring at a chosen character's feet is drawn in the
 // world (atlas-react ground-ring.ts), so walls cover it as they cover the feet.
-import { chip, keyWord, nameTag, promptColumn, promptRow, rule, scaleOf, sideCard, cardWords, orb, type NameTagWords, type SubjectBounds } from './world-ui.ts';
-import { promptPlace } from './character-view.mjs';
-import { CHARACTER_WORDS } from './character-words.mjs';
+import { chip, keyWord, promptColumn, promptRow, rule, scaleOf, sideCard, cardWords, orb, type NameTagWords, type SubjectBounds } from './world-ui.ts';
+import { characterGroup, lookLabel, type GroupContent } from './character-group.ts';
 import type { SocietySnapshot } from '/src/society-api.ts';
 import { DEFAULT_SOCIETY_ENGINE, societyEngine } from '/src/society-engines.ts';
 import { inhabitantWords } from '/src/ui/world-inhabitants.ts';
@@ -48,16 +47,21 @@ export interface CharacterPresence {
   look(words: NameTagWords | null, head?: { readonly x: number; readonly y: number }, inspectable?: boolean): void;
   /** What the chosen subject's card says; null hides the card. */
   choose(content: CardContent | null): void;
+  /** What a chosen character's group says (J30), in place of the card; null puts it away. */
+  group(content: GroupContent | null): void;
   /** What the question card says; null puts it away. */
   ask(content: QuestionContent | null): void;
-  /** Places whichever card is up beside the subject, each frame; null for a subject out of view. */
-  place(at: { readonly bounds: SubjectBounds; readonly prefer?: 'right' | 'left' | null } | null): void;
+  /**
+   * Places whichever card or group is up beside the subject, each frame; null for a subject out of view. `head` is the
+   * top of a character's head on screen, where the group's leader starts.
+   */
+  place(at: { readonly bounds: SubjectBounds; readonly prefer?: 'right' | 'left' | null; readonly head?: { readonly x: number; readonly y: number } } | null): void;
   /** Hides the tag and cards while a page is up, and brings them back after. */
   setCovered(covered: boolean): void;
   readonly asking: boolean;
-  /** The top of the name tag on screen while it shows, or null: a pop sits 12 px over it. */
+  /** The top of the looked-at label (r04) on screen while it shows, or null: a pop sits 12 px over it. */
   tagTop(): number | null;
-  /** The name tag's box on screen while it shows, so lines over others keep clear of it; else null. */
+  /** The looked-at label's box on screen while it shows, so lines over others keep clear of it; else null. */
   tagBox(): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | null;
   dispose(): void;
 }
@@ -67,40 +71,23 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
   readonly onAction: (action: string) => void;
 }): CharacterPresence {
   const scale = (): number => scaleOf(host);
-  const tag = nameTag({ scale });
-  const inspect = keyWord({ keys: ['E'], word: CHARACTER_WORDS.inspect, shortcut: 'E', onPress: onInspect }) as HTMLButtonElement;
-  inspect.classList.add('wu-anchored', 'wu-reveal');
-  inspect.hidden = true;
+  // Looked at: one soft label over the head (r04), the name, what they are doing and [E] Inspect.
+  const looked = lookLabel({ scale, onInspect });
   const card = sideCard({ scale });
   const question = sideCard({ question: true, scale });
-  for (const part of [card.root, question.root, tag.root, inspect]) host.append(part);
-  let shown: string | null = null, asked: string | null = null, covered = false, chosen = false;
+  const grouped = characterGroup({ scale, onAction });
+  for (const part of [card.root, grouped.root, question.root, looked.root]) host.append(part);
+  let shown: string | null = null, asked: string | null = null, covered = false, chosen = false, grouping = false;
   const prompt = (item: CardPrompt): HTMLElement => keyWord({ keys: item.keys, word: item.word, shortcut: item.shortcut, onPress: () => onAction(item.action) });
 
   return {
     get asking() { return asked !== null; },
-    tagTop() {
-      if (tag.root.hidden) return null;
-      const box = tag.root.getBoundingClientRect();
-      return box.height ? box.top : null;
-    },
-    tagBox() {
-      if (tag.root.hidden) return null;
-      const box = tag.root.getBoundingClientRect();
-      return box.height ? { x: box.left, y: box.top, width: box.width, height: box.height } : null;
-    },
+    tagTop: () => looked.box()?.y ?? null,
+    tagBox: () => looked.box(),
     look(words, head, inspectable = false) {
-      if (!words || !head || covered) { tag.hide(); inspect.hidden = true; return; }
-      tag.set(words);
-      tag.place(head.x, head.y);
-      inspect.hidden = !inspectable;
-      if (inspectable) {
-        const s = scale();
-        const at = promptPlace(head, { width: inspect.offsetWidth, height: inspect.offsetHeight }, { width: innerWidth, height: innerHeight }, s);
-        const transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`;
-        if (inspect.style.transform !== transform) inspect.style.transform = transform;
-        inspect.setAttribute('aria-label', `${CHARACTER_WORDS.inspect} ${words.name}`);
-      }
+      if (!words || !head || covered) { looked.set(null, false); return; }
+      looked.set({ name: words.name, doing: words.doing ?? null }, inspectable);
+      looked.place(head);
     },
     choose(content) {
       chosen = content !== null;
@@ -113,6 +100,10 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       if (content.chip) body.append(chip(content.chip, { live: content.live === true }));
       if (content.prompts.length) body.append(rule(), promptColumn(content.prompts.map(prompt)));
       body.setAttribute('aria-label', content.title);
+    },
+    group(content) {
+      grouping = content !== null;
+      grouped.set(content);
     },
     ask(content) {
       if (!content) { asked = null; question.hide(); question.body.replaceChildren(); return; }
@@ -142,17 +133,21 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       body.append(promptRow(content.answers.map(prompt)));
     },
     place(at) {
-      if (!at) { card.hide(); question.hide(); return; }
+      if (!at) { card.hide(); question.hide(); grouped.place(null); return; }
       // Under a page the cards wait.
-      if (covered) { card.hide(); question.hide(); return; }
-      if (asked) { card.hide(); question.place(at.bounds, { prefer: at.prefer ?? null }); }
+      if (covered) { card.hide(); question.hide(); grouped.place(null); return; }
+      if (asked) { card.hide(); grouped.place(null); question.place(at.bounds, { prefer: at.prefer ?? null }); }
+      else if (grouping) {
+        card.hide(); question.hide();
+        grouped.place({ head: at.head ?? { x: (at.bounds.left + at.bounds.right) / 2, y: at.bounds.headY ?? at.bounds.top }, bounds: at.bounds, prefer: at.prefer ?? null });
+      }
       else if (chosen) { question.hide(); card.place(at.bounds, { prefer: at.prefer ?? null }); }
     },
     setCovered(on) {
       covered = on;
-      if (on) { tag.hide(); inspect.hidden = true; card.hide(); question.hide(); }
+      if (on) { looked.set(null, false); card.hide(); question.hide(); grouped.place(null); }
     },
-    dispose() { for (const part of [card.root, question.root, tag.root, inspect]) part.remove(); },
+    dispose() { for (const part of [card.root, question.root, looked.root]) part.remove(); grouped.remove(); },
   };
 }
 
@@ -177,7 +172,9 @@ export function characterFacts(snapshot: SocietySnapshot | null, subjectId: stri
       doing = livingInhabitantWords({ role, has_home: held.has_home === true, has_work: held.has_work === true, action: person.action ?? null, goal }, ordinal).doing;
     } else {
       const listed = new Map((snapshot.places?.targets ?? []).filter(target => target.enabled).map(target => [target.targetId, target.place ?? null] as const));
-      doing = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson).doing;
+      // In the world the activity words stand alone (J31): no count of the minutes still to go.
+      const now = person.action ? { ...person, action: { ...person.action, remaining_ticks: 0 } } : person;
+      doing = inhabitantWords(now, [], inhabitants, profile, false, null, listed, playedByPerson).doing;
     }
   } catch { doing = null; }
   const state = snapshot.state as unknown as { readonly start_minute_of_day?: unknown; readonly clock?: { readonly start_minute_of_day?: unknown } | null };

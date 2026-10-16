@@ -207,3 +207,62 @@ export function modelRefusalWords(code, who) {
   if (code === 'person_not_in_this_world') return goneNote(who);
   return `This model cannot decide for ${who.within} here.`;
 }
+
+/**
+ * A chosen character's group beside them (DESIGN's J30, the r05 picture): its choices, each only where it
+ * works, as the key rows say them. `who` is called()'s.
+ */
+export const GROUP_WORDS = Object.freeze({
+  decide: who => `Let ${possessive(who.within)} model decide`,
+  stop: who => `Stop ${possessive(who.within)} model`,
+  choose: who => `Choose ${possessive(who.within)} model`,
+  follow: who => `Follow ${who.within}`,
+  stopFollowing: () => CHARACTER_WORDS.stopFollowing,
+});
+
+/**
+ * The group's small print: who decides for the character now (J30). `decider` is 'external' (an outside
+ * program, T7), 'person', 'model' or 'routine'; `model` the model's served name; `left` the time left of a run its model is in
+ * ("1:52"), or null when no run is on.
+ */
+export function decidesPrint(who, { decider, model = null, left = null }) {
+  if (decider === 'external') return `${who.start} comes from an outside program`;
+  if (decider === 'person') return `A person is playing ${who.within}`;
+  if (decider === 'model' && plain(model)) return left ? `${possessive(who.start)} model is deciding · ${left} left` : `${plain(model)} decides for ${who.within}`;
+  return `${who.start} follows a routine`;
+}
+
+/** A line as it was said, in curly quotes. */
+export const quoted = line => `“${line}”`;
+
+/**
+ * Under the last line said: to whom and when ("To Marco, 07:10"). `to` is called()'s for the one it was said
+ * to, or null for everyone near, which shows the time alone; `hhmm` is null where the society keeps no
+ * clock (J25), and then a line to everyone near shows nothing under it.
+ */
+export function saidUnder({ to = null, hhmm = null }) {
+  if (to) return hhmm ? `To ${to.within}, ${hhmm}` : `To ${to.within}`;
+  return hhmm ?? null;
+}
+
+/**
+ * Whose models a run asks (J28), the chosen character first, then the others in the order served: "Teo's model
+ * decides.", "Teo's and Ari's models decide.", "Teo's, Ari's and the resident's models decide.", "Teo's model and
+ * 3 more decide.", then "Everyone else carries on as before." unless nobody else lives in the world (`others`
+ * false). `whos` are called()'s for each character the run will ask; null when there is none.
+ */
+export function modelsDecide(whos, { others = true } = {}) {
+  const [first, ...rest] = whos ?? [];
+  if (!first) return null;
+  const owners = rest.length === 0 ? `${possessive(first.start)} model decides.`
+    : rest.length === 1 ? `${possessive(first.start)} and ${possessive(rest[0].within)} models decide.`
+      : rest.length === 2 ? `${possessive(first.start)}, ${possessive(rest[0].within)} and ${possessive(rest[1].within)} models decide.`
+        : `${possessive(first.start)} model and ${rest.length} more decide.`;
+  return others ? `${owners} Everyone else carries on as before.` : owners;
+}
+
+/** Under the Run question's model and cap (r08): when the run stops, naming no control. */
+export const stopsAfter = minutes => `It stops after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}, or when you stop it.`;
+
+/** The Run question's way to another model (r08), where another is offered and this page may choose. */
+export const ANOTHER_MODEL = 'Choose another model';

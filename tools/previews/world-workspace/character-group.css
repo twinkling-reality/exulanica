@@ -1,0 +1,51 @@
+/* A chosen character's group (DESIGN's J30, the r05 picture; frames/r05-character.html on frames/redo.css).
+   Sizes are reference pixels at 1920 by 1080 in world-ui.css's unit (--u); a max() floor is the sheet's own
+   1440 by 900 size where the scale alone would draw it smaller (name 40/44, words 18, keys 32). Built on the
+   shared craft's tokens and parts (.wu-shade, .wu-rows). */
+.cg-root { position: absolute; inset: 0; pointer-events: none; }
+.cg-leader { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
+.cg-leader path { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 1.2; filter: drop-shadow(0 0 2px rgba(0, 0, 0, .5)); }
+.cg-leader circle { fill: #ffffff; }
+/* One shade, pad 24 (TOKENS-FOR-WORLD-UI: a character's group). */
+/* The group is as wide as its widest line; the said line and the Run question's line wrap at 520 (440 at 1440). */
+.cg-group { left: 0; top: 0; --shade-pad: calc(24 * var(--u)); color: var(--ink); will-change: transform; }
+.cg-group > * { margin: 0; }
+.cg-name { font: 300 max(40px, calc(44 * var(--u)))/max(44px, calc(48 * var(--u))) var(--font-sans); letter-spacing: -.01em; white-space: nowrap; }
+.cg-doing { margin-top: var(--space-8); font: 400 max(18px, calc(20 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans); }
+/* The last line said wraps at the group's width, three lines at most. */
+.cg-said { margin-top: var(--space-16); max-width: max(440px, calc(520 * var(--u))); text-wrap: pretty; font: italic 400 max(16px, calc(18 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+  /* Room for the italic's lean past its last letter, which the clamp would otherwise cut (the closing quote). */
+  padding-right: .3em; }
+.cg-to, .cg-print { font: 400 max(12px, calc(13 * var(--u)))/max(20px, calc(24 * var(--u))) var(--font-sans); }
+/* The Run question (r08): whose models decide, at .92; when it stops, under the print at .86. */
+.cg-note { margin-top: var(--space-16); max-width: max(440px, calc(520 * var(--u))); text-wrap: pretty; font: 400 max(16px, calc(18 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .92); }
+.cg-after { color: rgba(255, 255, 255, .86); }
+/* A refusal takes the print's place in the refused ink, and Run dims (it still answers Enter). */
+.cg-print.cg-refused { color: var(--refused-ink); }
+.cg-group[data-refused="true"] .cg-rows > .wu-row:first-child { opacity: .55; }
+.cg-group > .cg-rows { margin-top: var(--space-24); pointer-events: auto; }
+.cg-print { margin-top: var(--space-16); }
+/* The model list (r07): "Per million tokens" over the price column, a row per model (its number key, its name with
+   "Current" after the character's own, its price), the chosen row's marker 14 px left of its key, the small keys under. */
+.cg-list-head { margin-top: var(--space-24); text-align: right; font: 400 max(12px, calc(13 * var(--u)))/max(14px, calc(16 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
+.cg-list { margin-top: var(--space-8); display: grid; row-gap: max(16px, calc(16 * var(--u))); --glyph: max(32px, calc(32 * var(--u))); pointer-events: auto; }
+.wu-root .cg-list > .cg-model { position: relative; display: grid; grid-template-columns: var(--glyph) auto 1fr; column-gap: max(16px, calc(16 * var(--u))); align-items: center;
+  height: var(--glyph); margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.cg-model:disabled { cursor: default; }
+.cg-model:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: calc(var(--glyph) / 4); }
+.cg-model-word { font-size: max(18px, calc(19 * var(--u))); line-height: var(--glyph); white-space: nowrap; }
+.cg-model.cg-on .cg-model-word { font-weight: 500; }
+.cg-model.cg-on::before { content: ''; position: absolute; left: calc(-14 * var(--u)); top: calc(6 * var(--u)); width: 3px; height: calc(20 * var(--u)); border-radius: 1px;
+  background: var(--wash); box-shadow: 0 0 10px rgba(168, 203, 210, .8); }
+.cg-current { margin-left: calc(12 * var(--u)); font: 500 12px/1 var(--font-mono); letter-spacing: .02em; color: var(--live); position: relative; top: -1px; }
+.cg-price { justify-self: end; padding-left: calc(32 * var(--u)); font: 400 max(14px, calc(15 * var(--u)))/1 var(--font-sans); color: rgba(255, 255, 255, .88); white-space: nowrap; }
+.cg-keys { margin-top: var(--space-24); display: flex; gap: var(--space-24); font: 400 max(13px, calc(14 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans); }
+.cg-keys > span { display: flex; align-items: center; gap: var(--space-8); }
+/* The label over a looked-at character (r04): on the speech label's shade (.wu-speech), centred over the head. */
+.cg-look { left: 0; top: 0; color: var(--ink); white-space: nowrap; will-change: transform; }
+.cg-look > * { margin: 0; }
+.cg-look-name { font: 500 max(15px, calc(16 * var(--u)))/max(18px, calc(20 * var(--u))) var(--font-sans); }
+.cg-look-doing { margin-top: 2px; font: 400 max(13px, calc(14 * var(--u)))/max(18px, calc(20 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .90); }
+.cg-look > .cg-look-rows { margin-top: var(--space-8); justify-items: center; pointer-events: auto; }
+.cg-look .wu-glyph { font-size: 11px; }
