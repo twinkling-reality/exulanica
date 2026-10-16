@@ -2,8 +2,8 @@
 // example words of DESIGN's frames, so a reviewer sees the parts beside the frames before any
 // screen uses them. Nothing here reads a world.
 import {
-  areaBanner, cardWords, chip, keyWord, label, mountUiScale, notes, orb, page, promptColumn, promptRow,
-  nameTag, outline, path, ring, rule, scaleOf, sideCard, stepList,
+  areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
+  nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
 } from './world-ui.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
@@ -93,6 +93,36 @@ if (query.get('view') === 'page') {
   placeAll();
   addEventListener('resize', () => requestAnimationFrame(placeAll));
   notes(root, { place: 'build' }).show('Removed the fan palm.', { prompt: keyWord({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z', onPress: press, small: true }), ms: 0 });
+} else if (query.get('view') === 'craft') {
+  // The redraws' shared craft, each part once where its frame puts it (r02, r05, r24, r13), for
+  // DESIGN's measure at 1920 and 1440.
+  const at = (part: HTMLElement, css: string): HTMLElement => { part.style.cssText += css; return add(part); };
+  const divider = document.createElement('i');
+  divider.style.cssText = 'width:1px;height:calc(16 * var(--u));background:var(--pill-divider)';
+  const people = document.createElement('span');
+  people.style.cssText = 'font-size:var(--pill-text-small);color:var(--ink-2)';
+  people.textContent = '24 people live here';
+  at(pill('Terraces on the bay', divider, people), 'position:absolute;left:50%;top:var(--edge-inset);transform:translateX(-50%)');
+  at(pill('06:55 · Day 1'), 'position:absolute;right:var(--edge-inset);top:var(--edge-inset)');
+  at(tip('History', 'H'), 'position:absolute;left:calc(var(--edge-inset) + 56 * var(--u));top:calc(var(--edge-inset) + 4 * var(--u))');
+  at(pill('W A S D to walk, the mouse to look'), 'position:absolute;left:50%;bottom:var(--edge-inset);transform:translateX(-50%);font-size:max(13px, calc(14 * var(--u)))');
+  // Speech over a person, and a name further off.
+  const said = at(shade(), 'left:calc(700 * var(--u));top:calc(300 * var(--u));text-align:center;white-space:nowrap;--shade-pad:calc(14 * var(--u));--shade-feather:calc(9 * var(--u));--shade-radius:calc(16 * var(--u))');
+  said.innerHTML = '<div style="font:500 calc(14 * var(--u))/calc(20 * var(--u)) var(--font-sans)">Ines, to Teo</div><div style="margin-top:var(--space-8);font:italic 450 calc(20 * var(--u))/calc(24 * var(--u)) var(--font-sans)">\u201cThe boats are out early.\u201d</div>';
+  at(shade({ small: true }), 'left:calc(420 * var(--u));top:calc(420 * var(--u));font:450 calc(14 * var(--u))/calc(20 * var(--u)) var(--font-sans)').textContent = 'Marco';
+  // A character's choices (r05), building's held keys (r13), talking's bars (r24).
+  const character = at(shade(), 'left:calc(1096 * var(--u));top:calc(296 * var(--u));--shade-pad:calc(24 * var(--u))');
+  character.append(glyphRows([
+    { key: 'Enter', word: "Teo's day", onPress: press }, { key: 'R', word: "Let Teo's model decide", onPress: press }, { key: 'V', word: 'Follow Teo', onPress: press },
+  ], { glyph: 32, rowGap: 16, colGap: 16, word: 19, nudge: 0 }));
+  // Building's held keys (W10) end their longest word 152 in from the right edge; talking's bars (T9) end 124 in.
+  const held = at(shade(), 'right:calc(152 * var(--u));top:calc(312 * var(--u));--shade-pad:calc(24 * var(--u))');
+  held.append(glyphRows([
+    { key: 'mouse', word: 'Place' }, { key: '[ ]', word: 'Turn' }, { key: 'Del', word: 'Remove' }, { key: 'Esc', word: 'Put back' },
+  ], { glyph: 'max(40px, calc(48 * var(--u)))', rowGap: 'max(12px, calc(16 * var(--u)))', colGap: 'max(16px, calc(20 * var(--u)))', word: 'max(28px, calc(32 * var(--u)))', nudge: -1 }));
+  at(glyphRows([
+    { key: 'V', word: 'Stop following', onPress: press }, { key: 'Enter', word: "Ines's day", onPress: press },
+  ], { glyph: 32, rowGap: 16, colGap: 16, word: 18, nudge: 1, bars: true }), 'position:absolute;right:calc(124 * var(--u));bottom:calc(128 * var(--u))');
 } else {
   for (const corner of ['tl', 'tr', 'bl', 'tc']) add(div(`wu-scrim wu-${corner}`));
   add(div('wu-back')).append(keyWord({ keys: ['Esc'], word: 'Your worlds', shortcut: 'Escape', onPress: press }));

@@ -137,6 +137,85 @@ export const rule = (): HTMLDivElement => element('div', 'wu-rule');
 /** A section label on a page or card ("Personality", "Model"). */
 export const label = (text: string): HTMLParagraphElement => element('p', 'wu-label', text);
 
+/** A pill of thin glass (the redraws' craft): a line of parts, such as a title, a divider and a count. */
+export function pill(...parts: readonly (Node | string)[]): HTMLDivElement {
+  const made = element('div', 'wu-glass-thin wu-pill');
+  made.append(...parts);
+  return made;
+}
+
+/** A rail button's tip: its word and its key as a small cap ("History [H]"). */
+export function tip(word: string, key: string): HTMLDivElement {
+  const made = element('div', 'wu-glass-thin wu-tip');
+  const cap = element('span', 'wu-key wu-small', key);
+  cap.setAttribute('aria-hidden', 'true');
+  made.append(element('span', '', word), cap);
+  return made;
+}
+
+/** Floating words over the world on one soft shade with no edge; `small` for a name over someone. The caller fills and places it. */
+export function shade({ small = false }: { readonly small?: boolean } = {}): HTMLDivElement {
+  return element('div', small ? 'wu-shade wu-small' : 'wu-shade');
+}
+
+/** One row of key and word: the key's name (Enter is drawn as a return arrow, 'mouse' as a mouse), its word, and what it does. */
+export interface GlyphRow {
+  readonly key: string;
+  readonly word: string;
+  /** The aria-keyshortcuts value; the key works whether or not the row shows. */
+  readonly shortcut?: string;
+  /** Present: the row is a button that runs it. Absent: the row only says the key. */
+  readonly onPress?: () => void;
+  readonly disabled?: boolean;
+}
+
+/**
+ * A group's figures: a number is reference pixels (scaled by --ui-scale), a string any CSS length (a
+ * sheet's own 1440 size as a max() floor). Each left out keeps world-ui.css's (32, 16, 16, 19, 0).
+ */
+export interface GlyphRowSizes {
+  readonly glyph?: number | string;
+  readonly rowGap?: number | string;
+  readonly colGap?: number | string;
+  readonly word?: number | string;
+  /** Plain pixels: the measured lift of a word's letters onto its key's middle. */
+  readonly nudge?: number;
+  /** Talking's choices: each row on its own feathered bar, no group shade. */
+  readonly bars?: boolean;
+}
+
+const RETURN = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 5v7a3 3 0 0 1-3 3H6 M10 11l-4 4 4 4"/></svg>';
+
+const MOUSE = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v4"/></svg>';
+
+/** Rows of key and word (the redraws' craft): keys one size, in one column, each word centred on its key. */
+export function glyphRows(rows: readonly GlyphRow[], sizes: GlyphRowSizes = {}): HTMLDivElement {
+  const group = element('div', sizes.bars === true ? 'wu-rows wu-bars' : 'wu-rows');
+  const length = (value: number | string): string => typeof value === 'number' ? `calc(${value} * var(--u))` : value;
+  for (const [name, property] of [['glyph', '--glyph'], ['rowGap', '--row-gap'], ['colGap', '--col-gap'], ['word', '--word']] as const) {
+    const value = sizes[name];
+    if (value !== undefined) group.style.setProperty(property, length(value));
+  }
+  if (sizes.nudge !== undefined && Number.isFinite(sizes.nudge)) group.style.setProperty('--nudge', `${sizes.nudge}px`);
+  for (const { key, word, shortcut, onPress, disabled = false } of rows) {
+    const row = onPress ? element('button', 'wu-row') : element('div', 'wu-row');
+    const glyph = element('span', 'wu-glyph');
+    if (key === 'Enter') glyph.innerHTML = RETURN;
+    else if (key === 'mouse') glyph.innerHTML = MOUSE;
+    else glyph.textContent = key;
+    glyph.setAttribute('aria-hidden', 'true');
+    row.append(glyph, element('span', 'wu-word', word));
+    if (shortcut) row.setAttribute('aria-keyshortcuts', shortcut);
+    if (row instanceof HTMLButtonElement) {
+      row.type = 'button';
+      row.disabled = disabled;
+      row.addEventListener('click', () => onPress?.());
+    } else if (disabled) row.setAttribute('aria-disabled', 'true');
+    group.append(row);
+  }
+  return group;
+}
+
 /**
  * Moves an anchored part to `x`, `y` (its top left, CSS pixels) by transform alone, kept `inset`
  * reference pixels inside the viewport. Returns where it went.

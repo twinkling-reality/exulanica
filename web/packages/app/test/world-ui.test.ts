@@ -3,6 +3,7 @@
 // they say to a keyboard and a screen reader. A prompt is one button named by its word, with its
 // key as aria-keyshortcuts and its drawn caps hidden; a hint that only says a key is not a button;
 // a note is one at a time and leaves on its own; a page is a modal dialog with its key row.
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /** What these tests use of world-ui.ts, a preview module outside this package. */
@@ -22,6 +23,10 @@ interface WorldUi {
   outline(options?: { form?: 'chosen' | 'copy' | 'refused' | 'origin' }): { readonly root: SVGSVGElement; place(corners: readonly { x: number; y: number }[]): void; form(form: 'chosen' | 'copy' | 'refused' | 'origin'): void; hide(): void };
   path(): { readonly root: SVGSVGElement; place(from: { x: number; y: number }, to: { x: number; y: number }): void; hide(): void };
   areaBanner(words: { name: string; over?: string; sub?: string }): { readonly root: HTMLElement; remove(): void };
+  pill(...parts: (Node | string)[]): HTMLElement;
+  tip(word: string, key: string): HTMLElement;
+  shade(options?: { small?: boolean }): HTMLElement;
+  glyphRows(rows: readonly { key: string; word: string; shortcut?: string; onPress?: () => void; disabled?: boolean }[], sizes?: { glyph?: number | string; rowGap?: number | string; colGap?: number | string; word?: number | string; nudge?: number; bars?: boolean }): HTMLElement;
 }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
 // module (outside this package) out of the program.
@@ -193,5 +198,56 @@ describe('the area banner', () => {
     expect(made.root.classList.contains('wu-made')).toBe(true);
     expect(made.root.querySelector('.wu-banner-over')!.textContent).toBe('Made from your words');
     expect(made.root.querySelector('.wu-banner-sub')).toBeNull();
+  });
+});
+
+describe('the redraws\' shared craft', () => {
+  it('draws rows of key and word: a pressable row is one button named by its word, Enter a drawn return arrow', async () => {
+    const { glyphRows } = await parts();
+    const pressed = vi.fn();
+    const group = glyphRows([
+      { key: 'Enter', word: "Teo's day", shortcut: 'Enter', onPress: pressed },
+      { key: 'V', word: 'Follow Teo', shortcut: 'V', onPress: () => {}, disabled: true },
+      { key: '[ ]', word: 'Turn' },
+    ], { glyph: 48, colGap: 20, word: 'max(28px, calc(32 * var(--u)))', nudge: -1 });
+    document.body.append(group);
+    const [enter, follow, turn] = [...group.children] as HTMLElement[];
+    expect(enter!.tagName).toBe('BUTTON');
+    expect(enter!.getAttribute('aria-keyshortcuts')).toBe('Enter');
+    expect(enter!.querySelector('.wu-glyph')!.getAttribute('aria-hidden')).toBe('true');
+    expect(enter!.querySelector('.wu-glyph svg')).not.toBeNull();
+    expect(enter!.textContent).toBe("Teo's day");
+    enter!.click();
+    expect(pressed).toHaveBeenCalledOnce();
+    expect((follow as HTMLButtonElement).disabled).toBe(true);
+    expect(turn!.tagName).toBe('DIV');
+    expect(turn!.querySelector('.wu-glyph')!.textContent).toBe('[ ]');
+    // A number is reference pixels, a string a length as given; those left out keep the stylesheet's.
+    expect(group.style.getPropertyValue('--glyph')).toBe('calc(48 * var(--u))');
+    expect(group.style.getPropertyValue('--word')).toBe('max(28px, calc(32 * var(--u)))');
+    expect(group.style.getPropertyValue('--nudge')).toBe('-1px');
+    expect(group.style.getPropertyValue('--row-gap')).toBe('');
+    expect(glyphRows([], { bars: true }).className).toBe('wu-rows wu-bars');
+    expect(glyphRows([{ key: 'mouse', word: 'Place' }]).querySelector('.wu-glyph svg')).not.toBeNull();
+  });
+
+  it('puts floating words on a shade, a pill and a tip on thin glass', async () => {
+    const { shade, pill, tip } = await parts();
+    expect(shade().className).toBe('wu-shade');
+    expect(shade({ small: true }).className).toBe('wu-shade wu-small');
+    const top = pill('Terraces on the bay', document.createElement('i'));
+    expect(top.className).toBe('wu-glass-thin wu-pill');
+    expect(top.childNodes).toHaveLength(2);
+    const history = tip('History', 'H');
+    expect(history.textContent).toBe('HistoryH');
+    expect(history.querySelector('.wu-key.wu-small')!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('keeps the sheets\' 1440 sizes as floors where the scale alone would draw them smaller', () => {
+    const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui.css`, 'utf8');
+    const start = css.indexOf('.wu-root {');
+    const root = css.slice(start, css.indexOf('\n}', start));
+    for (const token of ['--edge-inset: calc(32 * var(--u))', '--pill-height: max(36px, calc(40 * var(--u)))', '--pill-text: max(14px, calc(15 * var(--u)))',
+      '--pill-text-small: max(12px, calc(13 * var(--u)))', '--glass-thin-fill: rgba(13, 20, 27, .40)', '--shade-fill: rgba(6, 12, 16, .46)']) expect(root).toContain(token);
   });
 });
