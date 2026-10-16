@@ -1,7 +1,9 @@
-"""Yellow/pink authored duck looks share one admitted body without inventing model provenance."""
+"""Yellow/pink authored duck looks share one admitted body without inventing model provenance, and
+the duck walks about by its own routine."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,7 +12,8 @@ from exulanica.things.run_forms import run_form
 from exulanica.world.thing_store import read_admission
 from scripts.things.author_surfaces import assemble_authored
 
-ASSETS = Path(__file__).resolve().parents[1] / "assets/things/pond-duck"
+ROOT = Path(__file__).resolve().parents[1]
+ASSETS = ROOT / "assets/things/pond-duck"
 
 
 def test_duck_looks_rebuild_same_body_and_pass_existing_admission():
@@ -43,3 +46,27 @@ def test_duck_looks_rebuild_same_body_and_pass_existing_admission():
         "follow",
         "say",
     }
+
+
+def test_the_duck_s_routine_walks_it_about_more_than_it_waits():
+    yellow, _ = assemble_authored(json.loads((ASSETS / "authoring.json").read_text()))
+    pink, _ = assemble_authored(json.loads((ASSETS / "pink-authoring.json").read_text()))
+    held = (ASSETS / "yellow-v1/kind.json").read_bytes()
+    provenance = json.loads((ASSETS / "provenance.json").read_text())["kind"]
+    # The pink authoring states the same kind but for its look; the yellow kind is held at the
+    # digest its provenance names, and earlier versions are kept.
+    assert {**pink.kind.document, "looks": None} == {**yellow.kind.document, "looks": None}
+    assert yellow.kind.sha256 == hashlib.sha256(held).hexdigest()
+    assert (provenance["version"], provenance["sha256"]) == (
+        yellow.kind.version,
+        yellow.kind.sha256,
+    )
+    assert [old["version"] for old in provenance["superseded"]] == list(
+        range(yellow.kind.version - 1, 0, -1)
+    )
+    abilities = json.loads((ROOT / "assets/catalogs/things/abilities.v1.json").read_text())
+    moving = {entry["key"] for entry in abilities["entries"] if entry["needs"]["moves"]}
+    weights = json.loads(held)["routine"]["weights"]
+    # The routine draws walks (to an open spot, a place to visit or rest, another being) more often
+    # than it waits.
+    assert sum(weight for key, weight in weights.items() if key in moving) > weights["wait"] > 0

@@ -873,7 +873,7 @@
   },
   "kind": {
     "kind": "pond_duck",
-    "version": 2,
+    "version": 3,
     "label": "yellow pond duck",
     "summary": "An authored reference-inspired duck with a broad bill, wide eyes and webbed feet. This is a primitive mesh preview, not an official or model-generated asset.",
     "class": "being",
@@ -926,10 +926,14 @@
     ],
     "routine": {
       "weights": {
-        "wait": 1000
+        "wait": 250,
+        "stand": 400,
+        "visit": 200,
+        "rest": 100,
+        "talk": 50
       },
       "follow_holders_of": [],
-      "reason": "Uses the existing purposeful routine and supported recorded actions."
+      "reason": "Wanders to open spots near where it is, visits and rests where a place welcomes it, and sometimes stops by another being; waits in between."
     },
     "deciders": {
       "default": "routine",
