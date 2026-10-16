@@ -48,7 +48,7 @@
   --space-32: calc(32 * var(--u));
   --space-48: calc(48 * var(--u));
   --glass-thin-fill: rgba(13, 20, 27, .40);
-  --glass-thin-blur: blur(18px);
+  --glass-thin-blur: blur(18px) brightness(.7);
   --glass-thin-line: inset 0 0 0 1px rgba(255, 255, 255, .14);
   --pill-height: max(36px, calc(40 * var(--u)));
   --pill-radius: calc(12 * var(--u));
