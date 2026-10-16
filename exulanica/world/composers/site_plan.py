@@ -383,6 +383,13 @@ def compose_kind(
                 code="landscape_not_served",
             )
         stated_landscape = read_site_landscape(landscape)
+        if stated_landscape.site is not None:
+            raise LandscapeRefused(
+                "a site is not laid out on a volume's top yet: a site on a landscape stands on "
+                "its land",
+                path="landscape.site",
+                code="landscape_not_served",
+            )
         document = stated_landscape.land
     if land is not None:
         if support is not None:

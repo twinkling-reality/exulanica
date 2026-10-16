@@ -167,7 +167,7 @@ def _unreadable(receipt: dict) -> str:
 def test_a_receipt_that_no_longer_binds_its_landscape_is_refused_by_name(on_land, on_landscape):
     receipt = on_landscape.receipt
     rules = copy.deepcopy(receipt)
-    rules["landscape_rules"]["version"] = 4
+    rules["landscape_rules"]["version"] = 5
     assert _unreadable(rules) == "generated_world_landscape_rules_changed"
     named = copy.deepcopy(receipt)
     named["landscape_sha256"] = "0" * 64
@@ -199,4 +199,4 @@ def test_a_world_made_by_the_first_landscape_rules_reads_and_draws_by_them(on_la
     (stack,) = drawn["volumes"]
     assert stack["volume_sha256"] == first.placements[0].volume.sha256
     newest, _ = landscape_drawing(WORLD, on_landscape.receipt, "0" * 64, "1" * 64)
-    assert newest["landscape_rules_version"] == 3
+    assert newest["landscape_rules_version"] == 4

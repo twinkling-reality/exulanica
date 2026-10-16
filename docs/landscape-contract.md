@@ -174,12 +174,22 @@ cut's blend below it and never above it, and its cells are walked where the land
 | `land` | An unchanged `exulanica.landform/v1` document |
 | `volumes` | Placements: `id`, an unchanged `volume` document, `at_mm` (its origin in the world), `yaw_mdeg`, and in the canonical form `volume_sha256` |
 | `finest_cell_mm` | The finest cell its volumes are meshed at (2000 by default); every coarser one is meshed too |
+| `site` | From catalog version 2, optional: a site laid out on a placed volume's top, `on` (the placement's id), `at_mm` (the site's south-west corner in that volume's own frame) and `cut_fill_mm` (the deepest its grading may cut or fill, 0.5 to 4 m, 2 m by default) |
 
-Values are bounded by `assets/catalogs/landscape/landscape-value.v1.json`. The land and each volume
+Values are bounded by `assets/catalogs/landscape/landscape-value.v1.json` and
+`assets/catalogs/landscape/landscape-value.v2.json`; version 2 keeps every entry of version 1 and
+adds the site's two values. The land and each volume
 are read by their own readers; a refusal of either is passed on with its path inside the landscape
 (`volumes[1].volume.parts[0].radius_mm`) and its own code. A placement's origin lies on the land near
 the world: the extent and the ring of land chunks round it that the land realizer realizes, so a sea
 stack may stand in the bay beyond a site's edge. One volume may be placed many times.
+
+A `site` names a placement whose volume states a top land (`landscape_site_unknown_placement`,
+`landscape_site_no_top_land`), and its corner stands at whole metres inside that top land's square
+(`landscape_site_outside_top`), each refused by its path under `site`. The canonical form writes
+`site`, with its bound, only where it is stated, so a landscape without one keeps the identity it
+had under version 1. No site is laid out on a volume's top yet: the site composer refuses a
+landscape that states one (`landscape_not_served`, path `landscape.site`).
 
 ## Realizing a landscape's volumes
 
@@ -315,6 +325,7 @@ each served version's catalogs, golden field, chunks, tops and composition.
 | 1 | 1 | version 1 | Level and even |
 | 2 | 2 | version 2 | Level and even unless the strata vary them |
 | 3 | 3 | version 3 | As version 2; a volume may state a top land |
+| 4 | 3 | version 3 | As version 3; the landscape may state a site on a volume's top (landscape catalog version 2) |
 
 Volume rules 3 also name the land rules a top land is realized by (land rules 3, with their
 catalogs' digests), fixed for that version so a later land rules version never moves a served
@@ -486,7 +497,7 @@ made volumes by digest.
 | `landscape_rules_changed` | A receipt names landscape rules this server does not serve |
 | `landscape_extent_not_site` | A site's landscape states another extent than the site's |
 | `landscape_volume_on_site` | A placed volume reaches onto the site it is placed round |
-| `landscape_not_served` | A landscape asked of the town, or beside land or a support declaration |
+| `landscape_not_served` | A landscape asked of the town, or beside land or a support declaration, or stating a site on a volume's top |
 | `landscape_unavailable` | A landscape route asked of a world on no landscape (404) |
 | `landscape_document_unavailable` | A chunk or top the world's landscape drawing does not name (404) |
 | `generated_world_landscape_rules_changed` | A receipt names landscape rules this server does not serve, or names them on a world on no landscape; the world is listed unavailable |
@@ -501,7 +512,9 @@ made volumes by digest.
 | `island_too_deep` | An island's depth is more than three times its radius |
 | `island_rim_too_thick` | An island's rim slab is thicker than its radius or half its depth |
 | `island_later_version` | An island states a site, hangings or falls, which later versions state, or a top under island catalog version 1 |
-| `landscape_site_outside_top` | A site graded on a volume's top does not lie inside its square, or not at whole metres |
+| `landscape_site_unknown_placement` | A landscape's site names no placement it holds (path `site.on`) |
+| `landscape_site_no_top_land` | A landscape's site names a placement whose volume states no top land (path `site.on`) |
+| `landscape_site_outside_top` | A site on a volume's top does not lie inside its square, or not at whole metres (path `site.at_mm` in a landscape) |
 | `landscape_site_top_has_sea` | A site is graded on a top whose land has a shore |
 | `landscape_arrival_not_ground` | The arrival a landscape's surfaces are reached from is not walkable ground |
 

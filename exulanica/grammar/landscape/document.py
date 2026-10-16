@@ -17,6 +17,15 @@ near the world: the extent and the ring of land chunks round it that the land re
 site's edge (``landscape_outside_near_land``); ids are unique; the finest cell is one the volume
 realizer meshes at.
 
+**A site on a volume's top** (landscape catalog version 2 and later): ``site`` states ``on``, the
+id of a placement whose volume states a top land, ``at_mm``, the site's south-west corner east and
+north in that volume's own frame, in whole metres and inside the top land's square, and
+optionally ``cut_fill_mm``, the deepest its grading may cut or fill. Refused by path under
+``site``: a placement it does not name (``landscape_site_unknown_placement``), a volume with no top
+land (``landscape_site_no_top_land``), a corner off the square or the lattice
+(``landscape_site_outside_top``), and every value outside its bound. Canonical form writes ``site``
+only where it is stated, so a landscape without one keeps the identity it had.
+
 **Defaults are written in**, and every piece is carried whole with its digest, so one volume placed
 twice is the same document twice and a world rebuilds from its receipt alone. Its identity is the
 SHA-256 of its canonical JSON. Its volumes are read against the volume catalogs of one version of
@@ -27,13 +36,14 @@ records so its volumes are realized by the same rules.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.grammar.documents import parse_json
 from exulanica.grammar.landform import (
+    CELL_MM,
     LandDocument,
     LandformRefused,
     WorldFrame,
@@ -58,15 +68,18 @@ __all__ = [
     "PROFILE",
     "LandscapeDocument",
     "LandscapeRefused",
+    "LandscapeSite",
     "Placement",
     "read_landscape_document",
 ]
 
 PROFILE: Final = "exulanica.landscape/v1"
 _REQUIRED: Final = frozenset({"profile", "extent_mm", "land"})
-_OPTIONAL: Final = frozenset({"volumes", "finest_cell_mm"})
+_OPTIONAL: Final = frozenset({"volumes", "finest_cell_mm", "site"})
 _PLACEMENT_REQUIRED: Final = frozenset({"id", "volume", "at_mm"})
 _PLACEMENT_OPTIONAL: Final = frozenset({"yaw_mdeg", "volume_sha256"})
+_SITE_REQUIRED: Final = frozenset({"on", "at_mm"})
+_SITE_OPTIONAL: Final = frozenset({"cut_fill_mm"})
 
 
 class LandscapeRefused(ValueError):
@@ -88,6 +101,16 @@ class Placement:
 
 
 @dataclass(frozen=True, slots=True)
+class LandscapeSite:
+    """Where a site is laid out on a placed volume's top: the placement's id, the site's south-west
+    corner in that volume's own frame, and the deepest its grading may cut or fill."""
+
+    on: str
+    at_mm: tuple[int, int]
+    cut_fill_mm: int
+
+
+@dataclass(frozen=True, slots=True)
 class LandscapeDocument:
     extent_mm: tuple[int, int]
     land: LandDocument
@@ -97,6 +120,8 @@ class LandscapeDocument:
     sha256: str
     #: The volume rules its volumes were read against and are realized by.
     volume_rules: int
+    #: The site laid out on a placed volume's top, or None where a site stands on the land.
+    site: LandscapeSite | None = None
 
     def canonical(self) -> dict[str, Any]:
         return parse_json(self.canonical_bytes.decode(), PROFILE)
@@ -176,6 +201,51 @@ def _placement(
     return Placement(id=placement_id, volume=volume, at_mm=(x, y, z), yaw_mdeg=yaw)
 
 
+def _site(raw: object, catalog: LandscapeCatalog, placements: Sequence[Placement]) -> LandscapeSite:
+    bounds = catalog.values_of("site")
+    if not bounds:
+        raise LandscapeRefused(
+            "a site on a volume's top is read against landscape catalog version 2 or later",
+            path="site",
+        )
+    if (
+        not isinstance(raw, dict)
+        or not _SITE_REQUIRED <= set(raw) <= _SITE_REQUIRED | _SITE_OPTIONAL
+    ):
+        keys = sorted(raw) if isinstance(raw, dict) else type(raw).__name__
+        raise LandscapeRefused(
+            f"a site has {sorted(_SITE_REQUIRED)} and may have {sorted(_SITE_OPTIONAL)}, "
+            f"got {keys}",
+            path="site",
+        )
+    named = raw["on"]
+    placement = next((p for p in placements if p.id == named), None)
+    if placement is None:
+        raise LandscapeRefused(
+            f"a site stands on a placed volume; no placement is {named!r}",
+            path="site.on",
+            code="landscape_site_unknown_placement",
+        )
+    top = placement.volume.top_land
+    if top is None:
+        raise LandscapeRefused(
+            f"{named}'s volume states no top land, so no site stands on it",
+            path="site.on",
+            code="landscape_site_no_top_land",
+        )
+    east, north = _stated(raw, "at_mm", bounds["at_mm"], "site.at_mm")
+    (cut_fill,) = _stated(raw, "cut_fill_mm", bounds["cut_fill_mm"], "site.cut_fill_mm")
+    half = top.side_mm // 2
+    if east % CELL_MM or north % CELL_MM or not (-half <= east < half and -half <= north < half):
+        raise LandscapeRefused(
+            f"a site's corner stands at whole metres inside {named}'s top land, {-half} to "
+            f"{half} east and north of its origin, got ({east}, {north})",
+            path="site.at_mm",
+            code="landscape_site_outside_top",
+        )
+    return LandscapeSite(on=named, at_mm=(east, north), cut_fill_mm=cut_fill)
+
+
 def read_landscape_document(
     raw: object, catalog: LandscapeCatalog | None = None, *, volume_rules: int | None = None
 ) -> LandscapeDocument:
@@ -221,7 +291,8 @@ def read_landscape_document(
         if any(placement.id == other.id for other in placements):
             raise LandscapeRefused(f"id {placement.id} is used twice", path=f"volumes[{index}].id")
         placements.append(placement)
-    canonical = {
+    site = _site(raw["site"], catalog, placements) if "site" in raw else None
+    canonical: dict[str, Any] = {
         "profile": PROFILE,
         "extent_mm": [width, depth],
         "land": land.canonical(),
@@ -237,6 +308,12 @@ def read_landscape_document(
             for placement in placements
         ],
     }
+    if site is not None:
+        canonical["site"] = {
+            "on": site.on,
+            "at_mm": list(site.at_mm),
+            "cut_fill_mm": site.cut_fill_mm,
+        }
     encoded = canonical_json(canonical)
     return LandscapeDocument(
         extent_mm=(width, depth),
@@ -246,4 +323,5 @@ def read_landscape_document(
         canonical_bytes=encoded,
         sha256=hashlib.sha256(encoded).hexdigest(),
         volume_rules=rules,
+        site=site,
     )

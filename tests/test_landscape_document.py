@@ -31,7 +31,8 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "landscape"
 
 #: Every shipped landscape catalog, byte for byte: a change is a new file and a new rules version.
 SHIPPED = {
-    "landscape-value.v1.json": "9a387c2766f5ed92954046395bff4946fad94e846d78e2e5d48690b182ba1b7e"
+    "landscape-value.v1.json": "9a387c2766f5ed92954046395bff4946fad94e846d78e2e5d48690b182ba1b7e",
+    "landscape-value.v2.json": "94412b33b0ea0b352f919f497b7d534c9d6db1b38dc1acf84dd798c8db5afd14",
 }
 #: Each landscape rules version: its catalog digest and the volume rules version it names.
 RULES = {
@@ -50,6 +51,12 @@ RULES = {
     3: {
         "catalogs": {
             "landscape-value.v1": "26c04b3bae0d03b02fe1544cbdda2722f61036d6d7b4a6f1dbccd217e968bf31"
+        },
+        "volume_rules": 3,
+    },
+    4: {
+        "catalogs": {
+            "landscape-value.v2": "7d49ac01f0a6d2944a7aca1818d9a235e229f200807db4d1bd145c0e7e637b77"
         },
         "volume_rules": 3,
     },
@@ -206,7 +213,7 @@ def test_the_landscape_rules_name_the_catalog_and_the_volume_rules():
     "named",
     [
         None,
-        {**landscape_rules(), "version": 4},
+        {**landscape_rules(), "version": 5},
         {**landscape_rules(), "volume_rules": {"version": 2, "catalogs": {}}},
         {**landscape_rules(2), "volume_rules": volume_rules(1)},
         {**landscape_rules(), "catalogs": {"landscape-value.v1": "0" * 64}},

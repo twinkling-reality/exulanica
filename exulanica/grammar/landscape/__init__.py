@@ -36,6 +36,7 @@ from exulanica.grammar.landscape.document import (
     PROFILE,
     LandscapeDocument,
     LandscapeRefused,
+    LandscapeSite,
     Placement,
     read_landscape_document,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "LandscapeCatalog",
     "LandscapeDocument",
     "LandscapeRefused",
+    "LandscapeSite",
     "LandscapeSurfaces",
     "PlacedVolume",
     "Placement",

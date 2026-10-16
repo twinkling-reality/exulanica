@@ -4,7 +4,8 @@ One reviewed file, ``assets/catalogs/landscape/landscape-value.vN.json``, read t
 grammar's catalog loader with the volume value schema (:func:`~exulanica.grammar.volumes.catalog.
 value_schema`): each entry is ``<owner>_<value>`` with its minimum, maximum, default, whether it
 must be stated, how many whole numbers it is, and a reason and a licence. The owners are
-``landscape`` (the document itself) and ``placement`` (each volume it places).
+``landscape`` (the document itself), ``placement`` (each volume it places) and, from version 2,
+``site`` (a site laid out on a placed volume's top).
 
 A catalog changes only by a new version, and a later version keeps every entry of the one before
 it. Read on first use, never at import, and kept for the process.
@@ -39,9 +40,9 @@ CATALOG_DIRECTORY: Final = (
 )
 #: Every version of the landscape catalog this code reads, and the newest, which reads new
 #: landscapes.
-CATALOG_VERSIONS: Final = (1,)
-CATALOG_VERSION: Final = 1
-OWNERS: Final = ("landscape", "placement")
+CATALOG_VERSIONS: Final = (1, 2)
+CATALOG_VERSION: Final = 2
+OWNERS: Final = ("landscape", "placement", "site")
 #: The values the reader states by name; a catalog without one of them is refused at loading.
 _NAMED: Final = (
     ("landscape", "extent_mm"),

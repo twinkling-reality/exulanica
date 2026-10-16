@@ -1,0 +1,140 @@
+{
+ "schema_version": 1,
+ "catalog_id": "landscape-value",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "landscape_extent_mm",
+   "owner": "landscape",
+   "value": "extent_mm",
+   "minimum": 32000,
+   "maximum": 1024000,
+   "default": 256000,
+   "required": 1,
+   "count": 2,
+   "words": [],
+   "reason": "Authored: the world's extent east and north from its south-west corner, from 32 m to 1 km; the land is realized over it and one ring of land chunks round it.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  },
+  {
+   "key": "landscape_volumes",
+   "owner": "landscape",
+   "value": "volumes",
+   "minimum": 0,
+   "maximum": 64,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the most volumes one landscape places, a budget for realizing it; none is land alone.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  },
+  {
+   "key": "landscape_finest_cell_mm",
+   "owner": "landscape",
+   "value": "finest_cell_mm",
+   "minimum": 500,
+   "maximum": 4000,
+   "default": 2000,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the finest cell its volumes are meshed at; every coarser level of the realizer is meshed too, so a page can draw far volumes coarsely. 2 m by default, since finer levels cost tens of seconds a volume.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  },
+  {
+   "key": "placement_at_mm",
+   "owner": "placement",
+   "value": "at_mm",
+   "minimum": -200000,
+   "maximum": 1024000,
+   "default": 0,
+   "required": 1,
+   "count": 3,
+   "words": [],
+   "reason": "Authored: where a volume's own origin stands in the world, east and north on the land near it (the extent and the ring of land chunks round it), and up from the sea's level (a sea stack's foot may stand below it).",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  },
+  {
+   "key": "placement_yaw_mdeg",
+   "owner": "placement",
+   "value": "yaw_mdeg",
+   "minimum": 0,
+   "maximum": 359999,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: a volume's turn counterclockwise seen from above; volumes stand upright, so a placement only turns them.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  },
+  {
+   "key": "site_at_mm",
+   "owner": "site",
+   "value": "at_mm",
+   "minimum": -64000,
+   "maximum": 64000,
+   "default": 0,
+   "required": 1,
+   "count": 2,
+   "words": [],
+   "reason": "Authored: where a site laid out on a volume's top stands, its south-west corner east and north in the volume's own frame, in whole metres; within half the widest top land a volume states (128 m, volume catalog version 3).",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  },
+  {
+   "key": "site_cut_fill_mm",
+   "owner": "site",
+   "value": "cut_fill_mm",
+   "minimum": 500,
+   "maximum": 4000,
+   "default": 2000,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the deepest a site's grading may cut into or fill above a volume's top land. The top is rock with land on it, so it is graded far less than the ground's 8 m: 2 m by default, from half a metre to 4 m.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  }
+ ]
+}
