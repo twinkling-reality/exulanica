@@ -308,9 +308,10 @@ def test_a_seed_never_carries_the_sentence_a_world_was_made_from(seeded, store, 
             ("exulanica.world_draft_starts_maximum", "5"),
         ):
             admin.execute("select set_config(%s, %s, true)", (name, value))
+        # A draft that made its world has ended: its job is done.
         job = admin.execute(
-            "insert into job (workspace_id, kind, payload) values (%s, 'world_draft', %s) "
-            "returning job_id",
+            "insert into job (workspace_id, kind, payload, state, completed_at) "
+            "values (%s, 'world_draft', %s, 'done', now()) returning job_id",
             (holder, Jsonb({"draft_id": str(draft_id), "world_id": world_id})),
         ).fetchone()["job_id"]
         admin.execute(
@@ -522,6 +523,74 @@ def test_a_workspace_with_an_unfinished_creature_draft_is_refused(seeded, store,
         raise psycopg.Rollback()
     assert not admin.execute(
         "select 1 from creature_draft where workspace_id = %s", (holder,)
+    ).fetchall()
+
+
+def test_a_workspace_with_a_world_draft_still_being_made_is_refused(seeded, store, tmp_path):
+    """Until a world draft ends, its job is queued or running and world_draft_input holds the
+    person's sentence: either refuses the export. The same workspace with the job done and the input
+    forgotten, as 0207 forgets it, is carried (the positive control).
+
+    The rows are written for a new workspace inside a savepoint that is rolled back, and the shared
+    schema keeps none of them.
+    """
+    holder, actor, draft_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    world_id = f"world:generated:{draft_id}"
+    admin = seeded.connection
+
+    def refused(name):
+        with pytest.raises(SeedRefused, match="world draft still being made"):
+            export_seed(
+                admin,
+                store,
+                workspace_id=holder,
+                destination=tmp_path / name,
+                created_at=_CREATED_AT,
+            )
+        assert not (tmp_path / name).exists()
+
+    with admin.transaction():
+        for name, value in (
+            ("exulanica.workspace_id", str(holder)),
+            ("exulanica.world_draft_actor", str(actor)),
+            ("exulanica.world_draft_starts_maximum", "5"),
+        ):
+            admin.execute("select set_config(%s, %s, true)", (name, value))
+        job = admin.execute(
+            "insert into job (workspace_id, kind, payload) values (%s, 'world_draft', %s) "
+            "returning job_id",
+            (holder, Jsonb({"draft_id": str(draft_id), "world_id": world_id})),
+        ).fetchone()["job_id"]
+        admin.execute(
+            "insert into world_draft_start (workspace_id, draft_id, request_id, actor_id, job_id, "
+            "world_id, guest) values (%s, %s, %s, %s, %s, %s, false)",
+            (holder, draft_id, uuid.uuid4(), actor, job, world_id),
+        )
+        refused("queued")  # A queued job alone: half-done work.
+        admin.execute(
+            "insert into world_draft_input (workspace_id, draft_id, description) "
+            "values (%s, %s, %s)",
+            (holder, draft_id, "a harbour town with a fish market"),
+        )
+        admin.execute(
+            "update job set state = 'done', completed_at = now() where job_id = %s", (job,)
+        )
+        refused("words")  # The job ended, the sentence not yet forgotten: the person's words.
+        # The draft ends: its input forgotten (0207's world_draft_forget_input).
+        admin.execute("set local session_replication_role = replica")
+        admin.execute("delete from world_draft_input where workspace_id = %s", (holder,))
+        admin.execute("set local session_replication_role = origin")
+        export_seed(
+            admin,
+            store,
+            workspace_id=holder,
+            destination=tmp_path / "carried",
+            created_at=_CREATED_AT,
+        )
+        assert (tmp_path / "carried" / "manifest.json").exists()
+        raise psycopg.Rollback()
+    assert not admin.execute(
+        "select 1 from world_draft_start where workspace_id = %s", (holder,)
     ).fetchall()
 
 

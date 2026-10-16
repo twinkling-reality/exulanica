@@ -692,7 +692,8 @@ person who started it) answers it as `description`. It is the person's own words
 workspace alone, deleted with the world's erasure or the workspace's, and never part of a world
 package, a reviewer seed or a world's project: a source test holds that nothing in
 `exulanica/world_package` reads it, and the reviewer seed (`exulanica-seed`) classifies its table
-as one it never carries. A draft that made no world keeps nothing of the sentence. Progress and result records retain selected
+as one it never carries. The seed also refuses a workspace with a draft still being made, whose
+input and job it would otherwise carry. A draft that made no world keeps nothing of the sentence. Progress and result records retain selected
 omission/look/setting phrases for readback until world or workspace erasure. Those erasures
 cancel work, delete draft content and clear its job payload; start timing and financial identifiers
 remain without a content fingerprint. A backup restore reapplies those erasures and grants no

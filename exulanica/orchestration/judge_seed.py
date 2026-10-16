@@ -788,6 +788,29 @@ def _refuse_unfinished_creature_drafts(
         )
 
 
+def _refuse_unfinished_world_drafts(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> None:
+    """A workspace with a world draft still being made cannot be seeded.
+
+    Until a draft ends, ``world_draft_input`` holds the sentence the person typed and its job is
+    queued or running (migration 0207): a seed would carry the words, and the half-done job to
+    another server, where a worker could pick it up. An ended draft keeps no input (a made world's
+    sentence stays home in ``world_made_from``, which no seed carries), and is carried as it is.
+    """
+    held = connection.execute(
+        "select (select count(*) from world_draft_input where workspace_id = %(w)s)"
+        "     + (select count(*) from job where workspace_id = %(w)s and kind = 'world_draft'"
+        "         and state in ('queued', 'running')) as n",
+        {"w": workspace_id},
+    ).fetchone()
+    if held["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} has a world draft still being made, which holds the words "
+            "it was asked with; a seed cannot carry them, so let it end first"
+        )
+
+
 def _refuse_generated_outputs(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
     """A workspace holding outputs of generated pieces cannot be seeded: the pieces' bytes live in
     the shared generated-pieces namespace, which a seed does not carry, so a destination would hold
@@ -843,6 +866,7 @@ def export_seed(
     _refuse_private_workspace_style_packs(connection, workspace_id)
     _refuse_open_piece_requests(connection, workspace_id)
     _refuse_unfinished_creature_drafts(connection, workspace_id)
+    _refuse_unfinished_world_drafts(connection, workspace_id)
     _refuse_generated_outputs(connection, workspace_id)
 
     buckets = classify_tables(connection)
