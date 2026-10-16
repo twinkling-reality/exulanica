@@ -19,10 +19,11 @@ import { swatchMaterial } from './swatch-material.js';
  * axis, stretches a stated zone so a frame keeps its bars whatever the hole, or repeats a stated
  * zone so a building keeps its bays and storeys whatever its box; a tiled family repeats the piece
  * along the width. A building slot that states its storey height repeats up a copy a storey of its
- * drawing. A repeated zone is baked copy by copy: each triangle belongs, by its centroid, to
- * the part below the zone, the zone or the part above it on each repeating axis (the server holds
- * every triangle to one part), and a triangle of the zone is copied once for each copy. A slot whose
- * copies would bake more triangles than the drawing's `repeatedTrianglesMost` keeps its primitive.
+ * drawing, and one that states its arcade's bays repeats across a copy a bay. A repeated zone is
+ * baked copy by copy: each triangle belongs, by its centroid, to the part below the zone, the zone
+ * or the part above it on each repeating axis (the server holds every triangle to one part), and a
+ * triangle of the zone is copied once for each copy. A slot whose copies would bake more triangles
+ * than the drawing's `repeatedTrianglesMost` keeps its primitive.
  *
  * Every slot's piece is moved into place here, once, and the triangles of every slot that share a
  * swatch become one mesh, so a town's six hundred windows are a draw per swatch. Normals follow each
@@ -56,6 +57,8 @@ export interface PieceSlot {
   readonly drape?: true;
   /** A building's own storey height, where its drawing states one: a piece that repeats up draws a copy a storey. */
   readonly storeyHeightMm?: number;
+  /** A building's arcade bays, where its drawing states an arcade: a piece that repeats across draws a copy a bay. */
+  readonly arcadeBays?: number;
 }
 
 export interface SlotDressing {
@@ -189,6 +192,7 @@ export function dressSlots(
     const dressing = resolveLookRole(pack, {
       identity: slot.identity, lookRole: slot.lookRole, positionMm: slot.positionMm, yawQuarterTurns: 0, boxMm: slot.boxMm,
       ...(slot.storeyHeightMm === undefined ? {} : { storeyHeightMm: slot.storeyHeightMm }),
+      ...(slot.arcadeBays === undefined ? {} : { arcadeBays: slot.arcadeBays }),
     }, families, 'module');
     const module = dressing?.kind === 'module' ? pack.modules[dressing.role] : undefined;
     const piece = dressing?.kind === 'module' && module !== undefined ? pieces.get(module, dressing.file) : undefined;

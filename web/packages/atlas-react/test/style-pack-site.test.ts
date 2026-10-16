@@ -472,7 +472,7 @@ describe('a building a pack dresses with one piece', () => {
   });
 });
 
-describe('a building whose drawing states its storeys, dressed with a piece that repeats its storey', () => {
+describe('a building whose drawing states its storeys or its arcade, dressed with a piece that repeats them', () => {
   // Appearance catalog version 3, where a structure fills its box.
   const V3 = JSON.parse(readFileSync('../assets/catalogs/world-kinds/look-family.v3.json', 'utf8')) as typeof CATALOG;
   const filling = new Map<string, LookFamily>(V3.entries.map((entry) => [entry.key, {
@@ -480,21 +480,29 @@ describe('a building whose drawing states its storeys, dressed with a piece that
   }]));
   /** One 1 m storey of a 6 m front, 2 m before the piece's middle: the whole of its height repeats. */
   const STOREY = paletteGlb([{ points: [[-3, 0, 2], [3, 0, 2], [3, 1, 2], [-3, 1, 2]], normal: [0, 0, 1], srgb: LEAF }]);
-  const storeyPack = (): ResolvedStylePack => {
+  /** A 3.6 m front 2 m wide, 2 m before the piece's middle: a 1.6 m bay between 200 mm end walls, cut at the bay's edges. */
+  const BAY = paletteGlb([[-1, -0.8], [-0.8, 0.8], [0.8, 1]].map(([x0, x1]) => ({ points: [[x0!, 0, 2], [x1!, 0, 2], [x1!, 3.6, 2], [x0!, 3.6, 2]], normal: [0, 0, 1], srgb: LEAF })));
+  type Variant = { readonly bytes: Uint8Array<ArrayBuffer>; readonly size: readonly number[]; readonly repeat: readonly (readonly number[] | null)[] };
+  const STOREYED: Variant = { bytes: STOREY, size: [6000, 4000, 1000], repeat: [null, null, [0, 1000]] };
+  const BAYED: Variant = { bytes: BAY, size: [2000, 4000, 3600], repeat: [[200, 1800], null, null] };
+  const piecePack = (variant: Variant): ResolvedStylePack => {
     const manifest = structuredClone(CASES.cases.find((c: { name: string }) => c.name === 'a complete pack with no base').manifest);
     manifest['palette'].swatches.push({ key: 'leaf', srgb8: [...LEAF], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 });
     manifest['surfaces'] = { 'wall.default': { swatch: 'cream', up: null } };
     manifest['modules'] = {
-      'structure.default': { variants: [{ file: 'pieces/storey.glb', lod1: null, size_mm: [6000, 4000, 1000], stretch_mm: [null, null, null], repeat_mm: [null, null, [0, 1000]] }] },
+      'structure.default': { variants: [{ file: 'pieces/building.glb', lod1: null, size_mm: variant.size, stretch_mm: [null, null, null], repeat_mm: variant.repeat }] },
     };
-    manifest['files'] = [{ path: 'pieces/storey.glb', sha256: createHash('sha256').update(STOREY).digest('hex'), bytes: STOREY.byteLength, media_type: 'model/gltf-binary' }];
+    manifest['files'] = [{ path: 'pieces/building.glb', sha256: createHash('sha256').update(variant.bytes).digest('hex'), bytes: variant.bytes.byteLength, media_type: 'model/gltf-binary' }];
     return resolveStylePack([readStylePackManifest(manifest, { families: filling, textureSets: new Set<string>(CASES.context.texture_sets) })]);
   };
-  /** The heights, in metres, at which the hall's piece draws its storey lines, with or without the storey height it states. */
-  const storeyLines = async (stated: boolean): Promise<number[]> => {
-    const pack = storeyPack();
-    const pieces = await fetchPackPieces(pack, ['structure.default'], TABLE, async () => STOREY);
-    const hall = { ...slot('hall', 'structure.hall', 'none', [6000, 8000, 0], 0, [6000, 4000, 3600]), ...(stated ? { storeyHeightMm: 1200 } : {}) };
+  /**
+   * Where a 6 m by 4 m by 3.6 m hall's piece draws its lines along one renderer axis (0 east, 1
+   * up), in metres, with what its own slot states.
+   */
+  const linesOf = async (variant: Variant, stated: Readonly<Record<string, number>>, axis: 0 | 1): Promise<number[]> => {
+    const pack = piecePack(variant);
+    const pieces = await fetchPackPieces(pack, ['structure.default'], TABLE, async () => variant.bytes);
+    const hall = { ...slot('hall', 'structure.hall', 'none', [6000, 8000, 0], 0, [6000, 4000, 3600]), ...stated };
     const site = parseStructuredSiteDrawing({
       profile: 'exulanica.site-drawing/v1', world_id: 'world-storeys', receipt_sha256: 'a'.repeat(64),
       kind: { kind: 'fixture_hall', version: 1, label: 'Hall' },
@@ -513,7 +521,7 @@ describe('a building whose drawing states its storeys, dressed with a piece that
         const render = (drawn.root.findByName('style-pack:pieces') as pc.Entity).render!;
         const positions: number[] = [];
         render.meshInstances.find((instance) => instance.material.name === 'style-pack:swatch:leaf')!.mesh.getPositions(positions);
-        lines = [...new Set(positions.filter((_, i) => i % 3 === 1).map((up) => Math.round(up * 1000)))].sort((a, b) => a - b).map((mm) => mm / 1000);
+        lines = [...new Set(positions.filter((_, i) => i % 3 === axis).map((value) => Math.round(value * 1000)))].sort((a, b) => a - b).map((mm) => mm / 1000);
         return undress;
       },
     });
@@ -523,8 +531,17 @@ describe('a building whose drawing states its storeys, dressed with a piece that
 
   it('draws a copy for each of the storeys the drawing states, on the drawing\'s storey lines', async () => {
     // 3.6 m in three 1200 mm storeys: three copies at 1200 per mille, where the piece's own 1 m storey alone draws four of 900 mm.
-    expect(await storeyLines(true)).toEqual([0, 1.2, 2.4, 3.6]);
-    expect(await storeyLines(false)).toEqual([0, 0.9, 1.8, 2.7, 3.6]);
+    expect(await linesOf(STOREYED, { storeyHeightMm: 1200 }, 1)).toEqual([0, 1.2, 2.4, 3.6]);
+    expect(await linesOf(STOREYED, {}, 1)).toEqual([0, 0.9, 1.8, 2.7, 3.6]);
+  });
+
+  it('draws a copy for each of the arcade\'s bays, on the served bays between the end walls', async () => {
+    // The hall spans 3 m to 9 m east; its arcade's three bays share the 5.6 m between its 200 mm end
+    // walls, as the site lays out its arches: copies at 1167 per mille, where the piece's own 1.6 m
+    // bay alone draws four of 1.4 m.
+    const served = [0, 1, 2, 3].map((k) => Math.round(3200 + (5600 * k) / 3) / 1000);
+    expect(await linesOf(BAYED, { arcadeBays: 3, loggiaDepthMm: 1500 }, 0)).toEqual([3, ...served, 9]);
+    expect(await linesOf(BAYED, {}, 0)).toEqual([3, 3.2, 4.6, 6, 7.4, 8.8, 9]);
   });
 });
 

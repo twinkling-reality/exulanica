@@ -174,12 +174,16 @@ meets a 20 m box with five bays at 989 per mille. Up a building whose drawing st
 height, the count is instead the one whose copy is nearest that storey by ratio: each copy is
 exactly a storey tall where what lies below and above the zone is a whole number of storeys (a zone
 spanning the piece's height draws one copy for each of the building's storeys), and otherwise as
-near it as a whole number of copies allows; where those copies fall outside the family's bounds,
-and in a drawing that states no storey height, the count is the one above. A variant with no
-`repeat_mm` repeats nothing, and its manifest keeps its bytes. Every triangle of a repeating piece lies wholly below, inside or
-above each zone on its axis (the check holds this, section 11), so the page assigns each triangle
-by its centroid and the copies join without a crack; a triangle of two zones is drawn once for
-every pair of copies. A normal in a copy turns by the inverse of the copy's scale.
+near it as a whole number of copies allows. Across a building whose drawing states its arcade's
+bays, the count is those bays: the arcade spans the front between its 200 mm end walls in equal
+bays, so each copy is exactly one of them where what lies before and after the zone is 200 mm each,
+and otherwise there are as many copies as bays. Where those copies fall outside the family's bounds,
+and along an axis the drawing gives no count for, the count is the one above. A variant with no
+`repeat_mm` repeats nothing, and its manifest keeps its bytes. Every triangle of a repeating piece
+lies wholly below, inside or above each zone on its axis (the check holds this, section 11), so the
+page assigns each triangle by its centroid and the copies join without a crack; a triangle of two
+zones is drawn once for every pair of copies. A normal in a copy turns by the inverse of the
+copy's scale.
 
 ## 4. Palette and colour
 

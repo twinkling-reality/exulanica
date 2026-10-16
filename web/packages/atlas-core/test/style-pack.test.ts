@@ -283,6 +283,28 @@ describe('fitting a piece to a slot', () => {
     expect(fit(fill, [5000, 100, 2000], [20000, 100, 9400], [null, null, null], [[600, 4400], null, [500, 1500]], 4700)!.repeat[0])
       .toMatchObject({ copies: 5 });
   });
+  it('repeats across a copy a bay where the building states its arcade\'s bays, else as before', () => {
+    // A 12 m front's arcade: four bays of 2900 mm between its 200 mm end walls. A 2.4 m bay between
+    // 200 mm ends draws four copies, each exactly a served bay, where alone it takes five.
+    const across = [[200, 2600], null, null] as const;
+    const arcaded = fit(fill, [2800, 100, 2000], [12000, 100, 2000], [null, null, null], across, undefined, 4)!.repeat[0]!;
+    expect(arcaded.copies).toBe(4);
+    expect(arcaded.scale * 2400).toBeCloseTo(2900, 9);
+    expect(fit(fill, [2800, 100, 2000], [12000, 100, 2000], [null, null, null], across)!.repeat[0]).toMatchObject({ copies: 5 });
+    // The 3.8 m bay of a 20 m front takes the stated bays whichever way they lie from its own five.
+    const wide = [[600, 4400], null, null] as const;
+    expect(fit(fill, [5000, 100, 2000], [20000, 100, 2000], [null, null, null], wide, undefined, 4)!.repeat[0]).toMatchObject({ copies: 4 });
+    expect(fit(fill, [5000, 100, 2000], [20000, 100, 2000], [null, null, null], wide, undefined, 6)!.repeat[0]).toMatchObject({ copies: 6 });
+    // Three bays would stretch each copy past the bound: the piece keeps its own count.
+    expect(fit(fill, [5000, 100, 2000], [20000, 100, 2000], [null, null, null], wide, undefined, 3))
+      .toEqual(fit(fill, [5000, 100, 2000], [20000, 100, 2000], [null, null, null], wide));
+    // Seventy bays are past the profile's most copies: the piece keeps its own count, the most.
+    expect(fit(fill, [300, 100, 2000], [7200, 100, 2000], [null, null, null], [[100, 200], null, null], undefined, 70)!.repeat[0])
+      .toMatchObject({ copies: STYLE_PACK_MAX_REPEAT_COPIES });
+    // Bays count only across: a 6 m storey repeat keeps its five storeys with four bays stated.
+    expect(fit(fill, [5000, 100, 2000], [5000, 100, 6000], [null, null, null], [null, null, [500, 1500]], undefined, 4)!.repeat[1])
+      .toMatchObject({ copies: 5, scale: 1 });
+  });
   it('places each part of a repeated axis: below in place, each copy along, above after the last', () => {
     const repeat = { low: 600, high: 4400, copies: 5, scale: 18800 / 19000, box: 20000 };
     expect([0, 599, 600, 4400, 4401].map((p) => repeatPart(repeat, p))).toEqual([-1, -1, 0, 0, 1]);

@@ -1232,6 +1232,11 @@ export interface StyleSlot {
    * piece that repeats up draws a copy a storey (`fit`). Absent on every other slot.
    */
   readonly storeyHeightMm?: number;
+  /**
+   * The bays of the building's arcade, where its drawing states one: a piece that repeats across
+   * draws a copy a bay (`fit`). Absent on every other slot.
+   */
+  readonly arcadeBays?: number;
 }
 
 export type Dressing =
@@ -1309,15 +1314,15 @@ export function repeatCoordinate(repeat: AxisRepeat, p: number, part: -1 | 0 | 1
 
 /**
  * How many copies of a zone `length` long fill `room`, each scaled alike, at most
- * `STYLE_PACK_MAX_REPEAT_COPIES`: where a building's `storey` height is given, the count whose copy
- * is nearest the storey by ratio, so the copies follow the drawing's storeys; else, or where
- * those copies fall outside the family's bounds, the count whose scale is nearest 1 by ratio. The
- * fewer on a tie either way; null when no count leaves the copies within the family's bounds.
+ * `STYLE_PACK_MAX_REPEAT_COPIES`: the count a building's drawing gives (`stated`), so the copies
+ * follow its storeys or its arcade's bays; else, or where those copies fall outside the family's
+ * bounds, the count whose scale is nearest 1 by ratio (the fewer on a tie); null when no count
+ * leaves the copies within the family's bounds.
  */
-function repeatCopies(family: LookFamily, room: number, length: number, storey?: number): { readonly copies: number; readonly scale: number } | null {
+function repeatCopies(family: LookFamily, room: number, length: number, stated?: number): { readonly copies: number; readonly scale: number } | null {
   if (!(room > 0)) return null;
-  for (const unit of storey === undefined ? [length] : [storey, length]) {
-    const copies = nearestCount(room, unit);
+  const counts = stated !== undefined && stated >= 1 && stated <= STYLE_PACK_MAX_REPEAT_COPIES ? [stated, nearestCount(room, length)] : [nearestCount(room, length)];
+  for (const copies of counts) {
     const scale = room / (copies * length);
     if (scale * 1000 >= family.fillMinimumPermille && scale * 1000 <= family.fillMaximumPermille) return { copies, scale };
   }
@@ -1382,7 +1387,7 @@ export function resolveLookRole(
       for (let step = 0; step < count; step += 1) {
         const index = (first + step) % count;
         const variant = module.variants[index]!;
-        const fitted = fit(kind, variant.size_mm, slot.boxMm, variant.stretch_mm, variant.repeat_mm, slot.storeyHeightMm);
+        const fitted = fit(kind, variant.size_mm, slot.boxMm, variant.stretch_mm, variant.repeat_mm, slot.storeyHeightMm, slot.arcadeBays);
         if (fitted === null) continue;
         return {
           kind: 'module', role, variant: index,
@@ -1402,8 +1407,8 @@ export function resolveLookRole(
  * variant states one, every copy within the family's bounds, by its stretch zone where it states
  * one and the box leaves the zone some length, else by scaling within the family's bounds; copies
  * along the width, each scaled to share it exactly (tile). Up a building whose drawing states its
- * `storeyMm`, a repeat draws a copy a storey (`repeatCopies`). Scales, stretches and repeats are on
- * glTF axes: x width, y height, z depth.
+ * `storeyMm`, a repeat draws a copy a storey, and across one that states its arcade's `bays`, a copy
+ * a bay (`repeatCopies`). Scales, stretches and repeats are on glTF axes: x width, y height, z depth.
  */
 export function fit(
   family: LookFamily,
@@ -1412,6 +1417,7 @@ export function fit(
   stretch: StylePackVariant['stretch_mm'] = [null, null, null],
   repeat: StylePackVariant['repeat_mm'] = [null, null, null],
   storeyMm?: number,
+  bays?: number,
 ): { readonly scale: readonly [number, number, number]; readonly stretch: AxisStretches; readonly repeat: AxisRepeats; readonly copies: number } | null {
   const [w, d, h] = size;
   const [bw, bd, bh] = box;
@@ -1427,7 +1433,10 @@ export function fit(
         const step = repeat[i]!;
         if (step !== null) {
           const length = step[1] - step[0];
-          const copied = repeatCopies(family, box[i]! - (size[i]! - length), length, i === 2 ? storeyMm : undefined);
+          const room = box[i]! - (size[i]! - length);
+          // The count the building's drawing gives: its arcade's bays across, the count nearest its storey up.
+          const stated = i === 0 ? bays : i === 2 && storeyMm !== undefined ? nearestCount(room, storeyMm) : undefined;
+          const copied = repeatCopies(family, room, length, stated);
           return copied === null ? null : { scale: 1, stretch: null, repeat: { low: step[0], high: step[1], copies: copied.copies, scale: copied.scale, box: box[i]! } };
         }
         const zone = stretch[i]!;

@@ -164,6 +164,7 @@ function pieceSlot(slot: SiteSlot): PieceSlot {
     boxMm: slot.boxMm,
     ...(slot.drape === true ? { drape: true as const } : {}),
     ...(slot.storeyHeightMm === undefined ? {} : { storeyHeightMm: slot.storeyHeightMm }),
+    ...(slot.arcadeBays === undefined ? {} : { arcadeBays: slot.arcadeBays }),
   };
 }
 

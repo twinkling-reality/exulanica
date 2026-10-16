@@ -257,6 +257,19 @@ describe('a piece that repeats its bays and storeys', () => {
     pieces.dispose();
   });
 
+  it('draws a bay a copy where the slot states its building\'s arcade bays', async () => {
+    const host = app();
+    const { pack, pieces } = await loaded(host);
+    // 20 m wide with four arcade bays: four copies at 18.8 / 15.2, where the piece alone draws five.
+    const root = new pc.Entity('root');
+    const dressing = dressSlots(root, [{ ...slot([20_000, 100, 2000]), arcadeBays: 4 }], pack, families, pieces, SHADING);
+    const scale = 18_800 / 15_200;
+    expect(markers(root)).toEqual([0, 1, 2, 3].map((k) => `${(-(-10 + 0.6 + (k * 3.8 + 1.9) * scale)).toFixed(3)},1.000`).sort());
+    expect(Math.max(...corners(root).map(([east]) => east!))).toBeCloseTo(10, 5);
+    dressing.dispose();
+    pieces.dispose();
+  });
+
   it('keeps the primitive for a box narrower than its ends, past the drawing\'s triangles, or a textured piece', async () => {
     const host = app();
     const camera = new pc.Entity('camera');
