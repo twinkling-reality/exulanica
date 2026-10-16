@@ -19,6 +19,7 @@ from types import MappingProxyType
 
 import psycopg
 import pytest
+from exulanica.api.dependencies import holds_as_guest
 from exulanica.canonical import sha256_of_canonical
 from exulanica.world import worlds
 from exulanica.world.saved_entries import SavedWorldEntryRepository
@@ -636,6 +637,81 @@ def test_the_world_list_names_every_world_and_the_policy_and_nothing_of_another_
     stranger = deployment.as_stranger("GET", "/worlds")
     assert stranger.status_code == 200
     assert stranger.json()["worlds"] == []
+
+
+def test_the_world_list_states_the_figure_creation_is_refused_at(
+    deployment, repository, monkeypatch
+):
+    # A deployment that states its own figure: the list says that figure, not the document's, and
+    # creation is refused exactly there, so a client counting from the list is never surprised.
+    monkeypatch.setenv("EXULANICA_WORLDS_HELD", "1")
+    listed = deployment.as_owner("GET", "/worlds")
+    assert listed.status_code == 200, listed.text
+    limits = listed.json()["policy"]["limits"]
+    assert limits[GENERATED] == 1 != WORLD_COUNT_POLICY.limits[GENERATED]
+    assert limits == {kind: WORLD_COUNT_POLICY.limit(kind) for kind in WORLD_COUNT_POLICY.limits}
+    connection, workspace = repository.connection, repository.workspace_id
+    register_world(
+        connection,
+        workspace,
+        world_id=new_world_id(GENERATED),
+        kind=GENERATED,
+        created_by=uuid.uuid4(),
+        reason="the one this deployment allows",
+    )
+    with pytest.raises(WorldLimitReached) as refused:
+        register_world(
+            connection,
+            workspace,
+            world_id=new_world_id(GENERATED),
+            kind=GENERATED,
+            created_by=uuid.uuid4(),
+            reason="one past it",
+        )
+    assert refused.value.limit == limits[GENERATED]
+
+
+def test_a_guest_s_world_list_states_the_guest_s_figure(deployment, repository, monkeypatch):
+    # A guest holds the policy's guest budget: the list read as a guest says that figure, and a
+    # guest's creation is refused exactly there. The caller is made a guest the way the routes
+    # read it, through holds_as_guest (the membership role ``guest``).
+    monkeypatch.setenv("EXULANICA_GUEST_WORLDS_HELD", "1")
+    person = deployment.as_owner("GET", "/worlds")
+    assert person.status_code == 200, person.text
+    # The positive control: the same caller, not a guest, is told the person's figure.
+    assert person.json()["policy"]["limits"][GENERATED] == WORLD_COUNT_POLICY.limit(GENERATED) != 1
+    deployment.client.app.dependency_overrides[holds_as_guest] = lambda: True
+    try:
+        listed = deployment.as_owner("GET", "/worlds")
+    finally:
+        deployment.client.app.dependency_overrides.pop(holds_as_guest)
+    assert listed.status_code == 200, listed.text
+    limits = listed.json()["policy"]["limits"]
+    assert limits[GENERATED] == 1
+    assert limits == {
+        kind: WORLD_COUNT_POLICY.limit(kind, guest=True) for kind in WORLD_COUNT_POLICY.limits
+    }
+    connection, workspace = repository.connection, repository.workspace_id
+    register_world(
+        connection,
+        workspace,
+        world_id=new_world_id(GENERATED),
+        kind=GENERATED,
+        created_by=uuid.uuid4(),
+        reason="the one a guest holds",
+        guest=True,
+    )
+    with pytest.raises(WorldLimitReached) as refused:
+        register_world(
+            connection,
+            workspace,
+            world_id=new_world_id(GENERATED),
+            kind=GENERATED,
+            created_by=uuid.uuid4(),
+            reason="one past a guest's figure",
+            guest=True,
+        )
+    assert refused.value.limit == limits[GENERATED]
 
 
 def test_another_workspace_s_world_answers_exactly_as_an_invented_one(deployment, repository):

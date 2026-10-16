@@ -3,7 +3,9 @@
 Every route that reads or changes a world requires a ``world_id``; this is where a caller learns
 which ids there are. The list comes from the registry (:mod:`exulanica.world.worlds`), oldest
 first, and never from a fixed id. The policy is returned beside it so a client can say how many
-worlds of a kind the workspace may create without restating the number.
+worlds of a kind the workspace may create without restating the number: each kind's figure is the
+one creation is refused at for this caller (:meth:`~exulanica.world.worlds.WorldCountPolicy.limit`),
+a deployment's own where its environment states one and a guest's where the caller is a guest.
 
 A world is created by the path that builds it, which is where the count policy is checked: an
 authored starter (``POST /world-entries/starter``), or the personal-source world composed from the
@@ -30,6 +32,7 @@ from exulanica.api.dependencies import (
     ReadOnlyConnection,
     ScopedConnection,
     get_services,
+    holds_as_guest,
     owns_workspace,
 )
 from exulanica.api.services import Services
@@ -60,7 +63,8 @@ class WorldCountPolicyView(BaseModel):
     policy_id: str
     version: int
     sha256: str
-    #: The most worlds of each kind one workspace may hold; null where the policy sets no limit.
+    #: The most worlds of each kind this caller's workspace may hold, as creation enforces it (a
+    #: deployment's own figure, a guest's); null where the policy sets no limit.
     limits: dict[str, int | None]
 
 
@@ -86,14 +90,20 @@ class WorldsView(BaseModel):
     response_model=WorldsView,
     summary="Every world this workspace holds, with its kind, and how many of each it may hold.",
 )
-def worlds(connection: ReadOnlyConnection, session: CurrentSession) -> WorldsView:
+def worlds(
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    guest: Annotated[bool, Depends(holds_as_guest)],
+) -> WorldsView:
     policy = current_world_count_policy()
     return WorldsView(
         policy=WorldCountPolicyView(
             policy_id=policy.policy_id,
             version=policy.version,
             sha256=policy.sha256,
-            limits=dict(policy.limits),
+            # The figure each creation is refused at (refuse_past_limit asks the same), not the
+            # document's alone: a deployment's environment and a guest's budget both change it.
+            limits={kind: policy.limit(kind, guest=guest) for kind in policy.limits},
         ),
         worlds=[
             WorldView(
