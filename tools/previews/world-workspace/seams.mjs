@@ -65,7 +65,10 @@ export function patchSource(file, code, here) {
     return code.replace(seam('opening first'), `void import('/@fs/${here}/world-opening.ts').then((opening) => opening.mountOpening(), () => {});\n` + seam('opening first'));
   }
   if (file === SELECTION) {
-    return code.replace(seam('picker hook'), '    atlas.__workspacePick = pickedAlong;\n    atlas.__workspaceThings = () => things;\n' + seam('picker hook'));
+    // Build mode mounts the placed things' layer itself where nothing is placed yet, as a society does:
+    // its tray reads the library and draws through that layer.
+    return code.replace(seam('picker hook'), '    atlas.__workspacePick = pickedAlong;\n    atlas.__workspaceThings = () => things;\n'
+      + '    atlas.__workspaceMountThings = () => drawPlacedThings(atlas, regionId, true).then(() => things);\n' + seam('picker hook'));
   }
   return `import { mountContextualWorld } from '/@fs/${here}/contextual-world.ts';
 import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here}/front-door.ts';

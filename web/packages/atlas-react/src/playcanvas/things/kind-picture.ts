@@ -16,9 +16,9 @@
  *
  * Pictures are kept by the kind's digest and their size in device pixels, so a kind is drawn once a
  * size on a page, and asks for a picture still being drawn share that drawing. They are drawn one at
- * a time, so a whole tray asked for at once adds one picture's pass to a frame, not one a tile. A kind that cannot be
- * made, a figure that draws nothing, or a frame that cannot be read answers null, which is not kept,
- * so a later ask tries again.
+ * a time, so a whole tray asked for at once adds one picture's pass to a frame, not one a tile. A
+ * kind that cannot be made, a figure that draws nothing, or a frame that cannot be read answers null,
+ * which is not kept, so a later ask tries again.
  */
 
 import * as pc from 'playcanvas';

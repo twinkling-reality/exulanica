@@ -26,6 +26,7 @@ import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { BUSY, TRAY, buildKeys, createKindLabels, heldRows, keyAction, moveWords, movedNote, namesTogether, nothingInView, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray } from './world-ui-build.ts';
+import { NOTE_WORDS } from './world-words.mjs';
 
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
 const ASK_AFTER_MS = 180;
@@ -56,6 +57,8 @@ const NAMES_EVERY_MS = 200;
 const TILE_PICTURE = { width: 112, height: 84, leastWidth: 96, leastHeight: 72 };
 /** The first tile of the tray, which opens the page's creature maker. */
 const MAKE_TILE = 'make';
+/** How long build mode waits before mounting the placed things' layer again after a mount left no library, in milliseconds. */
+const LAYER_RETRY_MS = 5000;
 
 export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null, people = null, makeCreature = null }) {
   const lifetime = new AbortController();
@@ -118,6 +121,14 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   let reading = null;
   /** The tray's open tab, the made creatures as GET /things/kinds lists them (null until read), and whether the server could be read. */
   let trayTab = 'things', creatures = null, creaturesRead = null, offline = false;
+  /**
+   * The placed things' layer, which the tray reads the library through and draws its pictures and
+   * copies with: the page mounts it once something is placed, and build mode mounts it itself in a
+   * world where nothing is yet (`__workspaceMountThings`, the mount a society uses). A mount that
+   * leaves no library is asked again after a pause; until then the Things tab says the world's own
+   * offline line.
+   */
+  let layerMounting = null, layerUnread = false, layerAskedAt = -Infinity;
   /** Each tile's picture once drawn, by tile id. */
   const pictures = new Map();
   /** What the tray and the held group were last drawn with, so an unchanged state draws nothing again (a drag renders every move). */
@@ -233,7 +244,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** The kinds this world may place as tiles: the shipped library's objects, the latest version of each, in its order. */
   function thingTiles() {
     const library = things()?.layer?.maker?.library ?? null;
-    if (library === null) return null;
+    if (library === null) { mountLayer(); return layerUnread && layerMounting === null ? [] : null; }
+    layerUnread = false;
     const latest = new Map();
     for (const kind of library.list.kinds) {
       if (kind.class === 'object' && (latest.get(kind.kind)?.version ?? 0) < kind.version) latest.set(kind.kind, kind);
@@ -242,6 +254,22 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const named = { kind: kind.kind, version: kind.version, sha256: kind.sha256 };
       return { id: 'kind:' + kind.kind, name: titled(thingName({ kind: named })), kind: named, picture: pictures.get('kind:' + kind.kind) ?? null };
     });
+  }
+  /** Mount the placed things' layer where nothing placed has mounted it, once a pause, and draw the tray again after. */
+  function mountLayer() {
+    if (layerMounting !== null || performance.now() - layerAskedAt < LAYER_RETRY_MS) return;
+    if (typeof b.__workspaceMountThings !== 'function') { layerUnread = true; return; }
+    layerAskedAt = performance.now();
+    layerMounting = Promise.resolve()
+      .then(() => b.__workspaceMountThings())
+      .then(() => {}, () => {})
+      .finally(() => {
+        layerMounting = null;
+        layerUnread = !things()?.layer?.maker?.library;
+        if (lifetime.signal.aborted || !on) return;
+        render();
+        if (layerUnread) window.setTimeout(() => { if (on && !lifetime.signal.aborted) render(); }, LAYER_RETRY_MS);
+      });
   }
   /** The creatures this workspace made as tiles, newest first, each by its own label. */
   function creatureTiles() {
@@ -284,8 +312,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (!on || inspecting() || placingRegion() === null) { trayView.hide(); trayDrawn = ''; return; }
     const tiles = trayTab === 'things' ? thingTiles() : creatureTiles();
     const make = makeCreature ? [{ id: MAKE_TILE, name: TRAY.make, picture: null, make: true }] : [];
-    const drawn = { tab: trayTab, tiles: tiles === null ? null : [...make, ...tiles], held: heldTile(), offline, empty: trayTab === 'things' ? TRAY.noThings : TRAY.noCreatures };
-    const key = JSON.stringify([drawn.tab, drawn.tiles?.map(tile => [tile.id, tile.name]) ?? null, drawn.held, offline]);
+    // The library could not be read: the world's own offline line, the tiles dimmed, until it can.
+    const unread = trayTab === 'things' && tiles !== null && layerUnread;
+    const drawn = { tab: trayTab, tiles: tiles === null ? null : [...make, ...tiles], held: heldTile(), offline: offline || unread, empty: unread ? NOTE_WORDS.offline : trayTab === 'things' ? TRAY.noThings : TRAY.noCreatures };
+    const key = JSON.stringify([drawn.tab, drawn.tiles?.map(tile => [tile.id, tile.name]) ?? null, drawn.held, drawn.offline, drawn.empty]);
     if (key !== trayDrawn || trayView.root.hidden) { trayDrawn = key; trayView.set(drawn); }
     if (tiles !== null) drawPictures(tiles);
   }
