@@ -118,10 +118,11 @@ from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_site_place import site_obstructions
 from exulanica.world.society_walking_surfaces import (
     build_walking_surfaces_input,
+    town_head_count,
     walking_surfaces_place,
 )
 from exulanica.world.town_people import TownPeopleRefused, people_frame
-from exulanica.world.version_town import TownKey, composed_town_key, town_key, version_town_records
+from exulanica.world.version_town import TownKey, composed_town_key, town_and_made, town_key
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Text = Annotated[str, Field(min_length=1, max_length=500)]
@@ -185,11 +186,10 @@ class _ReadFirst:
 
 @dataclass(frozen=True, slots=True)
 class _TownRead:
-    """A generated world's records as its receipt generated them before the asset read lock: the
-    receipt's digest, the records, and the place they make under the living routine a district
-    reads, or the refusal generating them raised. A living town's place is made from the records
-    only when a living input is composed, under the routine that input records
-    (``living_places``, by the routine's digest), so a purposeful town's input never pays for it."""
+    """A generated world's records before the asset read lock: the receipt's digest, the records
+    (``made``, as made, where a version changes the town's buildings) and the place they make
+    under the living routine a district reads, or the refusal raised. A living town's place is made
+    only when a living input is composed, under the routine it records (``living_places``)."""
 
     receipt_sha256: str | None
     place: Mapping[str, Any] | None
@@ -213,6 +213,7 @@ class _TownRead:
     #: A town's own buildings, street furniture and trees, read from its records with its place,
     #: which a society of things keeps its things' places clear of.
     obstructions: CityObstructions | None = None
+    made: tuple[object, ...] | None = None
     support_source: Any = None
 
 
@@ -711,12 +712,10 @@ class SocietyRuntime:
     ) -> None:
         """Generate a generated world's records and their place before the asset read lock.
 
-        For a ground whose people walk the world's own surfaces, once a transaction: a town's
-        records through its receipt with the version's changes to its buildings, generated again
-        on a cold cache (:mod:`~exulanica.world.version_town`), and the place they make; a site
-        world's place as its last stored input (``stored``) carries it or the kind worker keeps it
-        (:func:`_site_read`). A refusal is kept and raised when the input is composed, so a
-        transaction that composes nothing is not refused for a world it does not read.
+        For a walking-surfaces ground, once a transaction: a town's records with the version's
+        changes (:mod:`~exulanica.world.version_town`) and their place; a site world's place as its
+        last stored input (``stored``) carries it or the kind worker keeps it (:func:`_site_read`).
+        A refusal is kept and raised when the input is composed, never for one that composes none.
         """
         if read.locked or ground.navigation_form != "walking_surfaces":
             return
@@ -728,11 +727,11 @@ class SocietyRuntime:
             if states_site(connection, *scope):
                 read.towns[key] = _site_read(connection, binding, ground, stored)
                 return
-            generated = version_town_records(connection, *scope, changes)
+            generated, made = town_and_made(connection, *scope, changes)
         except InvalidStructuralData as exc:
             read.towns[key] = _TownRead(None, None, str(exc))
             return
-        place = walking_surfaces_place(ground.place_id, generated.records)
+        place = walking_surfaces_place(ground.place_id, generated.records, made_records=made)
         read.towns[key] = _TownRead(
             generated.receipt_sha256,
             place,
@@ -741,6 +740,7 @@ class SocietyRuntime:
             receipt=generated.receipt,
             # Held to their shapes by the place just made from them.
             obstructions=city_obstructions(generated.records, checked=True),
+            made=made,
         )
 
     @staticmethod
@@ -763,7 +763,7 @@ class SocietyRuntime:
         place = town.living_places.get(routine.sha256)
         if place is None:
             try:
-                place = walking_surfaces_place(ground.place_id, town.records, routine)
+                place = walking_surfaces_place(ground.place_id, town.records, routine, town.made)
             except (CatalogError, InvalidStructuralData, ValueError) as exc:
                 raise UnavailableSocietyInput(
                     f"the town's living place could not be made: {exc}"
@@ -2028,19 +2028,18 @@ class SocietyRuntime:
             people = None
             day_place = day_routine = None
             if chosen == WALKING_SURFACES_COMPOSITION_V3 and reason is None:
-                # What the town's people are made from, under the routine the town's receipt
-                # pins: the homes and positions the living town reads, so a society of things
-                # over the town is the same people. Seed-free: its genesis completes it. Every
-                # input states the population it gives; the first alone records the frame. A
-                # site's people are made from the site's own place under the routine its receipt
-                # names, the place its living society would live in.
+                # The town's people, made under the routine its receipt pins over the homes and
+                # positions its living town reads (a site's over its own place, under the routine
+                # its receipt names). Seed-free: genesis completes it. Every input states the
+                # population it gives, a changed town's people as made; the first records the frame.
                 if town.site_receipt is not None and town.site_routine is not None:
                     made_under, lived_in = town.site_routine, town.place
                 else:
                     made_under = self._made_under(town)
                     lived_in = self._living_place(ground, town, made_under)
                 try:
-                    people = people_frame(lived_in, made_under)
+                    count = town_head_count(lived_in, town.made, made_under)
+                    people = people_frame(lived_in, made_under, population=count)
                     if self._resident_day and seq == 1:
                         day_place, day_routine = lived_in, made_under
                 except TownPeopleRefused as exc:
@@ -2073,6 +2072,7 @@ class SocietyRuntime:
                 if chosen == WALKING_SURFACES_COMPOSITION_V3
                 else None,
                 support_source=town.support_source,
+                made_records=town.made,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"

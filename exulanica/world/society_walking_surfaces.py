@@ -65,7 +65,11 @@ from exulanica.world.society_authored_ground import (
     things_in_region,
 )
 from exulanica.world.society_catalogs import PurposefulRoutine, RoutineModel, purposeful_routine
-from exulanica.world.society_city_place import CityObstructions, place_from_city_records
+from exulanica.world.society_city_place import (
+    CityObstructions,
+    city_people_as_made,
+    place_from_city_records,
+)
 from exulanica.world.society_composition import (
     SegmentBlocked,
     clearance_test,
@@ -102,6 +106,7 @@ __all__ = [
     "SEAT_NODE_PREFIX",
     "build_walking_surfaces_input",
     "place_residents",
+    "town_head_count",
     "walking_surfaces_ground",
     "walking_surfaces_place",
 ]
@@ -217,18 +222,23 @@ def _affordance(destination: Mapping[str, Any]) -> str | None:
 
 
 def walking_surfaces_place(
-    place_id: str, records: Sequence[object], routine: RoutineModel | None = None
+    place_id: str,
+    records: Sequence[object],
+    routine: RoutineModel | None = None,
+    made_records: Sequence[object] | None = None,
 ) -> dict[str, Any]:
     """The city place a generated world's records make: its walking surfaces, spots, premises and
     furniture, as the living society reads a city (:func:`place_from_city_records`), under
     ``routine`` (the living routine a new district reads when left out; a town's living input
-    names the routine its place was made under). The costly half of composing the world's input,
-    so a caller makes it before taking any lock and hands it to
-    :func:`build_walking_surfaces_input`, which does no generation of its own."""
+    names the routine its place was made under), with ``made_records`` the town's records as made
+    where a version changed its buildings. The costly half of composing the world's input, so a
+    caller makes it before taking any lock and hands it to :func:`build_walking_surfaces_input`,
+    which does no generation of its own."""
     return place_from_city_records(
         place_id=place_id,
         records=list(records),
         routine=current_routine() if routine is None else routine,
+        made_records=None if made_records is None else list(made_records),
     )
 
 
@@ -239,6 +249,24 @@ def place_residents(place: Mapping[str, Any]) -> int:
     return sum(
         int(destination.get("resident_capacity", 0)) for destination in place["destinations"]
     )
+
+
+def town_head_count(
+    place: Mapping[str, Any],
+    made_records: Sequence[object] | None,
+    routine: RoutineModel | None = None,
+) -> int | None:
+    """How many people a society over a town whose buildings a version changed is given: the
+    people the town as made houses under ``routine``, the routine ``place`` was made under (the
+    living routine a new district reads when left out, as :func:`walking_surfaces_place`), at
+    most the places the changed town's homes hold
+    (:func:`~exulanica.world.society_city_place.city_people_as_made`). So the homes a taller
+    building adds stand empty and nobody moves house. None where ``made_records`` is None, a town
+    as made, whose count is :func:`place_residents`."""
+    if made_records is None:
+        return None
+    chosen = current_routine() if routine is None else routine
+    return min(place_residents(place), city_people_as_made(made_records, chosen))
 
 
 def _things_on_surfaces(
@@ -754,6 +782,7 @@ def build_walking_surfaces_input(
     day_routine: RoutineModel | None = None,
     made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
     support_source: Any = None,
+    made_records: Sequence[object] | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -847,8 +876,13 @@ def build_walking_surfaces_input(
     records_list: list[dict[str, Any]] = []
     kept: list[list[int]] = []
     # A things town's people are its frame's, made under the routine the town was made under;
-    # any other input counts the places in the homes of the place it walks.
-    residents = place_residents(place) if people is None else int(people["population"])
+    # any other input counts the places in the homes of the place it walks, or, where a version
+    # changed the town's buildings (``made_records``, the town as made), its people as made.
+    if people is not None:
+        residents = int(people["population"])
+    else:
+        made = town_head_count(place, made_records, living)
+        residents = place_residents(place) if made is None else made
     for destination in sorted(place["destinations"], key=lambda d: d["destination_id"]):
         affordance = _affordance(destination)
         if affordance is None or not destination["enabled"]:

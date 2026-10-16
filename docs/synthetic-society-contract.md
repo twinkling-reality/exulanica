@@ -1907,6 +1907,25 @@ the market town's 1,162 where each housed two a premises before; both start with
 catalogs' own figures). The ground's figure of 128 still refuses a larger town when it is
 composed.
 
+**A taller building adds homes.** A version's changes to a made town's buildings keep the homes
+the town was made with and add the ones a taller building makes, rather than sharing the budget
+out again: the changed town's place is made with the town's records as made
+(`exulanica/world/version_town.py`), and every premises the changes leave alone, of the same
+identity, use class and floor area, houses exactly the people it housed as made. A premises the
+changes alter or add houses the places its floor now holds at the made town's density (the people
+the made town houses over the places its homes hold), rounded half up, never fewer than it housed
+as made where it stands taller and never more where it stands lower; a removed building's
+premises are gone and no other premises gains (`_people_living_after` in
+`exulanica/world/society_city_place.py`). On the small town one storey more takes a premises from
+two homes to four and leaves the other twenty as they were, 130 homes in all. A society over a
+changed town is given the made town's head count, at most the homes the changed town has
+(`town_head_count` in `exulanica/world/society_walking_surfaces.py`): every input's
+`population.size` and the people frame's `population` stay the made town's (128 people on the
+small town), so the new homes stand empty and nobody moves house. A new society's people are housed in destination order, so on a changed
+town the places left empty are the last in that order, which need not be the new ones. A version
+with no changes reads its town exactly as made: the same place document, homes, people frame and
+people (`tests/test_town_homes_after_change.py`).
+
 **A town keeps the routine it was made under.** A town's receipt pins the routine it was
 composed under (`arrival_routine`), and a society new to that town is made under the pinned one
 (`town_routine_of` in `exulanica/world/society_living.py`), whatever a new town is made under

@@ -28,7 +28,7 @@ from exulanica.world.objects import ElementOverride
 from exulanica.world.society_authored_ground_area import ground_place_id
 from exulanica.world.society_city_place import city_blocked_parts
 from exulanica.world.society_living import town_routine_of
-from exulanica.world.society_walking_surfaces import walking_surfaces_place
+from exulanica.world.society_walking_surfaces import town_head_count, walking_surfaces_place
 from exulanica.world.thing_landing_source import prepare_landing_in_region
 from exulanica.world.town_parts import town_buildings
 from exulanica.world.town_people import people_frame
@@ -90,11 +90,12 @@ class _Town:
             )
         return key, generated
 
-    def frame(self, records) -> dict:
-        """The people frame the town's living place under its own routine makes from ``records``."""
+    def frame(self, records, made=None) -> dict:
+        """The people frame the town's living place under its own routine makes from ``records``,
+        with ``made`` the town's records as made where a version changed its buildings."""
         routine = town_routine_of(self.made.receipt)
-        place = walking_surfaces_place(ground_place_id(self.region), records, routine)
-        return people_frame(place, routine)
+        place = walking_surfaces_place(ground_place_id(self.region), records, routine, made)
+        return people_frame(place, routine, population=town_head_count(place, made, routine))
 
 
 @pytest.fixture
@@ -206,7 +207,7 @@ def test_a_removed_building_is_gone_from_the_society_s_town_and_from_the_landing
     assert gone not in {b.identity for b in town_buildings(generated.records)}
     # The society made over the changed version offers nothing in the removed building.
     document = _society(town)
-    assert document["people"] == town.frame(generated.records)
+    assert document["people"] == town.frame(generated.records, town.made.records)
     assert not _premises_in(document["people"], building.premises)
     assert document["people"]["place"] != made_frame["place"]
     # The landing no longer holds a thing off the removed building's base ring, and holds every
@@ -259,8 +260,17 @@ def test_a_taller_building_changes_the_society_s_town(town):
     ]
     assert massing.storeys == storeys
     document = _society(town)
-    assert document["people"] == town.frame(generated.records)
-    assert document["people"]["place"] != town.frame(town.made.records)["place"]
+    assert document["people"] == town.frame(generated.records, town.made.records)
+    made_frame = town.frame(town.made.records)
+    assert document["people"]["place"] != made_frame["place"]
+    # The taller building adds homes and takes none from its neighbours; the society is given the
+    # made town's people, so the new homes stand empty.
+    homes = {row["subject_id"]: row["homes"] for row in document["people"]["premises"]}
+    made_homes = {row["subject_id"]: row["homes"] for row in made_frame["premises"]}
+    grew = {s for s in homes if homes[s] != made_homes[s]}
+    assert grew and all(homes[s] > made_homes[s] for s in grew)
+    assert all(_premises_in({"premises": [{"subject_id": s}]}, tall.premises) for s in grew)
+    assert document["people"]["population"] == made_frame["population"] < sum(homes.values())
     # Its base ring stands where it stood: a thing is held off the same ground.
     assert {p.ring for p in _landing(town).parts if p.kind == "building"} == _region_rings(
         generated.records

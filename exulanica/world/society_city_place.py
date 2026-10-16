@@ -87,6 +87,7 @@ __all__ = [
     "city_blocked_parts",
     "city_navigation",
     "city_obstructions",
+    "city_people_as_made",
     "city_street_names",
     "place_from_city_documents",
     "place_from_city_records",
@@ -654,6 +655,22 @@ def place_from_city_documents(
     )
 
 
+def _places_held(premises_units: Sequence[Any], routine: RoutineModel) -> dict[str, int]:
+    """The places in homes each premises of homes among ``premises_units`` holds, by identity."""
+    holds: dict[str, int] = {}
+    for premises in premises_units:
+        use = routine.use_classes[premises.use_class]
+        if not use.resident_capacity:
+            continue
+        dwellings = (
+            max(1, premises.floor_area_mm2 // use.dwelling_floor_area_mm2)
+            if use.dwelling_floor_area_mm2
+            else 1
+        )
+        holds[premises.identity] = dwellings * use.resident_capacity
+    return holds
+
+
 def _people_living(premises_units: Sequence[Any], routine: RoutineModel) -> dict[str, int]:
     """How many people live at each premises of homes among ``premises_units``, by its identity.
 
@@ -666,17 +683,7 @@ def _people_living(premises_units: Sequence[Any], routine: RoutineModel) -> dict
     every home is lived in. Under a routine that states neither, this is the use class's
     ``resident_capacity`` for each premises, as it always was.
     """
-    holds: dict[str, int] = {}
-    for premises in premises_units:
-        use = routine.use_classes[premises.use_class]
-        if not use.resident_capacity:
-            continue
-        dwellings = (
-            max(1, premises.floor_area_mm2 // use.dwelling_floor_area_mm2)
-            if use.dwelling_floor_area_mm2
-            else 1
-        )
-        holds[premises.identity] = dwellings * use.resident_capacity
+    holds = _places_held(premises_units, routine)
     budget = routine.policy.get("town_people_default")
     total = sum(holds.values())
     if budget is None or budget >= total:
@@ -688,6 +695,92 @@ def _people_living(premises_units: Sequence[Any], routine: RoutineModel) -> dict
     return living
 
 
+def _people_living_after(
+    premises_units: Sequence[Any], made_units: Sequence[Any], routine: RoutineModel
+) -> dict[str, int]:
+    """How many people live at each premises of homes among ``premises_units``, as a version's
+    changes to a made town's buildings leave them, where ``made_units`` are the premises the town
+    as made reaches (:func:`_people_living` over them is what each housed as made).
+
+    A premises the changes leave alone, of the same identity, use class and floor area as made,
+    houses exactly the people it housed as made. One they change or add houses the places its
+    homes hold at the made town's density, the people the made town houses over the places its
+    homes hold, rounded half up: a taller premises never fewer than it housed as made, a lower one
+    never more. A removed building's premises are gone and nobody else gains, so a taller building
+    adds homes to the town and takes none from its neighbours.
+    """
+    made = {premises.identity: premises for premises in made_units}
+    units = {premises.identity: premises for premises in premises_units}
+    housed = _people_living(made_units, routine)
+    people, places = sum(housed.values()), sum(_places_held(made_units, routine).values())
+    living: dict[str, int] = {}
+    for identity, held in _places_held(premises_units, routine).items():
+        premises, before = units[identity], made.get(identity)
+        was = housed.get(identity, 0)
+        if before is not None and (before.use_class, before.floor_area_mm2) == (
+            premises.use_class,
+            premises.floor_area_mm2,
+        ):
+            living[identity] = was
+            continue
+        share = (2 * held * people + places) // (2 * places) if places else 0
+        if before is not None and before.use_class == premises.use_class:
+            taller = premises.floor_area_mm2 > before.floor_area_mm2
+            share = max(share, was) if taller else min(share, was)
+        living[identity] = share
+    return living
+
+
+def _made_reached(
+    made_records: Iterable[object], curbs: set[str], doors_stand: bool, routine: RoutineModel
+) -> list[Any]:
+    """The premises among a town's records as made that its place reaches, as
+    :func:`place_from_city_records` reaches them: of a known use class that is not furniture, with
+    an entrance onto a footway of one of ``curbs`` (where ``doors_stand``, the city's navigation
+    table letting people stand on an entrance)."""
+    held = _validated(r for r in made_records if type(r) in (PremisesRecord, EntranceRecord))
+    entrances = (
+        {r.identity: r for r in held if isinstance(r, EntranceRecord)} if doors_stand else {}
+    )
+    reached = []
+    for premises in sorted((r for r in held if isinstance(r, PremisesRecord)), key=_identity):
+        use = routine.use_classes.get(premises.use_class)
+        if use is None or use.kind == "furniture":
+            continue
+        for identity in premises.entrance_identities:
+            entrance = entrances.get(identity)
+            curb = entrance.approach_curb_identity if entrance is not None else ()
+            if curb and curb[0] in curbs:
+                reached.append(premises)
+                break
+    return reached
+
+
+def _identity(record: Any) -> str:
+    return str(record.identity)
+
+
+def city_people_as_made(
+    made_records: Sequence[object],
+    routine: RoutineModel,
+    navigation: CityNavigation | None = None,
+) -> int:
+    """How many people a town as made houses under ``routine``: the residents of the place its
+    records make (:func:`place_from_city_records`), without making the place. A version's changes
+    to the town's buildings keep this head count, so the homes a taller building adds stand empty
+    and nobody moves house."""
+    navigation = navigation if navigation is not None else city_navigation()
+    held = _validated(r for r in made_records if type(r) in (StreetSegmentRecord, CurbEdgeRecord))
+    segments = {r.identity for r in held if isinstance(r, StreetSegmentRecord)}
+    curbs = {
+        r.identity for r in held if isinstance(r, CurbEdgeRecord) and r.segment_identity in segments
+    }
+    doors_stand = navigation.ground.get(EntranceRecord.RECORD_KIND) == "support"
+    return sum(
+        _people_living(_made_reached(made_records, curbs, doors_stand, routine), routine).values()
+    )
+
+
 def place_from_city_records(
     *,
     place_id: str,
@@ -695,10 +788,14 @@ def place_from_city_records(
     routine: RoutineModel,
     input_seq: int = 1,
     navigation: CityNavigation | None = None,
+    made_records: Sequence[object] | None = None,
 ) -> dict[str, Any]:
     """Derive the place these city records support. Each record is held to its own shape first.
 
     ``navigation`` defaults to the city descriptor's table and capsule, :func:`city_navigation`.
+    ``made_records`` are a made town's records as made where ``records`` are the town as a
+    version's changes to its buildings leave it: its homes are then those changes leave
+    (:func:`_people_living_after`), and with None, those the records hold (:func:`_people_living`).
     """
     navigation = navigation if navigation is not None else city_navigation()
     by_type: dict[type, list[Any]] = {kind: [] for kind in READ_KINDS}
@@ -1044,9 +1141,13 @@ def place_from_city_records(
 
     massing = {r.identity: r for r in by_type[MassingRecord]}
     parcels = {r.identity: r for r in by_type[ParcelRecord]}
-    living = _people_living(
-        [premises for premises in premises_units if premises.identity in access], routine
-    )
+    reached = [premises for premises in premises_units if premises.identity in access]
+    if made_records is None:
+        living = _people_living(reached, routine)
+    else:
+        doors_stand = EntranceRecord.RECORD_KIND in supports
+        made = _made_reached(made_records, set(kerbs), doors_stand, routine)
+        living = _people_living_after(reached, made, routine)
     for premises in premises_units:
         if premises.identity not in access:
             continue
