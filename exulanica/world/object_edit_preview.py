@@ -1,4 +1,4 @@
-"""Server previews for the object and thing edits that had none: move, remove and undo.
+"""Server previews for the object and thing edits that had none: place, move, remove and undo.
 
 Transport-independent, like :mod:`exulanica.world.composition_preview`: each preview runs the read
 that the durable writer runs first (the version row, then the base, then the subject), through the
@@ -40,10 +40,11 @@ from exulanica.world.errors import (
     StaleObjectBase,
     ThingKindGone,
     ThingLandingRefused,
+    ThingLimitReached,
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import ElementOverride, Transform, object_document
-from exulanica.world.placed_things import placed_thing_document
+from exulanica.world.placed_things import ThingPlacement, placed_thing_document
 from exulanica.world.site_parts import PART_CODES, PartChangeRefused
 from exulanica.world.thing_landing import LANDING_CODES, LandingGround
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
@@ -55,6 +56,7 @@ __all__ = [
     "preview_object_removal",
     "preview_part_change",
     "preview_redo",
+    "preview_thing_add",
     "preview_thing_move",
     "preview_thing_removal",
     "preview_undo",
@@ -64,6 +66,7 @@ __all__ = [
 EditKind = Literal[
     "move_object",
     "remove_object",
+    "add_thing",
     "move_thing",
     "remove_thing",
     "move_part",
@@ -87,6 +90,8 @@ _REFUSALS: Final[tuple[tuple[type[Exception], str], ...]] = (
     #: A thing's pose out of bounds, and a thing whose workspace kind is gone.
     (InvalidThingPlacement, "invalid_thing_placement"),
     (ThingKindGone, "thing_kind_erased"),
+    #: A placing in a version that already holds as many things as a version may.
+    (ThingLimitReached, "thing_limit_reached"),
 )
 
 #: Every code ``blocked_reason`` can carry. Stable: codes are added, never renamed. A thing's
@@ -114,7 +119,8 @@ class ObjectEditPreview:
     after: Mapping[str, Any] | None
     #: For an undo, the edit it would reverse.
     undoes: Mapping[str, Any] | None
-    #: For a move of a thing, whether where it would stand was checked, and what refused it.
+    #: For a placing or a move of a thing, whether where it would stand was checked, and what
+    #: refused it.
     landing: Mapping[str, Any] | None = None
 
     @property
@@ -243,6 +249,45 @@ def preview_thing_move(
             thing_id,
             placed_thing_document(current),
             placed_thing_document(moved),
+            None,
+            checked,
+        )
+
+
+def preview_thing_add(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    placement: ThingPlacement,
+    *,
+    base_state_sha256: str,
+    landing: LandingGround | None,
+) -> ObjectEditPreview:
+    """What ``POST .../things`` would record, held to the same ``landing`` the write is (None: a
+    made creature stands where its maker puts it, unchecked, and the preview says so). Takes no
+    lock and writes nothing."""
+    checked = {"checked": landing is not None}
+    with read_only_snapshot(repository.connection):
+        version = _version_block(repository, version_id)
+        thing_id = placement.thing_id
+        try:
+            placed = repository.validate_thing_add(
+                version_id, placement, base_state_sha256=base_state_sha256, landing=landing
+            )
+        except ThingLandingRefused as exc:
+            where = {**checked, "where": dict(exc.where)}
+            return ObjectEditPreview(
+                exc.code, str(exc), version, "add_thing", thing_id, None, None, None, where
+            )
+        except Exception as exc:
+            return _blocked(exc, version, "add_thing", thing_id)
+        return ObjectEditPreview(
+            None,
+            None,
+            version,
+            "add_thing",
+            thing_id,
+            None,
+            placed_thing_document(placed),
             None,
             checked,
         )

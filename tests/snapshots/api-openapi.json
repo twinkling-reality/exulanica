@@ -13225,6 +13225,55 @@
     }
    }
   },
+  "/things/kinds": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Every thing kind this workspace holds, newest first.",
+    "operationId": "held_kinds_things_kinds_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Held Kinds Things Kinds Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/things/kinds/{kind_sha256}": {
    "get": {
     "tags": [
@@ -14599,6 +14648,88 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/AlternateVersionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/things/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What placing a thing would record, and where it would stand. Writes nothing.",
+    "operationId": "add_thing_preview_world_versions__version_id__things_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AddThingPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Add Thing Preview World Versions  Version Id  Things Preview Post"
         }
        }
       }
@@ -28494,6 +28625,60 @@
      "origin_role"
     ],
     "title": "AddThingBody"
+   },
+   "AddThingPreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "thing_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Thing Id"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ThingKindBody"
+       },
+       {
+        "$ref": "#/components/schemas/WorkspaceKindBody"
+       }
+      ],
+      "title": "Kind"
+     },
+     "region_id": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "pose": {
+      "$ref": "#/components/schemas/ThingPoseBody"
+     },
+     "origin_role": {
+      "type": "string",
+      "enum": [
+       "fictional",
+       "personal"
+      ],
+      "title": "Origin Role"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "thing_id",
+     "kind",
+     "region_id",
+     "pose",
+     "origin_role"
+    ],
+    "title": "AddThingPreviewBody"
    },
    "AlternateVersionView": {
     "properties": {

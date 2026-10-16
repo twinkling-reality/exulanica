@@ -8,7 +8,9 @@ in a region of the version's source snapshot at its kind's own size
 the world's ground takes it (:mod:`exulanica.world.thing_landing`); a made creature is placed where
 its maker stands it, and held to the ground when it is moved. A thing whose workspace kind is gone
 (no longer held, or erased after it was placed) is moved nowhere (410 ``thing_kind_erased``) and is
-removed as any thing is. Every edit names the version state it was made against and runs in
+removed as any thing is. A placing, a move and a removal each have a preview beside them that
+writes nothing (:mod:`exulanica.world.object_edit_preview`), a placing's held to the same ground
+as the placing. Every edit names the version state it was made against and runs in
 :func:`exulanica.api.world_edit.commit_edit`, like every other authored edit, and answers with the
 whole version. An undo or redo of a change to a made town's building queues the version's changed
 tiles for baking in its own transaction, as a kept change does, here as on every undo route
@@ -51,10 +53,12 @@ from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.object_edit_preview import (
     preview_redo,
+    preview_thing_add,
     preview_thing_move,
     preview_thing_removal,
     preview_undo,
 )
+from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
 from exulanica.world.placed_things import (
     UNSCALED_MILLI,
@@ -104,16 +108,29 @@ class ThingPoseBody(BaseModel):
         return Transform(self.x_mm, self.y_mm, self.z_mm, self.yaw_microradians, UNSCALED_MILLI)
 
 
-class AddThingBody(EntryBoundEditBody):
+class ThingPlacingBody(BaseModel):
+    """What a placing names, for the write and its preview alike."""
+
+    model_config = ConfigDict(extra="forbid")
+
     thing_id: str = Field(min_length=1, max_length=200)
     kind: ThingKindBody | WorkspaceKindBody
     region_id: str = Field(min_length=1, max_length=500)
     pose: ThingPoseBody
     origin_role: Literal["fictional", "personal"]
 
-
-class MoveThingBody(EntryBoundEditBody):
-    pose: ThingPoseBody
+    def placement(self) -> ThingPlacement:
+        return ThingPlacement(
+            thing_id=self.thing_id,
+            kind=(
+                workspace_kind_reference(self.kind.sha256)
+                if isinstance(self.kind, WorkspaceKindBody)
+                else named_kind(self.kind.kind, self.kind.version, self.kind.sha256)
+            ),
+            region_id=self.region_id,
+            transform=self.pose.domain(),
+            origin=ObjectOrigin("authored", self.origin_role),
+        )
 
 
 class ThingEditPreviewBody(BaseModel):
@@ -124,8 +141,31 @@ class ThingEditPreviewBody(BaseModel):
     base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class AddThingBody(ThingPlacingBody, EntryBoundEditBody):
+    pass
+
+
+class AddThingPreviewBody(ThingPlacingBody, ThingEditPreviewBody):
+    pass
+
+
+class MoveThingBody(EntryBoundEditBody):
+    pose: ThingPoseBody
+
+
 class MoveThingPreviewBody(ThingEditPreviewBody):
     pose: ThingPoseBody
+
+
+def _placing_landing(
+    repository: WorldObjectRepository, version_id: uuid.UUID, body: ThingPlacingBody
+) -> LandingGround | Response | None:
+    """The ground a placing is held to: none for a creature made from words (a kind its workspace
+    keeps), placed where its maker stands it, unchecked; a thing of a shipped kind is held to the
+    ground as a move of it is."""
+    if isinstance(body.kind, WorkspaceKindBody):
+        return None
+    return _landing(lambda: prepare_landing_in_region(repository, version_id, body.region_id))
 
 
 def _landing(prepare: Callable[[], LandingGround | None]) -> LandingGround | Response | None:
@@ -153,37 +193,44 @@ def add_thing(
     session: CurrentSession,
     request: Request,
 ) -> Response | AlternateVersionView:
-    # A creature made from words (a kind its workspace keeps) is placed where its maker stands it,
-    # unchecked; a thing of a shipped kind is held to the ground as a move of it is.
-    landing = (
-        None
-        if isinstance(body.kind, WorkspaceKindBody)
-        else _landing(lambda: prepare_landing_in_region(repository, version_id, body.region_id))
-    )
+    landing = _placing_landing(repository, version_id, body)
     if isinstance(landing, Response):
         return landing
 
     def place() -> AlternateVersion:
-        placement = ThingPlacement(
-            thing_id=body.thing_id,
-            kind=(
-                workspace_kind_reference(body.kind.sha256)
-                if isinstance(body.kind, WorkspaceKindBody)
-                else named_kind(body.kind.kind, body.kind.version, body.kind.sha256)
-            ),
-            region_id=body.region_id,
-            transform=body.pose.domain(),
-            origin=ObjectOrigin("authored", body.origin_role),
-        )
         return repository.add_thing(
             version_id,
-            placement,
+            body.placement(),
             base_state_sha256=body.base_state_sha256,
             actor=session.actor,
             landing=landing,
         )
 
     return commit_edit(request, repository, version_id, body, place)
+
+
+@router.post(
+    "/versions/{version_id}/things/preview",
+    response_model=dict[str, object],
+    summary="What placing a thing would record, and where it would stand. Writes nothing.",
+)
+def add_thing_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: AddThingPreviewBody,
+    repository: WriteObjects,
+) -> Response | dict[str, object]:
+    # The write-scoped connection, read only, and the same ground the placing is held to, as the
+    # move preview uses them, so the verdict is the one the placing then answers.
+    landing = _placing_landing(repository, version_id, body)
+    if isinstance(landing, Response):
+        return landing
+    return preview_thing_add(
+        repository,
+        version_id,
+        body.placement(),
+        base_state_sha256=body.base_state_sha256,
+        landing=landing,
+    ).document()
 
 
 @router.post(

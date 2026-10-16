@@ -58,6 +58,7 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Final
 
 import psycopg
@@ -81,6 +82,7 @@ __all__ = [
     "KINDS_PER_WORKSPACE",
     "LOOKS_PER_WORKSPACE",
     "STORE_CODES",
+    "HeldKind",
     "KeptLook",
     "LookAdmission",
     "ThingStore",
@@ -160,6 +162,14 @@ class KeptLook:
     container_bytes: int
     container_profile: str
     withdrawn: bool
+
+
+@dataclass(frozen=True, slots=True)
+class HeldKind:
+    """A kind this workspace holds, as read again, and when it was kept."""
+
+    kind: ThingKind
+    made_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -386,6 +396,19 @@ class ThingStore:
         except ThingKindRefused:
             return None
         return kind if kind.sha256 == row["sha256"] else None
+
+    def kinds_held(self) -> list[HeldKind]:
+        """Every kind this workspace holds, newest first (at most :data:`KINDS_PER_WORKSPACE`, its
+        cap), each read again as :meth:`kind` reads it: a document the reader now refuses is left
+        out. The made creatures a person chooses from to place."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            rows = cursor.execute(
+                "select key, version, created_at from thing_kind_version where workspace_id=%s "
+                "order by created_at desc, key, version desc",
+                (self.workspace_id,),
+            ).fetchall()
+        found = [(self.kind(row["key"], row["version"]), row["created_at"]) for row in rows]
+        return [HeldKind(kind, made_at) for kind, made_at in found if kind is not None]
 
     def kind_by_digest(self, sha256: str) -> ThingKind | None:
         """A kind this workspace holds by its document's digest, read again."""

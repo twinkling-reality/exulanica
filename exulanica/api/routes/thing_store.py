@@ -16,6 +16,12 @@ any byte is sent, so another workspace's thing, a withdrawn look and an absent o
     but asks again before each use (``no-cache``): a revalidation naming that tag is answered 304
     with no body while the look is held, and 404 once it is withdrawn, so a withdrawal reaches
     every cache.
+*   ``GET /things/kinds`` answers every kind the workspace holds, newest first, each read again as
+    the one-kind read reads it (a document the reader now refuses is left out): its reference,
+    label, class, body plan and looks, as the shipped library lists its own, its body as its
+    document states it (a drafted creature's extent), and when it was kept
+    (``exulanica.held-thing-kinds/v1``), never cached. These are the creatures made from
+    a person's words that build mode offers to place.
 *   ``GET /things/kinds/{kind_sha256}`` answers the kind the workspace holds at that digest, read
     again with its looks and its plan resolved in the store, never cached.
 *   ``GET /things/plans/{plan_sha256}`` answers the drafted body plan the workspace holds at that
@@ -75,6 +81,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _DOCUMENT_HEADERS = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
 _GLB = "model/gltf-binary"
+#: The profile of the held kinds' listing. It grows only by optional fields.
+HELD_KINDS_PROFILE: Final = "exulanica.held-thing-kinds/v1"
 
 
 def _absent() -> JSONResponse:
@@ -143,6 +151,29 @@ def held_look_container(
     # ``get`` reads the whole object and verifies it hashes to its key.
     data = looks.get(BlobId.from_hex(kept.container_sha256))
     return Response(content=data, media_type=_GLB, headers=headers)
+
+
+@router.get("/kinds", summary="Every thing kind this workspace holds, newest first.")
+def held_kinds(sessions: ReadOnlySessions, session: CurrentSession) -> Any:
+    with sessions() as connection:
+        held = ThingStore(connection, session.workspace_id, None).kinds_held()
+    return _document(
+        {
+            "profile": HELD_KINDS_PROFILE,
+            "kinds": [
+                {
+                    **each.kind.reference(),
+                    "label": each.kind.label,
+                    "class": each.kind.klass,
+                    "body_plan": each.kind.plan,
+                    "body": dict(each.kind.document["body"]),
+                    "looks": [dict(look) for look in each.kind.looks],
+                    "made_at": each.made_at.isoformat(),
+                }
+                for each in held
+            ],
+        }
+    )
 
 
 @router.get(

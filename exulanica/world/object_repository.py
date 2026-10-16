@@ -2596,18 +2596,7 @@ class WorldObjectRepository:
         is not checked; every caller states which."""
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            thing = self._validated_thing_placement(row, placement)
-            if landing is not None:
-                if landing.region_id != thing.region_id:
-                    raise ValueError("a landing prepared for another region than the placing's")
-                refusal = landing_refusal(
-                    landing,
-                    thing,
-                    footprint_half_extents(thing),
-                    blocking_things(self._things(version_id), thing.thing_id),
-                )
-                if refusal is not None:
-                    raise refusal
+            thing = self._checked_thing_add(row, placement, landing)
             edit_id = uuid.uuid4()
             self._insert_thing(version_id, thing, (edit_id, edit_id))
             self._append_edit(
@@ -2696,6 +2685,36 @@ class WorldObjectRepository:
         row = self._version_row(version_id)
         self._require_edit_base(row, base_state_sha256)
         return self._checked_thing_move(version_id, thing_id, transform, landing)
+
+    def validate_thing_add(
+        self,
+        version_id: uuid.UUID,
+        placement: ThingPlacement,
+        *,
+        base_state_sha256: str,
+        landing: LandingGround | None,
+    ) -> PlacedThing:
+        """Validate exactly what ``add_thing`` would, without a lock or a write: the same base
+        check, then :meth:`_checked_thing_add`. Answers the thing as the placing would stand it."""
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._checked_thing_add(row, placement, landing)
+
+    def _checked_thing_add(
+        self, row: Mapping[str, Any], placement: ThingPlacement, landing: LandingGround | None
+    ) -> PlacedThing:
+        """The thing as the placing would stand it, or the refusal: its id taken, the version
+        full, its kind or pose not taken, or (with ``landing``) a place the world's ground does
+        not take it. A landing prepared for another region than the placing's is a fault."""
+        thing = self._validated_thing_placement(row, placement)
+        if landing is not None:
+            if landing.region_id != thing.region_id:
+                raise ValueError("a landing prepared for another region than the placing's")
+            blocking = blocking_things(self._things(row["version_id"]), thing.thing_id)
+            refusal = landing_refusal(landing, thing, footprint_half_extents(thing), blocking)
+            if refusal is not None:
+                raise refusal
+        return thing
 
     def validate_thing_removal(
         self, version_id: uuid.UUID, thing_id: str, *, base_state_sha256: str

@@ -578,6 +578,7 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/apply` | Add an arrangement's objects as ordinary edits |
 | `POST` | `/world/versions/{version_id}/things` | Place one thing by its kind, shipped or its workspace's own (section 14) |
+| `POST` | `/world/versions/{version_id}/things/preview` | What the placing would record and where the thing would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/move` | Replace one placed thing's pose where the world's ground takes it (section 14) |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/remove` | Store a placed thing's removal |
 | `POST` | `/world/versions/{version_id}/things/undo` | Reverse the newest edit not already reversed |
@@ -603,8 +604,8 @@ not, because they are keyed by `asset_key`, and a later migration could point th
 different digest. `immutable` tells the browser never to revalidate, which would leave the ETag
 unable to correct it. A reviewed asset is never a citation target and never evidence.
 
-A move, remove or undo preview (`exulanica/world/object_edit_preview.py`) takes the write's body
-without its saved entry and answers the composition preview's frame: `availability`,
+A placing, move, remove or undo preview (`exulanica/world/object_edit_preview.py`) takes the
+write's body without its saved entry and answers the composition preview's frame: `availability`,
 `blocked_reason`, `blocked_detail`, the `version` it read, and `would_change` with the subject's
 document before and after and, for an undo, the edit it would reverse. The repository's read-only
 validators share their checks with the writers, including an undo's restore rules for a placed
@@ -612,7 +613,13 @@ environment instance or point map whose binding moved, so for one stored state a
 `after` is the document the write records and a blocked preview's reason is the problem code the
 write answers (`stale_object_base`, `invalidated_source_version`, `invalid_object_state`,
 `invalid_object_data`, `invalid_environment_state`, and `withdrawn` for a move of an object whose
-workspace asset was withdrawn). The base is checked before the object is
+workspace asset was withdrawn). A placing's preview runs the placing's own checks (an id already
+placed (`invalid_object_state`), a version holding as many things as it may
+(`thing_limit_reached`), `invalid_thing_placement` for a kind, region or pose the version
+does not take) and holds a thing of a shipped kind to the same ground the placing is held to,
+answering a landing refusal by its code and `landing.where`; a creature made from words is placed
+where its maker stands it, so its preview says `landing.checked` false, as the placing checks
+nothing there. The base is checked before the object is
 looked up, as the write checks it, and an unknown or foreign version or object answers the write's
 `404 unknown_reference`. A preview does not compose the society input a purposeful society takes
 from every accepted edit, so a write whose preview was ready can still answer
