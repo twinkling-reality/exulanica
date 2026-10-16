@@ -10,15 +10,11 @@
   font: 450 calc(16 * var(--u))/1 var(--font-sans); background: linear-gradient(180deg, rgba(255, 255, 255, .18), rgba(255, 255, 255, .06)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 0 1px rgba(255, 255, 255, .18); }
 .wu-strip-stop i { width: calc(10 * var(--u)); height: calc(10 * var(--u)); border-radius: 2px; background: #fff; }
 .wu-strip-stop:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.wu-pop { max-width: calc(420 * var(--u)); text-align: center; font: 400 calc(18 * var(--u))/1.35 var(--font-sans); text-shadow: var(--text-shadow); pointer-events: none; }
-.wu-pop-said { font-style: italic; }
-.wu-pop.wu-pop-in { animation: wu-pop-in 240ms var(--ease) both; }
-.wu-pop[data-leaving="true"] { animation: wu-note-out 600ms var(--ease) both; }
-@keyframes wu-pop-in { from { opacity: 0; translate: 0 calc(12 * var(--u)); } to { opacity: 1; translate: 0 0; } }
+/* A line the character heard, in What Teo did (T6). */
+.wu-list-row.wu-heard .wu-what { color: var(--ink-2); }
 
 @media (prefers-reduced-motion: reduce) {
   .wu-strip-dot { animation: none; }
-  .wu-pop.wu-pop-in { animation-name: wu-fade; animation-duration: 120ms; }
 }
 
 /* The character page's places (5.7, frames 06 and 07), in reference pixels. */

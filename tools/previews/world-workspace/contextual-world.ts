@@ -10,17 +10,20 @@ import { keepWorldPicture } from '/src/composition/world-pictures.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
-import { CHARACTER_WORDS, called, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub, runSectionLine } from './character-words.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
+import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
-import { mountRunWatch } from './run-watch.ts';
+import { WATCH_MS, mountRunWatch } from './run-watch.ts';
 import { runLength, runRefusalWords, runningLine, whoDecides } from './run-words.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
 import { assignmentSubject } from './entity-properties.mjs';
 import { worldTime } from './world-clock.mjs';
 import { SocietyControlClient } from '/src/society-control-api.ts';
-import { pop } from './world-ui-character.ts';
+import { edgeInset, nameOver, speech, talkScene } from './world-ui-talk.ts';
+import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs';
+import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
+import { SCENE_WORDS, dayWord, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
@@ -32,7 +35,7 @@ import { MADE_HANDOFF_KEY, readMade } from './create-steps.mjs';
 import { CREATE_WORDS } from './create-words.mjs';
 import { madeNote } from './world-ui-create.ts';
 import { populationLine } from './opening-steps.mjs';
-import { OFFLINE_AFTER_FAILED_READS } from './world-ui-layout.mjs';
+import { BESIDE, OFFLINE_AFTER_FAILED_READS } from './world-ui-layout.mjs';
 import { worldKey, wakesHints } from './world-keys.mjs';
 import { CORNER_WORDS, NOTE_WORDS, availableHints } from './world-words.mjs';
 import { openDecisionPage } from './decision-page.ts';
@@ -248,6 +251,25 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     }, () => { setTimeout(() => subjectReads.options.delete(requestId), OPTIONS_RETRY_MS); });
     return null;
   }
+  /** A character's row by its society id. */
+  const beingRow = (id) => rows.find(item => item.scene?.type === 'being' && item.scene.id === id) ?? null;
+  /** A person as the tag and card call them (J20), by society id: from their offer, else "the" and their kind. */
+  function whoOf(id) {
+    const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null;
+    return row ? subjectWho(row, offers.get(row.key)?.offer ?? null, kind) : called({ name: null, kind });
+  }
+  const popScale = () => Number.parseFloat(root.style.getPropertyValue('--ui-scale')) || 1;
+  /**
+   * Just over a character's drawn head on screen, seated or standing: the point the renderer hangs
+   * its own marks at (authored-society anchorOf), so a pop and its connector meet a seated person's
+   * head rather than the air over where it stands; else the standing head. Null behind the camera.
+   */
+  function headOnScreen(row) {
+    const point = b.camera.getPosition().clone();
+    const head = row && b.authoredSociety?.anchorOf?.(row.scene.id, point) ? point : row ? targetPoint(row, true) : null;
+    const at = head ? b.camera.camera.worldToScreen(head) : null;
+    return at && at.z > 0 ? { x: at.x, y: at.y } : null;
+  }
   /** Everything the tag and card say of a subject, from the reads held now. */
   function subjectView(row) {
     const offer = offers.get(row.key)?.offer ?? null;
@@ -259,7 +281,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const latest = subjectReads.models?.latest.find(item => item.subjectId === row.scene.id) ?? null;
     const decision = facts ? chosenDecision({ person: facts.person, latest, living: facts.living, startMinute: facts.startMinute,
       options: latest?.requestId && held?.key === row.key ? decisionOptions(latest.requestId) : null }) : null;
-    return { being, who, offer, facts, decision, model: choice?.model?.name ?? null,
+    // Who decides where a model does not (T7): a person playing them, or an outside program at the door.
+    const decider = choice?.played ? 'person' : subjectReads.models?.outside?.some(item => item.subjectId === row.scene.id) ? 'external' : null;
+    return { being, who, offer, facts, decision, model: choice?.model?.name ?? null, decider,
+      deciderChose: facts?.person?.goal?.reason === 'chosen_by_their_model', chip: deciderWords(decider) ?? choice?.model?.name ?? null,
       doing: facts ? doingLine(facts.doing) : null, reading: !offers.has(row.key) || !facts || !subjectReads.models };
   }
   function picked(x, y) {
@@ -308,6 +333,62 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     b.controls.setView(following.pose, following.hold); following = null; b.invalidate();
     root.dataset.following = 'false';
   }
+  /**
+   * Following an exchange (T5): when the followed character talks with someone within 15 m who is
+   * seen, the camera eases over 600 ms to frame both and their pops, never nearer the two than
+   * following stood, and eases back 2 s after the exchange's last pop has gone. The person's own
+   * movement, a page or reduced motion ends it where the camera stands.
+   */
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let shownNow = [];
+  function framePair(now, shownPops) {
+    if (!following) return;
+    if (!held || pageShown() || reducedMotion.matches) { following.pair = null; return; }
+    const exchange = exchangeOf(shownPops, held.scene.id), other = exchange ? beingRow(exchange.other) : null;
+    const mine = targetPoint(held, true), theirs = other && targetPoint(other, true);
+    const near = Boolean(mine && theirs && Math.hypot(mine.x - theirs.x, mine.z - theirs.z) <= TALK_FRAMING.nearMetres);
+    const framed = Boolean(following.pair && !following.pair.back);
+    const otherFrame = near && !framed ? screenFrame(other) : null;
+    // An exchange the person's own movement ended stays ended (talk-pops.mjs framingStep, AUDIT B1).
+    const step = framingStep({ exchange, ended: following.ended ?? null, framed, near, seen: Boolean(otherFrame && seen(other, otherFrame)) });
+    following.ended = step.ended;
+    const base = following.pair?.base ?? { ...b.controls.state };
+    const to = step.frame ? pairFraming({ from: base, a: mine, b: theirs, fovDeg: b.camera.camera.fov, aspect: innerWidth / innerHeight,
+      safe: TALK_FRAMING.safe, least: Math.hypot(mine.x - base.x, mine.z - base.z) }) : null;
+    if (to && ['x', 'y', 'z', 'yaw', 'pitch'].every(key => Number.isFinite(to[key]))) {
+      if (!following.pair || following.pair.back) following.pair = { base, from: { ...b.controls.state }, at: now, to, quiet: null, back: null };
+      else Object.assign(following.pair, { to, quiet: null });
+    } else if (following.pair && !following.pair.back) {
+      following.pair.quiet ??= now;
+      if (now - following.pair.quiet >= TALK_FRAMING.backAfterMs) following.pair.back = { from: { ...b.controls.state }, at: now };
+    }
+    const pair = following.pair;
+    if (!pair) return;
+    const t = (now - (pair.back ?? pair).at) / TALK_FRAMING.easeMs;
+    b.controls.setView(pair.back ? easePose(pair.back.from, pair.base, t) : easePose(pair.from, pair.to, t), 'altitude');
+    b.invalidate();
+    if (pair.back && t >= 1) following.pair = null;
+  }
+  /**
+   * While following an exchange, the card's side away from the other person (T5), from their
+   * projected head; none where they stand behind the camera.
+   */
+  function awaySide(shownPops, x) {
+    if (!following || !held) return null;
+    const exchange = exchangeOf(shownPops, held.scene.id), other = exchange ? beingRow(exchange.other) : null;
+    const head = other ? targetPoint(other, true) : null;
+    const at = head ? b.camera.camera.worldToScreen(head) : null;
+    return at && at.z > 0 ? (at.x > x ? 'left' : 'right') : null;
+  }
+  /**
+   * The person moves the camera themselves: an exchange's framing ends where the camera stands, and
+   * that exchange stays ended (T5, AUDIT B1).
+   */
+  const endPair = () => {
+    if (!following || !held) return;
+    following.ended = endedBy(exchangeOf(shownNow, held.scene.id)) ?? following.ended ?? null;
+    following.pair = null;
+  };
   const followView = {
     active: () => following !== null,
     toggle: () => {
@@ -324,9 +405,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!ground) { stopFollowing(); worldNotes.show(outOfViewNote(subjectView(held).who)); return; }
     const delta = ground.clone().sub(following.ground);
     if (delta.lengthSq() > 0) {
-      const pose = b.controls.state;
-      b.controls.setView({ ...pose, x: pose.x + delta.x, y: pose.y + delta.y, z: pose.z + delta.z }, 'altitude');
-      b.invalidate();
+      // While an exchange is framed, the pose following would hold moves; the framing places the camera.
+      const pose = following.pair ? following.pair.base : b.controls.state;
+      const moved = { ...pose, x: pose.x + delta.x, y: pose.y + delta.y, z: pose.z + delta.z };
+      if (following.pair) following.pair.base = moved; else { b.controls.setView(moved, 'altitude'); b.invalidate(); }
     }
     following.ground.copy(ground);
   }
@@ -409,31 +491,77 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     ++serial; held = null; root.dataset.held = '';
     presence.choose(null);
   }
-  // A run (run-watch.ts): the strip, Stop, the ended note and the pops over characters whose model acted.
+  // A run (run-watch.ts): the strip, Stop and the ended note.
   const readOnly = import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1';
-  const pops = new Map();
   const modelName = (model) => subjectReads.models?.models.find(item => item.provider === model?.provider && item.modelId === (model?.model_id ?? model?.modelId))?.name ?? null;
   const eventsPath = (kinds, extra = '') => '/world/versions/' + encodeURIComponent(entry.authoredVersionId) + '/society/events?world_id=' + encodeURIComponent(entry.worldId)
     + kinds.map(kind => '&kinds=' + kind).join('') + extra;
   const runWatch = mountRunWatch({ host: root, notes: worldNotes, entry, credentials, isCurrent: current, readOnly,
-    acts: async (fromTick) => {
-      const page = await read(eventsPath(['said', 'decision_applied'], '&from_tick=' + fromTick + '&limit=256'));
-      const said = new Set(page.events.filter(event => event.event_kind === 'said').map(event => event.document?.thing?.request_id));
-      return page.events.flatMap(event => {
-        const document = event.document || {};
-        if (event.event_kind === 'said' && document.thing?.model && typeof document.thing.line === 'string') return [{ subjectId: event.subject_id, words: '“' + document.thing.line + '”', said: true }];
-        if (event.event_kind === 'decision_applied' && document.model && !said.has(document.request_id) && typeof document.chose === 'string') return [{ subjectId: event.subject_id, words: document.chose.charAt(0).toUpperCase() + document.chose.slice(1), said: false }];
-        return [];
-      });
-    },
-    onAct: (act) => {
-      let made = pops.get(act.subjectId);
-      if (!made) { made = pop({ scale: () => Number.parseFloat(root.style.getPropertyValue('--ui-scale')) || 1 }); beside.append(made.root); pops.set(act.subjectId, made); }
-      made.show(act.words, { said: act.said });
-    },
     onChange: () => { if (pageView) drawPage(); },
   });
   void runWatch.refresh();
+  // Talking (talk-pops.mjs, rulings T1 to T8 and N28): while the world plays, a line said and a choice a
+  // mind made show over whoever did it, read on the run's cadence from the minute after the last one
+  // read, retrying quietly (L14). Nothing shows while the world is paused. A name marks someone farther
+  // off: in a conversation out of hearing, or the person chosen last.
+  const talk = createTalk();
+  // The choices that change nothing to see (T11), by the decision-action catalog's own words, every version.
+  const quietChoices = quietWords(Object.values(import.meta.glob('../../../assets/catalogs/society/society-decision-action.v*.json', { eager: true, import: 'default' })));
+  const speechParts = new Map(), nameParts = new Map(), togetherParts = new Map();
+  const insetNow = edgeInset(beside);
+  let lastChosen = null;
+  // Talking while following a conversation (talk-scene.mjs, ruling T9): the scene's lines, and who speaks.
+  const scene = createScene();
+  let sceneSpeaker = null;
+  const sceneView = talkScene({ onStop: () => stopFollowing(), onDay: () => openSpeakerPage() });
+  root.append(sceneView.root);
+  /** The scene's Enter (T9): the page of whoever is speaking now, chosen if it is not the one followed. */
+  function openSpeakerPage() {
+    const row = (sceneSpeaker && beingRow(sceneSpeaker)) || held;
+    if (!row) return;
+    if (row.key !== held?.key) { stopFollowing(); held = row; root.dataset.held = row.key; }
+    void openPage(row);
+  }
+  /** Draws the scene (T9): open while it shows, the world view's chrome hidden under its bars. */
+  function drawScene(scened) {
+    sceneView.open(scened.showing);
+    root.dataset.scene = scened.showing ? 'talking' : '';
+    sceneSpeaker = scened.showing ? scened.now.speaker : null;
+    if (!scened.showing) return;
+    const speaker = whoOf(scened.now.speaker);
+    const listener = scened.now.to && scened.now.to !== scened.now.speaker ? whoOf(scened.now.to) : null;
+    const row = beingRow(scened.now.speaker), frameOf = row && screenFrame(row);
+    const head = frameOf?.headInView && seen(row, frameOf) ? headOnScreen(row) ?? frameOf.overhead : null;
+    sceneView.draw({
+      before: scened.before ? { speaker: whoOf(scened.before.speaker).start, words: scened.before.words } : null,
+      now: scened.now.words,
+      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: null },
+      day: dayWord(speaker),
+      stopFollowing: SCENE_WORDS.stopFollowing,
+      dot: head ? { x: head.x, y: head.y - SPEAKING_ABOVE * popScale() } : null,
+    });
+  }
+  let talkSeen = null, talkReading = false;
+  async function readTalk() {
+    const clock = selection.people?.clock() ?? null;
+    // Paused, or the page hidden: nothing is read, and what was said meanwhile never pops late (AUDIT S2).
+    if (clock?.mode !== 'playing' || !Number.isFinite(clock.minute) || document.hidden) { talkSeen = null; talk.clear(); return; }
+    if (talkSeen === null) { talkSeen = clock.minute; return; }
+    if (talkReading || clock.minute <= talkSeen || !readBackoff.ready('talk', performance.now())) return;
+    talkReading = true;
+    const upTo = clock.minute;
+    try {
+      const page = await read(eventsPath(['said', 'decision_applied'], '&from_tick=' + (talkSeen + 1) + '&limit=256'));
+      readBackoff.succeeded('talk');
+      talkSeen = Math.max(upTo, ...page.events.map(event => event.tick).filter(Number.isFinite));
+      // A page with more after it is a backlog, not what was just said: none of it pops.
+      if (page.next || lifetime.signal.aborted || selection.people?.clock().mode !== 'playing') return;
+      const now = performance.now();
+      for (const act of talkActs(page.events, quietChoices)) { talk.add(act, now); scene.add(act); }
+    } catch { readBackoff.failed('talk', performance.now()); } finally { talkReading = false; }
+  }
+  const talkTimer = window.setInterval(() => { void readTalk(); }, WATCH_MS);
+  lifetime.signal.addEventListener('abort', () => clearInterval(talkTimer), { once: true });
   /** The models read's choice for a character, and whether its model can be asked here. */
   function modelOf(row) {
     const choice = subjectReads.models?.choices.find(item => item.subjectId === row?.scene.id) ?? null;
@@ -518,7 +646,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
-      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId) })) : null,
+      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId), heard: row.heard === true })) : null,
       didFocus: pageView.didFocus, lastRun, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
@@ -554,16 +682,18 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (showing !== pageView) return;
       showing.events = events;
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
-        options: (requestId) => decisionOptions(requestId),
+        options: (requestId) => decisionOptions(requestId), who: whoOf,
         wordGoal: (document) => {
           if (!facts) return null;
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };
           return doingLine(characterFacts(shown, showing.row.scene.id)?.doing ?? null);
         } });
-      // The chosen row stays where it was; at first it is the newest row a decision stands behind.
-      if (showing.didFocus === null || showing.didFocus >= showing.did.length) {
+      // The chosen row stays where it was; at first it is the newest row a decision stands behind. A
+      // line heard is never chosen (T6).
+      if (showing.didFocus === null || showing.didFocus >= showing.did.length || showing.did[showing.didFocus]?.heard) {
         const first = showing.did.findIndex(row => row.requestId);
-        showing.didFocus = first >= 0 ? first : showing.did.length ? 0 : null;
+        const own = showing.did.findIndex(row => !row.heard);
+        showing.didFocus = first >= 0 ? first : own >= 0 ? own : null;
       }
       drawPage();
     } catch { if (showing === pageView && showing.did === null) { showing.did = []; drawPage(); } }
@@ -580,7 +710,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: 0, offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
     else if (action === 'compareChoose' && compare && !compare.asking) { compare.focus = index; readOffer(pageView); drawPage(); }
     else if (action === 'compareStart' && compare && !compare.asking) void compareAsk(pageView);
-    else if (action === 'row' && pageView.did?.[index]) { pageView.didFocus = index; drawPage(); }
+    else if (action === 'row' && pageView.did?.[index] && !pageView.did[index].heard) { pageView.didFocus = index; drawPage(); }
     else if (action === 'inspect' && !choosing && !pageView.ask) void openDecision(index ?? pageView.didFocus);
     else if (action === 'ask' && !readOnly && !choosing) { pageView.ask = { focus: 0, busy: false, asked: null, answer: null, failure: null, serial: 0 }; drawPage(); }
     else if (action === 'question' && pageView.ask) void askQuestion(index ?? pageView.ask.focus);
@@ -1014,6 +1144,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     dragging.x = event.clientX; dragging.y = event.clientY;
     dragging.moved ||= Math.hypot(event.clientX - dragging.startX, event.clientY - dragging.startY) > 4;
     if (!dragging.moved) return;
+    endPair(); // turning the camera oneself ends an exchange's framing (T5)
     b.controls.state.yaw -= dx * .0022;
     b.controls.state.pitch = Math.max(-Math.PI * .49, Math.min(Math.PI * .49, b.controls.state.pitch - dy * .0022));
     b.invalidate();
@@ -1031,6 +1162,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   window.addEventListener('blur', () => { dragging = null; corners.hold(false); }, { signal: lifetime.signal });
   window.addEventListener('keyup', event => { if (event.code === 'Tab') corners.hold(false); }, { signal: lifetime.signal });
   window.addEventListener('keydown', event => {
+    if (!pageShown() && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) endPair();
     if (!pageShown() && wakesHints(event)) corners.wake();
     if (!pageShown() && !event.repeat) corners.pressed(event.code);
     if (!pageShown() && event.code === 'Tab') corners.hold(true);
@@ -1106,7 +1238,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       else if (event.code === 'KeyQ' && !choosing && !event.repeat) { event.preventDefault(); pageAct('ask'); }
       else if (!choosing && (event.code === 'ArrowUp' || event.code === 'ArrowDown') && pageView.did?.length) {
         event.preventDefault();
-        pageAct('row', Math.max(0, Math.min(pageView.did.length - 1, (pageView.didFocus ?? -1) + (event.code === 'ArrowUp' ? -1 : 1))));
+        // The arrows step over the lines heard (T6).
+        const step = event.code === 'ArrowUp' ? -1 : 1;
+        let next = (pageView.didFocus ?? -1) + step;
+        while (pageView.did[next]?.heard) next += step;
+        if (pageView.did[next]) pageAct('row', next);
       }
       else if (choosing && ['ArrowUp', 'ArrowDown'].includes(event.code)) {
         event.preventDefault();
@@ -1135,7 +1271,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const being = held?.scene.type === 'being';
     if (held && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) release(); event.stopImmediatePropagation(); return; }
-      if (event.code === 'Enter' && event.target?.closest?.('.cw-beside button,.wu-prompt')) return;
+      if (event.code === 'Enter' && event.target?.closest?.('.cw-beside button,.wu-prompt,.wu-scene button')) return;
+      if (event.code === 'Enter' && root.dataset.scene === 'talking') { event.preventDefault(); if (!event.repeat) openSpeakerPage(); event.stopImmediatePropagation(); return; }
       if (event.code === 'Enter' && being) { event.preventDefault(); if (!event.repeat) act('details'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyR' && being) { event.preventDefault(); if (!event.repeat) act(runWatch.run ? 'stop' : 'run'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
@@ -1181,39 +1318,132 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     root.dataset.reachable = String(targetReachable);
     root.dataset.focusDistance = Number.isFinite(distance) ? distance.toFixed(2) : '';
     if (target || held) refreshSubjectReads(now);
+    // What pops now (T2: nothing while the world is paused), and the exchange a followed character is in (T5).
+    const shownPops = shownWhile(talk, selection.people?.clock().mode ?? null, now);
+    shownNow = shownPops;
+    framePair(now, shownPops);
+    // Following a conversation turns the view into its scene (T9); the two people's lines and the card
+    // give way to it.
+    const exchange = following && held ? exchangeOf(shownPops, held.scene.id) : null;
+    scene.follow(following && held ? held.scene.id : null, shownPops);
+    const scened = scene.shown(now, exchange);
+    drawScene(scened);
+    const inScene = new Set(scened.showing ? [held.scene.id, exchange?.other ?? scened.now.to, scened.now.speaker].filter(Boolean) : []);
     const looking = !pageShown() && !asking && !dragging && targetReachable && target.key !== held?.key && targetFrame?.headInView && seen(target, targetFrame);
     if (looking) {
       const view = subjectView(target);
       if (!view.offer && !offers.has(target.key) && readBackoff.ready(target.key, performance.now())) void entityOffer(target).catch(() => {});
-      presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.model, live: Boolean(runWatch.run), popping: Boolean(pops.get(target.scene.id)?.showing) }), { x: targetFrame.overhead.x, y: targetFrame.overhead.y }, true);
+      presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.chip ?? null, live: Boolean(runWatch.run && view.model), popping: shownPops.some(item => item.subjectId === target.scene.id) }), { x: targetFrame.overhead.x, y: targetFrame.overhead.y }, true);
     } else presence.look(null);
     // Chosen: the ring at its feet, drawn in the world so walls cover it as they cover the feet (J21),
     // and the card beside it while it is seen, placed from the ring's projected ellipse; both follow it.
     if (held) {
       const view = subjectView(held), { connected } = modelOf(held);
-      presence.choose(chosenCard({ who: view.who, being: view.being, doing: view.doing, decision: view.decision, model: view.model ?? null,
+      presence.choose(chosenCard({ who: view.who, being: view.being, doing: view.doing, decision: view.decision, model: view.model ?? null, decider: view.decider ?? null, deciderChose: view.deciderChose === true,
         running: Boolean(runWatch.run), connected, following: followView.active(), reading: view.reading && view.being, thingLine: view.thingLine ?? null }));
       const heldFrame = screenFrame(held);
       const ring = heldFrame ? ringAt(heldFrame) : null;
-      if (ring) groundRing.place(heldFrame.ground, PERSON_RING_METRES); else groundRing.hide();
-      if (ring && seen(held, heldFrame)) {
+      // The talking scene draws no ring (r24): it marks whoever speaks with its dot instead.
+      if (ring && !scened.showing) groundRing.place(heldFrame.ground, PERSON_RING_METRES); else groundRing.hide();
+      if (ring && seen(held, heldFrame) && !scened.showing) {
         const headY = heldFrame.headInView ? heldFrame.overhead.y : heldFrame.top;
         // The projected points run down the character's middle; its body reaches about 0.4 of the
         // ring's radius either side, so the card keeps clear of the shoulder as frame 05 does.
         const half = ring.rx * BODY_HALF_WIDTH;
         presence.place({ bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
-          headY, waistY: headY + (ring.y - headY) * CARD_WAIST } });
+          headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x) });
       } else presence.place(null);
     } else groundRing.hide();
-    // Pops over the characters whose model acted, 12 px over the head, while they show.
-    for (const [subjectId, made] of pops) {
-      if (!made.showing) continue;
-      const row = rows.find(item => item.scene?.type === 'being' && item.scene.id === subjectId);
-      const frameOf = row && screenFrame(row);
-      const tagShown = row?.key === target?.key && looking ? presence.tagTop() : null;
-      if (frameOf?.headInView && seen(row, frameOf)) made.place(frameOf.overhead.x, tagShown ?? frameOf.overhead.y);
-      else made.root.style.transform = 'translate3d(-9999px,0,0)';
+    // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4): within hearing,
+    // 24 px over the head and never nearer an edge of the view than the edge inset; two that would
+    // overlap stack, the earlier above. A line said off screen by someone the person attends to sits at
+    // the view's side nearest them (T8); a line said beyond hearing names its people instead (section 5).
+    const s = popScale(), inset = insetNow(), placedPops = [], beyond = [];
+    const safeTop = BESIDE.top * s, safeBottom = innerHeight - BESIDE.bottom * s;
+    const asked = runWatch.run ? new Set((subjectReads.models?.choices ?? []).filter(choice => choice.model).map(choice => choice.subjectId)) : null;
+    for (const shown of shownPops) {
+      const row = beingRow(shown.subjectId), frameOf = row && screenFrame(row);
+      const listener = shown.said && shown.to && shown.to !== shown.subjectId ? beingRow(shown.to) : null;
+      const heard = listener ? screenFrame(listener) : null;
+      const onScreen = Boolean(frameOf?.headInView && seen(row, frameOf));
+      const attended = shown.subjectId === held?.scene.id || Boolean(asked?.has(shown.subjectId)) || Boolean(heard?.headInView && seen(listener, heard));
+      const how = row ? popPlacement({ onScreen, metres: reachDistance(row), chosen: shown.subjectId === held?.scene.id, attended }) : 'none';
+      let part = speechParts.get(shown.subjectId);
+      if (how === 'far' || how === 'none' || inScene.has(shown.subjectId)) {
+        part?.away();
+        if (how === 'far' && !inScene.has(shown.subjectId)) beyond.push(shown.subjectId, ...(listener ? [listener.scene.id] : []));
+        continue;
+      }
+      if (!part) { part = speech(); beside.append(part.root); speechParts.set(shown.subjectId, part); }
+      if (listener && !offers.has(listener.key) && readBackoff.ready(listener.key, now)) void entityOffer(listener).catch(() => {});
+      const to = shown.said && shown.to && shown.to !== shown.subjectId ? whoOf(shown.to) : null;
+      part.draw({ label: speechLabel(whoOf(shown.subjectId), to), words: shown.words, said: shown.said, earlier: shown.earlier, leaving: shown.leaving });
+      const { width, height } = part.size();
+      if (how === 'over') {
+        const tagShown = row.key === target?.key && looking ? presence.tagTop() : null;
+        const over = headOnScreen(row) ?? frameOf.overhead;
+        placedPops.push({ id: shown.subjectId, part, serial: shown.serial, x: popLeft(over.x, width, innerWidth, inset), y: (tagShown ?? over.y) - height - OVER_HEAD.speech * s, width, height });
+      } else {
+        // Off screen (T8): the side the speaker stands on from where the camera looks, at the height a
+        // line over them would take, or the safe area's middle where they stand behind the camera.
+        const head = targetPoint(row, true);
+        if (!head) { part.away(); continue; }
+        const eye = b.camera.getPosition(), at = b.camera.camera.worldToScreen(head);
+        const right = head.clone().sub(eye).dot(b.camera.right) >= 0;
+        const overY = at.z > 0 && Number.isFinite(at.y) ? at.y - height - OVER_HEAD.speech * s : null;
+        placedPops.push({ id: shown.subjectId, part, serial: shown.serial, ...edgePlace({ right, overY, width, height, viewWidth: innerWidth, inset, top: safeTop, bottom: safeBottom }), width, height });
+      }
     }
+    // Lines keep clear of the looked-at name tag over someone else, as of each other (T4).
+    const tagBox = looking ? presence.tagBox() : null;
+    const tops = stackPops(placedPops, STACK_GAP * s, tagBox ? [tagBox] : []);
+    // Inside the area the side card keeps, under the top corners and the Running strip and above the
+    // hints; one that would rise above it sits at its edge (L21).
+    for (const item of placedPops) item.part.place(item.x, Math.max(safeTop, Math.min(safeBottom - item.height, tops.get(item.serial) ?? item.y)));
+    for (const [subjectId, part] of speechParts) if (!shownPops.some(item => item.subjectId === subjectId)) { part.remove(); speechParts.delete(subjectId); }
+    // Names over people farther off (N28 section 5): the people of a line said beyond hearing and the
+    // person chosen last, seen; never one whose line shows, who carries the looked-at tag or is chosen
+    // now; the person chosen last first, then the nearest, three at most.
+    if (held?.scene.type === 'being') lastChosen = held.scene.id;
+    const showing = new Set(placedPops.map(item => item.id));
+    if (looking) showing.add(target.scene.id);
+    if (held) showing.add(held.scene.id);
+    for (const id of inScene) showing.add(id);
+    const candidates = [];
+    if (!pageShown()) {
+      for (const id of new Set([...beyond, ...(lastChosen ? [lastChosen] : [])])) {
+        const row = beingRow(id), frameOf = row && screenFrame(row);
+        if (frameOf?.headInView && seen(row, frameOf) && frameOf.bottom - frameOf.top >= NAMED_LEAST_PX * s) candidates.push({ id, metres: reachDistance(row), last: id === lastChosen });
+      }
+    }
+    const named = namedPeople(candidates, showing);
+    // Each name is measured on its own label; names that would overlap become one label centred over them,
+    // "Marco and Ines" (T10), drawn on a label of its own so no label's words change from frame to frame.
+    const boxes = [], together = new Set();
+    for (const id of named) {
+      let part = nameParts.get(id);
+      if (!part) { part = nameOver(); beside.append(part.root); nameParts.set(id, part); }
+      const row = beingRow(id);
+      // A name needs the person's own offer, as a listener's does; until it is read, their kind names them.
+      if (!offers.has(row.key) && readBackoff.ready(row.key, now)) void entityOffer(row).catch(() => {});
+      part.draw(whoOf(id).start);
+      const over = headOnScreen(row) ?? screenFrame(row).overhead, { width, height } = part.size();
+      boxes.push({ id, part, over, x: over.x - width / 2, y: over.y - height - OVER_HEAD.name * s, width, height });
+    }
+    for (const group of nameGroups(boxes)) {
+      const members = group.map(id => boxes.find(box => box.id === id));
+      if (members.length === 1) { members[0].part.place(members[0].x, members[0].y); continue; }
+      for (const member of members) member.part.away();
+      const key = group.join(' ');
+      together.add(key);
+      let part = togetherParts.get(key);
+      if (!part) { part = nameOver(); beside.append(part.root); togetherParts.set(key, part); }
+      part.draw(togetherNames(group.map((id, index) => index ? whoOf(id).within : whoOf(id).start)));
+      const { width, height } = part.size(), x = members.reduce((sum, member) => sum + member.over.x, 0) / members.length;
+      part.place(x - width / 2, Math.min(...members.map(member => member.over.y)) - height - OVER_HEAD.name * s);
+    }
+    for (const [id, part] of nameParts) if (!named.includes(id)) { part.remove(); nameParts.delete(id); }
+    for (const [key, part] of togetherParts) if (!together.has(key)) { part.remove(); togetherParts.delete(key); }
     if (pageView && now - (pageView.drawnAt ?? 0) >= 1000) { pageView.drawnAt = now; drawPage(); }
     overlayCosts.push(performance.now() - workStart); if (overlayCosts.length > 120) overlayCosts.shift();
     if (now - lastMeasure >= 1000) {

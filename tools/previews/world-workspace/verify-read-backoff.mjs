@@ -33,7 +33,9 @@ assert.equal(recovering.ready('duck', 15000), true);
 // for (`entityOffer(row, true)`) is never held back.
 const source = readFileSync(new URL('./contextual-world.ts', import.meta.url), 'utf8');
 const automatic = source.split('\n').filter(line => /void entityOffer\(/.test(line));
-assert.equal(automatic.length, 2);
+// A new subject at the reticle, one looked at whose offer is missing, a line's listener, and a person a name is
+// shown over.
+assert.equal(automatic.length, 4);
 for (const line of automatic) assert.match(line, /readBackoff\.ready\(/);
 for (const line of source.split('\n').filter(line => /entityOffer\([^)]*, true\)/.test(line))) assert.doesNotMatch(line, /readBackoff/);
 console.log('Read backoff checks passed: 7 reads in 90 s of failing passes, per-subject waits, reset on success, automatic reads gated.');

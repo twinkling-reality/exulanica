@@ -15,6 +15,8 @@ export interface DidRow {
   readonly sub: string;
   /** Whether a recorded decision stands behind the row, which [Enter] Inspect decision opens. */
   readonly decision: boolean;
+  /** A line said to the character, or to everyone near (T6): second ink, no sub-line, never chosen. */
+  readonly heard?: boolean;
 }
 
 export interface ModelChoice {
@@ -294,6 +296,15 @@ export function openCharacterPage(host: HTMLElement, act: (action: string, value
         else {
           const rows = element('div', 'wu-rows');
           state.did.forEach((did, index) => {
+            if (did.heard) {
+              const item = element('div', 'wu-list-row wu-heard');
+              if (did.time) item.append(element('div', 'wu-time', did.time)); else item.dataset['untimed'] = '';
+              const words = element('div');
+              words.append(element('div', 'wu-what', did.what));
+              item.append(words);
+              rows.append(item);
+              return;
+            }
             const item = element('div', 'wu-list-row');
             const chosen = index === state.didFocus;
             if (chosen) item.setAttribute('aria-current', 'true');

@@ -2,8 +2,9 @@
 // it is looked at, and the ring and card once it is chosen. Pure: the reads come in as data and the
 // words from character-words.mjs; character-presence.ts draws the answer. verify-character-view.mjs
 // holds it.
-import { CHARACTER_WORDS, called, chosenLine, readingRecord, rowSub } from './character-words.mjs';
+import { CHARACTER_WORDS, called, chosenLine, deciderWords, readingRecord, rowSub } from './character-words.mjs';
 import { PAUSE_FIRST, RUN_WORDS, atMost, runFor, runRefusalWords, whoDecides } from './run-words.mjs';
+import { heardRow, saidRow } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
 const plain = value => typeof value === 'string' && value.trim() ? value.trim() : null;
@@ -49,19 +50,22 @@ export function chosenDecision({ person, latest, living = false, startMinute = n
 /**
  * The chosen card's words and prompts (spec 8.5, DESIGN's J1 and J2). `state` holds what is known:
  * `who`, `being`, `doing`, `decision` (from chosenDecision), `model` (the assigned model's name or
- * null), `running` (a run is open), `connected` (a model can be asked here), `following`, `reading` (the record is still being read) and
- * `thingLine` (a thing's one line, build mode's words).
+ * null), `decider` (`person` or `external` where a person playing or an outside program decides, T7:
+ * the chip says so, and the line where `deciderChose` its current action), `running` (a run is
+ * open), `connected` (a model can be asked here), `following`, `reading` (the record is still being
+ * read) and `thingLine` (a thing's one line, build mode's words).
  */
-export function chosenCard({ who, being, doing = null, decision = null, model = null, running = false, connected = true, following = false, reading = false, thingLine = null }) {
+export function chosenCard({ who, being, doing = null, decision = null, model = null, decider = null, deciderChose = false, running = false, connected = true, following = false, reading = false, thingLine = null }) {
   if (!being) return Object.freeze({ title: who.title, lines: [thingLine].filter(Boolean), chip: null, prompts: [] });
   if (reading) return Object.freeze({ title: who.title, lines: [readingRecord(who)], chip: null, prompts: [] });
-  const lines = [doing, decision ? chosenLine(who, decision.hhmm ? decision : { ...decision, hhmm: null }) : chosenLine(who, null)].filter(Boolean);
+  const lines = [doing, deciderChose && deciderWords(decider) ? chosenLine(who, null, decider)
+    : decision ? chosenLine(who, decision.hhmm ? decision : { ...decision, hhmm: null }) : chosenLine(who, null)].filter(Boolean);
   const prompts = [{ action: 'details', keys: ['Enter'], word: CHARACTER_WORDS.details, shortcut: 'Enter' }];
   // Run only where the character has a model that can be asked here (DESIGN's J2); Stop while one is on.
   if (running) prompts.push({ action: 'stop', keys: ['R'], word: CHARACTER_WORDS.stop, shortcut: 'R' });
   else if (model && connected) prompts.push({ action: 'run', keys: ['R'], word: CHARACTER_WORDS.run, shortcut: 'R' });
   prompts.push({ action: 'follow', keys: ['V'], word: following ? CHARACTER_WORDS.stopFollowing : CHARACTER_WORDS.follow, shortcut: 'V' });
-  return Object.freeze({ title: who.title, lines, chip: model, live: Boolean(running && model), prompts });
+  return Object.freeze({ title: who.title, lines, chip: deciderWords(decider) ?? model, live: Boolean(running && model), prompts });
 }
 
 /** The name tag's words (spec 5.3): a thing shows its name only; a pop hides the doing line. */
@@ -118,6 +122,26 @@ export function pageFraming({ ground, eye, fovDeg, aspect, framing = PAGE_FRAMIN
   return Object.freeze({ x: ground.x - dx * framing.distance, y: ground.y + framing.eyeHeight, z: ground.z - dz * framing.distance, yaw: facing - offset, pitch });
 }
 
+/**
+ * Following a character who talks with another (T5): the pose that frames both heads, from the
+ * following pose `from` ({x, y, z, yaw, pitch}): turned to face the middle of the two, at the same
+ * height and pitch, as far back as puts both heads within `safe` of the half width from the middle of
+ * the view (room for their pops and the card), and never nearer than `least` to the nearer of the two
+ * along the line of sight (one standing beyond the other never puts the nearer behind the camera).
+ */
+export function pairFraming({ from, a, b, fovDeg, aspect, safe, least = 0 }) {
+  const mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+  let dx = mid.x - from.x, dz = mid.z - from.z;
+  const length = Math.hypot(dx, dz);
+  if (length < 1e-6) { dx = -Math.sin(from.yaw); dz = -Math.cos(from.yaw); } else { dx /= length; dz /= length; }
+  const yaw = Math.atan2(-dx, -dz);
+  const across = Math.abs((b.x - a.x) * Math.cos(yaw) - (b.z - a.z) * Math.sin(yaw));
+  const along = Math.abs((b.x - a.x) * dx + (b.z - a.z) * dz);
+  const halfWidth = Math.atan(Math.tan((fovDeg * Math.PI / 180) / 2) * aspect);
+  const distance = Math.max(least + along / 2, across / 2 / (safe * Math.tan(halfWidth)));
+  return Object.freeze({ x: mid.x - dx * distance, y: from.y, z: mid.z - dz * distance, yaw, pitch: from.pitch });
+}
+
 /** A pose between two, `t` from 0 to 1, eased in and out; yaw turns the short way round. */
 export function easePose(from, to, t) {
   const k = t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
@@ -141,13 +165,18 @@ export function runQuestion({ who, model, limits, refusal = null, busy = false }
 
 /**
  * The rows of What Teo did (frame 06), newest first, at most `limit`: from the society's events for
- * the character, newest first as the events read serves them. A line said is one row; a model's
- * applied choice is one row; a goal the routine set is one row. A goal a model's choice set is the
- * choice's row already. `wordGoal(document)` says a goal in the catalog's words; `modelName` names
- * a model by its provider and id; `options(requestId)` is a decision's number of choices once read.
+ * the character, newest first as the events read serves them. A line said is one row ("Said to Ines:
+ * “…”", T6); a model's applied choice is one row; a goal the routine set is one row. A goal a model's
+ * choice set is the choice's row already. A line said to the character, or to everyone near while the
+ * character heard it, is a `heard` row ("Heard Ines: “…”") with no sub-line and no decision; a line
+ * overheard, said to someone else, is none. `wordGoal(document)` says a goal in the catalog's words;
+ * `modelName` names a model by its provider and id; `options(requestId)` is a decision's number of
+ * choices once read; `who(id)` calls a person as the tag and card do (J20).
  */
-export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, limit = 7 }) {
-  const mine = events.map((event, index) => ({ event, index })).filter(({ event }) => event.subject_id === subjectId)
+export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7 }) {
+  const heard = event => event.subject_id !== subjectId && event.event_kind === 'said' && typeof event.document?.thing?.line === 'string'
+    && Array.isArray(event.document.thing.heard_by) && event.document.thing.heard_by.includes(subjectId) && (event.document.thing.to === subjectId || !event.document.thing.to);
+  const mine = events.map((event, index) => ({ event, index })).filter(({ event }) => event.subject_id === subjectId || heard(event))
     .sort((a, b) => b.event.tick - a.event.tick || b.index - a.index).map(({ event }) => event);
   // A said event keeps its request under `thing` (society_things.py); a decision_applied event at the top.
   const said = new Set(mine.filter(event => event.event_kind === 'said').map(event => event.document?.thing?.request_id).filter(Boolean));
@@ -156,14 +185,17 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
     if (rows.length >= limit) break;
     const document = event.document || {};
     const time = worldTime(event.tick, startMinute)?.hhmm ?? '';
-    if (event.event_kind === 'said' && typeof document.thing?.line === 'string') {
+    if (event.subject_id !== subjectId) {
+      rows.push({ time, what: heardRow(who(event.subject_id), document.thing.line), sub: '', requestId: null, model: null, heard: true });
+    } else if (event.event_kind === 'said' && typeof document.thing?.line === 'string') {
       const model = document.thing.model ? modelName(document.thing.model) : null;
-      rows.push({ time, what: `Said \u201c${document.thing.line}\u201d`, sub: rowSub(model ? { model, options: options(document.thing.request_id) } : null), requestId: document.thing.request_id ?? null, model });
+      const to = typeof document.thing.to === 'string' ? who(document.thing.to) : null;
+      rows.push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model });
     } else if (event.event_kind === 'decision_applied' && !said.has(document.request_id)) {
       const what = typeof document.chose === 'string' && document.chose ? document.chose.charAt(0).toUpperCase() + document.chose.slice(1) : wordGoal(document);
       if (!what) continue;
       const model = document.model ? modelName(document.model) : null;
-      rows.push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : null), requestId: document.request_id ?? null, model });
+      rows.push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model });
     } else if (event.event_kind === 'goal_selected' && document.reason !== 'chosen_by_their_model') {
       const what = wordGoal(document);
       if (what) rows.push({ time, what, sub: rowSub(null), requestId: null, model: null });

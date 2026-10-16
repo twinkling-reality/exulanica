@@ -44,12 +44,13 @@ export const BESIDE = Object.freeze({ gap: 80, inset: ANCHOR_INSET, meet: 92, to
  * (a large part) never puts it over the top corners and a low one never over the notes and hints; a
  * card taller than the room between keeps its top at `top`.
  */
-export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = BESIDE.inset, meet = BESIDE.meet, connect = bounds, top = BESIDE.top, bottom = BESIDE.bottom } = {}) {
+export function placeBeside(bounds, size, viewport, { gap = BESIDE.gap, inset = BESIDE.inset, meet = BESIDE.meet, prefer = null, connect = bounds, top = BESIDE.top, bottom = BESIDE.bottom } = {}) {
   const head = Number.isFinite(bounds.headY) ? bounds.headY : bounds.top;
   const waist = Number.isFinite(bounds.waistY) ? bounds.waistY : (bounds.top + bounds.bottom) / 2;
   const fitsRight = bounds.right + gap + size.width <= viewport.width - inset;
   const fitsLeft = bounds.left - gap - size.width >= inset;
-  const side = fitsRight || !fitsLeft ? 'right' : 'left';
+  // A side asked for (`prefer`) is taken where the card fits there (T5); else the right, as it fits.
+  const side = prefer === 'left' && fitsLeft ? 'left' : prefer === 'right' && fitsRight ? 'right' : fitsRight || !fitsLeft ? 'right' : 'left';
   const x = side === 'right' ? bounds.right + gap : bounds.left - gap - size.width;
   const held = clampToView({ x, y: (head + waist) / 2 - size.height / 2 }, size, viewport, inset);
   const at = { x: held.x, y: Math.max(top, Math.min(viewport.height - bottom - size.height, held.y)) };

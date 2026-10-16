@@ -34,6 +34,11 @@ assert.equal(nearRight.side, 'left');
 assert.equal(nearRight.x, 1500 - 80 - 388);
 assert.equal(nearRight.connector.to.x, nearRight.x + 388);
 assert.equal(nearRight.connector.elbow.x, nearRight.x + 388 + 40);
+// A side asked for is taken where the card fits there; where it does not, the card keeps today's choice (T5).
+assert.equal(placeBeside({ left: 900, top: 300, right: 980, bottom: 700, headY: 320, waistY: 520 }, card, viewport, { prefer: 'left' }).side, 'left');
+assert.equal(placeBeside({ left: 300, top: 300, right: 380, bottom: 700, headY: 320, waistY: 520 }, card, viewport, { prefer: 'left' }).side, 'right');
+assert.equal(placeBeside({ left: 1500, top: 300, right: 1580, bottom: 700, headY: 320, waistY: 520 }, card, viewport, { prefer: 'right' }).side, 'left');
+assert.equal(placeBeside({ left: 900, top: 300, right: 980, bottom: 700, headY: 320, waistY: 520 }, card, viewport, { prefer: 'right' }).side, 'right');
 // Beside a carried copy and its spot together, the card sits by their union and points at the copy.
 const union = { left: 700, top: 300, right: 980, bottom: 700, headY: 320, waistY: 520 };
 const copy = { left: 700, top: 400, right: 820, bottom: 700, headY: 420, waistY: 560 };

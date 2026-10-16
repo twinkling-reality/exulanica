@@ -467,9 +467,10 @@ export interface SideCard {
   readonly body: HTMLElement;
   /**
    * Places the card and its connector beside the subject; returns the side it took. `connect`
-   * (default `bounds`) is where the connector starts, when the card sits beside more than its subject.
+   * (default `bounds`) is where the connector starts, when the card sits beside more than its subject;
+   * `prefer` is the side asked for, taken where the card fits there.
    */
-  place(bounds: SubjectBounds, options?: { readonly connect?: SubjectBounds }): 'right' | 'left';
+  place(bounds: SubjectBounds, options?: { readonly connect?: SubjectBounds; readonly prefer?: 'right' | 'left' | null }): 'right' | 'left';
   hide(): void;
 }
 
@@ -490,11 +491,11 @@ export function sideCard({ question = false, build = false, scale = () => 1 }: {
   return {
     root,
     body: card,
-    place(bounds, { connect = bounds } = {}) {
+    place(bounds, { connect = bounds, prefer = null } = {}) {
       root.hidden = false;
       const s = scale();
       const size = { width: card.offsetWidth, height: card.offsetHeight };
-      const at = placeBeside(bounds, size, { width: innerWidth, height: innerHeight }, { gap: BESIDE.gap * s, inset: BESIDE.inset * s, meet: BESIDE.meet * s, connect, top: BESIDE.top * s, bottom: BESIDE.bottom * s });
+      const at = placeBeside(bounds, size, { width: innerWidth, height: innerHeight }, { gap: BESIDE.gap * s, inset: BESIDE.inset * s, meet: BESIDE.meet * s, prefer, connect, top: BESIDE.top * s, bottom: BESIDE.bottom * s });
       card.style.transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`;
       const { from, elbow, to } = at.connector;
       line.setAttribute('d', `M${from.x.toFixed(1)} ${from.y.toFixed(1)}L${elbow.x.toFixed(1)} ${elbow.y.toFixed(1)}L${to.x.toFixed(1)} ${to.y.toFixed(1)}`);

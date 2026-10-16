@@ -1,6 +1,6 @@
-// The in-world parts only the character moments use (DESIGN's ruling L7): the Running strip (5.9),
-// and the pop over a character (5.10). Built from world-ui.ts's tokens and parts; their look lives
-// in world-ui-character.css.
+// The in-world parts only the character moments use (DESIGN's ruling L7): the Running strip (5.9).
+// Built from world-ui.ts's tokens and parts; their look lives in world-ui-character.css. The lines over
+// characters who talk are world-ui-talk.ts's.
 import './world-ui-character.css';
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
@@ -48,41 +48,5 @@ export function runStrip({ onStop }: { readonly onStop: () => void }): RunStrip 
       put(spent, words.spent); put(of, words.of); put(stopWords, words.stop);
     },
     remove() { root.remove(); },
-  };
-}
-
-export interface Pop {
-  readonly root: HTMLElement;
-  /** Shows what was said (in quotes, italic) or chosen; a newer one replaces it. */
-  show(words: string, { said }: { readonly said: boolean }): void;
-  place(x: number, y: number): void;
-  readonly showing: boolean;
-  hide(): void;
-}
-
-/** Words over a character whose model acted, while a run is open (5.10). */
-export function pop({ scale = () => 1, hold = 3600, out = 600 }: { readonly scale?: () => number; readonly hold?: number; readonly out?: number } = {}): Pop {
-  const root = element('div', 'wu-anchored wu-pop');
-  root.hidden = true;
-  let timer = 0, leaving = 0, showing = false;
-  const hide = (): void => { clearTimeout(timer); clearTimeout(leaving); showing = false; root.hidden = true; delete root.dataset.leaving; };
-  return {
-    root,
-    get showing() { return showing; },
-    show(words, { said }) {
-      hide();
-      root.replaceChildren(element('span', said ? 'wu-pop-said' : 'wu-pop-chose', words));
-      root.hidden = false; showing = true;
-      root.getAnimations().forEach(animation => animation.cancel());
-      root.classList.remove('wu-pop-in'); void root.offsetWidth; root.classList.add('wu-pop-in');
-      timer = window.setTimeout(() => { root.dataset.leaving = 'true'; leaving = window.setTimeout(hide, out); }, hold);
-    },
-    place(x, y) {
-      const s = scale();
-      const at = { x: x - root.offsetWidth / 2, y: y - root.offsetHeight - 12 * s };
-      const transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`;
-      if (root.style.transform !== transform) root.style.transform = transform;
-    },
-    hide,
   };
 }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
+import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -81,4 +81,14 @@ assert.equal(runSectionLine(teo, { offered: open, chosen: true, chosenRefusal: '
   'This model cannot decide for Teo here, so Teo follows a routine. Choose another model to run.');
 assert.equal(runSectionLine(resident, { offered: open, chosen: true, chosenRefusal: 'model_no_longer_offered' }),
   'This model cannot decide for the resident here, so the resident follows a routine.');
+// T7: where a person playing or an outside program decides, the chip, the row and the card say so.
+assert.equal(deciderWords('person'), 'A person playing');
+assert.equal(deciderWords('external'), 'An outside program');
+assert.equal(deciderWords('model'), null);
+assert.equal(chosenLine(teo, null, 'person'), 'A person chose this.');
+assert.equal(chosenLine(teo, null, 'external'), 'An outside program chose this.');
+assert.equal(chosenLine(teo, null), "Teo's routine.");
+assert.equal(rowSub({ decider: 'person' }), 'A person playing');
+assert.equal(rowSub({ decider: 'external' }), 'An outside program');
+assert.equal(rowSub({ decider: 'model' }), 'Routine', 'a model with no name read is no decider word');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

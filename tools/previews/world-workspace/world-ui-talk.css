@@ -1,0 +1,72 @@
+/* Talking's own parts in the world (DESIGN's rulings N28 and T1 to T8), from world-ui.css's tokens: a line
+   over its speaker and a name over someone farther off, each on the shared soft shade (.wu-shade), which
+   falls off evenly at both ends with no edge. Sizes are reference pixels; a max() floor is the sheet's own
+   1440 by 900 size. */
+/* Speech's own shade (N28 section 4, amended 16 October): tighter and softer than a group's, so over a flat
+   sky it reads as a falloff and not a dark box. */
+.wu-shade.wu-speech { max-width: calc(560 * var(--u)); text-align: center; pointer-events: none;
+  --shade-pad: calc(6 * var(--u)); --shade-feather: calc(14 * var(--u)); --shade-radius: calc(18 * var(--u)); --shade-fill: rgba(6, 12, 16, .56); }
+/* Who said it and to whom, 8 px over the line (N28 section 4). */
+.wu-speech-who { font: 500 max(13px, calc(14 * var(--u)))/max(18px, calc(20 * var(--u))) var(--font-sans); color: var(--ink); white-space: nowrap; }
+.wu-speech-line { margin-top: var(--space-8); font: 450 max(18px, calc(20 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans); color: var(--ink); text-wrap: balance; }
+.wu-speech-line[data-said="true"] { font-style: italic; }
+/* A line kept up by its reply, who said it and its words (T4). */
+.wu-speech[data-earlier="true"] .wu-speech-who, .wu-speech[data-earlier="true"] .wu-speech-line { color: var(--ink-2); }
+.wu-speech.wu-speech-in { animation: wu-speech-in 240ms var(--ease) both; }
+.wu-speech[data-leaving="true"] { animation: wu-note-out 600ms var(--ease) both; }
+@keyframes wu-speech-in { from { opacity: 0; translate: 0 calc(12 * var(--u)); } to { opacity: 1; translate: 0 0; } }
+/* A name over someone farther off (N28 section 5): 14/20 at both sizes. */
+.wu-shade.wu-name-over { font: 450 14px/20px var(--font-sans); color: var(--ink); white-space: nowrap; pointer-events: none; }
+/* Takes the edge inset as its width, so the page reads the token rather than a copy of it. */
+.wu-edge-probe { position: absolute; left: 0; top: 0; width: var(--edge-inset); height: 0; visibility: hidden; pointer-events: none; }
+
+/* Talking while following a conversation (T9, frame r24). Thin bars above and below slide in over 240 ms;
+   a fade over the picture's lower part holds the lines, which sit 120 px in and 40 px above the lower bar;
+   the choices sit on thin bars that end 124 px in from the right edge, their keys moving left for a longer
+   word. Over the bars nothing of the world view's chrome shows. */
+.wu-scene { position: absolute; inset: 0; z-index: 2; pointer-events: none; visibility: hidden; transition: visibility 0s linear 240ms; }
+.wu-scene[data-open="true"] { visibility: visible; transition: none; }
+.wu-scene-bar { position: absolute; left: 0; right: 0; height: calc(64 * var(--u)); background: rgba(5, 9, 12, .90); transition: transform 240ms var(--ease); }
+.wu-scene-top { top: 0; transform: translateY(-100%); }
+.wu-scene-bottom { bottom: 0; transform: translateY(100%); }
+.wu-scene[data-open="true"] .wu-scene-bar { transform: none; }
+/* The fade holds the lines without a shade of their own: .58 at its foot, .48 at 55% of its height where the line
+   before sits, clear at its top (T9, amended 16 October for the 1440 measure). */
+.wu-scene-fade { position: absolute; left: 0; right: 0; bottom: calc(64 * var(--u)); height: max(300px, calc(320 * var(--u)));
+  background: linear-gradient(0deg, rgba(6, 12, 16, .58) 0%, rgba(6, 12, 16, .48) 55%, rgba(6, 12, 16, 0) 100%);
+  opacity: 0; transition: opacity 240ms var(--ease); }
+.wu-scene[data-open="true"] .wu-scene-fade { opacity: 1; }
+.wu-scene-lines { position: absolute; left: calc(120 * var(--u)); bottom: calc(104 * var(--u)); width: calc(900 * var(--u)); text-shadow: var(--text-shadow); color: var(--ink); }
+.wu-scene-lines.wu-scene-new { animation: wu-scene-up 200ms var(--ease) both; }
+@keyframes wu-scene-up { from { translate: 0 calc(16 * var(--u)); opacity: .4; } to { translate: 0 0; opacity: 1; } }
+.wu-scene-before { font: 400 max(18px, calc(18 * var(--u)))/max(24px, calc(24 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .88); }
+.wu-scene-before b { margin-right: var(--space-8); font-weight: 500; color: var(--ink); }
+.wu-scene-now { margin-top: var(--space-16); font: 300 max(30px, calc(34 * var(--u)))/max(36px, calc(40 * var(--u))) var(--font-sans); letter-spacing: -.005em; text-wrap: pretty; }
+.wu-scene-before[hidden] + .wu-scene-now { margin-top: 0; }
+.wu-scene-plate { display: flex; align-items: center; gap: var(--space-16); height: max(48px, calc(48 * var(--u))); margin-top: var(--space-16); }
+.wu-scene-orb { display: grid; place-items: center; flex: none; width: max(44px, calc(44 * var(--u))); height: max(44px, calc(44 * var(--u))); overflow: hidden; border-radius: 50%;
+  background: #dfe6e5; box-shadow: 0 0 0 2px rgba(255, 255, 255, .9); font: 400 20px/1 var(--font-sans); color: #344750; text-shadow: none; }
+.wu-scene-orb img { width: 100%; height: 100%; object-fit: cover; }
+.wu-scene-name { font: 500 max(21px, calc(21 * var(--u)))/1 var(--font-sans); letter-spacing: .01em; }
+.wu-scene-to { font: 400 max(15px, calc(15 * var(--u)))/1 var(--font-sans); color: rgba(255, 255, 255, .94); }
+.wu-scene-choices { position: absolute; right: calc(144 * var(--u)); bottom: calc(128 * var(--u)); text-shadow: var(--text-shadow); color: var(--ink); }
+.wu-scene-choices .wu-row { pointer-events: auto; }
+/* The speaker: a dot with a soft halo, 18 px over the speaking person's head. */
+/* A faint dark edge under the white halo keeps it on a pale sky (T11). */
+.wu-scene-dot { position: absolute; left: 0; top: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1px rgba(6, 12, 16, .35), 0 0 0 4px rgba(255, 255, 255, .22), 0 0 14px rgba(255, 255, 255, .9); }
+.wu-scene-dot[hidden] { display: none; }
+/* The world view's chrome hides under the bars while the scene shows (T9: the rail, the pill and the clock;
+   the hint and the keys button too, which the lower bar would cut), and comes back after. The older corner
+   parts and the Running strip are named as well, for a page that still draws them (r09 carries a run in the
+   pill, which hides with it). */
+.wu-root[data-scene="talking"] :is(.wu-rail, .wu-corner-pill, .wu-top, .wu-clock-pill, .wu-first-hint, .wu-keys-button, .wu-keys-card, .wu-back, .wu-clock, .wu-mode, .wu-hints, .wu-strip) {
+  /* Their own fade-in holds their opacity (the world screen's .wu-screen-in), so it is set aside here and they are
+     hidden outright; it plays again when they come back. */
+  visibility: hidden; opacity: 0; animation: none; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wu-speech.wu-speech-in { animation-name: wu-fade; animation-duration: 120ms; }
+  .wu-scene-bar, .wu-scene-fade { transition-duration: 120ms; }
+  .wu-scene-lines.wu-scene-new { animation-name: wu-fade; animation-duration: 120ms; }
+}

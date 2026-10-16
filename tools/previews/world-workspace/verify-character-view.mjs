@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
+import { chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -72,11 +72,28 @@ const events = [
 ];
 const did = didRows({ events, subjectId: 't', startMinute: 360, wordGoal: () => 'Leaving home', modelName: model => model.model_id === 'nano' ? 'Nemotron 3 Nano 30B' : null, options: id => ({ r1: 9, r2: 9 })[id] });
 assert.deepEqual(did.map(row => [row.time, row.what, row.sub]), [
-  ['06:52', 'Said \u201cCalm water today.\u201d', 'Nemotron 3 Nano 30B · 9 choices'],
+  ['06:52', 'Said: \u201cCalm water today.\u201d', 'Nemotron 3 Nano 30B · 9 choices'],
   ['06:44', 'Follow Ines', 'Nemotron 3 Nano 30B · 9 choices'],
   ['06:00', 'Leaving home', 'Routine'],
 ]);
 assert.equal(didRows({ events, subjectId: 't', wordGoal: () => null, modelName: () => null, limit: 1 }).length, 1);
+// T6: a line said to Teo, or to everyone near while Teo heard it, is a heard row with no sub-line and
+// no decision; a line overheard, said to someone else, or not heard at all, is none; Teo's own line
+// names whom it was said to.
+const names = { i: called({ name: 'Ines' }), r: called({ kind: 'resident' }) };
+const talked = [
+  { subject_id: 'i', tick: 60, event_kind: 'said', document: { thing: { request_id: 'q1', line: 'Morning, Teo.', to: 't', heard_by: ['t', 'r'] } } },
+  { subject_id: 'r', tick: 59, event_kind: 'said', document: { thing: { request_id: 'q2', line: 'Calm water.', to: null, heard_by: ['t'] } } },
+  { subject_id: 'r', tick: 58, event_kind: 'said', document: { thing: { request_id: 'q3', line: 'Hello, Ines.', to: 'i', heard_by: ['t', 'i'] } } },
+  { subject_id: 'i', tick: 57, event_kind: 'said', document: { thing: { request_id: 'q4', line: 'Far off.', to: null, heard_by: ['r'] } } },
+  { subject_id: 't', tick: 56, event_kind: 'said', document: { thing: { request_id: 'q5', line: 'Hello, Ines.', to: 'i', heard_by: ['i'] } } },
+];
+const heard = didRows({ events: talked, subjectId: 't', startMinute: 360, wordGoal: () => null, modelName: () => null, who: id => names[id] });
+assert.deepEqual(heard.map(row => [row.time, row.what, row.sub, row.requestId, row.heard === true]), [
+  ['07:00', 'Heard Ines: \u201cMorning, Teo.\u201d', '', null, true],
+  ['06:59', 'Heard the resident: \u201cCalm water.\u201d', '', null, true],
+  ['06:56', 'Said to Ines: \u201cHello, Ines.\u201d', 'Routine', 'q5', false],
+]);
 
 // The page's camera: 2.6 m from the character at eye height, the character at 30 % of the width.
 const pose = pageFraming({ ground: { x: 0, y: 0, z: 0 }, eye: { x: 0, z: 5 }, fovDeg: 60, aspect: 16 / 9 });
@@ -87,4 +104,34 @@ assert.ok(Math.abs(share - 0.30) < 1e-9, String(share));
 assert.equal(easePose({ x: 0, y: 0, z: 0, yaw: 3.1, pitch: 0 }, { x: 2, y: 2, z: 2, yaw: -3.1, pitch: 1 }, 1).yaw, 3.1 + (Math.atan2(Math.sin(-6.2), Math.cos(-6.2))));
 assert.equal(easePose({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, { x: 2, y: 2, z: 2, yaw: 0, pitch: 1 }, 0.5).x, 1);
 
+// T5: following an exchange, the camera faces the middle of the two at its own height and pitch,
+// far enough back that both heads sit within the safe share of the half width, never nearer than asked.
+{
+  const from = { x: 0, y: 1.7, z: 10, yaw: 0, pitch: -0.1 }, a = { x: -4, y: 1.7, z: 0 }, b = { x: 4, y: 1.7, z: 0 };
+  const framed = pairFraming({ from, a, b, fovDeg: 60, aspect: 16 / 9, safe: 0.5 });
+  assert.ok(Math.abs(framed.yaw) < 1e-9 && framed.y === 1.7 && framed.pitch === -0.1);
+  const halfWidth = Math.atan(Math.tan(Math.PI / 6) * 16 / 9);
+  const share = 4 / framed.z / Math.tan(halfWidth);
+  assert.ok(Math.abs(share - 0.5) < 1e-9, `each head at half the half width: ${share}`);
+  assert.equal(pairFraming({ from, a, b, fovDeg: 60, aspect: 16 / 9, safe: 0.5, least: 30 }).z, 30, 'never nearer than following stands');
+  const side = pairFraming({ from: { x: 10, y: 1.7, z: 0, yaw: 0, pitch: 0 }, a: { x: 0, y: 1.7, z: -1 }, b: { x: 0, y: 1.7, z: 1 }, fovDeg: 60, aspect: 16 / 9, safe: 0.5, least: 10 });
+  assert.ok(Math.abs(-Math.sin(side.yaw) - -1) < 1e-9 && side.x === 10, 'turned to face the middle of the two');
+  // One 7 m beyond the other on the line of sight: the nearer stays `least` in front of the camera (AUDIT S1).
+  const behind = pairFraming({ from: { x: 0, y: 1.7, z: 3, yaw: 0, pitch: 0 }, a: { x: 0, y: 1.7, z: 0 }, b: { x: 0, y: 1.7, z: -7 }, fovDeg: 60, aspect: 16 / 9, safe: 0.4, least: 3 });
+  assert.ok(Math.abs(behind.z - 3) < 1e-9, `the nearer person stays 3 m in front: camera at z ${behind.z}`);
+}
+// T7: a character a person plays: the chip says so, and the card's line where the person chose it.
+{
+  const played = chosenCard({ who: teo, being: true, doing: 'Resting', decider: 'person', deciderChose: true });
+  assert.equal(played.chip, 'A person playing');
+  assert.deepEqual(played.lines, ['Resting', 'A person chose this.']);
+  assert.equal(chosenCard({ who: teo, being: true, decider: 'external', deciderChose: false }).lines.at(-1), "Teo's routine.");
+  assert.equal(chosenCard({ who: teo, being: true, decider: 'external' }).chip, 'An outside program');
+  assert.ok(!chosenCard({ who: teo, being: true, decider: 'person', connected: true }).prompts.some(item => item.action === 'run'), 'no Run without a model');
+  const rows = didRows({ events: [
+    { subject_id: 't', tick: 3, event_kind: 'said', document: { thing: { request_id: 'p1', line: 'Hello.', to: null, decider: 'person' } } },
+    { subject_id: 't', tick: 2, event_kind: 'decision_applied', document: { request_id: 'p2', chose: 'rest', origin: 'external' } },
+  ], subjectId: 't', wordGoal: () => null, modelName: () => null });
+  assert.deepEqual(rows.map(row => row.sub), ['A person playing', 'An outside program']);
+}
 console.log('Character view checks passed: names, the doing line, which decision chose, the card, the tag, the ring, the prompt, the run question, the rows and the page camera.');

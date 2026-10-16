@@ -51,12 +51,14 @@ export interface CharacterPresence {
   /** What the question card says; null puts it away. */
   ask(content: QuestionContent | null): void;
   /** Places whichever card is up beside the subject, each frame; null for a subject out of view. */
-  place(at: { readonly bounds: SubjectBounds } | null): void;
+  place(at: { readonly bounds: SubjectBounds; readonly prefer?: 'right' | 'left' | null } | null): void;
   /** Hides the tag and cards while a page is up, and brings them back after. */
   setCovered(covered: boolean): void;
   readonly asking: boolean;
   /** The top of the name tag on screen while it shows, or null: a pop sits 12 px over it. */
   tagTop(): number | null;
+  /** The name tag's box on screen while it shows, so lines over others keep clear of it; else null. */
+  tagBox(): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | null;
   dispose(): void;
 }
 
@@ -81,6 +83,11 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       if (tag.root.hidden) return null;
       const box = tag.root.getBoundingClientRect();
       return box.height ? box.top : null;
+    },
+    tagBox() {
+      if (tag.root.hidden) return null;
+      const box = tag.root.getBoundingClientRect();
+      return box.height ? { x: box.left, y: box.top, width: box.width, height: box.height } : null;
     },
     look(words, head, inspectable = false) {
       if (!words || !head || covered) { tag.hide(); inspect.hidden = true; return; }
@@ -138,8 +145,8 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       if (!at) { card.hide(); question.hide(); return; }
       // Under a page the cards wait.
       if (covered) { card.hide(); question.hide(); return; }
-      if (asked) { card.hide(); question.place(at.bounds); }
-      else if (chosen) { question.hide(); card.place(at.bounds); }
+      if (asked) { card.hide(); question.place(at.bounds, { prefer: at.prefer ?? null }); }
+      else if (chosen) { question.hide(); card.place(at.bounds, { prefer: at.prefer ?? null }); }
     },
     setCovered(on) {
       covered = on;

@@ -1,7 +1,8 @@
 // A world's run while it is open (DESIGN's frame 09): the Running strip at the top centre with its
-// time left, its spending and Stop; the note with why it ended and what it spent; the pops over
-// characters whose model acted; the live dot on their chips. It reads the world's running state
-// every 2.5 s only while a run is open, and once when asked otherwise. Starting and stopping are
+// time left, its spending and Stop; the note with why it ended and what it spent; the live dot on
+// the chips of characters whose model decides. It reads the world's running state every 2.5 s only
+// while a run is open, and once when asked otherwise. The pops over characters who said or chose
+// something come from contextual-world.ts's read while the world plays (T2), on the same cadence. Starting and stopping are
 // entity-execution.mjs's startRun and stopRun; the words are run-words.mjs's.
 import { SocietyControlClient, type SocietyPlaybackControl } from '/src/society-control-api.ts';
 import type { SocietyModels } from '/src/society-models-api.ts';
@@ -10,15 +11,8 @@ import { defaultRunLimits, endedNote, stripWords } from './run-words.mjs';
 import { runStrip, type RunStrip } from './world-ui-character.ts';
 import type { Notes } from './world-ui.ts';
 
-/** How often an open run is read, in milliseconds. */
-const WATCH_MS = 2500;
-
-/** One thing a character's model did in a run, for its pop: a line said, or an action chosen. */
-export interface RunAct {
-  readonly subjectId: string;
-  readonly words: string;
-  readonly said: boolean;
-}
+/** How often an open run is read, in milliseconds, and what was said while the world plays (T2). */
+export const WATCH_MS = 2500;
 
 export interface RunWatch {
   /** The latest read of the world's running state, or null before the first. */
@@ -40,22 +34,18 @@ export interface RunWatch {
   dispose(): void;
 }
 
-export function mountRunWatch({ host, notes, entry, credentials, isCurrent, readOnly, acts, onAct, onChange }: {
+export function mountRunWatch({ host, notes, entry, credentials, isCurrent, readOnly, onChange }: {
   readonly host: HTMLElement;
   readonly notes: Notes;
   readonly entry: { readonly worldId: string; readonly authoredVersionId: string };
   readonly credentials: Record<string, unknown>;
   readonly isCurrent: () => boolean;
   readonly readOnly: boolean;
-  /** Reads what models did in minutes after `fromTick`: the said lines and applied choices. */
-  readonly acts: (fromTick: number) => Promise<readonly RunAct[]>;
-  /** Called for each thing a model did, newest last, while a run is open. */
-  readonly onAct: (act: RunAct) => void;
   readonly onChange: (watch: RunWatch) => void;
 }): RunWatch {
   const controlClient = new SocietyControlClient({ ...credentials, worldId: entry.worldId } as ConstructorParameters<typeof SocietyControlClient>[0]);
   let control: SocietyPlaybackControl | null = null, live = true, timer = 0, requestId: string | null = null;
-  let strip: RunStrip | null = null, seenTick: number | null = null, stopping = false;
+  let strip: RunStrip | null = null, stopping = false;
   const watch: RunWatch = {
     get control() { return control; },
     get run() { return openRun(control); },
@@ -74,7 +64,6 @@ export function mountRunWatch({ host, notes, entry, credentials, isCurrent, read
             return limits;
           } });
         requestId = null;
-        seenTick = control?.currentTick ?? null;
         draw(); schedule(); onChange(watch);
         return null;
       } catch (error) {
@@ -118,13 +107,6 @@ export function mountRunWatch({ host, notes, entry, credentials, isCurrent, read
       control = fresh;
     } catch { return; }
     ended(before);
-    const run = openRun(control);
-    if (run && seenTick !== null && control.currentTick > seenTick) {
-      const from = seenTick + 1;
-      seenTick = control.currentTick;
-      void acts(from).then(list => { if (live) for (const act of list) onAct(act); }, () => {});
-    } else if (run && seenTick === null) seenTick = control.currentTick;
-    if (!run) seenTick = null;
     draw(); onChange(watch); schedule();
   }
   function schedule() {

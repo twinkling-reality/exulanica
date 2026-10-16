@@ -15,6 +15,12 @@ export const CHARACTER_WORDS = Object.freeze({
   writtenByYou: 'Written by you',
   noPersonality: 'No personality yet.',
   routine: 'Routine',
+  /** Who decides where a model does not (T7): the chip on the card and tag, and a row's sub-line. */
+  personPlaying: 'A person playing',
+  outsideProgram: 'An outside program',
+  /** The card's line where a person or an outside program chose what the character does (T7). */
+  personChose: 'A person chose this.',
+  programChose: 'An outside program chose this.',
   noModel: 'No AI model',
   free: 'Free',
   current: 'Current',
@@ -57,9 +63,12 @@ const choices = count => `${count} ${count === 1 ? 'choice' : 'choices'}`;
 
 /**
  * The chosen card's second line: what chose the character's current action. `decision` is the
- * model's decision that set it ({ hhmm, options }), or null when the routine did.
+ * model's decision that set it ({ hhmm, options }), or null when the routine did; `decider`,
+ * `person` or `external`, where a person playing or an outside program chose it (T7).
  */
-export function chosenLine(who, decision) {
+export function chosenLine(who, decision, decider = null) {
+  if (decider === 'person') return CHARACTER_WORDS.personChose;
+  if (decider === 'external') return CHARACTER_WORDS.programChose;
   if (!decision) return `${possessive(who.start)} routine.`;
   const options = Number.isSafeInteger(decision.options) && decision.options > 0 ? `, from ${choices(decision.options)}` : '';
   return `${possessive(who.start)} model chose this at ${decision.hhmm}${options}.`;
@@ -83,11 +92,19 @@ export const whatDid = who => `What ${who.within} did`;
 /** The list when nothing is recorded yet. */
 export const nothingYet = who => `${who.start} has not done anything yet.`;
 
-/** Under one row of What Teo did: the model and its number of choices, or the routine. */
+/**
+ * Under one row of What Teo did: the model and its number of choices, a person playing or an outside
+ * program where one decided (`decider`, T7), or the routine.
+ */
 export function rowSub(decision) {
+  const decided = deciderWords(decision?.decider);
+  if (decided) return decided;
   if (!decision?.model) return CHARACTER_WORDS.routine;
   return Number.isSafeInteger(decision.options) && decision.options > 0 ? `${decision.model} · ${choices(decision.options)}` : decision.model;
 }
+
+/** Who decides where a model does not (T7): "A person playing", "An outside program", or null. */
+export const deciderWords = decider => decider === 'person' ? CHARACTER_WORDS.personPlaying : decider === 'external' ? CHARACTER_WORDS.outsideProgram : null;
 
 /**
  * US dollars spent or allowed, as a person reads them (WORDS.md rule 5): whole cents to two places,
