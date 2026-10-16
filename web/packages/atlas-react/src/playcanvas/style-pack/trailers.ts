@@ -2,7 +2,7 @@ import { LAND_CELL_MM } from '@exulanica/atlas-core';
 import type { SiteLand } from '../generated-site/site-land.js';
 import { SITE_WALKER_RADIUS_M } from '../generated-site/site-navigation.js';
 import { CLIMB_STANDOFF_M, towardSun } from './climbers.js';
-import { slotRectMm, type CoverSlot } from './ground-cover.js';
+import { drapeLiftMm, slotRectMm, slotTopMm, type CoverSlot } from './ground-cover.js';
 import { generator, seedOf } from './seeded.js';
 
 /**
@@ -13,11 +13,13 @@ import { generator, seedOf } from './seeded.js';
  * The drawing states no terrace and no edge: a zone is a level pad in the graded land, and the drop
  * is the land past it, a bank or a retaining cell. So the edge is read from the land. One land cell
  * inside the side is the level; stepping out, the lip is the last point still at the level, and the
- * land must have fallen one cell past it. A wall or boundary box whose outer face is on the side
- * starts the face at its top; else the face starts at the lip. Down the land the face goes on while
- * each step falls faster than the rule's least slope and stays on the straight line from the lip (a
- * plant is rigid). The drop is the level less the land at the foot; a wall's own height does not
- * count. A station is left out where it is not this slot's top, where its side faces away from the
+ * land must have fallen one cell past it. Down the land the face goes on while each step falls faster
+ * than the rule's least slope and stays on the straight line from the lip (a plant is rigid). The drop
+ * is the level less the land at the face's foot. A wall or boundary box whose outer face is on the
+ * side is a parapet: a plant hangs from its top straight down its outer face to the land at its foot,
+ * never out over the land face below, so a plant over a bank stands against the wall and not in the
+ * air before it; the drop is still the land's, and the wall's own height does not count toward it.
+ * A station is left out where it is not this slot's top, where its side faces away from the
  * sun the rule asks for, and where a path or road, a box other than the wall hung over, or water lies
  * across the strip from the level to a walker's reach past the foot, or the foot is under water.
  *
@@ -134,11 +136,11 @@ export type TrailStation = {
   readonly levelMm: number;
   /** The last point out from the level still at the level. */
   readonly lipMm: TrailPointMm;
-  /** Where a plant hangs from: the wall's top outer edge, else the lip. */
+  /** Where a plant hangs from: the parapet's top outer edge, else the lip. */
   readonly topMm: TrailPointMm;
-  /** The last point of the face's straight run. */
+  /** Where the face a plant hangs down ends: the land at the parapet's outer foot, else the last point of the land face's straight run. */
   readonly footMm: TrailPointMm;
-  /** The level less the land at the foot. */
+  /** The level less the land at the foot of the land face's straight run. */
   readonly dropMm: number;
   /** The wall or boundary box the face starts on, by identity; null where the face starts at the lip. */
   readonly wall: string | null;
@@ -197,12 +199,10 @@ export function findTrailEdges(
   const sun = sunAzimuthDeg === null || figures.sun_within_mdeg === undefined ? null : towardSun(sunAzimuthDeg);
   const others = slots.filter((one) => one.identity !== slot.identity);
   const rects = new Map<TrailSlot, Rect>(others.map((one) => [one, slotRectMm(one)]));
-  // A draped slot stands as far above the land under each point as its base stands above the land under its centre.
-  const heightAt = (one: TrailSlot, eastMm: number, northMm: number): number => {
-    const top = one.primitive === 'plane' ? 0 : one.boxMm[2]!;
-    if (one.drape !== true) return one.positionMm[2]! + top;
-    return land.groundMm(eastMm, northMm) + one.positionMm[2]! - land.groundMm(one.positionMm[0]!, one.positionMm[1]!) + top;
-  };
+  // A slot's top at a point, by cover's own rule: a draped slot stands as far above the land under each
+  // point as its base stands above the land under its centre.
+  const lifts = new Map<TrailSlot, number | null>([slot, ...others].map((one) => [one, drapeLiftMm(one, land)]));
+  const heightAt = (one: TrailSlot, eastMm: number, northMm: number): number => slotTopMm(one, lifts.get(one) ?? null, land, eastMm, northMm);
   // Cover's own test: another slot stands on this one at a point, or another plane's surface lies above its own there.
   const covered = (eastMm: number, northMm: number): boolean => {
     const own = heightAt(slot, eastMm, northMm);
@@ -253,8 +253,11 @@ export function findTrailEdges(
       }
       const lip = lo;
       if (!(ground(lip + LAND_CELL_MM) < level - TRAIL_LEVEL_WITHIN_MM)) return { alongMm: along, leftOut: 'no fall' };
-      // The wall: a parapet whose outer face is on the side and spans the station starts the face at its top.
-      const wall = others.find((one) => parapet(one) && Math.abs(outerOf(rects.get(one)!)) <= TRAIL_WALL_FLUSH_MM && spans(rects.get(one)!, along)) ?? null;
+      // The wall: a parapet whose outer face is on the side, spans the station and stands above the land at that face.
+      const flush = others.find((one) => parapet(one) && Math.abs(outerOf(rects.get(one)!)) <= TRAIL_WALL_FLUSH_MM && spans(rects.get(one)!, along)) ?? null;
+      const outer = flush === null ? 0 : outerOf(rects.get(flush)!);
+      const [we, wn] = at(along, outer);
+      const wall = flush !== null && heightAt(flush, we, wn) > ground(outer) ? flush : null;
       // The face: steps out from the lip while each falls faster than the least slope, cut where a point
       // leaves the straight line from the lip.
       const face: [number, number][] = [[lip, ground(lip)]];
@@ -287,12 +290,10 @@ export function findTrailEdges(
       if (!land.dryAt(fe, fn)) return { alongMm: along, leftOut: 'wet foot' };
       const [pe, pn] = at(along, lip);
       const lipMm: TrailPointMm = [pe, pn, ground(lip)];
-      let topMm = lipMm;
-      if (wall !== null) {
-        const [we, wn] = at(along, outerOf(rects.get(wall)!));
-        topMm = [we, wn, heightAt(wall, we, wn)];
-      }
-      return { alongMm: along, leftOut: null, levelMm: level, lipMm, topMm, footMm: [fe, fn, footUp], dropMm: drop, wall: wall?.identity ?? null };
+      // Over a parapet a plant hangs from its top down its outer face, to the land at its foot.
+      const topMm: TrailPointMm = wall === null ? lipMm : [we, wn, heightAt(wall, we, wn)];
+      const footMm: TrailPointMm = wall === null ? [fe, fn, footUp] : [we, wn, ground(outer)];
+      return { alongMm: along, leftOut: null, levelMm: level, lipMm, topMm, footMm, dropMm: drop, wall: wall?.identity ?? null };
     };
     const stations: TrailStation[] = [];
     for (let i = 0; i < count; i += 1) stations.push(stationAt(from + ((to - from) * (i + 0.5)) / count));

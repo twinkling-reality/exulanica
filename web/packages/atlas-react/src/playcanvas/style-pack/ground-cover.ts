@@ -143,6 +143,20 @@ export function slotRectMm(slot: CoverSlot): readonly [number, number, number, n
   return [x! - east, y! - north, x! + east, y! + north];
 }
 
+/**
+ * How far a draped slot stands above the land under its centre, millimetres: it stands as far above
+ * the land under each of its points. Null for a slot that does not follow the land, or with no land.
+ */
+export function drapeLiftMm(slot: CoverSlot, land: Pick<CoverLand, 'groundMm'> | null): number | null {
+  return land === null || slot.drape !== true ? null : slot.positionMm[2]! - land.groundMm(slot.positionMm[0]!, slot.positionMm[1]!);
+}
+
+/** The height of a slot's top at a site point, millimetres (a plane's surface, else its box's top), given its `drapeLiftMm`. */
+export function slotTopMm(slot: CoverSlot, liftMm: number | null, land: Pick<CoverLand, 'groundMm'> | null, eastMm: number, northMm: number): number {
+  const top = slot.primitive === 'plane' ? 0 : slot.boxMm[2]!;
+  return (liftMm === null ? slot.positionMm[2]! : land!.groundMm(eastMm, northMm) + liftMm) + top;
+}
+
 /** The side of a cell of the grid the covering rectangles are found by, millimetres: a bound on the work, not a look. */
 const GRID_MM = 4000;
 
@@ -193,14 +207,9 @@ export function growCover(
   });
   const indexOf = new Map(slots.map((slot, index) => [slot, index]));
   // A draped slot stands as far above the land under each point as its base stands above the land under its centre.
-  const lift = slots.map((slot) => land === null || slot.drape !== true ? null : slot.positionMm[2]! - land.groundMm(slot.positionMm[0]!, slot.positionMm[1]!));
+  const lift = slots.map((slot) => drapeLiftMm(slot, land));
   /** The height of a slot's top at a point, millimetres. */
-  const heightAt = (index: number, eastMm: number, northMm: number): number => {
-    const slot = slots[index]!;
-    const top = slot.primitive === 'plane' ? 0 : slot.boxMm[2]!;
-    const raised = lift[index];
-    return (raised === null || raised === undefined ? slot.positionMm[2]! : land!.groundMm(eastMm, northMm) + raised) + top;
-  };
+  const heightAt = (index: number, eastMm: number, northMm: number): number => slotTopMm(slots[index]!, lift[index] ?? null, land, eastMm, northMm);
   /** Whether another slot stands on `own` at a point, or another plane's surface lies above its own there. */
   const covered = (own: number, eastMm: number, northMm: number, height: number): boolean => {
     for (const index of grid.get(`${String(Math.floor(eastMm / GRID_MM))}|${String(Math.floor(northMm / GRID_MM))}`) ?? []) {

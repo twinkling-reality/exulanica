@@ -1,16 +1,22 @@
+// @vitest-environment happy-dom
 /**
  * Where plants may hang over a terrace's edge: the edge and face finder over a site's land, read
- * side by side of a zone's ground plane, station by station.
+ * side by side of a zone's ground plane, station by station, and the dresser drawing what it finds.
  *
  * The land is synthetic, a real chunk on the 1 m lattice read by the page's own interpolation
  * (`chunkHeightMm`), from a formula per case: a level pad 10 m above the datum under a zone 16 m by
  * 12 m, with a drop, a bank or a rise past its sides. The slots are drawn as a site drawing on land
  * draws them: draped, each a few millimetres above the land by its layer. The plants are stood in
- * for by their authored sizes alone; nothing is drawn.
+ * for by their authored sizes alone, and in the dresser's case by one card each.
  */
-import { chunkHeightMm, type LandChunk } from '@exulanica/atlas-core';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { canonicalJson, chunkHeightMm, readStylePackManifest, resolveStylePack, type LandChunk, type LookFamily, type StylePackManifest } from '@exulanica/atlas-core';
+import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
+import { parseStructuredSiteDrawing, readSiteLand, siteMount } from '../src/playcanvas/generated-site/index.js';
 import { CLIMB_STANDOFF_M } from '../src/playcanvas/style-pack/climbers.js';
+import { packSiteDresser, renderLookOfPreset, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
 import {
   TRAIL_DROP_LEAST_MM, TRAIL_SLOPE_LEAST_PERMILLE, findTrailEdges, growTrailers, trailMatrix, trailRuns,
   type TrailKept, type TrailLand, type TrailPoint, type TrailRule, type TrailSide, type TrailSlot, type TrailStation,
@@ -150,7 +156,7 @@ describe('finding a terrace edge', () => {
     expect(at(east, 24_750).leftOut).toBeNull();
   });
 
-  it('hangs from a flush parapet at its top, and a wall set back from the side blocks', () => {
+  it('hangs from a flush parapet at its top down its outer face, and a wall set back from the side or buried below the lip blocks', () => {
     const land = landOf((east) => LEVEL + eastFall(2000)(east));
     const zone = zoneOf(land);
     const parapet = slotOf(land, 'zone:terrace:wall:0', 'boundary', [35_800, 20_000, 36_000, 26_000], { primitive: 'box', heightMm: 1100 });
@@ -161,10 +167,16 @@ describe('finding a terrace edge', () => {
       expect(found.wall).toBe('zone:terrace:wall:0');
       expect(found.topMm).toEqual([36_000, along, LEVEL + 6 + 1100]);
       expect(found.lipMm).toEqual([36_000, along, LEVEL]);
-      // The wall's own height does not count toward the drop.
+      // A plant hangs down the wall's outer face to the land at its foot, not out over the fall below it.
+      expect(found.footMm).toEqual([36_000, along, LEVEL]);
+      // The wall's own height does not count toward the drop, which is still the land's.
       expect(found.dropMm).toBe(2000);
     }
     for (const along of [27_250, 29_750, 31_750]) expect(at(east, along).leftOut).toBe('box');
+    // A wall on the side whose top stands below the land at its outer face hangs nothing: it is a box in the way.
+    const buried = slotOf(land, 'zone:terrace:wall:2', 'boundary', [35_800, 20_000, 36_000, 26_000], { primitive: 'box', heightMm: 1100, standMm: LEVEL - 2000 });
+    const under = sideOf(findTrailEdges(zone, land, [baseOf(land), zone, buried]), 'east');
+    for (const along of [20_250, 23_250, 25_750]) expect(at(under, along).leftOut).toBe('box');
   });
 
   it('grows only on a side within the rule\'s reach of the sun', () => {
@@ -257,6 +269,21 @@ describe('hanging plants over a terrace edge', () => {
     expect(m[15]).toBe(1);
   });
 
+  it('hangs a plant over a parapet straight down its outer face, facing out, no longer than the wall stands above the land', () => {
+    const land = landOf((east) => LEVEL + eastFall(2000, 500, 8000)(east));
+    const zone = zoneOf(land);
+    const parapet = slotOf(land, 'zone:terrace:wall:0', 'boundary', [35_800, 20_000, 36_000, 32_000], { primitive: 'box', heightMm: 1100 });
+    const points = growTrailers([{ slot: zone, rule: RULE }], land, [baseOf(land), zone, parapet], { sizeOf }).points;
+    expect(points.length).toBeGreaterThan(0);
+    for (const one of points) {
+      expect(one.wall).toBe('zone:terrace:wall:0');
+      expect(one.topM).toEqual([36, one.alongMm / 1000, (LEVEL + 6 + 1100) / 1000]);
+      expect(one.down).toEqual([0, 0, -1]);
+      expect(one.normal).toEqual([1, 0, 0]);
+      expect(one.hangM * 1000).toBeLessThanOrEqual(0.8 * 1106 + 1e-6);
+    }
+  });
+
   it('hangs no plant past the foot of any face it spans', () => {
     // The drop past the east side grows from 1.5 m at its south end to 2 m at its north end.
     const drop = (north: number): number => 1500 + (500 * Math.min(12_000, Math.max(0, north - 20_000))) / 12_000;
@@ -275,5 +302,188 @@ describe('hanging plants over a terrace edge', () => {
       const spanned = faces.filter((face) => face.to > one.alongMm - one.widthMm / 2 && face.from < one.alongMm + one.widthMm / 2);
       expect(one.hangM * 1000).toBeLessThanOrEqual(Math.min(...spanned.map((face) => face.lengthMm)) + 1e-6);
     }
+  });
+});
+
+// Relative to web/, where the suite runs.
+const CASES = JSON.parse(readFileSync('../assets/style-packs/manifest-cases.v1.json', 'utf8')) as {
+  context: { families: Record<string, { fit: LookFamily['fit']; dressing: LookFamily['dressing']; fill_minimum_permille: number; fill_maximum_permille: number }>; texture_sets: string[] };
+  cases: { name: string; manifest: StylePackManifest }[];
+};
+const families = new Map<string, LookFamily>(Object.entries(CASES.context.families).map(([key, entry]) => [key, {
+  fit: entry.fit, dressing: entry.dressing, fillMinimumPermille: entry.fill_minimum_permille, fillMaximumPermille: entry.fill_maximum_permille,
+}]));
+const WINDY = CASES.cases.find((one) => one.name === 'a pack growing grass and flowers on its lawns in a wind')!.manifest;
+/** The windy pack drawing its grounds as plain surfaces, hanging its grass tufts over the edges of whatever is drawn as one. */
+const TRAILING: StylePackManifest = {
+  ...WINDY,
+  surfaces: { ...WINDY.surfaces, 'ground.default': WINDY.surfaces!['wall.default']! },
+  trail: { 'ground.default': { pieces: ['plant.grass_tuft'], share_permille: 500, hang_permille: [500, 500], seed: 3 } },
+};
+const trailingPack = resolveStylePack([readStylePackManifest(TRAILING, { families, textureSets: new Set(CASES.context.texture_sets) })]);
+
+/** The dresser's land, east: level at 10 m to 20 m, falling 2 m across the next cell, then level at 8 m. */
+const stepEast = (east: number): number => (east <= 20_000 ? 10_000 : east >= 21_000 ? 8000 : 10_000 - 2 * (east - 20_000));
+function stepChunk(chunkX: number, chunkY: number): Record<string, unknown> {
+  const height = [];
+  for (let j = 0; j < 129; j += 1) for (let i = 0; i < 129; i += 1) height.push(stepEast(chunkX * 128_000 + i * 1000));
+  return { profile: 'exulanica.landform-chunk/v1', chunk: [chunkX, chunkY], cell_mm: 1000, samples_per_side: 129, height_mm: height };
+}
+const XS = [-400_000, -128_000, 0, 128_000, 400_000], YS = [-400_000, 0, 128_000, 400_000];
+const stepBackdrop = (): Record<string, unknown> => ({
+  profile: 'exulanica.landform-backdrop/v1', near_mm: [-128_000, 0, 128_000, 128_000], x_mm: XS, y_mm: YS,
+  height_mm: YS.flatMap((y) => XS.map((x) => (y < 0 ? -20_000 : stepEast(x)))),
+  water: [{ id: 'sea', kind: 'sea', level_mm: 0, side: 'south' }],
+});
+const digestOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+const named = (document: Record<string, unknown>): string => digestOf(new TextEncoder().encode(canonicalJson(document)));
+
+/**
+ * A site 40 m by 30 m on that land: its base ground over it all, an upper terrace on the level west of
+ * the fall, its east side on the fall's lip, and a lower one on the level east of it, each 6 mm above
+ * the land. Only the upper terrace's east side looks over a drop; neither terrace states a look role
+ * with a trail rule of its own, so each takes the rule of the role its surface is drawn in.
+ */
+function terracesDrawing() {
+  const ground = (identity: string, lookRole: string, rect: readonly [number, number, number, number], upMm: number) => ({
+    identity, part: identity.split(':')[0]!, label: identity, lookRole,
+    positionMm: [(rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2, upMm], yawQuarterTurns: 0,
+    boxMm: [rect[2] - rect[0], rect[3] - rect[1], 0], front: '+y', fit: 'surface', primitive: 'plane', drape: true,
+  });
+  return parseStructuredSiteDrawing({
+    profile: 'exulanica.site-drawing/v5', world_id: 'world:generated:terraces-fixture', receipt_sha256: 'c'.repeat(64),
+    kind: { kind: 'fixture_yard', version: 1, label: 'Terraces' },
+    extent: { widthMm: 40_000, depthMm: 30_000, enclosure: 'open' },
+    arrival: { positionMm: [10_000, 6000, 10_006], facingMm: [0, 1] },
+    slots: [
+      ground('site:ground', 'ground.default', [0, 0, 40_000, 30_000], 10_000),
+      ground('zone:upper', 'ground.terrace', [2000, 5000, 20_000, 25_000], 10_006),
+      ground('zone:lower', 'ground.terrace', [24_000, 5000, 38_000, 25_000], 8006),
+    ],
+    walk: { floorMm: [0, 0, 40_000, 30_000], blockersMm: [], keepOutMm: [] },
+    seats: [],
+    land: {
+      land_sha256: 'd'.repeat(64), chunk_mm: 128_000,
+      chunks: [{ chunk: [-1, 0], sha256: named(stepChunk(-1, 0)) }, { chunk: [0, 0], sha256: named(stepChunk(0, 0)) }],
+      backdrop_sha256: named(stepBackdrop()),
+      water: [{ id: 'sea', kind: 'sea', level_mm: 0, side: 'south' }],
+    },
+  });
+}
+
+/** One upright card for each plant piece, its back 20 mm in front of its foot, handed to the dresser as fetched pieces. */
+function trailingCards(): FetchedPieces {
+  const card = (digest: string) => {
+    const lod0 = {
+      primitives: [{
+        material: 0,
+        positions: new Float32Array([-0.25, 0, 0.02, 0.25, 0, 0.02, 0.25, 0.35, 0.06, -0.25, 0.35, 0.06]),
+        normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+        uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+        indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+      }],
+      materials: [{
+        baseColour: { image: 0, wrapS: 'clamp' as const, wrapT: 'clamp' as const }, normal: null, baseColourFactor: [1, 1, 1, 1] as const,
+        metalness: 0, roughness: 1, alphaCutoff: 0.5, doubleSided: true,
+      }],
+      images: [{ bytes: new Uint8Array(4), mediaType: 'image/png' as const }],
+      triangles: 2,
+      bounds: [-0.25, 0, 0.02, 0.25, 0.35, 0.06] as const,
+    };
+    return { groups: [], triangles: 2, bounds: lod0.bounds, textured: { lod0, lod1: null, lod0Images: [digest], lod1Images: [] } };
+  };
+  const pieces = new Map<string, ReturnType<typeof card>>();
+  for (const role of ['plant.grass_tuft', 'plant.wildflowers']) {
+    const module = trailingPack.modules[role]!;
+    const file = module.files.get(module.variants[0]!.file)!;
+    pieces.set(`${String(module.stated)}:${file.sha256}`, card(file.sha256));
+  }
+  const picture = { width: 2, height: 2, rgba: new Uint8Array(16).fill(200) };
+  return { pieces, pictures: new Map([...pieces.values()].map((piece) => [piece.textured.lod0Images[0]!, picture])) } as unknown as FetchedPieces;
+}
+
+/** Dress the terraces in the trailing pack under its windy look, and say what hung, where, and what was left after. */
+function dressedTerraces() {
+  const drawing = terracesDrawing();
+  const land = readSiteLand(drawing, new Map([['-1,0', stepChunk(-1, 0)], ['0,0', stepChunk(0, 0)]]), stepBackdrop(), digestOf, 1234);
+  const summaries: SiteDressingSummary[] = [];
+  const preset = TRAILING.light!.presets[TRAILING.light!.default_preset]!;
+  const look = renderLookOfPreset(preset, TRAILING.shading!, TRAILING.edge, 1, TRAILING.water);
+  const dresser = packSiteDresser({ pack: trailingPack, families, pieces: trailingCards(), shading: { model: 'pbr', toon: null, ink: null }, look, told: (summary) => summaries.push(summary) });
+  const canvas = document.createElement('canvas');
+  const app = new pc.AppBase(canvas);
+  const options = new pc.AppOptions();
+  options.graphicsDevice = new pc.NullGraphicsDevice(canvas);
+  options.componentSystems = [pc.RenderComponentSystem, pc.CameraComponentSystem, pc.LightComponentSystem];
+  app.init(options);
+  const camera = new pc.Entity('camera');
+  camera.addComponent('camera');
+  app.root.addChild(camera);
+  const environmentRoot = new pc.Entity('environment');
+  app.root.addChild(environmentRoot);
+  let during: { trail: string | undefined; instanced: string | undefined; translations: number[][]; casting: boolean[]; sways: boolean[]; buffers: pc.VertexBuffer[] } | null = null;
+  siteMount(drawing, {
+    servedBytes: 1, land,
+    dress: (host, drawn, dressing, scenery, environment, siteLand) => {
+      const undress = dresser(host, drawn, dressing, scenery, environment, siteLand);
+      const instances = (drawn.root.find((node) => node.name.startsWith('style-pack:instanced:trail:')) as pc.Entity[])
+        .flatMap((cell) => cell.render?.meshInstances ?? []);
+      const translations = instances.filter((instance) => instance.instancingData !== null).flatMap((instance) => {
+        const matrices = new Float32Array(instance.instancingData!.vertexBuffer!.lock());
+        const out: number[][] = [];
+        for (let at = 0; at < instance.instancingCount * 16; at += 16) out.push([matrices[at + 12]!, matrices[at + 13]!, matrices[at + 14]!]);
+        return out;
+      });
+      during = {
+        trail: canvas.dataset['siteTrail'],
+        instanced: canvas.dataset['sitePieceInstances'],
+        translations,
+        // Whether each trailing cell's first level casts a shadow, as the drawing chose at creation.
+        casting: instances.filter((instance) => instance.visible).map((instance) => instance.castShadow),
+        // Whether each trailing cell's material is the wind's.
+        sways: instances.map((instance) => String(instance.material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('transformCoreVS') ?? '').includes('exuWindRestPosition')),
+        buffers: instances.flatMap((instance) => { const buffer = instance.instancingData?.vertexBuffer; return buffer === undefined || buffer === null ? [] : [buffer]; }),
+      };
+      return undress;
+    },
+  }).attach({ app, camera, environmentRoot }).dispose();
+  // The trailing cells' instance buffers still held by the device once the site is taken back.
+  const held = during!.buffers.filter((buffer) => app.graphicsDevice.buffers.has(buffer)).length;
+  return { drawing, land, summary: summaries[0]!, during: during!, after: { trail: canvas.dataset['siteTrail'], held } };
+}
+
+describe('a site on land dressed in a pack with trailing plants', () => {
+  it('hangs them over the upper terrace\'s edge down the fall as instanced pieces just proud of its face, swaying, and takes them back', () => {
+    const { drawing, land, summary, during, after } = dressedTerraces();
+    const upper = drawing.slots.find((slot) => slot.identity === 'zone:upper')!;
+    const lower = drawing.slots.find((slot) => slot.identity === 'zone:lower')!;
+    const sizeOfPiece = (role: string, pick: number) => {
+      const module = trailingPack.modules[role]!;
+      return module.variants[Math.floor(pick * module.variants.length)]!.size_mm;
+    };
+    const rule = trailingPack.trail['ground.default']!;
+    const expected = growTrailers([{ slot: upper, rule }, { slot: lower, rule }], land, drawing.slots, { sizeOf: sizeOfPiece }).points;
+    // Half the 20 m run in tufts 500 mm wide and 350 mm tall, each hanging half the 2.24 m face: seven of them.
+    expect(expected).toHaveLength(7);
+    const said = { pieces: 7, terraces: 1, walled: 0, leftOut: 0, untried: 0 };
+    expect(summary.trail).toEqual(said);
+    expect(JSON.parse(during.trail!)).toEqual(said);
+    expect(JSON.parse(during.instanced!).instances).toBe(7);
+    expect(after).toEqual({ trail: undefined, held: 0 });
+    expect(during.buffers.length).toBeGreaterThan(0);
+    // The face falls 2 m over 1 m east from the lip at 20 m: its normal away from the land is (2, 0, 1) over root 5, east and up.
+    // Each tuft is scaled whole from the card's 0.35 m to its hang, its back (0.02 m out) 30 mm in front of the face at its top.
+    const root5 = Math.sqrt(5);
+    const want = expected.map((point) => {
+      const out = CLIMB_STANDOFF_M - 0.02 * (point.hangM / 0.35);
+      return [20 + (2 / root5) * out, 10 + (1 / root5) * out, -point.alongMm / 1000].map((value) => value.toFixed(3)).join(',');
+    }).sort();
+    expect(during.translations.map((one) => one.map((value) => value.toFixed(3)).join(',')).sort()).toEqual(want);
+    // A plant lying on its face casts no shadow within the trees' reach: it takes the climbers' reach, by default none.
+    expect(during.casting.length).toBeGreaterThan(0);
+    expect(during.casting.every((cast) => !cast)).toBe(true);
+    // The look's wind sways the plant family, and the trailing cells draw with the pieces' own swaying materials.
+    expect(during.sways.length).toBeGreaterThan(0);
+    expect(during.sways.every(Boolean)).toBe(true);
   });
 });

@@ -25,6 +25,7 @@ import { SiteTextures, packTextureSetId } from './site-textures.js';
 import { WaterRipples } from './water-material.js';
 import { coverMatrix, growCover, slotRectMm, type CoverSlot } from './ground-cover.js';
 import { CLIMB_STANDOFF_M, growClimbers, type ClimbSlot } from './climbers.js';
+import { growTrailers, trailMatrix } from './trailers.js';
 import { drawInstancedPieces, type InstancePlacement } from './instanced-pieces.js';
 import { PlantWind, windRuns } from './wind.js';
 import { applyFacadeFinish, clearFacadeWall, facadeApplied, facadeFronts, facadeRuns, facadeWears, litShareOf, setFacadeWall, type FacadeFront } from './facade-finish.js';
@@ -137,6 +138,12 @@ export interface SiteDressingSummary {
   readonly facade?: { readonly walls: number; readonly materials: number };
   /** What climbs the buildings' walls, where the pack states any: its plants, the buildings growing them, the plants the guard left out. */
   readonly climb?: { readonly pieces: number; readonly buildings: number; readonly leftOut: number };
+  /**
+   * What hangs over the terraces' edges, where the pack states trail and the site stands on land: its
+   * plants, the grounds growing any, the plants hung over a wall, the plants the guard left out, and the
+   * stations the bound on stations never read.
+   */
+  readonly trail?: { readonly pieces: number; readonly terraces: number; readonly walled: number; readonly leftOut: number; readonly untried: number };
   /** What grows on the land, where the pack states land cover: its pieces, by surface role, the pieces the guard left out and the points never tried. */
   readonly landCover?: { readonly pieces: number; readonly byRole: Readonly<Record<string, number>>; readonly leftOut: number; readonly untried: number };
   /** How many of the pieces' materials sway, where the look states a wind and the device runs it. */
@@ -452,10 +459,43 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     // drawing's own reach for them (by default none), not the trees' reach.
     const climbView = { ...view, drawing: { ...PIECE_DRAWING_DEFAULTS, shadowReachM: PIECE_DRAWING_DEFAULTS.climbShadowReachM } };
     const climbers = climbPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, climbPlacements, climbView);
+    // What hangs over the terraces' edges of a site on land, where the pack states trail for a ground's
+    // look role, or else for the role its surface is drawn in (as cover's): its textured plant pieces
+    // along each side of the ground's plane where the land falls away past it, each scaled whole to the
+    // share of the face it hangs and laid down the face just proud of it, instanced in cells as the
+    // climbers are and casting within their reach. The base ground is the land itself and grows none.
+    const baseSlot = baseGroundSlot(drawing);
+    const trailing = land === undefined || Object.keys(pack.trail).length === 0 ? null : growTrailers(drawing.slots.flatMap((slot) => {
+      if (slot.identity === baseSlot?.identity || slot.family !== 'ground' || slot.primitive !== 'plane') return [];
+      const entity = drawn.entities.get(slot.identity);
+      if (entity === undefined || !entity.enabled) return [];
+      const resolved = resolve(slot);
+      const drawnAs = resolved === null || resolved.kind === 'module' ? null : resolved.role;
+      const rule = pack.trail[slot.lookRole] ?? (drawnAs === null ? null : pack.trail[drawnAs] ?? null);
+      return rule === null ? [] : [{ slot, rule }];
+    }), land, drawing.slots, {
+      sizeOf: (role, pick) => variantOf(role, pick)?.variant.size_mm ?? null,
+      sunAzimuthDeg: dressing.look?.sun.azimuthDeg ?? null,
+    });
+    const trailPlacements: InstancePlacement[] = [];
+    for (const point of trailing?.points ?? []) {
+      const chosen = variantOf(point.piece, point.pick);
+      const file = chosen === null ? undefined : chosen.module.files.get(chosen.variant.file);
+      const piece = file === undefined ? undefined : pieces.get(chosen!.module, file);
+      if (piece?.textured === undefined || !(piece.bounds[4] > 0)) continue;
+      trailPlacements.push({
+        key: `trail:${String(chosen!.module.stated)}:${file!.sha256}`,
+        lod0: piece.textured.lod0,
+        lod1: piece.textured.lod1,
+        matrix: trailMatrix(point, piece.bounds),
+        heightM: point.hangM,
+      });
+    }
+    // A trailing plant lies on its face as a climbing one on its wall: it takes the climbers' shadow reach.
+    const trailers = trailPlacements.length === 0 ? null : drawInstancedPieces(drawn.root, trailPlacements, climbView);
     // What grows on the land itself, where the pack states land cover: its textured pieces over the
     // near land by the surface role the land is drawn in at each point, kept off the place's own slots
     // (the land under the place, its base ground, grows), instanced in cells like cover.
-    const baseSlot = baseGroundSlot(drawing);
     const landGrown = land === undefined || Object.keys(pack.land_cover).length === 0 ? null : growLandCover(pack.land_cover, {
       chunks: land.chunks, groundMm: land.groundMm, dryAt: land.dryAt, waters: land.section.water, surfaces: dressing.landSurfaces ?? null,
     }, {
@@ -720,8 +760,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (sceneryPieces !== null && canvas?.dataset !== undefined) canvas.dataset['siteSceneryPieces'] = String(sceneryPieces.placed);
     // How many grounds are drawn with a broken border.
     if (bordered.length > 0 && canvas?.dataset !== undefined) canvas.dataset['siteBorders'] = String(bordered.length);
-    // How many textured pieces stand instanced, in how many cells, the site's, the scenery's, the cover's and the climbers'.
-    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null, cover, climbers, landCover].filter((one) => one !== null);
+    // How many textured pieces stand instanced, in how many cells, the site's, the scenery's, the cover's, the climbers' and the trailers'.
+    const instancedParts = [placed.instanced, sceneryPieces?.instanced ?? null, cover, climbers, trailers, landCover].filter((one) => one !== null);
     if (instancedParts.length > 0 && canvas?.dataset !== undefined) {
       canvas.dataset['sitePieceInstances'] = JSON.stringify({
         instances: instancedParts.reduce((sum, one) => sum + one.instances, 0),
@@ -734,6 +774,11 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     // What climbs the walls.
     const climbSaid = climbing === null ? null : { pieces: climbPlacements.length, buildings: climbing.buildings, leftOut: climbing.leftOut };
     if (climbSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteClimb'] = JSON.stringify(climbSaid);
+    // What hangs over the terraces' edges, counted as it was drawn.
+    const trailSaid = trailing === null ? null : {
+      pieces: trailPlacements.length, terraces: trailing.terraces, walled: trailing.walled, leftOut: trailing.leftOut, untried: trailing.untried,
+    };
+    if (trailSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteTrail'] = JSON.stringify(trailSaid);
     // What grows on the land.
     const landCoverSaid = landGrown === null ? null : { pieces: landPlacements.length, byRole: landGrown.byRole, leftOut: landGrown.leftOut, untried: landGrown.untried };
     if (landCoverSaid !== null && canvas?.dataset !== undefined) canvas.dataset['siteLandCover'] = JSON.stringify(landCoverSaid);
@@ -762,6 +807,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       borderNeighboursLeftOut,
       ...(coverSaid === null ? {} : { cover: coverSaid }),
       ...(climbSaid === null ? {} : { climb: climbSaid }),
+      ...(trailSaid === null ? {} : { trail: trailSaid }),
       ...(landCoverSaid === null ? {} : { landCover: landCoverSaid }),
       ...(wind === null ? {} : { swaying: wind.materials }),
       ...(facadeSaid === null ? {} : { facade: facadeSaid }),
@@ -782,6 +828,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (finish !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFinish'];
       if (coverSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCover'];
       if (climbSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteClimb'];
+      if (trailSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteTrail'];
       if (landCoverSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteLandCover'];
       if (wind !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteWind'];
       if (facadeSaid !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteFacade'];
@@ -796,6 +843,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       sceneryPieces?.dispose();
       cover?.dispose();
       climbers?.dispose();
+      trailers?.dispose();
       landCover?.dispose();
       wind?.dispose();
       placed.dispose();
