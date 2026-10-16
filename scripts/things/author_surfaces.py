@@ -13,11 +13,30 @@ from types import MappingProxyType
 from typing import Any
 
 from exulanica.canonical import canonical_json
-from exulanica.things.bodies import build_body, read_body_recipe
+from exulanica.things.bodies import (
+    BodyRecipe,
+    BuiltBody,
+    body_grammars,
+    build_body,
+    read_body_recipe,
+)
 from exulanica.things.body_surfaces import author_surface_look
 from exulanica.things.catalogs import read_body_plan
 from exulanica.things.creatures import Creature
 from exulanica.things.kinds import THING_KIND_PROFILE, read_thing_kind
+
+
+def _body(recipe: BodyRecipe, source: dict[str, Any], origin: dict[str, Any]) -> BuiltBody:
+    """The body the source describes, under the newest body grammar version whose plan is the one
+    its surface pins, so a surface authored on an older grammar is built again exactly; under the
+    newest where none is, which the surface check then refuses by name."""
+    surface = source["surface"]
+    pinned = surface.get("plan_sha256") if isinstance(surface, dict) else None
+    for grammar in body_grammars():
+        built = build_body(recipe, **source["body"], origin=origin, grammar=grammar)
+        if read_body_plan(dict(built.plan)).sha256 == pinned:
+            return built
+    return build_body(recipe, **source["body"], origin=origin)
 
 
 def assemble_authored(source: dict[str, Any]) -> tuple[Creature, dict[str, Any]]:
@@ -33,7 +52,7 @@ def assemble_authored(source: dict[str, Any]) -> tuple[Creature, dict[str, Any]]
         "lineage": dict(origin["lineage"])
         | {"ingredients": list(dict.fromkeys([*origin["lineage"]["ingredients"], recipe.sha256]))}
     }
-    built = build_body(recipe, **source["body"], origin=body_origin)
+    built = _body(recipe, source, body_origin)
     plan = read_body_plan(dict(built.plan))
     look, payload, receipt = author_surface_look(
         source["surface"], built, recipe, **source["look"], origin=origin

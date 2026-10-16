@@ -696,6 +696,16 @@ yet.").
   from a table of square roots, so a recipe builds the same bytes on any machine and a left limb is
   the exact mirror of its right.
 
+A plan's reason names the body grammar version that built it, so the same recipe builds another
+plan under a newer version. Code that builds a kept plan again builds it with `built_again`,
+under the plan's own key, version, title and origin and the version that built it, every version
+being kept as it was published. This covers a creature's look request
+([`creature_look_command.py`](../exulanica/hosting/creature_look_command.py)) and an authored
+surface's check ([`body_surfaces.py`](../exulanica/things/body_surfaces.py)). The authoring script
+([`author_surfaces.py`](../scripts/things/author_surfaces.py)) builds the body under the newest
+version whose plan is the one the surface pins. A creature kept from before a newer version keeps
+its plan, its moves and its looks.
+
 `read_body_plan` reads a plan document with the catalog entries' own field readers, and also:
 every chain is the plan's own bones, parent-linked from the body outward, no bone in two chains,
 each role from the list; at most 128 bones; motions from the vocabulary; an origin record in place
