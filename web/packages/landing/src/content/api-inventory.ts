@@ -18057,6 +18057,381 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/history/moments/{moment_id}/picture",
+    "method": "put",
+    "id": "put_moment_picture_world_versions__version_id__history_moments__moment_id__picture_put",
+    "title": "Put Moment Picture",
+    "description": "Keep the picture a page drew of a moment of this version, unless one is kept already.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "moment_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Moment Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "recipe",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 56,
+          "title": "Recipe"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "image/jpeg": {
+          "schema": {
+            "type": "string",
+            "contentMediaType": "image/jpeg"
+          }
+        },
+        "image/webp": {
+          "schema": {
+            "type": "string",
+            "contentMediaType": "image/webp"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Put Moment Picture World Versions  Version Id  History Moments  Moment Id  Picture Put"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/portraits",
+    "method": "put",
+    "id": "put_portrait_world_portraits_put",
+    "title": "Put Portrait",
+    "description": "Keep a look's portrait in the world, unless one is kept already. A look is named by its\ndigest, not owned: any look may have a portrait in a world the caller holds.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "look_sha256",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Look Sha256"
+        }
+      },
+      {
+        "name": "recipe",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 56,
+          "title": "Recipe"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "image/jpeg": {
+          "schema": {
+            "type": "string",
+            "contentMediaType": "image/jpeg"
+          }
+        },
+        "image/webp": {
+          "schema": {
+            "type": "string",
+            "contentMediaType": "image/webp"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Put Portrait World Portraits Put"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/portraits",
+    "method": "get",
+    "id": "portraits_world_portraits_get",
+    "title": "Portraits",
+    "description": "For each look asked (comma separated digests), its kept portrait by the recipe, or null.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "looks",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 4160,
+          "title": "Looks"
+        }
+      },
+      {
+        "name": "recipe",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 56,
+          "default": "portrait/v1",
+          "title": "Recipe"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Portraits World Portraits Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/pictures/{sha256}",
+    "method": "get",
+    "id": "picture_world_pictures__sha256__get",
+    "title": "Picture",
+    "description": "A kept History picture's bytes in the world, by its digest.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "sha256",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/things/on-support/preview",
     "method": "post",
     "id": "preview_supported_thing_world_versions__version_id__things_on_support_preview_post",

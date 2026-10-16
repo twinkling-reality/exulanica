@@ -332,6 +332,17 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "base_topology_sha256": None,
         },
     },
+    "GET /world/portraits": {"params": {"world_id": FIXTURE_WORLD_ID, "looks": _ZERO_DIGEST}},
+    # A portrait's bytes are the body; the world's lookup comes before they are read for type or
+    # walk. What the History picture routes keep is tests/test_moment_pictures_postgres.py.
+    "PUT /world/portraits": {
+        "params": {
+            "world_id": FIXTURE_WORLD_ID,
+            "look_sha256": _ZERO_DIGEST,
+            "recipe": "portrait/v1",
+        },
+        "content": b"probe",
+    },
     "PUT /world/projects/{project_id}": {
         **_IN_WORLD,
         "json": {"base_revision": 1, "title": "probe", "version_id": str(uuid.uuid4())},
@@ -478,6 +489,11 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /world/versions/{version_id}/environment-instances/{instance_id}/remove": {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
+    # A moment picture's bytes are the body; the world's and version's lookups come first.
+    "PUT /world/versions/{version_id}/history/moments/{moment_id}/picture": {
+        "params": {"world_id": FIXTURE_WORLD_ID, "recipe": "moment-framing/v1"},
+        "content": b"probe",
     },
     "POST /world/versions/{version_id}/inventory/query": {
         **_IN_WORLD,
@@ -1041,15 +1057,18 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         build.invented_digest,
     ),
     # A request is named by 32 hexadecimal characters, so an invented one has that shape too.
-    "/world/github-projects/publications/{request_id}": Owned(
-        build.project_publication, lambda: uuid.uuid4().hex
-    ),
     "/world/github-projects/requests/{request_id}": Owned(
         build.project_request, lambda: uuid.uuid4().hex
+    ),
+    "/world/github-projects/publications/{request_id}": Owned(
+        build.project_publication, lambda: uuid.uuid4().hex
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),
     "/world/invitations/{grant_id}": Owned(build.invitation, owner_succeeds=True),
+    "/world/pictures/{sha256}": Owned(
+        build.history_picture, build.invented_digest, owner_succeeds=True
+    ),
     "/world/piece-requests/{piece_request_id}": Owned(build.piece_request),
     "/world/projects/{project_id}": Owned(build.world_project),
     "/world/projects/{project_id}/items/{item_id}": Owned(build.world_project_item),
@@ -1071,6 +1090,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/environment-instances/{instance_id}": Owned(
         build.environment_instance, build.invented_environment_instance
     ),
+    "/world/versions/{version_id}/history/moments/{moment_id}": Owned(build.history_moment),
     "/world/versions/{version_id}/objects/{object_id}": Owned(
         build.world_object, build.invented_object
     ),

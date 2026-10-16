@@ -160,6 +160,7 @@ from exulanica.api.routes import (
     world_models,
     world_objects,
     world_parts,
+    world_pictures,
     world_projects,
     world_read,
     world_support_placement,
@@ -545,6 +546,7 @@ def create_app(
             *workspace_style_packs.BODY_LIMITS,
             *intake.BODY_LIMITS,
             *world_entries.BODY_LIMITS,
+            *world_pictures.BODY_LIMITS,
         ),
     )
 
@@ -604,6 +606,7 @@ def create_app(
     app.include_router(world_parts.router)
     app.include_router(thing_characters.router)
     app.include_router(world_github_projects.router)
+    app.include_router(world_pictures.router)
     app.include_router(world_support_placement.router)
     app.include_router(world_objects.router)
     app.include_router(world_compositions.router)

@@ -555,6 +555,15 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     # A draft that made its world keeps its sentence with it; the world's erasure, and its
     # workspace's, delete it (0222).
     "0222": DefinerGrants(tables={"world_made_from": frozenset(("SELECT", "INSERT", "DELETE"))}),
+    # A world's identity's trigger deletes its History's moment pictures and portraits before the
+    # identity itself, by the world's key, and a moment's trigger deletes that moment's pictures
+    # before the moment (0223).
+    "0223": DefinerGrants(
+        tables={
+            "world_moment_picture": frozenset(("SELECT", "DELETE")),
+            "world_look_portrait": frozenset(("SELECT", "DELETE")),
+        }
+    ),
 }
 
 

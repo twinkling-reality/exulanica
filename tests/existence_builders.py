@@ -1279,6 +1279,89 @@ def web_picture(owner) -> uuid.UUID:
     return row["picture_id"]
 
 
+def _recorded_moment(owner, version_id: uuid.UUID) -> uuid.UUID:
+    """A moment of the version's society, as a minute records one (0221): one arrival at the first
+    minute, written as the society's engine writes an event, and the moment anchored on it."""
+    from psycopg.types.json import Jsonb
+
+    connection = owner.repository.connection
+    society = connection.execute(
+        "select society_id, engine_version, place_id from world_society "
+        "where workspace_id = %s and world_id = %s and version_id = %s",
+        (owner.workspace_id, WORLD, version_id),
+    ).fetchone()
+    subject, event_id, moment_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    document = {
+        "profile": society["engine_version"],
+        "branch_id": str(version_id),
+        "subject_id": str(subject),
+        "tick": "1",
+        "synthetic": True,
+        "order": "0",
+        "summary": "arrived",
+    }
+    connection.execute(
+        "insert into world_society_event (workspace_id,society_id,event_id,tick,event_kind,"
+        "subject_id,place_id,document,document_sha256) values (%s,%s,%s,1,'arrived',%s,%s,%s,%s)",
+        (
+            owner.workspace_id,
+            society["society_id"],
+            event_id,
+            subject,
+            society["place_id"],
+            Jsonb(document),
+            "0" * 64,
+        ),
+    )
+    connection.execute(
+        "insert into world_society_moment (workspace_id,moment_id,society_id,version_id,tick,kind,"
+        "rule_version,anchor_event_id,event_ids,request_id,subjects,document,document_sha256) "
+        "values (%s,%s,%s,%s,1,'went','society-moment-rules/v1',%s,%s,null,%s,'{}'::jsonb,%s)",
+        (
+            owner.workspace_id,
+            moment_id,
+            society["society_id"],
+            version_id,
+            event_id,
+            [event_id],
+            [subject],
+            "0" * 64,
+        ),
+    )
+    return moment_id
+
+
+def _kept_moment_picture(owner) -> tuple[uuid.UUID, uuid.UUID, str]:
+    """A moment's picture the owner's world keeps, of a moment its version's society recorded,
+    written as a keep writes it (domain: the API refuses a picture of a world that holds a
+    photograph, which the sweep's world is)."""
+    version_id = world_version(owner)
+    moment_id = _recorded_moment(owner, version_id)
+    data = b"a history picture"
+    digest = hashlib.sha256(moment_id.bytes).hexdigest()
+    owner.repository.connection.execute(
+        "insert into world_moment_picture (workspace_id,world_id,version_id,moment_id,recipe,"
+        "media_type,bytes,byte_size,sha256,width,height,taken_by) "
+        "values (%s,%s,%s,%s,'moment-framing/v1','image/jpeg',%s,%s,%s,640,360,%s)",
+        (owner.workspace_id, WORLD, version_id, moment_id, data, len(data), digest, owner.actor),
+    )
+    return version_id, moment_id, digest
+
+
+def history_picture(owner) -> str:
+    """A History picture's digest in the owner's world."""
+    return _kept_moment_picture(owner)[2]
+
+
+def history_moment(owner) -> dict[str, Any]:
+    """A moment of one of the owner's versions that keeps a picture."""
+    version_id, moment_id, _digest = _kept_moment_picture(owner)
+    return {
+        "/world/versions/{version_id}": version_id,
+        "/world/versions/{version_id}/history/moments/{moment_id}": moment_id,
+    }
+
+
 def piece_request(owner) -> uuid.UUID:
     """A requested piece of the owner's world's look, a well in the default pack (domain: the
     API asks only within the workspace's GPU allowance)."""

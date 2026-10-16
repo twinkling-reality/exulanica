@@ -80,6 +80,14 @@ NAMING_NO_SOCIETY = frozenset(
 )
 
 
+#: Tables that record a society only through another of its records, whose rows a definer trigger
+#: on that record deletes before it, so society_erase_rows reaches them without naming them: a
+#: moment's pictures go with their moment (0223), by the trigger named here.
+ERASED_BY_THEIR_RECORD = {
+    "world_moment_picture": ("world_society_moment", "tg_world_society_moment_takes_its_pictures")
+}
+
+
 def _readable(value: bytes) -> bytes:
     """A bytea value as its words are: gunzipped where it is stored compressed (a comparison's
     drawings and hours)."""
@@ -263,7 +271,18 @@ def test_every_table_that_records_a_society_is_erased_with_it_and_only_by_it(app
         "select pg_get_functiondef('society_erase_rows(uuid,uuid)'::regprocedure) as body"
     ).fetchone()["body"]
     erased = set(re.findall(r"delete from (\w+)", body))
-    assert erased == records | NAMING_NO_SOCIETY
+    assert erased == (records - ERASED_BY_THEIR_RECORD.keys()) | NAMING_NO_SOCIETY
+    # Each table erased through its record: that record is erased here, and its trigger runs
+    # before the record's own delete.
+    for table, (record, trigger) in ERASED_BY_THEIR_RECORD.items():
+        assert table in records and record in erased, (table, record)
+        timing = connection.execute(
+            "select tgtype from pg_trigger where tgname = %s and tgrelid = %s::regclass",
+            (trigger, record),
+        ).fetchone()
+        assert timing is not None, (table, trigger)
+        # A row-level BEFORE DELETE trigger: bits 1 (row), 2 (before) and 8 (delete) of tgtype.
+        assert timing["tgtype"] & 0b1011 == 0b1011, (trigger, timing["tgtype"])
     guarded = {
         row["tab"]
         for row in connection.execute(

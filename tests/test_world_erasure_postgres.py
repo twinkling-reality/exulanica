@@ -66,6 +66,8 @@ ERASED_WITH_PARTICIPATION = "participation_erase(uuid,text)"
 #: A saved world's picture hangs from its entry alone (0218): the entry's own BEFORE DELETE trigger
 #: runs this definer, which deletes the picture as world_erase_rows deletes the entry.
 ERASED_WITH_ITS_ENTRY = "saved_world_entry_picture_erase()"
+#: The world identity's own trigger: deletes its History's pictures before it (0223).
+ERASED_WITH_ITS_IDENTITY = "world_history_pictures_erase()"
 PARTICIPATION_GUARD = "tg_participation_record_guard"
 #: The guard 0182 put on a society's tables, and the one this erasure puts on a world's.
 SOCIETY_GUARD = "tg_society_record_erased_whole"
@@ -319,14 +321,46 @@ def _budgets_and_citations(existence, scratch: str) -> None:
 
 
 def _pictures(admin) -> None:
-    """A picture for every saved world of every workspace, written by the schema's owner (0218)."""
+    """A picture for every saved world of every workspace (0218), a moment's picture for a moment of
+    every society that has an event (each society given one moment where it has none, 0221) and a
+    look's portrait in each saved world's world (0223), written by the schema's owner. A world with
+    no society has no moment, so no moment's picture."""
     data = b"a picture"
+    digest = hashlib.sha256(data).hexdigest()
     admin.execute(
         "insert into saved_world_entry_picture (workspace_id,entry_id,media_type,bytes,byte_size,"
         "sha256,width,height,authored_version_id,authored_state_sha256,style_version_id,taken_by) "
         "select e.workspace_id,e.entry_id,'image/jpeg',%s,%s,%s,640,360,e.authored_version_id,"
         "e.authored_state_sha256,e.style_version_id,e.created_by from saved_world_entry e",
-        (data, len(data), hashlib.sha256(data).hexdigest()),
+        (data, len(data), digest),
+    )
+    admin.execute(
+        "insert into world_society_moment (workspace_id,moment_id,society_id,version_id,tick,kind,"
+        "rule_version,anchor_event_id,event_ids,request_id,subjects,document,document_sha256) "
+        "select distinct on (s.workspace_id,s.society_id) s.workspace_id,gen_random_uuid(),"
+        "s.society_id,s.version_id,e.tick::integer,'met','society-moment-rules/v1',e.event_id,"
+        "array[e.event_id],null,array[e.subject_id],'{}'::jsonb,repeat('0',64) "
+        "from world_society s join world_society_event e "
+        "on e.workspace_id = s.workspace_id and e.society_id = s.society_id "
+        "where not exists (select 1 from world_society_moment m "
+        "where m.workspace_id = s.workspace_id and m.society_id = s.society_id) "
+        "order by s.workspace_id,s.society_id,e.tick,e.event_id"
+    )
+    admin.execute(
+        "insert into world_moment_picture (workspace_id,world_id,version_id,moment_id,recipe,"
+        "media_type,bytes,byte_size,sha256,width,height,taken_by) "
+        "select m.workspace_id,s.world_id,m.version_id,m.moment_id,'moment-framing/v1',"
+        "'image/jpeg',%s,%s,%s,640,360,s.created_by from world_society_moment m "
+        "join world_society s on s.workspace_id = m.workspace_id and s.society_id = m.society_id "
+        "on conflict do nothing",
+        (data, len(data), digest),
+    )
+    admin.execute(
+        "insert into world_look_portrait (workspace_id,world_id,look_sha256,recipe,media_type,"
+        "bytes,byte_size,sha256,width,height,taken_by) "
+        "select e.workspace_id,e.world_id,%s,'portrait/v1','image/jpeg',%s,%s,%s,256,256,"
+        "e.created_by from saved_world_entry e on conflict do nothing",
+        (digest, data, len(data), digest),
     )
 
 
@@ -357,6 +391,7 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
         "participation_redemption_refusal"  # This workspace-wide audit is no single world's.
     }
     by_entry = _deleted_by(admin, ERASED_WITH_ITS_ENTRY)
+    by_identity = _deleted_by(admin, ERASED_WITH_ITS_IDENTITY)
     # What the entry's trigger deletes is reached only because the trigger runs on the entry's own
     # delete, which world_erase_rows makes: before each row's delete, as the definers' owner.
     assert "saved_world_entry" in by_world
@@ -374,15 +409,33 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
         "from pg_proc p where p.oid = %s::regprocedure",
         (ERASED_WITH_ITS_ENTRY,),
     ).fetchone()["definer"]
-    assert by_world | by_society | by_participation | by_entry == (hanging - {ERASURE_RECORD}) | {
-        NAMING_NO_KEY
-    }
+    # So is what the world identity's trigger deletes: world_erase_rows deletes the identity last.
+    assert "world_identity" in by_world
+    assert (
+        admin.execute(
+            "select count(*) as n from pg_trigger where tgrelid = 'world_identity'::regclass "
+            "and tgfoid = %s::regprocedure and not tgisinternal "
+            "and (tgtype & 1) = 1 and (tgtype & 2) = 2 and (tgtype & 8) = 8",
+            (ERASED_WITH_ITS_IDENTITY,),
+        ).fetchone()["n"]
+        == 1
+    )
+    assert admin.execute(
+        "select p.prosecdef and pg_get_userbyid(p.proowner) = 'exulanica_definer' as definer "
+        "from pg_proc p where p.oid = %s::regprocedure",
+        (ERASED_WITH_ITS_IDENTITY,),
+    ).fetchone()["definer"]
+    assert by_world | by_society | by_participation | by_entry | by_identity == (
+        hanging - {ERASURE_RECORD}
+    ) | {NAMING_NO_KEY}
     # What its societies' erasure leaves is the world's own to delete: every table that carries
     # the world's id, and every table no society's erasure deletes from.
     assert (hanging & _with_column(admin, "world_id")) - {
         ERASURE_RECORD
-    } <= by_world | by_participation
-    assert hanging - by_society - {ERASURE_RECORD} <= by_world | by_participation | by_entry
+    } <= by_world | by_participation | by_identity
+    assert hanging - by_society - {ERASURE_RECORD} <= (
+        by_world | by_participation | by_entry | by_identity
+    )
     assert REGISTRATION in by_world and KEPT_KINDS not in by_world
 
     guards = {
@@ -397,7 +450,9 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
     by_world_s_guard = {table for table, name in guards if name == WORLD_GUARD}
     # piece_output never had a delete guard (0175), and world_minds_budget's is its own.
     own = {"piece_output", "world_minds_budget"}
-    assert by_world_s_guard == ((by_world | by_entry | {KEPT_KINDS}) - by_society_s_guard - own)
+    assert by_world_s_guard == (
+        (by_world | by_entry | by_identity | {KEPT_KINDS}) - by_society_s_guard - own
+    )
     assert not by_world_s_guard & by_society_s_guard
     assert {table for table, name in guards if name == PARTICIPATION_GUARD} == (
         by_participation | {"participation_redemption_refusal"}
@@ -411,7 +466,7 @@ def test_every_table_that_hangs_from_a_world_is_erased_with_it_and_guarded(exist
             "and privilege_type = 'DELETE'"
         ).fetchall()
     }
-    required_delete = by_world | by_participation | by_entry | {KEPT_KINDS}
+    required_delete = by_world | by_participation | by_entry | by_identity | {KEPT_KINDS}
     assert required_delete <= may_delete, sorted(required_delete - may_delete)
 
 
@@ -498,6 +553,8 @@ def test_one_world_is_erased_whole_and_every_other_world_keeps_every_row(existen
     # Saved worlds' pictures (0218): some world keeps one, so a delete too wide would show; the
     # erasure of a world that has one is test_saved_entry_pictures_postgres.py's.
     assert sum(1 for world in worlds if before[world]["saved_world_entry_picture"]) >= 1
+    # A moment's picture (0223) too, of a moment its society recorded.
+    assert sum(1 for world in worlds if before[world]["world_moment_picture"]) >= 1
     for table, count in (
         ("world_minds_budget", 1),
         ("companion_answer_simulation_citation", 1),
