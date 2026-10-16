@@ -154,7 +154,8 @@ def _manifest_sets(manifest_raw: bytes) -> tuple[Mapping[str, Any], ...]:
     """The manifest's set rows, read strictly, with the fields this module compares typed."""
     manifest = read_document(manifest_raw, "manifest")
     sets = manifest.get("sets") if isinstance(manifest, Mapping) else None
-    _require(isinstance(sets, list), "the manifest is not a texture manifest")
+    if not isinstance(sets, list):
+        raise MaterialObjectError("the manifest is not a texture manifest")
     for entry in sets:
         _require(
             isinstance(entry, Mapping)

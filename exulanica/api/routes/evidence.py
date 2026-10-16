@@ -154,9 +154,9 @@ def masked(
     selection = selected_image(
         connection, session.workspace_id, address.blob_id.digest, evaluation_time(connection)
     )
-    selected = selection.sha256 if selection is not None else None
-    if selected is None:
+    if selection is None:
         raise HTTPException(409, "current viewer image is unavailable")
+    selected = selection.sha256
     try:
         data = store.get(BlobId(selected))
     except (BlobNotFoundError, IntegrityError) as error:

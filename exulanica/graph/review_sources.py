@@ -67,7 +67,7 @@ def review_source_rows(
                 state="available" if available else "unavailable_asset",
                 reason=None if available else "Current authorized viewer bytes are unavailable.",
                 evidence_path=f"/evidence/{row['span_id']}/masked" if available else None,
-                content_sha256=selected.hex() if available else None,
+                content_sha256=selected.hex() if selected is not None and available else None,
                 person_regions=regions.get(str(row["capture_id"]), []),
                 person_review_state=states.get(str(row["capture_id"]), "unscreened"),
             )

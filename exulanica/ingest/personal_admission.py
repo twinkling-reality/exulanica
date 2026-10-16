@@ -308,6 +308,7 @@ def execute(manifest: Manifest, data: bytes, pipeline: PhotoIngestPipeline) -> d
         if screening is None or screening.authorization_id != authorization.authorization_id:
             raise ValueError("screening does not belong to this authority")
     if manifest.operation in {"detect", "mask", "retry", "geometry-check"}:
+        assert screening is not None, "each operation here records or reads its screening above"
         check = (
             require_privacy_screening
             if manifest.operation == "geometry-check"
@@ -722,8 +723,9 @@ def admit_batch(
     if len({member.capture_id for member in body.members}) != len(body.members):
         raise ValueError("a batch must name each capture exactly once")
     reviewing = body.operation == "review"
+    reviewer_name = (body.reviewed_by_name or "").strip()
     if reviewing:
-        if not (body.reviewed_by_name or "").strip() or body.attestation != HUMAN_ATTESTATION:
+        if not reviewer_name or body.attestation != HUMAN_ATTESTATION:
             raise ValueError(
                 "an explicit named human exact-byte review and attestation are required"
             )
@@ -771,9 +773,7 @@ def admit_batch(
             raise ValueError("source bytes do not match the exact batch digest and size")
     scope: dict[str, Any] = {"purpose": body.purpose}
     if reviewing:
-        scope.update(
-            reviewed_by_name=body.reviewed_by_name.strip(), human_attestation=body.attestation
-        )
+        scope.update(reviewed_by_name=reviewer_name, human_attestation=body.attestation)
     if body.model_rights:
         # The wording each right was granted against, inside the authority the screening receipt
         # hashes, so what the person was shown is fixed by the same digest as the review itself.

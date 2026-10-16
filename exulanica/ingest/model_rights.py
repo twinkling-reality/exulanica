@@ -575,13 +575,13 @@ def require_model_right(
         )
     # Unknown is required. Only an explicit exemption, evaluated here, spares a capture a right.
     required = checked["required"] is not False
-    if required and stated is None:
-        raise ModelRightRefused(
-            "undeclared",
-            "this model does not state which model it is or where the bytes go, so no right can "
-            "name it and a personal photograph is not sent to it",
-        )
     if required:
+        if stated is None:
+            raise ModelRightRefused(
+                "undeclared",
+                "this model does not state which model it is or where the bytes go, so no "
+                "right can name it and a personal photograph is not sent to it",
+            )
         for identity, allowed in zip(identities, checked["allowed"], strict=True):
             if not allowed:
                 raise _refusal(repository, capture_id, identity, stated.destination, at)

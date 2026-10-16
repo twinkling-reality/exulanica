@@ -1010,14 +1010,15 @@ class _Checker:
                 in (segment.start_node_identity, segment.end_node_identity)
             }
             listed = [self.carried(identity) for identity in junction.segment_identities]
-            carried_listed = {segment.identity for segment in listed if segment is not None}
+            carried_segments = [segment for segment in listed if segment is not None]
+            carried_listed = {segment.identity for segment in carried_segments}
             if carried_listed != touching:
                 raise _fail(
                     "junction_segments", f"junction {junction.identity} lists other segments"
                 )
-            if node is not None and None not in listed:
+            if node is not None and len(carried_segments) == len(listed):
                 directions = []
-                for segment in listed:
+                for segment in carried_segments:
                     line = segment.centreline_mm
                     away = (
                         line[1]

@@ -328,9 +328,9 @@ def _degrees_e7(components: Any, ref: Any) -> int | None:
     if not isinstance(components, tuple | list) or len(components) != 3:
         return None
     parts = [_rational(component) for component in components]
-    if any(part is None for part in parts):
-        return None
     degrees, minutes, seconds = parts  # type: ignore[misc]
+    if degrees is None or minutes is None or seconds is None:
+        return None
     total = degrees + minutes / 60 + seconds / 3600
     scaled = total * 10_000_000
     value = round_half_down(scaled.numerator, scaled.denominator)

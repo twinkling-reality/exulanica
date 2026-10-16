@@ -190,7 +190,8 @@ def descriptor(
             pose_input_sha256=frame["sha256"],
             selected_sha256=selected.hex() if selected else None,
         )
-        require(selected is not None, "current_viewer_image_unavailable")
+        if selected is None:
+            raise ViewError("current_viewer_image_unavailable")
         require(selected.hex() == frame["sha256"], "viewer_pose_transform_unrecorded")
         span = connection.execute(
             "select span_id from evidence_span where workspace_id=%s and blob_sha256=%s "
@@ -245,9 +246,8 @@ def verify_view(view: dict[str, Any], record: dict[str, Any], data: bytes | None
         value = view.get("photo_bytes")
         if "photo_bytes" not in view:
             return {"state": "unavailable", "reason": "legacy_view_binding_missing"}
-        require(
-            isinstance(value, dict) and value.get("profile") == PROFILE, "view_descriptor_malformed"
-        )
+        if not (isinstance(value, dict) and value.get("profile") == PROFILE):
+            raise ViewError("view_descriptor_malformed")
         if value.get("state") == "unavailable":
             require(
                 isinstance(value.get("reason"), str) and bool(value["reason"]),

@@ -367,11 +367,14 @@ def _why(
     """
     names = {frame.sha256: frame.filename for frame in truth.frames}
 
+    def stored_at(digest: str) -> str:
+        instant = stored.get(digest)
+        return instant.isoformat() if instant else "nothing"
+
     def described(digests: set[str]) -> str:
         return ", ".join(
             f"{names.get(digest, digest[:12])} "
-            f"(manifest {by_instant[digest].isoformat()}, stored "
-            f"{stored[digest].isoformat() if stored.get(digest) else 'nothing'})"
+            f"(manifest {by_instant[digest].isoformat()}, stored {stored_at(digest)})"
             for digest in sorted(digests, key=lambda d: names.get(d, d))
         )
 

@@ -101,12 +101,13 @@ def derive_questions(truth: GroundTruth) -> GoldQuestions:
             )
         )
 
-    timed = [
+    recoverable = [
         (frame, _instant(frame.utc_instant or ""))
         for frame in truth.frames
         if frame.instant_is_recoverable_from_the_file
     ]
-    if any(instant is None for _, instant in timed):
+    timed = [(frame, instant) for frame, instant in recoverable if instant is not None]
+    if len(timed) != len(recoverable):
         raise ValueError("a recoverable manifest frame must carry an absolute instant")
     for trip in truth.trips:
         instants = sorted(instant for frame, instant in timed if frame.trip == trip)
