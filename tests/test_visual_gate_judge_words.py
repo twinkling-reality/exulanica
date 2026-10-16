@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from exulanica.evaluation import visual_gate
+from exulanica.evaluation import visual_gate_words
 from exulanica.evaluation.gate_keys import (
     ANSWER_OPTIONS,
     ANSWER_REQUIREMENT,
@@ -99,7 +99,7 @@ _THE_WORDS = frozenset({"words", "text"})
 
 def _folded(text: str) -> str:
     """Text as refuse_private_words compares it. Imported behaviour, restated nowhere else."""
-    return visual_gate._folded(text)
+    return visual_gate_words._folded(text)
 
 
 def _attributed_to(holder: dict, judge: str) -> bool:

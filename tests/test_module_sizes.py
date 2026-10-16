@@ -58,10 +58,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         "with the version's changes to a site's made parts",
     ),
     "exulanica/world/society_things.py": (2_291, "the society of things, exulanica-society/v7"),
-    "exulanica/evaluation/visual_gate.py": (
-        2_257,
-        "a visual gate record built from measured inputs",
-    ),
     "exulanica/graph/reconstruction_scenes.py": (
         2_185,
         "validated multi-photograph reconstruction scenes for the graph snapshot",
