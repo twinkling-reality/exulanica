@@ -39,11 +39,11 @@ touch are two segments and the naming flow can tell them apart.
 receipt digests, the member list, the placement's point maps, the exact segmentation artifact of
 every member, every person region by its digest, and the Gaussian source. Each segment also names
 the regions and point maps it rests on. The graph reader in
-``exulanica/graph/reconstruction_scenes.py`` refuses the whole artifact when a scene-level binding
-or an object mask input has moved, and withholds a single segment when a region it rests on has
-changed, a point map it came from is purged, or the person it depicts is no longer shown. It
-parses these bytes itself, because ``graph`` and ``ingest`` are siblings that may not import each
-other; a test pins the two spellings together.
+``exulanica/graph/reconstruction_scenes_segments.py`` refuses the whole artifact when a
+scene-level binding or an object mask input has moved, and withholds a single segment when a
+region it rests on has changed, a point map it came from is purged, or the person it depicts is
+no longer shown. It parses these bytes itself, because ``graph`` and ``ingest`` are siblings
+that may not import each other; a test pins the two spellings together.
 
 **Privacy-bearing, unlike the projection.** A person segment is where a person's body is in the
 scene. It is written only under the rule above, it carries a subject reference and never a name,
@@ -113,9 +113,9 @@ __all__ = [
     "validate_scene_segments",
 ]
 
-#: Spelled here and again in ``exulanica/graph/reconstruction_scenes.py``, because the layers
-#: contract forbids either sibling importing the other. A test pins the spellings together and the
-#: stage registry's ``output_kind`` to this one.
+#: Spelled here and again in ``exulanica/graph/reconstruction_scenes_segments.py``, because the
+#: layers contract forbids either sibling importing the other. A test pins the spellings together
+#: and the stage registry's ``output_kind`` to this one.
 SCENE_SEGMENTS_KIND: Final = "scene_segments"
 SCENE_SEGMENTS_STAGE: Final = "scene_segments"
 SCENE_SEGMENTS_PROFILE: Final = "exulanica.scene-segments/v1"

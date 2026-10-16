@@ -58,10 +58,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         "with the version's changes to a site's made parts",
     ),
     "exulanica/world/society_things.py": (2_291, "the society of things, exulanica-society/v7"),
-    "exulanica/graph/reconstruction_scenes.py": (
-        2_185,
-        "validated multi-photograph reconstruction scenes for the graph snapshot",
-    ),
     "exulanica/reconstruction/standpoint.py": (
         2_163,
         "photographs from one standpoint, joined by the rotation between them",

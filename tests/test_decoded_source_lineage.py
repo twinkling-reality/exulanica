@@ -470,7 +470,7 @@ def test_legacy_masked_depth_and_segmentation_versions_require_rebuild(upload, m
         )
         result = pipeline.ingest_derivatives(capture, privacy_screening_id=screening)
         assert result.error is None, result.error
-    from exulanica.graph.reconstruction_scenes import _SEGMENT_OBJECT_MASKS
+    from exulanica.graph.reconstruction_scenes_segments import _SEGMENT_OBJECT_MASKS
     from exulanica.ingest.scene_segments import _OBJECT_MASKS
 
     connection, workspace = upload.repository.connection, upload.repository.workspace_id

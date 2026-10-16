@@ -113,7 +113,7 @@ __all__ = [
 ]
 
 #: The output kind and profile. The kind is spelled again in ``exulanica/ingest/scene_segments.py``
-#: and in ``exulanica/graph/reconstruction_scenes.py`` and a test pins the three together.
+#: and in ``exulanica/graph/reconstruction_scenes_segments.py`` and a test pins the three together.
 OBJECT_MASK_KIND: Final = "object_mask_list"
 OBJECT_MASK_PROFILE: Final = "exulanica.object-mask-list/v1"
 

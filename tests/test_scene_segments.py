@@ -21,7 +21,7 @@ import pytest
 from exulanica.consent.regions import Silhouette, region_key
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.region import PPM, DisplayGeometry, Rect
-from exulanica.graph import reconstruction_scenes as reader
+from exulanica.graph import reconstruction_scenes_segments as reader
 from exulanica.graph.asset_read_policy import clear_scene_inputs_memo
 from exulanica.graph.reconstruction_scenes import clear_placement_memo, scene_segments_read
 from exulanica.ingest import scene_segments as lift
