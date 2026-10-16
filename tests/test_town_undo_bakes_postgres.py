@@ -5,12 +5,13 @@ baking, as a kept change queues them, through every route that reverses an edit
 
 Against PostgreSQL as the runtime role, on a small town made through the API, its changes written
 as the parts routes write them and undone and redone through the routes; the jobs are read as the
-owner. Where nothing is drained, every job a step queued is still queued after it.
+owner. Where nothing is drained, every job a step queued is still queued after it. The town is made
+under one fixed identity, so every run makes the same town.
 
 *   ``things/undo`` and ``things/redo`` queue the tiles each step leaves changed, and none twice;
 *   ``objects/undo`` (the page's Take back and the agent's undo) and ``environment-instances/undo``
     queue them too, found before the edit takes the workspace's lock, and a stale base is refused
-    as it always was;
+    as it always was; a redo finds the tiles of the change it puts back before the lock too;
 *   a tile whose bake failed because the version changed again is queued again by the undo that
     brings the version back, and is then baked.
 """
@@ -22,7 +23,7 @@ from exulanica.grammar.grammars.city.generation.massing import (
     BuildingChange,
     BuildingStoreysRefused,
 )
-from exulanica.world import version_tiles
+from exulanica.world import saved_entries, version_tiles
 from exulanica.world.generated_worlds import town_records, town_records_with
 from exulanica.world.objects import ElementOverride
 from exulanica.world.town_parts import town_buildings
@@ -41,9 +42,20 @@ from test_version_tiles_postgres import Town, _town  # noqa: F401
 pytestmark = pytest.mark.postgres
 
 
+#: The small town's identity, so every run makes the same town: one in which a building other than
+#: the first stands a storey taller with the first removed, and each change alters tiles. A town
+#: made under a fresh identity each run sometimes has no such building.
+TOWN = "world:generated:00000000-0000-4000-8000-000000000001"
+
+
 @pytest.fixture(name="made")
 def _made_alias(request):  # type: ignore[no-untyped-def]
     return request.getfixturevalue("imported_made")
+
+
+@pytest.fixture(autouse=True)
+def _the_same_town_on_every_run(monkeypatch):  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(saved_entries, "new_world_id", lambda kind: TOWN)
 
 
 def _queued(town: Town) -> list[tuple[tuple[int, int], str, str]]:
@@ -118,6 +130,25 @@ def _edit(town: Town, path: str) -> None:
     assert response.status_code == 200, response.text
 
 
+def _remakings_watched(monkeypatch) -> list[int]:  # type: ignore[no-untyped-def]
+    """Each remaking of the town with changes from now on, as how many advisory locks the remaking
+    connection held then: 0 throughout means none ran under the edit's workspace lock."""
+    held: list[int] = []
+    made_with = version_tiles.town_records_with
+
+    def watched(connection, *args, **kwargs):  # type: ignore[no-untyped-def]
+        with connection.cursor(row_factory=dict_row) as cursor:
+            row = cursor.execute(
+                "select count(*) as n from pg_locks where locktype = 'advisory' "
+                "and pid = pg_backend_pid() and granted"
+            ).fetchone()
+        held.append(row["n"])
+        return made_with(connection, *args, **kwargs)
+
+    monkeypatch.setattr(version_tiles, "town_records_with", watched)
+    return held
+
+
 def _forget(town: Town) -> None:
     """Forget, in this process, the tiles any change of the town alters, as a process that never
     found them starts."""
@@ -188,19 +219,7 @@ def test_every_undo_route_queues_a_town_change_s_tiles_found_before_the_edit_s_l
     assert _queued(town) == []
 
     _forget(town)
-    held: list[int] = []
-    made_with = version_tiles.town_records_with
-
-    def watched(connection, *args, **kwargs):  # type: ignore[no-untyped-def]
-        with connection.cursor(row_factory=dict_row) as cursor:
-            row = cursor.execute(
-                "select count(*) as n from pg_locks where locktype = 'advisory' "
-                "and pid = pg_backend_pid() and granted"
-            ).fetchone()
-        held.append(row["n"])
-        return made_with(connection, *args, **kwargs)
-
-    monkeypatch.setattr(version_tiles, "town_records_with", watched)
+    held = _remakings_watched(monkeypatch)
     _edit(town, route)
     assert _changes(town) == alone
     assert set(_queued(town)) == removed_set
@@ -233,3 +252,24 @@ def test_an_undo_queues_again_the_tiles_whose_bakes_failed_on_a_later_change(tow
     assert len(baked) == len(first)
     assert {o.status for o in baked} == {"baked"}
     assert {t.state for t in town.tiles()} == {"baked"}
+
+
+def test_a_redo_queues_the_tiles_of_the_change_it_puts_back_found_before_the_edit_s_lock(
+    town, monkeypatch
+):
+    removed = town.buildings()[0]
+    taller, storeys = _taller(town, removed)
+    town.change(ElementOverride(f"part:{taller}", suppressed=False, storeys=storeys), taller)
+    both = _changes(town)
+    _edit(town, "things/undo")
+    assert _changes(town) == {removed: BuildingChange(removed=True)}
+    both_set = _expected(town, both)
+
+    _forget(town)
+    held = _remakings_watched(monkeypatch)
+    _edit(town, "things/redo")
+    assert _changes(town) == both
+    assert both_set <= set(_queued(town))
+    # The town was made again with the change the redo restores, never while the edit held its lock.
+    assert held
+    assert set(held) == {0}
