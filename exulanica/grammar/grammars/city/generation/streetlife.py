@@ -54,6 +54,7 @@ from exulanica.grammar.grammars.city.corners import along, walk_round_face
 from exulanica.grammar.grammars.city.descriptor import CITY_SURFACES
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
+    admits,
     catalog,
     derived,
     entry,
@@ -237,12 +238,12 @@ def _trees(
         highest = _support_top_near(
             grounds, x - radius, y - radius, x + radius, y + radius, on_land
         )  # type: ignore[operator]
-        clear = derived(
-            context,
-            "tree_trunk_clear_height_mm",
-            face,
-            minimum=max(_CLEAR_LOW_MM, highest + _CAPSULE_HEIGHT_MM - z),
-        )
+        needed = max(_CLEAR_LOW_MM, highest + _CAPSULE_HEIGHT_MM - z)
+        if on_land and not admits(context, "tree_trunk_clear_height_mm", minimum=needed):
+            # The ground under its crown stands higher than a trunk of this street's range clears:
+            # no tree here, as where one would crowd another.
+            continue
+        clear = derived(context, "tree_trunk_clear_height_mm", face, minimum=needed)
         half = pit // 2
         extent = Extent(
             min(x - half, x - radius),  # type: ignore[operator]

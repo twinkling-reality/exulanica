@@ -205,6 +205,18 @@ def derived(
     return pick(context, name, ordinal, allowed)
 
 
+def admits(
+    context: StageContext, name: str, *, minimum: int | None = None, maximum: int | None = None
+) -> bool:
+    """Whether :func:`derived` would give the integer parameter ``name`` a value within ``minimum``
+    and ``maximum``: the narrowing meets its declared range and holds the value a scope binds."""
+    spec = CITY_SURFACES[context.grammar_version].parameters.get(name)
+    low = spec.minimum if minimum is None else max(spec.minimum, minimum)
+    high = spec.maximum if maximum is None else min(spec.maximum, maximum)
+    bound = context.parameters.get(name)
+    return low <= high and (bound is None or low <= bound <= high)  # type: ignore[operator]
+
+
 def covering(*extents: Extent) -> Extent:
     """The smallest extent containing every one given."""
     return Extent(

@@ -131,14 +131,20 @@ def is_shop_bay(bay: facade.GroundBayRecord) -> bool:
 
 
 def shop_units(bays: Sequence[facade.GroundBayRecord]) -> list[list[facade.GroundBayRecord]]:
-    """A face's shop units: runs of shop bays, each from its door, in order along the face."""
+    """A face's shop units: runs of shop bays, each from its door, in order along the face.
+
+    Shopfronts standing before a run's first door (on land, where the door a shop's first bay
+    would have stepped too high above its footway is a window) belong to the shop that door
+    opens."""
     units: list[list[facade.GroundBayRecord]] = []
     for bay in sorted(bays, key=lambda item: item.bay_ordinal):
         if not is_shop_bay(bay):
             continue
         starts = bay.bay_kind == "entrance"
         follows = units and units[-1][-1].bay_ordinal == bay.bay_ordinal - 1
-        if starts or not follows:
+        if starts and follows and not any(b.bay_kind == "entrance" for b in units[-1]):
+            units[-1].append(bay)
+        elif starts or not follows:
             units.append([bay])
         else:
             units[-1].append(bay)
@@ -527,6 +533,8 @@ def _generate(context: StageContext, at_threshold: bool = False) -> Iterator[obj
                     lot.threshold_offset_mm,
                     building.storeys,
                 )
+                if at_threshold and curb is not None:
+                    kinds = _shop_doors_within_a_step(kinds, layout, (start, end), run, base, curb)
                 for bay_ordinal, kind in enumerate(kinds):
                     u0 = layout.margin_start_mm + bay_ordinal * layout.pitch_mm
                     u1 = u0 + layout.pitch_mm
@@ -671,6 +679,31 @@ def _bay_kinds(
             for index in group[1:]:
                 kinds[index] = "shopfront"
     return kinds
+
+
+def _shop_doors_within_a_step(
+    kinds: list[str],
+    layout: facade.BayLayout,
+    line: tuple[tuple[int, int], tuple[int, int]],
+    run: int,
+    base: int,
+    curb: streets.CurbEdgeRecord,
+) -> list[str]:
+    """On land: each shop door whose threshold would stand more than an entrance's step above the
+    footway under it is a shopfront, the shop entered by its next door along the face
+    (:func:`shop_units`). Where a frontage climbs, a level ground floor meets its footway lower at
+    one end than the other, and the bay at the low end is a window there rather than a door."""
+    most = _field(facade.ENTRANCE_SHAPE, "step_height_mm").maximum
+    (x0, y0), (x1, y1) = line
+    held = list(kinds)
+    for ordinal, kind in enumerate(kinds):
+        if kind != "shop_door":
+            continue
+        centre = layout.margin_start_mm + ordinal * layout.pitch_mm + layout.pitch_mm // 2
+        door = (x0 + (x1 - x0) * centre // run, y0 + (y1 - y0) * centre // run)
+        if base - footway_surface_at(curb, door) > most:
+            held[ordinal] = "shopfront"
+    return held
 
 
 def _panels(

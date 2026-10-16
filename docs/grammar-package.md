@@ -384,6 +384,17 @@ same places along it. A row that keeps within the bound stands on the middle lin
 5 place every row there, so only a candidate earlier versions refused generates differently
 (`tests/test_city_rooftop_rows.py`).
 
+Nor is a town on its land refused for one door or one tree its slope makes unfit. A lot stands level
+at the highest its footway reaches along its frontage, so on a climbing street a shop door near the
+frontage's low end would stand more than the entrance record's step (600 mm) above the footway under
+it: version 6 lays that bay out as a shopfront, and the shop is entered by its next door along the
+face (a face's shopfronts before its first door belong to the shop that door opens; a shop left with
+no door is still refused). A street tree whose crown would hang over a lot standing above its
+footway, so that no trunk height in the street's range clears it, is not planted there, as a tree
+that would crowd another is not, and no other tree moves. A door or a tree that fits stands as it
+did, so only a candidate that was refused for one generates differently; versions 1 to 5 lay out
+every door and tree as before (`tests/test_city_town_on_land_parts.py`).
+
 The record shapes are in `exulanica/grammar/grammars/city/` (`common.py` holds what every record
 shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data. Every version
 declares the same record kinds at the same versions; a facade's own `grammar_version` states the
