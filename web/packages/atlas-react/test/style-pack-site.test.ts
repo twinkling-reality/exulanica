@@ -472,6 +472,62 @@ describe('a building a pack dresses with one piece', () => {
   });
 });
 
+describe('a building whose drawing states its storeys, dressed with a piece that repeats its storey', () => {
+  // Appearance catalog version 3, where a structure fills its box.
+  const V3 = JSON.parse(readFileSync('../assets/catalogs/world-kinds/look-family.v3.json', 'utf8')) as typeof CATALOG;
+  const filling = new Map<string, LookFamily>(V3.entries.map((entry) => [entry.key, {
+    fit: entry.fit, dressing: entry.dressing, fillMinimumPermille: entry.fill_minimum_permille, fillMaximumPermille: entry.fill_maximum_permille,
+  }]));
+  /** One 1 m storey of a 6 m front, 2 m before the piece's middle: the whole of its height repeats. */
+  const STOREY = paletteGlb([{ points: [[-3, 0, 2], [3, 0, 2], [3, 1, 2], [-3, 1, 2]], normal: [0, 0, 1], srgb: LEAF }]);
+  const storeyPack = (): ResolvedStylePack => {
+    const manifest = structuredClone(CASES.cases.find((c: { name: string }) => c.name === 'a complete pack with no base').manifest);
+    manifest['palette'].swatches.push({ key: 'leaf', srgb8: [...LEAF], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 });
+    manifest['surfaces'] = { 'wall.default': { swatch: 'cream', up: null } };
+    manifest['modules'] = {
+      'structure.default': { variants: [{ file: 'pieces/storey.glb', lod1: null, size_mm: [6000, 4000, 1000], stretch_mm: [null, null, null], repeat_mm: [null, null, [0, 1000]] }] },
+    };
+    manifest['files'] = [{ path: 'pieces/storey.glb', sha256: createHash('sha256').update(STOREY).digest('hex'), bytes: STOREY.byteLength, media_type: 'model/gltf-binary' }];
+    return resolveStylePack([readStylePackManifest(manifest, { families: filling, textureSets: new Set<string>(CASES.context.texture_sets) })]);
+  };
+  /** The heights, in metres, at which the hall's piece draws its storey lines, with or without the storey height it states. */
+  const storeyLines = async (stated: boolean): Promise<number[]> => {
+    const pack = storeyPack();
+    const pieces = await fetchPackPieces(pack, ['structure.default'], TABLE, async () => STOREY);
+    const hall = { ...slot('hall', 'structure.hall', 'none', [6000, 8000, 0], 0, [6000, 4000, 3600]), ...(stated ? { storeyHeightMm: 1200 } : {}) };
+    const site = parseStructuredSiteDrawing({
+      profile: 'exulanica.site-drawing/v1', world_id: 'world-storeys', receipt_sha256: 'a'.repeat(64),
+      kind: { kind: 'fixture_hall', version: 1, label: 'Hall' },
+      extent: { widthMm: 12_000, depthMm: 12_000, enclosure: 'open' },
+      arrival: { positionMm: [6000, 2000, 0], facingMm: [0, 1] },
+      slots: [hall, { ...slot('hall:wall:0', 'wall.default', 'box', [6000, 6000, 0], 0, [6000, 200, 3600], 'surface'), structure: 'hall' }],
+      walk: { floorMm: [0, 0, 12_000, 12_000], blockersMm: [], keepOutMm: [] },
+      seats: [],
+    });
+    const dresser = packSiteDresser({ pack, families: filling, pieces, shading: PBR });
+    let lines: number[] = [];
+    const mount = siteMount(site, {
+      servedBytes: 1,
+      dress: (host, drawn, drawing) => {
+        const undress = dresser(host, drawn, drawing);
+        const render = (drawn.root.findByName('style-pack:pieces') as pc.Entity).render!;
+        const positions: number[] = [];
+        render.meshInstances.find((instance) => instance.material.name === 'style-pack:swatch:leaf')!.mesh.getPositions(positions);
+        lines = [...new Set(positions.filter((_, i) => i % 3 === 1).map((up) => Math.round(up * 1000)))].sort((a, b) => a - b).map((mm) => mm / 1000);
+        return undress;
+      },
+    });
+    mount.attach(nullApp()).dispose();
+    return lines;
+  };
+
+  it('draws a copy for each of the storeys the drawing states, on the drawing\'s storey lines', async () => {
+    // 3.6 m in three 1200 mm storeys: three copies at 1200 per mille, where the piece's own 1 m storey alone draws four of 900 mm.
+    expect(await storeyLines(true)).toEqual([0, 1.2, 2.4, 3.6]);
+    expect(await storeyLines(false)).toEqual([0, 0.9, 1.8, 2.7, 3.6]);
+  });
+});
+
 /** A place of one ground over its whole extent and one wall, in the served shape: 40 m by 30 m. */
 const placeOn = (ground: string, enclosure: 'open' | 'indoor' = 'open'): StructuredSiteDrawing => parseStructuredSiteDrawing({
   profile: 'exulanica.site-drawing/v1',

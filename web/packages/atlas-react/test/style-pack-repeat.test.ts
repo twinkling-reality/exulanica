@@ -239,6 +239,24 @@ describe('a piece that repeats its bays and storeys', () => {
     pieces.dispose();
   });
 
+  it('draws a storey a copy where the slot states its building\'s storey height', async () => {
+    const host = app();
+    const { pack, pieces } = await loaded(host);
+    // 6.6 m of six 1100 mm storeys leaves 5.6 m over the base and under the top: five storeys of
+    // 1120 mm, where the piece's own 1 m storey alone draws six.
+    const root = new pc.Entity('root');
+    const dressing = dressSlots(root, [{ ...slot([20_000, 100, 6600]), storeyHeightMm: 1100 }], pack, families, pieces, SHADING);
+    const heights = [...new Set(markers(root).map((key) => key.split(',')[1]!))].map(Number).sort((a, b) => a - b);
+    expect(heights).toEqual([0, 1, 2, 3, 4].map((k) => Number((0.5 + (k + 0.5) * 1.12).toFixed(3))));
+    expect(markers(root)).toHaveLength(25);
+    expect(Math.max(...corners(root).map(([, up]) => up!))).toBeCloseTo(6.6, 5);
+    const plain = new pc.Entity('plain');
+    const unstated = dressSlots(plain, [slot([20_000, 100, 6600])], pack, families, pieces, SHADING);
+    expect(markers(plain)).toHaveLength(30);
+    for (const one of [dressing, unstated]) one.dispose();
+    pieces.dispose();
+  });
+
   it('keeps the primitive for a box narrower than its ends, past the drawing\'s triangles, or a textured piece', async () => {
     const host = app();
     const camera = new pc.Entity('camera');

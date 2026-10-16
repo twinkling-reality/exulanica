@@ -18,7 +18,8 @@ import { swatchMaterial } from './swatch-material.js';
  * the front sees it; never a reflection. The family's fit (`fit` in the pack module) scales each
  * axis, stretches a stated zone so a frame keeps its bars whatever the hole, or repeats a stated
  * zone so a building keeps its bays and storeys whatever its box; a tiled family repeats the piece
- * along the width. A repeated zone is baked copy by copy: each triangle belongs, by its centroid, to
+ * along the width. A building slot that states its storey height repeats up a copy a storey of its
+ * drawing. A repeated zone is baked copy by copy: each triangle belongs, by its centroid, to
  * the part below the zone, the zone or the part above it on each repeating axis (the server holds
  * every triangle to one part), and a triangle of the zone is copied once for each copy. A slot whose
  * copies would bake more triangles than the drawing's `repeatedTrianglesMost` keeps its primitive.
@@ -53,6 +54,8 @@ export interface PieceSlot {
    * the land under it as the slot's base stands above the land under its base's centre.
    */
   readonly drape?: true;
+  /** A building's own storey height, where its drawing states one: a piece that repeats up draws a copy a storey. */
+  readonly storeyHeightMm?: number;
 }
 
 export interface SlotDressing {
@@ -183,7 +186,10 @@ export function dressSlots(
   for (const slot of slots) {
     const captured = capture?.identities.has(slot.identity) ? new SwatchBatch() : null;
     let captureRefused = false;
-    const dressing = resolveLookRole(pack, { identity: slot.identity, lookRole: slot.lookRole, positionMm: slot.positionMm, yawQuarterTurns: 0, boxMm: slot.boxMm }, families, 'module');
+    const dressing = resolveLookRole(pack, {
+      identity: slot.identity, lookRole: slot.lookRole, positionMm: slot.positionMm, yawQuarterTurns: 0, boxMm: slot.boxMm,
+      ...(slot.storeyHeightMm === undefined ? {} : { storeyHeightMm: slot.storeyHeightMm }),
+    }, families, 'module');
     const module = dressing?.kind === 'module' ? pack.modules[dressing.role] : undefined;
     const piece = dressing?.kind === 'module' && module !== undefined ? pieces.get(module, dressing.file) : undefined;
     if (dressing?.kind !== 'module' || module === undefined || piece === undefined) {

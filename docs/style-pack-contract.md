@@ -170,8 +170,13 @@ scale is nearest 1 by ratio (the fewer copies on a tie), at most 64 an axis, and
 within the family's bounds, else the variant does not fit. What lies below the zone keeps its place
 and what lies above it follows the last copy, so a building keeps its end walls, ground storey and
 cornice and repeats its bays across and its storeys up: a front of 600 mm ends about a 3.8 m bay
-meets a 20 m box with five bays at 989 per mille. A variant with no `repeat_mm` repeats nothing,
-and its manifest keeps its bytes. Every triangle of a repeating piece lies wholly below, inside or
+meets a 20 m box with five bays at 989 per mille. Up a building whose drawing states its storey
+height, the count is instead the one whose copy is nearest that storey by ratio: each copy is
+exactly a storey tall where what lies below and above the zone is a whole number of storeys (a zone
+spanning the piece's height draws one copy for each of the building's storeys), and otherwise as
+near it as a whole number of copies allows; where those copies fall outside the family's bounds,
+and in a drawing that states no storey height, the count is the one above. A variant with no
+`repeat_mm` repeats nothing, and its manifest keeps its bytes. Every triangle of a repeating piece lies wholly below, inside or
 above each zone on its axis (the check holds this, section 11), so the page assigns each triangle
 by its centroid and the copies join without a crack; a triangle of two zones is drawn once for
 every pair of copies. A normal in a copy turns by the inverse of the copy's scale.

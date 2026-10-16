@@ -1227,6 +1227,11 @@ export interface StyleSlot {
   readonly positionMm: readonly [number, number, number];
   readonly yawQuarterTurns: 0 | 1 | 2 | 3;
   readonly boxMm: readonly [number, number, number];
+  /**
+   * The storey height of the building the slot is, in millimetres, where its drawing states one: a
+   * piece that repeats up draws a copy a storey (`fit`). Absent on every other slot.
+   */
+  readonly storeyHeightMm?: number;
 }
 
 export type Dressing =
@@ -1303,21 +1308,31 @@ export function repeatCoordinate(repeat: AxisRepeat, p: number, part: -1 | 0 | 1
 }
 
 /**
- * How many copies of a zone `length` long fill `room`, each scaled alike: the count whose scale is
- * nearest 1 by ratio (the fewer on a tie), at most `STYLE_PACK_MAX_REPEAT_COPIES`; null when no count
- * leaves the copies within the family's bounds.
+ * How many copies of a zone `length` long fill `room`, each scaled alike, at most
+ * `STYLE_PACK_MAX_REPEAT_COPIES`: where a building's `storey` height is given, the count whose copy
+ * is nearest the storey by ratio, so the copies follow the drawing's storeys; else, or where
+ * those copies fall outside the family's bounds, the count whose scale is nearest 1 by ratio. The
+ * fewer on a tie either way; null when no count leaves the copies within the family's bounds.
  */
-function repeatCopies(family: LookFamily, room: number, length: number): { readonly copies: number; readonly scale: number } | null {
+function repeatCopies(family: LookFamily, room: number, length: number, storey?: number): { readonly copies: number; readonly scale: number } | null {
   if (!(room > 0)) return null;
-  const ideal = room / length;
-  const counts = [...new Set([Math.floor(ideal), Math.ceil(ideal)].map((n) => Math.min(STYLE_PACK_MAX_REPEAT_COPIES, Math.max(1, n))))];
-  let best: { copies: number; scale: number } | null = null;
-  for (const copies of counts) {
+  for (const unit of storey === undefined ? [length] : [storey, length]) {
+    const copies = nearestCount(room, unit);
     const scale = room / (copies * length);
-    if (best === null || Math.abs(Math.log(scale)) < Math.abs(Math.log(best.scale))) best = { copies, scale };
+    if (scale * 1000 >= family.fillMinimumPermille && scale * 1000 <= family.fillMaximumPermille) return { copies, scale };
   }
-  const ok = best!.scale * 1000 >= family.fillMinimumPermille && best!.scale * 1000 <= family.fillMaximumPermille;
-  return ok ? best : null;
+  return null;
+}
+
+/** The whole number of copies, from 1 to the most, whose share of `room` is nearest `unit` by ratio, the fewer on a tie. */
+function nearestCount(room: number, unit: number): number {
+  const ideal = room / unit;
+  const counts = [...new Set([Math.floor(ideal), Math.ceil(ideal)].map((n) => Math.min(STYLE_PACK_MAX_REPEAT_COPIES, Math.max(1, n))))];
+  let best = counts[0]!;
+  for (const copies of counts) {
+    if (Math.abs(Math.log(room / (copies * unit))) < Math.abs(Math.log(room / (best * unit)))) best = copies;
+  }
+  return best;
 }
 
 /** FNV-1a over UTF-8: the variant a part's identity picks, the same in every runtime. */
@@ -1367,7 +1382,7 @@ export function resolveLookRole(
       for (let step = 0; step < count; step += 1) {
         const index = (first + step) % count;
         const variant = module.variants[index]!;
-        const fitted = fit(kind, variant.size_mm, slot.boxMm, variant.stretch_mm, variant.repeat_mm);
+        const fitted = fit(kind, variant.size_mm, slot.boxMm, variant.stretch_mm, variant.repeat_mm, slot.storeyHeightMm);
         if (fitted === null) continue;
         return {
           kind: 'module', role, variant: index,
@@ -1386,8 +1401,9 @@ export function resolveLookRole(
  * to fit inside (contain); each axis to the box (fill), by repeating its repeat zone where the
  * variant states one, every copy within the family's bounds, by its stretch zone where it states
  * one and the box leaves the zone some length, else by scaling within the family's bounds; copies
- * along the width, each scaled to share it exactly (tile). Scales, stretches and repeats are on glTF
- * axes: x width, y height, z depth.
+ * along the width, each scaled to share it exactly (tile). Up a building whose drawing states its
+ * `storeyMm`, a repeat draws a copy a storey (`repeatCopies`). Scales, stretches and repeats are on
+ * glTF axes: x width, y height, z depth.
  */
 export function fit(
   family: LookFamily,
@@ -1395,6 +1411,7 @@ export function fit(
   box: readonly [number, number, number],
   stretch: StylePackVariant['stretch_mm'] = [null, null, null],
   repeat: StylePackVariant['repeat_mm'] = [null, null, null],
+  storeyMm?: number,
 ): { readonly scale: readonly [number, number, number]; readonly stretch: AxisStretches; readonly repeat: AxisRepeats; readonly copies: number } | null {
   const [w, d, h] = size;
   const [bw, bd, bh] = box;
@@ -1410,7 +1427,7 @@ export function fit(
         const step = repeat[i]!;
         if (step !== null) {
           const length = step[1] - step[0];
-          const copied = repeatCopies(family, box[i]! - (size[i]! - length), length);
+          const copied = repeatCopies(family, box[i]! - (size[i]! - length), length, i === 2 ? storeyMm : undefined);
           return copied === null ? null : { scale: 1, stretch: null, repeat: { low: step[0], high: step[1], copies: copied.copies, scale: copied.scale, box: box[i]! } };
         }
         const zone = stretch[i]!;

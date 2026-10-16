@@ -163,6 +163,7 @@ function pieceSlot(slot: SiteSlot): PieceSlot {
     front: FRONTS[slot.yawQuarterTurns]!,
     boxMm: slot.boxMm,
     ...(slot.drape === true ? { drape: true as const } : {}),
+    ...(slot.storeyHeightMm === undefined ? {} : { storeyHeightMm: slot.storeyHeightMm }),
   };
 }
 

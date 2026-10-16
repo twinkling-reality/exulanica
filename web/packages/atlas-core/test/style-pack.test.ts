@@ -263,6 +263,26 @@ describe('fitting a piece to a slot', () => {
       .toMatchObject({ copies: STYLE_PACK_MAX_REPEAT_COPIES });
     expect(fit(fill, [300, 100, 2000], [10200, 100, 2000], [null, null, null], [[100, 200], null, null])).toBeNull();
   });
+  it('repeats up a copy a storey where the building states its storey height, else as before', () => {
+    // A storey spanning the piece's height in a 6 m building of five 1200 mm storeys: five copies,
+    // each a storey tall, where the piece's own 1 m storey alone takes six.
+    const whole = [null, null, [0, 1000]] as const;
+    expect(fit(fill, [5000, 100, 1000], [5000, 100, 6000], [null, null, null], whole, 1200)!.repeat[1]).toMatchObject({ copies: 5, scale: 1.2 });
+    expect(fit(fill, [5000, 100, 1000], [5000, 100, 6000], [null, null, null], whole)!.repeat[1]).toMatchObject({ copies: 6, scale: 1 });
+    // A 900 mm storey between a 500 mm base and a 500 mm top, together one of a 6 m building's six
+    // 1000 mm storeys: five copies, each exactly a storey, where alone it takes six at 926 per mille.
+    const between = [null, null, [500, 1400]] as const;
+    const storeyed = fit(fill, [5000, 100, 1900], [5000, 100, 6000], [null, null, null], between, 1000)!.repeat[1]!;
+    expect(storeyed.copies).toBe(5);
+    expect(storeyed.scale * 900).toBeCloseTo(1000, 9);
+    expect(fit(fill, [5000, 100, 1900], [5000, 100, 6000], [null, null, null], between)!.repeat[1]).toMatchObject({ copies: 6 });
+    // Three 2000 mm storeys would stretch each copy past the bound: the piece keeps its own count.
+    expect(fit(fill, [5000, 100, 1900], [5000, 100, 6000], [null, null, null], between, 2000))
+      .toEqual(fit(fill, [5000, 100, 1900], [5000, 100, 6000], [null, null, null], between));
+    // A storey height counts only up: two 4700 mm storeys leave the 20 m front its five bays, not four.
+    expect(fit(fill, [5000, 100, 2000], [20000, 100, 9400], [null, null, null], [[600, 4400], null, [500, 1500]], 4700)!.repeat[0])
+      .toMatchObject({ copies: 5 });
+  });
   it('places each part of a repeated axis: below in place, each copy along, above after the last', () => {
     const repeat = { low: 600, high: 4400, copies: 5, scale: 18800 / 19000, box: 20000 };
     expect([0, 599, 600, 4400, 4401].map((p) => repeatPart(repeat, p))).toEqual([-1, -1, 0, 0, 1]);
