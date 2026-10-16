@@ -119,6 +119,7 @@ def _read(container: bytes) -> dict[str, Any]:
     header = json.loads(container[8 : 8 + length])
     sections = {(s["projection"], s["name"]): s for s in header["sections"]}
     triangles: dict[str, list[list[list[int]]]] = {}
+    indices: dict[str, list[tuple[int, ...]]] = {}
     for projection in header["projections"]:
         name = projection["name"]
         position, index = sections[(name, "position_mm")], sections[(name, "index")]
@@ -133,13 +134,47 @@ def _read(container: bytes) -> dict[str, Any]:
             [[offsets[corners[t * 3 + c] * 3 + a] + origin[a] for a in range(3)] for c in range(3)]
             for t in range(projection["triangle_count"])
         ]
-    return {"header": header, "triangles": triangles}
+        indices[name] = [corners[t * 3 : t * 3 + 3] for t in range(projection["triangle_count"])]
+    return {"header": header, "triangles": triangles, "indices": indices}
 
 
 def _entries(tile: dict[str, Any], projection: str) -> list[tuple[str, dict[str, Any]]]:
     header = tile["header"]
     [found] = [p for p in header["projections"] if p["name"] == projection]
     return [(header["records"][e["record"]]["kind"], e) for e in found["entries"]]
+
+
+def test_no_drawn_surface_has_a_corner_its_faces_turn_away_from_each_other(baked):
+    # A renderer's normal at a corner is the sum of its triangles' facings over their surface: where
+    # they face exactly opposite ways it is nothing, the tile is refused and the town does not open.
+    for tile in baked:
+        triangles, indices = tile["triangles"]["render_batch"], tile["indices"]["render_batch"]
+        for kind, entry in _entries(tile, "render_batch"):
+            for surface in entry.get("surfaces", []):
+                first, count = surface["first_triangle"], surface["triangle_count"]
+                sums: dict[int, list[float]] = {}
+                for triangle in range(first, first + count):
+                    facing = _unit_normal(triangles[triangle])
+                    for corner in indices[triangle]:
+                        total = sums.setdefault(corner, [0.0, 0.0, 0.0])
+                        for axis in range(3):
+                            total[axis] += facing[axis]
+                for corner, total in sums.items():
+                    assert sum(value * value for value in total) > 1e-12, (
+                        tile["tile"],
+                        kind,
+                        surface["role"],
+                        surface["orientation"],
+                        corner,
+                    )
+
+
+def _unit_normal(triangle: list[list[int]]) -> tuple[float, float, float]:
+    (ax, ay, az), (bx, by, bz), (cx, cy, cz) = triangle
+    u, v = (bx - ax, by - ay, bz - az), (cx - ax, cy - ay, cz - az)
+    n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+    size = sum(value * value for value in n) ** 0.5
+    return (0.0, 0.0, 0.0) if size == 0 else (n[0] / size, n[1] / size, n[2] / size)
 
 
 def _upright(triangle: list[list[int]]) -> bool:

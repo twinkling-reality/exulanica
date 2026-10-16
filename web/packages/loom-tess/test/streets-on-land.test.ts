@@ -285,6 +285,31 @@ describe('the steps at a frontage, between a footway and the lot behind it', () 
     expect(new Set(triangles(step).map((triangle) => Math.sign(normal(...triangle)[1])))).toEqual(new Set([-1, 1]));
   });
 
+  it('turns round at the millimetre where the footway meets the lot, so no part faces both ways', () => {
+    // Where the crossing falls between millimetres, a cut at the floor of its share leaves the
+    // footway a millimetre short of the lot there, and the part beyond would stand on both sides of
+    // the lot's grade: its two triangles would face opposite ways at the corners they share, and a
+    // renderer's normal there would be nothing at all.
+    // A kerb line rising 1,576 mm over 38.5 m, as a town on a hillside's does, and lots whose corners
+    // fall between its whole millimetres of height (the first, 26 m long, is the town's own).
+    const hillside: Point[] = [[15_400, 3_500, 6_482 - UP], [53_900, 3_500, 8_058 - UP]];
+    for (const to of [41_277, 41_281, 41_293, 41_311, 41_337, 41_359, 41_383]) {
+      const [from, grade] = [14_600, 6_562];
+      const step = stepsOf(hillside, from, to, grade);
+      const facing = new Map<number, number>();
+      for (let corner = 0; corner < step.triangles.length; corner += 3) {
+        const at = [0, 1, 2].map((k) => step.triangles[corner + k]!);
+        const [a, b, c] = at.map((v): Point => [step.vertices[v * 3]!, step.vertices[v * 3 + 1]!, step.vertices[v * 3 + 2]!]);
+        const side = Math.sign(normal(a!, b!, c!)[1]);
+        for (const vertex of at) {
+          expect(facing.get(vertex) ?? side, `a corner of the step from ${from} to ${to} at a grade of ${grade}`).toBe(side);
+          facing.set(vertex, side);
+        }
+      }
+      expect(new Set(facing.values())).toEqual(new Set([-1, 1]));
+    }
+  });
+
   it('turns round where the footway falls past the lot, as where it climbs past it', () => {
     const grade = backAt(descending, 40_000);
     const step = stepsOf(descending, 30_000, 50_000, grade);

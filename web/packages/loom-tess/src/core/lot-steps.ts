@@ -191,10 +191,14 @@ function atFrontage(steps: Steps, lot: SteppedLot, frontage: LotFrontage, tile: 
     const [z0, z1] = [subtract(footway(before), lot.gradeMm, where), subtract(footway(place), lot.gradeMm, where)];
     if (multiply(z0, z1, where) < 0) {
       // Where the footway passes the lot's grade the step turns round: the place of the crossing, its
-      // run times the share of the climb below it, with the climb made positive.
+      // run times the share of the climb below it, with the climb made positive. The footway's own
+      // heights are floored along its kerb line, so that place can fall a millimetre short of the
+      // grade, where the part beyond it would stand on both sides of the grade and face both ways:
+      // the cut is the place nearest it where the footway meets the grade exactly.
       const run = subtract(place, before, where);
       const [share, climb] = z1 > z0 ? [subtract(0, z0, where), subtract(z1, z0, where)] : [z0, subtract(z0, z1, where)];
-      const crossing = add(before, floorDivide(multiply(run, share, where), climb, where), where);
+      const estimate = add(before, floorDivide(multiply(run, share, where), climb, where), where);
+      const crossing = meeting(estimate, before, place, (at) => footway(at) === lot.gradeMm, where);
       if (crossing !== before && crossing !== place) places.push(crossing);
     }
     places.push(place);
@@ -204,6 +208,23 @@ function atFrontage(steps: Steps, lot: SteppedLot, frontage: LotFrontage, tile: 
     const [from, to] = [places[index]!, places[index + 1]!];
     addQuad(steps, plan(from), plan(to), footway(from), footway(to), lot.gradeMm, heights, where);
   }
+}
+
+/**
+ * The place strictly between `before` and `place` nearest `estimate` where `meets` holds, nearer
+ * `before` first at equal distance; `estimate` itself where none does (a footway steeper than a
+ * millimetre a millimetre, which no street on land climbs).
+ */
+function meeting(estimate: number, before: number, place: number, meets: (at: number) => boolean, where: string): number {
+  const [low, high] = before < place ? [before, place] : [place, before];
+  const toward = before < place ? -1 : 1;
+  const reach = subtract(high, low, where);
+  for (let distance = 0; distance <= reach; distance += 1) {
+    for (const at of distance === 0 ? [estimate] : [add(estimate, multiply(toward, distance, where), where), subtract(estimate, multiply(toward, distance, where), where)]) {
+      if (at > low && at < high && meets(at)) return at;
+    }
+  }
+  return estimate;
 }
 
 /**
