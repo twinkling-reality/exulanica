@@ -24,6 +24,14 @@ nearest edge point, a flat level. A land the realizer refuses is refused here by
 ``top_land.land``. The surface is the land's height above each point, not a distance to it; it
 only ever raises a value, as a cap does, so it changes no bound below.
 
+**Given heights.** A field may be capped by heights given on the top's lattice in place of the
+land's own (:class:`TopHeights`): the top graded for a site laid out on it, so the rock meets the
+walked ground at every lattice point. They are read between and beyond lattice points as the
+realized ones are, the extent stops at their highest, and their digest is folded into
+:func:`~exulanica.grammar.volumes.realize.input_sha256`, so every chunk and sheet made under them
+names them. A volume with no top land, or heights not one per point of its square's lattice, is
+refused (``volume_top_heights_invalid``).
+
 **Strata.** Beds are a triangle wave across each bed's thickness: a bed stands out at its middle and
 is cut back at its joins. Stated plainly they are level beds of the period's thickness, every one
 standing out by the amplitude. A volume may vary them (:class:`_Beds`): beds alternate thicker and
@@ -57,10 +65,10 @@ step factor from the erosion's amplitude over its wavelength).
 **Extent and looks.** Every solid point lies inside :attr:`VolumeField.extent`: each added part's
 own bounds grown by a quarter of every blend (the most a chain of smooth unions lowers a value),
 the erosion's and the strata's amplitudes, no higher than the lowest cap, and no higher than the
-top land's highest realized height (a smooth maximum is at least each of its values, and the
-bilinear surface never rises above the lattice heights round it). Outside it is air,
-which is where a realizer may stop looking. :meth:`VolumeField.look_at` names the look of the
-added part nearest a point, the volume's own look where the part states none.
+top land's highest height, realized or given (a smooth maximum is at least each of its values,
+and the bilinear surface never rises above the lattice heights round it). Outside it is air, which
+is where a realizer may stop looking. :meth:`VolumeField.look_at` names the look of the added part
+nearest a point, the volume's own look where the part states none.
 
 Nothing here opens a database, a store or evidence.
 """
@@ -71,9 +79,10 @@ import bisect
 import hashlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from functools import partial
+from functools import cached_property, partial
 from typing import Final, TypeAlias
 
+from exulanica.canonical import canonical_json
 from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.landform import CELL_MM as LAND_CELL_MM
 from exulanica.grammar.landform import LandformRefused, NearLand, WorldFrame, realize_region
@@ -95,6 +104,7 @@ __all__ = [
     "FAR_MM",
     "SHAPES",
     "TOP_LAND_CELL_MM",
+    "TopHeights",
     "TopLandSurface",
     "VolumeField",
     "realize_top_land",
@@ -408,22 +418,53 @@ def realize_top_land(top: TopLand, volume_id: str) -> NearLand:
         raise VolumeRefused(f"{volume_id}: {refused.detail}", path=inner) from refused
 
 
+@dataclass(frozen=True)
+class TopHeights:
+    """Heights a volume's top is capped by in place of its land's own: one per point of the top's
+    square lattice, :data:`TOP_LAND_CELL_MM` apart and ``count`` a side, rows from the south, from
+    the square's south-west corner, such as the top graded for a site laid out on it."""
+
+    count: int
+    heights: tuple[int, ...]
+
+    def document(self) -> dict[str, object]:
+        return {"cell_mm": TOP_LAND_CELL_MM, "count": self.count, "height_mm": list(self.heights)}
+
+    @cached_property
+    def sha256(self) -> str:
+        """The digest every realization of a field capped by these heights names."""
+        return hashlib.sha256(canonical_json(self.document())).hexdigest()
+
+
 class TopLandSurface:
-    """A top land's surface: its heights realized once on its square's lattice, read between them
-    by the floor of their bilinear blend and outside the square at its nearest edge point."""
+    """A top land's surface: its heights realized once on its square's lattice, or the heights
+    given for it, read between them by the floor of their bilinear blend and outside the square at
+    its nearest edge point."""
 
     __slots__ = ("_count", "_half", "_heights", "blend", "highest", "lowest")
 
-    def __init__(self, top: TopLand, volume_id: str) -> None:
+    def __init__(self, top: TopLand, volume_id: str, given: TopHeights | None = None) -> None:
         side = top.side_mm
-        near = realize_top_land(top, volume_id)
+        if given is None:
+            near = realize_top_land(top, volume_id)
+            count, heights = near.nx, near.heights
+        else:
+            count, heights = given.count, given.heights
+            lattice = side // TOP_LAND_CELL_MM + 1
+            if count != lattice or len(heights) != count * count:
+                raise VolumeRefused(
+                    f"{volume_id}: a top's heights are one per point of its {side} mm square's "
+                    f"lattice, {lattice} a side, got {len(heights)} at {count} a side",
+                    path="top_land",
+                    code="volume_top_heights_invalid",
+                )
         self._half = side // 2
-        self._count = near.nx
-        self._heights = near.heights
+        self._count = count
+        self._heights = heights
         self.blend = top.blend_mm
-        #: The highest and lowest realized heights: the surface lies between them everywhere.
-        self.highest = max(near.heights)
-        self.lowest = min(near.heights)
+        #: The highest and lowest heights: the surface lies between them everywhere.
+        self.highest = max(heights)
+        self.lowest = min(heights)
 
     def height(self, x: int, y: int) -> int:
         """The surface's height above ``(x, y)`` of the volume's frame."""
@@ -450,7 +491,8 @@ class VolumeField:
     """One volume's field under one seed and one version of the volume rules (the newest that
     reads the catalogs its document was read against, unless a world's rules name another).
     ``whole`` evaluates every part at every point and weathers every point: slower, and the
-    reference the culled field is held to."""
+    reference the culled field is held to. ``top`` caps the volume's top land by given heights in
+    place of the land's own."""
 
     __slots__ = (
         "_beds",
@@ -472,6 +514,7 @@ class VolumeField:
         "seed",
         "slope_permille",
         "solids",
+        "top_heights",
         "weathering_mm",
     )
 
@@ -482,6 +525,7 @@ class VolumeField:
         *,
         whole: bool = False,
         rules: int | None = None,
+        top: TopHeights | None = None,
     ) -> None:
         named = rules_reading(document.catalog_version) if rules is None else rules
         if SERVED_VOLUME_RULES.get(named) != document.catalog_version:
@@ -531,9 +575,18 @@ class VolumeField:
         self._caps = tuple(
             (number(part.values["height_mm"]), number(part.values["blend_mm"])) for part in caps
         )
-        #: The top land's surface, realized once for this field, or None.
+        if top is not None and document.top_land is None:
+            raise VolumeRefused(
+                f"{document.id} states no top land for given heights to cap",
+                path="top_land",
+                code="volume_top_heights_invalid",
+            )
+        #: The heights given for the top land in place of its own, or None.
+        self.top_heights = top
+        #: The top land's surface, realized once for this field or taken from the given heights,
+        #: or None.
         self._top = (
-            TopLandSurface(document.top_land, document.id)
+            TopLandSurface(document.top_land, document.id, top)
             if document.top_land is not None
             else None
         )

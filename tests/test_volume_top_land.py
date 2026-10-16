@@ -1,21 +1,28 @@
 """A volume's top land: read against the version 3 catalogs and refused by path, realized once per
 field and capping the mass by its surface, so the walkable tops follow the land where it is no
-steeper than 1 in 4; a version 3 volume with no top land is version 2's rock."""
+steeper than 1 in 4; heights given for it, such as a site's graded top, cap the mass in its place
+and are named by every realization; a version 3 volume with no top land is version 2's rock."""
 
 from __future__ import annotations
 
 import copy
 import hashlib
+from collections.abc import Callable
 
 import pytest
-from exulanica.canonical import sha256_of_canonical
+from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.grammar.landform import WorldFrame, land_heights
 from exulanica.grammar.volumes import (
     EXACT_MM,
     PROFILE,
+    TOP_LAND_CELL_MM,
+    TopHeights,
     VolumeField,
     VolumeRefused,
+    input_sha256,
     read_volume_document,
+    realize_top_land,
+    realize_volume,
     volume_catalog,
     volume_tops,
 )
@@ -279,3 +286,94 @@ def test_a_land_the_realizer_refuses_is_refused_by_its_path_when_the_field_is_ma
         VolumeField(document, SEED)
     assert caught.value.path == "top_land.land"
     assert "64000 mm" in caught.value.detail
+
+
+def graded(top: dict, change: Callable[[int, int, int], int]) -> TopHeights:
+    """The mesa's natural top with each lattice height changed by ``change(x, y, height)``, its
+    point in the volume's frame: a top graded as a site's grading grades it."""
+    read = read_volume_document(mesa(top)).top_land
+    assert read is not None
+    near = realize_top_land(read, "mesa")
+    half = SIDE // 2
+    return TopHeights(
+        count=near.nx,
+        heights=tuple(
+            change(
+                i * TOP_LAND_CELL_MM - half,
+                j * TOP_LAND_CELL_MM - half,
+                near.heights[j * near.nx + i],
+            )
+            for j in range(near.ny)
+            for i in range(near.nx)
+        ),
+    )
+
+
+def pad(x: int, y: int, height: int) -> int:
+    """A level pad 3.5 m up across the middle 16 m, filled above the 2 m hill, and a metre cut
+    along the west edge."""
+    if abs(x) <= 8000 and abs(y) <= 8000:
+        return 3500
+    return height - 1000 if x <= -20000 else height
+
+
+def test_given_heights_cap_the_rock_in_place_of_the_land_and_the_walked_top_is_them():
+    given = graded(GENTLE, pad)
+    field = VolumeField(read_volume_document(mesa(GENTLE)), SEED, top=given)
+    half, count = SIDE // 2, given.count
+    corners = {
+        (x + di * SHEET_CELL_MM, y + dj * SHEET_CELL_MM): heights[2 * dj + di]
+        for (x, y), heights in walkable_cells(field).items()
+        for dj in (0, 1)
+        for di in (0, 1)
+    }
+    assert len(corners) >= (SIDE // SHEET_CELL_MM - 2) ** 2
+    # Nothing weathers the block and its cut has no blend: on the lattice the top is the given
+    # heights exactly, the pad and the cut included.
+    for (x, y), height in corners.items():
+        assert height == given.heights[(y + half) // 1000 * count + (x + half) // 1000], (x, y)
+    assert {corners[(x, y)] for x in range(-8000, 8001, 1000) for y in (-8000, 0, 8000)} == {3500}
+    assert corners[(-25000, 0)] == land_at(GENTLE, [(-25000, 0)])[0] - 1000
+    # The extent stops at the given heights' highest, above the land's own.
+    assert field.extent[1][2] == max(given.heights) == 3500
+    assert mesa_field(GENTLE).extent[1][2] < 2100
+
+
+def test_given_heights_are_named_by_every_chunk_and_sheet_and_a_field_given_none_names_none():
+    document = read_volume_document(mesa(GENTLE))
+    natural = VolumeField(document, SEED)
+    own = VolumeField(document, SEED, top=graded(GENTLE, lambda x, y, height: height))
+    capped = VolumeField(document, SEED, top=graded(GENTLE, pad))
+    # A field capped by its own land names what it named before heights could be given.
+    assert (
+        input_sha256(natural)
+        == hashlib.sha256(
+            canonical_json(
+                {"volume_sha256": document.sha256, "seed": SEED.hex(), "volume_rules": 3}
+            )
+        ).hexdigest()
+    )
+    assert len({input_sha256(field) for field in (natural, own, capped)}) == 3
+    # The land's own heights, given, cap the rock exactly as the land does.
+    grid = ((-31000, -31000, -3000), 2000, (32, 32, 5))
+    assert own.grid(*grid) == natural.grid(*grid)
+    assert capped.grid(*grid) != natural.grid(*grid)
+    chunks = realize_volume(capped, 4000)
+    assert chunks and {chunk.input_sha256 for chunk in chunks} == {input_sha256(capped)}
+    assert {sheet.input_sha256 for sheet in volume_tops(capped)} == {input_sha256(capped)}
+
+
+def test_given_heights_off_the_squares_lattice_or_for_a_volume_with_no_top_land_are_refused():
+    document = read_volume_document(mesa(GENTLE))
+    given = graded(GENTLE, pad)
+    fewer = given.count - 1
+    for wrong in (
+        TopHeights(count=fewer, heights=given.heights[: fewer * fewer]),
+        TopHeights(count=given.count, heights=given.heights[:-1]),
+    ):
+        with pytest.raises(VolumeRefused) as caught:
+            VolumeField(document, SEED, top=wrong)
+        assert (caught.value.path, caught.value.code) == ("top_land", "volume_top_heights_invalid")
+    with pytest.raises(VolumeRefused) as caught:
+        VolumeField(read_volume_document(STACK), SEED, top=given)
+    assert (caught.value.path, caught.value.code) == ("top_land", "volume_top_heights_invalid")

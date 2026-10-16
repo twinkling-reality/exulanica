@@ -1,7 +1,7 @@
 """The sky island: its catalogs pinned, every value held to its bound and refused by path and code,
 and the maker's volume admitted by the volume reader, the same for the same island and seed, and
 shaped by its rules: level at 0, centred, no deeper than stated, narrowing below the slab; or, where
-it states a top land, walked on that land."""
+it states a top land, walked on that land, its rock left high enough for a site's fills."""
 
 from __future__ import annotations
 
@@ -31,9 +31,13 @@ from exulanica.grammar.volumes import (
     CATALOG_VERSION as VOLUME_CATALOG_VERSION,
 )
 from exulanica.grammar.volumes import (
+    TOP_LAND_CELL_MM,
+    TopHeights,
     TopLandSurface,
+    VolumeDocument,
     VolumeField,
     read_volume_document,
+    realize_top_land,
     volume_catalog,
     volume_tops,
 )
@@ -46,6 +50,7 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "islands"
 SHIPPED = {
     "sky-island-value.v1.json": "2e9f3bf90d036aff61941d8c7fc16ef873781446c0a0d41bb0bb02aabf8d397d",
     "sky-island-value.v2.json": "adb133d1ea6844a631d8d0e0e968026867b1feebcb06025daf7a0fbc81c93bee",
+    "sky-island-value.v3.json": "26efb1101adff286a14161f78d6fb0896b8e3678928fdbf4d86f44804704f2b5",
 }
 
 #: About 40 m across, the widest the catalog admits, weathered and bedded as islands read well.
@@ -128,14 +133,20 @@ def test_the_shipped_catalog_is_never_edited():
 
 
 def test_every_value_holds_its_default_and_every_word_is_a_volume_word():
-    assert CATALOG_VERSIONS == (1, 2)
+    assert CATALOG_VERSIONS == (1, 2, 3)
     assert [island_catalog(version).volume_catalog_version for version in CATALOG_VERSIONS] == [
         2,
         3,
+        3,
     ]
     catalog = island_catalog()
-    assert (catalog.version, catalog.volume_catalog_version) == (2, 3)
+    assert (catalog.version, catalog.volume_catalog_version) == (3, 3)
     assert catalog.values["top"].words == ("level", "land")
+    fill = catalog.values["top_fill_mm"]
+    assert (fill.minimum, fill.maximum, fill.default, fill.required) == (0, 4000, 4000, False)
+    # Every entry of the version before is kept as it was.
+    second = island_catalog(2)
+    assert {name: catalog.values[name] for name in second.values} == dict(second.values)
     own = volume_catalog(catalog.volume_catalog_version).values_of("volume")
     for name, bound in catalog.values.items():
         if bound.words:
@@ -156,7 +167,7 @@ def test_a_catalog_bounding_another_owner_is_refused(tmp_path):
     with pytest.raises(CatalogError, match="unknown owner"):
         load_island_catalog(tmp_path, version=1)
     with pytest.raises(CatalogError, match="versions"):
-        load_island_catalog(version=3)
+        load_island_catalog(version=4)
 
 
 def test_a_stated_island_is_read_with_its_defaults_written_in():
@@ -225,10 +236,13 @@ _DELETE = object()
         ({"top": {}}, "top", "island_invalid", "a land document has exactly"),
         ({"top": {**HILL_TOP, "ground_mm": "low"}}, "top.ground_mm", "island_invalid",
          "whole number"),
+        ({"top_fill_mm": 1000}, "top_fill_mm", "island_invalid", "states no top"),
+        ({"top": HILL_TOP, "top_fill_mm": 4001}, "top_fill_mm", "island_invalid", "0 to 4000"),
+        ({"top": HILL_TOP, "top_fill_mm": -1}, "top_fill_mm", "island_invalid", "0 to 4000"),
         *[
             ({name: {}}, name, "island_later_version", "later version")
             for name in LATER
-            if name != "top"
+            if name not in ("top", "top_fill_mm")
         ],
     ],
 )  # fmt: skip
@@ -475,3 +489,120 @@ def test_the_walked_top_is_the_land_never_above_it_and_within_a_quarter_of_its_b
     heights = corners.values()
     assert max(lands) - min(lands) > 500
     assert max(heights) - min(heights) >= max(lands) - min(lands) - quarter
+
+
+#: Each island with a top, read against a catalog version, and the identities of the island and
+#: of the volume it makes under SEED: version 2's held as version 3 came.
+GOLDEN_TOPS = {
+    ("high_island", 2): (
+        "63c6e76dd2a3fe5421e75230a487dae81fe03b9227f907a2324f8838d1631d31",
+        "ba1c5fde581feb9767ef063471ed1dd7c2de0e3ad4df807bb4ac0e949520ec0a",
+    ),
+    ("high_island", 3): (
+        "da91915e210a29a60cec0b523cfe91b0e1fb3ef0cdc1793cc38adf390ffd6026",
+        "284774e60806bb3910a094468d8dd54cb3f5a8e278c4414b2a74b4cb5f605325",
+    ),
+    ("small_island", 2): (
+        "458a81aade2cb70887f09f946d7e5fc8ed7fdb5cd4ee49f78a0ef4cc816c5ccf",
+        "a61cd54031f3cd200e698e6c12fbfd8a05d7c1725f94bb00be383b5d5f2fc56e",
+    ),
+    ("small_island", 3): (
+        "932847635faf037292dcebc27ca3e97d7dda3dafed7ecbbb5b6246b3f0a1f6ce",
+        "0c26d4350d5d1310349e64285e15bf9ac9a24e8686c03294727ea39b00a70247",
+    ),
+}
+WITH_TOPS = {"high_island": {**HIGH, "top": HILL_TOP}, "small_island": {**SMALL, "top": HOLLOW_TOP}}
+
+
+@pytest.mark.parametrize("key", sorted(GOLDEN_TOPS))
+def test_the_golden_islands_with_a_top_and_their_volumes_are_pinned_at_each_catalog(key):
+    name, version = key
+    read = read_island_document(WITH_TOPS[name], island_catalog(version))
+    assert (read.sha256, make_island_volume(read, SEED).sha256) == GOLDEN_TOPS[key]
+
+
+def test_the_third_catalog_writes_in_a_fill_with_a_top_only():
+    raw = WITH_TOPS["high_island"]
+    read = read_island_document(raw)
+    assert (read.catalog_version, read.top_fill_mm, read.canonical()["top_fill_mm"]) == (
+        3,
+        4000,
+        4000,
+    )
+    assert read_island_document(read.canonical()).canonical_bytes == read.canonical_bytes
+    level = read_island_document(HIGH)
+    assert "top_fill_mm" not in level.canonical() and level.top_fill_mm == 0
+    assert level.canonical_bytes == read_island_document(HIGH, island_catalog(2)).canonical_bytes
+    assert made(HIGH).sha256 == GOLDEN["high_island"][1]
+    with pytest.raises(IslandRefused) as caught:
+        read_island_document({**raw, "top_fill_mm": 0}, island_catalog(2))
+    assert (caught.value.path, caught.value.code) == ("top_fill_mm", "island_later_version")
+
+
+def _filled(volume: VolumeDocument, fill: int, inner: int) -> tuple[TopHeights, dict]:
+    """The volume's natural top with ``fill`` added at every lattice point within ``inner`` of its
+    axis, as a site's grading fills a pad, and those points' filled heights."""
+    assert volume.top_land is not None
+    near = realize_top_land(volume.top_land, volume.id)
+    half = volume.top_land.side_mm // 2
+    heights, filled = [], {}
+    for j in range(near.ny):
+        for i in range(near.nx):
+            x, y = i * TOP_LAND_CELL_MM - half, j * TOP_LAND_CELL_MM - half
+            height = near.heights[j * near.nx + i]
+            if abs(x) <= inner and abs(y) <= inner:
+                height += fill
+                filled[(x, y)] = height
+            heights.append(height)
+    return TopHeights(count=near.nx, heights=tuple(heights)), filled
+
+
+def test_the_rock_reaches_a_full_fill_above_the_top_where_the_second_catalog_left_too_little():
+    raw = WITH_TOPS["high_island"]
+    third = made(raw)
+    second = make_island_volume(read_island_document(raw, island_catalog(2)), SEED)
+    given, filled = _filled(third, 4000, raw["radius_mm"] // 2)
+
+    def reaching(volume: VolumeDocument) -> int:
+        """How many filled points the rock reaches up to, capped by the filled heights."""
+        field = VolumeField(volume, SEED, top=given)
+        return sum(1 for (x, y), height in filled.items() if field.distance(x, y, height) <= 0)
+
+    assert len(filled) > 400
+    assert reaching(third) == len(filled)
+    # The control: version 2's rock, weathered, falls short under a full fill at many points.
+    assert reaching(second) < len(filled) * 9 // 10
+    (slab,) = [part for part in third.parts if part.id == "slab"]
+    surface = TopLandSurface(third.top_land, third.id)  # type: ignore[arg-type]
+    weathering = raw["erosion"]["amplitude_mm"] + raw["strata"]["amplitude_mm"]
+    top = slab.values["at_mm"][2] + slab.values["height_mm"]
+    assert top > surface.highest + 4000 + weathering
+
+
+def _rock_under_top(volume: VolumeDocument, half: int) -> int:
+    """How many points of the 1 m lattice over a square ``half`` each way have rock a metre under
+    the volume's top (its land, or level 0 where it states none)."""
+    field = VolumeField(volume, SEED)
+    surface = None if volume.top_land is None else TopLandSurface(volume.top_land, volume.id)
+    return sum(
+        1
+        for y in range(-half, half + 1, 1000)
+        for x in range(-half, half + 1, 1000)
+        if field.distance(x, y, (0 if surface is None else surface.height(x, y)) - 1000) <= 0
+    )
+
+
+def test_the_third_catalogs_raised_top_keeps_the_outline_the_island_states():
+    raw = WITH_TOPS["high_island"]
+    third = made(raw)
+    assert third.top_land is not None
+    half = third.top_land.side_mm // 2
+    level = _rock_under_top(made(HIGH), half)
+    second = _rock_under_top(
+        make_island_volume(read_island_document(raw, island_catalog(2)), SEED), half
+    )
+    kept = _rock_under_top(third, half)
+    # Raised 4 m further for a fill, the slab still holds the level island's top a metre under
+    # the land; version 2's, raised by the land's relief alone, leans less and holds less.
+    assert kept * 100 >= level * 98
+    assert kept > second

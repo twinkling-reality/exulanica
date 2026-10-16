@@ -53,9 +53,13 @@ make the same volume, byte for byte.
   (:class:`~exulanica.grammar.volumes.TopLandSurface`), then makes the island as if its top were
   level at the land's lowest height (or 0, where the land never falls below it), so the rim and
   the underside hang below the lowest point, and raises the slab and the lobes by the land's
-  relief, so they reach above its highest point by their rounding and the weathering as they reach
-  above a level cap: the land cuts every point of the top. A slab raised so keeps its base and its
-  widest radius and leans less.
+  relief and the island's ``top_fill_mm``, so they reach above its highest point by that fill,
+  their rounding and the weathering as they reach above a level cap: the land cuts every point of
+  the top, and a site graded on it may fill up to ``top_fill_mm`` above the land and still stand on
+  rock. Under island catalog version 2 a slab raised so keeps its base and its widest radius and
+  leans less, so its top outline shrinks; from version 3 (:data:`_KEEPS_OUTLINE_FROM`) it keeps its
+  lean and widens with the raise, so the top's outline at the land's lowest height is the one the
+  island states, whatever the land's relief and the fill.
 * Varied strata read well on islands (amplitude 700 to 1100 mm, period 2800 to 4500 mm, thinner
   beds on smaller islands and never under 2 m for a 2 m drawing cell, a spread, relief about 600,
   offset 500 to 700, tilt 4 to 5 degrees). They are the island's own section and passed on as
@@ -95,6 +99,9 @@ _FULL: Final = 360_000
 _OVER_MM: Final = 500
 #: A top land's square is whole 2 m, as the volume reader holds it.
 _SQUARE_STEP_MM: Final = 2_000
+#: The first island catalog version whose raised slab and lobes keep their lean, so the top's
+#: outline is the one the island states however far they are raised.
+_KEEPS_OUTLINE_FROM: Final = 3
 
 Part = dict[str, Any]
 Point = tuple[int, int, int]
@@ -482,13 +489,23 @@ def _fingers(key: bytes, island: IslandDocument, cores: list[_Core]) -> list[Par
 
 
 def _slab(
-    part_id: str, at: Point, base: int, top: int, over: int, rounding: int, blend: int, rise: int
+    part_id: str,
+    at: Point,
+    base: int,
+    top: int,
+    over: int,
+    rounding: int,
+    blend: int,
+    rise: int,
+    *,
+    keep: bool,
 ) -> Part:
     """A slab from ``base`` radius at its point up to ``top`` radius at the cap's level, reaching
     ``over`` past the cap, where its top is wider still by the same overhang; raised by ``rise``
-    above that with the same base and widest radius."""
+    above that with the same base and, where it ``keep``s its outline, its lean carried on (so its
+    radius at the cap's level stays ``top``), else the same widest radius."""
     height = -at[2] + over
-    widest = base + (top - base) * height // -at[2]
+    widest = base + (top - base) * (height + (rise if keep else 0)) // -at[2]
     return _column(part_id, at, height + rise, base, widest, rounding, blend=blend)
 
 
@@ -502,7 +519,10 @@ def _top(key: bytes, island: IslandDocument, rise: int) -> tuple[list[Part], int
     rounding = max(300, min(rim // 7, 4_000))
     weathering = int(island.erosion["amplitude_mm"]) + int(island.strata["amplitude_mm"])
     over = rounding + weathering + _OVER_MM
-    parts: list[Part] = [_slab("slab", (0, 0, -rim), slab_base, slab_top, over, rounding, 0, rise)]
+    keep = island.catalog_version >= _KEEPS_OUTLINE_FROM
+    parts: list[Part] = [
+        _slab("slab", (0, 0, -rim), slab_base, slab_top, over, rounding, 0, rise, keep=keep)
+    ]
     discs: list[Point] = [(0, 0, slab_top)]
     lobes = island.lobes - 1
     first = draws.between(0, _FULL - 1)
@@ -524,6 +544,7 @@ def _top(key: bytes, island: IslandDocument, rise: int) -> tuple[list[Part], int
                 min(rounding, floor // 4),
                 lobe.between(1_500, 2_500),
                 rise,
+                keep=keep,
             )
         )
     return parts, slab_base, discs
@@ -562,7 +583,7 @@ def make_island_volume(island: IslandDocument, seed: bytes) -> VolumeDocument:
         top_land = TopLand(land=island.top, side_mm=_square(outline), blend_mm=blend)
         surface = TopLandSurface(top_land, island.id)
         drop = max(0, -surface.lowest)
-        rise = max(0, surface.highest) + drop
+        rise = max(0, surface.highest) + drop + island.top_fill_mm
     top, slab_base, discs = _top(key, island, rise)
     underside, cores = _underside(key, island, slab_base)
     fingers = _fingers(key, island, cores)

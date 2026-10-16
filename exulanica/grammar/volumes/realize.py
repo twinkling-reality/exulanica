@@ -16,10 +16,11 @@ surface nets, in whole numbers throughout:
 * A vertex's normal is the gradient over its cell's corners, scaled to :data:`NORMAL_ONE`; its look
   is the look of the added part nearest it.
 
-A chunk is a pure function of the volume document, the seed and the volume rules its field is
-evaluated by, and its document names them by :func:`input_sha256` and its ``rules_version``; a
-chunk of any rules this server serves reads back. Its identity is the SHA-256 of its canonical
-JSON, so a realized chunk is kept and served by digest and never realized twice.
+A chunk is a pure function of the volume document, the seed, the volume rules its field is
+evaluated by and any heights given for its top, and its document names them by
+:func:`input_sha256` and its ``rules_version``; a chunk of any rules this server serves reads
+back. Its identity is the SHA-256 of its canonical JSON, so a realized chunk is kept and served by
+digest and never realized twice.
 """
 
 from __future__ import annotations
@@ -80,16 +81,16 @@ _KEYS: Final = frozenset(
 
 def input_sha256(field: VolumeField) -> str:
     """What a realization of this field is a function of: the volume document, the seed and the
-    volume rules, as one digest."""
-    return hashlib.sha256(
-        canonical_json(
-            {
-                "volume_sha256": field.document.sha256,
-                "seed": field.seed.hex(),
-                "volume_rules": field.rules,
-            }
-        )
-    ).hexdigest()
+    volume rules, and the heights its top is capped by where they are given, as one digest. A
+    field capped by its own top land names no heights, so its digest is unchanged by them."""
+    inputs: dict[str, object] = {
+        "volume_sha256": field.document.sha256,
+        "seed": field.seed.hex(),
+        "volume_rules": field.rules,
+    }
+    if field.top_heights is not None:
+        inputs["top_sha256"] = field.top_heights.sha256
+    return hashlib.sha256(canonical_json(inputs)).hexdigest()
 
 
 @dataclass(frozen=True)

@@ -22,7 +22,7 @@ own frame, in whole numbers:
 
 Turning a sheet into exact contact geometry (``heightfield-geometry/v1``) is the walking layer's;
 this module only states where the tops are. A sheet is a pure function of the volume document, the
-seed and the volume rules its field is evaluated by, named by
+seed, the volume rules its field is evaluated by and any heights given for its top, named by
 :func:`~exulanica.grammar.volumes.realize.input_sha256` and its ``rules_version``; a sheet of any
 rules this server serves reads back. Its identity is the SHA-256 of its canonical JSON.
 """

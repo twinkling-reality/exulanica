@@ -10,8 +10,9 @@ so they are bounded by the volume catalog of the version :data:`VOLUME_CATALOGS`
 A catalog changes only by a new version, and a later version keeps every entry of the one before
 it. Version 2 adds ``island_top``: an island read against it may state its top as a land
 (``level``, the default, is the flat top version 1 makes), and its made volume is read against the
-version 3 volume catalogs, which admit a top land. Read on first use, never at import, and kept for
-the process.
+version 3 volume catalogs, which admit a top land. Version 3 adds ``island_top_fill_mm``: the rock
+an island whose top is a land leaves above the land's highest point, so a site graded on the top
+can fill and still stand on rock. Read on first use, never at import, and kept for the process.
 """
 
 from __future__ import annotations
@@ -43,11 +44,11 @@ CATALOG_DIRECTORY: Final = (
 )
 #: Every version of the sky-island catalog this code reads, and the newest, which reads new
 #: islands.
-CATALOG_VERSIONS: Final = (1, 2)
-CATALOG_VERSION: Final = 2
+CATALOG_VERSIONS: Final = (1, 2, 3)
+CATALOG_VERSION: Final = 3
 #: Each sky-island catalog version and the volume catalog version its islands' erosion and strata
 #: are read against and its made volumes are read under.
-VOLUME_CATALOGS: Final = {1: 2, 2: 3}
+VOLUME_CATALOGS: Final = {1: 2, 2: 3, 3: 3}
 #: The values the reader states by name; a catalog without one of them is refused at loading.
 _NAMED: Final = (
     "radius_mm",

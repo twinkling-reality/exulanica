@@ -19,9 +19,11 @@ depth, so an underside hangs below it (``island_rim_too_thick``). Read against a
 catalog that bounds ``top`` (version 2), an island may state ``top``, an unchanged
 ``exulanica.landform/v1`` document read by the land reader against the landform catalog its volume
 catalog names, refused by its path under ``top``; the maker caps the island by that land instead
-of a level. A site, hangings and falls are later versions of the island, as a top is under version
-1, and an island stating one is refused by its path (``island_later_version``). Any other refusal
-is ``island_invalid``, by path.
+of a level. Under a catalog that bounds ``top_fill_mm`` (version 3), an island with a top states
+how far its rock reaches above the land's highest point for a site's fills (written in with its
+default, and refused without a top). A site, hangings and falls are later versions of the island,
+as a top is under version 1 and its fill under version 2, and an island stating one is refused by
+its path (``island_later_version``). Any other refusal is ``island_invalid``, by path.
 
 **Defaults are written in.** The canonical document carries every value, with the catalogs'
 defaults filled in at reading, so a later default never changes an island made before it. Its
@@ -67,9 +69,9 @@ _OPTIONAL: Final = frozenset(
     {"lobes", "underside", "fingers", "look", "top_look", "walk", "erosion", "strata"}
 )
 #: What later versions of the island state, each refused where its catalog does not bound it: the
-#: top's own land (bounded from version 2), a site laid out on it, vines and debris hanging from
-#: it, and water falling from its edge.
-LATER: Final = ("top", "site", "hangings", "falls")
+#: top's own land (bounded from version 2), the rock left above it for a site's fills (from version
+#: 3), a site laid out on it, vines and debris hanging from it, and water falling from its edge.
+LATER: Final = ("top", "top_fill_mm", "site", "hangings", "falls")
 #: The values the catalog bounds, in the order the document states them.
 _VALUES: Final = (
     "radius_mm",
@@ -116,6 +118,9 @@ class IslandDocument:
     volume_catalog_version: int
     #: The land its top follows, or None where its top is level at its top height.
     top: LandDocument | None = None
+    #: How far its rock reaches above its top land's highest point for a site's fills: 0 with no
+    #: top land or under a catalog that does not bound it.
+    top_fill_mm: int = 0
 
     def canonical(self) -> dict[str, Any]:
         return parse_json(self.canonical_bytes.decode(), PROFILE)
@@ -215,6 +220,15 @@ def read_island_document(raw: object, catalog: IslandCatalog | None = None) -> I
         )
     erosion, strata = _weathering(raw, island_id, catalog.volume_catalog_version)
     top = _top(raw["top"], catalog) if "top" in raw else None
+    fill = 0
+    if "top_fill_mm" in catalog.values:
+        if top is None and "top_fill_mm" in raw:
+            raise IslandRefused(
+                "top_fill_mm is the rock left above a top land, and this island states no top",
+                path="top_fill_mm",
+            )
+        if top is not None:
+            fill = int(_value(raw, catalog.values["top_fill_mm"]))
     canonical: dict[str, Any] = {
         "profile": PROFILE,
         "id": island_id,
@@ -224,6 +238,8 @@ def read_island_document(raw: object, catalog: IslandCatalog | None = None) -> I
     }
     if top is not None:
         canonical["top"] = top.canonical()
+        if "top_fill_mm" in catalog.values:
+            canonical["top_fill_mm"] = fill
     encoded = canonical_json(canonical)
     return IslandDocument(
         id=island_id,
@@ -243,4 +259,5 @@ def read_island_document(raw: object, catalog: IslandCatalog | None = None) -> I
         catalog_version=catalog.version,
         volume_catalog_version=catalog.volume_catalog_version,
         top=top,
+        top_fill_mm=fill,
     )

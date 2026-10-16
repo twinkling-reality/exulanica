@@ -123,13 +123,17 @@ integers only (no float, no `math`, no `numpy`, as the grammar package requires)
    square's nearest edge point. A land the realizer refuses (beyond 64 m of its datum, a range rising
    inside the square, a cascade beyond it) is refused when the field is made, by its path under
    `top_land.land`; a site world on a landscape is refused so when it is made, before any receipt
-   is written (`volume_invalid`, by its path in the request).
+   is written (`volume_invalid`, by its path in the request). A field may instead be given heights
+   for its top on the same lattice (`TopHeights`: the top graded for a site laid out on it), which
+   cap the rock in place of the land's own and are read between and beyond lattice points as they
+   are; heights not one per point of the square's lattice, or given for a volume with no top land,
+   are refused (`volume_top_heights_invalid`, path `top_land`).
 
 A part is evaluated only inside its bounds grown by a margin, and weathering only where it can
 reach the surface; the margin is chosen so that every value within 4 m of a surface (`EXACT_MM`) is
 the value the whole field gives and every sign is the whole field's sign everywhere. Every solid
 point lies within the field's `extent`, which stops at the lowest cap and at the top land's highest
-realized height. `air_reach` states how far round a point every point is certainly air, from the
+height, realized or given. `air_reach` states how far round a point every point is certainly air, from the
 parts' slope bound and the weathering amplitudes; a cap and a top land only raise a value, so they
 change no bound below them.
 
@@ -144,8 +148,9 @@ holds its lower end. Neighbouring chunks therefore meet without a seam. A vertex
 (the gradient over its cell, at 32767) and the look of the nearest added part.
 
 A chunk names the volume's digest, the volume rules version its field was evaluated by
-(`rules_version`), and the digest of what it is a function of (`input_sha256`: the volume, the seed
-and the volume rules); its own identity is the SHA-256 of its canonical JSON. The reader reads a
+(`rules_version`), and the digest of what it is a function of (`input_sha256`: the volume, the seed,
+the volume rules and, only where they are given, the digest of the heights its top is capped by,
+so a chunk of a field capped by its own land names what it always named); its own identity is the SHA-256 of its canonical JSON. The reader reads a
 chunk of any served rules version and refuses a chunk by path and, given a digest, any chunk but
 the one it names. A top names its rules the same way.
 
@@ -426,17 +431,22 @@ Nothing reads a sky island yet: a landscape does not place one.
 | `look`, `top_look`, `walk` | As a volume's: `rock` or `wall`; `grass`, `moss`, `rock` or `sand`; `tops` or `none` |
 | `erosion`, `strata` | A volume's sections exactly, read by the volume reader against the volume catalog version its island catalog names |
 | `top` | From island catalog version 2, optional: the land the top follows, an unchanged `exulanica.landform/v1` document |
+| `top_fill_mm` | From island catalog version 3, with a `top` only: how far the rock reaches above the land's highest point for a site's fills, 0 to 4 m, 4 m by default |
 
-Bounds, defaults and words are read from `assets/catalogs/islands/sky-island-value.v1.json` and
-`assets/catalogs/islands/sky-island-value.v2.json`, entry-shaped catalogs with a reason and a
-licence on every entry, read with the volume value schema.
+Bounds, defaults and words are read from `assets/catalogs/islands/sky-island-value.v1.json`,
+`sky-island-value.v2.json` and `sky-island-value.v3.json`, entry-shaped catalogs with a reason and
+a licence on every entry, read with the volume value schema.
 Version 1 names volume catalog version 2; version 2 keeps every entry of version 1, adds `top`
 (`level`, the flat top version 1 makes, or `land`) and names volume catalog version 3, which admits
 a top land. Defaults are written in at reading, and the island's identity is the SHA-256 of its
 canonical JSON; an island without a top has the same identity and makes the same volume under
 either version. A top is read by the land reader against the landform catalog its volume catalog
 names and refused by its path under `top`; under version 1 a top is refused as a later version.
-A site, hangings and falls belong to later versions and are refused if stated.
+Version 3 keeps every entry of version 2, adds `top_fill_mm` and names volume catalog version 3: an
+island with a top states it, its default written in, and an island without one may not; an island
+without a top has the same identity and volume as under version 2. Under versions 1 and 2 a fill is
+refused as a later version. A site, hangings and falls belong to later versions and are refused if
+stated.
 
 `make_island_volume` (`exulanica/grammar/islands/maker.py`) turns an island and a seed into a volume
 whose id is the island's: a slab whose top overhangs its base and smaller slabs for the further
@@ -470,9 +480,14 @@ the application:
   datum the top height 0, cut with the cap's blend. The maker realizes that land as the field will,
   makes the island as if its top were level at the land's lowest height (or 0, where the land never
   falls below it), so the rim and the underside hang below the lowest point, and raises the slab and
-  the lobes by the land's relief with the same base and widest radius, so they reach above its
-  highest point as they reach above a level cap. Every point of the top is then the land, and the
-  walkable top climbs it where it is no steeper than 1 in 4.
+  the lobes by the land's relief and the island's `top_fill_mm`, so they reach above its highest
+  point, and above any fill up to `top_fill_mm` over it, as they reach above a level cap. Under
+  island catalog version 2 a raised slab keeps its base and widest radius and leans less, so its
+  top outline shrinks; from version 3 it keeps its lean, so the outline at the land's lowest height
+  is the one the island states. Every point of the top is then the land, the walkable top climbs it
+  where it is no steeper than 1 in 4, and a site graded on it may fill up to `top_fill_mm` and still
+  stand on rock that reaches its graded top. A cut gets no extra rock, since a thicker rim would
+  change the island's look.
 
 The maker reads the volume under the volume catalog version the island's catalog names, so the
 volume reader admits it; it lists at most 16 parts, within the volume catalog's limit. The radius is
@@ -491,6 +506,7 @@ made volumes by digest.
 | `volume_too_many_parts` | More parts than the catalog allows |
 | `volume_digest_mismatch` | A chunk or top is not the one its digest names |
 | `volume_rules_changed` | A chunk, top or receipt names volume rules this server does not serve |
+| `volume_top_heights_invalid` | Heights given for a volume's top are not one per point of its top land's square lattice, or the volume states no top land (path `top_land`) |
 | `landscape_invalid` | A landscape document breaks its shape or a bound (by path) |
 | `landscape_outside_near_land` | A placement's origin lies off the land near the world |
 | `landscape_digest_mismatch` | A placement's `volume_sha256` is not its volume's digest |
@@ -511,7 +527,7 @@ made volumes by digest.
 | `island_invalid` | A sky-island document breaks its shape or a bound, its erosion and strata included (by path) |
 | `island_too_deep` | An island's depth is more than three times its radius |
 | `island_rim_too_thick` | An island's rim slab is thicker than its radius or half its depth |
-| `island_later_version` | An island states a site, hangings or falls, which later versions state, or a top under island catalog version 1 |
+| `island_later_version` | An island states a site, hangings or falls, which later versions state, a top under island catalog version 1, or a top fill under versions 1 and 2 |
 | `landscape_site_unknown_placement` | A landscape's site names no placement it holds (path `site.on`) |
 | `landscape_site_no_top_land` | A landscape's site names a placement whose volume states no top land (path `site.on`) |
 | `landscape_site_outside_top` | A site on a volume's top does not lie inside its square, or not at whole metres (path `site.at_mm` in a landscape) |
