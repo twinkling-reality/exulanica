@@ -9,7 +9,20 @@ a smooth union, a ``carve`` by a smooth subtraction, each with its blend (the po
 minimum: no join where two values are a blend apart, a fillet nearer). Then erosion (fractal value
 noise on the volume's own axes times the erosion's amplitude), then strata, then caps in order (a
 smooth intersection with the half-space below each level), so a capped top stays level whatever
-the weathering below it.
+the weathering below it, then the top land, the same way below its surface.
+
+**Top land.** A volume that states a top land (:class:`~exulanica.grammar.volumes.document.TopLand`)
+is capped by the land's surface as a cap is by its level: ``smooth_max(value, z - surface, blend)``,
+after the caps. The land is realized once per field (:class:`TopLandSurface`) by the land realizer
+(:func:`~exulanica.grammar.landform.realize_region`) on the land's own lattice,
+:data:`TOP_LAND_CELL_MM` apart, over its square in the square's own frame (its south-west corner
+the land's origin, the square's side the land's extent, the land's datum the volume's level 0), its
+frame's seed drawn from the volume's id alone, so the same document has the same top under every
+seed and wherever it is placed. Between lattice points the surface is the floor of the bilinear
+blend of the four round it, in whole numbers; outside the square it is the height of the square's
+nearest edge point, a flat level. A land the realizer refuses is refused here by its path under
+``top_land.land``. The surface is the land's height above each point, not a distance to it; it
+only ever raises a value, as a cap does, so it changes no bound below.
 
 **Strata.** Beds are a triangle wave across each bed's thickness: a bed stands out at its middle and
 is cut back at its joins. Stated plainly they are level beds of the period's thickness, every one
@@ -33,17 +46,19 @@ part takes a point into its own frame by the transpose of its turn
 
 **Exactness and culling.** A part is evaluated only for points inside its bounds grown by twice its
 blend and a margin, and weathering only where the unweathered value is below a gate. The margin is
-:data:`EXACT_MM` plus the erosion's and the strata's amplitudes, twice every cap's blend and twice
-every part's blend, which is enough that a smooth join, weathering or a cap can never carry a
-skipped part's difference down to the surface: every value within :data:`EXACT_MM` of a surface is
-the value the whole field (every part at every point, weathered everywhere) gives, and every sign
-is the whole field's sign everywhere. Farther away a value is only a bound on the distance (noise
-is not a distance either; a reader marching the field states a step factor from the erosion's
-amplitude over its wavelength).
+:data:`EXACT_MM` plus the erosion's and the strata's amplitudes, twice every cap's and the top
+land's blend and twice every part's blend, which is enough that a smooth join, weathering or a cap
+can never carry a skipped part's difference down to the surface: every value within
+:data:`EXACT_MM` of a surface is the value the whole field (every part at every point, weathered
+everywhere) gives, and every sign is the whole field's sign everywhere. Farther away a value is
+only a bound on the distance (noise is not a distance either; a reader marching the field states a
+step factor from the erosion's amplitude over its wavelength).
 
 **Extent and looks.** Every solid point lies inside :attr:`VolumeField.extent`: each added part's
 own bounds grown by a quarter of every blend (the most a chain of smooth unions lowers a value),
-the erosion's and the strata's amplitudes, and no higher than the lowest cap. Outside it is air,
+the erosion's and the strata's amplitudes, no higher than the lowest cap, and no higher than the
+top land's highest realized height (a smooth maximum is at least each of its values, and the
+bilinear surface never rises above the lattice heights round it). Outside it is air,
 which is where a realizer may stop looking. :meth:`VolumeField.look_at` names the look of the
 added part nearest a point, the volume's own look where the part states none.
 
@@ -60,9 +75,12 @@ from functools import partial
 from typing import Final, TypeAlias
 
 from exulanica.grammar.geometry import integer_sqrt
+from exulanica.grammar.landform import CELL_MM as LAND_CELL_MM
+from exulanica.grammar.landform import LandformRefused, WorldFrame, realize_region
 from exulanica.grammar.volumes.document import (
     PROFILE,
     PartValue,
+    TopLand,
     VolumeDocument,
     VolumeRefused,
     number,
@@ -72,7 +90,16 @@ from exulanica.grammar.volumes.noise3 import HALF, Noise3
 from exulanica.grammar.volumes.rules import SERVED_VOLUME_RULES, rules_reading
 from exulanica.grammar.volumes.turns import TURN_ONE, Turn, sin_cos, turn_matrix
 
-__all__ = ["EXACT_MM", "FAR_MM", "SHAPES", "VolumeField", "smooth_max", "smooth_min"]
+__all__ = [
+    "EXACT_MM",
+    "FAR_MM",
+    "SHAPES",
+    "TOP_LAND_CELL_MM",
+    "TopLandSurface",
+    "VolumeField",
+    "smooth_max",
+    "smooth_min",
+]
 
 #: Within this distance of a surface every value is the whole field's value.
 EXACT_MM: Final = 4_000
@@ -82,6 +109,8 @@ FAR_MM: Final = 1 << 62
 _FINE: Final = 1 << 24
 #: Slack for a turned bounds' corners, floored once by the turn.
 _TURN_SLACK_MM: Final = 4
+#: The lattice a top land is realized on: the land's own.
+TOP_LAND_CELL_MM: Final = LAND_CELL_MM
 
 Point: TypeAlias = tuple[int, int, int]
 Distance: TypeAlias = Callable[[int, int, int], int]
@@ -358,6 +387,46 @@ class _Beds:
         return max(-self.bedding, min(self.bedding, value))
 
 
+class TopLandSurface:
+    """A top land's surface: its heights realized once on its square's lattice, read between them
+    by the floor of their bilinear blend and outside the square at its nearest edge point."""
+
+    __slots__ = ("_count", "_half", "_heights", "blend", "highest", "lowest")
+
+    def __init__(self, top: TopLand, volume_id: str) -> None:
+        side = top.side_mm
+        seed = hashlib.sha256(PROFILE.encode() + b"\x1ftop_land\x1f" + volume_id.encode())
+        frame = WorldFrame(width_mm=side, depth_mm=side, seed=seed.hexdigest())
+        try:
+            near = realize_region(top.land, frame, 0, 0, side, side)
+        except LandformRefused as refused:
+            inner = f"top_land.land.{refused.path}" if refused.path else "top_land.land"
+            raise VolumeRefused(f"{volume_id}: {refused.detail}", path=inner) from refused
+        self._half = side // 2
+        self._count = near.nx
+        self._heights = near.heights
+        self.blend = top.blend_mm
+        #: The highest and lowest realized heights: the surface lies between them everywhere.
+        self.highest = max(near.heights)
+        self.lowest = min(near.heights)
+
+    def height(self, x: int, y: int) -> int:
+        """The surface's height above ``(x, y)`` of the volume's frame."""
+        cell, count, side = TOP_LAND_CELL_MM, self._count, 2 * self._half
+        u = min(side, max(0, x + self._half))
+        v = min(side, max(0, y + self._half))
+        i, j = min(u // cell, count - 2), min(v // cell, count - 2)
+        fx, fy = u - i * cell, v - j * cell
+        at = j * count + i
+        heights = self._heights
+        return (
+            heights[at] * (cell - fx) * (cell - fy)
+            + heights[at + 1] * fx * (cell - fy)
+            + heights[at + count] * (cell - fx) * fy
+            + heights[at + count + 1] * fx * fy
+        ) // (cell * cell)
+
+
 #: The strata values that vary the beds; a volume stating none of them has level, even beds.
 _VARIED: Final = ("spread_mm", "relief_permille", "offset_permille", "tilt_mdeg")
 
@@ -378,6 +447,7 @@ class VolumeField:
         "_quarter",
         "_strata",
         "_strata_gate",
+        "_top",
         "_up",
         "_whole",
         "bounds",
@@ -446,7 +516,15 @@ class VolumeField:
         self._caps = tuple(
             (number(part.values["height_mm"]), number(part.values["blend_mm"])) for part in caps
         )
+        #: The top land's surface, realized once for this field, or None.
+        self._top = (
+            TopLandSurface(document.top_land, document.id)
+            if document.top_land is not None
+            else None
+        )
         capping = 2 * sum(blend for _, blend in self._caps)
+        if self._top is not None:
+            capping += 2 * self._top.blend
         self._strata_gate = EXACT_MM + bedding + capping
         self._erosion_gate = self._strata_gate + amplitude
         solid_parts = [part for part in document.parts if part.op != "cap"]
@@ -511,13 +589,23 @@ class VolumeField:
         )
         if self._caps:
             high = (high[0], high[1], min(high[2], min(height for height, _ in self._caps)))
+        if self._top is not None:
+            high = (high[0], high[1], min(high[2], self._top.highest))
         #: Every solid point lies inside this box; outside it is air.
         self.extent: tuple[Point, Point] = (low, high)
         #: Varied beds keep their variation out of the lowest quarter of the volume's height.
         self._floor = low[2]
         self._quarter = max(1, (high[2] - low[2]) // 4)
 
-    def _finish(self, value: int, x: int, y: int, z: int, noise: Callable[[], int]) -> int:
+    def _finish(
+        self,
+        value: int,
+        x: int,
+        y: int,
+        z: int,
+        noise: Callable[[], int],
+        surface: int | None = None,
+    ) -> int:
         whole = self._whole
         if self._erosion and (whole or value < self._erosion_gate):
             value += noise() * self._erosion // HALF
@@ -533,6 +621,11 @@ class VolumeField:
                 value += beds.value((up_x * x + up_y * y + up_z * z) // TURN_ONE, x, y, share)
         for height, blend in self._caps:
             value = smooth_max(value, z - height, blend)
+        top = self._top
+        if top is not None:
+            if surface is None:
+                surface = top.height(x, y)
+            value = smooth_max(value, z - surface, top.blend)
         return value
 
     def bare(self, x: int, y: int, z: int) -> int:
@@ -595,14 +688,24 @@ class VolumeField:
                         values[row + i] = solid.join(values[row + i], solid.value(x, y, z))
         noise = self._noise
         ax, ay, az = noise.axis(xs), noise.axis(ys), noise.axis(zs)
+        top = self._top
+        surfaces: list[int | None] = (
+            [None] * (nx * ny) if top is None else [top.height(x, y) for y in ys for x in xs]
+        )
         index = 0
         for k in range(nz):
             z, wz = zs[k], az[k]
             for j in range(ny):
                 y, wy = ys[j], ay[j]
+                row = j * nx
                 for i in range(nx):
                     values[index] = self._finish(
-                        values[index], xs[i], y, z, partial(noise.sample, ax[i], wy, wz)
+                        values[index],
+                        xs[i],
+                        y,
+                        z,
+                        partial(noise.sample, ax[i], wy, wz),
+                        surfaces[row + i],
                     )
                     index += 1
         return values

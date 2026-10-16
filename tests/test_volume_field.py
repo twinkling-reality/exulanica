@@ -60,6 +60,10 @@ GOLDEN = {
         "points": [3734, -15233, 5447, 0, 19000, 2955, -909, 2641],
         "grid": "2b052a791c9bc43930312da772dd0e565efdff5d28ac0bafb2cc28f90a93e63e",
     },
+    3: {
+        "points": [3734, -15233, 5447, 898, 19898, 2955, -1, 2641],
+        "grid": "98e9aa48cbcde417924f9ae7a745190a513ceb0c8c1c951d931c76871db10fc2",
+    },
 }
 #: Beds varied every way version 2 states: thickness, relief, a side and a lean.
 VARIED_STRATA = {
@@ -72,6 +76,21 @@ VARIED_STRATA = {
     "toward_mdeg": 120000,
 }
 GRID = ((-24000, -24000, -10000), 2000, (25, 25, 28))
+#: A top land for the stack under version 3: a rough hill and a roll over a 40 m square, its ground
+#: below the stack's cap, so the stack's top follows the land.
+TOP_LAND = {
+    "land": {
+        "profile": "exulanica.landform/v1",
+        "ground_mm": 38000,
+        "features": [
+            {"id": "hill", "kind": "rise", "side": "centre", "width_mm": 24000,
+             "depth_mm": 20000, "height_mm": 2500},
+            {"id": "roll", "kind": "undulation", "amplitude_mm": 600, "wavelength_mm": 9000},
+        ],
+    },
+    "side_mm": 40000,
+    "blend_mm": 600,
+}  # fmt: skip
 
 #: Broad blends, a deep tilt and two caps: what the culling margin has to cover.
 BROAD = {
@@ -101,8 +120,11 @@ def stack_field(*, whole: bool = False) -> VolumeField:
 
 
 def golden_field(version: int) -> VolumeField:
-    """The stack under rules ``version``: as stated under version 1, its beds varied under 2."""
+    """The stack under rules ``version``: as stated under version 1, its beds varied under 2, and
+    its top a land under 3."""
     raw = STACK if version == 1 else {**STACK, "strata": VARIED_STRATA}
+    if version >= 3:
+        raw = {**raw, "top_land": TOP_LAND}
     document = read_volume_document(raw, volume_catalog(SERVED_VOLUME_RULES[version]))
     return VolumeField(document, SEED, rules=version)
 

@@ -100,9 +100,10 @@ describe('a volume chunk', () => {
       return raw;
     };
     expect(refusal(() => readVolumeChunk(chunk(), digest, '0'.repeat(64)))).toBe('volume chunk');
-    expect(refusal(() => readVolumeChunk(changed('rules_version', () => 3), digest))).toBe('volume chunk.rules_version');
+    expect(refusal(() => readVolumeChunk(changed('rules_version', () => 4), digest))).toBe('volume chunk.rules_version');
     expect(refusal(() => readVolumeChunk(changed('rules_version', () => '1'), digest))).toBe('volume chunk.rules_version');
     expect(readVolumeChunk(changed('rules_version', () => 2), digest).sha256).not.toBe(firstSha);
+    expect(readVolumeChunk(changed('rules_version', () => 3), digest).sha256).not.toBe(firstSha);
     expect(refusal(() => readVolumeChunk(changed('cell_mm', () => 3000), digest))).toBe('volume chunk.cell_mm');
     expect(refusal(() => readVolumeChunk(changed('looks', () => ['rock']), digest))).toBe('volume chunk.looks');
     expect(refusal(() => readVolumeChunk(changed('positions_mm', (p) => [(p as number[])[0]! + 200_000, ...(p as number[]).slice(1)]), digest))).toBe('volume chunk.positions_mm');

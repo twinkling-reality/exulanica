@@ -25,6 +25,7 @@ SEED = hashlib.sha256(b"exulanica landscape compose test").hexdigest()
 GOLDEN_SECTION = {
     1: "392fc55e0d4d43bab695011827726589f955c4a8866df6fa69ff31dba616bf8e",
     2: "91296abf6d4b4e6188599b89e350f9649ffeb19ee36afe73d01548c8b6a7b8c5",
+    3: "87d987d818a018a1fc1099a61607e733d699680e580b1d9f620213d907b5f167",
 }
 
 

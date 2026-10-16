@@ -1,0 +1,728 @@
+{
+ "schema_version": 1,
+ "catalog_id": "volume-value",
+ "catalog_version": 3,
+ "entries": [
+  {
+   "key": "volume_parts",
+   "owner": "volume",
+   "value": "parts",
+   "minimum": 1,
+   "maximum": 32,
+   "default": 1,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the most parts one volume lists, a budget for the work of each evaluation; a larger mass is two volumes.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "volume_look",
+   "owner": "volume",
+   "value": "look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "rock",
+    "wall"
+   ],
+   "reason": "Authored: the look role its faces are dressed in: rock, or a built wall for a built mass.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "volume_top_look",
+   "owner": "volume",
+   "value": "top_look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "moss",
+    "grass",
+    "rock",
+    "sand"
+   ],
+   "reason": "Authored: the look role of faces that point up, where soil and plants hold.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "volume_walk",
+   "owner": "volume",
+   "value": "walk",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "tops",
+    "none"
+   ],
+   "reason": "Authored: tops means its upward faces with headroom are walkable surfaces; none means scenery only.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "erosion_amplitude_mm",
+   "owner": "erosion",
+   "value": "amplitude_mm",
+   "minimum": 0,
+   "maximum": 8000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far weathering moves a face, at most 8 m; more reads as a different mass, which is a part, not weathering.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "erosion_wavelength_mm",
+   "owner": "erosion",
+   "value": "wavelength_mm",
+   "minimum": 2000,
+   "maximum": 200000,
+   "default": 12000,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the size of the coarsest weathering, from 2 m pitting to 200 m slumps.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "erosion_octaves",
+   "owner": "erosion",
+   "value": "octaves",
+   "minimum": 1,
+   "maximum": 5,
+   "default": 3,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how many finer layers of weathering lie on the coarsest, each half as deep; five reaches below a metre from the coarsest default.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "erosion_ridged",
+   "owner": "erosion",
+   "value": "ridged",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "no",
+    "yes"
+   ],
+   "reason": "Authored: ridged weathering leaves sharp crests and eroded flanks; plain weathering is rounded.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_amplitude_mm",
+   "owner": "strata",
+   "value": "amplitude_mm",
+   "minimum": 0,
+   "maximum": 2000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far bedded ledges stand out, at most 2 m; a deeper ledge is an overhang, which is a part.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_period_mm",
+   "owner": "strata",
+   "value": "period_mm",
+   "minimum": 1000,
+   "maximum": 20000,
+   "default": 3000,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the height of one bed, from 1 m to 20 m.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_spread_mm",
+   "owner": "strata",
+   "value": "spread_mm",
+   "minimum": 0,
+   "maximum": 19000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far a bed's thickness departs from the period: beds alternate thicker and thinner, each by a drawn amount from a quarter of the spread to all of it, so no two in a row are equal. Below the period less 1 m, so a bed is at least 1 m; 0 is beds of one thickness.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_relief_permille",
+   "owner": "strata",
+   "value": "relief_permille",
+   "minimum": 0,
+   "maximum": 1000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how unequally beds stand out, per thousand of the amplitude: each bed steps out by a drawn share of the amplitude, down to this much less, and is set proud or recessed within what is left, so the outline is not a smooth taper; 0 is every bed alike.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_offset_permille",
+   "owner": "strata",
+   "value": "offset_permille",
+   "minimum": 0,
+   "maximum": 1000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far each bed stands proud on one side of the mass and recessed on the other, per thousand of the amplitude, toward a side drawn for each bed, so the beds share no axis; 0 is every bed even all round.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_tilt_mdeg",
+   "owner": "strata",
+   "value": "tilt_mdeg",
+   "minimum": 0,
+   "maximum": 15000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far the bedding planes lean from level, at most 15 degrees; steeper bedding is a turned part.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "strata_toward_mdeg",
+   "owner": "strata",
+   "value": "toward_mdeg",
+   "minimum": 0,
+   "maximum": 359999,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the compass bearing the bedding leans toward, clockwise from north, as a part leans.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "part_at_mm",
+   "owner": "part",
+   "value": "at_mm",
+   "minimum": -1200000,
+   "maximum": 1200000,
+   "default": 0,
+   "required": 0,
+   "count": 3,
+   "words": [],
+   "reason": "Authored: where a part's base stands in the volume's own frame (east, north, up), within 1.2 km of its origin.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "part_yaw_mdeg",
+   "owner": "part",
+   "value": "yaw_mdeg",
+   "minimum": 0,
+   "maximum": 359999,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: a part's turn counterclockwise seen from above, in whole millidegrees; one way to say each turn.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "part_tilt_mdeg",
+   "owner": "part",
+   "value": "tilt_mdeg",
+   "minimum": 0,
+   "maximum": 85000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far a part leans from upright, at most 85 degrees; past that it lies down, which is a turned part, not a lean.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "part_toward_mdeg",
+   "owner": "part",
+   "value": "toward_mdeg",
+   "minimum": 0,
+   "maximum": 359999,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the compass bearing a part leans toward, clockwise from north.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "part_blend_mm",
+   "owner": "part",
+   "value": "blend_mm",
+   "minimum": 0,
+   "maximum": 30000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far a part melts into what comes before it; 0 is a sharp join, 30 m a broad fillet.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "part_look",
+   "owner": "part",
+   "value": "look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "volume",
+    "rock",
+    "wall"
+   ],
+   "reason": "Authored: a part's own look role where it differs from the volume's; volume takes the volume's.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "sphere_radius_mm",
+   "owner": "sphere",
+   "value": "radius_mm",
+   "minimum": 500,
+   "maximum": 400000,
+   "default": 500,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: from a half-metre boulder to a 400 m dome.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "box_size_mm",
+   "owner": "box",
+   "value": "size_mm",
+   "minimum": 500,
+   "maximum": 1200000,
+   "default": 500,
+   "required": 1,
+   "count": 3,
+   "words": [],
+   "reason": "Authored: its sides east, north and up, from half a metre to 1.2 km.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "box_round_mm",
+   "owner": "box",
+   "value": "round_mm",
+   "minimum": 0,
+   "maximum": 60000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the radius its edges are rounded by, at most half its smallest side.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "capsule_to_mm",
+   "owner": "capsule",
+   "value": "to_mm",
+   "minimum": -1200000,
+   "maximum": 1200000,
+   "default": 0,
+   "required": 1,
+   "count": 3,
+   "words": [],
+   "reason": "Authored: the limb's far end from the part's point, in the part's own frame; never the point itself.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "capsule_radius_mm",
+   "owner": "capsule",
+   "value": "radius_mm",
+   "minimum": 200,
+   "maximum": 200000,
+   "default": 200,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the limb's radius at the part's point, from a 200 mm root to a 200 m spur.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "capsule_to_radius_mm",
+   "owner": "capsule",
+   "value": "to_radius_mm",
+   "minimum": 0,
+   "maximum": 200000,
+   "default": 0,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the limb's radius at its far end; 0 tapers it to a point.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "column_height_mm",
+   "owner": "column",
+   "value": "height_mm",
+   "minimum": 1000,
+   "maximum": 1200000,
+   "default": 1000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: from a 1 m plinth to a 1.2 km spire.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "column_base_radius_mm",
+   "owner": "column",
+   "value": "base_radius_mm",
+   "minimum": 300,
+   "maximum": 400000,
+   "default": 300,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the radius it stands on.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "column_top_radius_mm",
+   "owner": "column",
+   "value": "top_radius_mm",
+   "minimum": 0,
+   "maximum": 400000,
+   "default": 0,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the radius of its top; 0 is a point, wider than the base is an overhang.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "column_round_mm",
+   "owner": "column",
+   "value": "round_mm",
+   "minimum": 0,
+   "maximum": 60000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the radius its rims are rounded by, below half its height and at most its smaller radius.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_width_mm",
+   "owner": "arch",
+   "value": "width_mm",
+   "minimum": 1500,
+   "maximum": 150000,
+   "default": 1500,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the passage's width, from a 1.5 m doorway to a 150 m sea arch; its head is a half circle of that width.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_spring_mm",
+   "owner": "arch",
+   "value": "spring_mm",
+   "minimum": 0,
+   "maximum": 300000,
+   "default": 0,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the height of its straight sides before the round head springs.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_depth_mm",
+   "owner": "arch",
+   "value": "depth_mm",
+   "minimum": 1000,
+   "maximum": 600000,
+   "default": 1000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far the passage runs through the mass, along the part's north.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "cap_height_mm",
+   "owner": "cap",
+   "value": "height_mm",
+   "minimum": -200000,
+   "maximum": 1200000,
+   "default": 0,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the level the mass is cut at in the volume's own frame.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "top_land_side_mm",
+   "owner": "top_land",
+   "value": "side_mm",
+   "minimum": 2000,
+   "maximum": 128000,
+   "default": 2000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the side of the square a volume's top land covers, centred on the volume's own origin, in whole 2 m so its corners lie on the land's 1 m lattice; from a 2 m crown to 128 m, the square round the top of an island about 58 m in radius. Measured: the land is realized whole at 1 m each time the volume's field is made (two to four times for a world on a landscape); a gently rolling land took 0.6 to 1.3 s for a 128 m square (16641 points) and 2.5 to 4.4 s for 256 m on one core of the development machine at load averages of 38 to 85 on 15 October 2026. A wider top is a later version, after timings on a quiet machine.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "top_land_blend_mm",
+   "owner": "top_land",
+   "value": "blend_mm",
+   "minimum": 0,
+   "maximum": 30000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far the top land's cut melts into the volume's sides, as a cap's blend: 0 is a sharp rim, 30 m a broad shoulder.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  }
+ ]
+}

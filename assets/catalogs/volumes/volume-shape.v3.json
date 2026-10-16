@@ -1,0 +1,107 @@
+{
+ "schema_version": 1,
+ "catalog_id": "volume-shape",
+ "catalog_version": 3,
+ "entries": [
+  {
+   "key": "sphere",
+   "words": "a ball of rock: a boulder or a rounded knoll, or a hollow where it carves",
+   "ops": [
+    "add",
+    "carve"
+   ],
+   "placed": 1,
+   "reason": "Authored: the simplest rounded mass, and the commonest carve for a hollow or a cove.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "box",
+   "words": "a mass with square sides standing on its base, its edges rounded",
+   "ops": [
+    "add",
+    "carve"
+   ],
+   "placed": 1,
+   "reason": "Authored: a cut face, a ledge or a built mass; rounding softens its edges without another part.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "capsule",
+   "words": "a limb from the part's point to another, tapering from one radius to the other",
+   "ops": [
+    "add",
+    "carve"
+   ],
+   "placed": 1,
+   "reason": "Authored: fingers, spurs, roots and leaning spires are limbs between two points.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "column",
+   "words": "a round mass standing on its base; wider at its top than its base, it overhangs",
+   "ops": [
+    "add",
+    "carve"
+   ],
+   "placed": 1,
+   "reason": "Authored: sea stacks, pillars and spires; a top wider than the base is the overhang the land cannot state.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch",
+   "words": "a passage with a round head through the mass, its floor at the part's base",
+   "ops": [
+    "carve"
+   ],
+   "placed": 1,
+   "reason": "Authored: a sea arch or a gate through rock; it only takes rock away, so it only carves.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  },
+  {
+   "key": "cap",
+   "words": "a level the whole mass is cut at, leaving a flat top",
+   "ops": [
+    "cap"
+   ],
+   "placed": 0,
+   "reason": "Authored: a flat walkable top; it applies after erosion so the cut stays level, and it has no placement because a level is a height in the volume's own frame.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica volumes; see the entry reasons"
+   }
+  }
+ ]
+}

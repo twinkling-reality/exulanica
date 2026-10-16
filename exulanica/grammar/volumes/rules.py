@@ -16,7 +16,10 @@ New volumes name :data:`VOLUME_RULES_VERSION`.
 
 Version 1 reads the version 1 catalogs. Version 2 reads the version 2 catalogs, whose strata may
 vary the beds; a version 2 volume that states none of that variation is version 1's rock, and a
-world made by version 1 is realized by version 1 and names it in every chunk and top.
+world made by version 1 is realized by version 1 and names it in every chunk and top. Version 3
+reads the version 3 catalogs, whose volumes may state a top land, and realizes a top land by the
+land rules it names (:func:`~exulanica.grammar.landform.land_rules`), so a change to the land's
+realizer is a new version here too; a version 3 volume with no top land is version 2's rock.
 """
 
 from __future__ import annotations
@@ -26,21 +29,27 @@ from collections.abc import Mapping
 from typing import Any, Final
 
 from exulanica.grammar.catalogs import catalog_digest, load_catalog
+from exulanica.grammar.landform import land_rules
 from exulanica.grammar.volumes.catalog import CATALOG_DIRECTORY, shape_schema, value_schema
 from exulanica.grammar.volumes.document import VolumeRefused
 
 __all__ = [
     "SERVED_VOLUME_RULES",
+    "TOP_LAND_RULES",
     "VOLUME_RULES_VERSION",
     "check_volume_rules",
     "rules_reading",
+    "top_land_rules",
     "volume_rules",
 ]
 
 #: The rules new volumes are made by. A change to the field that moves a value is a new version.
-VOLUME_RULES_VERSION: Final = 2
+VOLUME_RULES_VERSION: Final = 3
 #: Every rules version this code makes volumes by, and the volume catalog version each reads.
-SERVED_VOLUME_RULES: Final = {1: 1, 2: 2}
+SERVED_VOLUME_RULES: Final = {1: 1, 2: 2, 3: 3}
+#: Each rules version whose volumes may state a top land, and the land rules that realize it, named
+#: here and not taken as the newest land rules so a later land version never moves a served one.
+TOP_LAND_RULES: Final = {3: 3}
 
 
 @functools.cache
@@ -59,11 +68,25 @@ def _catalog_digests(version: int) -> tuple[tuple[str, str], ...]:
     )
 
 
+def top_land_rules(version: int) -> int | None:
+    """The land rules a top land is realized by under volume rules ``version``, or None where its
+    volumes state no top land."""
+    return TOP_LAND_RULES.get(version)
+
+
 def volume_rules(version: int | None = None) -> dict[str, Any]:
-    """The rules ``version`` (the newest unless one is named): its number and each shaping
-    catalog's digest. A new mapping each time, since a receipt keeps it."""
+    """The rules ``version`` (the newest unless one is named): its number, each shaping catalog's
+    digest and, where its volumes may state a top land, the land rules that realize it. A new
+    mapping each time, since a receipt keeps it."""
     named = VOLUME_RULES_VERSION if version is None else version
-    return {"version": named, "catalogs": dict(_catalog_digests(SERVED_VOLUME_RULES[named]))}
+    rules: dict[str, Any] = {
+        "version": named,
+        "catalogs": dict(_catalog_digests(SERVED_VOLUME_RULES[named])),
+    }
+    land = top_land_rules(named)
+    if land is not None:
+        rules["land_rules"] = land_rules(land)
+    return rules
 
 
 def rules_reading(catalog_version: int) -> int:

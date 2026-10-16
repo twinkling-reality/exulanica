@@ -12,11 +12,13 @@ each entry carries a reason and a licence, as the landform catalogs are.
   point or a size east, north and up), and for a value stated in words the words it may take (its
   default is then an index into them). The owner is a shape, ``part`` (what every part states),
   ``volume`` (the document itself: its looks, whether it is walked, how many parts it lists),
-  ``erosion`` or ``strata``.
+  ``erosion``, ``strata`` or ``top_land``.
 
 Version 2 adds five strata values that vary the beds (their thickness, how far each stands out,
 the side it stands out on, and the lean of the bedding); every one defaults to version 1's level,
-even beds, and its shapes are version 1's.
+even beds, and its shapes are version 1's. Version 3 adds the two values of a top land (the side of
+the square it covers and the blend of its cut), whose land is read against the landform catalog
+version :data:`LAND_CATALOGS` names; its shapes and every other value are version 2's.
 
 A catalog changes only by a new version, and a later version keeps every entry of the one before
 it, so a volume an earlier version admits reads the same under a later one. Read on first use,
@@ -44,6 +46,7 @@ __all__ = [
     "CATALOG_DIRECTORY",
     "CATALOG_VERSION",
     "CATALOG_VERSIONS",
+    "LAND_CATALOGS",
     "OPS",
     "OWNERS",
     "ShapeKind",
@@ -59,12 +62,15 @@ CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[3].joinpath("assets", "catalogs", "volumes")
 )
 #: Every version of the volume catalogs this code reads, and the newest, which reads new volumes.
-CATALOG_VERSIONS: Final = (1, 2)
-CATALOG_VERSION: Final = 2
+CATALOG_VERSIONS: Final = (1, 2, 3)
+CATALOG_VERSION: Final = 3
+#: Each volume catalog version that admits a top land, and the landform catalog version its land
+#: is read against.
+LAND_CATALOGS: Final = {3: 3}
 #: What a part may do to the mass: add to it, carve from it, or cap it at a level.
 OPS: Final = ("add", "carve", "cap")
 #: The owners of values that are not a shape.
-OWNERS: Final = ("volume", "erosion", "strata", "part")
+OWNERS: Final = ("volume", "erosion", "strata", "part", "top_land")
 #: The values the reader states by name; a catalog without one of them is refused at loading.
 _NAMED: Final = (
     ("volume", "parts"),

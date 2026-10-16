@@ -1,0 +1,215 @@
+{
+ "schema_version": 1,
+ "catalog_id": "sky-island-value",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "island_radius_mm",
+   "owner": "island",
+   "value": "radius_mm",
+   "minimum": 8000,
+   "maximum": 20000,
+   "default": 8000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far the island's top outline reaches from its centre, from an 8 m rock a few people stand on to a 20 m island, about 40 m across. Measured: the costliest island this catalog admits at 20 m (five lobes, a depth of three times the radius, the thickest rim, four fingers, weathered as islands read well: erosion 2.6 m over 9 m in three ridged octaves, varied beds 1.1 m) realized its surface at the 2 m cell in 4.6 s (cone; spires 3.5 s, bowl 3.4 s) on the development machine at a load average of 35 on 15 October 2026; at 24 m its extent reaches 64 chunks and took 19.8 s at a load average of 47, past the 10 s one island may take of a landscape's 40 s. A wider island is two volumes or a later version.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_lobes",
+   "owner": "island",
+   "value": "lobes",
+   "minimum": 1,
+   "maximum": 5,
+   "default": 3,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how many overlapping lobes make the top outline: one is a round slab, more crease where they meet; past five the outline reads as noise rather than lobes.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_rim_mm",
+   "owner": "island",
+   "value": "rim_mm",
+   "minimum": 2000,
+   "maximum": 20000,
+   "default": 2000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how thick the rim slab is below the top, at least 2 m so the slab reads at a 2 m drawing cell; at most the radius and half the depth, which the reader holds, so at most the widest radius.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_depth_mm",
+   "owner": "island",
+   "value": "depth_mm",
+   "minimum": 4000,
+   "maximum": 60000,
+   "default": 4000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far the underside hangs below the top, at most three times the radius, which the reader holds, so at most three times the widest radius; a small island reads floating with a keel about 1.3 to 1.5 times its top width deep.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_underside",
+   "owner": "island",
+   "value": "underside",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "cone",
+    "bowl",
+    "spires"
+   ],
+   "reason": "Authored: the underside's form: cone is one leaning keel ending in a blunt toe, bowl a shallow wide underside, spires several narrow keels each ending in a blunt toe.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_fingers",
+   "owner": "island",
+   "value": "fingers",
+   "minimum": 0,
+   "maximum": 4,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how many thick, blunt rock limbs or roots hang from the underside. Measured: each finger is a part the field evaluates over nearly the whole island, so fingers cost in proportion; the costliest 32 m island took 39.7 s at the 2 m cell with twelve fingers and 20.7 s with four (load average 49, 15 October 2026), and the costliest 20 m island the catalog admits takes 4.6 s with four (load average 35).",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_look",
+   "owner": "island",
+   "value": "look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "rock",
+    "wall"
+   ],
+   "reason": "Authored: the look role its faces are dressed in, as a volume's: rock, or a built wall for a built island.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_top_look",
+   "owner": "island",
+   "value": "top_look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "grass",
+    "moss",
+    "rock",
+    "sand"
+   ],
+   "reason": "Authored: the look role of its upward faces, as a volume's; grass first, since the surface material catalog draws grass and has no moss.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_walk",
+   "owner": "island",
+   "value": "walk",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "tops",
+    "none"
+   ],
+   "reason": "Authored: tops means the island's upward faces with headroom are walkable surfaces, as a volume's; none means scenery only.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  },
+  {
+   "key": "island_top",
+   "owner": "island",
+   "value": "top",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "level",
+    "land"
+   ],
+   "reason": "Authored: an island's top is level at its top height unless it states top, an unchanged exulanica.landform/v1 document realized over the square round the top's outline with its datum at the top height; the slab is raised above the land's highest point and its rim deepened below its lowest so the land cuts every point of the top.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sky islands; see the entry reasons"
+   }
+  }
+ ]
+}

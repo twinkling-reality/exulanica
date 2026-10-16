@@ -32,6 +32,7 @@ from test_volume_field import SEED, golden_field
 GOLDEN_CHUNKS = {
     1: {"count": 12, "digest": "b7aa34e5b2d548e8b2c3fe3652515d8b189cbb641dd4924d70cc63c9b89895f4"},
     2: {"count": 12, "digest": "d78797a384722dca7cf50621f2c2c4d8289089b510b7454293b2cff9b98102c1"},
+    3: {"count": 12, "digest": "ee2b0b587b302b38745db6aaa26911077adcd2d1d62fb8ff704c17c173984207"},
 }
 
 
@@ -145,7 +146,7 @@ def _changed(chunk: VolumeChunk, name: str, value: object) -> dict:
     ("name", "value", "path", "code"),
     [
         ("profile", "exulanica.volume-chunk/v2", "profile", "volume_invalid"),
-        ("rules_version", 3, "rules_version", "volume_rules_changed"),
+        ("rules_version", 4, "rules_version", "volume_rules_changed"),
         ("rules_version", True, "rules_version", "volume_rules_changed"),
         ("volume_sha256", "ABC", "volume_sha256", "volume_invalid"),
         ("cell_mm", 3000, "cell_mm", "volume_invalid"),

@@ -60,12 +60,20 @@ millimetres and millidegrees, in the volume's own frame (east, north, up):
 | `erosion` | `amplitude_mm`, `wavelength_mm`, `octaves`, `ridged` |
 | `strata` | `amplitude_mm`, `period_mm`, and from catalog version 2 `spread_mm`, `relief_permille`, `offset_permille`, `tilt_mdeg`, `toward_mdeg` (how the beds vary) |
 | `parts` | 1 to 32 parts, each `id`, `shape`, `op` and the values its shape and every part state |
+| `top_land` | From catalog version 3, optional: a land its top follows instead of a level, `land` (an unchanged `exulanica.landform/v1` document), `side_mm` and `blend_mm` |
 
 A part states `at_mm` (three numbers), `yaw_mdeg`, `tilt_mdeg`, `toward_mdeg`, `blend_mm` and `look`,
 and its shape's own values; a `cap` states only its height, blend and look. Defaults are written in
 at reading, so a later default never changes a volume made before it, and the volume's identity is
 the SHA-256 of its canonical JSON. A volume holds no free text: its parts are named by keys. A bed
 is at least 1 m, so the strata's spread is at most the period less 1 m.
+
+A top land's `land` is read by the land reader against the landform catalog version the volume
+catalog names (version 3 for volume catalog version 3), unchanged and with its defaults written in,
+and refused by its path under `top_land.land`. It covers a square of side `side_mm` centred on the
+volume's own origin, in whole 2 m so the square's corners and middle lie on the land's 1 m lattice;
+the square's south-west corner is the land's origin and the volume's level 0 is the land's datum.
+A volume that states no top land has the canonical bytes and identity it had under version 2.
 
 ## The volume catalogs
 
@@ -75,7 +83,9 @@ words, the operations it performs, the first its default, and whether it has a p
 `volume-value.vN.json` (every value's bounds, default, whether it is required, and whether it is one
 number, three numbers or a word). A catalog changes only by a new version, which keeps every entry
 of the one before it. Version 2 adds the five strata values that vary the beds, each defaulting to
-level, even beds; its shapes are version 1's. A volume is read against one version (the newest,
+level, even beds; its shapes are version 1's. Version 3 adds the top land's two values, the side of
+its square (2 m to 128 m) and the blend of its cut (0 to 30 m, by default none); its shapes and
+every other value are version 2's. A volume is read against one version (the newest,
 unless a world's rules name another) and records it.
 
 ## The field
@@ -104,12 +114,23 @@ integers only (no float, no `math`, no `numpy`, as the grammar package requires)
    narrow foot of an island or a stack into a neck.
 4. Caps in order, each a smooth intersection with the half-space below its level, so a capped top
    stays level whatever the weathering below it.
+5. The top land, where the volume states one, the same way below its surface: the land is realized
+   once for the field by the land realizer on its own 1 m lattice over its square, the frame's seed
+   drawn from the volume's id alone, so the same document has the same top wherever and under
+   whatever seed it is placed. Between lattice points the surface is the floor of the bilinear blend
+   of the four heights round the point, in whole numbers; beyond the square it is the height of the
+   square's nearest edge point. A land the realizer refuses (beyond 64 m of its datum, a range rising
+   inside the square, a cascade beyond it) is refused when the field is made, by its path under
+   `top_land.land`; a site world on a landscape is refused so when it is made, before any receipt
+   is written (`volume_invalid`, by its path in the request).
 
 A part is evaluated only inside its bounds grown by a margin, and weathering only where it can
 reach the surface; the margin is chosen so that every value within 4 m of a surface (`EXACT_MM`) is
 the value the whole field gives and every sign is the whole field's sign everywhere. Every solid
-point lies within the field's `extent`. `air_reach` states how far round a point every point is
-certainly air, from the parts' slope bound and the weathering amplitudes.
+point lies within the field's `extent`, which stops at the lowest cap and at the top land's highest
+realized height. `air_reach` states how far round a point every point is certainly air, from the
+parts' slope bound and the weathering amplitudes; a cap and a top land only raise a value, so they
+change no bound below them.
 
 ## Chunks
 
@@ -137,6 +158,9 @@ then halved to the millimetre. A cell is walkable when its four corners have top
 more than 1 in 4 (the land's walking grade), and the field 1.2 m above each corner is at least 1 m.
 Each 4-connected set of walkable cells is a surface `top:<n>`, numbered in the order its first cell
 comes from the south-west; it holds heights over its rectangle and its walkable cells as runs.
+Under a top land whose rock reaches above it, a top is the land itself, within a quarter of the
+cut's blend below it and never above it, and its cells are walked where the land is no steeper than
+1 in 4.
 
 ## The landscape document
 
@@ -289,6 +313,11 @@ each served version's catalogs, golden field, chunks, tops and composition.
 | --- | --- | --- | --- |
 | 1 | 1 | version 1 | Level and even |
 | 2 | 2 | version 2 | Level and even unless the strata vary them |
+| 3 | 3 | version 3 | As version 2; a volume may state a top land |
+
+Volume rules 3 also name the land rules a top land is realized by (land rules 3, with their
+catalogs' digests), fixed for that version so a later land rules version never moves a served
+volume. A version 3 volume with no top land is the same rock under volume rules 2 and 3.
 
 New worlds are made by the newest rules. A receipt is read back under the rules it names: its
 volumes against the catalogs those name and realized by them, so a world made by landscape rules 1
@@ -361,12 +390,19 @@ Nothing reads a sky island yet: a landscape does not place one.
 | `underside` | `cone` (one leaning keel ending in a blunt toe), `bowl` (a shallow, wide underside) or `spires` (several narrow keels) |
 | `fingers` | 0 to 4 thick, blunt rock limbs hanging from the underside |
 | `look`, `top_look`, `walk` | As a volume's: `rock` or `wall`; `grass`, `moss`, `rock` or `sand`; `tops` or `none` |
-| `erosion`, `strata` | A volume's sections exactly, read by the volume reader against volume catalog version 2 |
+| `erosion`, `strata` | A volume's sections exactly, read by the volume reader against the volume catalog version its island catalog names |
+| `top` | From island catalog version 2, optional: the land the top follows, an unchanged `exulanica.landform/v1` document |
 
-Bounds, defaults and words are read from `assets/catalogs/islands/sky-island-value.v1.json`, an
-entry-shaped catalog with a reason and a licence on every entry, read with the volume value schema.
-Defaults are written in at reading, and the island's identity is the SHA-256 of its canonical JSON.
-Top land, a site, hangings and falls belong to later versions and are refused if stated.
+Bounds, defaults and words are read from `assets/catalogs/islands/sky-island-value.v1.json` and
+`assets/catalogs/islands/sky-island-value.v2.json`, entry-shaped catalogs with a reason and a
+licence on every entry, read with the volume value schema.
+Version 1 names volume catalog version 2; version 2 keeps every entry of version 1, adds `top`
+(`level`, the flat top version 1 makes, or `land`) and names volume catalog version 3, which admits
+a top land. Defaults are written in at reading, and the island's identity is the SHA-256 of its
+canonical JSON; an island without a top has the same identity and makes the same volume under
+either version. A top is read by the land reader against the landform catalog its volume catalog
+names and refused by its path under `top`; under version 1 a top is refused as a later version.
+A site, hangings and falls belong to later versions and are refused if stated.
 
 `make_island_volume` (`exulanica/grammar/islands/maker.py`) turns an island and a seed into a volume
 whose id is the island's: a slab whose top overhangs its base and smaller slabs for the further
@@ -395,6 +431,14 @@ the application:
   leave its end floating.
 - The slab reaches above the cap by its rounding and the weathering's amplitude, so the top is level
   at 0 wherever rock lies under it.
+- An island that states a top is capped by its land instead of a level: the volume's `top_land` is
+  the island's land over the square round the top's discs grown by a tenth, in whole 2 m, its
+  datum the top height 0, cut with the cap's blend. The maker realizes that land as the field will,
+  makes the island as if its top were level at the land's lowest height (or 0, where the land never
+  falls below it), so the rim and the underside hang below the lowest point, and raises the slab and
+  the lobes by the land's relief with the same base and widest radius, so they reach above its
+  highest point as they reach above a level cap. Every point of the top is then the land, and the
+  walkable top climbs it where it is no steeper than 1 in 4.
 
 The maker reads the volume under the volume catalog version the island's catalog names, so the
 volume reader admits it; it lists at most 16 parts, within the volume catalog's limit. The radius is
@@ -433,7 +477,7 @@ made volumes by digest.
 | `island_invalid` | A sky-island document breaks its shape or a bound, its erosion and strata included (by path) |
 | `island_too_deep` | An island's depth is more than three times its radius |
 | `island_rim_too_thick` | An island's rim slab is thicker than its radius or half its depth |
-| `island_later_version` | An island states top land, a site, hangings or falls, which later versions state |
+| `island_later_version` | An island states a site, hangings or falls, which later versions state, or a top under island catalog version 1 |
 | `landscape_arrival_not_ground` | The arrival a landscape's surfaces are reached from is not walkable ground |
 
 ## Limits

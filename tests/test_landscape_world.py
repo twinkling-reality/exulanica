@@ -142,6 +142,22 @@ def test_a_landscape_off_its_site_is_refused_by_name_and_path(on_land):
     assert (refused.code, refused.path) == ("landscape_not_served", "landscape")
 
 
+def test_a_top_land_the_land_realizer_refuses_is_refused_by_its_path_when_the_site_is_made(on_land):
+    # Its reader admits this land; realized, 40 m of ground and a 30 m hill pass the 64 m the land
+    # is held to about its datum.
+    hill = {"id": "hill", "kind": "rise", "side": "centre", "width_mm": 30000, "depth_mm": 30000,
+            "height_mm": 30000, "roughness_permille": 0}  # fmt: skip
+    high = {"profile": "exulanica.landform/v1", "ground_mm": 40000, "features": [hill]}
+    topped = bay(on_land)
+    topped["volumes"][0]["volume"] = {**ROCK, "top_land": {"land": high, "side_mm": 12000}}
+    refused = _refused(on_land, topped)
+    assert (refused.code, refused.path) == (
+        "volume_invalid",
+        "landscape.volumes[0].volume.top_land.land",
+    )
+    assert "64000 mm" in refused.detail
+
+
 def _unreadable(receipt: dict) -> str:
     with pytest.raises(InvalidStructuralData) as caught:
         site_plan.check_receipt(receipt)
@@ -151,7 +167,7 @@ def _unreadable(receipt: dict) -> str:
 def test_a_receipt_that_no_longer_binds_its_landscape_is_refused_by_name(on_land, on_landscape):
     receipt = on_landscape.receipt
     rules = copy.deepcopy(receipt)
-    rules["landscape_rules"]["version"] = 3
+    rules["landscape_rules"]["version"] = 4
     assert _unreadable(rules) == "generated_world_landscape_rules_changed"
     named = copy.deepcopy(receipt)
     named["landscape_sha256"] = "0" * 64
@@ -183,4 +199,4 @@ def test_a_world_made_by_the_first_landscape_rules_reads_and_draws_by_them(on_la
     (stack,) = drawn["volumes"]
     assert stack["volume_sha256"] == first.placements[0].volume.sha256
     newest, _ = landscape_drawing(WORLD, on_landscape.receipt, "0" * 64, "1" * 64)
-    assert newest["landscape_rules_version"] == 2
+    assert newest["landscape_rules_version"] == 3

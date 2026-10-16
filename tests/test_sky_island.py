@@ -1,6 +1,7 @@
-"""The sky island: its catalog pinned, every value held to its bound and refused by path and code,
+"""The sky island: its catalogs pinned, every value held to its bound and refused by path and code,
 and the maker's volume admitted by the volume reader, the same for the same island and seed, and
-shaped by its rules: level at 0, centred, no deeper than stated, narrowing below the slab."""
+shaped by its rules: level at 0, centred, no deeper than stated, narrowing below the slab; or, where
+it states a top land, walked on that land."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.islands import (
     CATALOG_VERSION,
+    CATALOG_VERSIONS,
     LATER,
     PROFILE,
     IslandRefused,
@@ -24,14 +26,18 @@ from exulanica.grammar.islands import (
     make_island_volume,
     read_island_document,
 )
+from exulanica.grammar.landform import read_land_document
 from exulanica.grammar.volumes import (
     CATALOG_VERSION as VOLUME_CATALOG_VERSION,
 )
 from exulanica.grammar.volumes import (
+    TopLandSurface,
     VolumeField,
     read_volume_document,
     volume_catalog,
+    volume_tops,
 )
+from exulanica.grammar.volumes.sheets import SHEET_CELL_MM
 
 CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "islands"
 
@@ -39,6 +45,7 @@ CATALOGS = Path(__file__).parents[1] / "assets" / "catalogs" / "islands"
 #: edit, since an island's defaults are written in from it.
 SHIPPED = {
     "sky-island-value.v1.json": "2e9f3bf90d036aff61941d8c7fc16ef873781446c0a0d41bb0bb02aabf8d397d",
+    "sky-island-value.v2.json": "adb133d1ea6844a631d8d0e0e968026867b1feebcb06025daf7a0fbc81c93bee",
 }
 
 #: About 40 m across, the widest the catalog admits, weathered and bedded as islands read well.
@@ -81,6 +88,21 @@ GOLDEN = {
     ),
 }
 UNDERSIDES = ("cone", "bowl", "spires")
+#: The top as land: a round hill 2 m high over 40 m in the middle of the top, gentle enough to
+#: walk all over, no noise in it.
+HILL_TOP = {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 0,
+    "features": [{"id": "hill", "kind": "rise", "side": "centre", "width_mm": 40000,
+                  "depth_mm": 40000, "height_mm": 2000, "roughness_permille": 0}],
+}  # fmt: skip
+#: The top as land falling below the top height: a dry hollow 2 m deep in the middle of the top.
+HOLLOW_TOP = {
+    "profile": "exulanica.landform/v1",
+    "ground_mm": 0,
+    "features": [{"id": "hollow", "kind": "basin", "side": "centre", "radius_mm": 10000,
+                  "depth_mm": 2000, "water": "dry"}],
+}  # fmt: skip
 
 
 def island(**values: object) -> dict:
@@ -106,8 +128,14 @@ def test_the_shipped_catalog_is_never_edited():
 
 
 def test_every_value_holds_its_default_and_every_word_is_a_volume_word():
+    assert CATALOG_VERSIONS == (1, 2)
+    assert [island_catalog(version).volume_catalog_version for version in CATALOG_VERSIONS] == [
+        2,
+        3,
+    ]
     catalog = island_catalog()
-    assert (catalog.version, catalog.volume_catalog_version) == (1, 2)
+    assert (catalog.version, catalog.volume_catalog_version) == (2, 3)
+    assert catalog.values["top"].words == ("level", "land")
     own = volume_catalog(catalog.volume_catalog_version).values_of("volume")
     for name, bound in catalog.values.items():
         if bound.words:
@@ -126,9 +154,9 @@ def test_a_catalog_bounding_another_owner_is_refused(tmp_path):
     document["entries"][0]["owner"] = "volume"
     path.write_text(json.dumps(document))
     with pytest.raises(CatalogError, match="unknown owner"):
-        load_island_catalog(tmp_path)
+        load_island_catalog(tmp_path, version=1)
     with pytest.raises(CatalogError, match="versions"):
-        load_island_catalog(version=2)
+        load_island_catalog(version=3)
 
 
 def test_a_stated_island_is_read_with_its_defaults_written_in():
@@ -149,7 +177,8 @@ def test_a_stated_island_is_read_with_its_defaults_written_in():
         "strata": {"amplitude_mm": 0, "period_mm": 3000, "spread_mm": 0, "relief_permille": 0,
                    "offset_permille": 0, "tilt_mdeg": 0, "toward_mdeg": 0},
     }  # fmt: skip
-    assert (read.catalog_version, read.volume_catalog_version) == (CATALOG_VERSION, 2)
+    assert (read.catalog_version, read.volume_catalog_version) == (CATALOG_VERSION, 3)
+    assert read.top is None
     assert read.sha256 == hashlib.sha256(read.canonical_bytes).hexdigest()
     assert read_island_document(read.canonical()).canonical_bytes == read.canonical_bytes
 
@@ -193,9 +222,13 @@ _DELETE = object()
          "three times the radius"),
         ({"radius_mm": 10000, "rim_mm": 10001}, "rim_mm", "island_rim_too_thick", "the radius"),
         ({"rim_mm": 15001}, "rim_mm", "island_rim_too_thick", "half the depth"),
+        ({"top": {}}, "top", "island_invalid", "a land document has exactly"),
+        ({"top": {**HILL_TOP, "ground_mm": "low"}}, "top.ground_mm", "island_invalid",
+         "whole number"),
         *[
             ({name: {}}, name, "island_later_version", "later version")
             for name in LATER
+            if name != "top"
         ],
     ],
 )  # fmt: skip
@@ -219,8 +252,10 @@ def test_the_volume_is_admitted_by_the_volume_reader_under_the_newest_catalog():
     for raw in (HIGH, SMALL):
         volume = made(raw)
         assert volume.id == raw["id"]
-        assert volume.catalog_version == VOLUME_CATALOG_VERSION
-        again = read_volume_document(volume.canonical())
+        # Made under the volume catalog its island catalog names, it reads the same under the
+        # newest.
+        assert volume.catalog_version == island_catalog().volume_catalog_version
+        again = read_volume_document(volume.canonical(), volume_catalog(VOLUME_CATALOG_VERSION))
         assert again.sha256 == volume.sha256
         caps = [part for part in volume.parts if part.op == "cap"]
         assert [part.values["height_mm"] for part in caps] == [0]
@@ -361,3 +396,82 @@ def test_a_cone_hangs_its_keel_to_the_stated_depth():
     field = VolumeField(made(raw), SEED)
     assert _solid(field, -36000 + 1500, 14000)
     assert not _solid(field, -36000 - 1000, 14000)
+
+
+def test_the_first_catalog_states_no_top_land_and_reads_every_other_value_as_the_second():
+    with pytest.raises(IslandRefused) as caught:
+        read_island_document({**HIGH, "top": HILL_TOP}, island_catalog(1))
+    assert (caught.value.path, caught.value.code) == ("top", "island_later_version")
+    first = read_island_document(HIGH, island_catalog(1))
+    assert first.canonical_bytes == read_island_document(HIGH).canonical_bytes
+    assert make_island_volume(first, SEED).sha256 == made(HIGH).sha256
+
+
+def test_a_top_land_is_written_in_and_made_the_volumes_top_land_over_the_square_round_its_top():
+    read = read_island_document({**HIGH, "top": HILL_TOP})
+    assert read.top is not None
+    assert read.canonical()["top"] == read_land_document(HILL_TOP).canonical()
+    assert read_island_document(read.canonical()).canonical_bytes == read.canonical_bytes
+    volume = make_island_volume(read, SEED)
+    assert volume.top_land is not None
+    assert volume.top_land.land.canonical() == read.top.canonical()
+    assert [part for part in volume.parts if part.op == "cap"] == []
+    # The square is whole 2 m and covers the level island's top: all the rock a metre under it.
+    side = volume.top_land.side_mm
+    level = VolumeField(made(HIGH), SEED)
+    under = _solid(level, -1000, HIGH["radius_mm"] + level.weathering_mm + 3000)
+    assert side % 2000 == 0 and max(max(abs(x), abs(y)) for x, y in under) <= side // 2
+    assert read_volume_document(volume.canonical()).sha256 == volume.sha256
+
+
+@pytest.mark.parametrize("top", [HILL_TOP, HOLLOW_TOP], ids=["hill", "hollow"])
+def test_the_slab_reaches_above_the_lands_highest_point_and_its_base_below_the_lowest(top):
+    raw = {**HIGH, "top": top}
+    volume = made(raw)
+    assert volume.top_land is not None
+    surface = TopLandSurface(volume.top_land, volume.id)
+    # The hill rises above the top height and the hollow falls below it.
+    assert surface.highest > 1500 if top is HILL_TOP else surface.lowest < -1500
+    (slab,) = [part for part in volume.parts if part.id == "slab"]
+    base = slab.values["at_mm"][2]
+    assert base <= surface.lowest - raw["rim_mm"]
+    weathering = raw["erosion"]["amplitude_mm"] + raw["strata"]["amplitude_mm"]
+    assert base + slab.values["height_mm"] > surface.highest + weathering
+    # The rock reaches no higher than the land's highest point and no deeper than the stated
+    # depth below its lowest.
+    field = VolumeField(volume, SEED)
+    assert field.extent[1][2] == surface.highest
+    half = raw["radius_mm"] + field.weathering_mm + 3000
+    assert _solid(field, surface.lowest - raw["depth_mm"] - field.weathering_mm - 1000, half) == []
+
+
+def test_the_walked_top_is_the_land_never_above_it_and_within_a_quarter_of_its_blend_below():
+    raw = {**HIGH, "top": HILL_TOP}
+    volume = made(raw)
+    assert volume.top_land is not None
+    surface = TopLandSurface(volume.top_land, volume.id)
+    field = VolumeField(volume, SEED)
+    near = raw["radius_mm"] // 2
+    corners: dict[tuple[int, int], int] = {}
+    for sheet in volume_tops(field):
+        x0, y0 = sheet.origin_mm
+        for row, first, last in sheet.walkable:
+            for column in range(first, last + 1):
+                for dj in (0, 1):
+                    for di in (0, 1):
+                        x = x0 + (column + di) * SHEET_CELL_MM
+                        y = y0 + (row + dj) * SHEET_CELL_MM
+                        if abs(x) <= near and abs(y) <= near:
+                            index = (row + dj) * sheet.columns + column + di
+                            corners[(x, y)] = sheet.height_mm[index]
+    # The middle of the top is walked: nearly every corner within half the radius of the axis.
+    assert len(corners) >= (2 * near // SHEET_CELL_MM) ** 2 * 9 // 10
+    quarter = volume.top_land.blend_mm // 4
+    for (x, y), top in corners.items():
+        land = surface.height(x, y)
+        assert land - quarter - 1 <= top <= land, (x, y, top, land)
+    # It climbs the hill as the land does: not a level top.
+    lands = [surface.height(x, y) for x, y in corners]
+    heights = corners.values()
+    assert max(lands) - min(lands) > 500
+    assert max(heights) - min(heights) >= max(lands) - min(lands) - quarter

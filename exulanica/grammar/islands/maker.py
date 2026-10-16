@@ -1,8 +1,9 @@
 """The island maker: a sky island and a seed made into an unchanged ``exulanica.volume/v1``.
 
 The volume is in the island's own frame (x east, y north, z up, whole millimetres): its top is
-capped flat at height 0 by a cap part, and the top outline is centred on the origin (the middle of
-the box round the slab's and the lobes' top discs). Its id is the island's id, its looks, walk,
+capped flat at height 0 by a cap part, or by the island's top land where it states one, and the
+top outline is centred on the origin (the middle of the box round the slab's and the lobes' top
+discs). Its id is the island's id, its looks, walk,
 erosion and strata are the island's, and it is read by the volume reader under the volume catalog
 version the island's catalog names, so what the maker returns is a volume any volume reader admits.
 It lists at most the volume catalog's part limit: a slab, up to four lobes, the underside's parts,
@@ -46,6 +47,15 @@ make the same volume, byte for byte.
   from are wide enough, so weathering does not eat through one and leave its end floating.
 * The slab and the lobes reach above the cap by their rounding and the weathering's amplitude, so
   the cap cuts their rounding away and the top is level at 0 wherever rock lies under it.
+* A top land (:attr:`~exulanica.grammar.islands.document.IslandDocument.top`) is the volume's
+  ``top_land`` over the square round the top's discs grown by a tenth, in whole 2 m, its datum the
+  island's top height 0. The maker realizes it as the field will
+  (:class:`~exulanica.grammar.volumes.TopLandSurface`), then makes the island as if its top were
+  level at the land's lowest height (or 0, where the land never falls below it), so the rim and
+  the underside hang below the lowest point, and raises the slab and the lobes by the land's
+  relief, so they reach above its highest point by their rounding and the weathering as they reach
+  above a level cap: the land cuts every point of the top. A slab raised so keeps its base and its
+  widest radius and leans less.
 * Varied strata read well on islands (amplitude 700 to 1100 mm, period 2800 to 4500 mm, thinner
   beds on smaller islands and never under 2 m for a 2 m drawing cell, a spread, relief about 600,
   offset 500 to 700, tilt 4 to 5 degrees). They are the island's own section and passed on as
@@ -69,6 +79,8 @@ from exulanica.grammar.volumes import (
 )
 from exulanica.grammar.volumes import (
     TURN_ONE,
+    TopLand,
+    TopLandSurface,
     VolumeDocument,
     read_volume_document,
     sin_cos,
@@ -81,6 +93,8 @@ _FULL: Final = 360_000
 #: How far the slab reaches past where the cap cuts it beyond its rounding and the weathering, so
 #: the cap cuts its rounding away and no weathering reaches down through the top.
 _OVER_MM: Final = 500
+#: A top land's square is whole 2 m, as the volume reader holds it.
+_SQUARE_STEP_MM: Final = 2_000
 
 Part = dict[str, Any]
 Point = tuple[int, int, int]
@@ -468,18 +482,19 @@ def _fingers(key: bytes, island: IslandDocument, cores: list[_Core]) -> list[Par
 
 
 def _slab(
-    part_id: str, at: Point, base: int, top: int, over: int, rounding: int, blend: int
+    part_id: str, at: Point, base: int, top: int, over: int, rounding: int, blend: int, rise: int
 ) -> Part:
     """A slab from ``base`` radius at its point up to ``top`` radius at the cap's level, reaching
-    ``over`` past the cap, where its top is wider still by the same overhang."""
+    ``over`` past the cap, where its top is wider still by the same overhang; raised by ``rise``
+    above that with the same base and widest radius."""
     height = -at[2] + over
     widest = base + (top - base) * height // -at[2]
-    return _column(part_id, at, height, base, widest, rounding, blend=blend)
+    return _column(part_id, at, height + rise, base, widest, rounding, blend=blend)
 
 
-def _top(key: bytes, island: IslandDocument) -> tuple[list[Part], int, list[Point]]:
-    """The slab and its lobes, the slab's base radius, and each one's disc at the cap's level
-    (east, north, radius)."""
+def _top(key: bytes, island: IslandDocument, rise: int) -> tuple[list[Part], int, list[Point]]:
+    """The slab and its lobes, raised by ``rise``, the slab's base radius, and each one's disc at
+    the cap's level (east, north, radius)."""
     radius, rim = island.radius_mm, island.rim_mm
     draws = _Draws(key, "slab")
     slab_top = radius * (95 - 3 * island.lobes) // 100 if island.lobes > 1 else radius
@@ -487,7 +502,7 @@ def _top(key: bytes, island: IslandDocument) -> tuple[list[Part], int, list[Poin
     rounding = max(300, min(rim // 7, 4_000))
     weathering = int(island.erosion["amplitude_mm"]) + int(island.strata["amplitude_mm"])
     over = rounding + weathering + _OVER_MM
-    parts: list[Part] = [_slab("slab", (0, 0, -rim), slab_base, slab_top, over, rounding, 0)]
+    parts: list[Part] = [_slab("slab", (0, 0, -rim), slab_base, slab_top, over, rounding, 0, rise)]
     discs: list[Point] = [(0, 0, slab_top)]
     lobes = island.lobes - 1
     first = draws.between(0, _FULL - 1)
@@ -508,36 +523,52 @@ def _top(key: bytes, island: IslandDocument) -> tuple[list[Part], int, list[Poin
                 over,
                 min(rounding, floor // 4),
                 lobe.between(1_500, 2_500),
+                rise,
             )
         )
     return parts, slab_base, discs
 
 
-def _centred(parts: list[Part], discs: list[Point]) -> list[Part]:
-    """The parts moved level so the box round the top's discs is centred on the origin."""
+def _centred(parts: list[Part], discs: list[Point], drop: int = 0) -> list[Part]:
+    """The parts moved level so the box round the top's discs is centred on the origin, and down by
+    ``drop``."""
     east = -(min(x - r for x, _, r in discs) + max(x + r for x, _, r in discs)) // 2
     north = -(min(y - r for _, y, r in discs) + max(y + r for _, y, r in discs)) // 2
     for part in parts:
         at = part["at_mm"]
-        part["at_mm"] = [at[0] + east, at[1] + north, at[2]]
+        part["at_mm"] = [at[0] + east, at[1] + north, at[2] - drop]
     return parts
 
 
+def _square(discs: list[Point]) -> int:
+    """The side of the top land's square: the box round the top's discs grown by a tenth, in whole
+    2 m."""
+    across = max(
+        max(x + r for x, _, r in discs) - min(x - r for x, _, r in discs),
+        max(y + r for _, y, r in discs) - min(y - r for _, y, r in discs),
+    )
+    return -(-(across * 11 // 10) // _SQUARE_STEP_MM) * _SQUARE_STEP_MM
+
+
 def make_island_volume(island: IslandDocument, seed: bytes) -> VolumeDocument:
-    """The island as a volume: its slab and lobes, its underside, its fingers, capped flat at 0."""
+    """The island as a volume: its slab and lobes, its underside, its fingers, capped flat at 0 or
+    by its top land."""
     key = hashlib.sha256(PROFILE.encode() + b"\x1f" + seed + b"\x1f" + island.id.encode()).digest()
-    top, slab_base, discs = _top(key, island)
+    blend = max(400, min(island.rim_mm // 8, 1_200))
+    top_land: TopLand | None = None
+    drop = rise = 0
+    if island.top is not None:
+        _, _, outline = _top(key, island, 0)
+        top_land = TopLand(land=island.top, side_mm=_square(outline), blend_mm=blend)
+        surface = TopLandSurface(top_land, island.id)
+        drop = max(0, -surface.lowest)
+        rise = max(0, surface.highest) + drop
+    top, slab_base, discs = _top(key, island, rise)
     underside, cores = _underside(key, island, slab_base)
     fingers = _fingers(key, island, cores)
-    cap: Part = {
-        "id": "top",
-        "shape": "cap",
-        "height_mm": 0,
-        "blend_mm": max(400, min(island.rim_mm // 8, 1_200)),
-    }
     catalog = volume_catalog(island.volume_catalog_version)
-    parts = [*_centred([*top, *underside, *fingers], discs), cap]
-    raw = {
+    parts = _centred([*top, *underside, *fingers], discs, drop)
+    raw: dict[str, Any] = {
         "profile": VOLUME_PROFILE,
         "id": island.id,
         "look": island.look,
@@ -547,4 +578,12 @@ def make_island_volume(island: IslandDocument, seed: bytes) -> VolumeDocument:
         "strata": dict(island.strata),
         "parts": parts,
     }
+    if top_land is None:
+        parts.append({"id": "top", "shape": "cap", "height_mm": 0, "blend_mm": blend})
+    else:
+        raw["top_land"] = {
+            "land": top_land.land.canonical(),
+            "side_mm": top_land.side_mm,
+            "blend_mm": top_land.blend_mm,
+        }
     return read_volume_document(raw, catalog)

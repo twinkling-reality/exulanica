@@ -44,7 +44,7 @@ from exulanica.grammar.landscape import (
     volumes_section,
 )
 from exulanica.grammar.landscape.rules import served_landscape_rules
-from exulanica.grammar.volumes import TURN_ONE, VolumeField, sin_cos
+from exulanica.grammar.volumes import TURN_ONE, VolumeField, VolumeRefused, sin_cos
 from exulanica.world.errors import InvalidStructuralData
 
 __all__ = [
@@ -79,7 +79,18 @@ def place_landscape_on_site(landscape: LandscapeDocument, width_mm: int, depth_m
             code="landscape_extent_not_site",
         )
     for index, placement in enumerate(landscape.placements):
-        (low_x, low_y, _), (high_x, high_y, _) = VolumeField(placement.volume, b"").extent
+        try:
+            field = VolumeField(placement.volume, b"")
+        except VolumeRefused as refused:
+            # A top land the land realizer refuses is refused here, the first field a site's
+            # landscape makes, by its path in the request.
+            where = f"landscape.volumes[{index}].volume"
+            raise LandscapeRefused(
+                refused.detail,
+                path=f"{where}.{refused.path}" if refused.path else where,
+                code=refused.code,
+            ) from refused
+        (low_x, low_y, _), (high_x, high_y, _) = field.extent
         sine, cosine = sin_cos(placement.yaw_mdeg)
         turned = [
             ((cosine * x - sine * y) // TURN_ONE, (sine * x + cosine * y) // TURN_ONE)

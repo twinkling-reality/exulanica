@@ -12,9 +12,11 @@ from pathlib import Path
 
 import pytest
 from exulanica.grammar.errors import CatalogError
+from exulanica.grammar.landform import SERVED_LAND_RULES, land_rules
 from exulanica.grammar.volumes import (
     CATALOG_VERSION,
     CATALOG_VERSIONS,
+    LAND_CATALOGS,
     PROFILE,
     SERVED_VOLUME_RULES,
     SHAPES,
@@ -37,6 +39,8 @@ SHIPPED = {
     "volume-value.v1.json": "8da177cfd44b106adc05abb6852f80e3ecd9362db7eaac925b426c26347a870c",
     "volume-shape.v2.json": "46dd7702ec5757e20426c660b11010bc1bbf1b7d965f1272bd97ec734b01073f",
     "volume-value.v2.json": "ced8acf3b5675bd1bd43c70ce3af14f8cd29ddb32bdee2130fd055680d98287b",
+    "volume-shape.v3.json": "6fe17ddbd5accec6aed83e6ccf25eaf2e65ac3b7d479185a20ee2858ab8305f6",
+    "volume-value.v3.json": "6590e0d89cb675bb79e850bf7ac562467921b81403e20e2bfba03c38b295194d",
 }
 
 #: Each volume rules version and the catalog digests it names.
@@ -49,7 +53,13 @@ RULES = {
         "volume-shape.v2": "cc5763039e163e8358a478fb5abb63b376c1a6473b89e98cd4d94b37b055e19d",
         "volume-value.v2": "b1879ca4841ee62a7a20cb597bd5ef76cef730498e2918b0dce6565c2a6f3cb5",
     },
+    3: {
+        "volume-shape.v3": "1483230908de90e963bcf95eb41083c79288de764e5b13bba5b9f09f8c14a46b",
+        "volume-value.v3": "c10eb009d170e772d0646e910dab79422f9d2865adfc58e3d9927bebf07bb1e4",
+    },
 }
+#: Each volume rules version whose volumes may state a top land, and the land rules realizing it.
+TOP_LAND_RULES = {3: 3}
 
 #: A sea stack: an overhanging column, a shoulder, a leaning spur, a tilted ledge, a sea arch
 #: through its foot and a level top, weathered and bedded.
@@ -78,6 +88,7 @@ STACK = {
 STACK_SHA256 = {
     1: "a3d38dc6ba7dba815092cc8868307e76cec4e12c83b4637b21e28b25b27b66bd",
     2: "486944d84cad9c8c4ce63a5294083c89368d0a3b427fbbe79a220fb2179945ca",
+    3: "486944d84cad9c8c4ce63a5294083c89368d0a3b427fbbe79a220fb2179945ca",
 }
 
 BOULDER = {"id": "boulder", "shape": "sphere", "radius_mm": 3000}
@@ -103,7 +114,7 @@ def test_the_shipped_catalogs_are_never_edited():
 def test_every_value_names_an_owner_and_holds_its_default_and_every_shape_has_a_field():
     catalog = volume_catalog()
     assert set(catalog.shapes) == SHAPES
-    owners = {"volume", "erosion", "strata", "part", *catalog.shapes}
+    owners = {"volume", "erosion", "strata", "part", "top_land", *catalog.shapes}
     for (owner, name), bound in catalog.values.items():
         assert owner in owners, (owner, name)
         if bound.words:
@@ -244,9 +255,17 @@ def test_a_volume_lists_one_to_its_catalog_most_parts_and_adds_at_least_one():
 def test_the_volume_rules_name_the_shipped_catalogs_by_digest():
     assert VOLUME_RULES_VERSION in SERVED_VOLUME_RULES
     for version, catalogs in RULES.items():
-        assert volume_rules(version) == {"version": version, "catalogs": catalogs}
+        named: dict[str, object] = {"version": version, "catalogs": catalogs}
+        if version in TOP_LAND_RULES:
+            named["land_rules"] = land_rules(TOP_LAND_RULES[version])
+            # The land rules read the landform catalog the volume catalog reads a top land against.
+            land_catalog = LAND_CATALOGS[SERVED_VOLUME_RULES[version]]
+            assert SERVED_LAND_RULES[TOP_LAND_RULES[version]] == land_catalog
+        assert volume_rules(version) == named
         assert check_volume_rules(volume_rules(version)) == SERVED_VOLUME_RULES[version]
     assert set(RULES) == set(SERVED_VOLUME_RULES)
+    served = SERVED_VOLUME_RULES.items()
+    assert set(TOP_LAND_RULES) == {rules for rules, catalog in served if catalog in LAND_CATALOGS}
 
 
 @pytest.mark.parametrize(

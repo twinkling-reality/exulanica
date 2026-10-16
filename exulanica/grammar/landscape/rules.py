@@ -10,7 +10,8 @@ named by its own land rules beside them. Rules this code does not serve are refu
 
 A change to the composition is a new version; a change to the volume rules or the catalog is a new
 version naming them. The tests pin each served version. Version 2 is version 1 realizing its
-volumes by volume rules 2, whose strata may vary the beds.
+volumes by volume rules 2, whose strata may vary the beds. Version 3 is version 1 realizing its
+volumes by volume rules 3, whose volumes may state a top land.
 """
 
 from __future__ import annotations
@@ -33,10 +34,10 @@ __all__ = [
 ]
 
 #: The rules new landscapes are made by.
-LANDSCAPE_RULES_VERSION: Final = 2
+LANDSCAPE_RULES_VERSION: Final = 3
 #: Every rules version this code makes landscapes by: the landscape catalog version it reads and
 #: the volume rules version it realizes volumes by.
-SERVED_LANDSCAPE_RULES: Final = {1: (1, 1), 2: (1, 2)}
+SERVED_LANDSCAPE_RULES: Final = {1: (1, 1), 2: (1, 2), 3: (1, 3)}
 
 
 @functools.cache

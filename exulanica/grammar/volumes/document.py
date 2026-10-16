@@ -4,17 +4,28 @@ What a world says about rock the land cannot state: a cliff that overhangs, a se
 arch through it, a spire. A volume is a short list of bounded parts in its own frame (x east,
 y north, z up, whole millimetres), each a shape from the volume catalog that adds to the mass,
 carves from it or caps it at a level, placed, turned and leaned, and joined to what comes before
-it with a stated blend; then weathered by erosion and bedded by strata. The field that realizes it
-is :mod:`exulanica.grammar.volumes.field`.
+it with a stated blend; then weathered by erosion and bedded by strata, and optionally capped by a
+top land. The field that realizes it is :mod:`exulanica.grammar.volumes.field`.
 
 **Closed and bounded.** Top keys are ``profile``, ``id`` and ``parts``, and optionally ``look``,
-``top_look``, ``walk``, ``erosion`` and ``strata``. A part states ``id`` and ``shape`` and only
-values its shape and every part may state; a shape without a placement (a cap) states none; a
-required value must be stated; every integer is held to its bound and every word to its words; a
-bed is at least 1 m, so the strata's spread is at most its period less 1 m. A refusal names the
-path of what it refused, the bound it broke and a code:
+``top_look``, ``walk``, ``erosion``, ``strata`` and ``top_land``. A part states ``id`` and
+``shape`` and only values its shape and every part may state; a shape without a placement (a cap)
+states none; a required value must be stated; every integer is held to its bound and every word
+to its words; a bed is at least 1 m, so the strata's spread is at most its period less 1 m. A
+refusal names the path of what it refused, the bound it broke and a code:
 ``volume_too_many_parts``, ``volume_part_wrong_op`` (an operation its shape does not perform, or a
 placement on a shape that has none), ``volume_rounding_too_large``, or ``volume_invalid``.
+
+**A top land** (volume catalog version 3 and later) caps the mass by a land's surface instead of a
+level: ``top_land`` states ``land``, an unchanged ``exulanica.landform/v1`` document read by the
+land reader against the landform catalog version the volume catalog names
+(:data:`~exulanica.grammar.volumes.catalog.LAND_CATALOGS`), ``side_mm``, the side of the square it
+covers, centred on the volume's own origin, in whole 2 m so the square's corners lie on the land's
+1 m lattice, and ``blend_mm``, the blend of its cut, both bounded by the catalog. The land's datum
+is the volume's level 0. A land the land reader refuses is refused by its path under
+``top_land.land``; one the land realizer refuses (beyond 64 m of level 0, a range rising inside
+its square, a cascade beyond the land near it) is refused when its field is made, also by that
+path. A volume read against an earlier catalog states no top land.
 
 **Defaults are written in.** The canonical document carries every value of the volume and of every
 part, with the catalog's defaults filled in at reading, so a later catalog default never changes a
@@ -34,13 +45,25 @@ from typing import Any, Final, TypeAlias
 
 from exulanica.canonical import canonical_json
 from exulanica.grammar.documents import parse_json
+from exulanica.grammar.landform import (
+    LandDocument,
+    LandformRefused,
+    landform_catalog,
+    read_land_document,
+)
 from exulanica.grammar.records import KEY_PATTERN
-from exulanica.grammar.volumes.catalog import ValueBound, VolumeCatalog, volume_catalog
+from exulanica.grammar.volumes.catalog import (
+    LAND_CATALOGS,
+    ValueBound,
+    VolumeCatalog,
+    volume_catalog,
+)
 
 __all__ = [
     "PLACEMENT",
     "PROFILE",
     "PartValue",
+    "TopLand",
     "VolumeDocument",
     "VolumePart",
     "VolumeRefused",
@@ -51,7 +74,9 @@ __all__ = [
 
 PROFILE: Final = "exulanica.volume/v1"
 _REQUIRED: Final = frozenset({"profile", "id", "parts"})
-_OPTIONAL: Final = frozenset({"look", "top_look", "walk", "erosion", "strata"})
+_OPTIONAL: Final = frozenset({"look", "top_look", "walk", "erosion", "strata", "top_land"})
+#: A top land's side is whole 2 m, so its half lies on the land's 1 m lattice.
+_SIDE_STEP_MM: Final = 2_000
 #: The values a placed part states and a shape without a placement does not.
 PLACEMENT: Final = ("at_mm", "yaw_mdeg", "tilt_mdeg", "toward_mdeg")
 
@@ -92,6 +117,16 @@ class VolumePart:
 
 
 @dataclass(frozen=True, slots=True)
+class TopLand:
+    """The land a volume's top follows: its document, the side of the square it covers (centred on
+    the volume's own origin) and the blend of its cut."""
+
+    land: LandDocument
+    side_mm: int
+    blend_mm: int
+
+
+@dataclass(frozen=True, slots=True)
 class VolumeDocument:
     id: str
     look: str
@@ -104,6 +139,8 @@ class VolumeDocument:
     sha256: str
     #: The version of the catalogs it was read against.
     catalog_version: int
+    #: The land its top follows, or None where its top is its caps' levels alone.
+    top_land: TopLand | None = None
 
     def canonical(self) -> dict[str, Any]:
         return parse_json(self.canonical_bytes.decode(), PROFILE)
@@ -249,6 +286,38 @@ def _part(raw: object, index: int, catalog: VolumeCatalog) -> VolumePart:
     return part
 
 
+def _top_land(raw: object, catalog: VolumeCatalog) -> TopLand:
+    bounds = catalog.values_of("top_land")
+    land_version = LAND_CATALOGS.get(catalog.version)
+    if not bounds or land_version is None:
+        raise VolumeRefused(
+            f"a top land is read against volume catalog version {min(LAND_CATALOGS)} or later; "
+            f"this volume is read against version {catalog.version}",
+            path="top_land",
+        )
+    if not isinstance(raw, dict):
+        raise VolumeRefused("top_land is an object", path="top_land")
+    unknown = sorted(set(raw) - {"land"} - set(bounds))
+    if unknown or "land" not in raw:
+        raise VolumeRefused(
+            f"top_land states land and {sorted(bounds)}, got {sorted(raw)}", path="top_land"
+        )
+    values = _values(raw, bounds, "top_land", "top_land")
+    side = number(values["side_mm"])
+    if side % _SIDE_STEP_MM:
+        raise VolumeRefused(
+            f"top_land: the square's side is whole {_SIDE_STEP_MM} mm, so its corners lie on the "
+            f"land's lattice, got {side}",
+            path="top_land.side_mm",
+        )
+    try:
+        land = read_land_document(raw["land"], landform_catalog(land_version))
+    except LandformRefused as refused:
+        inner = f"top_land.land.{refused.path}" if refused.path else "top_land.land"
+        raise VolumeRefused(refused.detail, path=inner) from refused
+    return TopLand(land=land, side_mm=side, blend_mm=number(values["blend_mm"]))
+
+
 def _plain(value: PartValue) -> object:
     return list(value) if isinstance(value, tuple) else value
 
@@ -303,7 +372,8 @@ def read_volume_document(raw: object, catalog: VolumeCatalog | None = None) -> V
         parts.append(part)
     if not any(part.op == "add" for part in parts):
         raise VolumeRefused("a volume adds at least one part; carves and caps alone are empty")
-    canonical = {
+    top_land = _top_land(raw["top_land"], catalog) if "top_land" in raw else None
+    canonical: dict[str, Any] = {
         "profile": PROFILE,
         "id": volume_id,
         **looks,
@@ -319,6 +389,12 @@ def read_volume_document(raw: object, catalog: VolumeCatalog | None = None) -> V
             for part in parts
         ],
     }
+    if top_land is not None:
+        canonical["top_land"] = {
+            "land": top_land.land.canonical(),
+            "side_mm": top_land.side_mm,
+            "blend_mm": top_land.blend_mm,
+        }
     encoded = canonical_json(canonical)
     return VolumeDocument(
         id=volume_id,
@@ -331,4 +407,5 @@ def read_volume_document(raw: object, catalog: VolumeCatalog | None = None) -> V
         canonical_bytes=encoded,
         sha256=hashlib.sha256(encoded).hexdigest(),
         catalog_version=catalog.version,
+        top_land=top_land,
     )

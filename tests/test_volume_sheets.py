@@ -40,6 +40,18 @@ GOLDEN_TOPS = {
             "af238f5d5a6282daea57324ef4bbbe27f169527b6759022bf9f89502b1b2a9c3",
         ],
     },
+    3: {
+        "cells": [259, 1, 2, 126, 6, 1, 1],
+        "digests": [
+            "c1fc979f3fac81aadd1e61d93cc397f7963995a63995e39c2e59b2fbc99774e7",
+            "64b1899083f895a58d7bb3b79e5a8bbe51a213f0f01685b7daf0ffd40da12f25",
+            "4336ef194e11bc9cbec850cc7a832b38c5dea6011725473764ab18ff86187fff",
+            "6e5a0acfb30c36af4a99d7cfd836fb197017979e5f12d683ef37a4478393b3d1",
+            "ca907ef5b07c954c34a655f56986b22a50ff2fdf0c4d986e0912747333e0e93a",
+            "250ab6af8c2135e68e9d406f4196ddafaa6405363201af5b12209191e1250942",
+            "9938f50fd8049df163596f9b6e27edf77c55787bac93f7aeae38ff97bf88eef0",
+        ],
+    },
 }
 
 
@@ -137,7 +149,7 @@ def test_a_sheet_reads_back_only_as_the_sheet_its_digest_names(sheet):
     ("name", "value", "path", "code"),
     [
         ("profile", "exulanica.volume-sheet/v2", "profile", "volume_invalid"),
-        ("rules_version", 3, "rules_version", "volume_rules_changed"),
+        ("rules_version", 4, "rules_version", "volume_rules_changed"),
         ("rules_version", True, "rules_version", "volume_rules_changed"),
         ("surface", "top:01", "surface", "volume_invalid"),
         ("surface", "bottom:0", "surface", "volume_invalid"),

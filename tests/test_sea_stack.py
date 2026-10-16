@@ -120,8 +120,9 @@ def test_the_shipped_catalog_is_pinned_and_reads():
     catalog = sea_stack_catalog()
     assert catalog.version == CATALOG_VERSION == 1
     assert sorted(catalog.values_of("arch")) == ["bearing_mdeg", "floor_mm", "rise_mm", "width_mm"]
-    # A stack's volume is read against the newest volume catalog, whose strata vary the beds.
-    assert VOLUME_CATALOG_VERSION == NEWEST_VOLUME_CATALOG
+    # A stack's volume is read against volume catalog 2, whose strata vary the beds; a later
+    # volume catalog adds only what a stack does not state.
+    assert VOLUME_CATALOG_VERSION == 2 < NEWEST_VOLUME_CATALOG
 
 
 @pytest.mark.parametrize(
