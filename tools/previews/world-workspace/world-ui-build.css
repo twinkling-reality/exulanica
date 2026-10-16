@@ -1,0 +1,44 @@
+/* Build mode's own parts (the building sheet, section 3; frame r13): the held group at the right, the
+   tray along the bottom, the names over people near what is held, and the note's place above the
+   tray. Sizes are reference pixels at 1920 by 1080 in world-ui.css's unit; where the sheet sets a
+   larger size at 1440 than the scale gives, a max() floor carries it. */
+
+/* The held group: one soft shade, its longest word ending 152 in from the right edge. */
+.wu-shade.wu-held { right: calc(152 * var(--u)); top: calc(312 * var(--u)); --shade-pad: calc(24 * var(--u)); pointer-events: none; }
+.wu-held-title { margin: 0 0 calc(16 * var(--u)); font: 400 calc(24 * var(--u))/calc(24 * var(--u)) var(--font-sans); white-space: nowrap; }
+.wu-held-line { max-width: calc(420 * var(--u)); margin: calc(-8 * var(--u)) 0 calc(16 * var(--u)); font: 400 calc(18 * var(--u))/calc(24 * var(--u)) var(--font-sans); }
+
+/* The tray: thin glass along the bottom, its tabs above a row of tiles, each picture on a light neutral ground
+   (DESIGN, 16 October: rgb 214 222 224, as r13's light tiles). */
+.wu-root { --tile-width: max(96px, calc(112 * var(--u))); --tile-height: max(72px, calc(84 * var(--u))); }
+.wu-tray { position: absolute; left: 50%; bottom: var(--edge-inset); transform: translateX(-50%); box-sizing: border-box; max-width: calc(100% - 2 * var(--edge-inset));
+  padding: calc(12 * var(--u)); border-radius: calc(18 * var(--u)); pointer-events: auto; }
+.wu-tray-tabs { display: flex; gap: calc(16 * var(--u)); margin: 0 calc(4 * var(--u)) calc(12 * var(--u)); }
+.wu-tray-tab { margin: 0; padding: 0; border: 0; background: none; color: var(--ink-2); font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-sans); cursor: pointer; }
+.wu-tray-tab[aria-selected="true"] { color: var(--ink); font-weight: 500; }
+.wu-tray-tab:focus-visible, .wu-tile:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: calc(4 * var(--u)); }
+/* Held at a tile's height while the tiles are read, so the tray does not jump when they arrive. */
+.wu-tray-tiles { display: flex; gap: calc(8 * var(--u)); min-height: calc(var(--tile-height) + 8 * var(--u) + max(12px, calc(13 * var(--u))) * 1.2);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.wu-tray-tiles::-webkit-scrollbar { display: none; }
+/* A tile's picture stands at its top whatever its name's lines (a button would centre them). */
+.wu-tile { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: var(--tile-width); margin: 0; padding: 0;
+  border: 0; background: none; color: var(--ink); text-align: center;
+  font: 400 max(12px, calc(13 * var(--u)))/1.2 var(--font-sans); cursor: pointer; }
+.wu-tile-picture { display: block; width: var(--tile-width); height: var(--tile-height); margin-bottom: calc(8 * var(--u)); border-radius: calc(12 * var(--u));
+  background: #d6dee0 center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+.wu-tile[aria-pressed="true"] .wu-tile-picture { box-shadow: 0 0 0 2px #fff, 0 0 18px rgba(191, 233, 240, .6); }
+.wu-tile.wu-make .wu-tile-picture { display: grid; place-items: center; background: rgba(255, 255, 255, .10); font: 200 calc(34 * var(--u))/1 var(--font-sans); }
+.wu-tray[data-offline="true"] .wu-tile { opacity: .55; cursor: default; }
+.wu-tray-empty { align-self: center; margin: 0; padding: 0 calc(4 * var(--u)); color: var(--ink-2); font: 400 max(12px, calc(14 * var(--u)))/1.4 var(--font-sans); white-space: nowrap; }
+
+/* Names over people near what is held: small soft shades, centred over their heads. */
+.wu-names-near { position: absolute; inset: 0; pointer-events: none; }
+.wu-shade.wu-name-near { left: 0; top: 0; font: 450 max(12px, calc(14 * var(--u)))/calc(20 * var(--u)) var(--font-sans); white-space: nowrap; will-change: transform; }
+
+/* The note in build mode: the thin glass pill 12 above the tray (its top is --wu-tray-top), its key small. */
+.wu-root .wu-note[data-place="build"] { bottom: calc(var(--wu-tray-top, calc(190 * var(--u))) + 12 * var(--u)); gap: calc(12 * var(--u)); height: calc(36 * var(--u));
+  box-sizing: border-box; padding: 0 calc(16 * var(--u)); border-radius: calc(10 * var(--u)); background: var(--glass-thin-fill);
+  -webkit-backdrop-filter: var(--glass-thin-blur); backdrop-filter: var(--glass-thin-blur); box-shadow: var(--glass-thin-line); font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-sans); }
+.wu-root .wu-note[data-place="build"]::after { display: none; }
+.wu-root .wu-note[data-place="build"] .wu-prompt { gap: calc(12 * var(--u)); font: inherit; }

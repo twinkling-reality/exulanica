@@ -71,7 +71,7 @@ function tokenRgb(element: Element, name: string): readonly [number, number, num
 }
 
 /** Targeting and inspection use real native hits and authorized inventory identities. */
-export async function mountContextualWorld({ state, renderer, selection, objects, send, binding }) {
+export async function mountContextualWorld({ state, renderer, selection, objects, send, binding, makeCreature = null }) {
   disposePrior();
   const b = renderer.atlas.binding, canvas = document.getElementById('atlas');
   const entry = state.activeWorldEntry;
@@ -173,7 +173,22 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   };
   // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
   const build = writable
-    ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => pageShown() || held !== null, groundRing: createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, ...THING_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } }) }) : null;
+    ? mountBuildMode({
+      b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => pageShown() || held !== null,
+      groundRing: createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, ...THING_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } }),
+      // Who is drawn and where, for the names over people near what is held; read as the people arrive.
+      people: {
+        ids: () => b.authoredSociety?.visibleInhabitantIds ?? [],
+        groundOf: (id, out) => b.authoredSociety?.groundOf(id, out) ?? false,
+        heightOf: (id) => b.authoredSociety?.heightOf(id) ?? null,
+        // A person's own name only: someone the world has not named is not labelled over their head.
+        name: (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? null,
+        // The society read the names come from, refreshed no more often than any subject read.
+        refresh: () => refreshSubjectReads(performance.now()),
+      },
+      // The tray's first tile opens the page's own creature maker.
+      makeCreature,
+    }) : null;
   worldHints();
   function notice(words) {
     if (words) corners.notes.show(words); else corners.notes.clear();

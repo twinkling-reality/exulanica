@@ -18,8 +18,10 @@
  * edit (`editSeq`), by those, also after a reload; otherwise while the minutes drawn still show it
  * as it was before an edit made on this page. A paused world shows an edit at once, and a minute
  * that took the edit in draws it again. An editor may draw a
- * see-through copy of a placed thing where it would go (`setGhost`), tinted where the world refused
- * that spot.
+ * see-through copy of a placed thing where it would go (`setGhost`), or of a thing of a kind not yet
+ * placed where it would be placed (`setKindGhost`), tinted where the world refused that spot. A kind
+ * not yet placed also has a picture for build mode's tray (`drawKindPicture`, `./kind-picture.ts`),
+ * drawn apart from the world's frame.
  *
  * Picking meets each figure's pick volume; the nearest wins. The picked thing wears a ring. While a
  * person plays a being (Play this one), that being wears a steady ring at its feet as the society
@@ -49,9 +51,10 @@ import type { BodyMotion } from './body-motion.js';
 import type { ThingCrowdFigures } from './crowd-figures.js';
 import type { Grip, LookDrawing } from './documents.js';
 import type { InstancedContainer } from './dispatch.js';
-import { ThingFigureMaker, refusalOf } from './figure-maker.js';
+import { ThingFigureMaker, refusalOf, type FigureMade } from './figure-maker.js';
 import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
-import type { Named, ThingLibrary } from './library.js';
+import { KindPictures, UNPLACED_THING, type PictureSize } from './kind-picture.js';
+import type { Named, ThingLibrary, WorkspaceNamed } from './library.js';
 import { PickRing, rayMeets, ringRadius } from './ring.js';
 
 /**
@@ -162,6 +165,57 @@ export interface BoxGhost {
 /** How thin a copy of a part that lies flat (a pond, a field) is drawn, millimetres. */
 const FLAT_GHOST_MM = 50;
 
+/**
+ * Where an editor would place a thing of a kind not yet placed (a kind picked from build mode's
+ * tray): the kind as a placed thing names it, the region it would stand in, a pose in that region's
+ * frame (east, up, south, millimetres; a yaw that turns its front) and whether the world refused that
+ * spot.
+ */
+export interface KindGhost {
+  readonly kind: PlacedKind;
+  readonly regionId: string;
+  readonly xMm: number;
+  readonly yMm: number;
+  readonly zMm: number;
+  readonly yawMicroradians: number;
+  readonly refused: boolean;
+}
+/** The name a kind's copy is made under, never a placed id. */
+const KIND_GHOST = 'thing-ghost:kind';
+
+/** The kind a placed thing names, as the figure maker asks the library for it. */
+const namedKindOf = (kind: PlacedKind): Named | WorkspaceNamed =>
+  kind.source === 'workspace' ? { source: 'workspace', sha256: kind.sha256 } : { key: kind.kind, version: kind.version, sha256: kind.sha256 };
+
+/** What a kind's copy is made from: another kind or region is another copy. */
+const kindGhostKey = (ghost: KindGhost): string =>
+  `${ghost.kind.source === 'workspace' ? 'workspace' : `${ghost.kind.kind}/v${ghost.kind.version}`}:${ghost.kind.sha256}|${ghost.regionId}`;
+
+/**
+ * Turn every part of a copy into the ghost's light: no shadows, each material a light copy of its
+ * own, which the copy owns. Only a part whose material can fade is drawn: a copy is never solid. With
+ * `ownBones` false a skinned part is not drawn either: another figure's bones pose it, so it would
+ * stand where that figure stands. A part in `seen` is left as it is, so a figure that adds a part
+ * after it is made (a person's full form, loaded later) is turned part by part. Answers the
+ * materials made.
+ */
+function lightCopy(root: pc.Entity, refused: boolean, ownBones: boolean, seen: WeakSet<pc.MeshInstance> = new WeakSet()): pc.StandardMaterial[] {
+  const materials: pc.StandardMaterial[] = [];
+  for (const render of root.findComponents('render') as pc.RenderComponent[]) {
+    // A copy throws no shadow (a second, dithered one, drawn in every cascade); it still receives.
+    render.castShadows = false;
+    for (const instance of render.meshInstances) {
+      if (seen.has(instance)) continue;
+      seen.add(instance);
+      if (!(instance.material instanceof pc.StandardMaterial) || (!ownBones && instance.skinInstance != null)) { instance.visible = false; continue; }
+      const material = asGhost(instance.material.clone(), refused);
+      instance.material = material;
+      materials.push(material);
+    }
+  }
+  return materials;
+}
+
 export interface ThingMiss {
   readonly placedId: string;
   readonly reason: string;
@@ -261,6 +315,31 @@ export class ThingLayer {
   /** The see-through copy an editor asked for, and what it was made from. */
   private ghost: { readonly placedId: string; readonly refused: boolean; readonly source: ThingFigure; readonly root: pc.Entity; readonly materials: readonly pc.StandardMaterial[] } | null = null;
   /**
+   * The see-through copy of a kind not yet placed, once made: what it was made from and in, its
+   * figure, the parts already in the ghost's light and their materials, and its tint.
+   */
+  private kindGhost: {
+    readonly key: string;
+    readonly parent: pc.Entity;
+    readonly figure: ThingFigure;
+    readonly seen: WeakSet<pc.MeshInstance>;
+    readonly materials: pc.StandardMaterial[];
+    refused: boolean;
+  } | null = null;
+  /** The kind copy asked for last, posed as soon as it is made. */
+  private kindGhostWanted: KindGhost | null = null;
+  /** The kind copy being made now; asking for another, or for none, ends it. */
+  private kindGhostMaking: { readonly key: string; readonly parent: pc.Entity; readonly done: Promise<boolean> } | null = null;
+  /** Raised each time a kind copy is asked to be made or no longer wanted, so a late make is dropped. */
+  private kindGhostGeneration = 0;
+  /**
+   * The kind copy last refused (a kind this page cannot draw, or one its maker drew nothing for), not
+   * made again until another is asked for.
+   */
+  private kindGhostRefused: string | null = null;
+  /** Pictures of kinds not yet placed, for build mode's tray, once a kind and size. */
+  private readonly pictures: KindPictures;
+  /**
    * Things an edit moved, placed or brought back, by placed id, with every spot the edits replaced
    * (east and south, millimetres): where the drawing stood it before the first, and each place its
    * version gave it before a later one. A minute that lists it at one of them has not taken the
@@ -291,6 +370,11 @@ export class ThingLayer {
       library: options.library,
       ...(options.instantiate ? { instantiate: options.instantiate } : {}),
       ...(options.bodyMotion ? { bodyMotion: options.bodyMotion } : {}),
+    });
+    this.pictures = new KindPictures({
+      app: options.app,
+      maker: this.maker,
+      ...(options.invalidate ? { invalidate: options.invalidate } : {}),
     });
     // After the engine's animation step, so a rigged look's arm is posed over its clip.
     options.app.on('update', this.onUpdate);
@@ -361,19 +445,8 @@ export class ThingLayer {
       if (ringed) figure.root.addChild(this.ring.entity);
       root.name = `thing-ghost:${ghost.placedId}`;
       root.enabled = true;
-      const materials: pc.StandardMaterial[] = [];
-      for (const render of root.findComponents('render') as pc.RenderComponent[]) {
-        // A copy throws no shadow (a second, dithered one, drawn in every cascade); it still receives.
-        render.castShadows = false;
-        for (const instance of render.meshInstances) {
-          // Only a part whose material can fade is drawn: a copy is never solid. A skinned part is
-          // posed by its original's bones, so it would stand where the original stands: not drawn.
-          if (!(instance.material instanceof pc.StandardMaterial) || instance.skinInstance != null) { instance.visible = false; continue; }
-          const material = asGhost(instance.material.clone(), ghost.refused);
-          instance.material = material;
-          materials.push(material);
-        }
-      }
+      // A clone's skinned parts are posed by the original's bones: not drawn.
+      const materials = lightCopy(root, ghost.refused, false);
       entry.parent.addChild(root);
       this.ghost = { placedId: ghost.placedId, refused: ghost.refused, source: figure, root, materials };
     }
@@ -410,6 +483,107 @@ export class ThingLayer {
     this.boxGhost.shape.setLocalPosition(0, height / 2, 0);
     this.boxGhost.shape.setLocalScale(width, height, depth);
     this.options.invalidate?.();
+  }
+
+  /**
+   * Draw a see-through copy of a thing of a kind not yet placed where an editor would place it (a
+   * kind picked from build mode's tray), made by this layer's figure maker as a placed thing of that
+   * kind is made, in the ghost's light, coral where the world refused the spot; null takes it away.
+   * Its own bones pose it, so its skinned parts are drawn too. The kind's figure is made once and
+   * posed again while the kind and region stay, and tinted again when the refusal changes. It is
+   * never picked, never listed as drawn and never part of a society. Resolves true once the copy is
+   * drawn, false where the region is not drawn, the kind cannot be drawn, or another copy (or none)
+   * was asked for before it was made.
+   */
+  async setKindGhost(ghost: KindGhost | null): Promise<boolean> {
+    const parent = ghost === null || this.destroyed ? null : this.options.regionRoot(ghost.regionId);
+    const key = ghost === null || parent === null ? null : kindGhostKey(ghost);
+    if (key !== this.kindGhostRefused) this.kindGhostRefused = null;
+    // Another kind or region, or none: the copy made goes, and a copy being made is no longer wanted.
+    if (this.kindGhost !== null && (this.kindGhost.key !== key || this.kindGhost.parent !== parent)) this.dropKindGhost();
+    if (this.kindGhostMaking !== null && (this.kindGhostMaking.key !== key || this.kindGhostMaking.parent !== parent)) {
+      this.kindGhostMaking = null;
+      this.kindGhostGeneration += 1;
+    }
+    this.kindGhostWanted = key === null ? null : ghost;
+    if (ghost === null || parent === null || key === null) {
+      this.options.invalidate?.();
+      return false;
+    }
+    if (this.kindGhost !== null) {
+      this.poseKindGhost();
+      return true;
+    }
+    if (this.kindGhostRefused === key) return false;
+    if (this.kindGhostMaking === null) {
+      this.kindGhostGeneration += 1;
+      this.kindGhostMaking = { key, parent, done: this.makeKindGhost(ghost.kind, key, parent, this.kindGhostGeneration) };
+    }
+    return this.kindGhostMaking.done;
+  }
+
+  private async makeKindGhost(kind: PlacedKind, key: string, parent: pc.Entity, generation: number): Promise<boolean> {
+    const stale = () => this.destroyed || generation !== this.kindGhostGeneration;
+    let made: FigureMade | null;
+    try {
+      made = await this.maker.make(parent, { name: KIND_GHOST, thingId: UNPLACED_THING, kind: namedKindOf(kind), look: null }, stale);
+    } catch {
+      // A kind this page cannot draw has no copy, and is not made again until another is asked for.
+      if (stale()) return false;
+      this.kindGhostMaking = null;
+      this.kindGhostRefused = key;
+      return false;
+    }
+    if (stale()) {
+      made?.figure.destroy();
+      return false;
+    }
+    this.kindGhostMaking = null;
+    if (made === null) {
+      // The maker drew nothing (a kind not served yet): not made again on every move, as a throw.
+      this.kindGhostRefused = key;
+      return false;
+    }
+    const refused = this.kindGhostWanted?.refused ?? false;
+    const seen = new WeakSet<pc.MeshInstance>();
+    // Its own figure, posed by its own bones: every part a light copy.
+    this.kindGhost = { key, parent, figure: made.figure, seen, materials: lightCopy(made.figure.root, refused, true, seen), refused };
+    this.poseKindGhost();
+    return true;
+  }
+
+  /** Stand the kind copy where it was asked for last, tinted as asked. */
+  private poseKindGhost(): void {
+    const ghost = this.kindGhostWanted, copy = this.kindGhost;
+    if (ghost === null || copy === null) return;
+    if (copy.refused !== ghost.refused) {
+      for (const material of copy.materials) asGhost(material, ghost.refused);
+      copy.refused = ghost.refused;
+    }
+    copy.figure.pose({
+      position: [ghost.xMm / 1000, ghost.yMm / 1000, ghost.zMm / 1000],
+      facing: facingOfYaw(ghost.yawMicroradians),
+      deltaSeconds: 0,
+      discontinuity: true,
+    });
+    this.options.invalidate?.();
+  }
+
+  private dropKindGhost(): void {
+    if (this.kindGhost === null) return;
+    this.kindGhost.figure.destroy();
+    for (const material of this.kindGhost.materials) material.destroy();
+    this.kindGhost = null;
+  }
+
+  /**
+   * A picture of a kind not yet placed, for build mode's tray (`./kind-picture.ts`): the figure a
+   * placed thing of the kind is drawn as, alone, `width` by `height` device pixels, as a PNG data
+   * URL; null where the kind cannot be made or drawn. A kind is drawn once a size on a page, and never
+   * in the world's own frame.
+   */
+  drawKindPicture(kind: PlacedKind, size: PictureSize): Promise<string | null> {
+    return this.pictures.picture(namedKindOf(kind), size);
   }
 
   private dropBoxGhost(): void {
@@ -509,6 +683,10 @@ export class ThingLayer {
     this.options.app.off('update', this.onUpdate);
     this.dropGhost();
     this.dropBoxGhost();
+    this.dropKindGhost();
+    this.kindGhostMaking = null;
+    this.kindGhostWanted = null;
+    this.pictures.destroy();
     this.ring.place(null, 0);
     for (const [id, entry] of this.entries) this.drop(id, entry);
     this.ring.destroy();
@@ -596,9 +774,7 @@ export class ThingLayer {
         {
           name: `thing:${id}`,
           thingId: id,
-          kind: record.kind.source === 'workspace'
-            ? { source: 'workspace', sha256: record.kind.sha256 }
-            : { key: record.kind.kind, version: record.kind.version, sha256: record.kind.sha256 },
+          kind: namedKindOf(record.kind),
           look: this.lookChoices.get(id) ?? null,
         },
         stale,
@@ -824,6 +1000,9 @@ export class ThingLayer {
       this.applySociety();
     }
     for (const entry of this.entries.values()) this.poseOne(entry, dt, reduced);
+    // A part the kind copy's figure added since (a person's full form, loaded later) joins its light.
+    const copy = this.kindGhost;
+    if (copy !== null) copy.materials.push(...lightCopy(copy.figure.root, copy.refused, true, copy.seen));
     const camera = this.options.camera.getPosition();
     for (const entry of this.entries.values()) {
       if (entry.figure instanceof PresenceFigure) entry.figure.face(camera);

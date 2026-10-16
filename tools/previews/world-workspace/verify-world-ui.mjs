@@ -78,13 +78,15 @@ assert.match(css, /prefers-reduced-motion: reduce/u);
 assert.match(css, /prefers-reduced-transparency: reduce/u);
 assert.match(css, /prefers-contrast: more/u);
 assert.doesNotMatch(css, /text-transform:\s*uppercase/u);
-for (const file of ['world-ui.css', 'world-ui.ts', 'world-ui-layout.mjs', 'world-ui-parts.ts', 'world-ui-parts.html']) {
+for (const file of ['world-ui.css', 'world-ui.ts', 'world-ui-layout.mjs', 'world-ui-parts.ts', 'world-ui-parts.html', 'world-ui-build.css', 'world-ui-build.ts']) {
   assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /\u2014/u, file);
 }
 // Text under 16 px never scales below 12 px, except a key cap's glyph (DESIGN's ruling L5).
 assert.match(css, /\.wu-key \{[^}]*font: 500 max\(9px, calc\(13 \* var\(--u\)\)\)/u);
-for (const [, size] of css.matchAll(/(?:font:\s*\d+\s+|font-size:\s*)calc\((\d+(?:\.\d+)?) \* var\(--u\)\)/gu)) {
-  assert.ok(Number(size) >= 16, `a ${size} px text scales below 12 px; wrap it in max(12px, ...)`);
+for (const sheet of [css, readFileSync(new URL('world-ui-build.css', import.meta.url), 'utf8')]) {
+  for (const [, size] of sheet.matchAll(/(?:font:\s*\d+\s+|font-size:\s*)calc\((\d+(?:\.\d+)?) \* var\(--u\)\)/gu)) {
+    assert.ok(Number(size) >= 16, `a ${size} px text scales below 12 px; wrap it in max(12px, ...)`);
+  }
 }
 
 export default true;

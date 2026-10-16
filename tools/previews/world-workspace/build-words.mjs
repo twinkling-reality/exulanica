@@ -74,7 +74,13 @@ export function titled(name) {
  * where a thing may not stand, which is written for a person. Any other code says plainly that
  * nothing changed: a server's other details are written for developers.
  */
+/** What a change the server could not take up yet says (a 503, its place still being made): not a refusal (W11). */
+export const BUSY = 'The world is busy with another change. Try again in a moment.';
+
 const REFUSALS = Object.freeze({
+  kind_work_overran: BUSY,
+  kind_work_busy: BUSY,
+  kind_work_unavailable: BUSY,
   stale_object_base: 'Someone changed this world a moment ago. Look again and try once more.',
   stale_saved_world_entry: 'This world was saved from another window a moment ago. Reload it to see it as it is now.',
   saved_entry_reconciliation_required: 'This world was saved from another window a moment ago. Reload it to see it as it is now.',
@@ -287,16 +293,6 @@ export function placedLine() {
   return 'Placed in this world';
 }
 
-/** The card's line for a part made with the world, with the area it stands in when it names one. */
-export function madeLine(area) {
-  return typeof area === 'string' && area ? `Made with this world · ${titled(area)}` : 'Made with this world';
-}
-
-/** What keeping a move will do, said before it is kept. */
-export function keepLine() {
-  return 'People who use it go to the new spot from the next minute.';
-}
-
 /** Said when Tab finds nothing to choose. */
 export function nothingInView() {
   return 'No placed things in view. Walk closer to one.';
@@ -306,49 +302,88 @@ export function nothingInView() {
 export const HISTORY = Object.freeze({ title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
 
 /**
- * The keys build mode offers in its state `{ moving }`, as its hints draw them, bottom left: each
- * the caps drawn, its word and the shortcut a reader is told.
+ * Every key build mode has, as the keys card at the bottom right lists them (ruling W10): each the caps
+ * drawn, its word and the shortcut a reader is told.
  */
-export function buildHints(state) {
-  if (state.moving) {
-    return [
-      { keys: 'mouse', word: 'Drag to move' },
-      { keys: ['[', ']'], word: 'Turn', shortcut: '[ ]' },
-      { keys: ['Alt'], word: 'Free', shortcut: 'Alt' },
-    ];
-  }
+export function buildKeys() {
   return [
-    { keys: 'mouse-click', word: 'Select' },
+    { keys: 'mouse', word: 'Move' },
+    { keys: ['[', ']'], word: 'Turn', shortcut: '[ ]' },
+    { keys: ['Alt'], word: 'Free', shortcut: 'Alt' },
+    { keys: ['Del'], word: 'Remove', shortcut: 'Delete' },
     { keys: ['Tab'], word: 'Next', shortcut: 'Tab' },
     { keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z' },
+    { keys: ['B'], word: 'Done', shortcut: 'B' },
     { keys: ['H'], word: 'History', shortcut: 'H' },
+    { keys: ['Esc'], word: 'Back', shortcut: 'Escape' },
   ];
 }
 
 /**
- * The prompts on the chosen thing's card in build mode's state `{ moving, ready, confirming }`, each
- * with the action pressing it does (keyAction's names; none for a prompt that only says how):
- * chosen, Drag to move, Turn and Remove (not Remove once a removal was refused: it would only be
- * refused again); moving, Keep (dimmed until the server says it may stand there) and Put it back;
- * refused, Put it back alone; a question, Remove and Keep it.
+ * The held group's rows at the right in build mode's state `{ placing, moving, ready, refused,
+ * confirming, removeRefused }` (ruling W10, the building sheet's section 3), each where it works: its
+ * key, one word, the shortcut a reader is told and the action pressing it does (keyAction's names;
+ * none for a row that only says how).
+ * - Held (a new thing from the tray being placed, or a placed thing being moved): Place (the mouse: a
+ *   click, or Enter; dimmed until the server says it may stand there), Turn, Remove (a thing already
+ *   in the world only) and Put back (a moved thing to where it stood, a new one to the tray).
+ * - Refused (the server refused the spot): Put back alone, under the refusal's sentence.
+ * - Asking (before a removal): Remove and Keep.
+ * - Chosen: Move (a drag), Turn and Remove, not Remove once a removal was refused: it would only be
+ *   refused again.
  */
-export function cardPrompts(state) {
+export function heldRows(state) {
   if (state.confirming) {
     return [
-      { keys: ['Enter'], word: 'Remove', shortcut: 'Enter', action: 'confirm' },
-      { keys: ['Esc'], word: 'Keep it', shortcut: 'Escape', action: 'cancel' },
+      { key: 'Enter', word: 'Remove', shortcut: 'Enter', action: 'confirm' },
+      { key: 'Esc', word: 'Keep', shortcut: 'Escape', action: 'cancel' },
     ];
   }
-  if (state.moving) {
-    const back = { keys: ['Esc'], word: 'Put it back', shortcut: 'Escape', action: 'put-back' };
+  const turn = { key: '[ ]', word: 'Turn', shortcut: '[ ]', action: 'turn-right' };
+  const remove = { key: 'Del', word: 'Remove', shortcut: 'Delete', action: 'remove' };
+  if (state.placing || state.moving) {
+    const back = { key: 'Esc', word: 'Put back', shortcut: 'Escape', action: 'put-back' };
     if (state.refused) return [back];
-    return [{ keys: ['Enter'], word: 'Keep', shortcut: 'Enter', action: 'keep', disabled: !state.ready }, back];
+    return [
+      { key: 'mouse-click', word: 'Place', shortcut: 'Enter', action: 'place', disabled: !state.ready },
+      turn,
+      ...(state.placing ? [] : [remove]),
+      back,
+    ];
   }
-  return [
-    { keys: 'mouse', word: 'Drag to move' },
-    { keys: ['[', ']'], word: 'Turn', shortcut: '[ ]', action: 'turn-right' },
-    ...(state.removeRefused ? [] : [{ keys: ['Del'], word: 'Remove', shortcut: 'Delete', action: 'remove' }]),
-  ];
+  return [{ key: 'mouse-click', word: 'Move' }, turn, ...(state.removeRefused ? [] : [remove])];
+}
+
+/** The tray's words: its two tabs, its first tile, and what an empty tab says (ruling W10, B12). */
+export const TRAY = Object.freeze({
+  label: 'Things to place',
+  things: 'Things',
+  creatures: 'Creatures',
+  make: 'Make a creature',
+  noThings: "This world's kit has nothing to place.",
+  noCreatures: 'No creatures made yet.',
+});
+
+/**
+ * The names over people standing together near what is held (frame r13, ruling W11), each a person's
+ * own name or null for someone the world has not named: "Teo", "Teo and Ines", "Teo, Ines and
+ * Marco", and from four on the first and how many more ("Teo and 3 more"). Someone unnamed among
+ * named people is "the resident" (two unnamed among three are counted instead: "Teo and 2 more");
+ * people none of whom is named get no words ("").
+ */
+export function namesTogether(names) {
+  const named = names.filter((name) => typeof name === 'string' && name);
+  if (!named.length) return '';
+  const unnamed = names.length - named.length;
+  const said = [...named, ...Array.from({ length: unnamed }, () => 'the resident')];
+  if (said.length >= 4 || unnamed > 1) return `${said[0]} and ${said.length - 1} more`;
+  if (said.length === 3) return `${said[0]}, ${said[1]} and ${said[2]}`;
+  return said.length === 2 ? `${said[0]} and ${said[1]}` : said[0];
+}
+
+/** What placing a new thing did, said after it is kept. */
+export function placedNote(name) {
+  return `Placed the ${name}.`;
 }
 
 /** The largest yaw a pose may state (one revolution, in microradians, as the server bounds it). */
@@ -373,17 +408,22 @@ export function snapped(mm, free) {
 }
 
 /**
- * What a key does in build mode's state `{ on, selected, confirming, moving, ready, busy, removeRefused }`: an
- * action, 'held' for a key build mode takes and does nothing with now (a held-down B, Backspace with
- * nothing selected), or null when it leaves the key to the page. B switches build mode on and off;
- * Esc puts a question away, puts a moved thing back, lets go of what is selected, then leaves build
- * mode; Backspace or Delete asks to remove what is selected; `[` and `]` turn it, Alt for a free
- * turn; Enter answers yes to a question or keeps a move the server said may be kept; Cmd+Z or
- * Ctrl+Z takes back the world's newest change, with Shift does the last one taken back again; Tab
- * and Shift+Tab choose the next or previous placed thing in view. After the server refused removing
- * what is chosen (`removeRefused`), Backspace and Delete do nothing: its card offers moving it only.
- * H is the page's: it opens History from anywhere. While a request is on its way only B acts:
- * nothing is sent twice, and Esc does not seem to call back a change already sent.
+ * What a key does in build mode's state `{ on, selected, placing, confirming, moving, ready, refused,
+ * busy, removeRefused, focused }`: an action, 'held' for a key build mode takes and does nothing with
+ * now (a held-down B, Backspace with nothing selected), or null when it leaves the key to the page.
+ * B switches build mode on and off; Esc puts a question away, puts a held thing back (a moved one
+ * where it stood, a new one in the tray), lets go of what is selected, then leaves build mode;
+ * Backspace or Delete asks to remove what is selected, and while it is being moved puts it back
+ * first (a new thing from the tray is not in the world, so it has nothing to remove); `[` and `]`
+ * turn it, Alt for a free turn; Enter answers yes to a question, or places what is held where the
+ * server said it may stand; Cmd+Z or Ctrl+Z takes back the world's newest change, with Shift does the
+ * last one taken back again; Tab and Shift+Tab choose the next or previous placed thing in view,
+ * and Tab past the last moves into the tray. While a control of build mode has the focus (a row or a
+ * tile), Tab, Enter and Space are that control's and Esc gives the focus back to the world.
+ * After the server refused removing what is chosen (`removeRefused`), or the spot a held thing is
+ * at (`refused`), Backspace and Delete do nothing: the rows offer what still works. H is the page's:
+ * it opens History from anywhere. While a request is on its way only B acts: nothing is sent twice,
+ * and Esc does not seem to call back a change already sent.
  */
 export function keyAction(state, event) {
   const command = event.metaKey || event.ctrlKey;
@@ -395,12 +435,17 @@ export function keyAction(state, event) {
   if (event.code === 'KeyB') return event.repeat ? 'held' : 'toggle';
   if (!state.on) return null;
   if (state.busy) return turn !== null || ['Escape', 'Backspace', 'Delete', 'Enter'].includes(event.code) ? 'held' : null;
-  if (event.code === 'Escape') return state.confirming ? 'cancel' : state.moving ? 'put-back' : state.selected ? 'deselect' : 'leave';
-  // Tab chooses the next placed thing in view, Shift+Tab the one before, unless a control of
-  // build mode has the focus, where Tab moves the focus as anywhere else.
-  if (event.code === 'Tab') return state.focused || state.confirming || state.moving ? null : event.shiftKey ? 'previous' : 'next';
-  if (['Backspace', 'Delete'].includes(event.code)) return state.selected && !state.confirming && !state.moving && !state.removeRefused ? 'remove' : 'held';
-  if (turn !== null) return state.selected && !state.confirming ? turn : 'held';
-  if (event.code === 'Enter') return state.confirming ? 'confirm' : state.moving ? (state.ready ? 'keep' : 'held') : null;
+  const held = state.placing || state.moving;
+  if (state.focused && ['Tab', 'Enter', 'Space'].includes(event.code)) return null;
+  if (state.focused && event.code === 'Escape' && !state.confirming && !held) return 'unfocus';
+  if (event.code === 'Escape') return state.confirming ? 'cancel' : held ? 'put-back' : state.selected ? 'deselect' : 'leave';
+  // Tab chooses the next placed thing in view, Shift+Tab the one before.
+  if (event.code === 'Tab') return state.confirming || held ? null : event.shiftKey ? 'previous' : 'next';
+  if (['Backspace', 'Delete'].includes(event.code)) {
+    const removable = state.selected && !state.confirming && !state.placing && !state.refused && !state.removeRefused;
+    return removable ? 'remove' : 'held';
+  }
+  if (turn !== null) return (state.selected || state.placing) && !state.confirming ? turn : 'held';
+  if (event.code === 'Enter') return state.confirming ? 'confirm' : held ? (state.ready ? 'place' : 'held') : null;
   return null;
 }

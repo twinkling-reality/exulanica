@@ -158,7 +158,7 @@ export function shade({ small = false }: { readonly small?: boolean } = {}): HTM
   return element('div', small ? 'wu-shade wu-small' : 'wu-shade');
 }
 
-/** One row of key and word: the key's name (Enter is drawn as a return arrow, 'mouse' as a mouse), its word, and what it does. */
+/** One row of key and word: the key's name (Enter is drawn as a return arrow, 'mouse' as a mouse, 'mouse-click' as one with its left button lit), its word, and what it does. */
 export interface GlyphRow {
   readonly key: string;
   readonly word: string;
@@ -188,6 +188,9 @@ const RETURN = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width=
 
 const MOUSE = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v4"/></svg>';
 
+/** The mouse with its left button lit (frame r13's Place): a click or a drag. */
+const MOUSE_CLICK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="6"/><path d="M12 2.5v7 M6 9.5h12"/><path d="M6.8 9 V8.5 a5.2 5.2 0 0 1 5.2 -5.2 V9 z" fill="#fff" stroke="none"/></svg>';
+
 /** Rows of key and word (the redraws' craft): keys one size, in one column, each word centred on its key. */
 export function glyphRows(rows: readonly GlyphRow[], sizes: GlyphRowSizes = {}): HTMLDivElement {
   const group = element('div', sizes.bars === true ? 'wu-rows wu-bars' : 'wu-rows');
@@ -202,6 +205,7 @@ export function glyphRows(rows: readonly GlyphRow[], sizes: GlyphRowSizes = {}):
     const glyph = element('span', 'wu-glyph');
     if (key === 'Enter') glyph.innerHTML = RETURN;
     else if (key === 'mouse') glyph.innerHTML = MOUSE;
+    else if (key === 'mouse-click') glyph.innerHTML = MOUSE_CLICK;
     else glyph.textContent = key;
     glyph.setAttribute('aria-hidden', 'true');
     row.append(glyph, element('span', 'wu-word', word));

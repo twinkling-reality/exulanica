@@ -1,27 +1,31 @@
 // Build mode in the world workspace. B switches it on and off while the world keeps playing. In it,
-// pointing at a thing placed in the world names it, a click selects it (its outline, a ring at its
-// foot and a card beside it). Dragging it carries a see-through copy along the ground and `[` `]`
-// turn it (half metres and 15 degree steps, Alt for free); the server says whether it may stand
-// there while it moves and when it is let go, and Enter keeps the move, Esc puts it back. Backspace
-// asks the server what removing it would do and Enter does it, and Cmd+Z takes back the world's
-// newest change, and Cmd+Shift+Z does the last change taken back again. Tab and Shift+Tab choose
-// the next or previous placed thing in view, so selecting needs no pointer. History, the page H
-// opens, takes changes back through the same `undo` and `redo` this returns. Every write goes
-// through the app's own edit path (`send`, main.ts's sendPlanned), which
-// advances the saved world and redraws what changed; every write is asked of the server first as a
-// preview, and only the server's answer is shown.
+// pointing at a thing placed in the world names it, a click selects it (its outline and a ring at its
+// foot), and the group at the right names it with a large key and one word for each thing that works
+// now (ruling W10). Dragging it carries a see-through copy along the ground and `[` `]` turn it (half
+// metres and 15 degree steps, Alt for free); the server says whether it may stand there while it
+// moves and when it is let go, and Enter or a click places it there, Esc puts it back. Delete asks
+// the server what removing it would do and Enter does it; while it is being moved, Delete puts it
+// back first. The tray along the bottom holds the things this world may place, as pictures: picking
+// one carries its see-through copy under the pointer, asked of the server as it rests, and a click or
+// Enter places it; "Make a creature" opens the page's own maker. Cmd+Z takes back the world's newest
+// change, and Cmd+Shift+Z does the last change taken back again. Tab and Shift+Tab choose the next or
+// previous placed thing in view, so selecting needs no pointer. History, the page H opens, takes
+// changes back through the same `undo` and `redo` this returns. Every write goes through the app's own
+// edit path (`send`, main.ts's sendPlanned), which advances the saved world and redraws what changed;
+// every write is asked of the server first as a preview, and only the server's answer is shown.
 // In a site world (one made from a world kind) the parts made with the world (a building, a garden
 // fixture, a pond or field) are chosen, moved, turned a quarter at a time and removed the same way,
 // through the parts routes; after a change the made world is drawn again (main.ts).
-// It is drawn with the in-world design's shared parts (world-ui.ts) and the world's corners (the
-// mode word, the Back corner, the hints and the note); what a key does in each state, and every
-// sentence, is build-words.mjs.
+// It is drawn with build mode's own parts (world-ui-build.ts) and the world's corners (the Building
+// pill, the keys card and the note); what a key does in each state, and every sentence, is
+// build-words.mjs.
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { pickSiteSlot } from '/src/composition/sight.ts';
 import { currentOpenSite } from '/src/composition/site-world.ts';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
-import { buildHints, cardPrompts, createKindLabels, keepLine, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
-import { cardWords, keyWord, nameTag, outline, path, promptColumn, promptRow, scaleOf, sideCard } from './world-ui.ts';
+import { BUSY, TRAY, buildKeys, createKindLabels, heldRows, keyAction, moveWords, movedNote, namesTogether, nothingInView, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
+import { heldGroup, namesNear, tray } from './world-ui-build.ts';
 
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
 const ASK_AFTER_MS = 180;
@@ -33,30 +37,52 @@ const RING_MARGIN = 1.18;
  * ground ring's look.
  */
 export const THING_RING = Object.freeze({ linePx: 1.6, glowAlpha: 0, fillAlpha: 0 });
-/** What a refusal the server words for a person starts with, drawn in the refused colour. */
-const NOT_HERE = 'Not here:';
 /** How a made part is named where a placed thing's id would be: chosen, carried, pointed at. */
 const PART = 'part:';
 /** The four turns a made part can take, microradians, as the parts routes state them. */
 const QUARTER_TURNS = [0, 1_570_796, 3_141_593, 4_712_389];
 const quarterOf = (yaw) => Math.max(0, QUARTER_TURNS.indexOf(yaw));
+/** How near a held thing someone stands to be named over their head, and how near two stand to be named together, in metres. */
+const NAMES_NEAR_M = 8;
+const TOGETHER_M = 2;
+/** The most names shown over people at once, nearest first, so the view stays the world's. */
+const NAMES_AT_MOST = 3;
+/** How often the names over people are chosen again, in milliseconds (a frame only moves them). */
+const NAMES_EVERY_MS = 200;
+/**
+ * The tray's tile pictures, reference pixels (frame r13), never smaller than the sheet's 1440 tiles
+ * (world-ui-build.css's floors), drawn at the screen's pixel density.
+ */
+const TILE_PICTURE = { width: 112, height: 84, leastWidth: 96, leastHeight: 72 };
+/** The first tile of the tray, which opens the page's creature maker. */
+const MAKE_TILE = 'make';
 
-export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null }) {
+export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null, people = null, makeCreature = null }) {
   const lifetime = new AbortController();
   const listen = (target, type, run, options = {}) => target.addEventListener(type, run, { ...options, signal: lifetime.signal });
-  const node = (tag, words = '', cls = '') => { const item = document.createElement(tag); item.textContent = String(words); item.className = cls; return item; };
   const scale = () => scaleOf(root);
   const versionPath = '/world/versions/' + encodeURIComponent(entry.authoredVersionId);
   const worldQuery = '?world_id=' + encodeURIComponent(entry.worldId);
 
   const tag = nameTag({ scale });
-  const card = sideCard({ build: true, scale });
-  card.body.setAttribute('role', 'region'); card.body.setAttribute('aria-labelledby', 'bm-title');
+  const group = heldGroup();
+  const names = namesNear();
+  const trayView = tray({
+    words: { label: TRAY.label, things: TRAY.things, creatures: TRAY.creatures },
+    onTab: (tab) => { trayTab = tab; if (tab === 'creatures') void readCreatures(); render(); },
+    onPick: (tile) => pick(tile),
+  });
   const chosen = outline(), copy = outline({ form: 'copy' }), origin = outline({ form: 'origin' }), trail = path();
-  root.append(origin.root, trail.root, chosen.root, copy.root, tag.root, card.root);
+  root.append(origin.root, trail.root, chosen.root, copy.root, names.root, tag.root, group.root, trayView.root);
+  // The note stands 12 above the tray, whatever the tray's height at this size.
+  const trayHeight = new ResizeObserver(() => {
+    if (trayView.root.hidden) return;
+    root.style.setProperty('--wu-tray-top', `${(trayView.root.offsetHeight + 32 * scale()).toFixed(1)}px`);
+  });
+  trayHeight.observe(trayView.root);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
-  /** Whether the server refused removing what is chosen: its card then offers moving it only. */
+  /** Whether the server refused removing what is chosen: its rows then offer moving it only. */
   let removeRefused = false;
   /**
    * A move being made: the thing, where it stands (`from`) and where it would stand (`to`, region
@@ -64,7 +90,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    * the server's newest answer about `to` (`verdict`: checking, ready or refused, with its words).
    */
   let moving = null, asked = 0, askTimer = 0;
-  let records = new Map(), pointer = null, lastPick = 0;
+  /**
+   * A new thing being placed from the tray: its tile, its kind as a placed thing names it, its name,
+   * the region and id it would be placed under, where it would stand (`to`, as a move's) and the
+   * server's newest answer about it (`verdict`, as a move's).
+   */
+  let placing = null;
+  let records = new Map(), pointer = null, lastPick = 0, lastNames = 0;
   /** A site world's made parts as the parts read gives them, by `part:<id>`; none in any other world. */
   let parts = new Map();
   /**
@@ -79,27 +111,39 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const exists = (id) => (isPart(id) ? parts.has(id) : records.has(id));
   const siteDrawing = () => currentOpenSite()?.drawing() ?? null;
   const slotOf = (id) => siteDrawing()?.slots?.find(slot => slot.identity === id.slice(PART.length)) ?? null;
-  const regionRoot = () => (entry.generatedSite ? b.regionRoots?.get(entry.generatedSite.regionId) ?? null : null);
+  /** The region a made world is drawn in, where new things are placed; null in a world drawn otherwise, which offers no tray. */
+  const placingRegion = () => entry.generatedSite?.regionId ?? entry.generatedGround?.regionId ?? null;
+  const regionRoot = (regionId = entry.generatedSite?.regionId ?? null) => (regionId ? b.regionRoots?.get(regionId) ?? null : null);
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
-  /** What the corners show now, so they are told only when it changes (a hint's fade restarts when told). */
+  /** The tray's open tab, the made creatures as GET /things/kinds lists them (null until read), and whether the server could be read. */
+  let trayTab = 'things', creatures = null, creaturesRead = null, offline = false;
+  /** Each tile's picture once drawn, by tile id. */
+  const pictures = new Map();
+  /** What the tray and the held group were last drawn with, so an unchanged state draws nothing again (a drag renders every move). */
+  let trayDrawn = '', groupDrawn = '';
+  /** What the corners show now, so they are told only when it changes. */
   let cornersShow = '';
   /**
-   * The projected points the card and marks were last placed at, so a still view places nothing
-   * (placing the card reads its size, which lays the page out); cleared whenever the card is redrawn.
+   * The projected points the marks were last placed at, so a still view places nothing; cleared
+   * whenever the group is drawn again.
    */
   let lastPlacedKey = '';
-  const point = b.camera.getPosition().clone(), seen = point.clone();
+  const point = b.camera.getPosition().clone(), seen = point.clone(), feet = point.clone(), heldAt = point.clone();
   let wasInspecting = false;
 
   const things = () => b.__workspaceThings?.() ?? null;
-  const focused = () => card.root.contains(document.activeElement);
-  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, moving: moving !== null, ready: moving?.verdict.state === 'ready', busy, removeRefused, focused: focused() });
+  const focused = () => group.root.contains(document.activeElement) || trayView.root.contains(document.activeElement);
+  const flags = () => ({
+    on, selected: selected !== null, placing: placing !== null, confirming: confirming !== null, moving: moving !== null,
+    ready: (placing ?? moving)?.verdict.state === 'ready', refused: (placing ?? moving)?.verdict.state === 'refused',
+    busy, removeRefused, focused: focused(),
+  });
 
-  /** A note at the bottom centre; a change it reports can be taken back from it. */
+  /** The note above the tray; a change it reports can be taken back from it. */
   function say(words, { undoable = false } = {}) {
     if (!words) { corners.notes.clear(); return; }
-    corners.notes.show(words, undoable ? { prompt: keyWord({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z', onPress: () => { void undo(); } }) } : {});
+    corners.notes.show(words, undoable ? { prompt: keyWord({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z', small: true, onPress: () => { void undo(); } }) } : {});
   }
   function problem(error) {
     const detail = typeof error?.code === 'string' && typeof error.message === 'string' && error.message.startsWith(error.code + ': ') ? error.message.slice(error.code.length + 2) : '';
@@ -136,10 +180,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (screen.z <= 0 || screen.x < 0 || screen.x > innerWidth || screen.y < 0 || screen.y > innerHeight) continue;
       found.push({ placedId, distance: eye.distance(figure.root.getPosition()) });
     }
-    const root = regionRoot();
-    if (root) for (const [id, part] of parts) {
+    const site = regionRoot();
+    if (site) for (const [id, part] of parts) {
       const slot = slotOf(id);
-      root.getWorldTransform().transformPoint(point.set(part.centre_mm[0] / 1000, (slot?.positionMm[2] ?? 0) / 1000 + 1, -part.centre_mm[1] / 1000), point);
+      site.getWorldTransform().transformPoint(point.set(part.centre_mm[0] / 1000, (slot?.positionMm[2] ?? 0) / 1000 + 1, -part.centre_mm[1] / 1000), point);
       const distance = eye.distance(point);
       const screen = b.camera.camera.worldToScreen(point, seen);
       if (screen.z <= 0 || screen.x < 0 || screen.x > innerWidth || screen.y < 0 || screen.y > innerHeight) continue;
@@ -149,8 +193,11 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
   function cycle(step) {
     const ids = inView();
-    if (!ids.length) { say(nothingInView()); return; }
     const at = selected === null ? -1 : ids.indexOf(selected);
+    // Past the last thing in view, Tab moves into the tray: its open tab, then its tiles.
+    const tab = trayView.root.hidden ? null : trayView.root.querySelector('[role="tab"][aria-selected="true"]');
+    if (step > 0 && tab && (ids.length === 0 || at === ids.length - 1)) { tab.focus(); return; }
+    if (!ids.length) { say(nothingInView()); return; }
     select(ids[at === -1 ? (step > 0 ? 0 : ids.length - 1) : (at + step + ids.length) % ids.length]);
   }
 
@@ -174,87 +221,269 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /**
    * A creature its workspace made is called by its kind's own label (rulings J20, J23), read once by
    * digest and again after a failed read's pause; until it arrives build mode says "creature", and
-   * draws its card again when it does.
+   * draws its group again when it does.
    */
   const kindLabels = createKindLabels(read, kindDocumentLabel);
   kindLabels.listen(() => { if (on && !lifetime.signal.aborted) render(); });
   const kindLabel = (kind) => kindLabels.label(kind);
   function nameOf(id) { return isPart(id) ? partOf(id)?.label ?? 'part' : thingName(records.get(id), kindLabel); }
 
-  /** The card's answer line: the server's sentence, its "Not here:" drawn as a refusal. */
-  function answer(words) {
-    const line = node('p', '', 'wu-card-answer');
-    if (words.startsWith(NOT_HERE)) line.append(node('span', NOT_HERE, 'wu-refused'), ' ' + words.slice(NOT_HERE.length).trimStart());
-    else line.textContent = words;
-    return line;
+  // ---------- The tray ----------
+
+  /** The kinds this world may place as tiles: the shipped library's objects, the latest version of each, in its order. */
+  function thingTiles() {
+    const library = things()?.layer?.maker?.library ?? null;
+    if (library === null) return null;
+    const latest = new Map();
+    for (const kind of library.list.kinds) {
+      if (kind.class === 'object' && (latest.get(kind.kind)?.version ?? 0) < kind.version) latest.set(kind.kind, kind);
+    }
+    return [...latest.values()].map(kind => {
+      const named = { kind: kind.kind, version: kind.version, sha256: kind.sha256 };
+      return { id: 'kind:' + kind.kind, name: titled(thingName({ kind: named })), kind: named, picture: pictures.get('kind:' + kind.kind) ?? null };
+    });
+  }
+  /** The creatures this workspace made as tiles, newest first, each by its own label. */
+  function creatureTiles() {
+    if (creatures === null) return null;
+    return creatures.map(made => {
+      const named = { source: 'workspace', sha256: made.sha256 };
+      return { id: 'made:' + made.sha256, name: titled(thingName({ kind: named }, () => made.label)), kind: named, picture: pictures.get('made:' + made.sha256) ?? null };
+    });
+  }
+  /** The made creatures, read when their tab first opens and again after one is placed. */
+  async function readCreatures(again = false) {
+    if (creaturesRead !== null && !again) return creaturesRead;
+    creaturesRead = (async () => {
+      try {
+        const listed = await read('/things/kinds');
+        // Each kind the workspace holds once, its newest version (the listing is newest first), placed by its
+        // digest alone as a workspace kind: never by a key its maker's words made.
+        const seenKinds = new Set();
+        creatures = (listed.kinds || []).filter(kind => {
+          if (typeof kind?.sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(kind.sha256)) return false;
+          const key = typeof kind.kind === 'string' ? kind.kind : kind.sha256;
+          if (seenKinds.has(key)) return false;
+          seenKinds.add(key);
+          return true;
+        }).map(kind => ({ sha256: kind.sha256, label: typeof kind.label === 'string' ? kind.label : '' }));
+        offline = false;
+      } catch { creatures ??= []; offline = true; creaturesRead = null; }
+      if (on && !lifetime.signal.aborted) render();
+    })();
+    return creaturesRead;
+  }
+  /** The tile of what is held: a new thing's, or a moved thing's own kind. */
+  function heldTile() {
+    if (placing !== null) return placing.tileId;
+    const kind = moving === null || isPart(moving.placedId) ? null : records.get(moving.placedId)?.kind;
+    if (!kind) return null;
+    return kind.source === 'workspace' ? 'made:' + kind.sha256 : 'kind:' + kind.kind;
+  }
+  function drawTray() {
+    if (!on || inspecting() || placingRegion() === null) { trayView.hide(); trayDrawn = ''; return; }
+    const tiles = trayTab === 'things' ? thingTiles() : creatureTiles();
+    const make = makeCreature ? [{ id: MAKE_TILE, name: TRAY.make, picture: null, make: true }] : [];
+    const drawn = { tab: trayTab, tiles: tiles === null ? null : [...make, ...tiles], held: heldTile(), offline, empty: trayTab === 'things' ? TRAY.noThings : TRAY.noCreatures };
+    const key = JSON.stringify([drawn.tab, drawn.tiles?.map(tile => [tile.id, tile.name]) ?? null, drawn.held, offline]);
+    if (key !== trayDrawn || trayView.root.hidden) { trayDrawn = key; trayView.set(drawn); }
+    if (tiles !== null) drawPictures(tiles);
+  }
+  /** Each tile's picture, drawn once by the world's own renderer and kept for the page's life. */
+  function drawPictures(tiles) {
+    const layer = things()?.layer;
+    if (!layer?.drawKindPicture) return;
+    const density = globalThis.devicePixelRatio || 1;
+    const size = {
+      width: Math.round(Math.max(TILE_PICTURE.leastWidth, TILE_PICTURE.width * scale()) * density),
+      height: Math.round(Math.max(TILE_PICTURE.leastHeight, TILE_PICTURE.height * scale()) * density),
+    };
+    for (const tile of tiles) {
+      if (pictures.has(tile.id)) continue;
+      pictures.set(tile.id, null);
+      void layer.drawKindPicture(tile.kind, size).then(url => {
+        if (typeof url !== 'string' || lifetime.signal.aborted) return;
+        pictures.set(tile.id, url);
+        trayView.picture(tile.id, url);
+      }, () => {});
+    }
   }
 
-  /** The card's prompts for the state build mode is in: a column while chosen, an answer pair in one row. */
-  function prompts() {
-    const verdict = moving?.verdict.state ?? null;
-    const items = cardPrompts({ moving: moving !== null, ready: verdict === 'ready', refused: verdict === 'refused', confirming: confirming !== null, removeRefused });
-    const made = items.map(item => keyWord({
-      keys: item.keys, word: item.word, shortcut: item.shortcut, disabled: busy || item.disabled === true,
-      onPress: item.action ? () => act(item.action, false) : undefined,
-    }));
-    return moving !== null || confirming !== null ? promptRow(made) : promptColumn(made);
+  /** A tile picked: its thing carried under the pointer to be placed, or the creature maker opened. */
+  function pick(tile) {
+    if (!on || busy) return;
+    if (tile.make) { putBack(); deselect(); makeCreature?.(); return; }
+    if (placing?.tileId === tile.id) { putBack(); return; }
+    const regionId = placingRegion();
+    if (regionId === null) return;
+    dropMove(); dropPlacing();
+    selected = null; confirming = null; failure = ''; removeRefused = false;
+    const name = tile.kind.source === 'workspace' ? thingName({ kind: tile.kind }, () => creatures?.find(made => made.sha256 === tile.kind.sha256)?.label ?? null) : thingName({ kind: tile.kind });
+    placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' } };
+    const held = placing;
+    void kindBox(tile.kind).then(box => { held.box = box; });
+    const at = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
+    const ground = groundAt(at.x, at.y);
+    if (ground !== null) placeTo(ground, false);
+    render();
+    canvas.focus({ preventScroll: true });
+  }
+  /** A kind's footprint as its document states it (millimetres across and deep), for the ring under its copy; null where unread. */
+  async function kindBox(kind) {
+    const library = things()?.layer?.maker?.library;
+    if (!library) return null;
+    try {
+      const document = await library.kindDocument(kind.source === 'workspace' ? kind : { key: kind.kind, version: kind.version, sha256: kind.sha256 });
+      const box = document?.body?.box_mm;
+      return Number.isFinite(box?.width) && Number.isFinite(box?.depth) ? { width: box.width, depth: box.depth } : null;
+    } catch { return null; }
+  }
+  /** A new thing's id: its kind's key, or "creature", and a short random part the server has not seen. */
+  function newThingId(kind) {
+    const random = Array.from(crypto.getRandomValues(new Uint8Array(4)), byte => byte.toString(16).padStart(2, '0')).join('');
+    return `${kind.source === 'workspace' ? 'creature' : kind.kind}:${random}`;
+  }
+  /** How high the ground stands at a point of the region, millimetres: on land, the land's height; else level. */
+  function groundHeightMm(x, z) {
+    const height = b.authoredSociety?.groundHeightAt;
+    return typeof height === 'function' ? Math.round(height(x / 1000, z / 1000) * 1000) : 0;
+  }
+  /** Stand the new thing's copy at a ground point, turned as it is. */
+  function placeTo(ground, free) {
+    if (placing === null) return;
+    const x = snapped(ground.xMm, free), z = snapped(ground.zMm, free);
+    standNew({ x, y: groundHeightMm(x, z), z, yaw: placing.to?.yaw ?? 0 });
+  }
+  /** Stand the new thing's copy at `to` and ask the server about it once it rests. */
+  function standNew(to) {
+    if (placing === null) return;
+    if (placing.to && placing.to.x === to.x && placing.to.z === to.z && placing.to.yaw === to.yaw) return;
+    placing.to = to;
+    placing.verdict = { state: 'checking', words: '' };
+    showKindCopy(placing, false);
+    clearTimeout(askTimer);
+    askTimer = window.setTimeout(() => { void askPlace(); }, ASK_AFTER_MS);
+    render();
+  }
+  /** The server's placing preview for where the copy stands now; an older answer is dropped. */
+  async function askPlace() {
+    if (placing === null || placing.to === null) return;
+    const request = ++asked, held = placing, to = { ...held.to }, stateBase = base();
+    try {
+      const answered = (await post('things.place.preview', '/things/preview', { base_state_sha256: stateBase, ...placingBody(held, to) })).body;
+      if (request !== asked || placing !== held) return;
+      held.verdict = answered.availability === 'ready'
+        ? { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to }
+        : { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
+    } catch (error) {
+      if (request !== asked || placing !== held) return;
+      held.verdict = { state: 'refused', words: problem(error) };
+    }
+    showKindCopy(held, held.verdict.state === 'refused');
+    render();
+  }
+  const placingBody = (held, to) => ({
+    thing_id: held.thingId, kind: held.kind, region_id: held.regionId,
+    pose: { x_mm: to.x, y_mm: to.y, z_mm: to.z, yaw_microradians: to.yaw }, origin_role: 'fictional',
+  });
+  function showKindCopy(held, refused) {
+    const to = held.to; if (to === null) return;
+    void things()?.layer?.setKindGhost?.({ kind: held.kind, regionId: held.regionId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused });
+  }
+  /** Place the new thing where the server said it may stand: the placing's own base and pose. */
+  async function placeNew() {
+    if (placing === null || busy || placing.verdict.state !== 'ready') return;
+    const held = placing, verdict = held.verdict, name = held.name;
+    busy = true; render();
+    try {
+      await post('things.place', '/things', { base_state_sha256: verdict.base, ...placingBody(held, verdict.to), saved_entry: savedEntry() });
+      busy = false; dropPlacing();
+      try { await refreshRecords(); } catch {}
+      if (records.has(held.thingId)) selected = held.thingId;
+      render(); say(placedNote(name), { undoable: true });
+      if (held.kind.source === 'workspace') void readCreatures(true);
+      return;
+    } catch (error) {
+      busy = false;
+      if (placing === held) held.verdict = { state: 'refused', words: problem(error) };
+      showKindCopy(held, true);
+      render();
+    }
+    try { await refreshRecords(); } catch {}
+  }
+  /** The new thing being placed put back in the tray: its copy goes, nothing was written. */
+  function dropPlacing() {
+    if (placing === null) return;
+    placing = null; ++asked; clearTimeout(askTimer);
+    void things()?.layer?.setKindGhost?.(null);
   }
 
-  /** Tells the corners what building shows now: its mode word, the Back corner and its hints. */
+  // ---------- The held group, the corners and the marks ----------
+
+  /** Tells the corners what building shows now: the Building pill, the keys card and no hints. */
   function renderCorners() {
-    const question = confirming !== null || moving !== null;
-    const show = !on ? 'off' : `on:${moving !== null}:${question}`;
+    const question = confirming !== null || moving !== null || placing !== null;
+    const show = !on ? 'off' : `on:${question}`;
     if (show === cornersShow) return;
     const was = cornersShow;
     cornersShow = show;
     if (!on) {
       if (!was || was === 'off') return;
-      corners.mode(null); corners.hints(null); corners.back('Your worlds'); corners.notes.place('world');
+      corners.mode(null); corners.hints(null); corners.keys?.(null); corners.back('Your worlds'); corners.notes.place('world');
       return;
     }
     if (!was.startsWith('on:')) {
       corners.mode('Building', keyWord({ keys: ['B'], word: 'Done', shortcut: 'B', onPress: () => { void toggle(); } }));
+      corners.hints(null);
+      corners.keys?.(buildKeys());
       corners.notes.place('build');
     }
     // A question shows its own Esc; the Back corner hides while it does.
     corners.back(question ? null : 'Back');
-    corners.hints(buildHints({ moving: moving !== null }), { vertical: true });
+  }
+
+  /** The group's words and rows for the state build mode is in, each row pressing what its key does. */
+  function groupWords() {
+    const rowsOf = (state) => heldRows(state).map(row => ({
+      key: row.key, word: row.word, shortcut: row.shortcut, disabled: busy || row.disabled === true,
+      onPress: row.action ? () => act(row.action, false) : undefined,
+    }));
+    if (placing !== null) {
+      const verdict = placing.verdict;
+      const line = verdict.state === 'refused' ? { words: verdict.words, refused: verdict.words !== BUSY } : verdict.words ? { words: verdict.words } : null;
+      return { title: titled(placing.name), line, rows: rowsOf({ placing: true, ready: verdict.state === 'ready', refused: verdict.state === 'refused' }) };
+    }
+    const name = nameOf(selected) || 'thing';
+    if (confirming !== null) return { title: removeTitle(name), line: { words: removeLine() }, rows: rowsOf({ confirming: true }) };
+    if (moving !== null) {
+      const verdict = moving.verdict;
+      const line = verdict.state === 'refused' ? { words: verdict.words, refused: verdict.words !== BUSY } : verdict.words ? { words: verdict.words } : null;
+      return { title: titled(name), line, rows: rowsOf({ moving: true, ready: verdict.state === 'ready', refused: verdict.state === 'refused' }) };
+    }
+    return { title: titled(name), line: failure ? { words: failure, refused: failure !== BUSY } : null, rows: rowsOf({ removeRefused }) };
   }
 
   function render() {
     renderCorners();
     lastPlacedKey = '';
-    if (!cardShows()) { card.hide(); hideMarks(); return; }
-    const name = nameOf(selected) || 'thing';
-    const body = [];
-    if (confirming !== null && !busy) {
-      body.push(cardWords({ title: removeTitle(name) }), answer(removeLine()));
-    } else if (moving !== null && !busy) {
-      const where = moveWords(moving.from, moving.to);
-      body.push(cardWords({ title: titled(name), lines: [where.charAt(0).toUpperCase() + where.slice(1)] }));
-      const verdict = moving.verdict;
-      body.push(answer(verdict.state === 'checking' ? 'Checking…' : verdict.words || keepLine()));
-    } else {
-      body.push(cardWords({ title: titled(name), lines: [isPart(selected) ? madeLine(partOf(selected)?.zone_label) : placedLine()] }));
-      if (busy) body.push(answer('Checking…'));
-      else if (failure) body.push(answer(failure));
-    }
-    body.push(prompts());
-    card.body.replaceChildren(...body);
-    card.body.querySelector('.wu-card-title')?.setAttribute('id', 'bm-title');
+    drawTray();
+    if (!groupShows()) { group.hide(); groupDrawn = ''; hideMarks(); return; }
+    const words = groupWords();
+    const key = JSON.stringify([words.title, words.line, words.rows.map(row => [row.key, row.word, row.disabled])]);
+    if (key !== groupDrawn) { groupDrawn = key; group.set(words); }
   }
 
-  function hideMarks() { chosen.hide(); copy.hide(); origin.hide(); trail.hide(); groundRing?.hide(); }
-  /** Whether the chosen thing's card and marks show: building, something chosen, nothing over them. */
-  const cardShows = () => on && selected !== null && !inspecting();
+  function hideMarks() { chosen.hide(); copy.hide(); origin.hide(); trail.hide(); groundRing?.hide(); names.hide(); }
+  /** Whether the held group and the marks show: building, something chosen or held, nothing over them. */
+  const groupShows = () => on && (selected !== null || placing !== null) && !inspecting();
 
   function select(placedId) {
-    dropMove();
+    dropMove(); dropPlacing();
     selected = placedId; confirming = null; failure = ''; removeRefused = false;
     render();
   }
   function deselect() {
-    dropMove();
+    dropMove(); dropPlacing();
     selected = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
   }
@@ -265,9 +494,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     on = true; say(''); render();
     reading = refreshRecords().catch(error => { say(error.message); });
     await reading; reading = null;
+    render();
   }
   function leave() {
-    dropMove();
+    dropMove(); dropPlacing();
     on = false; hovered = null; tag.hide();
     selected = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
@@ -280,7 +510,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     things()?.layer.setGhost(null);
     things()?.layer.setBoxGhost?.(null);
   }
-  function putBack() { dropMove(); render(); canvas.focus({ preventScroll: true }); }
+  /** What is held put back: a moved thing where it stood, a new one in the tray. */
+  function putBack() { dropMove(); dropPlacing(); render(); canvas.focus({ preventScroll: true }); }
 
   /** The ground point under a screen point (region frame, millimetres), or null off the ground. */
   function groundAt(x, y) {
@@ -351,6 +582,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const poseOf = (id, to) => ({ x_mm: to.x, y_mm: isPart(id) ? 0 : to.y, z_mm: to.z, yaw_microradians: to.yaw });
 
   function turn(degrees, free) {
+    if (placing !== null) {
+      if (placing.to !== null) standNew({ ...placing.to, yaw: turned(placing.to.yaw, degrees, free) });
+      return;
+    }
     const move = beginMove(); if (move === null) return;
     // A made part turns a quarter at a time, the only turns it can take.
     if (isPart(move.placedId)) { moveTo({ ...move.to, yaw: QUARTER_TURNS[(quarterOf(move.to.yaw) + (degrees > 0 ? 1 : 3)) % 4] }); return; }
@@ -383,6 +618,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const post = (actionId, tail, body) => send({ actionId, stepIndex: 0, method: 'POST', path: versionPath + tail, body });
 
   async function askRemove() {
+    // While it is being moved, it is put back first and then asked about where it stands.
+    if (moving !== null) dropMove();
     if (selected === null || busy) return;
     const placedId = selected, stateBase = base();
     busy = true; failure = ''; removeRefused = false; render();
@@ -457,7 +694,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     return said;
   }
 
-  /** What a key or a pressed prompt asks for, by keyAction's name; `free` is Alt held. */
+  /** What a key or a pressed row asks for, by keyAction's name; `free` is Alt held. */
   function act(action, free) {
     if (action === 'toggle') void toggle();
     else if (action === 'leave') leave();
@@ -469,10 +706,11 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     else if (action === 'turn-left') turn(15 * (free ? 1 / 15 : 1), free);
     else if (action === 'turn-right') turn(-15 * (free ? 1 / 15 : 1), free);
     else if (action === 'put-back') putBack();
-    else if (action === 'keep') void keepMove();
+    else if (action === 'place') void (placing !== null ? placeNew() : keepMove());
     else if (action === 'redo') void redo();
     else if (action === 'next') cycle(1);
     else if (action === 'previous') cycle(-1);
+    else if (action === 'unfocus') canvas.focus({ preventScroll: true });
   }
 
   /**
@@ -515,23 +753,23 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    * the camera.
    */
   function partOnScreen(id, to) {
-    const part = partOf(id), root = regionRoot();
-    if (part === null || root === null) return null;
+    const part = partOf(id), site = regionRoot();
+    if (part === null || site === null) return null;
     const slot = slotOf(id);
-    const base = to?.y ?? slot?.positionMm[2] ?? 0, height = Math.max(slot?.boxMm[2] ?? 0, 300);
+    const floor = to?.y ?? slot?.positionMm[2] ?? 0, height = Math.max(slot?.boxMm[2] ?? 0, 300);
     let [width, depth] = part.size_mm;
     // Turned an odd number of quarters from how it stands now, its sides swap.
     if (to !== null && Math.abs(quarterOf(to.yaw) - turnsNow(id)) % 2 === 1) [width, depth] = [depth, width];
     const east = to === null ? part.centre_mm[0] : to.x, north = to === null ? part.centre_mm[1] : -to.z;
-    const frame = root.getWorldTransform();
+    const frame = site.getWorldTransform();
     const ground = [];
     let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
     for (const [x, n] of [[east - width / 2, north - depth / 2], [east + width / 2, north - depth / 2], [east + width / 2, north + depth / 2], [east - width / 2, north + depth / 2]]) {
-      for (const y of [base, base + height]) {
+      for (const y of [floor, floor + height]) {
         frame.transformPoint(point.set(x / 1000, y / 1000, -n / 1000), point);
         const at = b.camera.camera.worldToScreen(point, seen);
         if (at.z <= 0) return null;
-        if (y === base) ground.push({ x: at.x, y: at.y });
+        if (y === floor) ground.push({ x: at.x, y: at.y });
         left = Math.min(left, at.x); right = Math.max(right, at.x); top = Math.min(top, at.y); bottom = Math.max(bottom, at.y);
       }
     }
@@ -544,22 +782,22 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    * little wider than its half diagonal, so it never crosses the outline.
    */
   function ringUnder(id) {
-    const corners = groundRing === null ? null : footprintInWorld(id);
-    if (corners === null) { groundRing?.hide(); return; }
-    const mean = (axis) => corners.reduce((sum, corner) => sum + corner[axis], 0) / corners.length;
+    const footprint = groundRing === null ? null : footprintInWorld(id);
+    if (footprint === null) { groundRing?.hide(); return; }
+    const mean = (axis) => footprint.reduce((sum, corner) => sum + corner[axis], 0) / footprint.length;
     const half = (a, c) => Math.hypot(a.x - c.x, a.z - c.z) / 2;
-    groundRing.place({ x: mean('x'), y: mean('y'), z: mean('z') }, Math.hypot(half(corners[0], corners[1]), half(corners[1], corners[2])) * RING_MARGIN);
+    groundRing.place({ x: mean('x'), y: mean('y'), z: mean('z') }, Math.hypot(half(footprint[0], footprint[1]), half(footprint[1], footprint[2])) * RING_MARGIN);
   }
 
   /** A chosen thing's or made part's footprint as it stands: its four ground corners, world metres. */
   function footprintInWorld(id) {
     let frame, sides;
     if (isPart(id)) {
-      const part = partOf(id), region = regionRoot();
-      if (part === null || region === null) return null;
-      const base = (slotOf(id)?.positionMm[2] ?? 0) / 1000, [width, depth] = part.size_mm, [east, north] = part.centre_mm;
-      frame = region.getWorldTransform();
-      sides = { x0: (east - width / 2) / 1000, x1: (east + width / 2) / 1000, z0: -(north - depth / 2) / 1000, z1: -(north + depth / 2) / 1000, y: base };
+      const part = partOf(id), site = regionRoot();
+      if (part === null || site === null) return null;
+      const floor = (slotOf(id)?.positionMm[2] ?? 0) / 1000, [width, depth] = part.size_mm, [east, north] = part.centre_mm;
+      frame = site.getWorldTransform();
+      sides = { x0: (east - width / 2) / 1000, x1: (east + width / 2) / 1000, z0: -(north - depth / 2) / 1000, z1: -(north + depth / 2) / 1000, y: floor };
     } else {
       const figure = things()?.layer?.figureOf(id), volume = figure?.pickVolume;
       if (!figure || !volume || !figure.root.enabled) return null;
@@ -573,15 +811,56 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       return { x: point.x, y: point.y, z: point.z };
     });
   }
-  /** The screen box around two subjects, the first's head and waist kept for the card's height. */
-  const around = (first, second) => ({
-    left: Math.min(first.left, second.left), right: Math.max(first.right, second.right),
-    top: Math.min(first.top, second.top), bottom: Math.max(first.bottom, second.bottom),
-    headY: first.headY, waistY: first.waistY,
-  });
   const middle = (ground) => ({ x: ground.reduce((sum, corner) => sum + corner.x, 0) / ground.length, y: ground.reduce((sum, corner) => sum + corner.y, 0) / ground.length });
 
-  listen(canvas, 'pointermove', event => { pointer = { x: event.clientX, y: event.clientY }; });
+  /** Where what is held stands in the world now (metres), or null: a new thing's or a moved one's copy, else the chosen thing. */
+  function heldInWorld() {
+    if (placing?.to) {
+      const at = regionRoot(placing.regionId);
+      if (at === null) return null;
+      at.getWorldTransform().transformPoint(heldAt.set(placing.to.x / 1000, placing.to.y / 1000, placing.to.z / 1000), heldAt);
+      return heldAt;
+    }
+    const footprint = selected === null ? null : footprintInWorld(selected);
+    if (footprint === null) return null;
+    return heldAt.set(footprint.reduce((sum, corner) => sum + corner.x, 0) / 4, footprint[0].y, footprint.reduce((sum, corner) => sum + corner.z, 0) / 4);
+  }
+
+  /**
+   * The names over people near what is held (frame r13): who stands within a few metres of it,
+   * nearest first, two standing together named together, at most a few names, each over the
+   * highest head of its people.
+   */
+  function placeNames() {
+    const held = people === null ? null : heldInWorld();
+    if (held === null) { names.hide(); return; }
+    people.refresh?.();
+    // Everyone near, named or not: someone unnamed is said with the named people beside them.
+    const near = [];
+    for (const id of people.ids()) {
+      if (!people.groundOf(id, feet)) continue;
+      const distance = feet.distance(held);
+      if (distance > NAMES_NEAR_M) continue;
+      near.push({ name: people.name(id) || null, id, distance, x: feet.x, y: feet.y + (people.heightOf(id) ?? 1.7), z: feet.z });
+    }
+    near.sort((a, c) => a.distance - c.distance || (a.id < c.id ? -1 : 1));
+    const groups = [];
+    for (const one of near) {
+      const together = groups.find(group => Math.hypot(group[0].x - one.x, group[0].z - one.z) <= TOGETHER_M);
+      if (together) together.push(one); else groups.push([one]);
+    }
+    const placed = [];
+    for (const together of groups.filter(group => group.some(one => one.name !== null)).slice(0, NAMES_AT_MOST)) {
+      const top = together.reduce((high, one) => (one.y > high.y ? one : high));
+      const centre = together.reduce((sum, one) => ({ x: sum.x + one.x / together.length, z: sum.z + one.z / together.length }), { x: 0, z: 0 });
+      const at = b.camera.camera.worldToScreen(point.set(centre.x, top.y, centre.z), seen);
+      if (at.z <= 0) continue;
+      placed.push({ words: namesTogether(together.map(one => one.name)), x: at.x, y: at.y });
+    }
+    names.place(placed, scale());
+  }
+
+  listen(canvas, 'pointermove', event => { pointer = { x: event.clientX, y: event.clientY, free: event.altKey }; });
   listen(canvas, 'pointerleave', () => { pointer = null; });
   render();
 
@@ -608,7 +887,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
      * follows the pointer until it is let go); false leaves the press to looking around.
      */
     pointerDown(event) {
-      if (!on || busy || event.button !== 0 || selected === null || confirming !== null) return false;
+      if (!on || busy || event.button !== 0 || selected === null || confirming !== null || placing !== null) return false;
       if (placedAt(event.clientX, event.clientY) !== selected) return false;
       const ground = groundAt(event.clientX, event.clientY);
       const move = ground === null ? null : beginMove();
@@ -631,6 +910,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     click(x, y) {
       if (!on || busy) return false;
       if (reading !== null) { void reading.then(() => { if (on) this.click(x, y); }); return true; }
+      // While something is held, a click places it where the server said it may stand, as Enter does.
+      if (placing !== null || moving !== null) { if ((placing ?? moving).verdict.state === 'ready') act('place', false); return true; }
       const placedId = placedAt(x, y);
       if (placedId === null) { if (selected !== null) deselect(); return true; }
       if (placedId !== selected) select(placedId);
@@ -640,12 +921,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (!on) return;
       if (now - lastPick >= 50) {
         lastPick = now;
-        hovered = pointer && !inspecting() && moving?.grip == null ? placedAt(pointer.x, pointer.y) : null;
-        canvas.style.cursor = moving?.grip != null ? 'grabbing' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : '';
+        hovered = pointer && !inspecting() && moving?.grip == null && placing === null ? placedAt(pointer.x, pointer.y) : null;
+        canvas.style.cursor = moving?.grip != null ? 'grabbing' : placing !== null ? 'crosshair' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : '';
+        // A new thing's copy follows the pointer over the ground.
+        if (placing !== null && pointer && !inspecting()) { const ground = groundAt(pointer.x, pointer.y); if (ground !== null) placeTo(ground, pointer.free); }
       }
       const layer = things()?.layer;
-      // The name of what the pointer is on, above it; the chosen thing's card names it instead, and
-      // a carried copy's card speaks for where it is going.
+      // The name of what the pointer is on, above it; the held group names what is chosen instead.
       let head = null;
       if (hovered !== null && hovered !== selected && moving === null) {
         if (isPart(hovered)) {
@@ -658,43 +940,50 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       }
       if (head && head.z > 0) { tag.set({ name: titled(nameOf(hovered)) }); tag.place(head.x, head.y); }
       else tag.hide();
-      if (!cardShows()) { hideMarks(); lastPlacedKey = ''; }
+      if (!groupShows()) { hideMarks(); lastPlacedKey = ''; }
       else {
-        // Out of view is not closed: the card keeps its state and shows again when it is in view.
-        const figure = isPart(selected) ? null : layer?.figureOf(selected) ?? null;
-        const carrying = moving !== null && moving.placedId === selected;
-        const standing = isPart(selected) ? partOnScreen(selected, null) : figure && figure.root.enabled ? onScreen(figure, null) : null;
-        const carried = !carrying ? null : isPart(selected) ? partOnScreen(selected, moving.to) : figure ? onScreen(figure, moving.to) : null;
-        const key = [standing, carried].map(shape => shape === null ? '-' : [...shape.ground.flatMap(p => [p.x, p.y]), shape.bounds.left, shape.bounds.right, shape.bounds.top, shape.bounds.bottom].map(v => v.toFixed(1)).join(',')).join('|') + (moving?.verdict.state ?? '');
-        if (key === lastPlacedKey) { /* Nothing moved on the screen: everything stays where it is. */ }
-        else if (carried === null && standing === null) { lastPlacedKey = key; card.root.style.visibility = 'hidden'; hideMarks(); }
+        if (now - lastNames >= NAMES_EVERY_MS || moving !== null || placing !== null) { lastNames = now; placeNames(); }
+        if (placing !== null) {
+          // The ring follows the new thing's copy, a little wider than its footprint's half diagonal.
+          chosen.hide(); copy.hide(); origin.hide(); trail.hide();
+          const at = placing.box === null ? null : heldInWorld();
+          if (at === null || groundRing === null) groundRing?.hide();
+          else groundRing.place({ x: at.x, y: at.y, z: at.z }, Math.hypot(placing.box.width, placing.box.depth) / 2000 * RING_MARGIN);
+        }
         else {
-          lastPlacedKey = key;
-          card.root.style.visibility = '';
-          // While a copy is carried, the card stands beside the copy and the spot it left together,
-          // its connector to the copy (ruling L11).
-          if (carried && standing) card.place(around(carried.bounds, standing.bounds), { connect: carried.bounds });
-          else card.place((carried ?? standing).bounds);
-          if (moving !== null) {
-            // The copy where it would go, its spot dashed where it stands, and the way between.
-            chosen.hide(); groundRing?.hide();
-            if (carried) { copy.form(moving.verdict.state === 'refused' ? 'refused' : 'copy'); copy.place(carried.ground); } else copy.hide();
-            if (standing && carried) { origin.place(standing.ground); trail.place(middle(standing.ground), middle(carried.ground)); }
-            else { origin.hide(); trail.hide(); }
-          } else {
-            copy.hide(); origin.hide(); trail.hide();
-            if (standing) { chosen.place(standing.ground); ringUnder(selected); } else { chosen.hide(); groundRing?.hide(); }
+          // Out of view is not let go: what is chosen stays chosen and its marks show again in view.
+          const figure = isPart(selected) ? null : layer?.figureOf(selected) ?? null;
+          const carrying = moving !== null && moving.placedId === selected;
+          const standing = isPart(selected) ? partOnScreen(selected, null) : figure && figure.root.enabled ? onScreen(figure, null) : null;
+          const carried = !carrying ? null : isPart(selected) ? partOnScreen(selected, moving.to) : figure ? onScreen(figure, moving.to) : null;
+          const key = [standing, carried].map(shape => shape === null ? '-' : [...shape.ground.flatMap(p => [p.x, p.y]), shape.bounds.left, shape.bounds.right, shape.bounds.top, shape.bounds.bottom].map(v => v.toFixed(1)).join(',')).join('|') + (moving?.verdict.state ?? '');
+          if (key === lastPlacedKey) { /* Nothing moved on the screen: everything stays where it is. */ }
+          else if (carried === null && standing === null) { lastPlacedKey = key; chosen.hide(); copy.hide(); origin.hide(); trail.hide(); groundRing?.hide(); }
+          else {
+            lastPlacedKey = key;
+            if (moving !== null) {
+              // The copy where it would go, its spot dashed where it stands, and the way between.
+              chosen.hide(); groundRing?.hide();
+              if (carried) { copy.form(moving.verdict.state === 'refused' ? 'refused' : 'copy'); copy.place(carried.ground); } else copy.hide();
+              if (standing && carried) { origin.place(standing.ground); trail.place(middle(standing.ground), middle(carried.ground)); }
+              else { origin.hide(); trail.hide(); }
+            } else {
+              copy.hide(); origin.hide(); trail.hide();
+              if (standing) { chosen.place(standing.ground); ringUnder(selected); } else { chosen.hide(); groundRing?.hide(); }
+            }
           }
         }
       }
-      // Inspecting a being hides the card and the hints; closing it brings them back.
+      // Inspecting a being hides the group and the tray; closing it brings them back.
       if (inspecting() !== wasInspecting) { wasInspecting = inspecting(); render(); }
     },
     dispose() {
       lifetime.abort();
+      trayHeight.disconnect();
+      dropPlacing();
       if (on) { on = false; renderCorners(); }
       canvas.style.cursor = '';
-      for (const part of [origin.root, trail.root, chosen.root, copy.root, tag.root, card.root]) part.remove();
+      for (const part of [origin.root, trail.root, chosen.root, copy.root, names.root, tag.root, group.root, trayView.root]) part.remove();
       groundRing?.dispose();
     },
   };

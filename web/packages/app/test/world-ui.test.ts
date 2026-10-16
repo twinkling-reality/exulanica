@@ -251,3 +251,90 @@ describe('the redraws\' shared craft', () => {
       '--pill-text-small: max(12px, calc(13 * var(--u)))', '--glass-thin-fill: rgba(13, 20, 27, .40)', '--shade-fill: rgba(6, 12, 16, .46)']) expect(root).toContain(token);
   });
 });
+
+/** What these tests use of world-ui-build.ts, build mode's own parts. */
+interface TrayTile { readonly id: string; readonly name: string; readonly picture: string | null; readonly make?: boolean }
+interface BuildUi {
+  heldGroup(): { readonly root: HTMLElement; set(words: { title: string; line?: { words: string; refused?: boolean } | null; rows: readonly { key: string; word: string; shortcut?: string; onPress?: () => void; disabled?: boolean }[] }): void; hide(): void };
+  tray(options: { words: { label: string; things: string; creatures: string }; onTab: (tab: 'things' | 'creatures') => void; onPick: (tile: TrayTile) => void }): {
+    readonly root: HTMLElement;
+    set(state: { tab: 'things' | 'creatures'; tiles: readonly TrayTile[] | null; held: string | null; offline: boolean; empty: string }): void;
+    picture(id: string, url: string): void;
+    hide(): void;
+  };
+  namesNear(): { readonly root: HTMLElement; place(names: readonly { words: string; x: number; y: number }[], scale: number): void; hide(): void };
+}
+const buildParts = async (): Promise<BuildUi> => import('../../../../tools/previews/world-workspace/' + 'world-ui-build.ts') as Promise<BuildUi>;
+
+describe('build mode\'s own parts', () => {
+  it('the held group is a region named by its title, a refusal drawn refused, and rows that press', async () => {
+    const { heldGroup } = await buildParts();
+    const group = heldGroup();
+    document.body.append(group.root);
+    expect(group.root.hidden).toBe(true);
+    const back = vi.fn();
+    group.set({ title: 'Bench', line: { words: 'Not here: that spot is in the pool.', refused: true }, rows: [
+      { key: 'mouse-click', word: 'Place', shortcut: 'Enter', onPress: () => {}, disabled: true },
+      { key: 'Esc', word: 'Put back', shortcut: 'Escape', onPress: back },
+    ] });
+    expect(group.root.hidden).toBe(false);
+    expect(group.root.classList.contains('wu-shade')).toBe(true);
+    const title = group.root.querySelector('h2')!;
+    expect(group.root.getAttribute('role')).toBe('region');
+    expect(group.root.getAttribute('aria-labelledby')).toBe(title.id);
+    expect(title.textContent).toBe('Bench');
+    expect(group.root.querySelector('.wu-held-line.wu-refused')!.textContent).toBe('Not here: that spot is in the pool.');
+    const [place, putBack] = [...group.root.querySelectorAll('.wu-rows > button')] as HTMLButtonElement[];
+    expect(place!.disabled).toBe(true);
+    expect(place!.querySelector('.wu-glyph svg')).not.toBeNull();
+    putBack!.click();
+    expect(back).toHaveBeenCalledOnce();
+    group.set({ title: 'Remove the bench?', line: { words: 'Nobody can use it from the next minute.' }, rows: [] });
+    expect(group.root.querySelector('.wu-held-line')!.classList.contains('wu-refused')).toBe(false);
+    group.hide();
+    expect(group.root.hidden).toBe(true);
+  });
+
+  it('the tray is two tabs over picture tiles: the held one pressed, an empty tab said, offline dimmed', async () => {
+    const { tray } = await buildParts();
+    const tabbed = vi.fn(), picked = vi.fn();
+    const made = tray({ words: { label: 'Things to place', things: 'Things', creatures: 'Creatures' }, onTab: tabbed, onPick: picked });
+    document.body.append(made.root);
+    made.set({ tab: 'things', tiles: null, held: null, offline: false, empty: '' });
+    expect(made.root.hidden).toBe(false);
+    expect(made.root.querySelectorAll('.wu-tile')).toHaveLength(0);
+    const tiles = [{ id: 'make', name: 'Make a creature', picture: null, make: true }, { id: 'kind:bench', name: 'Bench', picture: null }, { id: 'kind:well', name: 'Well', picture: 'data:image/png;base64,AA' }];
+    made.set({ tab: 'things', tiles, held: 'kind:bench', offline: false, empty: 'Nothing.' });
+    const tabs = [...made.root.querySelectorAll('[role="tab"]')] as HTMLButtonElement[];
+    expect(tabs.map(tab => [tab.textContent, tab.getAttribute('aria-selected')])).toEqual([['Things', 'true'], ['Creatures', 'false']]);
+    expect(made.root.querySelector('[role="tabpanel"]')!.getAttribute('aria-labelledby')).toBe(tabs[0]!.id);
+    tabs[1]!.click();
+    expect(tabbed).toHaveBeenCalledWith('creatures');
+    const buttons = [...made.root.querySelectorAll('.wu-tile')] as HTMLButtonElement[];
+    expect(buttons.map(button => button.textContent)).toEqual(['+Make a creature', 'Bench', 'Well']);
+    expect(buttons.map(button => button.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    expect((buttons[2]!.querySelector('.wu-tile-picture') as HTMLElement).style.backgroundImage).toContain('data:image/png');
+    made.picture('kind:bench', 'data:image/png;base64,BB');
+    expect((buttons[1]!.querySelector('.wu-tile-picture') as HTMLElement).style.backgroundImage).toContain('BB');
+    buttons[1]!.click();
+    expect(picked).toHaveBeenCalledWith(tiles[1]);
+    made.set({ tab: 'creatures', tiles: [tiles[0]!], held: null, offline: true, empty: 'No creatures made yet.' });
+    expect(made.root.querySelector('.wu-tray-empty')!.textContent).toBe('No creatures made yet.');
+    expect(made.root.dataset.offline).toBe('true');
+    expect((made.root.querySelector('.wu-tile') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('names over people stand above their point, and the ones not asked for hide', async () => {
+    const { namesNear } = await buildParts();
+    const names = namesNear();
+    document.body.append(names.root);
+    names.place([{ words: 'Teo and Ines', x: 400, y: 300 }, { words: 'Ari', x: 700, y: 320 }], 1);
+    const labels = [...names.root.children] as HTMLElement[];
+    expect(labels.map(label => [label.textContent, label.hidden])).toEqual([['Teo and Ines', false], ['Ari', false]]);
+    expect(labels[0]!.style.transform).toContain('translate3d(400.0px,284.0px,0)');
+    expect(names.root.getAttribute('aria-hidden')).toBe('true');
+    names.place([{ words: 'Ari', x: 10, y: 20 }], 0.78);
+    expect(labels.map(label => label.hidden)).toEqual([false, true]);
+    expect(labels[0]!.textContent).toBe('Ari');
+  });
+});

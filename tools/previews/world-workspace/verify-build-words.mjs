@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { HISTORY, MAX_YAW, buildHints, createKindLabels, cardPrompts, changeWords, clockWords, dayWords, keyAction, madeLine, moveWords, movedNote, nothingInView, placedLine, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { BUSY, HISTORY, MAX_YAW, TRAY, buildKeys, createKindLabels, changeWords, clockWords, dayWords, heldRows, keyAction, moveWords, namesTogether, movedNote, nothingInView, placedLine, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
@@ -82,8 +82,20 @@ assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: -3500, z:
 // The card's line for a placed thing, which the chosen card outside build mode reads too.
 assert.equal(placedLine(), 'Placed in this world');
 // A part made with the world says so, with the area it stands in (frame 13).
-assert.equal(madeLine('lower pools'), 'Made with this world · Lower pools');
-assert.equal(madeLine(''), 'Made with this world');
+assert.equal(placedNote('bench'), 'Placed the bench.');
+// A change the server could not take up yet says so, in DESIGN's words (W11), whichever wait it is.
+for (const code of ['kind_work_overran', 'kind_work_busy', 'kind_work_unavailable']) assert.equal(refusalWords(code, 'Ask again shortly.'), BUSY);
+assert.equal(BUSY, 'The world is busy with another change. Try again in a moment.');
+// People standing together near what is held, named as one (frame r13, ruling W11).
+assert.equal(namesTogether(['Teo']), 'Teo');
+assert.equal(namesTogether(['Teo', 'Ines']), 'Teo and Ines');
+assert.equal(namesTogether(['Teo', 'Ines', 'Marco']), 'Teo, Ines and Marco');
+assert.equal(namesTogether(['Teo', 'Ines', 'Marco', 'Ari']), 'Teo and 3 more');
+assert.equal(namesTogether([null, 'Teo']), 'Teo and the resident');
+assert.equal(namesTogether(['Teo', null, 'Ines']), 'Teo, Ines and the resident');
+assert.equal(namesTogether(['Teo', null, null]), 'Teo and 2 more');
+assert.equal(namesTogether([null, null]), '');
+assert.equal(namesTogether([]), '');
 // A made part's refusals, and the land's under it, are the server's own sentences.
 assert.equal(refusalWords('part_blocked', 'Not here: it would stand on the farmhouse.'), 'Not here: it would stand on the farmhouse.');
 assert.equal(refusalWords('part_houses_people', 'Not removed: Ada Lane 1 lives there. The farmhouse can be moved instead.'), 'Not removed: Ada Lane 1 lives there. The farmhouse can be moved instead.');
@@ -189,6 +201,11 @@ for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'KeyE']) assert.e
 assert.equal(keyAction(on, key('Tab')), 'next');
 assert.equal(keyAction(chosen, key('Tab', { shiftKey: true })), 'previous');
 assert.equal(keyAction({ ...chosen, focused: true }, key('Tab')), null);
+// A row or a tile with the focus takes Enter and Space itself; Esc gives the focus back to the world.
+assert.equal(keyAction({ ...on, focused: true }, key('Enter')), null);
+assert.equal(keyAction({ ...on, focused: true }, key('Space')), null);
+assert.equal(keyAction({ ...chosen, focused: true }, key('Escape')), 'unfocus');
+assert.equal(keyAction({ ...asking, focused: true }, key('Escape')), 'cancel');
 assert.equal(keyAction(asking, key('Tab')), null);
 assert.equal(keyAction(off, key('Tab')), null);
 // H is the page's in build mode too: it opens History from anywhere.
@@ -200,17 +217,29 @@ const refusedRemoval = { ...chosen, removeRefused: true };
 assert.equal(keyAction(refusedRemoval, key('Delete')), 'held');
 assert.equal(keyAction(refusedRemoval, key('Backspace')), 'held');
 assert.equal(keyAction(refusedRemoval, key('BracketRight')), 'turn-right');
-// Moving: [ and ] turn what is selected, with Alt for a free turn; Enter keeps only a move the
-// server said may be kept; Esc puts it back; Backspace does nothing while moving.
+// Moving: [ and ] turn what is selected, with Alt for a free turn; Enter places it only where the
+// server said it may stand; Esc puts it back; Delete puts it back and asks to remove it, but not
+// once the server refused the spot (the rows then offer Put back alone).
 const moving = { ...chosen, moving: true, ready: false }, keepable = { ...moving, ready: true };
 assert.equal(keyAction(chosen, key('BracketLeft')), 'turn-left');
 assert.equal(keyAction(chosen, key('BracketRight', { altKey: true })), 'turn-right');
 assert.equal(keyAction(on, key('BracketRight')), 'held');
 assert.equal(keyAction(asking, key('BracketRight')), 'held');
 assert.equal(keyAction(moving, key('Enter')), 'held');
-assert.equal(keyAction(keepable, key('Enter')), 'keep');
+assert.equal(keyAction(keepable, key('Enter')), 'place');
 assert.equal(keyAction(keepable, key('Escape')), 'put-back');
-assert.equal(keyAction(keepable, key('Backspace')), 'held');
+assert.equal(keyAction(keepable, key('Delete')), 'remove');
+assert.equal(keyAction(moving, key('Backspace')), 'remove');
+assert.equal(keyAction({ ...moving, refused: true }, key('Delete')), 'held');
+// Placing a new thing from the tray: nothing is chosen yet; it turns, Enter places it where the
+// server said it may stand, Esc puts it back in the tray, and Delete has nothing to remove.
+const placing = { ...on, placing: true, ready: false }, placeable = { ...placing, ready: true };
+assert.equal(keyAction(placing, key('BracketLeft')), 'turn-left');
+assert.equal(keyAction(placing, key('Enter')), 'held');
+assert.equal(keyAction(placeable, key('Enter')), 'place');
+assert.equal(keyAction(placing, key('Escape')), 'put-back');
+assert.equal(keyAction(placeable, key('Delete')), 'held');
+assert.equal(keyAction(placing, key('Tab')), null);
 assert.equal(keyAction(off, key('BracketLeft')), null);
 assert.equal(keyAction(chosen, key('', { key: ']' })), 'turn-right');
 assert.equal(keyAction(chosen, key('KeyQ', { key: ']' })), null);
@@ -253,27 +282,34 @@ assert.equal(clockWords('not a time'), '');
 assert.equal(dayWords(new Date(2026, 9, 14, 7, 5).toISOString(), new Date(2026, 9, 14, 23, 0).getTime()), 'Today');
 assert.equal(dayWords(new Date(2026, 9, 13, 22, 40).toISOString(), new Date(2026, 9, 14, 0, 10).getTime()), '13 Oct');
 assert.equal(dayWords('not a time', Date.now()), '');
-// The keys build mode offers, in the design's words and order (WORDS.md, frames 13 and 14).
+// Build mode's keys and rows, in the design's words and order (WORDS.md, ruling W10).
 const said = (list) => list.map(({ keys, word }) => [Array.isArray(keys) ? keys.join(' ') : keys, word]);
-assert.deepEqual(said(buildHints({ moving: false })), [['mouse-click', 'Select'], ['Tab', 'Next'], ['⌘Z', 'Undo'], ['H', 'History']]);
-assert.deepEqual(said(buildHints({ moving: true })), [['mouse', 'Drag to move'], ['[ ]', 'Turn'], ['Alt', 'Free']]);
-// The card's prompts in each state (frames 13 to 16), each pressing what its key does.
-assert.deepEqual(said(cardPrompts({})), [['mouse', 'Drag to move'], ['[ ]', 'Turn'], ['Del', 'Remove']]);
-assert.deepEqual(said(cardPrompts({ moving: true, ready: true })), [['Enter', 'Keep'], ['Esc', 'Put it back']]);
-assert.equal(cardPrompts({ moving: true, ready: false })[0].disabled, true);
-assert.deepEqual(said(cardPrompts({ moving: true, refused: true })), [['Esc', 'Put it back']]);
-assert.deepEqual(said(cardPrompts({ confirming: true })), [['Enter', 'Remove'], ['Esc', 'Keep it']]);
-// After a removal was refused (people live or work there), the card offers moving it, not removing it again.
-assert.deepEqual(said(cardPrompts({ removeRefused: true })), [['mouse', 'Drag to move'], ['[ ]', 'Turn']]);
-const keyOf = { Enter: 'Enter', Esc: 'Escape', Del: 'Delete', '[ ]': 'BracketRight' };
-const flagsOf = (state) => ({ on: true, selected: true, confirming: false, moving: false, ready: false, busy: false, removeRefused: false, focused: false, ...state });
-for (const state of [{}, { moving: true, ready: true }, { moving: true, refused: true }, { confirming: true }, { removeRefused: true }]) {
-  for (const prompt of cardPrompts(state)) {
-    if (!prompt.action || prompt.disabled) continue;
-    const code = keyOf[Array.isArray(prompt.keys) ? prompt.keys.join(' ') : prompt.keys];
-    assert.equal(keyAction(flagsOf(state), { code, key: '', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false }), prompt.action, `${prompt.word} presses what its key does`);
+// The keys card lists every key build mode has (ruling W10).
+assert.deepEqual(said(buildKeys()), [
+  ['mouse', 'Move'], ['[ ]', 'Turn'], ['Alt', 'Free'], ['Del', 'Remove'], ['Tab', 'Next'], ['⌘Z', 'Undo'],
+  ['B', 'Done'], ['H', 'History'], ['Esc', 'Back'],
+]);
+// The held group's rows in each state (ruling W10), each pressing what its key does.
+const rows = (state) => heldRows(state).map(({ key, word }) => [key, word]);
+assert.deepEqual(rows({}), [['mouse-click', 'Move'], ['[ ]', 'Turn'], ['Del', 'Remove']]);
+assert.deepEqual(rows({ moving: true, ready: true }), [['mouse-click', 'Place'], ['[ ]', 'Turn'], ['Del', 'Remove'], ['Esc', 'Put back']]);
+assert.equal(heldRows({ moving: true, ready: false })[0].disabled, true);
+assert.equal(heldRows({ moving: true, ready: true })[0].disabled, false);
+assert.deepEqual(rows({ placing: true, ready: true }), [['mouse-click', 'Place'], ['[ ]', 'Turn'], ['Esc', 'Put back']]);
+assert.deepEqual(rows({ moving: true, refused: true }), [['Esc', 'Put back']]);
+assert.deepEqual(rows({ placing: true, refused: true }), [['Esc', 'Put back']]);
+assert.deepEqual(rows({ confirming: true }), [['Enter', 'Remove'], ['Esc', 'Keep']]);
+// After a removal was refused (people live or work there), the rows offer moving it, not removing it again.
+assert.deepEqual(rows({ removeRefused: true }), [['mouse-click', 'Move'], ['[ ]', 'Turn']]);
+const keyOf = { Enter: 'Enter', Esc: 'Escape', Del: 'Delete', '[ ]': 'BracketRight', 'mouse-click': 'Enter' };
+const flagsOf = (state) => ({ on: true, selected: !state.placing, placing: false, confirming: false, moving: false, ready: false, refused: false, busy: false, removeRefused: false, focused: false, ...state });
+for (const state of [{}, { moving: true, ready: true }, { placing: true, ready: true }, { moving: true, refused: true }, { confirming: true }, { removeRefused: true }]) {
+  for (const row of heldRows(state)) {
+    if (!row.action || row.disabled) continue;
+    assert.equal(keyAction(flagsOf(state), { code: keyOf[row.key], key: '', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false }), row.action, `${row.word} presses what its key does`);
   }
 }
+for (const words of [...Object.values(TRAY), placedNote('bench')]) assert.doesNotMatch(words, /\u2014|_/u);
 assert.equal(nothingInView(), 'No placed things in view. Walk closer to one.');
 assert.deepEqual({ ...HISTORY }, { title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
 console.log('Build words checks passed: names by kind, refusals as sentences, undo notes, move words, snapping, redo, the changes list, keys per state.');
