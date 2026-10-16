@@ -350,7 +350,13 @@ host offering societies of things, a world holding a placed thing gets a society
 beings live on their routines and show "Their own routine" here until the owner picks a mind or a
 person plays one. Refused `society_engine_differs` (what the world holds changed meanwhile), the page
 reads the entry once more and asks again with its engine. A society already there keeps its engine: a
-world whose people came in before its things were placed keeps the people it has.
+world whose people came in before its things were placed keeps the people it has. The world workspace
+asks the same way from the world itself (`tools/previews/world-workspace/world-people.mjs`): where
+nobody lives yet the people line at the top says so, and on a page that may change the world the
+clock's place offers "[P] Bring people in", then "Bringing people in…"; once they arrive the line
+reads "24 people now live here, invented for this world" for a minute, and with nowhere they could reach
+(`no_reachable_targets`) it reads "People need somewhere to rest or visit nearby" while the clock
+offers Build in its place.
 
 When the playback control says open models are not asked for the people here now (its
 `model_minds_code`, `spending_cap_reached` when the allowance for this visit is used up), People says

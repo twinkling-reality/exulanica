@@ -114,6 +114,9 @@ span.wu-prompt { cursor: default; }
 .wu-clock-time { display: flex; flex-direction: column; align-items: flex-end; gap: calc(6 * var(--u)); }
 .wu-clock-hhmm { font: 300 calc(30 * var(--u))/1 var(--font-sans); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .wu-clock-state { display: flex; align-items: center; gap: calc(7 * var(--u)); font: 450 max(12px, calc(13 * var(--u)))/1 var(--font-sans); color: var(--ink-2); letter-spacing: .02em; }
+/* Where nobody lives yet (K13): the clock's corner holds a line where the time goes; a second line under it. */
+.wu-welcome-line { font: 450 calc(16 * var(--u))/1.25 var(--font-sans); color: var(--ink); text-align: right; }
+.wu-welcome-second { margin-top: calc(6 * var(--u)); font: 450 max(12px, calc(13 * var(--u)))/1 var(--font-sans); color: var(--ink-2); letter-spacing: .02em; }
 .wu-glyph-pause { width: calc(8 * var(--u)); height: calc(9 * var(--u)); border-left: 2.5px solid currentColor; border-right: 2.5px solid currentColor; }
 .wu-glyph-play { width: 0; height: 0; border-left: calc(8 * var(--u)) solid currentColor; border-top: calc(5 * var(--u)) solid transparent; border-bottom: calc(5 * var(--u)) solid transparent; }
 .wu-divider { width: 1px; height: calc(40 * var(--u)); background: linear-gradient(transparent, rgba(255, 255, 255, .5), transparent); }

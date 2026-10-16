@@ -125,9 +125,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   };
   // The corners (world-corners.ts): the way out (or Back while something is chosen), the clock with
   // Play and Pause, the hints for what works here, the reticle and the note.
-  // A read-only copy dims what needs the server (Play and Pause), as the offline state does.
+  // A read-only copy dims what needs the server (Play and Pause), as the offline state does. Where
+  // nobody lives yet, a page that may change the world offers to bring people in from the clock's
+  // corner, and with nowhere for them to go, build mode (K13), as B opens it.
+  const writable = Boolean(send && binding) && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1';
   const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); },
-    readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed });
+    readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed,
+    canBringIn: writable, onBuild: writable ? () => { build?.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b' })); } : null });
   const guidance = corners.hintsRoot, worlds = corners.backRoot, worldNotes = corners.notes;
   let rows = [], inventory = null, target = null, held = null;
   let dragging = null, serial = 0, lastPick = 0, frameId = 0;
@@ -161,7 +165,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     return response.json();
   };
   // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
-  const build = send && binding && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1'
+  const build = writable
     ? mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => pageShown() || held !== null, groundRing: createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, ...THING_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } }) }) : null;
   worldHints();
   function notice(words) {
@@ -1113,12 +1117,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (event.code === 'KeyR' && being) { event.preventDefault(); if (!event.repeat) act(runWatch.run ? 'stop' : 'run'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
     }
-    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere }, Boolean(event.target?.closest?.('.cw-beside button,.wu-prompt')));
+    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn() }, Boolean(event.target?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
     if (fate === 'inspect') void choose();
     else if (fate === 'leave') leaveWorld();
     else if (fate === 'play') corners.togglePlay();
+    else if (fate === 'bring-in') corners.bringIn();
     else if (fate === 'history') openHistory();
     event.stopImmediatePropagation();
   }, { capture: true, signal: lifetime.signal });

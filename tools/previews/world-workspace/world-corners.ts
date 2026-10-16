@@ -1,11 +1,13 @@
 // The world's corners (DESIGN's specification, section 5.2, frames 02 and 04): top left the way out
 // (Your worlds, or Back), top right the world's clock with Play or Pause on P, top centre a mode
 // word while a mode is on, bottom left the hints for what works now, which fade, the reticle, and
-// one note at a time. Built from the shared parts (world-ui.ts); the world view (contextual-world.ts)
-// and build mode tell the corners what to say.
+// one note at a time. Where nobody lives yet, the clock's corner offers to bring people in (K13).
+// Built from the shared parts (world-ui.ts); the world view (contextual-world.ts) and build mode tell
+// the corners what to say.
 import { clockLine, worldTime } from './world-clock.mjs';
 import { SPEED_SCALE, speedBars } from './opening-steps.mjs';
-import { CORNER_WORDS, NOTE_WORDS } from './world-words.mjs';
+import { CORNER_WORDS, NOTE_WORDS, PEOPLE_WORDS, withoutCornerKeys } from './world-words.mjs';
+import { mountPeople } from './world-people.mjs';
 import { WORLD_UI_TIMING, hintsShown } from './world-ui-layout.mjs';
 import { keyWord, notes as mountNotes, promptColumn, promptRow, setWord, type Notes } from './world-ui.ts';
 
@@ -21,6 +23,8 @@ export interface CornerPeople {
   };
   play(): Promise<void>;
   pause(): Promise<void>;
+  /** The People panel's own request to bring people in; a refusal rejects with the server's code. */
+  bringIn?(): Promise<void>;
 }
 
 /** One hint: its caps and word; `gapBefore` starts the keys that do something. */
@@ -49,6 +53,12 @@ export interface Corners {
   hasClock(): boolean;
   /** Plays or pauses the world's time (P). */
   togglePlay(): void;
+  /** Where nobody lives yet (K13): the people line and what the clock holds in its place. */
+  readonly people: ReturnType<typeof mountPeople>;
+  /** Whether the clock's corner offers to bring people in now (P brings them in). */
+  offersBringIn(): boolean;
+  /** Brings people in, as the corner's prompt does (P where nobody lives yet). */
+  bringIn(): void;
   /** Called every frame by the world view. */
   frame(now: number): void;
   dispose(): void;
@@ -59,12 +69,16 @@ const div = (className: string): HTMLDivElement => { const made = document.creat
 /** How often the clock reads the people's state, in ms (a minute of the world is seconds of real time). */
 const CLOCK_READ_MS = 250;
 
-export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed = () => NaN, timing = WORLD_UI_TIMING }: {
+export function mountCorners({ host, people, onLeave, readOnly = false, canBringIn = false, onBuild = null, flySpeed = () => NaN, timing = WORLD_UI_TIMING }: {
   readonly host: HTMLElement;
   readonly people: CornerPeople | null;
   readonly onLeave: () => void;
   /** A copy that may not change the world: Play and Pause show dimmed and do nothing. */
   readonly readOnly?: boolean;
+  /** Whether this page may bring people into a world nobody lives in; elsewhere that corner stays empty (K13). */
+  readonly canBringIn?: boolean;
+  /** Opens build mode, as B does, for the corner's Build where people have nowhere to go; null where there is none. */
+  readonly onBuild?: (() => void) | null;
   /** The flying speed in metres a second, for the speed scale beside the Speed hint. */
   readonly flySpeed?: () => number;
   readonly timing?: typeof WORLD_UI_TIMING;
@@ -85,6 +99,20 @@ export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed
   clock.setAttribute('aria-label', 'The world\'s clock');
   clock.hidden = true; scrims.tr.hidden = true;
 
+  // Where nobody lives yet (K13): the same corner in the clock's own layout, a line where the time
+  // goes, the divider and the prompt; the line describes the prompt.
+  const welcome = div('wu-clock wu-welcome');
+  const welcomeLine = div('wu-welcome-line'), welcomeFirst = document.createElement('span'), welcomeSecond = div('wu-welcome-second');
+  welcomeLine.id = `wu-welcome-${Math.random().toString(36).slice(2)}`;
+  welcomeLine.append(welcomeFirst, welcomeSecond);
+  const welcomeDivider = div('wu-divider');
+  const bringPrompt = keyWord({ keys: ['P'], word: PEOPLE_WORDS.bringIn, shortcut: 'P', onPress: () => folk.bringIn() });
+  const buildPrompt = keyWord({ keys: ['B'], word: PEOPLE_WORDS.build, shortcut: 'B', onPress: () => onBuild?.() });
+  bringPrompt.setAttribute('aria-describedby', welcomeLine.id);
+  buildPrompt.setAttribute('aria-describedby', welcomeLine.id);
+  welcome.append(welcomeLine, welcomeDivider, bringPrompt, buildPrompt);
+  welcome.hidden = true;
+
   const modeRoot = div('wu-mode');
   modeRoot.hidden = true; scrims.tc.hidden = true;
   const reticle = div('wu-reticle');
@@ -93,17 +121,22 @@ export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed
   const hintsRoot = div('wu-hints');
   hintsRoot.setAttribute('aria-label', 'Keys');
 
-  host.append(scrims.tl, scrims.tr, scrims.bl, scrims.tc, backRoot, clock, modeRoot, reticle, hintsRoot);
+  host.append(scrims.tl, scrims.tr, scrims.bl, scrims.tc, backRoot, clock, welcome, modeRoot, reticle, hintsRoot);
   const notes = mountNotes(host, { place: 'world' });
 
   let own: readonly Hint[] = [], handed: readonly Hint[] | null = null, vertical = false;
   let since = performance.now(), wokenAt = -Infinity, held = false, lastRead = -Infinity, shownTime = '', shownLine = '';
   let playing = false, present = false, sending = false;
+  // Bringing people in (K13): world-people.mjs decides; the clock's corner draws it (drawWelcome) and
+  // redraws at once when an answer comes.
+  const folk = mountPeople({ people, canBringIn: canBringIn && !readOnly, canBuild: onBuild !== null, note: (words) => notes.show(words) });
+  folk.onChange(() => { drawWelcome(); scrims.tr.hidden = clock.hidden && welcome.hidden; });
 
   // The speed scale (frame 03): seven bars, the lit ones the flying speed's share of its range.
   let gauge: HTMLElement[] = [], litBars = -1;
   function drawHints(): void {
-    const list = handed ?? own;
+    // The corner's Build stands for the hint row's own B while it shows, so B is drawn once (K13).
+    const list = handed ?? (!welcome.hidden && welcome.dataset.state === 'nowhere' ? withoutCornerKeys(own, ['B']) : own);
     gauge = []; litBars = -1;
     const prompts = list.map((hint) => {
       const prompt = keyWord({ keys: hint.keys, word: hint.word, ...(hint.shortcut ? { shortcut: hint.shortcut } : {}) });
@@ -126,11 +159,31 @@ export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed
     hintsRoot.replaceChildren(...drawn.childNodes);
   }
 
+  /** The welcome corner: what world-people.mjs says the clock holds where nobody lives yet (K13). */
+  function drawWelcome(): void {
+    const offer = clock.hidden ? folk.clockOffer() : null;
+    const was = welcome.hidden ? null : welcome.dataset.state;
+    welcome.hidden = offer === null;
+    if (!offer) { if (was !== null && !handed) drawHints(); return; }
+    if (was === offer.state) return;
+    welcome.dataset.state = offer.state;
+    const nowhere = offer.state === 'nowhere';
+    welcomeFirst.textContent = offer.state === 'bringing' ? offer.word : nowhere ? PEOPLE_WORDS.nowhere : PEOPLE_WORDS.nobodyYet;
+    welcomeSecond.textContent = PEOPLE_WORDS.nowhereSecond;
+    welcomeSecond.hidden = !nowhere;
+    bringPrompt.hidden = offer.state !== 'offer';
+    buildPrompt.hidden = !nowhere;
+    welcomeDivider.hidden = bringPrompt.hidden && buildPrompt.hidden;
+    if (!handed) drawHints();
+  }
+
   function readClock(): void {
     const read = people?.clock() ?? null;
     present = read?.society === 'present';
     const at = present && read ? worldTime(read.minute ?? NaN, read.startMinuteOfDay ?? NaN) : null;
-    clock.hidden = at === null; scrims.tr.hidden = at === null;
+    clock.hidden = at === null;
+    drawWelcome();
+    scrims.tr.hidden = clock.hidden && welcome.hidden;
     if (!at || !read) return;
     playing = read.mode === 'playing';
     const line = clockLine(at.day, read.mode);
@@ -163,6 +216,8 @@ export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed
     },
     mode(word, prompt = null) {
       modeRoot.hidden = word === null; scrims.tc.hidden = word === null;
+      // Going to build with nowhere for people to go is the step the corner asked for: it offers again.
+      if (word !== null) folk.building();
       modeRoot.replaceChildren();
       if (word === null) return;
       const words = div('wu-mode-word');
@@ -177,6 +232,9 @@ export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed
     hold(on) { held = on; },
     hasClock: () => present && !clock.hidden,
     togglePlay,
+    people: folk,
+    offersBringIn: () => !welcome.hidden && folk.offersBringIn(),
+    bringIn: () => folk.bringIn(),
     frame(now) {
       if (now - lastRead >= CLOCK_READ_MS) { lastRead = now; readClock(); }
       if (gauge.length) {
@@ -189,7 +247,7 @@ export function mountCorners({ host, people, onLeave, readOnly = false, flySpeed
     },
     dispose() {
       notes.clear();
-      for (const part of [...Object.values(scrims), backRoot, clock, modeRoot, reticle, hintsRoot, notes.root]) part.remove();
+      for (const part of [...Object.values(scrims), backRoot, clock, welcome, modeRoot, reticle, hintsRoot, notes.root]) part.remove();
     },
   };
   since = performance.now();
