@@ -13,8 +13,10 @@ ground the rule cannot read, which is edited as before and said to be unchecked:
   society reads (made with the world, or asked of the worker here, outside any lock, answered as
   :class:`~exulanica.world.kinds.worker.KindWorkWaiting` while it is being made); a site world
   made from terrain has no society projection and is not checked;
-* a town: its records (:func:`~exulanica.world.generated_worlds.town_records`), the walking
-  surfaces its society walks and their blocked parts.
+* a town: its records with the version's changes to its buildings
+  (:mod:`~exulanica.world.version_town`), the walking surfaces its society walks and their blocked
+  parts, so a thing lands where a removed building stood and against a taller or lower one's own
+  massing.
 
 Every figure is turned into the region's frame (east and south), the frame a placed thing's pose
 is in. The version's other placed objects are read inside the edit's own transaction
@@ -28,7 +30,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
-from exulanica.world.generated_worlds import generation_receipt, states_site, town_records
+from exulanica.world.generated_worlds import generation_receipt, states_site
 from exulanica.world.kinds.worker import (
     PLACE_SECONDS,
     KindWorkWaiting,
@@ -42,6 +44,7 @@ from exulanica.world.society_authored_ground import SocietyGround, read_authored
 from exulanica.world.society_city_place import city_blocked_parts
 from exulanica.world.society_walking_surfaces import surface_height_above, walking_surfaces_place
 from exulanica.world.thing_landing import BlockedPart, LandingGround, rests_on_plane
+from exulanica.world.version_town import town_key, version_town_records
 
 if TYPE_CHECKING:
     from exulanica.world.object_repository import WorldObjectRepository
@@ -98,10 +101,12 @@ def prepare_landing_in_region(
             return None
         place, parts = answer
     else:
+        scope = (repository.workspace_id, repository.world_id, ground.snapshot_id)
+        key, changes = town_key(connection, *scope, version_id)
+        if key is None:
+            return None  # A change the town does not take: its ground cannot be read.
         try:
-            generated = town_records(
-                connection, repository.workspace_id, repository.world_id, ground.snapshot_id
-            )
+            generated = version_town_records(connection, *scope, changes)
         except InvalidStructuralData:
             return None
         place = walking_surfaces_place(ground.place_id, generated.records)

@@ -55,7 +55,7 @@ from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.composers import site_plan
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
-from exulanica.world.generated_worlds import generation_receipt, states_site, town_records
+from exulanica.world.generated_worlds import generation_receipt, states_site
 from exulanica.world.kinds.worker import (
     PLACE_SECONDS,
     KindWorkWaiting,
@@ -121,6 +121,7 @@ from exulanica.world.society_walking_surfaces import (
     walking_surfaces_place,
 )
 from exulanica.world.town_people import TownPeopleRefused, people_frame
+from exulanica.world.version_town import TownKey, composed_town_key, town_key, version_town_records
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Text = Annotated[str, Field(min_length=1, max_length=500)]
@@ -168,16 +169,16 @@ class _ReadFirst:
     so a row that names other bytes under the lock is known to have changed in between.
     ``locked`` is whether this transaction's society has taken the lock, after which nothing is
     read ahead. ``read`` holds what was already read ahead, so it is read once a transaction.
-    ``towns`` holds, by world and snapshot, what a generated world's society is composed from:
-    its records generated again through its receipt and the place they make, or the refusal
-    reading them raised. Generating a world takes a noticeable time, and every guarded write in
-    the deployment waits on the asset read lock while it is held, so it is done before the lock.
+    ``towns`` holds, by :data:`TownKey`, what a generated world's society is composed from: its
+    records generated again with the version's changes and the place they make, or the refusal
+    reading them raised. Generating a world takes a noticeable time, and every guarded write in the
+    deployment waits on the asset read lock while it is held, so it is done before the lock.
     """
 
     found: dict[tuple[str, int | None], bytes | str | None] = field(default_factory=dict)
     rows: dict[str, ReviewedRow] = field(default_factory=dict)
     read: set[tuple[str, str]] = field(default_factory=set)
-    towns: dict[tuple[str, uuid.UUID], _TownRead] = field(default_factory=dict)
+    towns: dict[TownKey, _TownRead] = field(default_factory=dict)
     arrivals: dict[str, ArrivalAuthority] = field(default_factory=dict)
     locked: bool = False
 
@@ -711,22 +712,23 @@ class SocietyRuntime:
         """Generate a generated world's records and their place before the asset read lock.
 
         For a ground whose people walk the world's own surfaces, once a transaction: a town's
-        records through the world's receipt (:func:`town_records`, which generates them again on a
-        cold cache) and the place they make; a site world's place as its last stored input
-        (``stored``) carries it or the kind worker keeps it (:func:`_site_read`). A refusal is
-        kept and raised when the input is composed, so a transaction that composes nothing is not
-        refused for a world it does not read.
+        records through its receipt with the version's changes to its buildings, generated again
+        on a cold cache (:mod:`~exulanica.world.version_town`), and the place they make; a site
+        world's place as its last stored input (``stored``) carries it or the kind worker keeps it
+        (:func:`_site_read`). A refusal is kept and raised when the input is composed, so a
+        transaction that composes nothing is not refused for a world it does not read.
         """
-        key = (binding.world_id, ground.snapshot_id)
-        if read.locked or ground.navigation_form != "walking_surfaces" or key in read.towns:
+        if read.locked or ground.navigation_form != "walking_surfaces":
             return
+        scope = (binding.workspace_id, binding.world_id, ground.snapshot_id)
+        key, changes = town_key(connection, *scope, binding.version_id)
+        if key is None or key in read.towns:
+            return  # Changes the town refuses are read again, and refused, when it is composed.
         try:
-            if states_site(connection, binding.workspace_id, binding.world_id, ground.snapshot_id):
+            if states_site(connection, *scope):
                 read.towns[key] = _site_read(connection, binding, ground, stored)
                 return
-            generated = town_records(
-                connection, binding.workspace_id, binding.world_id, ground.snapshot_id
-            )
+            generated = version_town_records(connection, *scope, changes)
         except InvalidStructuralData as exc:
             read.towns[key] = _TownRead(None, None, str(exc))
             return
@@ -1956,10 +1958,10 @@ class SocietyRuntime:
                 workspace_obstacles=workspace,
             )
         if ground.navigation_form == "walking_surfaces":
-            # The records and the place they make were generated before the asset read lock
-            # (``_read_town_ahead``); under it only the receipt's digest is read again, so the
-            # input is composed from the receipt the world's snapshot still names.
-            town = read.towns.get((binding.world_id, ground.snapshot_id))
+            # Made before the asset read lock (``_read_town_ahead``) with the version's changes;
+            # under it only rows are read again: the changes, and the receipt the snapshot names.
+            scope = (binding.workspace_id, binding.world_id, ground.snapshot_id)
+            town = read.towns.get(composed_town_key(connection, *scope, binding.version_id))
             if town is None:
                 raise UnavailableSocietyInput(
                     "the world's records were not read before the asset read lock"
@@ -1977,9 +1979,7 @@ class SocietyRuntime:
             if town.refusal is not None or town.place is None:
                 raise UnavailableSocietyInput(f"the world's records are unreadable: {town.refusal}")
             try:
-                digest, _ = generation_receipt(
-                    connection, binding.workspace_id, binding.world_id, ground.snapshot_id
-                )
+                digest, _ = generation_receipt(connection, *scope)
             except InvalidStructuralData as exc:
                 raise UnavailableSocietyInput(f"the world's records are unreadable: {exc}") from exc
             if digest != town.receipt_sha256:
