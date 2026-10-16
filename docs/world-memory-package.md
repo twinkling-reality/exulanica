@@ -965,13 +965,15 @@ change between sessions. One project's fault never stops another, one worker hol
 directory at a time, and it follows at most 64 folders unless `EXULANICA_PROJECTS_MAXIMUM` states
 another number. Beside each project it follows it writes `project-status.json` (profile
 `exulanica.world-project-status/v1`, [`project_status.py`](../exulanica/world/project_status.py)),
-never committed and never published: the world and version, its saved checkpoints, whether
+never committed and never published: the world and version, the project's identity, its saved checkpoints, whether
 changes wait and how long the world stays unchanged before they are saved (its settle period), its
 link, and what GitHub last said (the repository's visibility, how many saved checkpoints it does
 not hold yet and when the newest one it holds was saved, the open rolling pull request and a
 pause), read once after each checkpoint of a linked project. The API reads these from the same directory
 (`EXULANICA_PROJECTS_DIRECTORY`) and answers them as `GET /world/github-projects` (`world.write`, so
-a guest with a world read does not see where it is kept), the read a world's History page shows; no
+a guest with a world read does not see where it is kept), the read a world's History page shows. A
+status names no workspace (its worker is told none), so the read answers a project only where the
+requester's workspace holds the version it follows. No
 value a caller sends becomes a path, and a folder that is a link is never followed. A person may
 also ask for a world to be kept with no command: `POST /world/github-projects` (`world.write`;
 a version of the world the requester's workspace holds, and whether readable text is kept) writes
@@ -986,15 +988,44 @@ now), then removes the request, or leaves it refused by a code (`nothing_to_keep
 its own workspace holds: a request it reads as absent (another workspace's, or a world erased
 since) leaves as gone. The server and the worker change the requests folder under one lock, so
 two asks for one world at once never both write. Where no projects
-directory is configured the server answers 409 `projects_not_kept`. Linking a repository stays a
-command, and nothing in a request reaches GitHub. The three
+directory is configured the server answers 409 `projects_not_kept`. Linking an existing
+repository stays a command (`link`), and nothing in a request to keep a world reaches GitHub. The three
 settings may also be given as `EXULANICA_PROJECTS_DIRECTORY`,
 `EXULANICA_PROJECT_API_URL` and `EXULANICA_PROJECT_TOKEN_FILE`. SIGTERM or SIGINT stops it: the
 round in hand finishes, each project with pending changes records them once within 60 seconds
 (`EXULANICA_PROJECT_FINISH_SECONDS`), and it exits 0. Each event is one line of JSON naming a
 folder by its name, never its path, and never carrying the bearer. It writes only the project
 folders and never the world; it reaches a remote only for a folder whose link publishes on its own
-(below, "Automatic publication"), and stopping publishes nothing.
+(below, "Automatic publication") and for a person's request to put a project on GitHub (next),
+and stopping publishes nothing.
+
+A person may also put a kept project on their own GitHub with no command.
+`POST /world/github-projects/publications` (`world.write`; the project by the identity its status
+states, at a version the requester's workspace holds and not linked yet, and the repository name
+the person chose or none) writes a request of a second profile
+(`exulanica.world-project-publication-request/v1`) into the same folder under the same lock, one
+per project, and the read lists them as `publications`. The worker, which runs as the person, acts
+on it with their own GitHub CLI
+([`publication.py`](../exulanica/world_package/projects/publication.py)); the server never runs the
+CLI and holds no credential of theirs. First it reviews, writing nothing on GitHub: the CLI must be
+installed and signed in, the signed-in login and whether the name is free are read as
+`review-repository` reads them (with no name it proposes `exulanica-` and the world's title as
+words where the project keeps readable text, else `exulanica-world-` and 12 hexadecimal characters
+of the project's identity), and the files the first publication would send are checked as for a
+private repository. The review (the account, the repository, whether written words go, the saved
+checkpoints, and a digest binding the account, the repository, the project and that setting) is
+written onto the request. `POST /world/github-projects/publications/{request_id}/create` with that
+digest is the person's yes. The worker then marks the request started, reviews again and requires
+the same digest, creates the private repository as `create-repository` does, reads it and requires
+`PRIVATE`, links the project with `publish: "automatic"` (the repository's default branch as the
+base, `exulanica/world` as the project branch), publishes it once as automatic publication does,
+writes its status and removes the request. Anything else leaves the request refused by a code
+(`gh_missing`, `not_signed_in`, `name_taken`, `changed`, `not_private`, `rights_refused`,
+`failed`), and nothing is retried: a request found started was being created when a worker
+stopped, so it is refused `failed`, and the person looks on GitHub before asking again. The routes
+answer 409 `project_linked`, `publication_not_reviewed`, `publication_review_changed`,
+`publication_refused` or `publication_started` by those states, and a request being created is not
+taken back.
 
 ### GitHub transport
 

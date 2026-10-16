@@ -292,6 +292,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "seam": "where the record stops and the imagining begins",
         },
     },
+    "POST /world/github-projects/publications": {
+        **_IN_WORLD,
+        "json": {"project_id": "project:nobody-kept"},
+    },
+    "POST /world/github-projects/publications/{request_id}/create": {
+        **_IN_WORLD,
+        "json": {"review_sha256": _ZERO_DIGEST},
+    },
     "POST /world/interactions/previews": {
         **_IN_WORLD,
         "json": {
@@ -1035,6 +1043,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     # A request is named by 32 hexadecimal characters, so an invented one has that shape too.
     "/world/github-projects/requests/{request_id}": Owned(
         build.project_request, lambda: uuid.uuid4().hex
+    ),
+    "/world/github-projects/publications/{request_id}": Owned(
+        build.project_publication, lambda: uuid.uuid4().hex
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),

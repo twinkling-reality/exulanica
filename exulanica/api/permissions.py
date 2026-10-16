@@ -846,6 +846,8 @@ _WORLD_WRITES: Final = _every(
     "POST /world-write/scenes/{scene_id}/generated",
     "GET /world/github-projects",
     "POST /world/github-projects",
+    "POST /world/github-projects/publications",
+    "POST /world/github-projects/publications/{request_id}/create",
     "DELETE /world/github-projects/requests/{request_id}",
     "POST /world/interactions/previews",
     "DELETE /world/interactions/previews/{preview_id}",

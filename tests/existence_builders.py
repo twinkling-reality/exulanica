@@ -1626,6 +1626,42 @@ def project_request(owner) -> str:
     return made["request_id"]
 
 
+def project_publication(owner) -> str:
+    """A request to put a project of the owner's world on GitHub (API). The project's status is
+    written into the sweep's projects directory as its follower would write it beside the
+    project, since no follower runs in the sweep."""
+    from exulanica.world.project_status import projects_directory, write_status
+
+    version_id = str(_plain_version(owner))
+    directory = projects_directory()
+    assert directory is not None, "the sweep configures a projects directory"
+    folder = directory / f"world-{uuid.uuid4().hex[:12]}"
+    folder.mkdir()
+    project_id = f"project:{uuid.uuid4().hex[:12]}"
+    write_status(
+        folder,
+        {
+            "profile": "exulanica.world-project-status/v1",
+            "world_id": WORLD,
+            "version_id": version_id,
+            "project_id": project_id,
+            "written_at": "2026-10-15T07:00:00Z",
+            "checkpoints": 1,
+            "last_checkpoint_at": "2026-10-15T07:00:00Z",
+            "pending": False,
+            "link": None,
+            "github": None,
+        },
+    )
+    made = _ok(
+        in_world(
+            owner, "POST", "/world/github-projects/publications", json={"project_id": project_id}
+        ),
+        202,
+    )
+    return made["request_id"]
+
+
 def world_project(owner) -> str:
     return _world_project(owner)["/world/projects/{project_id}"]
 
