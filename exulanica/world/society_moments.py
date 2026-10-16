@@ -569,9 +569,12 @@ def _lines(
         thing = one["thing"] if isinstance(one["thing"], Mapping) else {}
         to = thing.get("to")
         model = thing.get("model")
+        request = _uuid(thing.get("request_id"))
         found[uuid.UUID(str(one["event_id"]))] = {
             "tick": int(one["tick"]),
             "by": str(one["subject_id"]),
+            # The decision that said it, so a page can open it; none for a line no request asked.
+            "request_id": None if request is None else str(request),
             "to": [] if to is None else [str(to)],
             "line": str(thing.get("line") or ""),
             "decider": {
@@ -786,6 +789,8 @@ def read_moments(
                 "session_id": _session_of(int(one["tick"]), sessions),
                 "kind": one["kind"],
                 "subjects": [str(subject) for subject in one["subjects"]],
+                # The decision that made it, so a page can open it; none for a routine's moment.
+                "request_id": None if one["request_id"] is None else str(one["request_id"]),
                 "place": document.get("place"),
                 "target": document.get("target"),
                 "with": None if document.get("thing") is None else {"thing": document["thing"]},

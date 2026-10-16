@@ -458,7 +458,10 @@ and upgraded first when this checkout has migrations it lacks, after a file copy
 the workspace's identity and token in `install/`, the content store in `store/` and the world projects
 in `projects/`. It then starts the API with a personal install's settings and its workers, and the
 world workspace on the slot's app port, and prints that page's address. `down` stops the database
-through `exulanica-local-db stop`, which takes a backup.
+through `exulanica-local-db stop`, which takes a backup. Worlds played before this checkout kept
+their moments get them from `python3 scripts/acceptance/launch.py moments-backfill --worktree .`,
+run once while the install is up and before its worlds play on: it reports what it would write, and
+writes it with `--apply` ([a world's moments](synthetic-society-contract.md#a-worlds-moments)).
 See [capability boundaries](README.md#capability-boundaries) and [product direction](product-direction.md).
 
 ### Opt-in world interface previews

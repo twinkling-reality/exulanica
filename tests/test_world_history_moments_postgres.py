@@ -32,7 +32,7 @@ pytestmark = pytest.mark.postgres
 
 def _moment_rows(connection, society_id) -> list[dict]:
     rows = connection.execute(
-        "select moment_id, kind, subjects, document from world_society_moment "
+        "select moment_id, kind, subjects, request_id, document from world_society_moment "
         "where society_id = %s order by tick, moment_id",
         (society_id,),
     ).fetchall()
@@ -70,6 +70,11 @@ def test_a_line_said_is_a_moment_read_with_its_line_back_filled_once_and_erased(
     assert moment["said"][0]["by"] == knight
     assert moment["decider"] == {"kind": "person", "model": None}
     assert moment["said"][0]["decider"] == {"kind": "person", "model": None}, "each line's own"
+    # Each moment and each line names the decision that made it, so a page can open it.
+    request = str(said["request_id"])
+    assert said["request_id"] is not None, "the positive control: a person's line answers a request"
+    assert moment["request_id"] == request
+    assert moment["said"][0]["request_id"] == request
     assert moment["at"] is not None, "a person's time, to order moments among edits"
     assert moment["picture"] is None and moment["branches"] == []
     assert moment["scene"]["people"][0]["id"] == knight

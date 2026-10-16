@@ -12,6 +12,7 @@
     python3 scripts/acceptance/launch.py status --worktree PATH
     python3 scripts/acceptance/launch.py restart-api --worktree PATH [--revoke TOKEN_FILE]
     python3 scripts/acceptance/launch.py keep-projects --worktree PATH [--projects DIR]
+    python3 scripts/acceptance/launch.py moments-backfill --worktree PATH [--apply]
     python3 scripts/acceptance/launch.py down   --worktree PATH
 
 ``--worktree`` names any checkout of this repository, a linked worktree or a plain clone, with its
@@ -165,6 +166,12 @@ started before ``--personal``): the directory as ``up`` resolves it, ``~/Exulani
 default, ``token-read`` minted where the run has none, then ``restart-api``, which starts the
 follower. It refuses a run that already keeps projects. It restarts the first API alone: in a run
 with ``--second-api``, ``restart-api --api second`` then serves the projects there too.
+
+``moments-backfill`` writes the moments of the minutes the run's worlds played before moments were
+written (``python -m exulanica.api.moments_backfill``), for every workspace the run's tokens name, with
+the database, store and settings the API was started with and never a model's. Without ``--apply`` it
+reports what it would write and writes nothing. Its lines are kept in the run's logs. Run it once,
+before the worlds play on.
 
 ``down`` stops only what this launcher started, checked by process id and command line, and never
 deletes a database cluster or a run record. Run state lives in the system temporary directory.
@@ -405,6 +412,7 @@ REFUSALS = {
     "scripted-with-model": "--scripted-model and --model cannot both be given",
     "scripted-plan-missing": "--scripted-model names no readable plan file",
     "no-second-api": "restart-api --api second names a run that started no second API",
+    "moments-backfill-refused": "the moments of a society were not written; the run's logs say which",
 }
 
 
@@ -439,6 +447,35 @@ uvicorn.run("exulanica.api.app:create_app", factory=True, host="127.0.0.1",
 
 #: The marker the API wrapper prints, and that ``down`` requires in the command line it stops.
 API_MARKER = "ACCEPTANCE-EXULANICA"
+
+#: The moments back-fill, run by the checkout's own interpreter on the checkout's own code.
+MOMENTS_BACKFILL_WRAPPER = r"""
+import pathlib, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+import exulanica
+where = pathlib.Path(exulanica.__file__).resolve()
+if not where.is_relative_to(root):
+    print(f"ACCEPTANCE-REFUSED exulanica imported from {where}, not {root}", flush=True)
+    raise SystemExit(3)
+from exulanica.api.moments_backfill import main
+raise SystemExit(main(sys.argv[2:]))
+"""
+
+
+def moments_backfill_command(
+    python: Path, worktree: Path, workspace_id: str, apply: bool
+) -> list[str]:
+    """The back-fill's command line for one workspace: a report alone unless ``apply``."""
+    return [
+        str(python),
+        "-c",
+        MOMENTS_BACKFILL_WRAPPER,
+        str(worktree),
+        "--workspace",
+        workspace_id,
+        *(["--apply"] if apply else []),
+    ]
+
 
 #: The same checks, then the scripted-model API instead of the plain one
 #: (``scripts/acceptance/scripted_model.py``, which binds loopback itself).
@@ -2549,6 +2586,47 @@ def recorded_grants(state: Mapping[str, object], run_dir: Path) -> dict[str, dic
     return grants
 
 
+def recorded_api_environment(
+    state: Mapping[str, object],
+    run_dir: Path,
+    grants: Mapping[str, Mapping[str, object]],
+    *,
+    model: bool,
+) -> dict[str, str]:
+    """The environment the run's API was started with, rebuilt from its state: its database (through
+    the run's latency proxy where it has one), these grants, its store and its settings, and the
+    model's settings only with ``model``."""
+    logs = run_dir / "logs"
+    exports = served_exports((logs / "database-serve.txt").read_text())
+    if isinstance(state.get("database_latency"), Mapping):
+        exports = through_proxy(exports, int(state["database_latency"]["port"]))
+    grant = {(run_dir / name).read_text(): granted for name, granted in grants.items()}
+    playback = state.get("society_playback")
+    return api_environment(
+        exports=exports,
+        grant=grant,
+        data_dir=Path(state["data_dir"]),
+        model=model,
+        derivative_worker=state.get("derivative_worker") != "off",
+        society_playback=society_playback_environment(
+            state["workspace_id"] if playback else None,
+            playback.get("base_tick_interval_ms") if isinstance(playback, Mapping) else None,
+        ),
+        door_bridges=state.get("door_bridges"),
+        society_of_things=bool(state.get("society_of_things")),
+        accounts=(state.get("accounts") or {}).get("environment"),
+        reference_pictures=state.get("reference_pictures"),
+        references=references_environment(state.get("references")),
+        creatures=state.get("creatures"),
+        workspace_style_packs=bool(state.get("workspace_style_packs")),
+        worlds_held=state.get("worlds_held"),
+        projects=None
+        if not isinstance(state.get("project_worker"), Mapping)
+        else Path(str(state["project_worker"]["projects"])),
+        personal=bool(state.get("personal")),
+    )
+
+
 def restart_api(arguments: argparse.Namespace) -> None:
     worktree = recorded_checkout(arguments.worktree)
     state_file = state_dir(worktree) / "state.json"
@@ -2568,34 +2646,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         grants.pop(revoked)
     if state.get("model"):
         model_environment()  # refuse before the running API is stopped, not after
-    exports = served_exports((logs / "database-serve.txt").read_text())
-    if isinstance(state.get("database_latency"), Mapping):
-        exports = through_proxy(exports, int(state["database_latency"]["port"]))
-    grant = {(run_dir / name).read_text(): granted for name, granted in grants.items()}
-    playback = state.get("society_playback")
-    environment = api_environment(
-        exports=exports,
-        grant=grant,
-        data_dir=Path(state["data_dir"]),
-        model=bool(state.get("model")),
-        derivative_worker=state.get("derivative_worker") != "off",
-        society_playback=society_playback_environment(
-            state["workspace_id"] if playback else None,
-            playback.get("base_tick_interval_ms") if isinstance(playback, Mapping) else None,
-        ),
-        door_bridges=state.get("door_bridges"),
-        society_of_things=bool(state.get("society_of_things")),
-        accounts=(state.get("accounts") or {}).get("environment"),
-        reference_pictures=state.get("reference_pictures"),
-        references=references_environment(state.get("references")),
-        creatures=state.get("creatures"),
-        workspace_style_packs=bool(state.get("workspace_style_packs")),
-        worlds_held=state.get("worlds_held"),
-        projects=None
-        if not isinstance(state.get("project_worker"), Mapping)
-        else Path(str(state["project_worker"]["projects"])),
-        personal=bool(state.get("personal")),
-    )
+    environment = recorded_api_environment(state, run_dir, grants, model=bool(state.get("model")))
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
     if isinstance(scripted, Mapping):
@@ -2732,6 +2783,40 @@ def stop_personal_database(worktree: Path, database: Mapping[str, object]) -> No
     print(run(local_database_command(python, "stop", "--directory", directory), worktree).strip())
 
 
+def moments_backfill(arguments: argparse.Namespace) -> None:
+    """Write the moments of minutes the run's worlds played before moments were written, for every
+    workspace the run's tokens name, as the API's code, database and store and with no model's
+    settings; keep its lines in the run's logs and refuse by name when a society was refused."""
+    worktree = recorded_checkout(arguments.worktree)
+    state_file = state_dir(worktree) / "state.json"
+    if not state_file.exists():
+        refuse("no-state", str(state_file))
+    state = json.loads(state_file.read_text())
+    run_dir = Path(state["run_dir"])
+    grants = recorded_grants(state, run_dir)
+    environment = recorded_api_environment(state, run_dir, grants, model=False)
+    python = worktree / ".venv" / "bin" / "python"
+    record = run_dir / "logs" / f"moments-backfill-{dt.datetime.now(dt.UTC):%Y%m%dT%H%M%SZ}.jsonl"
+    refused = []
+    with record.open("w") as kept:
+        for workspace_id in sorted({str(granted["workspace_id"]) for granted in grants.values()}):
+            completed = subprocess.run(
+                moments_backfill_command(python, worktree, workspace_id, arguments.apply),
+                cwd=worktree,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            kept.write(completed.stdout + completed.stderr)
+            print(completed.stdout, end="")
+            if completed.returncode != 0:
+                refused.append(workspace_id)
+    print(f"kept at {record}")
+    if refused:
+        refuse("moments-backfill-refused", f"workspaces {', '.join(refused)}; see {record}")
+
+
 def down(arguments: argparse.Namespace) -> None:
     worktree = recorded_checkout(arguments.worktree)
     state_file = state_dir(worktree) / "state.json"
@@ -2783,9 +2868,15 @@ def down(arguments: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("up", "status", "down", "restart-api", "keep-projects"):
+    for name in ("up", "status", "down", "restart-api", "keep-projects", "moments-backfill"):
         command = commands.add_parser(name)
         command.add_argument("--worktree", required=True, help="the checkout to run")
+        if name == "moments-backfill":
+            command.add_argument(
+                "--apply",
+                action="store_true",
+                help="write the moments (default: report what would be written and write nothing)",
+            )
         if name == "restart-api":
             command.add_argument(
                 "--api",
@@ -3008,6 +3099,7 @@ def main(argv: list[str] | None = None) -> int:
             "down": down,
             "restart-api": restart_api,
             "keep-projects": keep_projects,
+            "moments-backfill": moments_backfill,
         }
         commands[arguments.command](arguments)
     except Refused as refused:

@@ -146,7 +146,7 @@ class SocietyReplay:
                     state, events = advance_society(state, row["seed"])
                     expected_events.extend(events)
             elif engine.state_family == "living":
-                state, expected_events = self._replay_living(row)
+                state, expected_events = self._replay_living(row, minute=observe)
             elif engine.state_family in ("purposeful", "things"):
                 documents = self._validated_inputs(row)
                 with inputs_ahead(self.connection, documents):
@@ -365,10 +365,15 @@ class SocietyReplay:
         row: dict[str, Any],
         observe: Callable[[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[dict]], None]
         | None = None,
+        *,
+        minute: Callable[[dict[str, Any], dict[str, Any], tuple[SocietyEvent, ...]], None]
+        | None = None,
     ) -> tuple[dict[str, Any], list[SocietyEvent]]:
         """Regenerate a living society from genesis over every retained input, transition and,
         for an engine whose owner may choose models, every receipt each minute consumed: asked
-        again of nothing, and held to the dispositions the minutes recorded."""
+        again of nothing, and held to the dispositions the minutes recorded. ``observe`` is handed
+        each minute's states, event documents and places; ``minute`` its states and events, as
+        :meth:`replay` hands them for every engine."""
         documents = self._validated_inputs(row)
         with inputs_ahead(self.connection, documents):
             for document in documents:
@@ -450,6 +455,8 @@ class SocietyReplay:
                     [event.document for event in events],
                     [place.document for place in places],
                 )
+            if minute is not None:
+                minute(previous_state, state, tuple(events))
             expected.extend(events)
         return state, expected
 

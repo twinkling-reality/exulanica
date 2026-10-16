@@ -1143,19 +1143,25 @@ the decision that made it where one did, who decided (a kind, and a model's prov
 thing its author placed nearest it, the thing handed over, and its scene (each person's position,
 last path, action and partner, as the live drawing reads them; never a camera or a pose). Its id is
 derived from its version, its rule and the event it is anchored on, so a back-fill of minutes played
-before (through the replay, for the purposeful and things engines) writes the same moments and a
-second write of one is nothing. Each minute is formed from the moments of the minutes before it alone,
+before (through the replay, for every engine but the legacy one, whose minutes record only arrivals
+and departures) writes the same moments and a second write of one is nothing. Each minute is formed from the moments of the minutes before it alone,
 in the hook and in a back-fill alike, so a back-fill run after later minutes forms an earlier minute as
 its hook would have. A society played before moments were written is back-filled once, before it
 plays on: a minute played in between is formed without the earlier moments, so a meeting before it can
-be told twice. A moment holds no words of anyone's: the read joins each line from its `said` event.
+be told twice. `python -m exulanica.api.moments_backfill --workspace <uuid>` back-fills a workspace's
+societies as the runtime role, each in a transaction of its own under the workspace's lock, its stored
+inputs authorized as the API authorizes them; without `--apply` it reports what it would write and
+rolls back, and a society that does not replay or whose input is no longer authorized is refused by
+name with nothing of it written. A moment holds no words of anyone's: the read joins each line from
+its `said` event.
 
 `GET /world/versions/{version_id}/history/moments` answers `exulanica.world-history-moments/v1`, newest
 last, at most `limit` (50 by default, 200 at most) before minute `before`, with `more`: each moment's
 kind, subjects, place, the lines said in it (a reply within 10 of the world's minutes is a line of the
 moment it answers, up to 4; two characters going to the same place in the same minute, or one
 following the other there, are one going, with the first one's time and decider), who decided (with a
-model's name), the run it happened in, its scene, and another model's answers to its decision (the
+model's name) and the request that decided it, each line with its own, so a page can open the
+decision, the run it happened in, its scene, and another model's answers to its decision (the
 asks of [decision roles](decision-roles-contract.md)) as branches, each naming whose decision it
 answers and marked when it chose the same; a going made together keeps every one of its people's
 branches. An ask that was not answered is no branch. It writes nothing and asks no model; a page

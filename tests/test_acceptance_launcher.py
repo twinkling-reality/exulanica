@@ -1725,3 +1725,50 @@ def test_a_restart_starts_a_stopped_follower_and_leaves_a_running_one(tmp_path, 
     assert LAUNCH.keep_follower_up(*up, "token-read") is None and started == []
     assert LAUNCH.keep_follower_up(*up) == 5151
     assert started == [(Path("/kept"), 19431, tmp_path / "run" / "token-read")]
+
+
+# -- the moments back-fill -------------------------------------------------------------------------
+
+
+def test_the_moments_back_fill_reports_unless_told_to_apply_on_the_checkout_s_own_code(tmp_path):
+    parser = LAUNCH.build_parser()
+    assert parser.parse_args(["moments-backfill", "--worktree", "w"]).apply is False
+    assert parser.parse_args(["moments-backfill", "--worktree", "w", "--apply"]).apply is True
+    with pytest.raises(SystemExit), redirect_stderr(io.StringIO()):
+        parser.parse_args(["moments-backfill"])
+    python, worktree = tmp_path / "python", tmp_path / "tree"
+    wrapper = LAUNCH.MOMENTS_BACKFILL_WRAPPER
+    report = LAUNCH.moments_backfill_command(python, worktree, "w1", False)
+    assert report == [str(python), "-c", wrapper, str(worktree), "--workspace", "w1"]
+    assert LAUNCH.moments_backfill_command(python, worktree, "w1", True)[-1] == "--apply"
+    assert "is_relative_to(root)" in wrapper, "the checkout's own code, or a refusal"
+
+
+def test_the_moments_back_fill_has_the_api_s_settings_and_never_a_model_s(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    state = _recorded_run(run_dir, others=1)
+    (run_dir / "logs").mkdir()
+    (run_dir / "logs" / "database-serve.txt").write_text(_LOCAL_DB_CONNECTIONS)
+    store = tmp_path / "store"
+    state.update({"run_dir": str(run_dir), "data_dir": str(store), "model": True, "personal": True})
+    monkeypatch.setenv("NEBIUS_API_KEY", "a-key-the-back-fill-is-never-given")
+
+    grants = LAUNCH.recorded_grants(state, run_dir)
+    environment = LAUNCH.recorded_api_environment(state, run_dir, grants, model=False)
+
+    assert not [name for name in environment if name.startswith("NEBIUS_")]
+    served = LAUNCH.served_exports(_LOCAL_DB_CONNECTIONS)
+    assert environment["EXULANICA_DATABASE_URL"] == served["EXULANICA_DATABASE_URL"]
+    assert (environment["EXULANICA_DATA_DIR"], environment["EXULANICA_PERSONAL_INSTALL"]) == (
+        str(store),
+        "on",
+    )
+    tokens = json.loads(environment["EXULANICA_API_TOKENS"])
+    assert {granted["workspace_id"] for granted in tokens.values()} == {"w1", "w2"}
+
+
+def test_the_moments_back_fill_with_nothing_recorded_is_refused(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(["moments-backfill", "--worktree", str(worktree)])
+
+    assert _refusal(LAUNCH.moments_backfill, arguments) == "no-state"
