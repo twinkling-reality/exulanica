@@ -908,7 +908,7 @@ def test_the_stage_spec_refuses_a_float_parameter_at_construction():
 
 
 def test_the_fillet_centre_is_the_grammars_corner_rule(tmp_path):
-    """Tess's `cornerCentre` gives exactly what `document._corner_centre` gives, which the
+    """Tess's `cornerCentre` gives exactly what `corners.corner_centre` gives, which the
     `[corner_radius]` check holds every corner to, so the check and the geometry are one rule.
 
     The cases are both tangent points of every carried fixture corner with a radius, walked round
@@ -917,7 +917,8 @@ def test_the_fillet_centre_is_the_grammars_corner_rule(tmp_path):
     """
     import random
 
-    from exulanica.grammar.grammars.city.document import _corner_centre, _walk_round_face
+    from exulanica.grammar.grammars.city.corners import corner_centre as _corner_centre
+    from exulanica.grammar.grammars.city.corners import walk_round_face as _walk_round_face
     from exulanica.grammar.grammars.city.streets import CurbEdgeRecord
 
     if not TSX.exists():

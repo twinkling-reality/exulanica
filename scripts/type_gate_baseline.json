@@ -18,7 +18,7 @@
     "exulanica/evaluation/questions.py": 8,
     "exulanica/evaluation/scorers.py": 1,
     "exulanica/grammar/grammars/city/catalogs.py": 1,
-    "exulanica/grammar/grammars/city/document.py": 2,
+    "exulanica/grammar/grammars/city/document_street_checks.py": 2,
     "exulanica/graph/review_sources.py": 1,
     "exulanica/graph/world_read_views.py": 5,
     "exulanica/ingest/exif.py": 2,

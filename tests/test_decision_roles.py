@@ -441,7 +441,10 @@ def test_a_roles_key_profiles_and_prompt_are_stated_in_its_entry_and_adapter_alo
                 seen_in_adapter = role.key in hits
                 continue
             # The city grammar's older junction_signal is a record kind, not a role declaration.
-            if path.relative_to(ROOT).as_posix() == "exulanica/grammar/grammars/city/document.py":
+            if (
+                path.relative_to(ROOT).as_posix()
+                == "exulanica/grammar/grammars/city/document_street_checks.py"
+            ):
                 hits = [hit for hit in hits if hit != "junction_signal"]
             assert not hits, (path.relative_to(ROOT).as_posix(), hits)
         # The positive control: the adapter declares its key, so the scan can see one.

@@ -76,10 +76,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         "a workspace sealed into a verified archive; its refusals include a workspace that keeps "
         "web pictures (0215) or a changed town's tiles (0219)",
     ),
-    "exulanica/grammar/grammars/city/document.py": (
-        1_986,
-        "a city tile document and the checks that span its records",
-    ),
     "exulanica/world/saved_entries.py": (
         1_939,
         "reopening a personal world at a saved state, and making a town on its land",
