@@ -2,7 +2,8 @@
  * @exulanica/atlas-react/generated-site
  *
  * The browser path that draws a world made from a world kind: it reads the site's served drawing
- * (`exulanica.site-drawing/v1`, or `/v5` for a site on land, with its land read by digest), builds
+ * (`exulanica.site-drawing/v1`, or `/v5` for a site on land, with its land read by digest, or `/v6`
+ * for a site on a floating island's top, with the graded top read by digest), builds
  * where a person walks from it and draws its slots as the engine's primitives under the generated
  * tile's light. A separate entry from `./playcanvas`, as
  * the generated tile's is, so a page that opens no such world carries none of it.
@@ -18,14 +19,15 @@ export type {
   SitePrimitive,
   SiteRectMm,
   SiteSlot,
+  SiteTopSection,
   SiteUvFrame,
 } from './site-drawing.js';
-export { SITE_DRAWING_PROFILE, SITE_DRAWING_TERRAIN_PROFILE, SITE_DRAWING_DRESSED_TERRAIN_PROFILE, SITE_DRAWING_LAND_PROFILE, isTerrainSiteDrawing, SiteDrawingError, parseSiteDrawing, parseSiteLandSection, parseStructuredSiteDrawing } from './site-drawing.js';
+export { SITE_DRAWING_PROFILE, SITE_DRAWING_TERRAIN_PROFILE, SITE_DRAWING_DRESSED_TERRAIN_PROFILE, SITE_DRAWING_LAND_PROFILE, SITE_DRAWING_TOP_PROFILE, isTerrainSiteDrawing, SiteDrawingError, parseSiteDrawing, parseSiteLandSection, parseSiteTopSection, parseStructuredSiteDrawing } from './site-drawing.js';
 export { SITE_WALKER_RADIUS_M, siteLandSurface, siteNavigationWorld, siteStart, siteSurface } from './site-navigation.js';
-export type { DrapedSlots, DrawnSiteLand, SiteLand } from './site-land.js';
-export { LAND_GROUND_RGB, attachLandRound, drapeSiteSlots, drawSiteLand, readLandSection, readSiteLand } from './site-land.js';
+export type { DrapedSlots, DrawnSiteLand, SiteLand, SiteNearLand, SiteTopLand } from './site-land.js';
+export { LAND_GROUND_RGB, VOLUME_ROCK_RGB, attachLandRound, drapeSiteSlots, drawSiteLand, readLandSection, readLandscapeGround, readSiteLand, readSiteTopLand } from './site-land.js';
 export type { DrawnSiteVolumes, SiteVolume, SiteVolumes } from './site-volumes.js';
-export { VOLUME_ROCK_RGB, drawSiteVolumes, readSiteVolumes, siteVolumeChunks, volumeChunkVertices, volumeOriginM } from './site-volumes.js';
+export { drawSiteVolumes, landscapePlacementM, readSiteVolumes, siteVolumeChunks, volumeChunkVertices, volumeOriginM } from './site-volumes.js';
 export type { DrawnSiteSlots } from './site-primitives.js';
 export { drawSiteSlots, slotColour } from './site-primitives.js';
 export type { RoofInput, RoofMesh, ShapedRoofs } from './site-roofs.js';

@@ -430,7 +430,9 @@ place of `land` naming the graded top by digest (`exulanica.site-top/v1`, served
 `GET /world/versions/{version_id}/land/top`), the landscape and placement, the site's corner in the
 volume's frame, the water on the top and the cells drawn as land. It has no land chunks or
 backdrop. Its landscape is drawn as `exulanica.landscape-drawing/v2`, with the land below the
-volume served by digest. The application does not draw version 6 yet.
+volume served by digest. The application reads version 6, draws the graded top as land on the
+island and the landscape round it with the land below
+([landscape contract](landscape-contract.md#readers-in-the-browser)).
 
 A style pack dresses a slot by its look role and never changes it. Nothing in the drawing decides a
 look.

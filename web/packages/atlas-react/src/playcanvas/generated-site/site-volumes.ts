@@ -1,8 +1,9 @@
 import * as pc from 'playcanvas';
 import {
-  VOLUME_NORMAL_ONE, readVolumeChunk, volumeDrawnCellMm,
+  VOLUME_NORMAL_ONE, landscapeToSiteMm, readVolumeChunk, volumeDrawnCellMm,
   type HeightfieldDigest, type LandscapeDrawing, type PlacedVolume, type VolumeChunk, type VolumeChunkRef,
 } from '@exulanica/atlas-core';
+import type { SiteNearLand } from './site-land.js';
 
 /**
  * The volumes a site on a landscape places round it (`docs/landscape-contract.md`), read and
@@ -21,10 +22,14 @@ import {
  * Volumes stand off the site and are seen, not walked: nothing here is read by the site's walk,
  * its society or its seats. Each is worn in its own look ({@link DrawnSiteVolumes.wearEach}), so a
  * floating island's upward faces can be its grass while a sea stack is rock throughout.
+ *
+ * A site on a placed volume's top (`exulanica.landscape-drawing/v2`) has a frame of its own in the
+ * landscape: its south-west corner at the site frame's `atMm`, turned by its `yawMdeg`. The page's
+ * frame stays the site's, so the landscape's root stands at the site frame's inverse
+ * ({@link landscapePlacementM}) and every volume under it at its own place in the landscape's frame;
+ * the landscape's own land below the island, its `ground`, is read as a site's land is
+ * (`readLandscapeGround`) and drawn under the same root, so the island floats over that land or sea.
  */
-
-/** The rock a volume is drawn in where nothing dresses it: the engine's own, as the land's ground has. */
-export const VOLUME_ROCK_RGB: readonly [number, number, number] = [0.47, 0.455, 0.431];
 
 export interface SiteVolume {
   readonly volume: PlacedVolume;
@@ -37,7 +42,12 @@ export interface SiteVolume {
 export interface SiteVolumes {
   readonly drawing: LandscapeDrawing;
   readonly volumes: readonly SiteVolume[];
-  /** The bytes the landscape drawing and its chunks were served as. */
+  /**
+   * The landscape's own land below a site on a volume's top, read and held to the digests its
+   * `ground` names, in the landscape's frame; none for a landscape whose land is the site's.
+   */
+  readonly ground: SiteNearLand | null;
+  /** The bytes the landscape drawing and its chunks were served as; the ground's are its own. */
   readonly servedBytes: number;
 }
 
@@ -52,6 +62,8 @@ export function siteVolumeChunks(drawing: LandscapeDrawing, finestMm?: number): 
 /**
  * Read a landscape's chunks (`bodies`, by the digest each was fetched by), each held to the digest
  * its drawing names, to its volume and its input, and to its place; refused as a whole otherwise.
+ * A landscape that states the land below a site on a volume's top is read with that land
+ * (`ground`, from `readLandscapeGround`), and one that states none with none.
  */
 export function readSiteVolumes(
   drawing: LandscapeDrawing,
@@ -59,7 +71,11 @@ export function readSiteVolumes(
   digest: HeightfieldDigest,
   servedBytes: number,
   finestMm?: number,
+  ground: SiteNearLand | null = null,
 ): SiteVolumes {
+  if (ground === null ? drawing.ground !== null : ground.section !== drawing.ground) {
+    throw new TypeError("The landscape's land below its site is read with it, and only the land it names.");
+  }
   const volumes = drawing.volumes.map((volume): SiteVolume => {
     const cellMm = volumeDrawnCellMm(volume, finestMm);
     const named = cellMm === null ? [] : volume.chunks.filter((chunk) => chunk.cellMm === cellMm);
@@ -75,7 +91,20 @@ export function readSiteVolumes(
     });
     return Object.freeze({ volume, cellMm: cellMm ?? 0, chunks: Object.freeze(chunks) });
   });
-  return Object.freeze({ drawing, volumes: Object.freeze(volumes), servedBytes });
+  return Object.freeze({ drawing, volumes: Object.freeze(volumes), ground, servedBytes });
+}
+
+/**
+ * Where a landscape's root stands in the page's frame, the site's: the renderer's position of the
+ * landscape's origin, metres east, up and south, and its turn about up, degrees counterclockwise
+ * seen from above. A landscape on a volume's top stands at its site frame's inverse, `R(-yaw)(p -
+ * atMm)`, so the site's corner is the page's origin; one with no site frame is in the site's frame.
+ */
+export function landscapePlacementM(drawing: LandscapeDrawing): { readonly atM: readonly [number, number, number]; readonly yawDeg: number } {
+  const frame = drawing.siteFrame;
+  if (frame === null) return { atM: [0, 0, 0], yawDeg: 0 };
+  const [x, y, z] = landscapeToSiteMm(frame, 0, 0, 0);
+  return { atM: [x / 1000, z / 1000, -y / 1000], yawDeg: -frame.yawMdeg / 1000 };
 }
 
 /** The renderer's position for a volume's origin, metres east, up and south. */
@@ -112,13 +141,47 @@ export interface DrawnSiteVolumes {
   destroy(): void;
 }
 
+/** How far from level a volume's face may lean and still be one of its upward faces: about 44 degrees. */
+const UPWARD_NORMAL = Math.round(0.72 * VOLUME_NORMAL_ONE);
+
 /**
- * Draw a landscape's volumes under a new root: one entity per placed volume at its origin and turn,
- * one mesh per chunk in `material`, each culled by its own bounds. Volumes cast shadows and
- * receive them.
+ * A chunk's triangles but its upward faces lying wholly where `covered` says something else draws
+ * the ground (a site's graded top drawn as land): each triangle is left out only where all three of
+ * its corners are covered and face up, so the rock's own top, drawn on its coarser cells, never
+ * shows through the land drawn over it, and the rock still meets that land at its edge.
  */
-export function drawSiteVolumes(device: pc.GraphicsDevice, volumes: SiteVolumes, material: pc.Material): DrawnSiteVolumes {
+function uncoveredTriangles(chunk: VolumeChunk, covered: (xMm: number, yMm: number) => boolean): Uint32Array {
+  const p = chunk.positionsMm, n = chunk.normals, t = chunk.triangles;
+  const under = (v: number): boolean => n[3 * v + 2]! >= UPWARD_NORMAL && covered(p[3 * v]!, p[3 * v + 1]!);
+  const kept: number[] = [];
+  for (let i = 0; i < t.length; i += 3) {
+    const a = t[i]!, b = t[i + 1]!, c = t[i + 2]!;
+    if (under(a) && under(b) && under(c)) continue;
+    kept.push(a, b, c);
+  }
+  return Uint32Array.from(kept);
+}
+
+/**
+ * Draw a landscape's volumes under a new root, standing where the landscape stands in the page's
+ * frame ({@link landscapePlacementM}): one entity per placed volume at its origin and turn, one mesh
+ * per chunk in `material`, each culled by its own bounds. Volumes cast shadows and receive them.
+ * What else the landscape draws, the land below a site on a volume's top, goes under the same root.
+ * `covered` names, for a volume by its id, the points of its own frame where something else draws
+ * its top (a site's graded top drawn as land), whose upward faces are then left out.
+ */
+export function drawSiteVolumes(
+  device: pc.GraphicsDevice,
+  volumes: SiteVolumes,
+  material: pc.Material,
+  covered?: (volumeId: string, xMm: number, yMm: number) => boolean,
+): DrawnSiteVolumes {
   const root = new pc.Entity('site-volumes');
+  if (volumes.drawing.siteFrame !== null) {
+    const { atM, yawDeg } = landscapePlacementM(volumes.drawing);
+    root.setLocalPosition(atM[0], atM[1], atM[2]);
+    root.setLocalEulerAngles(0, yawDeg, 0);
+  }
   const meshes: pc.Mesh[] = [];
   const instances: pc.MeshInstance[] = [];
   const worn: { readonly volume: PlacedVolume; readonly instances: readonly pc.MeshInstance[] }[] = [];
@@ -130,16 +193,17 @@ export function drawSiteVolumes(device: pc.GraphicsDevice, volumes: SiteVolumes,
     placed.setLocalEulerAngles(0, volume.yawMdeg / 1000, 0);
     const own: pc.MeshInstance[] = [];
     for (const chunk of chunks) {
-      if (chunk.triangles.length === 0) continue;
+      const kept = covered === undefined ? chunk.triangles : uncoveredTriangles(chunk, (xMm, yMm) => covered(volume.id, xMm, yMm));
+      if (kept.length === 0) continue;
       const { positions, normals } = volumeChunkVertices(chunk);
       const mesh = new pc.Mesh(device);
       mesh.setPositions(positions);
       mesh.setNormals(normals);
-      mesh.setIndices(chunk.triangles);
+      mesh.setIndices(kept);
       mesh.update(pc.PRIMITIVE_TRIANGLES);
       meshes.push(mesh);
       own.push(new pc.MeshInstance(mesh, material));
-      triangles += chunk.triangles.length / 3;
+      triangles += kept.length / 3;
     }
     if (own.length > 0) placed.addComponent('render', { meshInstances: own, castShadows: true, receiveShadows: true });
     instances.push(...own);

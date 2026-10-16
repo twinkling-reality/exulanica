@@ -2,8 +2,10 @@ import {
   DEFAULT_MAXIMUM_SLOPE_DEGREES,
   DEFAULT_MAXIMUM_STEP_HEIGHT_AU,
   DISPLAY_EYE_HEIGHT,
+  LAND_CELL_MM,
   SupportNavigationError,
   atlasVec3,
+  siteTopCellHeld,
   terrainGroundPose,
   type TerrainOccupancyProof,
   type NavigationSurface,
@@ -77,16 +79,29 @@ export function siteSurface(drawing: StructuredSiteDrawing): NavigationSurface {
 const LAND_SLOPE_STEP_M = 0.5;
 
 /**
+ * Whether a site point, metres east and south, lies in a cell a volume's top is drawn as land over:
+ * the open top round the site, which a person may walk to its rim and no further.
+ */
+function onTopCells(land: SiteLand, east: number, south: number): boolean {
+  if (land.top === null) return false;
+  const [x0, y0] = land.top.originMm;
+  const column = Math.floor((east * MILLIMETRES - x0) / LAND_CELL_MM), row = Math.floor((-south * MILLIMETRES - y0) / LAND_CELL_MM);
+  return column >= 0 && row >= 0 && column < land.top.columns - 1 && row < land.top.rows - 1
+    && siteTopCellHeld(land.section.rockCells, row, column);
+}
+
+/**
  * The floor of a site on land: the graded land wherever the site states its floor, its height
  * and its slope read from the land, and none off it, so walking off the site's edge recovers a
- * person as on level ground.
+ * person as on level ground. On a volume's top, the open top round the site is floor too, out to
+ * the cells drawn as land, so a person walks from the gate to the rim and never past it.
  */
 export function siteLandSurface(drawing: StructuredSiteDrawing, land: SiteLand): NavigationSurface {
   const floor = drawing.walk.floorMm;
   const h = LAND_SLOPE_STEP_M;
   return Object.freeze({
     sample: (east: number, south: number): SurfaceSample | null => {
-      if (!onRect(floor, east, south)) return null;
+      if (!onRect(floor, east, south) && !onTopCells(land, east, south)) return null;
       const dx = (land.groundM(east + h, south) - land.groundM(east - h, south)) / (2 * h);
       const dz = (land.groundM(east, south + h) - land.groundM(east, south - h)) / (2 * h);
       const length = Math.hypot(dx, 1, dz);
@@ -115,7 +130,15 @@ export function siteNavigationWorld(drawing: SiteDrawing, occupancy: TerrainOccu
     });
   }
   const support = drawing.support;
-  const bounds = support === undefined ? drawing.walk.floorMm : [
+  // On a volume's top a person walks the whole drawn top, so the field reaches its lattice's edge.
+  const top = land?.top ?? null;
+  const floorBounds = top === null ? drawing.walk.floorMm : [
+    Math.min(drawing.walk.floorMm[0], top.originMm[0]),
+    Math.min(drawing.walk.floorMm[1], top.originMm[1]),
+    Math.max(drawing.walk.floorMm[2], top.originMm[0] + (top.columns - 1) * LAND_CELL_MM),
+    Math.max(drawing.walk.floorMm[3], top.originMm[1] + (top.rows - 1) * LAND_CELL_MM),
+  ];
+  const bounds = support === undefined ? floorBounds : [
     Math.min(...support.document.surfaces.map(s => s.rect_mm[0])),
     -Math.max(...support.document.surfaces.map(s => s.rect_mm[3])),
     Math.max(...support.document.surfaces.map(s => s.rect_mm[2])),

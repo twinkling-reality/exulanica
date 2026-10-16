@@ -765,12 +765,18 @@ export type { TerrainState, TerrainNavigation, TerrainGroundPose, TerrainOccupan
 export {
   LAND_BACKDROP_PROFILE, LAND_CELL_MM, LAND_CHUNK_MM, LAND_CHUNK_PROFILE, LAND_NEAR_BOUND_MM, LAND_SAMPLES_PER_SIDE,
   LAND_SURFACE_CATALOG_ID, LAND_SURFACE_GROUND, LandformError, NearLand, backdropMeshData, chunkHeightMm, landBackdropColour, landBandAt, landBandWeight,
-  landChunkGeometry, landChunkLocal, landNoiseShift, readLandBackdrop, readLandChunk, readLandSurfaces, valueNoise,
+  landChunkGeometry, landChunkLocal, landNoiseShift, readLandBackdrop, readLandChunk, readLandSurfaces, readLandWater, valueNoise,
 } from './landform.js';
 export type { BackdropBlock, LandBackdrop, LandChunk, LandSurfaceBand, LandSurfaces, LandWater } from './landform.js';
 
 export {
-  LANDSCAPE_DRAWING_PROFILE, LandscapeError, VOLUME_CHUNK_MM, VOLUME_CHUNK_PROFILE, VOLUME_DRAWN_FINEST_MM, VOLUME_LEVELS_MM,
-  VOLUME_LOOKS, VOLUME_NORMAL_ONE, VOLUME_RULES_VERSION, placedPointMm, readLandscapeDrawing, readVolumeChunk, volumeDrawnCellMm,
+  LANDSCAPE_DRAWING_PROFILE, LandscapeError, TOP_LANDSCAPE_DRAWING_PROFILE, VOLUME_CHUNK_MM, VOLUME_CHUNK_PROFILE, VOLUME_DRAWN_FINEST_MM,
+  VOLUME_LEVELS_MM, VOLUME_LOOKS, VOLUME_NORMAL_ONE, VOLUME_RULES_VERSION, landscapeToSiteMm, placedPointMm, readLandscapeDrawing,
+  readVolumeChunk, volumeDrawnCellMm,
 } from './landscape.js';
-export type { LandscapeDrawing, PlacedVolume, VolumeChunk, VolumeChunkRef, VolumeTopRef } from './landscape.js';
+export type {
+  LandscapeDrawing, LandscapeGround, LandscapeSiteFrame, PlacedVolume, VolumeChunk, VolumeChunkRef, VolumeTopRef,
+} from './landscape.js';
+
+export { SITE_TOP_PROFILE, SiteTopError, readSiteTop, siteTopCellHeld, siteTopHeightMm } from './site-top.js';
+export type { SiteTop, SiteTopRun } from './site-top.js';

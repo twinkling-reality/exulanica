@@ -40,6 +40,15 @@ import type { TerrainOccupancyProof } from '@exulanica/atlas-core';
  * of the level a volume is drawn at to the digest the landscape names (`readSiteVolumes`). Volumes
  * stand off the site and are never walked, so a landscape that cannot be read does not stop the
  * site: it is drawn without them, and `landscape.reason` says why.
+ *
+ * A site on a floating island's top (`exulanica.site-drawing/v6`) names the island's graded top by
+ * digest; it is read through the world's version (`GET .../land/top`) and held to that digest
+ * (`readSiteTopLand`) as a site on land's land is, and a top that cannot be read stops the site the
+ * same way. Its landscape (`exulanica.landscape-drawing/v2`) is held to the same top, landscape and
+ * placement, and names the land below the island by digest, each chunk and the backdrop read through
+ * `GET .../landscape/ground?sha256=` and held to it (`readLandscapeGround`); the island floats over
+ * that land, and a landscape or land below that cannot be read leaves the island in the sky alone,
+ * with `landscape.reason` saying why.
  */
 
 import type { GeneratedSiteMount, SiteDrawing, SiteLand, SiteVolumes, StructuredSiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
@@ -149,7 +158,7 @@ export async function loadSiteWorld(
         || terrain.contactSha256 !== drawing.terrain.sha256 || terrain.arrivalMm.some((v, i) => v !== drawing.arrival.positionMm[i])
         || terrain.arrivalFacingMm.some((v, i) => v !== drawing.arrival.facingMm[i])) throw new Error("This world's terrain drawing differs from its saved entry.");
   } else if (entry.generatedSite == null) throw new Error("This world's drawing is not its declared terrain.");
-  const land = isTerrainSiteDrawing(drawing) || drawing.land === undefined ? null : await loadSiteLand(access, entry, drawing);
+  const land = isTerrainSiteDrawing(drawing) || (drawing.land === undefined && drawing.top === undefined) ? null : await loadSiteLand(access, entry, drawing);
   const landscape = land === null || isTerrainSiteDrawing(drawing) ? null : await loadSiteLandscape(access, entry, drawing, actual, waiting, wait);
   const world = { ...await siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry, land, landscape?.volumes ?? null), drawingSha256: actual };
   return landscape === null || landscape.state === null ? world : { ...world, landscape: landscape.state };
@@ -158,9 +167,11 @@ export async function loadSiteWorld(
 /**
  * The volumes a site on land's landscape places round it, read through its world's version: the
  * landscape drawing, held to its route's digest and to this site's drawing (`drawingSha256`),
- * world and land, then every chunk of the level each volume is drawn at, held to the digest the
- * landscape names. None, with no state, for a site on no landscape (404); none, with the reason,
- * for a landscape that cannot be read, since the site is drawn without its volumes.
+ * world and land (or for a site on a volume's top, its top, landscape and placement), then every
+ * chunk of the level each volume is drawn at, held to the digest the landscape names, and for a
+ * site on a volume's top every chunk and the backdrop of the land below it. None, with no state,
+ * for a site on no landscape (404); none, with the reason, for a landscape that cannot be read,
+ * since the site is drawn without its volumes.
  */
 async function loadSiteLandscape(
   access: Credentials,
@@ -191,7 +202,7 @@ async function loadSiteLandscape(
       if (problem?.code === 'landscape_unavailable') return { volumes: null, state: null };
     }
     if (!response.ok) throw new Error(`This world's landscape could not be read: HTTP ${response.status}.`);
-    const [{ readSiteVolumes, siteVolumeChunks }, { sha256Hex }, { readLandscapeDrawing }] = await Promise.all([
+    const [{ readLandscapeGround, readSiteVolumes, siteVolumeChunks }, { sha256Hex }, { readLandscapeDrawing }] = await Promise.all([
       import('@exulanica/atlas-react/generated-site'),
       import('@exulanica/atlas-react/playcanvas'),
       import('@exulanica/atlas-core'),
@@ -201,19 +212,33 @@ async function loadSiteLandscape(
     const stated = response.headers.get('ETag')?.replaceAll('"', '') ?? undefined;
     if (stated === undefined) throw new Error("This world's landscape arrived with no digest.");
     const landscape = readLandscapeDrawing(JSON.parse(text), sha256Hex, stated);
-    if (landscape.worldId !== entry.worldId || landscape.siteDrawingSha256 !== drawingSha256 || landscape.landSha256 !== drawing.land!.landSha256) {
+    const top = drawing.top;
+    if (top === undefined && (landscape.worldId !== entry.worldId || landscape.siteDrawingSha256 !== drawingSha256 || landscape.landSha256 !== drawing.land!.landSha256 || landscape.topSha256 !== null)) {
       throw new Error("This world's landscape names another drawing, world or land than its site's.");
     }
-    const refs = siteVolumeChunks(landscape);
-    const bodies = new Map(await Promise.all(refs.map(async (ref) => {
-      const chunk = await ask(`landscape/chunk?${new URLSearchParams({ sha256: ref.sha256, world_id: entry.worldId }).toString()}`);
-      if (!chunk.ok) throw new Error(`This world's landscape chunk could not be read: HTTP ${chunk.status}.`);
-      if (chunk.headers.get('ETag')?.replaceAll('"', '') !== ref.sha256) throw new Error("This world's landscape chunk arrived as a document its landscape does not name.");
-      const body = await chunk.text();
+    if (top !== undefined && (landscape.worldId !== entry.worldId || landscape.siteDrawingSha256 !== drawingSha256 || landscape.topSha256 !== top.topSha256
+        || landscape.landscapeSha256 !== top.landscapeSha256 || landscape.siteFrame?.placement !== top.placement)) {
+      throw new Error("This world's landscape names another drawing, world, top or placement than its site's.");
+    }
+    /** A landscape document by the digest it names, held to that digest by its route's entity tag. */
+    const named = async (route: 'chunk' | 'ground', sha256: string): Promise<unknown> => {
+      const response = await ask(`landscape/${route}?${new URLSearchParams({ sha256, world_id: entry.worldId }).toString()}`);
+      const what = route === 'chunk' ? 'landscape chunk' : 'land below its top';
+      if (!response.ok) throw new Error(`This world's ${what} could not be read: HTTP ${response.status}.`);
+      if (response.headers.get('ETag')?.replaceAll('"', '') !== sha256) throw new Error(`This world's ${what} arrived as a document its landscape does not name.`);
+      const body = await response.text();
       bytes += new TextEncoder().encode(body).byteLength;
-      return [ref.sha256, JSON.parse(body) as unknown] as const;
-    })));
-    const volumes = readSiteVolumes(landscape, bodies, sha256Hex, bytes);
+      return JSON.parse(body) as unknown;
+    };
+    const refs = siteVolumeChunks(landscape);
+    const bodies = new Map(await Promise.all(refs.map(async (ref) => [ref.sha256, await named('chunk', ref.sha256)] as const)));
+    // The land below a site on a volume's top: its chunks by place and its backdrop, by digest.
+    const volumeBytes = bytes;
+    const ground = landscape.ground === null ? null : await Promise.all([
+      Promise.all(landscape.ground.chunks.map(async ({ chunk: [x, y], sha256 }) => [`${x},${y}`, await named('ground', sha256)] as const)),
+      named('ground', landscape.ground.backdropSha256),
+    ]).then(([chunks, backdrop]) => readLandscapeGround(landscape, new Map(chunks), backdrop, sha256Hex, bytes - volumeBytes));
+    const volumes = readSiteVolumes(landscape, bodies, sha256Hex, volumeBytes, undefined, ground);
     return { volumes, state: { volumes: volumes.volumes.length, reason: null } };
   } catch (error) {
     return { volumes: null, state: { volumes: 0, reason: error instanceof Error ? error.message : String(error) } };
@@ -222,14 +247,14 @@ async function loadSiteLandscape(
 
 /**
  * The land a site on land names, read through its world's version: every chunk and the backdrop,
- * each held to the digest its route names and to the one the drawing names.
+ * each held to the digest its route names and to the one the drawing names. For a site on a
+ * volume's top, the graded top, held the same way.
  */
 async function loadSiteLand(access: Credentials, entry: SavedWorldEntry, drawing: StructuredSiteDrawing): Promise<SiteLand> {
-  const [{ readSiteLand }, { sha256Hex }] = await Promise.all([
+  const [{ readSiteLand, readSiteTopLand }, { sha256Hex }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('@exulanica/atlas-react/playcanvas'),
   ]);
-  const section = drawing.land!;
   const query = new URLSearchParams({ world_id: entry.worldId });
   const version = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`;
   let bytes = 0;
@@ -244,6 +269,11 @@ async function loadSiteLand(access: Credentials, entry: SavedWorldEntry, drawing
     bytes += new TextEncoder().encode(text).byteLength;
     return JSON.parse(text);
   };
+  if (drawing.top !== undefined) {
+    const top = await read('land/top', drawing.top.topSha256);
+    return readSiteTopLand(drawing, top, sha256Hex, bytes);
+  }
+  const section = drawing.land!;
   const [chunks, backdrop] = await Promise.all([
     Promise.all(section.chunks.map(async ({ chunk: [x, y], sha256 }) => [`${x},${y}`, await read(`land/chunks/${x}/${y}`, sha256)] as const)),
     read('land/backdrop', section.backdropSha256),

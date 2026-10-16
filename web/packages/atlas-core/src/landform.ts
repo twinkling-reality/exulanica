@@ -151,7 +151,8 @@ export type LandWater =
 
 const FALL_SIDES: readonly string[] = ['north', 'east', 'south', 'west'];
 
-function readWater(raw: unknown, where: string): LandWater {
+/** Admit one body of water on land, or refuse it by where it broke. */
+export function readLandWater(raw: unknown, where: string): LandWater {
   require(raw !== null && typeof raw === 'object' && !Array.isArray(raw), where, 'is an object');
   const kind = (raw as Record<string, unknown>)['kind'];
   const bound = 10_000_000;
@@ -205,7 +206,7 @@ export function readLandBackdrop(raw: unknown, digest: HeightfieldDigest, expect
   require(xMm.length * yMm.length <= BACKDROP_MOST_SAMPLES, 'backdrop', 'holds at most a million samples');
   const heights = integers(row['height_mm'], xMm.length * yMm.length, -far, far, 'backdrop.height_mm');
   require(Array.isArray(row['water']), 'backdrop.water', 'is a list');
-  const water = (row['water'] as unknown[]).map((body, i) => readWater(body, `backdrop.water[${i}]`));
+  const water = (row['water'] as unknown[]).map((body, i) => readLandWater(body, `backdrop.water[${i}]`));
   const sha256 = checked(raw, digest, expectedSha256, 'backdrop');
   return Object.freeze({ nearMm: [x0!, y0!, x1!, y1!] as const, xMm, yMm, heightMm: Int32Array.from(heights), water, sha256 });
 }

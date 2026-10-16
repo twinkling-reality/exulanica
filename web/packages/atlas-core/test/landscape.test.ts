@@ -7,8 +7,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  LandscapeError, placedPointMm, readLandscapeDrawing, readVolumeChunk, volumeDrawnCellMm,
-  type PlacedVolume,
+  LandscapeError, TOP_LANDSCAPE_DRAWING_PROFILE, landscapeToSiteMm, placedPointMm, readLandscapeDrawing, readVolumeChunk,
+  volumeDrawnCellMm, type PlacedVolume,
 } from '../src/landscape.js';
 
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -67,7 +67,7 @@ describe('the landscape drawing', () => {
     };
     const volume = (raw: Record<string, unknown>) => (raw['volumes'] as Record<string, unknown>[])[0]!;
     expect(refusal(() => readLandscapeDrawing(drawing(), digest, '0'.repeat(64)))).toBe('landscape');
-    expect(refusal(() => readLandscapeDrawing(changed((raw) => { raw['profile'] = 'exulanica.landscape-drawing/v2'; }), digest))).toBe('landscape.profile');
+    expect(refusal(() => readLandscapeDrawing(changed((raw) => { raw['profile'] = 'exulanica.landscape-drawing/v3'; }), digest))).toBe('landscape.profile');
     expect(refusal(() => readLandscapeDrawing(changed((raw) => { raw['sky'] = []; }), digest))).toBe('landscape');
     expect(refusal(() => readLandscapeDrawing(changed((raw) => { volume(raw)['at_mm'] = [0, 0, 2_000_000]; }), digest))).toBe('landscape.volumes[0].at_mm[2]');
     expect(refusal(() => readLandscapeDrawing(changed((raw) => { volume(raw)['yaw_mdeg'] = 360_000; }), digest))).toBe('landscape.volumes[0].yaw_mdeg');
@@ -133,5 +133,47 @@ describe('where a page draws a volume', () => {
     expect(east).toBeCloseTo(1000, 6);
     expect(north).toBeCloseTo(3000, 6);
     expect(up).toBe(3000);
+  });
+});
+
+/** A world on a volume's top: `packages/atlas-react/test/fixtures/site-top.v6.json`, the server's own. */
+const ON_TOP = JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-top.v6.json', 'utf8')) as {
+  landscape: Record<string, unknown>; landscape_sha256: string; top_sha256: string;
+};
+const onTop = (): Record<string, unknown> => structuredClone(ON_TOP.landscape);
+
+describe('the landscape of a world on a volume\'s top', () => {
+  it('reads the server\'s version 2 drawing: the site\'s frame, the graded top and the ground below', () => {
+    const read = readLandscapeDrawing(onTop(), digest, ON_TOP.landscape_sha256);
+    expect(read.profile).toBe(TOP_LANDSCAPE_DRAWING_PROFILE);
+    expect(read.topSha256).toBe(ON_TOP.top_sha256);
+    expect(read.siteFrame).toEqual({ placement: 'isle', atMm: [59000, 49000, 60000], yawMdeg: 0 });
+    expect(read.ground!.chunks.length).toBeGreaterThan(3);
+    expect(read.ground!.chunkMm).toBe(128_000);
+    // A version 1 drawing states none of them.
+    const first = readLandscapeDrawing(drawing(), digest);
+    expect([first.topSha256, first.siteFrame, first.ground]).toEqual([null, null, null]);
+  });
+
+  it('refuses a version 2 drawing missing what it states, or naming a placement it does not place', () => {
+    const without = onTop();
+    delete without['ground'];
+    expect(refusal(() => readLandscapeDrawing(without, digest))).toBe('landscape');
+    const elsewhere = onTop();
+    (elsewhere['site_frame'] as Record<string, unknown>)['placement'] = 'nowhere';
+    expect(refusal(() => readLandscapeDrawing(elsewhere, digest))).toBe('landscape.site_frame.placement');
+    const empty = onTop();
+    (empty['ground'] as Record<string, unknown>)['chunks'] = [];
+    expect(refusal(() => readLandscapeDrawing(empty, digest))).toBe('landscape.ground.chunks');
+    const v1WithFrame = drawing();
+    v1WithFrame['site_frame'] = onTop()['site_frame'];
+    expect(refusal(() => readLandscapeDrawing(v1WithFrame, digest))).toBe('landscape');
+  });
+
+  it('takes a landscape point into the site\'s frame by the site frame\'s inverse', () => {
+    const frame = { placement: 'isle', atMm: [59000, 49000, 60000] as const, yawMdeg: 90_000 };
+    // The site's corner is its origin; a point a metre along the site's turned east is 1 m east of it.
+    expect(landscapeToSiteMm(frame, 59000, 49000, 60000).map(Math.round)).toEqual([0, 0, 0]);
+    expect(landscapeToSiteMm(frame, 59000, 50000, 61000).map(Math.round)).toEqual([1000, 0, 1000]);
   });
 });

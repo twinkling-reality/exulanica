@@ -1,5 +1,5 @@
 import {readTerrainDressing, type TerrainDressing} from './terrain-dressing.js';
-import { LAND_CELL_MM, LAND_CHUNK_MM, readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type LandWater, type SupportNavigation } from '@exulanica/atlas-core';
+import { LAND_CELL_MM, LAND_CHUNK_MM, readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type LandWater, type SiteTopRun, type SupportNavigation } from '@exulanica/atlas-core';
 import { sha256Hex, canonicalJson } from '../character/digest.js';
 /**
  * The drawing a site world's records make, in its level-floor or explicit-support profile.
@@ -25,6 +25,12 @@ export const SITE_DRAWING_DRESSED_TERRAIN_PROFILE = 'exulanica.site-drawing/v4';
  * naming the land's chunks and backdrop by digest, which the page reads before it draws the site.
  */
 export const SITE_DRAWING_LAND_PROFILE = 'exulanica.site-drawing/v5';
+/**
+ * A site laid out on a placed volume's top, a floating island's (`docs/landscape-contract.md`):
+ * version 5's slots, drapes and arrival standing on the graded top, and a `top` section in place of
+ * `land`, naming the graded top by digest and the cells of its lattice drawn as land.
+ */
+export const SITE_DRAWING_TOP_PROFILE = 'exulanica.site-drawing/v6';
 
 export type SiteFit = 'contain' | 'fill' | 'tile' | 'surface';
 export type SitePrimitive = 'box' | 'plane' | 'gable' | 'none';
@@ -56,7 +62,8 @@ export interface SiteSlot {
   readonly uvFrame?: SiteUvFrame;
   /**
    * A slot of a site on land that follows the land: each point of it stands as far above the land
-   * under it as its base stands above the land under its base's centre. Stated only on land.
+   * under it as its base stands above the land under its base's centre. Stated only on land and on
+   * a volume's graded top.
    */
   readonly drape?: true;
   /**
@@ -109,13 +116,31 @@ export interface SiteLandSection {
   readonly walls?: readonly SiteLandWall[];
 }
 
+/**
+ * What a site on a placed volume's top states of the top: the graded top's digest (served at
+ * `land/top`), the landscape and the placement it is a top of, the site's south-west corner in the
+ * volume's frame, the water on the top, and the runs of the top's lattice cells with rock under all
+ * four corners, which are drawn as land (rows from the south, columns from the west, from the
+ * lattice's south-west corner); the volume's own rock draws the rest of the top.
+ */
+export interface SiteTopSection {
+  readonly topSha256: string;
+  readonly landscapeSha256: string;
+  readonly placement: string;
+  readonly offsetMm: readonly [east: number, north: number];
+  readonly water: readonly LandWater[];
+  readonly rockCells: readonly SiteTopRun[];
+}
+
 export type SiteRectMm = readonly [x0: number, y0: number, x1: number, y1: number];
 
 export interface StructuredSiteDrawing {
-  readonly profile?: typeof SITE_DRAWING_PROFILE | typeof SITE_DRAWING_SUPPORT_PROFILE | typeof SITE_DRAWING_LAND_PROFILE;
+  readonly profile?: typeof SITE_DRAWING_PROFILE | typeof SITE_DRAWING_SUPPORT_PROFILE | typeof SITE_DRAWING_LAND_PROFILE | typeof SITE_DRAWING_TOP_PROFILE;
   readonly support?: SupportNavigation;
-  /** The land a site on land stands on, by digest; none for a site on level ground. */
+  /** The land a site on land stands on, by digest; none for a site on level ground or on a volume's top. */
   readonly land?: SiteLandSection;
+  /** The graded top a site on a placed volume's top stands on, by digest; none for any other site. */
+  readonly top?: SiteTopSection;
   readonly worldId: string;
   readonly receiptSha256: string;
   readonly kind: { readonly kind: string; readonly version: number; readonly label: string };
@@ -197,10 +222,10 @@ const FITS: readonly SiteFit[] = ['contain', 'fill', 'tile', 'surface'];
 const PRIMITIVES: readonly SitePrimitive[] = ['box', 'plane', 'gable', 'none'];
 const LOOK = /^([a-z]+)\.([a-z][a-z0-9_]{0,47})$/u;
 
-function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
+function slot(value: unknown, index: number, graded: boolean): SiteSlot {
   const row = object(value, `slot ${index}`);
   const drape = row['drape'];
-  if (drape !== undefined && (drape !== true || !onLand)) fail(`The site drawing's slot ${index} drapes only on land, and only as true.`);
+  if (drape !== undefined && (drape !== true || !graded)) fail(`The site drawing's slot ${index} drapes only on land, and only as true.`);
   const look = text(row['lookRole'], `slot ${index} look role`);
   const parts = LOOK.exec(look);
   if (parts === null) fail(`The site drawing's slot ${index} names no look role family.leaf.`);
@@ -314,30 +339,63 @@ export function parseSiteLandSection(value: unknown): SiteLandSection {
     chunkMm: LAND_CHUNK_MM,
     chunks: Object.freeze(read),
     backdropSha256: digest(row['backdrop_sha256'], 'backdrop digest'),
-    water: Object.freeze(water.map((one, index): LandWater => {
-      const kind = object(one, `land water ${index}`)['kind'];
-      const fields = typeof kind === 'string' ? WATER_FIELDS[kind] : undefined;
-      if (fields === undefined) fail(`The site drawing's land water ${index} is not sea, lake, pond, pool or fall.`);
-      const body = closed(one, fields, `land water ${index}`);
-      const id = text(body['id'], `land water ${index} id`), levelMm = integer(body['level_mm'], `land water ${index} level`);
-      if (kind === 'sea') return Object.freeze({ id, kind, levelMm, side: text(body['side'], `land water ${index} side`) });
-      if (kind === 'lake') return Object.freeze({ id, kind, levelMm, centreMm: point(body['centre_mm'], `land water ${index} centre`), radiusMm: integer(body['radius_mm'], `land water ${index} radius`) });
-      if (kind !== 'fall') {
-        const [x0, y0, x1, y1] = rect(body['rect_mm'], `land water ${index} rectangle`);
-        return Object.freeze({ id, kind: kind as 'pond' | 'pool', levelMm, rectMm: Object.freeze([x0, y0, x1, y1] as const) });
-      }
-      const line = body['rect_mm'];
-      if (!Array.isArray(line) || line.length !== 4) fail(`The site drawing's land water ${index} line is not four numbers.`);
-      const [x0, y0, x1, y1] = line.map((v) => integer(v, `land water ${index} line`)) as [number, number, number, number];
-      if (!((x0 === x1 && y0 < y1) || (y0 === y1 && x0 < x1))) fail(`The site drawing's land water ${index} is a fall that is not a line across its channel.`);
-      const rectMm = Object.freeze([x0, y0, x1, y1] as const);
-      const bottomMm = integer(body['bottom_mm'], `land water ${index} bottom`);
-      if (bottomMm >= levelMm) fail(`The site drawing's land water ${index} is a fall that does not fall.`);
-      const side = text(body['side'], `land water ${index} side`);
-      if (!MAIN_SIDES.includes(side)) fail(`The site drawing's land water ${index} falls toward ${side}, not north, east, south or west.`);
-      return Object.freeze({ id, kind: 'fall' as const, levelMm, bottomMm, rectMm, side: side as 'north' | 'east' | 'south' | 'west' });
-    })),
+    water: Object.freeze(water.map((one, index) => waterBody(one, index, 'land'))),
     ...(Array.isArray(walls) ? { walls: Object.freeze(walls.map(landWall)) } : {}),
+  });
+}
+
+/** A body of water a land section or a top section states, by its kind's closed fields; `what` names the section. */
+function waterBody(one: unknown, index: number, what: 'land' | 'top'): LandWater {
+  const kind = object(one, `${what} water ${index}`)['kind'];
+  const fields = typeof kind === 'string' ? WATER_FIELDS[kind] : undefined;
+  if (fields === undefined) fail(`The site drawing's ${what} water ${index} is not sea, lake, pond, pool or fall.`);
+  const body = closed(one, fields, `${what} water ${index}`);
+  const id = text(body['id'], `${what} water ${index} id`), levelMm = integer(body['level_mm'], `${what} water ${index} level`);
+  if (kind === 'sea') return Object.freeze({ id, kind, levelMm, side: text(body['side'], `${what} water ${index} side`) });
+  if (kind === 'lake') return Object.freeze({ id, kind, levelMm, centreMm: point(body['centre_mm'], `${what} water ${index} centre`), radiusMm: integer(body['radius_mm'], `${what} water ${index} radius`) });
+  if (kind !== 'fall') {
+    const [x0, y0, x1, y1] = rect(body['rect_mm'], `${what} water ${index} rectangle`);
+    return Object.freeze({ id, kind: kind as 'pond' | 'pool', levelMm, rectMm: Object.freeze([x0, y0, x1, y1] as const) });
+  }
+  const line = body['rect_mm'];
+  if (!Array.isArray(line) || line.length !== 4) fail(`The site drawing's ${what} water ${index} line is not four numbers.`);
+  const [x0, y0, x1, y1] = line.map((v) => integer(v, `${what} water ${index} line`)) as [number, number, number, number];
+  if (!((x0 === x1 && y0 < y1) || (y0 === y1 && x0 < x1))) fail(`The site drawing's ${what} water ${index} is a fall that is not a line across its channel.`);
+  const rectMm = Object.freeze([x0, y0, x1, y1] as const);
+  const bottomMm = integer(body['bottom_mm'], `${what} water ${index} bottom`);
+  if (bottomMm >= levelMm) fail(`The site drawing's ${what} water ${index} is a fall that does not fall.`);
+  const side = text(body['side'], `${what} water ${index} side`);
+  if (!MAIN_SIDES.includes(side)) fail(`The site drawing's ${what} water ${index} falls toward ${side}, not north, east, south or west.`);
+  return Object.freeze({ id, kind: 'fall' as const, levelMm, bottomMm, rectMm, side: side as 'north' | 'east' | 'south' | 'west' });
+}
+
+/** A placement's key in a landscape: the landscape catalog's words. */
+const PLACEMENT = /^[a-z][a-z0-9_]*$/u;
+
+/**
+ * The top section of a site on a placed volume's top: the graded top's and the landscape's digests,
+ * the placement, the site's corner in the volume's frame, the water on the top and the runs of
+ * cells drawn as land, each `[row, first, last]` in whole cells from the lattice's south-west
+ * corner, every field closed.
+ */
+export function parseSiteTopSection(value: unknown): SiteTopSection {
+  const row = closed(value, 'top_sha256 landscape_sha256 placement offset_mm water rock_cells', 'top');
+  const placement = text(row['placement'], 'top placement');
+  if (!PLACEMENT.test(placement)) fail("The site drawing's top placement is not a placement's key.");
+  const water = row['water'], cells = row['rock_cells'];
+  if (!Array.isArray(water) || !Array.isArray(cells)) fail("The site drawing's top states no water list or no list of cells.");
+  return Object.freeze({
+    topSha256: digest(row['top_sha256'], 'top digest'),
+    landscapeSha256: digest(row['landscape_sha256'], 'top landscape digest'),
+    placement,
+    offsetMm: pair(row['offset_mm'], 'top offset'),
+    water: Object.freeze(water.map((one, index) => waterBody(one, index, 'top'))),
+    rockCells: Object.freeze(cells.map((one, index): SiteTopRun => {
+      if (!Array.isArray(one) || one.length !== 3) fail(`The site drawing's top cells ${index} is not three figures.`);
+      const [run, first, last] = one.map((v) => integer(v, `top cells ${index}`)) as [number, number, number];
+      if (run < 0 || first < 0 || first > last) fail(`The site drawing's top cells ${index} is not a row and its first and last column.`);
+      return Object.freeze([run, first, last] as const);
+    })),
   });
 }
 
@@ -346,8 +404,12 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
   const body = object(value, 'document');
   if ((body['profile'] === SITE_DRAWING_TERRAIN_PROFILE || body['profile'] === SITE_DRAWING_DRESSED_TERRAIN_PROFILE)) return parseTerrainDrawing(body);
   const profile = body['profile'];
-  if (profile !== SITE_DRAWING_PROFILE && profile !== SITE_DRAWING_SUPPORT_PROFILE && profile !== SITE_DRAWING_LAND_PROFILE) fail(`The site drawing is not ${SITE_DRAWING_PROFILE}, ${SITE_DRAWING_SUPPORT_PROFILE} or ${SITE_DRAWING_LAND_PROFILE}.`);
+  if (profile !== SITE_DRAWING_PROFILE && profile !== SITE_DRAWING_SUPPORT_PROFILE && profile !== SITE_DRAWING_LAND_PROFILE && profile !== SITE_DRAWING_TOP_PROFILE) {
+    fail(`The site drawing is not ${SITE_DRAWING_PROFILE}, ${SITE_DRAWING_SUPPORT_PROFILE}, ${SITE_DRAWING_LAND_PROFILE} or ${SITE_DRAWING_TOP_PROFILE}.`);
+  }
   const onLand = profile === SITE_DRAWING_LAND_PROFILE;
+  const onTop = profile === SITE_DRAWING_TOP_PROFILE;
+  if (onTop && body['land'] !== undefined) fail("The site drawing stands on a volume's top and states no land.");
   const kind = object(body['kind'], 'kind');
   const extent = object(body['extent'], 'extent');
   const enclosure = extent['enclosure'];
@@ -378,8 +440,9 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
     if (!/^[0-9a-f]{64}$/.test(text(supportRaw['place_sha256'], 'support place digest'))
         || binding[text(supportRaw['entry_node_id'], 'support entry node')] !== entrySurface) fail('The site support entry/place binding is invalid.');
   }
-  const read = slots.map((one, index) => slot(one, index, onLand));
+  const read = slots.map((one, index) => slot(one, index, onLand || onTop));
   const land = onLand ? parseSiteLandSection(body['land']) : undefined;
+  const top = onTop ? parseSiteTopSection(body['top']) : undefined;
   // Network supports are canonical walking geometry. Draw their exact top planes in the same dresser.
   if (support !== undefined) for (const surface of support.document.surfaces) {
     if (surface.surface_id === support.entry.surfaceId) continue;
@@ -403,6 +466,7 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
     profile,
     ...(support === undefined ? {} : { support }),
     ...(land === undefined ? {} : { land }),
+    ...(top === undefined ? {} : { top }),
     worldId: text(body['world_id'], 'world'),
     receiptSha256: text(body['receipt_sha256'], 'receipt'),
     kind: Object.freeze({

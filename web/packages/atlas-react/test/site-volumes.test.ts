@@ -134,6 +134,11 @@ describe('drawing the volumes', () => {
     const { app } = nullApp();
     const plain = new pc.StandardMaterial();
     const drawn = drawSiteVolumes(app.graphicsDevice, volumesOf(), plain);
+    // A landscape in the site's own frame stands its root at the site's origin, unturned, with no land below.
+    const root = drawn.root.getLocalPosition();
+    expect([root.x, root.y, root.z]).toEqual([0, 0, 0]);
+    expect(drawn.root.getLocalEulerAngles().y).toBe(0);
+    expect(volumesOf().ground).toBeNull();
     const placed = drawn.root.findByName('site-volumes:small_island') as pc.Entity;
     const at = placed.getLocalPosition();
     expect([at.x, at.y, at.z]).toEqual([32, 70, 60]);
@@ -150,6 +155,31 @@ describe('drawing the volumes', () => {
     expect(drawn.instances.every((instance) => instance.material === topped)).toBe(true);
     drawn.destroy();
     drawn.destroy();
+  });
+
+  it('leaves out a volume\'s upward faces only where something else draws its top, and only that volume\'s', () => {
+    const { app } = nullApp();
+    const plain = new pc.StandardMaterial();
+    const volumes = volumesOf();
+    const upward = (chunk: (typeof volumes.volumes)[number]['chunks'][number]): number => {
+      let count = 0;
+      for (let i = 0; i < chunk.triangles.length; i += 3) {
+        if ([0, 1, 2].every((k) => chunk.normals[3 * chunk.triangles[i + k]! + 2]! >= Math.round(0.72 * 32_767))) count += 1;
+      }
+      return count;
+    };
+    const faces = volumes.volumes[0]!.chunks.reduce((sum, chunk) => sum + upward(chunk), 0);
+    expect(faces).toBeGreaterThan(0);
+    // Everything covered: every upward face is left out, and every other face is kept.
+    const all = drawSiteVolumes(app.graphicsDevice, volumes, plain, (id) => id === 'small_island');
+    expect(all.triangles).toBe(264 - faces);
+    // Another volume covered, or none: nothing is left out.
+    expect(drawSiteVolumes(app.graphicsDevice, volumes, plain, (id) => id === 'elsewhere').triangles).toBe(264);
+    // Covered only east of the volume's axis: some upward faces go, fewer than all.
+    const half = drawSiteVolumes(app.graphicsDevice, volumes, plain, (id, xMm) => id === 'small_island' && xMm > 0);
+    expect(half.triangles).toBeGreaterThan(264 - faces);
+    expect(half.triangles).toBeLessThan(264);
+    for (const drawn of [all, half]) drawn.destroy();
   });
 });
 

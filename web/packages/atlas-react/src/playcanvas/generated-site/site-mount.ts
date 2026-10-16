@@ -1,5 +1,5 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { LAND_CELL_MM, landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SiteTop, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
@@ -8,11 +8,11 @@ import type { TileEnvironment } from '../generated-tile/environment.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
 import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
 import { budgetedLook } from '../generated-tile/budgeted-look.js';
-import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type TerrainSiteDrawing, type SiteSlot } from './site-drawing.js';
+import { isTerrainSiteDrawing, type SiteDrawing, type SiteTopSection, type StructuredSiteDrawing, type TerrainSiteDrawing, type SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, slotColour, type DrawnSiteSlots } from './site-primitives.js';
-import { LAND_GROUND_RGB, drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
-import { VOLUME_ROCK_RGB, drawSiteVolumes, type SiteVolumes } from './site-volumes.js';
+import { LAND_GROUND_RGB, VOLUME_ROCK_RGB, drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
+import { drawSiteVolumes, landscapePlacementM, type SiteVolumes } from './site-volumes.js';
 import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
 import { measureSite } from './site-measurements.js';
@@ -44,7 +44,10 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
   /** The kind the world was made from, in its own words, which the About panel says. */
   readonly kindLabel: string;
   readonly drawing: SiteDrawing;
-  /** A site on land's land, which its society, its things and its sight stand on; none on level ground. */
+  /**
+   * A site on land's land, or a site on a volume's top's graded top, which its society, its things
+   * and its sight stand on; none on level ground.
+   */
   readonly land?: SiteLand;
 }
 
@@ -98,8 +101,9 @@ export interface SiteMountOptions {
   readonly renderBudget?: RenderBudget;
   /**
    * The land a site on land stands on, read and held to the digests its drawing names
-   * (`readSiteLand`). A drawing that states land is not mounted without it; a drawing on level
-   * ground takes none.
+   * (`readSiteLand`), or the graded top a site on a volume's top stands on (`readSiteTopLand`). A
+   * drawing that states land or a top is not mounted without it; a drawing on level ground takes
+   * none.
    */
   readonly land?: SiteLand;
   /**
@@ -111,7 +115,8 @@ export interface SiteMountOptions {
    * The volumes a site on a landscape places round it, read and held to the digests its landscape
    * drawing names (`readSiteVolumes`): drawn on the land, off the site, in the engine's rock or the
    * rock the dresser makes for each volume's top look (`volumeLook`). None draws none; they are
-   * never walked.
+   * never walked. For a site on a volume's top, the landscape stands where its site frame puts the
+   * site, and the land below the island is drawn with it, out to its backdrop's horizon.
    */
   readonly landscape?: SiteVolumes;
 }
@@ -159,12 +164,32 @@ function byTheSea(land: SiteLand, surfaces: LandSurfaces, eastMm: number, northM
 }
 
 /** The mount for a checked site drawing. */
+/**
+ * Which points of the volume a site's top stands on (its own frame, millimetres) lie in a cell of
+ * the top its drawing draws as land: the site's frame is the volume's moved by the site's corner.
+ */
+function topCovers(section: SiteTopSection, top: SiteTop): (volumeId: string, xMm: number, yMm: number) => boolean {
+  const held = new Set<number>();
+  for (const [row, first, last] of section.rockCells) for (let column = first; column <= last; column += 1) held.add(row * top.columns + column);
+  const [east, north] = section.offsetMm, [x0, y0] = top.originMm;
+  return (volumeId, xMm, yMm) => {
+    if (volumeId !== section.placement) return false;
+    const column = Math.floor((xMm - east - x0) / LAND_CELL_MM), row = Math.floor((yMm - north - y0) / LAND_CELL_MM);
+    return column >= 0 && row >= 0 && column < top.columns - 1 && row < top.rows - 1 && held.has(row * top.columns + column);
+  };
+}
+
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
   if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
   const { look, caps } = drawnWithin(options, drawing.extent.enclosure === 'open' ? 'open_site' : 'indoor_site');
-  // A site on land is drawn on the land its drawing names, or not at all.
-  const land = drawing.land === undefined ? null : options.land ?? null;
+  // A site on land is drawn on the land its drawing names, a site on a volume's top on the top its
+  // drawing names, or not at all.
+  const land = drawing.land === undefined && drawing.top === undefined ? null : options.land ?? null;
   if (drawing.land !== undefined && (land === null || land.section !== drawing.land)) throw new TypeError("A site on land is mounted with the land its drawing names.");
+  if (drawing.top !== undefined && (land === null || land.section !== drawing.top)) throw new TypeError("A site on a volume's top is mounted with the top its drawing names.");
+  // A volume's top has no backdrop and nothing beyond the place to stand scenery on: the island's
+  // rim is its edge, and the landscape's land lies below it.
+  const onTop = land !== null && land.top !== null;
   const navigationWorld = land === null ? siteNavigationWorld(drawing) : siteNavigationWorld(drawing, undefined, land);
   return Object.freeze({
     kindLabel: drawing.kind.label,
@@ -190,10 +215,13 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         landPlain.diffuse = new pc.Color(...LAND_GROUND_RGB);
         landPlain.update();
       }
+      // A volume's top is drawn in the frame of the island's level 0: its surfaces' heights are
+      // above the sea by the island's altitude, which its landscape's site frame states.
+      const datumMm = onTop ? options.landscape?.drawing.siteFrame?.atMm[2] ?? 0 : 0;
       const drawnLand = land === null ? null : drawSiteLand(host.app.graphicsDevice, land,
         landBaseShape?.render?.meshInstances[0]?.material ?? landPlain!,
         landBase === null ? LAND_GROUND_RGB : slotColour(landBase, drawing.extent.enclosure, materials),
-        options.landSurfaces ?? null);
+        options.landSurfaces ?? null, { datumMm, matte: onTop });
       if (drawnLand !== null) {
         host.environmentRoot.addChild(drawnLand.root);
         // The land is the base ground: the slot is kept for what dresses it, and not drawn.
@@ -212,13 +240,37 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         rockPlain.diffuse = new pc.Color(...VOLUME_ROCK_RGB);
         rockPlain.update();
       }
-      const drawnVolumes = volumes === null ? null : drawSiteVolumes(host.app.graphicsDevice, volumes, rockPlain!);
+      // On a volume's top the site's graded top is drawn as land over the cells it lists, so that
+      // volume's own upward faces under those cells are left out.
+      const drawnVolumes = volumes === null ? null : drawSiteVolumes(host.app.graphicsDevice, volumes, rockPlain!,
+        land !== null && land.top !== null ? topCovers(land.section, land.top) : undefined);
       if (drawnVolumes !== null) host.environmentRoot.addChild(drawnVolumes.root);
+      // The landscape's own land below a site on a volume's top, under the landscape's root with its
+      // volumes, wearing the world's look as any land does (the site's base ground as dressed, its
+      // surfaces with heights above the sea, matte as the top is), its backdrop to the horizon and
+      // its water; the camera sees as far as it reaches from the site.
+      const below = volumes?.ground ?? null;
+      const belowPlain = below === null || landBaseShape?.render?.meshInstances[0] !== undefined ? null : new pc.StandardMaterial();
+      if (belowPlain !== null) {
+        belowPlain.name = 'site-landscape:ground';
+        belowPlain.diffuse = new pc.Color(...LAND_GROUND_RGB);
+        belowPlain.update();
+      }
+      const drawnBelow = below === null || drawnVolumes === null ? null : drawSiteLand(host.app.graphicsDevice, below,
+        landBaseShape?.render?.meshInstances[0]?.material ?? belowPlain!,
+        landBase === null ? LAND_GROUND_RGB : slotColour(landBase, drawing.extent.enclosure, materials),
+        options.landSurfaces ?? null, { datumMm: volumes!.drawing.siteFrame?.atMm[2] ?? 0, matte: true });
+      if (drawnBelow !== null) {
+        drawnVolumes!.root.addChild(drawnBelow.root);
+        const { atM } = landscapePlacementM(volumes!.drawing);
+        const camera = host.camera.camera;
+        if (camera != null) camera.farClip = Math.max(camera.farClip, Math.hypot(drawnBelow.reachM + Math.hypot(atM[0], atM[2]), atM[1]));
+      }
       // What stands beyond the place: scenery, beside the site's slots in the same frame and none of
       // them, so nothing that reads or outlines the slots meets it. The dresser is handed it to
       // shade, or to stand its own trees in.
       // It stands on the ground beyond: a look that draws no ground beyond the place draws none.
-      const stated = options.scenery === undefined || materials === null || environment.ground === null
+      const stated = options.scenery === undefined || materials === null || environment.ground === null || onTop
         ? null : sceneryOf(drawing, base, options.scenery, materials);
       // On land, scenery stands on the land where it is dry, never in the sea, a lake or a pond, and
       // where the land wears its surfaces, never on the sand by the sea.
@@ -234,17 +286,21 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         : options.dress?.(host, slots, drawing, scenery, environment, land)) ?? null;
       // The near land wears the base ground as it is dressed, a pack's texture with its own scale.
       const dressedBase = landBaseShape?.render?.meshInstances[0]?.material ?? null;
-      if (drawnLand !== null && dressedBase !== null) {
-        drawnLand.wear(dressedBase);
-        for (const instance of drawnLand.ground) undress?.dressBeyond?.(instance, landBase!);
+      // The land below a volume's top is dressed with it, so the two read as one world.
+      for (const one of [drawnLand, drawnBelow]) {
+        if (one === null || dressedBase === null) continue;
+        one.wear(dressedBase);
+        for (const instance of one.ground) undress?.dressBeyond?.(instance, landBase!);
         // A pack's texture replaces what the land wears: the land's surfaces go over it again.
-        drawnLand.surfaces();
+        one.surfaces();
       }
-      // The land's sea and lakes in the look's water, as the dresser makes it; plain where it makes none.
-      if (drawnLand !== null && undress?.landWater !== undefined) drawnLand.wearWater(undress.landWater);
-      // The backdrop over the colour the pack states for the ground the near land wears, so the two
-      // meet in one colour at the near land's edge.
-      if (drawnLand !== null && undress?.landGround !== undefined) drawnLand.colourBackdrop(undress.landGround);
+      for (const one of [drawnLand, drawnBelow]) {
+        // The land's sea and lakes in the look's water, as the dresser makes it; plain where it makes none.
+        if (one !== null && undress?.landWater !== undefined) one.wearWater(undress.landWater);
+        // The backdrop over the colour the pack states for the ground the near land wears, so the two
+        // meet in one colour at the near land's edge.
+        if (one !== null && undress?.landGround !== undefined) one.colourBackdrop(undress.landGround);
+      }
       // The land's retaining walls in what the site's own walls wear as dressed, a zone's parapet or
       // the site's boundary wall (a wall no building owns); in rock where it has none, a fence or a
       // hoarding among them.
@@ -288,9 +344,12 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       if (scenery !== null && canvas?.dataset !== undefined) {
         canvas.dataset['siteScenery'] = JSON.stringify({ stands: scenery.stands, beyond: scenery.material, pieces: scenery.pieces.length });
       }
-      // The land, said on the canvas: its chunks, the slots laid on it and what it draws.
+      // The land, said on the canvas: its chunks (or the top it is), the slots laid on it and what it draws.
       if (drawnLand !== null && canvas?.dataset !== undefined) {
-        canvas.dataset['siteLand'] = JSON.stringify({ land: land!.section.landSha256, chunks: land!.chunks.length, draped: draped!.draped, draws: drawnLand.draws, triangles: drawnLand.triangles });
+        const ground = land!;
+        canvas.dataset['siteLand'] = JSON.stringify(ground.top === null
+          ? { land: ground.section.landSha256, chunks: ground.chunks.length, draped: draped!.draped, draws: drawnLand.draws, triangles: drawnLand.triangles }
+          : { top: ground.top.sha256, draped: draped!.draped, draws: drawnLand.draws, triangles: drawnLand.triangles });
       }
       // The landscape, said on the canvas: its volumes, the chunks drawn, and whether the dressing dressed them.
       if (drawnVolumes !== null && canvas?.dataset !== undefined) {
@@ -300,6 +359,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
           dressed: dressedVolumes > 0,
           draws: drawnVolumes.draws,
           triangles: drawnVolumes.triangles,
+          ...(drawnBelow === null ? {} : { ground: { land: below!.section.landSha256, chunks: below!.chunks.length, draws: drawnBelow.draws, triangles: drawnBelow.triangles } }),
         });
       }
       const said = options.dress === undefined && materials !== null && canvas?.dataset !== undefined;
@@ -318,9 +378,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         animating: undress?.animating ?? false,
         metrics: Object.freeze({
           tileName: `site:${drawing.worldId}`,
-          triangles: slots.triangles + (drawnLand?.triangles ?? 0) + (drawnVolumes?.triangles ?? 0),
-          drawBatches: slots.drawn + (drawnLand?.draws ?? 0) + (drawnVolumes?.draws ?? 0),
-          transferredBytes: options.servedBytes + (land?.servedBytes ?? 0) + (volumes?.servedBytes ?? 0) + (undress?.textureMetrics?.transferredBytes ?? 0),
+          triangles: slots.triangles + (drawnLand?.triangles ?? 0) + (drawnVolumes?.triangles ?? 0) + (drawnBelow?.triangles ?? 0),
+          drawBatches: slots.drawn + (drawnLand?.draws ?? 0) + (drawnVolumes?.draws ?? 0) + (drawnBelow?.draws ?? 0),
+          transferredBytes: options.servedBytes + (land?.servedBytes ?? 0) + (volumes?.servedBytes ?? 0) + (below?.servedBytes ?? 0) + (undress?.textureMetrics?.transferredBytes ?? 0),
           decodedTextureBytes: undress?.textureMetrics?.decodedTextureBytes ?? 0,
           unavailableSurfaces: undress?.textureMetrics?.unavailableSurfaces ?? 0,
           neighbours: Object.freeze([]),
@@ -352,6 +412,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
           draped?.destroy();
           drawnLand?.destroy();
           landPlain?.destroy();
+          // The land below goes before the landscape's root it hangs from.
+          drawnBelow?.destroy();
+          belowPlain?.destroy();
           drawnVolumes?.destroy();
           rockPlain?.destroy();
           environment.dispose();

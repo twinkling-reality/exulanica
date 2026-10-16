@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
-import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
+import type { GeneratedSiteMount, SiteVolumes } from '@exulanica/atlas-react/generated-site';
 import { DRAWING_ASKS, currentOpenSite, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { siteSightRings } from '../src/composition/sight.js';
@@ -525,6 +525,121 @@ describe('a site on a landscape', () => {
     vi.stubGlobal('fetch', landHost(null, landscape).fetched);
     const world = (await loadSiteWorld(access, landEntry, () => {}, async () => {}, '', null))!;
     expect(world.mount.land).toBeDefined();
+    expect(world.landscape?.volumes).toBe(0);
+    expect(world.landscape?.reason).toContain(said);
+    expect((mounts.asked.at(-1) as { landscape?: unknown }).landscape).toBeUndefined();
+  });
+});
+
+/**
+ * A site on a floating island's top (`exulanica.site-drawing/v6`): the server's own hamlet on a sky
+ * island the atlas-react tests read (`fixtures/site-top.v6.json`), its graded top served by the
+ * digest its drawing names, and its landscape (`exulanica.landscape-drawing/v2`) with its
+ * placements' chunks left out (the fixture carries none) and the yard's two chunks and backdrop as
+ * the land below the island, each served by its digest.
+ */
+const TOP_FIXTURE = JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-top.v6.json', 'utf8')) as {
+  drawing: Record<string, unknown>; top: Record<string, unknown>; top_sha256: string; landscape: Record<string, unknown>;
+};
+const TOP_DRAWING = canonical(TOP_FIXTURE.drawing);
+const topEntry = { ...entry, worldId: 'world:generated:island' } as unknown as SavedWorldEntry;
+const ISLAND_WORLD = 'world_id=world%3Agenerated%3Aisland';
+/** The land below the island, by digest: the yard's two chunks, then its backdrop. */
+const BELOW = new Map([landChunk(-1, 0), landChunk(0, 0), landBackdrop()].map((body) => [sha256(new TextEncoder().encode(body)), body] as const));
+function landscapeOfIsland(otherTop: boolean): string {
+  const landscape = structuredClone(TOP_FIXTURE.landscape);
+  for (const volume of landscape['volumes'] as { chunks: unknown[] }[]) volume.chunks = [];
+  const [west, east, backdrop] = [...BELOW.keys()];
+  landscape['ground'] = {
+    ...(landscape['ground'] as Record<string, unknown>),
+    chunks: [{ chunk: [-1, 0], sha256: west }, { chunk: [0, 0], sha256: east }], backdrop_sha256: backdrop,
+    water: [{ id: 'sea', kind: 'sea', level_mm: 0, side: 'south' }],
+  };
+  if (otherTop) landscape['top_sha256'] = '0'.repeat(64);
+  return canonical(landscape);
+}
+type IslandLandscape = 'served' | 'none' | 'other-top' | 'tampered-ground';
+
+/** A host serving the island's hamlet and its top; `tampered` serves the top changed; `landscape` what its landscape routes answer. */
+function topHost(tampered = false, landscape: IslandLandscape = 'served') {
+  const level = host(200, TOP_DRAWING);
+  const top = canonical(TOP_FIXTURE.top);
+  const fetched = vi.fn(async (input: string): Promise<Response> => {
+    const path = input.slice(access.baseUrl.length);
+    if (path === `/world/versions/version/land/top?${ISLAND_WORLD}`) {
+      level.asked.push(path);
+      return new Response(tampered ? top.replace('"height_mm":[0', '"height_mm":[1') : top, { status: 200, headers: { ETag: `"${TOP_FIXTURE.top_sha256}"` } });
+    }
+    if (path === `/world/versions/version/landscape?${ISLAND_WORLD}`) {
+      level.asked.push(path);
+      if (landscape === 'none') return refused(404, 'landscape_unavailable');
+      const body = landscapeOfIsland(landscape === 'other-top');
+      return new Response(body, { status: 200, headers: { ETag: `"${sha256(new TextEncoder().encode(body))}"` } });
+    }
+    const below = /^\/world\/versions\/version\/landscape\/ground\?sha256=([0-9a-f]{64})&world_id=world%3Agenerated%3Aisland$/.exec(path);
+    if (below !== null) {
+      level.asked.push(path);
+      const body = BELOW.get(below[1]!);
+      if (body === undefined) return refused(404, 'landscape_document_unavailable');
+      return new Response(landscape === 'tampered-ground' ? body.replace('6000', '6001') : body, { status: 200, headers: { ETag: `"${below[1]}"` } });
+    }
+    // A world on a top has no land chunks or backdrop.
+    if (path.startsWith('/world/versions/version/land/')) {
+      level.asked.push(path);
+      return refused(404, 'land_unavailable');
+    }
+    return level.fetched(input);
+  });
+  return { fetched, asked: level.asked };
+}
+
+describe("a site on a floating island's top", () => {
+  it('reads its graded top and the land below its island by digest, and mounts the site on its top with its landscape', async () => {
+    const { fetched, asked } = topHost();
+    vi.stubGlobal('fetch', fetched);
+    const world = (await loadSiteWorld(access, topEntry, () => {}, async () => {}, '', null))!;
+    const land = world.mount.land!;
+    expect(land.top?.sha256).toBe(TOP_FIXTURE.top_sha256);
+    expect(land.chunks).toEqual([]);
+    expect(land.backdrop).toBeNull();
+    // A person arrives standing on the top, 1842 mm over the island's level.
+    expect(land.groundMm(11_000, 4500)).toBe(1842);
+    expect((mounts.asked.at(-1) as { land?: unknown }).land).toBe(land);
+    expect((mounts.asked.at(-1) as { landSurfaces?: unknown }).landSurfaces).toBe(LAND_SURFACES);
+    expect(world.landscape).toEqual({ volumes: 3, reason: null });
+    const handed = (mounts.asked.at(-1) as { landscape?: SiteVolumes }).landscape!;
+    expect(handed.drawing.siteFrame).toEqual({ placement: 'isle', atMm: [59_000, 49_000, 60_000], yawMdeg: 0 });
+    expect(handed.ground?.chunks.map((chunk) => [chunk.chunkX, chunk.chunkY])).toEqual([[-1, 0], [0, 0]]);
+    expect(asked.filter((path) => path.includes('/land/'))).toEqual([`/world/versions/version/land/top?${ISLAND_WORLD}`]);
+    expect(asked.filter((path) => path.includes('/landscape/ground?')).map((path) => path.slice(path.indexOf('sha256=') + 7, path.indexOf('&'))).sort())
+      .toEqual([...BELOW.keys()].sort());
+    // Redrawn in another look on the same top and landscape, read once.
+    const before = asked.length;
+    const again = await world.relook({ packId: null, source: 'address' } as unknown as WorldLookChoice);
+    expect(again.mount.land).toBe(land);
+    expect((mounts.asked.at(-1) as { landscape?: unknown }).landscape).toBe(handed);
+    expect(asked.slice(before).some((path) => path.includes('/land'))).toBe(false);
+  });
+
+  it('is not drawn when its top is not the document its drawing names', async () => {
+    vi.stubGlobal('fetch', topHost(true).fetched);
+    await expect(loadSiteWorld(access, topEntry, () => {}, async () => {}, '', null)).rejects.toThrow('is the document its digest names');
+  });
+
+  it('floats with no landscape where the server says it stands on none', async () => {
+    vi.stubGlobal('fetch', topHost(false, 'none').fetched);
+    const world = (await loadSiteWorld(access, topEntry, () => {}, async () => {}, '', null))!;
+    expect(world.mount.land?.top?.sha256).toBe(TOP_FIXTURE.top_sha256);
+    expect(world.landscape).toBeUndefined();
+  });
+
+  it.each([
+    ['other-top', 'names another drawing, world, top or placement'],
+    ['tampered-ground', 'is the document its digest names'],
+  ] as const)('is drawn on its top without its landscape, saying why, when its landscape is %s', async (landscape, said) => {
+    vi.stubGlobal('fetch', topHost(false, landscape).fetched);
+    const world = (await loadSiteWorld(access, topEntry, () => {}, async () => {}, '', null))!;
+    expect(world.mount.land?.top?.sha256).toBe(TOP_FIXTURE.top_sha256);
     expect(world.landscape?.volumes).toBe(0);
     expect(world.landscape?.reason).toContain(said);
     expect((mounts.asked.at(-1) as { landscape?: unknown }).landscape).toBeUndefined();

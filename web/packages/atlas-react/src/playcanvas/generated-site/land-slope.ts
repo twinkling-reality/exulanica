@@ -25,8 +25,13 @@ const MARK = '// exulanica: land surfaces';
 
 const f = (value: number): string => (Number.isInteger(value) ? `${value}.0` : String(value));
 
-/** The land's bands set after a colour chunk, or null where the chunk has no one colour function. */
-export function withLandSurfaces(chunk: string, surfaces: LandSurfaces, sea: boolean): string | null {
+/**
+ * The land's bands set after a colour chunk, or null where the chunk has no one colour function.
+ * Every band's height is above the sea's level: `datumMm` is how far above the sea the scene's own
+ * level 0 lies (a floating island's level, for land drawn in a frame that stands on it), none for
+ * land drawn in the sea's frame.
+ */
+export function withLandSurfaces(chunk: string, surfaces: LandSurfaces, sea: boolean, datumMm = 0): string | null {
   if (chunk.includes(MARK)) return chunk;
   if (chunk.split(ALBEDO).length !== 2) return null;
   const { noise } = surfaces;
@@ -59,7 +64,7 @@ void getAlbedo() {
 \tvec2 p = vPositionW.xz;
 \tfloat shift = (2.0 * exuLandNoise(p / ${f(noise.broadM)}) - 1.0) * ${f(1 - noise.fineShare)} + (2.0 * exuLandNoise(p / ${f(noise.fineM)} + vec2(17.0, 3.0)) - 1.0) * ${f(noise.fineShare)};
 \tfloat moved = 1.0 + ${f(noise.jitter)} * shift;
-\tfloat h = vPositionW.y * 1000.0;
+\tfloat h = vPositionW.y * 1000.0${datumMm === 0 ? '' : ` + ${f(datumMm)}`};
 ${bands.join('\n')}
 }
 `;
@@ -68,13 +73,14 @@ ${bands.join('\n')}
 /**
  * A copy of `material` wearing the land's bands over its own colour, or null where they cannot be
  * set: a WebGPU device, or a colour chunk with no one colour function. The caller owns the copy.
+ * `datumMm` is how far above the sea the scene's level 0 lies, as `withLandSurfaces` takes it.
  */
-export function landSurfaceMaterial(device: pc.GraphicsDevice, material: pc.Material, surfaces: LandSurfaces, sea: boolean): pc.StandardMaterial | null {
+export function landSurfaceMaterial(device: pc.GraphicsDevice, material: pc.Material, surfaces: LandSurfaces, sea: boolean, datumMm = 0): pc.StandardMaterial | null {
   if (device.isWebGPU === true || !(material instanceof pc.StandardMaterial)) return null;
   const held = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS') as string | undefined;
   const plain = pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).get('diffusePS') as string | undefined;
   const chunk = held ?? plain;
-  const wrapped = chunk === undefined ? null : withLandSurfaces(chunk, surfaces, sea);
+  const wrapped = chunk === undefined ? null : withLandSurfaces(chunk, surfaces, sea, datumMm);
   if (wrapped === null) return null;
   const copy = material.clone();
   copy.name = `site-land:surfaces:${material.name}`;

@@ -1,14 +1,15 @@
 import * as pc from 'playcanvas';
 import {
-  LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, landBackdropColour, readLandBackdrop, readLandChunk, valueNoise,
-  type HeightfieldDigest, type LandBackdrop, type LandChunk, type LandSurfaces, type LandWater,
+  LAND_CELL_MM, LAND_CHUNK_MM, backdropMeshData, chunkHeightMm, landBackdropColour, readLandBackdrop, readLandChunk, readSiteTop,
+  siteTopCellHeld, siteTopHeightMm, valueNoise,
+  type HeightfieldDigest, type LandBackdrop, type LandChunk, type LandscapeDrawing, type LandSurfaces, type LandWater, type SiteTop,
+  type SiteTopRun,
 } from '@exulanica/atlas-core';
 import type { GeneratedTileHost } from '../generated-tile/binding-contract.js';
 import { buildSurfaceMesh } from '../generated-tile/surface-mesh.js';
 import { landSurfaceMaterial } from './land-slope.js';
-import type { SiteLandSection, SiteLandWall, SiteSlot, StructuredSiteDrawing } from './site-drawing.js';
+import type { SiteLandSection, SiteLandWall, SiteSlot, SiteTopSection, StructuredSiteDrawing } from './site-drawing.js';
 import type { DrawnSiteSlots } from './site-primitives.js';
-import { VOLUME_ROCK_RGB } from './site-volumes.js';
 
 /**
  * A site world's land, read and drawn: the near land a person walks in chunks, the backdrop to the
@@ -22,12 +23,25 @@ import { VOLUME_ROCK_RGB } from './site-volumes.js';
  * renderer's frame is east, up and south in metres, so a site point (x, y) is the renderer's
  * (x / 1000, -y / 1000).
  *
+ * A site on a placed volume's top, a floating island's, stands on the volume's graded top instead
+ * (`exulanica.site-top/v1`, read by `readSiteTopLand`): the same kind of land to every reader that
+ * asks its height, where it is dry and its water, but with no chunks and no backdrop. Its heights
+ * are above the volume's level 0, the site frame's own; the landscape's land below it is drawn
+ * with the volumes (`site-volumes.ts`). Only the cells of its lattice with rock under them are
+ * drawn as land, a few millimetres over the volume's own top faces; the volume's rock draws the
+ * rest of the top.
+ *
  * A site on level ground has no land: none of this is read, made or asked, and every reader that
  * takes a ground function is handed none.
  */
 
 /** The ground land wears where nothing it stands for is drawn: a site's with no base ground, and a town's. */
 export const LAND_GROUND_RGB = [0.47, 0.56, 0.33] as const;
+/**
+ * The rock a volume is drawn in where nothing dresses it (`site-volumes.ts`): the engine's own, as
+ * the land's ground has. The land's retaining walls wear it where the land's surfaces hand no rock.
+ */
+export const VOLUME_ROCK_RGB: readonly [number, number, number] = [0.47, 0.455, 0.431];
 /** Plain water where the drawing's own water material is not handed over. */
 const PLAIN_WATER: readonly [number, number, number] = [0.24, 0.42, 0.55];
 /** Scenery stands only on land at least this far above the sea's level. */
@@ -36,21 +50,47 @@ const DRY_ABOVE_SEA_MM = 300;
 const FAR_MARGIN = 1.15;
 /** How far a retaining wall's coping stands above the upper level it holds. */
 const WALL_COPING_MM = 100;
+/**
+ * How far over the volume's own top faces a graded top's cells are drawn, so the top is the one
+ * seen where both lie: half of the drawing's layer step (6 mm), so a ground draped a layer over the
+ * land still lies over it.
+ */
+const TOP_LIFT_MM = 3;
 
-/** The land a site on land stands on, read and held to the digests its drawing names. */
-export interface SiteLand {
-  readonly section: SiteLandSection;
-  readonly chunks: readonly LandChunk[];
-  readonly backdrop: LandBackdrop;
+/** What every land a site stands on answers, whatever it is read from. */
+interface SiteGround {
   /** The land's height under a site point, millimetres east and north; the near land's edge beyond it. */
   readonly groundMm: (eastMm: number, northMm: number) => number;
   /** The land's height under a renderer point, metres east and south: the scene's and the society's frame. */
   readonly groundM: (eastM: number, southM: number) => number;
   /** Whether scenery may stand at a site point: on the near land, above the sea and out of every lake and pond. */
   readonly dryAt: (eastMm: number, northMm: number) => boolean;
-  /** The bytes the chunks and the backdrop were served as. */
+  /** The bytes its documents were served as. */
   readonly servedBytes: number;
 }
+
+/** The land a site on land stands on, read and held to the digests its drawing names: its chunks and backdrop. */
+export interface SiteNearLand extends SiteGround {
+  readonly section: SiteLandSection;
+  readonly chunks: readonly LandChunk[];
+  readonly backdrop: LandBackdrop;
+  readonly top: null;
+}
+
+/**
+ * The graded top a site on a placed volume's top stands on, read and held to the digest its drawing
+ * names. Heights are above the volume's level 0, and beyond the top's lattice its nearest edge's. It
+ * has no chunks (land cover, which grows over chunks, grows none on it) and no backdrop.
+ */
+export interface SiteTopLand extends SiteGround {
+  readonly section: SiteTopSection;
+  readonly chunks: readonly LandChunk[];
+  readonly backdrop: null;
+  readonly top: SiteTop;
+}
+
+/** The land a site on land, or on a volume's top, stands on, read and held to the digests its drawing names. */
+export type SiteLand = SiteNearLand | SiteTopLand;
 
 /** A chunk's place as one number, so a lookup makes no text. */
 const placeKey = (chunkX: number, chunkY: number): number => (chunkX + 4096) * 8193 + (chunkY + 4096);
@@ -111,7 +151,7 @@ export function readSiteLand(
   backdrop: unknown,
   digest: HeightfieldDigest,
   servedBytes = 0,
-): SiteLand {
+): SiteNearLand {
   const section = drawing.land;
   if (section === undefined) throw new Error('The site drawing states no land.');
   return readLandSection(section, chunks, backdrop, digest, servedBytes);
@@ -128,7 +168,7 @@ export function readLandSection(
   backdrop: unknown,
   digest: HeightfieldDigest,
   servedBytes = 0,
-): SiteLand {
+): SiteNearLand {
   const read = section.chunks.map(({ chunk: [x, y], sha256 }) => {
     const raw = chunks.get(`${x},${y}`);
     if (raw === undefined) throw new Error(`The land chunk (${x}, ${y}) its land section names was not served.`);
@@ -147,7 +187,53 @@ export function readLandSection(
     groundM: (eastM: number, southM: number): number => sampler.heightMm(eastM * 1000, -southM * 1000) / 1000,
     dryAt: (eastMm: number, northMm: number): boolean => !underWater(section.water, eastMm, northMm, groundMm(eastMm, northMm)),
     servedBytes,
+    top: null,
   });
+}
+
+/**
+ * Read the graded top a site on a placed volume's top stands on, from the document served for it
+ * (`land/top`), held to the digest its drawing names; every cell its drawing draws as land must lie
+ * on the top's lattice. Refuses (throws) a drawing on no top, a top that is not the one named and a
+ * cell off its lattice.
+ */
+export function readSiteTopLand(drawing: StructuredSiteDrawing, raw: unknown, digest: HeightfieldDigest, servedBytes = 0): SiteTopLand {
+  const section = drawing.top;
+  if (section === undefined) throw new Error("The site drawing stands on no volume's top.");
+  const top = readSiteTop(raw, digest, section.topSha256);
+  for (const [row, , last] of section.rockCells) {
+    if (row >= top.rows - 1 || last >= top.columns - 1) throw new Error(`The site drawing draws a cell of its top's row ${row} off the top's lattice.`);
+  }
+  const groundMm = (eastMm: number, northMm: number): number => siteTopHeightMm(top, eastMm, northMm);
+  return Object.freeze({
+    section,
+    chunks: Object.freeze([]),
+    backdrop: null,
+    top,
+    groundMm,
+    groundM: (eastM: number, southM: number): number => siteTopHeightMm(top, eastM * 1000, -southM * 1000) / 1000,
+    dryAt: (eastMm: number, northMm: number): boolean => !underWater(section.water, eastMm, northMm, groundMm(eastMm, northMm)),
+    servedBytes,
+  });
+}
+
+/**
+ * Read the land below a site on a volume's top from the documents served for its landscape's
+ * ground (`landscape/ground?sha256=`): every chunk the ground names, by place, and its backdrop,
+ * each held to the digest the ground names, as `readLandSection` reads a site's land. Its heights
+ * and places are the landscape's own, above the sea, never the site's: it is drawn under the
+ * landscape's root, which stands the landscape where the site's frame puts it (`site-volumes.ts`).
+ * Refuses (throws) a landscape with no ground, and whatever `readLandSection` refuses.
+ */
+export function readLandscapeGround(
+  landscape: LandscapeDrawing,
+  chunks: ReadonlyMap<string, unknown>,
+  backdrop: unknown,
+  digest: HeightfieldDigest,
+  servedBytes = 0,
+): SiteNearLand {
+  if (landscape.ground === null) throw new Error('The landscape states no land below its site.');
+  return readLandSection(landscape.ground, chunks, backdrop, digest, servedBytes);
 }
 
 /** A site rectangle's extent of a slot in plan: east and north half sides, its quarter turns applied. */
@@ -303,11 +389,14 @@ export function waterPlane(body: LandWater, reachM: number): {
 /** What drawing a site's land put in the scene, and how to dress it and take it away. */
 export interface DrawnSiteLand {
   readonly root: pc.Entity;
-  /** One per chunk: the land a person walks, worn in the site's base ground once that is dressed. */
+  /**
+   * One per chunk, or on a volume's top the one mesh of its cells drawn as land: the land a person
+   * walks, worn in the site's base ground once that is dressed.
+   */
   readonly ground: readonly pc.MeshInstance[];
   readonly triangles: number;
   readonly draws: number;
-  /** How far from the site's origin the backdrop reaches, metres: where the far plane must stand. */
+  /** How far from the site's origin the backdrop (or a volume's top) reaches, metres: where the far plane must stand. */
   readonly reachM: number;
   /**
    * Wear the site's base ground on the near land, as it is dressed, and the land's own surfaces
@@ -414,6 +503,65 @@ function wallFaces(walls: readonly SiteLandWall[], groundMm: (eastMm: number, no
   return { positions, normals, surfaceMm, indices };
 }
 
+/**
+ * A graded top's mesh in the scene's frame: every point of its lattice, lifted `TOP_LIFT_MM`, with
+ * the normals of the whole lattice, and triangles for the cells in `runs`, each split as a near
+ * chunk's cells are (and as the height rule splits them), from its south-west corner to its
+ * north-east. Its rim is a fringe, not a stair: a cell outside the runs with three corners on rock
+ * (corners of a cell in the runs) draws the half of it those three span, so the top's edge runs on
+ * the cells' diagonals where the rock's does. None where the runs hold no cell.
+ */
+function topMesh(top: SiteTop, runs: readonly SiteTopRun[]): {
+  readonly positions: number[]; readonly normals: number[]; readonly surfaceMm: number[]; readonly indices: number[]; readonly reachM: number;
+} | null {
+  const { columns, rows, heightMm } = top;
+  const [x0, y0] = top.originMm;
+  const positions: number[] = [], surfaceMm: number[] = [];
+  let reach = 0;
+  for (let j = 0; j < rows; j += 1) for (let i = 0; i < columns; i += 1) {
+    const east = x0 + i * LAND_CELL_MM, north = y0 + j * LAND_CELL_MM;
+    positions.push(east / 1000, (heightMm[j * columns + i]! + TOP_LIFT_MM) / 1000, -north / 1000);
+    surfaceMm.push(east, -north);
+    reach = Math.max(reach, Math.hypot(east, north) / 1000);
+  }
+  const all: number[] = [], indices: number[] = [];
+  const rock = new Set<number>();
+  for (const [row, first, last] of runs) {
+    for (let i = first; i <= last; i += 1) for (const at of [row * columns + i, row * columns + i + 1, (row + 1) * columns + i, (row + 1) * columns + i + 1]) rock.add(at);
+  }
+  for (let j = 0; j + 1 < rows; j += 1) for (let i = 0; i + 1 < columns; i += 1) {
+    const sw = j * columns + i, se = sw + 1, nw = sw + columns, ne = nw + 1;
+    all.push(sw, se, ne, sw, ne, nw);
+    if (siteTopCellHeld(runs, j, i)) {
+      indices.push(sw, se, ne, sw, ne, nw);
+      continue;
+    }
+    const on = [sw, se, ne, nw].filter((corner) => rock.has(corner));
+    if (on.length !== 3) continue;
+    // The half the three corners span, turned as the cell's own halves are.
+    if (!rock.has(nw)) indices.push(sw, se, ne);
+    else if (!rock.has(se)) indices.push(sw, ne, nw);
+    else if (!rock.has(ne)) indices.push(sw, se, nw);
+    else indices.push(se, ne, nw);
+  }
+  if (indices.length === 0) return null;
+  return { positions, normals: pc.calculateNormals(positions, all), surfaceMm, indices, reachM: reach };
+}
+
+/**
+ * A land material's shine taken off: no metal and fully rough, its textures' own roughness and
+ * metalness left unread, so grass never glosses in the sun.
+ */
+function matteOver(material: pc.StandardMaterial): void {
+  material.useMetalness = true;
+  material.metalness = 0;
+  material.metalnessMap = null;
+  material.glossMap = null;
+  material.glossInvert = false;
+  material.gloss = 0;
+  material.update();
+}
+
 function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMaterial {
   const material = new pc.StandardMaterial();
   material.name = name;
@@ -432,6 +580,12 @@ function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMateri
  * levels. With no `surfaces` the land wears its ground alone. A near chunk `leaveOut` names is not
  * drawn: a town's tiles draw the land under them. Nothing here casts a shadow; the near land
  * receives them.
+ *
+ * A volume's graded top is drawn as one mesh of the cells its drawing draws as land, in the same
+ * way, with no backdrop. `datumMm` is how far above the sea the frame the land is drawn in has its
+ * level 0, so the surfaces' heights stay above the sea: a floating island's level, for its top and
+ * for the landscape's land drawn under a root that stands the island at the page's level 0. With
+ * `matte`, every material the land wears is a matte copy, without its shine.
  */
 export function drawSiteLand(
   device: pc.GraphicsDevice,
@@ -439,7 +593,7 @@ export function drawSiteLand(
   groundMaterial: pc.Material,
   groundRgb: Rgb,
   surfaces: LandSurfaces | null = null,
-  options: { readonly leaveOut?: (chunkX: number, chunkY: number) => boolean } = {},
+  options: { readonly leaveOut?: (chunkX: number, chunkY: number) => boolean; readonly datumMm?: number; readonly matte?: boolean } = {},
 ): DrawnSiteLand {
   const root = new pc.Entity('site-land');
   const meshes: pc.Mesh[] = [];
@@ -451,11 +605,15 @@ export function drawSiteLand(
   // Each material the near land wears, with the land's surfaces over it, made once.
   const surfaced = new Map<pc.Material, pc.Material>();
   const worn = new Set<pc.Material>();
+  const matte = options.matte === true;
   const overlaid = (material: pc.Material): pc.Material => {
-    if (surfaces === null || worn.has(material)) return material;
+    if ((surfaces === null && !matte) || worn.has(material)) return material;
     let copy = surfaced.get(material);
     if (copy === undefined) {
-      const fresh = landSurfaceMaterial(device, material, surfaces, sea);
+      const fresh = surfaces === null
+        ? (material instanceof pc.StandardMaterial ? material.clone() : null)
+        : landSurfaceMaterial(device, material, surfaces, sea, options.datumMm ?? 0);
+      if (fresh !== null && matte) matteOver(fresh);
       copy = fresh ?? material;
       if (fresh !== null) { made.push(fresh); worn.add(fresh); }
       surfaced.set(material, copy);
@@ -489,6 +647,16 @@ export function drawSiteLand(
     triangles += all.length / 3;
     add(`site-land:chunk:${chunk.chunkX}:${chunk.chunkY}`, [near], true);
   }
+  // A volume's top: the cells with rock under them as one mesh, over the volume's own top faces.
+  const top = land.top === null ? null : topMesh(land.top, land.section.rockCells);
+  if (top !== null) {
+    const mesh = buildSurfaceMesh(device, top, (s, t) => [s / 1000, t / 1000]);
+    meshes.push(mesh);
+    const near = new pc.MeshInstance(mesh, overlaid(groundMaterial));
+    ground.push(near);
+    triangles += top.indices.length / 3;
+    add('site-land:top', [near], true);
+  }
   // The backdrop: coloured by vertex, linear, by the land's surfaces over its ground, since it is
   // drawn only and never dressed; a dresser hands it the colour the near land wears instead.
   const groundLinear = [linear(groundRgb[0]), linear(groundRgb[1]), linear(groundRgb[2])] as const;
@@ -514,10 +682,10 @@ export function drawSiteLand(
   far.metalness = 0;
   far.update();
   made.push(far);
-  let reach = 0;
+  let reach = top?.reachM ?? 0;
   const blocks: pc.MeshInstance[] = [];
   const backdrop: { readonly mesh: pc.Mesh; readonly positions: number[]; readonly normals: number[] }[] = [];
-  for (const block of backdropMeshData(land.backdrop, { blocks: 4 })) {
+  for (const block of land.backdrop === null ? [] : backdropMeshData(land.backdrop, { blocks: 4 })) {
     const positions = Array.from(block.positions), indices = Array.from(block.indices);
     const normals = pc.calculateNormals(positions, indices);
     for (let v = 0; v < positions.length; v += 3) reach = Math.max(reach, Math.hypot(positions[v]!, positions[v + 2]!));
@@ -532,7 +700,7 @@ export function drawSiteLand(
     blocks.push(new pc.MeshInstance(mesh, far));
     triangles += indices.length / 3;
   }
-  add('site-land:backdrop', blocks, true);
+  if (land.backdrop !== null) add('site-land:backdrop', blocks, true);
   // The sea and the lakes, level at their own heights, wide enough to meet the backdrop's edge.
   const water = plainMaterial('site-land:water', PLAIN_WATER, 0.85);
   made.push(water);
@@ -554,7 +722,7 @@ export function drawSiteLand(
   }
   // The retaining walls where the land's levels meet: one mesh in one plain material, the surfaces'
   // rock where they are handed, the engine's rock where they are not. Seen, never walked.
-  const walls = land.section.walls ?? [];
+  const walls = (land.top === null ? land.section.walls : undefined) ?? [];
   const rock = surfaces?.bands.find((band) => band.key === 'rock')?.linear;
   const stone = walls.length === 0 ? null
     : plainMaterial('site-land:walls', rock === undefined ? VOLUME_ROCK_RGB : [gamma(rock[0]), gamma(rock[1]), gamma(rock[2])], 0.1);

@@ -9,11 +9,20 @@
  * above, so a world point is `atMm + R(yaw) p`. A scene draws east as x, up as y and north as minus
  * z. Every bound is the server's; a document that breaks one, or is not the one its digest names,
  * is refused by where it broke it.
+ *
+ * A world on a placed volume's top is drawn as `exulanica.landscape-drawing/v2`: version 1's fields
+ * and the graded top's digest (`topSha256`, the site drawing's), where the site stands in the
+ * landscape (`siteFrame`: the placement, the site's south-west corner in the landscape's frame and
+ * its turn), and the land below (`ground`: the landscape's own land as 128 m chunks and a backdrop by
+ * digest, and its water). A page whose frame is the site's places the landscape at the inverse of
+ * the site frame ({@link landscapeToSiteMm}).
  */
 import { canonicalJson } from './style-pack.js';
 import type { HeightfieldDigest } from './heightfield-geometry.js';
+import { LAND_CHUNK_MM, readLandWater, type LandWater } from './landform.js';
 
 export const LANDSCAPE_DRAWING_PROFILE = 'exulanica.landscape-drawing/v1';
+export const TOP_LANDSCAPE_DRAWING_PROFILE = 'exulanica.landscape-drawing/v2';
 export const VOLUME_CHUNK_PROFILE = 'exulanica.volume-chunk/v1';
 /** The newest volume rules the server realizes chunks by. */
 export const VOLUME_RULES_VERSION = 3;
@@ -98,7 +107,27 @@ export interface PlacedVolume {
   readonly tops: readonly VolumeTopRef[];
 }
 
+/** Where a site on a placed volume's top stands in its landscape's frame. */
+export interface LandscapeSiteFrame {
+  /** The placement the site stands on. */
+  readonly placement: string;
+  /** The site's south-west corner in the landscape's frame, millimetres east, north and up. */
+  readonly atMm: readonly [number, number, number];
+  /** The site's turn in the landscape, the placement's: counterclockwise seen from above. */
+  readonly yawMdeg: number;
+}
+
+/** The land below a site on a volume's top, by digest, in the landscape's frame. */
+export interface LandscapeGround {
+  readonly landSha256: string;
+  readonly chunkMm: number;
+  readonly chunks: readonly { readonly chunk: readonly [number, number]; readonly sha256: string }[];
+  readonly backdropSha256: string;
+  readonly water: readonly LandWater[];
+}
+
 export interface LandscapeDrawing {
+  readonly profile: string;
   readonly worldId: string;
   readonly receiptSha256: string;
   readonly siteDrawingSha256: string;
@@ -106,6 +135,12 @@ export interface LandscapeDrawing {
   readonly landscapeSha256: string;
   readonly landscapeRulesVersion: number;
   readonly volumes: readonly PlacedVolume[];
+  /** For a site on a volume's top (version 2): the graded top's digest, else null. */
+  readonly topSha256: string | null;
+  /** For a site on a volume's top (version 2): where it stands, else null. */
+  readonly siteFrame: LandscapeSiteFrame | null;
+  /** For a site on a volume's top (version 2): the land below, else null. */
+  readonly ground: LandscapeGround | null;
   readonly sha256: string;
 }
 
@@ -146,17 +181,58 @@ function placedVolume(raw: unknown, where: string): PlacedVolume {
   });
 }
 
-/** Admit a landscape drawing, or refuse it by where it broke; with `expectedSha256`, only the one that digest names. */
+/** How far a site frame's corner may lie from the landscape's origin, each axis. */
+const SITE_FRAME_MOST_MM = 2_000_000;
+const GROUND_CHUNK_MOST = 4_096;
+
+function siteFrame(raw: unknown, where: string): LandscapeSiteFrame {
+  const row = fields(raw, 'placement at_mm yaw_mdeg', where);
+  const [x, y, z] = integers(row['at_mm'], 3, -SITE_FRAME_MOST_MM, SITE_FRAME_MOST_MM, `${where}.at_mm`);
+  return Object.freeze({
+    placement: text(row['placement'], KEY, `${where}.placement`),
+    atMm: Object.freeze([x!, y!, z!] as const),
+    yawMdeg: integer(row['yaw_mdeg'], 0, 359_999, `${where}.yaw_mdeg`),
+  });
+}
+
+function ground(raw: unknown, where: string): LandscapeGround {
+  const row = fields(raw, 'land_sha256 chunk_mm chunks backdrop_sha256 water', where);
+  require(row['chunk_mm'] === LAND_CHUNK_MM, `${where}.chunk_mm`, `is ${LAND_CHUNK_MM}`);
+  require(Array.isArray(row['chunks']) && row['chunks'].length > 0, `${where}.chunks`, 'is a list of at least one chunk');
+  const chunks = (row['chunks'] as unknown[]).map((one, i) => {
+    const chunk = fields(one, 'chunk sha256', `${where}.chunks[${i}]`);
+    const [cx, cy] = integers(chunk['chunk'], 2, -GROUND_CHUNK_MOST, GROUND_CHUNK_MOST, `${where}.chunks[${i}].chunk`);
+    return Object.freeze({ chunk: Object.freeze([cx!, cy!] as const), sha256: text(chunk['sha256'], DIGEST, `${where}.chunks[${i}].sha256`) });
+  });
+  require(new Set(chunks.map((one) => one.chunk.join(','))).size === chunks.length, `${where}.chunks`, 'names each chunk once');
+  require(Array.isArray(row['water']), `${where}.water`, 'is a list');
+  return Object.freeze({
+    landSha256: text(row['land_sha256'], DIGEST, `${where}.land_sha256`),
+    chunkMm: LAND_CHUNK_MM,
+    chunks: Object.freeze(chunks),
+    backdropSha256: text(row['backdrop_sha256'], DIGEST, `${where}.backdrop_sha256`),
+    water: Object.freeze((row['water'] as unknown[]).map((body, i) => readLandWater(body, `${where}.water[${i}]`))),
+  });
+}
+
+/** Admit a landscape drawing (version 1, or version 2 for a site on a volume's top), or refuse it
+ * by where it broke; with `expectedSha256`, only the one that digest names. */
 export function readLandscapeDrawing(raw: unknown, digest: HeightfieldDigest, expectedSha256?: string): LandscapeDrawing {
-  const row = fields(raw, 'profile world_id receipt_sha256 site_drawing_sha256 land_sha256 landscape_sha256 landscape_rules_version volumes', 'landscape');
-  require(row['profile'] === LANDSCAPE_DRAWING_PROFILE, 'landscape.profile', `is ${LANDSCAPE_DRAWING_PROFILE}`);
+  const profile = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>)['profile'] : undefined;
+  const onTop = profile === TOP_LANDSCAPE_DRAWING_PROFILE;
+  const named = 'profile world_id receipt_sha256 site_drawing_sha256 land_sha256 landscape_sha256 landscape_rules_version volumes';
+  const row = fields(raw, onTop ? `${named} top_sha256 site_frame ground` : named, 'landscape');
+  require(row['profile'] === LANDSCAPE_DRAWING_PROFILE || onTop, 'landscape.profile', `is ${LANDSCAPE_DRAWING_PROFILE} or ${TOP_LANDSCAPE_DRAWING_PROFILE}`);
   require(typeof row['world_id'] === 'string' && row['world_id'].length > 0 && row['world_id'].length <= 256, 'landscape.world_id', 'is a world id');
   require(Array.isArray(row['volumes']), 'landscape.volumes', 'is a list');
   const volumes = (row['volumes'] as unknown[]).map((volume, i) => placedVolume(volume, `landscape.volumes[${i}]`));
   const ids = volumes.map((volume) => volume.id);
   require(new Set(ids).size === ids.length, 'landscape.volumes', 'names each placement once');
+  const frame = onTop ? siteFrame(row['site_frame'], 'landscape.site_frame') : null;
+  if (frame !== null) require(ids.includes(frame.placement), 'landscape.site_frame.placement', 'names a placement the drawing places');
   const sha256 = checked(raw, digest, expectedSha256, 'landscape');
   return Object.freeze({
+    profile: row['profile'] as string,
     worldId: row['world_id'] as string,
     receiptSha256: text(row['receipt_sha256'], DIGEST, 'landscape.receipt_sha256'),
     siteDrawingSha256: text(row['site_drawing_sha256'], DIGEST, 'landscape.site_drawing_sha256'),
@@ -164,8 +240,20 @@ export function readLandscapeDrawing(raw: unknown, digest: HeightfieldDigest, ex
     landscapeSha256: text(row['landscape_sha256'], DIGEST, 'landscape.landscape_sha256'),
     landscapeRulesVersion: integer(row['landscape_rules_version'], 1, 1_000_000, 'landscape.landscape_rules_version'),
     volumes: Object.freeze(volumes),
+    topSha256: onTop ? text(row['top_sha256'], DIGEST, 'landscape.top_sha256') : null,
+    siteFrame: frame,
+    ground: onTop ? ground(row['ground'], 'landscape.ground') : null,
     sha256,
   });
+}
+
+/** A landscape-frame point (millimetres east, north, up) in the frame of the site standing at
+ * `frame`: the site frame's inverse, `R(-yaw) (p - atMm)`. */
+export function landscapeToSiteMm(frame: LandscapeSiteFrame, x: number, y: number, z: number): [number, number, number] {
+  const turn = (frame.yawMdeg / 1000) * (Math.PI / 180);
+  const cos = Math.cos(turn), sin = Math.sin(turn);
+  const dx = x - frame.atMm[0], dy = y - frame.atMm[1];
+  return [cos * dx + sin * dy, -sin * dx + cos * dy, z - frame.atMm[2]];
 }
 
 export interface VolumeChunk {

@@ -7,7 +7,8 @@ and searched for walkable tops in Python; a landscape places volumes on an uncha
 realizes each under a seed of its own. A site world can be laid out on a landscape through its
 route, kept under the receipt check every site world meets, and its landscape's drawing, chunks and
 tops are served by digest. A site world can also be laid out on a placed volume's top, a sky
-island's, and is kept and drawn there by its site drawing; the application does not draw it yet.
+island's, kept and drawn there by its site drawing; the application draws it on the island, over
+the landscape's land below.
 The application draws a site's volumes round it in rock; people do not walk on them, and a world
 made from a person's words never stands on a landscape.
 
@@ -451,7 +452,7 @@ landscape at its inverse), and `ground`: the landscape's own land, ungraded, in 
 frame over its extent and one ring of chunks, realized under the seed a world's land is, as 128 m
 land chunks, a backdrop and the water on it, the ground or sea the volume floats over. Its chunks
 and backdrop are served by digest (`GET /world/versions/{version_id}/landscape/ground?sha256=`). The
-page does not draw a world on a top yet.
+application draws such a world as [readers in the browser](#readers-in-the-browser) says.
 
 ## Readers in the browser
 
@@ -473,6 +474,27 @@ as every surface that colours its upward faces apart, and a drawing that names n
 volumes in rock throughout (`wearEach`, `volumeLook` in `style-pack/site-dresser.ts`). Volumes
 cast and receive shadows and are counted in the site's triangles and draws. A landscape that
 cannot be read does not stop the site: it opens without its volumes and the page keeps the reason.
+
+A world on a volume's top is read the same way and drawn in the site's frame, which stays the
+page's. `readSiteTop` (`web/packages/atlas-core/src/site-top.ts`) reads the graded top
+(`exulanica.site-top/v1`) held to the digest the site drawing (`exulanica.site-drawing/v6`) names,
+and `siteTopHeightMm` gives its height at any point by the server's own triangle rule, so the page
+stands slots, people and things where the server's place stands them (pinned by
+`tests/fixtures/landform/site-top-conformance.json`). The top is the site's land to every reader
+that asks a height, a dry point or its water, with no chunks and no backdrop
+(`readSiteTopLand`, `web/packages/atlas-react/src/playcanvas/generated-site/site-land.ts`); it is
+drawn as one mesh of the cells its drawing lists in `rock_cells`, 3 mm over the island's rock,
+worn in the site's base ground with the land's slope bands, its rim a fringe of half cells where
+three of a cell's corners are on rock, so the edge runs on the cells' diagonals and not in steps.
+Under those cells the island's own upward faces are not drawn, so its coarser rock never shows
+through the land; the island's rock draws the rest of the top to its rim and the rim's face below.
+Land cover grows only on chunks, so none grows on a top, and no scenery stands beyond it. `readLandscapeDrawing` reads version 2, and the page holds it to the site's top,
+landscape and placement; its whole landscape (the volumes and the land below, read from
+`landscape/ground` by `readLandscapeGround` and drawn as a site's land is) stands under one root at
+the inverse of `site_frame` (`landscapePlacementM`), so the island is where the site stands and
+everything else is where the landscape puts it. The slope bands of the top and of the land below
+add the island's altitude (`site_frame.at_mm`'s height) to each height, so their heights stay above
+the sea. A landscape that cannot be read leaves the island in the sky alone, with the reason kept.
 
 ## Sky islands
 
@@ -612,7 +634,8 @@ made volumes by digest.
   people; they stand off a site, or carry it on their top;
   spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
 - A world on a volume's top stands on one volume's top, its people held to the site's rectangle;
-  only kinds whose people all live on the site can stand there, and the page does not draw it yet.
+  only kinds whose people all live on the site can stand there. Where the top's drawn cells end
+  short of the rock's own edge, the island's rock shows there in its top look.
   Its landscape drawing realizes the ground below as a site's land is realized, a few seconds more
   than a site on land's.
 - Realized chunks and tops are kept in the kind worker's memory with the landscape's drawing, in a
