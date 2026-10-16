@@ -1,5 +1,6 @@
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { createHash } from 'node:crypto';
+import { createReadStream, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -219,6 +220,48 @@ const previewApi: Plugin = {
 };
 
 /**
+ * DEVELOPMENT ONLY: the painted world's lab page (`src/dev/painted-splat.ts`) reads the splat this
+ * server was started with, `EXULANICA_PAINTED_SPLAT` (a `.sog` or a 3DGS `.ply`), and its optional
+ * frame, `EXULANICA_PAINTED_FRAME`, at two fixed routes. A request names no file: anything but GET
+ * or HEAD of those two routes is refused, and with no splat named the routes answer 404.
+ */
+const paintedLab: Plugin = {
+  name: 'exulanica-painted-lab',
+  apply: 'serve',
+  configureServer(server) {
+    const splat = process.env['EXULANICA_PAINTED_SPLAT'];
+    const frame = process.env['EXULANICA_PAINTED_FRAME'];
+    server.middlewares.use('/__painted-lab', (request, response) => {
+      response.setHeader('cache-control', 'no-store');
+      const path = new URL(request.url ?? '/', 'http://painted-lab.local').pathname;
+      const file = path === '/splat' ? splat : path === '/frame.json' ? frame : undefined;
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        response.statusCode = 405;
+        response.end();
+        return;
+      }
+      const format = path === '/splat' && file !== undefined ? (/\.sog$/i.test(file) ? 'sog' : /\.ply$/i.test(file) ? 'ply' : null) : 'json';
+      if (file === undefined || file === '' || format === null) {
+        response.statusCode = 404;
+        response.end();
+        return;
+      }
+      let size: number;
+      try { size = statSync(file).size; } catch {
+        response.statusCode = 404;
+        response.end();
+        return;
+      }
+      response.setHeader('content-type', format === 'json' ? 'application/json; charset=utf-8' : 'application/octet-stream');
+      if (format !== 'json') response.setHeader('x-painted-lab-format', format);
+      response.setHeader('content-length', String(size));
+      if (request.method === 'HEAD') { response.end(); return; }
+      createReadStream(file).pipe(response);
+    });
+  },
+};
+
+/**
  * The authenticated surface.
  *
  * The API is reached through a dev proxy rather than by naming its origin in the client, so the
@@ -228,7 +271,7 @@ const previewApi: Plugin = {
  */
 export default defineConfig({
   build: { target: 'es2022' },
-  plugins: [societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi],
+  plugins: [societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi, paintedLab],
   server: {
     // A recorded take (scripts/demo/take_run.sh) must not be reloaded part way: with
     // TAKE_APP_WATCHES_NOTHING set the development server watches no file, so no change, real or

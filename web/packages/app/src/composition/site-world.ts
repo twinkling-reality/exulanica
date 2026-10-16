@@ -375,11 +375,19 @@ export function switchableSite(
   return {
     ...world.mount,
     attach: (host) => {
+      // DEVELOPMENT ONLY: the painted world's lab page over what this drawing adds (`../dev/painted-splat.ts`).
+      const environment = import.meta.env.DEV ? host.environmentRoot as typeof host.environmentRoot | undefined : undefined;
+      const before = environment === undefined ? null : new Set(environment.children);
       const attachment = drawing.attach(host);
       openSite = site;
+      const drawn = environment === undefined || before === null ? null : new Set(environment.children.filter((child) => !before.has(child)));
+      const lab = import.meta.env.DEV && drawn !== null && typeof window !== 'undefined'
+        ? import('../dev/painted-splat.js').then((module) => module.openPaintedLab(host, drawn, window.location.search))
+        : null;
       const dispose = attachment.dispose;
       return Object.assign(attachment, {
         dispose() {
+          void lab?.then((opened) => opened?.dispose());
           if (openSite === site) openSite = null;
           dispose.call(attachment);
         },
