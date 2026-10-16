@@ -1,8 +1,9 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
+import { landSlopePermille } from '../style-pack/land-cover.js';
 import type { TileEnvironment } from '../generated-tile/environment.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
 import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
@@ -145,6 +146,18 @@ export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null 
     && slot.positionMm[0] * 2 === widthMm && slot.positionMm[1] * 2 === depthMm && (slot.positionMm[2] === 0 || slot.drape === true)) ?? null;
 }
 
+/**
+ * Whether a site point's land is drawn in a band its sea brings, the sand by it: the surface role
+ * there as land cover reads it (`landBandAt` over the land's slope and height and the surfaces'
+ * noise, `../style-pack/land-cover.ts`). Never on land with no sea.
+ */
+function byTheSea(land: SiteLand, surfaces: LandSurfaces, eastMm: number, northMm: number): boolean {
+  if (!land.section.water.some((body) => body.kind === 'sea')) return false;
+  const role = landBandAt(surfaces, 'near', landSlopePermille(land.groundMm, eastMm, northMm), land.groundMm(eastMm, northMm),
+    landNoiseShift(surfaces.noise, eastMm / 1000, -northMm / 1000), true);
+  return surfaces.bands.some((band) => band.needsSea && band.key === role);
+}
+
 /** The mount for a checked site drawing. */
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
   if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
@@ -207,9 +220,12 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       // It stands on the ground beyond: a look that draws no ground beyond the place draws none.
       const stated = options.scenery === undefined || materials === null || environment.ground === null
         ? null : sceneryOf(drawing, base, options.scenery, materials);
-      // On land, scenery stands on the land where it is dry, never in the sea, a lake or a pond.
+      // On land, scenery stands on the land where it is dry, never in the sea, a lake or a pond, and
+      // where the land wears its surfaces, never on the sand by the sea.
+      const surfaces = options.landSurfaces ?? null;
       const standing = stated === null || land === null ? stated
-        : { ...stated, pieces: stated.pieces.filter((piece) => land.dryAt(piece.xMm, piece.yMm)) };
+        : { ...stated, pieces: stated.pieces.filter((piece) => land.dryAt(piece.xMm, piece.yMm)
+          && (surfaces === null || !byTheSea(land, surfaces, piece.xMm, piece.yMm))) };
       const scenery = standing === null || standing.pieces.length === 0 ? null
         : land === null ? drawSiteScenery(host.app.graphicsDevice, standing, materials)
           : drawSiteScenery(host.app.graphicsDevice, standing, materials, land.groundMm);
