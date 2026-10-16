@@ -13,7 +13,10 @@ cost:
 * every **path** is a corridor graded no steeper than one step over its longest station spacing
   (the site's place lays a station every ``footway_station_spacing_mm`` or a little more), less a
   rounding margin, since heights are floored at both ends of an edge;
-* every **water area** is a pond, its level its rim less the land catalog's freeboard;
+* every **water area** is a pond, its level its rim less the land catalog's freeboard, named by its
+  zone's number and its area's number in the zone (``zone 1 pond 0``); under land rules before
+  :data:`POND_IDS_BY_ZONE` by its area's number alone (``pond 0``), so two zones' ponds may share
+  an id;
 * the **entry** is where the first path meets the site's south edge; a path that ends within a
   lattice cell of the site's edge is graded to the edge, where the society's entry stands.
 
@@ -22,8 +25,8 @@ cannot be graded so is refused by name (``exulanica.grammar.landform`` grading r
 
 The receipt also names the land rules that made its land (``exulanica.grammar.landform.rules``):
 land is read against the catalog version those rules name and realized and graded again only under
-rules this code serves; a receipt that names others is refused by name
-(``generated_world_land_rules_changed``), never drawn as other land.
+rules this code serves, its grading plan the one those rules ask; a receipt that names others is
+refused by name (``generated_world_land_rules_changed``), never drawn as other land.
 
 The site's own frame keeps its origin at height 0, which is the land's datum, the sea's level: every
 height here, in the drawing, the place and the browser is above the same zero.
@@ -72,6 +75,7 @@ from exulanica.grammar.landform import (
 from exulanica.world.society_place import STEP_LIMIT_MM
 
 __all__ = [
+    "POND_IDS_BY_ZONE",
     "ROUNDING_MARGIN_MM",
     "SiteLand",
     "check_receipt_land_rules",
@@ -85,6 +89,8 @@ __all__ = [
 #: Heights are floored at both ends of an edge, so a path graded exactly at the step could climb
 #: a millimetre more over a station; the margin keeps every edge strictly within it.
 ROUNDING_MARGIN_MM: Final = 2
+#: The first land rules version whose pond ids name their zone, so no two ponds of a site share one.
+POND_IDS_BY_ZONE: Final = 4
 
 
 def _along_y(path: SitePathRecord) -> bool:
@@ -134,8 +140,20 @@ def _distance_squared(path: SitePathRecord, x: int, y: int) -> int:
     return dx * dx + dy * dy
 
 
-def site_grading(records: Sequence[object], station_mm: int) -> GradingPlan:
-    """The grading a site's records ask of its land."""
+def _pond_id(area: SiteAreaRecord, zones: Mapping[str, SiteZoneRecord], rules_version: int) -> str:
+    if rules_version < POND_IDS_BY_ZONE:
+        return f"pond {area.ordinal}"
+    zone = zones.get(area.zone_identity)
+    if zone is None:
+        raise LandformRefused(
+            f"water area {area.identity} lies in zone {area.zone_identity}, which is not among the "
+            "site's zones"
+        )
+    return f"zone {zone.ordinal} pond {area.ordinal}"
+
+
+def site_grading(records: Sequence[object], station_mm: int, *, rules_version: int) -> GradingPlan:
+    """The grading a site's records ask of its land under the land rules ``rules_version``."""
     extent = next(r for r in records if isinstance(r, SiteExtentRecord))
     paths = sorted((r for r in records if isinstance(r, SitePathRecord)), key=lambda p: p.ordinal)
     zones = sorted((r for r in records if isinstance(r, SiteZoneRecord)), key=lambda z: z.ordinal)
@@ -165,10 +183,11 @@ def site_grading(records: Sequence[object], station_mm: int) -> GradingPlan:
                 water_allowed=True,
             )
         )
+    owners = {zone.identity: zone for zone in zones}
     basin = landform_catalog().values_of("basin")
     basins = tuple(
         Basin(
-            id=f"pond {area.ordinal}",
+            id=_pond_id(area, owners, rules_version),
             rect_mm=(area.min_x_mm, area.min_y_mm, area.max_x_mm, area.max_y_mm),
             depth_mm=basin["depth_mm"].default,
             shelf_mm=basin["shelf_mm"].default,
@@ -266,22 +285,28 @@ def _records_digest(records: Sequence[object]) -> str:
     return digest.hexdigest()
 
 
-_KEPT: dict[tuple[str, str, str, int], SiteLand] = {}
+_KEPT: dict[tuple[str, str, str, int, int], SiteLand] = {}
 _KEPT_MOST: Final = 8
 
 
 def site_land(
-    land: LandDocument, records: Sequence[object], seed: str, station_mm: int
+    land: LandDocument,
+    records: Sequence[object],
+    seed: str,
+    station_mm: int,
+    *,
+    rules_version: int,
 ) -> SiteLand:
-    """Realize a site's land and grade it for its records, or refuse by name. Kept for the process
-    by the land, the records, the seed and the station spacing: the composer, the drawing, the land
-    routes and the place each ask for the same graded land."""
-    key = (land.sha256, _records_digest(records), seed, station_mm)
+    """Realize a site's land and grade it for its records under the land rules ``rules_version``,
+    or refuse by name. Kept for the process by the land, the records, the seed, the station spacing
+    and the rules version: the composer, the drawing, the land routes and the place each ask for
+    the same graded land."""
+    key = (land.sha256, _records_digest(records), seed, station_mm, rules_version)
     if key not in _KEPT:
         extent = next(r for r in records if isinstance(r, SiteExtentRecord))
         frame = WorldFrame(width_mm=extent.width_mm, depth_mm=extent.depth_mm, seed=seed)
         own = water_bodies(land, frame)
-        plan = site_grading(records, station_mm)
+        plan = site_grading(records, station_mm, rules_version=rules_version)
         graded = grade_land(realize_near(land, frame), plan, water=own)
         if len(_KEPT) >= _KEPT_MOST:
             _KEPT.pop(next(iter(_KEPT)))
@@ -314,4 +339,10 @@ def site_land_of(
             "generated_world_land_changed: its land document no longer reads as the one its "
             "receipt names"
         )
-    return site_land(land, records, land_seed(str(receipt["world_id"]), land.sha256), station_mm)
+    return site_land(
+        land,
+        records,
+        land_seed(str(receipt["world_id"]), land.sha256),
+        station_mm,
+        rules_version=receipt["land_rules"]["version"],
+    )

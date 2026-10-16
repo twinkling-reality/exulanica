@@ -257,7 +257,9 @@ change to walking cost:
   lays a station every `footway_station_spacing_mm` or a little more), less a 2 mm rounding
   margin; a path ending within a lattice cell of the site's edge is graded to the edge;
 - every **water area** is a pond carved into its zone's terrace, its level the rim less the
-  catalog's freeboard;
+  catalog's freeboard, its id its zone's number then its area's number in the zone
+  (`zone 1 pond 0`), so no two ponds of a site share one; under land rules 1 to 3 the id is the
+  area's number alone (`pond 0`), and two zones' first ponds share it;
 - the place's nodes and spots stand at the graded land's height, its frame's datum the sea's
   level, and a join that would climb more than the step is not made.
 
@@ -343,11 +345,12 @@ land, so the receipt also names the rules that made it, `land_rules`
 ([`rules.py`](../exulanica/grammar/landform/rules.py)):
 
 ```json
-{"version": 3, "catalogs": {"landform-feature.v3": "<sha256>", "landform-value.v3": "<sha256>"}}
+{"version": 4, "catalogs": {"landform-feature.v3": "<sha256>", "landform-value.v3": "<sha256>"}}
 ```
 
 - `version` stands for the realizer, its grading and the grading plan a site's layout asks of its
-  land. A change to any of them that moves land is the next version.
+  land. A change to any of them that moves land, or what a site's drawing states of it, is the next
+  version.
 - `catalogs` names each catalog that shapes land by the digest of its canonical entries. A catalog
   changes by a new file (`landform-value.v3.json`), never by an edit of a shipped one.
 
@@ -357,14 +360,19 @@ as other land, and its saved entry is listed unavailable by the same name
 ([saved world entry](saved-world-entry.md)). A level world's receipt names no land rules, and one
 that does is refused the same way.
 
-Every rules version this code makes the same land by is served: versions 1, 2 and 3, each reading
-its own catalog version (`SERVED_LAND_RULES`). The realizer and grading are one code for all;
-version 2 only adds the `cascade` and version 3 its `follow` course, so land an earlier version
-admits is the same land under a later one, and a world made under an earlier version regenerates
-byte for byte. New worlds name version 3. The tests pin every shipped
-landform catalog byte for byte, and each served version with the catalogs it names and the graded
-land of its own golden site ([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a
-change that would move a served version's land fails until that version is no longer served.
+Every rules version this code makes the same land by is served: versions 1 to 4, each reading the
+catalog version `SERVED_LAND_RULES` names (versions 1 to 3 their own, version 4 version 3's, since
+it changes no catalog). The realizer and grading are one code for all; version 2 only adds the
+`cascade` and version 3 its `follow` course, so land an earlier version admits is the same land
+under a later one. Version 4 moves no height and changes what a site's drawing states: a site's
+grading plan names each pond by its zone and its area's number in the zone (`zone 1 pond 0`) where
+versions 1 to 3 name it by that number alone (`pond 0`), so two zones' ponds no longer share an id.
+The grading plan takes the rules version the receipt names, so a world made under an earlier
+version regenerates byte for byte, its ponds named as they were. New worlds name version 4. The
+tests pin every shipped landform catalog byte for byte, and each served version with the catalogs
+it names and the graded land of its own golden site, its water's ids among it
+([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a change that would move a served
+version's land or what its drawing states fails until that version is no longer served.
 
 The land's look is not part of the rules: `landform-surface.v1.json` colours land and shapes none
 of it. A world's appearance should change only when its look does, so the surface catalog version a
@@ -458,8 +466,9 @@ as walls up to about 4 m.
 - A corridor steeper than its grade is refused rather than given stairs.
 - Below the datum a shore's sea covers everything; a valley carved below it floods.
 - Performance is measured only on the development machine's tests; no drawing cost is stated here.
-- The server serves land rules versions 1, 2 and 3. A world made under any other is refused, not
-  realized by the rules it names.
+- The server serves land rules versions 1 to 4. A world made under any other is refused, not
+  realized by the rules it names. A world made under versions 1 to 3 keeps its ponds' ids, so two
+  of its zones' ponds may share one.
 - A world does not name the land surface catalog it wears: a newer land look reaches every world on
   land. Naming it by the world's look is planned.
 - A cascade is straight, along one of the four main sides, and its water stands still: level pools

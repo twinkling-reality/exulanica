@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import json
 import uuid
+from dataclasses import replace
 from itertools import pairwise
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from exulanica.grammar.grammars.site.records import (
 from exulanica.grammar.landform import (
     CHUNK_PROFILE,
     LAND_RULES_VERSION,
+    SERVED_LAND_RULES,
     LandformRefused,
     land_rules,
     read_land_chunk,
@@ -31,7 +33,7 @@ from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.kinds import samples
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.site_drawing import LAND_DRAWING_PROFILE, site_drawing, site_drawing_sha256
-from exulanica.world.site_land import path_grade_permille, site_land_of
+from exulanica.world.site_land import path_grade_permille, site_grading, site_land_of
 from exulanica.world.society_engines import CREATES
 from exulanica.world.society_living import LivingPlace, initial_living_society
 from exulanica.world.society_place import STEP_LIMIT_MM
@@ -150,6 +152,75 @@ def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> No
         world_id=first["world_id"], receipt=world.receipt, receipt_sha256="b" * 64, records=records
     )
     assert site_drawing_sha256(drawing) == site_drawing_sha256(named_now)
+
+
+#: Two zones, each with one pond, the first water area of its zone.
+TWO_PONDS = (
+    SiteExtentRecord("site:extent", "ponds", 48000, 60000, 4000, "fence", "ground", "grass",
+                     24000, 4000, 1200, 200),
+    SitePathRecord("site:path:0", 0, "spine", 22000, 0, 26000, 44000, ("footway",), "ground",
+                   "gravel"),
+    SiteZoneRecord("site:zone:0", 0, "yard", 4000, 8000, 20000, 24000, "east", "open", "ground",
+                   "grass", 20000, 16000),
+    SiteZoneRecord("site:zone:1", 1, "garden", 28000, 28000, 44000, 44000, "west", "open",
+                   "ground", "grass", 28000, 36000),
+    SiteAreaRecord("site:area:0", "site:zone:1", 0, "pond", 32000, 32000, 40000, 40000,
+                   ("water",), "water", "pond", 32000, 36000),
+    SiteAreaRecord("site:area:1", "site:zone:0", 0, "pond", 8000, 12000, 14000, 20000,
+                   ("water",), "water", "pond", 14000, 16000),
+)  # fmt: skip
+
+
+def test_two_zones_first_ponds_have_their_own_ids_from_land_rules_4() -> None:
+    """From land rules 4 a pond's id names its zone, so each zone's first pond has its own; under
+    rules 1 to 3 both are ``pond 0``, as their drawings state. The plan is otherwise the same, its
+    ponds carved in the same order."""
+    plans = {
+        version: site_grading(TWO_PONDS, 4000, rules_version=version)
+        for version in SERVED_LAND_RULES
+    }
+    assert [basin.id for basin in plans[4].basins] == ["zone 1 pond 0", "zone 0 pond 0"]
+    for version in (1, 2, 3):
+        assert [basin.id for basin in plans[version].basins] == ["pond 0", "pond 0"]
+        unnamed = tuple(replace(basin, id="") for basin in plans[version].basins)
+        assert replace(plans[4], basins=unnamed) == replace(plans[version], basins=unnamed)
+        assert tuple(replace(basin, id="") for basin in plans[4].basins) == unnamed
+    stray = (*TWO_PONDS[:-1], replace(TWO_PONDS[-1], zone_identity="site:zone:9"))
+    with pytest.raises(LandformRefused, match=r"site:area:1 lies in zone site:zone:9, which is"):
+        site_grading(stray, 4000, rules_version=4)
+    assert [b.id for b in site_grading(stray, 4000, rules_version=3).basins] == ["pond 0", "pond 0"]
+
+
+def test_a_world_named_by_land_rules_3_keeps_its_pond_ids_and_rules_4_moves_no_height() -> None:
+    """A world named by rules 3 regenerates byte for byte, its pond named by its area's number in
+    its zone; the same receipt naming rules 4 names the pond by its zone too, on the same land."""
+    world = made("farm")  # the farm's pond corner holds a pond
+    third, fourth = copy.deepcopy(world.receipt), copy.deepcopy(world.receipt)
+    third["land_rules"], fourth["land_rules"] = land_rules(3), land_rules(4)
+    records = site_plan.records(third)
+    assert records == site_plan.records(fourth) == world.records
+    zones = {r.identity: r.ordinal for r in records if isinstance(r, SiteZoneRecord)}
+    ponds = sorted(
+        (r for r in records if isinstance(r, SiteAreaRecord) and "water" in r.roles),
+        key=lambda area: area.ordinal,
+    )
+    assert ponds
+    now, before = site_land_of(fourth, records, 4000), site_land_of(third, records, 4000)
+
+    def named(graded) -> list[str]:  # type: ignore[no-untyped-def]
+        return [body.id for body in graded.water if body.kind == "pond"]
+
+    def unnamed(graded) -> dict:  # type: ignore[no-untyped-def,type-arg]
+        section = graded.drawing_section()
+        section["water"] = [
+            {**body, "id": ""} if body["kind"] == "pond" else body for body in section["water"]
+        ]
+        return section
+
+    assert named(before) == [f"pond {area.ordinal}" for area in ponds]
+    assert named(now) == [f"zone {zones[a.zone_identity]} pond {a.ordinal}" for a in ponds]
+    assert now.graded.near.heights == before.graded.near.heights
+    assert unnamed(now) == unnamed(before), "the same land, chunks, backdrop and water levels"
 
 
 def test_a_site_stands_beside_a_cascade_and_its_drawing_lists_the_pools_and_falls() -> None:

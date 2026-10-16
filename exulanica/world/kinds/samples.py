@@ -35,7 +35,7 @@ from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars.site import generate_site, site_records
 from exulanica.grammar.grammars.site.layout import LayoutBudget, LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import SitePlan, plan_sha256
-from exulanica.grammar.landform import LandDocument, LandformRefused
+from exulanica.grammar.landform import LAND_RULES_VERSION, LandDocument, LandformRefused
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused
 from exulanica.world.kinds.routine import kind_routine
@@ -227,10 +227,10 @@ def compose_site(
     ``layout_trials``) and meets every need; :class:`SiteRefused` with every candidate's sentence
     when none does.
 
-    With ``land``, each candidate's layout grades the land (:mod:`exulanica.world.site_land`) and
-    its place stands on the graded land; a layout the land cannot take is refused with the
-    grading's sentence and the next candidate tried, and the kind's needs are checked on the
-    graded place. Without it, nothing here differs from a level site."""
+    With ``land``, each candidate's layout grades the land (:mod:`exulanica.world.site_land`) under
+    the land rules new worlds name, and its place stands on the graded land; a layout the land
+    cannot take is refused with the grading's sentence and the next candidate tried, and the kind's
+    needs are checked on the graded place. Without it, nothing here differs from a level site."""
     bounds = load_kind_catalogs().bounds
     tries = bounds["candidates"][0] if candidates is None else candidates
     budget = layout_budget() if budget is None else budget
@@ -282,6 +282,7 @@ def compose_site(
                     records,
                     land_seed(world_id, land.sha256),
                     routine.policy["footway_station_spacing_mm"],
+                    rules_version=LAND_RULES_VERSION,
                 )
             except LandformRefused as exc:
                 refused.append(

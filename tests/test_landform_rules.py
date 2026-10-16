@@ -73,6 +73,15 @@ RULES = {
         },
         "golden_site": "a7074e8d82c7ce85efd87b7ad87bbf38955451558efc81a222b32bd4258b6120",
     },
+    4: {
+        "catalogs": {
+            "landform-feature.v3": (
+                "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08"
+            ),
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+        },
+        "golden_site": "0e949267edcd10fd4578e79247bc2f9bc402205bfd1681cdd080488b5d2d29bb",
+    },
 }
 
 #: Every feature kind once, a valley and a filled basin beside a terraced hill above a shore.
@@ -109,6 +118,18 @@ GOLDEN_SITE = (
     SiteAreaRecord("site:area:0", "site:zone:1", 0, "pond", 32000, 32000, 40000, 40000,
                    ("water",), "water", "pond", 32000, 36000),
 )  # fmt: skip
+#: Each served version's golden site: version 4's adds a pond to the other zone, the first area of
+#: its zone as the garden's pond is of its own, so the two ponds' ids differ only by their zones.
+GOLDEN_SITES = {
+    1: GOLDEN_SITE,
+    2: GOLDEN_SITE,
+    3: GOLDEN_SITE,
+    4: (
+        *GOLDEN_SITE,
+        SiteAreaRecord("site:area:1", "site:zone:0", 0, "pond", 8000, 12000, 14000, 20000,
+                       ("water",), "water", "pond", 14000, 16000),
+    ),
+}  # fmt: skip
 
 
 def test_no_shipped_landform_catalog_is_edited() -> None:
@@ -152,8 +173,8 @@ def test_land_made_by_other_rules_is_refused_saying_both(other: object) -> None:
 
 
 #: Each served version's golden land: version 1's as it was pinned, version 2's the same with a
-#: cascade from the terraced hill, past the site's west side, into the sea, and version 3's with
-#: that cascade following the land.
+#: cascade from the terraced hill, past the site's west side, into the sea, version 3's with that
+#: cascade following the land, and version 4's as 3's, since version 4 changes no catalog.
 GOLDEN_LANDS = {
     1: GOLDEN_LAND,
     2: {
@@ -173,15 +194,25 @@ GOLDEN_LANDS = {
         ],
     },
 }  # fmt: skip
+GOLDEN_LANDS[4] = GOLDEN_LANDS[3]
 WATER = {
     1: {"sea", "lake", "pond"},
     2: {"sea", "lake", "pond", "pool", "fall"},
     3: {"sea", "lake", "pond", "pool", "fall"},
+    4: {"sea", "lake", "pond", "pool", "fall"},
+}
+#: Each served version's pond ids, in the golden site's drawing: by the area's number in its zone
+#: alone, and from version 4 by its zone and that number.
+PONDS = {
+    1: ["pond 0"],
+    2: ["pond 0"],
+    3: ["pond 0"],
+    4: ["zone 1 pond 0", "zone 0 pond 0"],
 }
 
 
 def test_every_served_version_and_only_those_are_pinned() -> None:
-    assert set(SERVED_LAND_RULES) == set(RULES) == set(GOLDEN_LANDS)
+    assert set(SERVED_LAND_RULES) == set(RULES) == set(GOLDEN_LANDS) == set(GOLDEN_SITES)
     assert max(SERVED_LAND_RULES) == LAND_RULES_VERSION
     for version in SERVED_LAND_RULES:
         assert land_rules(version) == {"version": version, "catalogs": RULES[version]["catalogs"]}
@@ -191,9 +222,11 @@ def test_every_served_version_and_only_those_are_pinned() -> None:
 @pytest.mark.parametrize("version", sorted(RULES))
 def test_a_graded_site_is_the_same_land_while_its_rules_version_is_served(version: int) -> None:
     land = read_land_document(GOLDEN_LANDS[version], landform_catalog(SERVED_LAND_RULES[version]))
-    graded = site_land(land, GOLDEN_SITE, land_seed("world:golden", land.sha256), 4000)
+    seed = land_seed("world:golden", land.sha256)
+    graded = site_land(land, GOLDEN_SITES[version], seed, 4000, rules_version=version)
     section = graded.drawing_section()
     assert {body["kind"] for body in section["water"]} == WATER[version]
+    assert [body["id"] for body in section["water"] if body["kind"] == "pond"] == PONDS[version]
     assert hashlib.sha256(canonical_json(section)).hexdigest() == RULES[version]["golden_site"], (
         f"the land a site is graded on moved under rules version {version}: the realizer, its "
         "grading or a site's grading plan changed. Worlds made on land name the rules that made "

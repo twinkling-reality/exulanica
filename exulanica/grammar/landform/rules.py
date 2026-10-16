@@ -16,10 +16,14 @@ A change to any of those rules is a new version, and a change to a catalog is a 
 **Every version this code can make the same land by is served.** The realizer and its grading are
 one code for every served version: a later version only adds what an earlier one could not state
 (version 2 adds the ``cascade``, version 3 its ``follow`` course), so a document an earlier
-version admits is the same land under this code. A receipt's land is read against the catalog
+version admits is the same land under this code. Version 4 is the first that states an admitted
+document differently: a site's grading plan names each pond by its zone (``zone 1 pond 0``), where
+earlier versions name it by its area's number in its zone alone (``pond 0``), and moves no height.
+So a site's grading plan takes the rules version its receipt names, and such a change applies
+from its version on. A receipt's land is read against the catalog
 version its rules name, and the tests pin each served version's golden site, so a change that would
-move an earlier version's land fails until that version is no longer served. New worlds name
-:data:`LAND_RULES_VERSION`.
+move an earlier version's land or what its drawing states fails until that version is no longer
+served. New worlds name :data:`LAND_RULES_VERSION`.
 """
 
 from __future__ import annotations
@@ -35,10 +39,11 @@ from exulanica.grammar.landform.document import LandformRefused
 __all__ = ["LAND_RULES_VERSION", "SERVED_LAND_RULES", "check_land_rules", "land_rules"]
 
 #: The rules new land is made by. A change to the realizer, its grading or a site's grading plan
-#: that moves land is a new version.
-LAND_RULES_VERSION: Final = 3
+#: that moves land, or what a site's drawing states of it, is a new version.
+LAND_RULES_VERSION: Final = 4
 #: Every rules version this code makes land by, and the landform catalog version each reads.
-SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3}
+#: Version 4 changes no catalog, so it reads version 3's.
+SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3, 4: 3}
 
 
 @functools.cache
