@@ -635,10 +635,12 @@ packages for creature names.
 
 [`bodies.py`](../exulanica/things/bodies.py) reads a body recipe, `exulanica.body-recipe/v1`, with
 `read_body_recipe`, against the body grammar's newest version
-([`body-grammar.v2.json`](../assets/catalogs/things/body-grammar.v2.json), which names the
-swimming module and gives its reasons by the shapes of bodies; the first,
-[`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json), named no swimming module
-and is kept as it was published), whose entries state every choice and bound with its reason:
+([`body-grammar.v3.json`](../assets/catalogs/things/body-grammar.v3.json), which lets legs swim by
+paddling and names the gaits catalog version a swimmer's pace in water is read from; the second,
+[`body-grammar.v2.json`](../assets/catalogs/things/body-grammar.v2.json), named the swimming
+module, and the first,
+[`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json), named none; both are kept
+as they were published), whose entries state every choice and bound with its reason:
 
 | Field | Holds |
 | --- | --- |
@@ -664,11 +666,22 @@ and is kept as it was published), whose entries state every choice and bound wit
 
 The grammar's movement entries say what each body can do and which module it does it by: walking
 (at least one pair of legs, four or more tentacles, or a serpentine body, never a floating one) is
-`exulanica-movement/walking/v1`, and swimming (at least one pair of fins, four or more tentacles, or
-a serpentine body) is `exulanica-movement/swimming/v1`, by which a being crosses the water its
-society's input states ([movement modules contract](movement-modules-contract.md#swimming)). Flight,
-climbing and burrowing are stated with no module and with the sentence a creature asked for one is
-refused with ("This world has no flying creatures yet.").
+`exulanica-movement/walking/v1`, and swimming (at least one pair of fins, at least one pair of legs
+to paddle with, four or more tentacles, or a serpentine body) is `exulanica-movement/swimming/v1`,
+by which a being crosses the water its society's input states
+([movement modules contract](movement-modules-contract.md#swimming)). Flight, climbing and
+burrowing are stated with no module and with the sentence a creature asked for one is refused with
+("This world has no flying creatures yet.").
+
+A creature drafted to swim states its pace in water with its swimming move
+(`{"module": "exulanica-movement/swimming/v1", "parameters": {"pace_permille": N}}`), read from the
+gaits catalog version the grammar's swimming entry names
+([`gaits.v2.json`](../assets/catalogs/things/gaits.v2.json), `swim_pace_permille` in
+[`gaits.py`](../exulanica/things/gaits.py)): its own walking pace times the largest share among the
+ways it can swim, fins seven tenths, four or more tentacles or a long body six tenths, paddling legs
+four tenths, so a larger body swims faster as it walks faster. Its run form carries the figure as the
+kind states it. A creature kept before the grammar named a pace states its swimming by module alone,
+is built again as it was, and swims at the swimming module's reference pace.
 
 ### The builder and a drafted plan
 
@@ -1001,7 +1014,11 @@ walking module moves each being by its own pace's share of the society's budget,
 whole millimetre: at 60 m a minute a body at 251 walks 15,060 mm in a minute and one at 1,171
 walks 70,260 mm ([movement modules contract](movement-modules-contract.md#walking)). A hand-over
 is timed by what each party spends. A society whose first input records no movement module walks
-every body at the one budget, whatever its run form states.
+every body at the one budget, whatever its run form states. The catalog's second version,
+[`gaits.v2.json`](../assets/catalogs/things/gaits.v2.json), keeps the first's walking entries and
+adds a swim entry for each way the grammar lets a body swim, each a share of its walking pace with
+its reason, chosen figures rather than published ones: hips at 1,235 mm on paddling legs give
+1,171 x 0.4, 468, in water (`tests/test_swim_paces.py`).
 
 **Its card.** The card of such a being
 (`GET /world/versions/{version_id}/society/things/{thing_id}`) states what it can do here, where
@@ -1634,9 +1651,9 @@ These are material limits of the boundary above, not partial behaviour:
   A person in flight wears no pill: the flock draws them, not the crowd.
 - No creature flies, climbs or burrows: the grammar states those movements and refuses them in
   words. A floating body walks by no module; one with four or more tentacles swims, and any other
-  cannot move at all yet. A body's pace in water, how a swimmer is drawn and a swimming activity in
-  the routine are not built: every swimmer swims at the swimming module's reference pace, is drawn
-  along its path as a walker is, and swims only on the way to somewhere on land.
+  cannot move at all yet. How a swimmer is drawn and a swimming activity in the routine are not
+  built: a swimmer is drawn along its path as a walker is, and swims only on the way to somewhere on
+  land. The shipped pond duck's kind names no swimming yet, so it walks round water.
 - A creature may wear an admitted compatible look. The sculpted-look pipeline (route C
   of [generated appearance](generated-appearance.md)) is built. In its two pre-registered rig
   trials one and then four bodies of eight counted, against the five the rule needed, so the sketch

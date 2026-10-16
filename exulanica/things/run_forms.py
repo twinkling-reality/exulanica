@@ -16,7 +16,10 @@ here by code from the kept kind, its drafted plan and that plan's recipe:
 *   what it **moves** by, its **abilities** and **offers**, its routine's weights and its
     **deciders**, as the kind states them; with the walking it moves by, its **pace** in
     thousandths of a society's own, from its body's standing height
-    (:func:`exulanica.things.gaits.pace_permille`, ``assets/catalogs/things/gaits.v1.json``);
+    (:func:`exulanica.things.gaits.pace_permille`, ``assets/catalogs/things/gaits.v1.json``), and
+    with a swimming, the pace in water the kind states (a creature drafted since the gaits catalog's
+    version 2 states :func:`exulanica.things.gaits.swim_pace_permille`; one drafted before states
+    none and swims at the swimming module's reference pace);
 *   its **label**, a body name, and its **summary**, a sentence of its size, its parts, whether
     it walks and what it carries with: catalog words built from the body's own figures
     (:func:`body_name`, :func:`body_summary`, ``assets/catalogs/things/body-names.v1.json``),
@@ -467,8 +470,9 @@ def run_form(
     shipped = _shipped_kind_keys()
     moves = [_move(entry) for entry in document["moves"]]
     for move in moves:
-        # A body that walks states the pace its own standing height gives it.
-        if PACE_PERMILLE in _MOVE_PARAMETERS.get(move["module"], frozenset()):
+        # A body that walks states the pace its own standing height gives it. A swimming states
+        # the pace in water its kind was drafted with, copied as the kind states it.
+        if move["module"] in _WALKING_PACED:
             move["parameters"][PACE_PERMILLE] = pace_permille(recipe)
     form = {
         "profile": RUN_FORM_PROFILE,
@@ -553,13 +557,18 @@ def _figures(where: str, value: object, declared: frozenset[str]) -> None:
 
 
 #: The figures a run form may state for a movement module its kind moves by, by module: the
-#: walking a body moves by takes its pace. Each is optional: a form written before a figure was
-#: declared states none and reads as it did, and whatever reads the figure takes its absence as
-#: the society's own pace. Another module that takes a figure from each kind (a wingspan) is
-#: added here with that figure's name.
+#: walking a body moves by takes its pace, and a swimming the pace in water its kind states. Each
+#: is optional: a form written before a figure was declared states none and reads as it did, and
+#: whatever reads the figure takes its absence as the module's reference pace. Another module
+#: that takes a figure from each kind (a wingspan) is added here with that figure's name.
 _MOVE_PARAMETERS: Final[Mapping[str, frozenset[str]]] = MappingProxyType(
-    {"exulanica-movement/walking/v1": frozenset({PACE_PERMILLE})}
+    {
+        "exulanica-movement/walking/v1": frozenset({PACE_PERMILLE}),
+        "exulanica-movement/swimming/v1": frozenset({PACE_PERMILLE}),
+    }
 )
+#: The walking whose pace a run form computes from the body (a swimming's pace is the kind's own).
+_WALKING_PACED: Final = frozenset({"exulanica-movement/walking/v1"})
 #: The widest a pace may be read: from one thousandth of a society's own pace to ten times it.
 #: The gaits catalog holds a pace it computes to its own, narrower limits.
 _PACE_RANGE: Final = (1, 10_000)

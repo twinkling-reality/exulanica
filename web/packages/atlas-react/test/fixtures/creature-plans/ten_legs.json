@@ -233,7 +233,7 @@
     "width": 1800
    },
    "plan": "fixture_ten_legs/v1",
-   "plan_sha256": "d6dff6c64705cb6362af3527bc797432d174f6102057fb158350f392be529271"
+   "plan_sha256": "b8741733f89676051a852938211cd2f00c2a9b59ae1e92c172429c9b835c6b5a"
   },
   "class": "being",
   "deciders": {
@@ -250,11 +250,17 @@
   "looks": [
    {
     "look": "fixture-ten-legs-sketch",
-    "sha256": "eacd237af68bfe3913f6d04e9f21bf2a4eb80eb7e018a751ab89650dd83b6d2a",
+    "sha256": "385192d1d4cea368a8034561c7772967f1f6813e91aa6dcaf4375043ed30d24e",
     "version": 1
    }
   ],
   "moves": [
+   {
+    "module": "exulanica-movement/swimming/v1",
+    "parameters": {
+     "pace_permille": 368
+    }
+   },
    "exulanica-movement/walking/v1"
   ],
   "offers": [
@@ -295,7 +301,7 @@
    "lineage": {
     "ingredients": [
      "37e5229e867ba7ea9ddf0f7f4e6e90ed809079e01e789d61d1fbbcab285436a8",
-     "d6dff6c64705cb6362af3527bc797432d174f6102057fb158350f392be529271"
+     "b8741733f89676051a852938211cd2f00c2a9b59ae1e92c172429c9b835c6b5a"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -344,7 +350,7 @@
    "lineage": {
     "ingredients": [
      "37e5229e867ba7ea9ddf0f7f4e6e90ed809079e01e789d61d1fbbcab285436a8",
-     "d6dff6c64705cb6362af3527bc797432d174f6102057fb158350f392be529271"
+     "b8741733f89676051a852938211cd2f00c2a9b59ae1e92c172429c9b835c6b5a"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -731,6 +737,7 @@
    ]
   },
   "moves": [
+   "exulanica-movement/swimming/v1",
    "exulanica-movement/walking/v1"
   ],
   "origin": {
@@ -766,7 +773,7 @@
   },
   "profile": "exulanica.body-plan/v1",
   "reach_mm": 1500,
-  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 37e5229e867ba7ea9ddf0f7f4e6e90ed809079e01e789d61d1fbbcab285436a8): every bone, chain, socket and range follows from the recipe and the body grammar version 2.",
+  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 37e5229e867ba7ea9ddf0f7f4e6e90ed809079e01e789d61d1fbbcab285436a8): every bone, chain, socket and range follows from the recipe and the body grammar version 3.",
   "size": {
    "extent_mm": {
     "height": {

@@ -5,7 +5,9 @@ the south-east corner of its site: an area whose roles name water, 35.1 m by 32.
 walking lines of its zone along its south, west and north sides. :func:`compose_farm` composes a
 things input over the farm's own surfaces as the runtime does, with the water the site composer
 states (:func:`~exulanica.world.composers.site_plan.swim_nodes`) handed to the composition, and
-:func:`finned_walker` is a body with four legs and a pair of fins drafted to walk and swim. Nothing
+:func:`finned_walker` is a body with four legs and a pair of fins drafted to walk and swim: under
+the body grammar's second version, as a kind kept before the grammar named a pace in water, so it
+swims at the swimming module's reference pace, or under a later version, stating its own. Nothing
 here names an animal: the body is described by its shape.
 """
 
@@ -20,7 +22,7 @@ from typing import Any
 from exulanica.environment.district_geometry import segment_blocked
 from exulanica.grammar.grammars.site.records import SiteAreaRecord
 from exulanica.selection.creature_drafting import assembled_form
-from exulanica.things.bodies import body_grammar, read_body_recipe
+from exulanica.things.bodies import load_body_grammar, read_body_recipe
 from exulanica.things.creatures import assemble_creature
 from exulanica.things.run_forms import run_form
 from exulanica.world.authored_delta import version_delta_sha256
@@ -94,18 +96,21 @@ def farm() -> Farm:
 
 
 @cache
-def finned_walker_creature() -> Any:
-    """A body with four legs and a pair of fins, drafted to walk and swim."""
+def finned_walker_creature(grammar_version: int = 2) -> Any:
+    """A body with four legs and a pair of fins, drafted to walk and swim under the body grammar's
+    ``grammar_version``."""
+    grammar = load_body_grammar(version=grammar_version)
     form = form_of("three_heads", label="finned walker", moves=["walking", "swimming"])
     form["fins"], form["fin_segments"] = 2, 2
-    return assemble_creature(assembled_form(form, body_grammar()), by=BY)
+    return assemble_creature(assembled_form(form, grammar), by=BY, grammar=grammar)
 
 
 @cache
-def finned_walker() -> tuple[str, dict[str, Any]]:
+def finned_walker(grammar_version: int = 2) -> tuple[str, dict[str, Any]]:
     """:func:`finned_walker_creature`'s kind's digest and its run form."""
-    creature = finned_walker_creature()
-    recipe = read_body_recipe(dict(creature.recipe))
+    creature = finned_walker_creature(grammar_version)
+    grammar = load_body_grammar(version=grammar_version)
+    recipe = read_body_recipe(dict(creature.recipe), grammar=grammar)
     return creature.kind.sha256, run_form(creature.kind, creature.plan, recipe)
 
 

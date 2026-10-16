@@ -288,7 +288,7 @@
     "width": 1600
    },
    "plan": "fixture_floating_eight/v1",
-   "plan_sha256": "3c1d17d007551ae162e0773b8e889ac21b9bdb57c2960ebe243c1aa54b6377a2"
+   "plan_sha256": "acbf42103d70ce5139a7ead94c60bf65afd1e66627ae5d7022a58b2c5bed564d"
   },
   "class": "being",
   "deciders": {
@@ -305,12 +305,17 @@
   "looks": [
    {
     "look": "fixture-floating-eight-sketch",
-    "sha256": "875210ab6f8452c055deaab0f4f5c0f440650f454c4870d5147f8e698c582a41",
+    "sha256": "c8adfa1423f237e5cb111b1e193753c318ec14841a158afdb2293d4ca4d54a45",
     "version": 1
    }
   ],
   "moves": [
-   "exulanica-movement/swimming/v1"
+   {
+    "module": "exulanica-movement/swimming/v1",
+    "parameters": {
+     "pace_permille": 766
+    }
+   }
   ],
   "offers": [
    {
@@ -350,7 +355,7 @@
    "lineage": {
     "ingredients": [
      "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
-     "3c1d17d007551ae162e0773b8e889ac21b9bdb57c2960ebe243c1aa54b6377a2"
+     "acbf42103d70ce5139a7ead94c60bf65afd1e66627ae5d7022a58b2c5bed564d"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -399,7 +404,7 @@
    "lineage": {
     "ingredients": [
      "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
-     "3c1d17d007551ae162e0773b8e889ac21b9bdb57c2960ebe243c1aa54b6377a2"
+     "acbf42103d70ce5139a7ead94c60bf65afd1e66627ae5d7022a58b2c5bed564d"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -843,7 +848,7 @@
   },
   "profile": "exulanica.body-plan/v1",
   "reach_mm": null,
-  "reason": "Built by exulanica-body-builder/v1 from a floating body recipe (sha256 8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1): every bone, chain, socket and range follows from the recipe and the body grammar version 2.",
+  "reason": "Built by exulanica-body-builder/v1 from a floating body recipe (sha256 8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1): every bone, chain, socket and range follows from the recipe and the body grammar version 3.",
   "size": {
    "extent_mm": {
     "height": {

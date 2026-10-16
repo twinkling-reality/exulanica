@@ -37,6 +37,7 @@ from typing import Any, Final
 from exulanica.things.bodies import (
     BODY_RECIPE_PROFILE,
     BodyGrammar,
+    BodyRecipe,
     BodyRefused,
     body_grammar,
     build_body,
@@ -50,6 +51,7 @@ from exulanica.things.catalogs import (
     read_body_plan,
     thing_catalogs,
 )
+from exulanica.things.gaits import PACE_PERMILLE, SWIM_MOVEMENT, gaits, swim_pace_permille
 from exulanica.things.kinds import (
     THING_KIND_PROFILE,
     ThingKind,
@@ -94,8 +96,8 @@ CREATURE_CODES: Final = (
     (
         "creature_cannot_move_so",
         "A creature moves only in the ways its body allows: it walks on legs, four or more "
-        "tentacles or a long body, swims with fins, four or more tentacles or a long body, and "
-        "flies with a pair of wings or a floating body.",
+        "tentacles or a long body, swims with fins, legs, four or more tentacles or a long "
+        "body, and flies with a pair of wings or a floating body.",
     ),
     (
         "creature_movement_unbuilt",
@@ -240,6 +242,25 @@ def recipe_of(form: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _kind_moves(
+    moves: Sequence[str], modules: Sequence[str], recipe: BodyRecipe, grammar: BodyGrammar
+) -> list[Any]:
+    """The kind's moves: each movement's module, and, where the grammar's movement names the gaits
+    catalog version its pace comes from (``pace``, from the body grammar's third version), a
+    swimming with the pace in water the body gives it (:func:`~exulanica.things.gaits.
+    swim_pace_permille`), so a society swims it at its own pace. Under a grammar that names none,
+    as every one before, a move is its module alone, so such a kind is built as it always was."""
+    stated: list[Any] = []
+    for movement, module in zip(moves, modules, strict=True):
+        source = grammar.movements[movement].get("pace")
+        pace = None
+        if movement == SWIM_MOVEMENT and source is not None:
+            pace = swim_pace_permille(recipe, gaits(int(source["version"])))
+        move = module if pace is None else {"module": module, "parameters": {PACE_PERMILLE: pace}}
+        stated.append(move)
+    return stated
+
+
 def assemble_creature(
     form: Mapping[str, Any],
     *,
@@ -368,7 +389,7 @@ def assemble_creature(
             _DRAFTED_LICENCE,
             [recipe.sha256, plan.sha256, *reference_ingredients],
         ),
-        "moves": modules,
+        "moves": _kind_moves(moves, modules, recipe, grammar),
         "abilities": [{"key": ability, "parameters": {}} for ability in abilities],
         "offers": [{"key": offer, "parameters": {}} for offer in offers],
         "routine": {"weights": weights, "follow_holders_of": [], "reason": _ROUTINE_REASON},

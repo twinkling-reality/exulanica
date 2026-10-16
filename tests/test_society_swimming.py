@@ -164,8 +164,10 @@ def test_a_minute_over_land_and_water_shares_the_budget_stretch_by_stretch_by_ha
 # -- a body with fins on the farm ------------------------------------------------------------
 
 
-def _swimmer_society(**compose: Any) -> tuple[dict[str, Any], dict[str, Any], str]:
-    sha256, form = finned_walker()
+def _swimmer_society(
+    grammar_version: int = 2, **compose: Any
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    sha256, form = finned_walker(grammar_version)
     document = compose_farm(
         placed("swimmer", sha256, *START_MM), made_kinds={sha256: form}, **compose
     )
@@ -255,6 +257,48 @@ def test_a_finned_body_walks_to_the_shore_swims_across_and_walks_on():
     assert me["location"] == {"node_id": ACROSS, "edge": None}
     assert (me["action"]["kind"], me["action"]["reason"]) == ("stand", "standing_a_while")
     assert _person(third, subject)["motion_path_mm"] == [[86000, -36500]]
+
+
+def test_a_body_drafted_under_the_third_grammar_swims_at_the_pace_its_kind_states():
+    """The same body drafted under the body grammar's third version states its pace in water: seven
+    tenths of its walk of 846, 592 in a thousand. Swimming that much faster, its quickest route
+    enters the water at once, by the 3,092 mm shore edge from its own node.
+
+    Minute 1: the whole budget swims, 60,000 x 592 / 1000 = 35,520 mm: 3,092 mm out to the lattice
+    at (76000, -4000), 30,000 mm north to its far row, 2,000 mm east along it and 428 mm on, ending
+    on a swim edge. The body kept before is 22,172 mm into its swim at that minute's end. Minute 2:
+    it swims the 1,572 mm left of that edge and the 2,765 mm shore edge, 4,337 mm that spend
+    4,337,000 / 592, rounded up, 7,327; the 52,673 left let it walk 44,561 mm, more than the
+    4,122 mm to where it was asked to stand, so it arrives and stands."""
+    document, state, subject = _swimmer_society(grammar_version=3)
+    _sha256, form = finned_walker(3)
+    assert form["moves"][0] == {"module": SWIMMING, "parameters": {"pace_permille": 592}}
+    assert 60_000 * 592 // 1000 == 35_520 == 3_092 + 30_000 + 2_000 + 428
+    (first, _events), (second, _) = _minutes(
+        state, document, _asked_to_stand(document, subject, ACROSS), 2
+    )
+    wet = _wet_points(document)
+    path = _person(first, subject)["motion_path_mm"]
+    assert path[:2] == [[74181, -1500], [76000, -4000]]
+    assert path[-3:] == [[76000, -34000], [78000, -34000], [78428, -34000]]
+    assert all(tuple(point) in wet for point in path[1:-1])
+    edge = _person(first, subject)["location"]["edge"]
+    assert (edge["edge_id"], edge["progress_mm"]) == (
+        "water:+00078000:-00034000|water:+00080000:-00034000",
+        428,
+    )
+    swum = 1_572 + 2_765
+    left = MOVEMENT_BUDGET_MM - math.ceil(swum * 1000 / 592)
+    assert (left, left * 846 // 1000) == (52_673, 44_561)
+    me = _person(second, subject)
+    assert me["motion_path_mm"] == [
+        [78428, -34000],
+        [80000, -34000],
+        [81909, -36000],
+        [86000, -36500],
+    ]
+    assert me["location"] == {"node_id": ACROSS, "edge": None}
+    assert (me["action"]["kind"], me["action"]["reason"]) == ("stand", "standing_a_while")
 
 
 def test_the_society_replays_minute_by_minute():

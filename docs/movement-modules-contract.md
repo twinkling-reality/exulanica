@@ -156,9 +156,11 @@ reads and walks the walking graph alone, as it always did, and never enters the 
 - **The step** (`traverse_swimming`). A swimmer's own budget in water is the society's scaled by
   its pace there, `budget * pace_permille // 1000` millimetres, a whole number by floor division
   and never less than one, spent along a route by walking's `traverse`, called and not copied. The
-  row declares `pace_permille`, from 1 to 10,000, which a kind may state with the swimming it moves
-  by, and `reference_pace_permille`, 400, the pace of a swimmer whose kind states none: 24,000 mm in
-  a minute where a new society walks 60,000 mm.
+  row declares `pace_permille`, from 1 to 10,000, which a kind states with the swimming it moves
+  by (a drafted body's is its walking pace times a share by what it swims with, from the gaits
+  catalog's second version; [things contract](things-contract.md#the-body-recipe)), and
+  `reference_pace_permille`, 400, the pace of a swimmer whose kind states none, as every kind kept
+  before a pace in water was stated: 24,000 mm in a minute where a new society walks 60,000 mm.
 - **A minute** (`crossing`). A swimmer's route is taken a stretch at a time, a stretch being its
   edges from where the swimmer is to the next change between land and water; a shore edge is
   water. A stretch of land is walked by the walking step the society records, at the swimmer's
@@ -178,9 +180,8 @@ water at all.
 
 What swimming does not do:
 
-- No kind states a pace in water: a drafted body's run form states its walking pace alone, so every
-  swimmer swims at the reference pace. A body's own pace in water, how a swimmer is drawn in the
-  water and a swimming activity in the routine are not built.
+- How a swimmer is drawn in the water and a swimming activity in the routine are not built. A
+  kind kept before a pace in water was stated swims at the reference pace.
 - The choices a decider is offered, a person's direct request and the routine's choice of where
   to go are read over the walking graph: a place reached only across water is not offered, and a
   swimmer in the water is offered nothing until it is ashore. Once a goal is chosen, a swimmer's
@@ -654,7 +655,7 @@ viewers could share them.
 | --- | --- | --- |
 | Registry, dispatch | `exulanica/movement/registry.py`, `steps.py`, `movement-modules.v1.json` | `tests/test_movement_modules.py` |
 | Walking | `exulanica/movement/walking.py` | `tests/test_movement_modules.py`, the society replay pins above, `tests/test_society_living_crossings_unchanged.py` |
-| Swimming: the row, the step, routes and a minute's stretches | `exulanica/movement/swimming.py`, its row in `movement-modules.v1.json` and its step in `steps.py`, `exulanica/world/society_movement.py` (`Movers`) | `tests/test_society_swimming.py` (the budget, the quickest route and a minute's stretches worked by hand; a body with fins on the fixture farm walking to the pond's shore, swimming across and walking on, minute by minute, against figures worked by hand from the farm's own graph; its society replayed; nobody who does not swim entering the water; the same body walking round in a society made before swimming and when its kind does not swim) |
+| Swimming: the row, the step, routes and a minute's stretches | `exulanica/movement/swimming.py`, its row in `movement-modules.v1.json` and its step in `steps.py`, `exulanica/world/society_movement.py` (`Movers`) | `tests/test_society_swimming.py` (the budget, the quickest route and a minute's stretches worked by hand; a body with fins on the fixture farm walking to the pond's shore, swimming across and walking on, minute by minute, against figures worked by hand from the farm's own graph; its society replayed; nobody who does not swim entering the water; the same body walking round in a society made before swimming and when its kind does not swim; the same body drafted under the body grammar's third version swimming at the pace its kind states), `tests/test_swim_paces.py` (each body's pace in water from its walking pace and the gaits catalog's shares, worked by hand for five) |
 | Walking at a body's own pace, what a society records | `exulanica/movement/walking_v2.py`, `registry.py` (`current_engine_modules`, `check_recorded`, `recorded_movement`), `exulanica/world/society_thing_inputs.py` (`record_modules`), `society_movement.py` (`walker_paces`, `tick_budgets`) | `tests/test_society_walking_paces.py` (budgets worked by hand from the paces `tests/test_creature_gaits.py` works by hand; each walker's progress read from its route; a society of shipped kinds the same hour either way; a society that records none walking by the first module) |
 | Air, grid, perches | `exulanica/movement/air.py`, `fixed.py` | `tests/test_flight.py` |
 | Flight step, choices, episodes, search bounds | `exulanica/movement/flight.py` | `tests/test_flight.py`, `tests/test_flight_search_bounds.py` |

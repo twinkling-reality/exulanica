@@ -128,7 +128,7 @@
     "width": 600
    },
    "plan": "fixture_serpent/v1",
-   "plan_sha256": "91143a95fa51944ff0c8eca503b3200360c9615494a5bae17452da82bd357463"
+   "plan_sha256": "6bdb6644f4fa0ea2167562e7d03b487b59894146d297188fe592ca8867d80d3b"
   },
   "class": "being",
   "deciders": {
@@ -145,12 +145,17 @@
   "looks": [
    {
     "look": "fixture-serpent-sketch",
-    "sha256": "f51fce9c0debed52848d410cc88920be26217af5ff23c860c029e25ae3837a93",
+    "sha256": "1b28aa8eaa753cfa0d9c942cdf2de4e98e133f28619c472f0cb6f8c8d2215d34",
     "version": 1
    }
   ],
   "moves": [
-   "exulanica-movement/swimming/v1",
+   {
+    "module": "exulanica-movement/swimming/v1",
+    "parameters": {
+     "pace_permille": 600
+    }
+   },
    "exulanica-movement/walking/v1"
   ],
   "offers": [
@@ -191,7 +196,7 @@
    "lineage": {
     "ingredients": [
      "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
-     "91143a95fa51944ff0c8eca503b3200360c9615494a5bae17452da82bd357463"
+     "6bdb6644f4fa0ea2167562e7d03b487b59894146d297188fe592ca8867d80d3b"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -240,7 +245,7 @@
    "lineage": {
     "ingredients": [
      "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
-     "91143a95fa51944ff0c8eca503b3200360c9615494a5bae17452da82bd357463"
+     "6bdb6644f4fa0ea2167562e7d03b487b59894146d297188fe592ca8867d80d3b"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -449,7 +454,7 @@
   },
   "profile": "exulanica.body-plan/v1",
   "reach_mm": 900,
-  "reason": "Built by exulanica-body-builder/v1 from a serpentine body recipe (sha256 1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1): every bone, chain, socket and range follows from the recipe and the body grammar version 2.",
+  "reason": "Built by exulanica-body-builder/v1 from a serpentine body recipe (sha256 1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1): every bone, chain, socket and range follows from the recipe and the body grammar version 3.",
   "size": {
    "extent_mm": {
     "height": {

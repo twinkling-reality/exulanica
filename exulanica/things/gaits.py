@@ -1,4 +1,4 @@
-"""How fast a drafted body walks, from the body it was given.
+"""How fast a drafted body walks and swims, from the body it was given.
 
 A society moves its people at one pace. A creature made from words may stand a hand high or as
 high as a house, and it walks at a pace its own body gives: by the dynamic similarity rule of
@@ -12,11 +12,16 @@ rule is data, one entry each with its reason, in ``assets/catalogs/things/gaits.
 *   one **gait** for each way the body grammar lets a body walk, saying which chains it stands on
     (legs; tentacles where it has no leg; none for a body lying along the ground) and whether its
     pace follows the rule or is the reference pace;
-*   the **limits** every pace is held to.
+*   the **limits** every pace is held to;
+*   from version 2 (``gaits.v2.json``), one **swim** entry for each way the body grammar lets a body
+    swim (fins, four or more tentacles, a long body, legs that paddle), saying what share of its own
+    walking pace a body swims at by it.
 
-:func:`pace_permille` is the whole of it: a body's pace in thousandths of the society's own, in
-integer arithmetic alone, so a pace recorded in a society's input is the same on any machine. It
-names no creature and reads no words: a recipe's figures and the catalog.
+:func:`pace_permille` is the whole of walking: a body's pace in thousandths of the society's own,
+in integer arithmetic alone, so a pace recorded in a society's input is the same on any machine; it
+reads version 1, as it always has. :func:`swim_pace_permille` is a body's pace in water: its walking
+pace times the best share among the ways it can swim, from version 2. Neither names a creature or
+reads words: a recipe's figures and the catalog.
 """
 
 from __future__ import annotations
@@ -37,10 +42,13 @@ __all__ = [
     "GAITS_ID",
     "PACE_PERMILLE",
     "REFERENCE_PACE_PERMILLE",
+    "SWIM_MOVEMENT",
+    "SWIM_VERSION",
     "Gaits",
     "gaits",
     "load_gaits",
     "pace_permille",
+    "swim_pace_permille",
 ]
 
 GAITS_ID: Final = "gaits"
@@ -48,7 +56,15 @@ GAITS_ID: Final = "gaits"
 PACE_PERMILLE: Final = "pace_permille"
 #: A society's own pace, in thousandths of itself.
 REFERENCE_PACE_PERMILLE: Final = 1000
-_GROUPS: Final = ("rule", "reference", "gait", "limit")
+_GROUPS: Final = ("rule", "reference", "gait", "limit", "swim")
+#: What a swim entry may read: a part counted as the recipe counts it (pairs, tentacles one by one),
+#: or the posture of a long body.
+_SWIM_PARTS: Final = ("fin", "leg", "tentacle")
+_SWIM_POSTURES: Final = ("serpentine",)
+#: The version of the catalog whose swim entries a body's pace in water is read from.
+SWIM_VERSION: Final = 2
+#: The body grammar's movement a pace in water is stated with.
+SWIM_MOVEMENT: Final = "swimming"
 #: The chains a gait may stand on, in the order a body is read: a body with legs walks on them.
 _STANDS_ON: Final = ("leg", "tentacle")
 _PACES: Final = ("stance_similarity", "reference")
@@ -71,6 +87,9 @@ class Gaits:
     minimum: int
     maximum: int
     version: int
+    #: Each way a body may swim, ``(reads, least, share in thousandths)``: a part with at least
+    #: ``least`` of it, or a posture (``least`` None). None before version 2.
+    swimming: tuple[tuple[str, int | None, int], ...] = ()
 
 
 def _spec(where: str, value: object) -> str:
@@ -98,6 +117,7 @@ def load_gaits(version: int, directory: Path = CATALOG_DIRECTORY) -> Gaits:
     limits: list[Mapping[str, Any]] = []
     standing: dict[str, bool] = {}
     lying: list[str] = []
+    swimming: dict[str, tuple[int | None, int]] = {}
     for entry in catalog.entries:
         values = dict(entry.values)
         where = f"{GAITS_ID}.{entry.key}"
@@ -116,6 +136,22 @@ def load_gaits(version: int, directory: Path = CATALOG_DIRECTORY) -> Gaits:
             references.append(value)
         elif group == "limit":
             limits.append(spec)
+        elif group == "swim":
+            reads, least, share = spec.get("reads"), spec.get("least"), spec.get("share_permille")
+            part = reads in _SWIM_PARTS and type(least) is int and 1 <= least <= 64
+            posture = reads in _SWIM_POSTURES and least is None
+            if (
+                set(spec) != {"reads", "least", "share_permille"}
+                or not (part or posture)
+                or reads in swimming
+                or type(share) is not int
+                or not 1 <= share <= REFERENCE_PACE_PERMILLE
+            ):
+                raise ThingCatalogError(
+                    f"{where}: reads one part with how many, or one posture, once, and the share "
+                    "of a body's walking pace it swims at, in thousandths, at most the whole"
+                )
+            swimming[str(reads)] = (least, share)
         else:
             reads, pace = spec.get("reads"), spec.get("pace")
             if set(spec) != {"reads", "pace"} or pace not in _PACES:
@@ -151,6 +187,7 @@ def load_gaits(version: int, directory: Path = CATALOG_DIRECTORY) -> Gaits:
         minimum=low,
         maximum=high,
         version=catalog.catalog_version,
+        swimming=tuple((reads, least, share) for reads, (least, share) in sorted(swimming.items())),
     )
 
 
@@ -177,3 +214,22 @@ def pace_permille(recipe: BodyRecipe, table: Gaits | None = None) -> int:
         pace = math.isqrt(1_000_000 * stance // table.reference_stance_mm)
         return max(table.minimum, min(table.maximum, pace))
     return REFERENCE_PACE_PERMILLE
+
+
+def swim_pace_permille(recipe: BodyRecipe, table: Gaits | None = None) -> int | None:
+    """The pace in water of the body ``recipe`` describes, in thousandths of a society's own pace,
+    or None where it has no way to swim the table states.
+
+    It is the body's own walking pace (:func:`pace_permille`, read from the same table) times the
+    largest share among the swim entries the body meets: at least ``least`` of a part, or the
+    posture named. So a larger body swims faster as it walks faster, by the same rule. A whole
+    number by floor division, never less than one."""
+    table = table or gaits(SWIM_VERSION)
+    shares = [
+        share
+        for reads, least, share in table.swimming
+        if (recipe.posture == reads if least is None else recipe.pairs(reads) >= least)
+    ]
+    if not shares:
+        return None
+    return max(1, pace_permille(recipe, table) * max(shares) // REFERENCE_PACE_PERMILLE)
