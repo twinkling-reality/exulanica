@@ -92,7 +92,7 @@ Implementation:
   declared area of each, the dependency its input names its place under, the kinds of the
   world's own records its people's activities may name, the thing kind its population is made
   of and, for a town, the measured cost of a minute in place of a head count:
-  `assets/catalogs/society-ground/society-ground.v7.json` (versions 1 to 6 kept beside it), read by
+  `assets/catalogs/society-ground/society-ground.v8.json` (versions 1 to 7 kept beside it), read by
   `exulanica/world/society_grounds.py`; the reader of the measured points:
   `exulanica/world/society_minute_cost.py`;
 - sending a society's people away and bringing them back:
@@ -608,7 +608,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v7.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v8.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
@@ -2102,7 +2102,13 @@ draws, of the kind the ground's catalog entry names, `population_kind`), `placed
 world's author placed in the version) or `crossed` (a visitor from an outside program). At genesis
 the author's beings are seated first, each at the open node nearest where it was placed, and only
 then does anybody of the population whose starting node one took step to the open node nearest it,
-so a composed scene holds from its first minute.
+so a composed scene holds from its first minute. From ground catalog version 8 every ground's
+population is the villager's second version, which lists saying beside what the first did: a
+villager a model or the world's owner decides for is offered to say something to the nearest who
+hear it and to everyone near, and, asked the minute after a line was said to it, may answer. A
+society whose first input recorded the first villager keeps it, and its villagers say nothing. A
+society no model decides for lives the same either way
+(`tests/test_villagers_say_lines.py`).
 
 **Its input carries the things its author placed.** It reads
 `exulanica.society-input/authored-ground-v5` (migration 0151): the fourth profile's projection, at

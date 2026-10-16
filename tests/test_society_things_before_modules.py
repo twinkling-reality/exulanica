@@ -21,7 +21,7 @@ from exulanica.world.society import society_state_sha256
 from exulanica.world.society_planner import advance_purposeful_society, input_sha256
 from exulanica.world.society_things import advance_things, initial_things_society
 
-from things_society_support import compose, thing
+from things_society_support import FIRST_VILLAGER, compose, thing
 
 HISTORY = Path(__file__).parent / "fixtures" / "society-things-before-modules.json"
 GATE = thing("gate", "gate", 1, 0, 9_000, yaw=3_141_593)
@@ -29,10 +29,12 @@ KNIGHT = thing("knight", "knight", 1, 3_000, 3_000)
 
 
 def _stored_input():
-    """The input as it was stored: the same composition, recording no modules of either kind."""
+    """The input as it was stored: the same composition, recording no modules of either kind, its
+    people the villager's first version."""
     document = compose((GATE, KNIGHT))
     document.pop("modules", None)
     document.pop("movement_modules", None)
+    document["population_kind"] = dict(FIRST_VILLAGER)
     document.pop("document_sha256")
     document["document_sha256"] = input_sha256(document)
     return document

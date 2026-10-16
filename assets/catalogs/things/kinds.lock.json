@@ -123,6 +123,11 @@
       "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"
     },
     {
+      "kind": "villager",
+      "version": 2,
+      "sha256": "05500ac2514966f7610586f40ad4e73d62479742c9c49acbf7ef2cd82959e595"
+    },
+    {
       "kind": "visitor",
       "version": 1,
       "sha256": "97be94be55a6290a75b8865e2cf589970ea465c8ff7ee9eb5910e2070f935df8"

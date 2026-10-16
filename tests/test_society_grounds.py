@@ -273,9 +273,15 @@ def test_an_activity_may_name_only_the_records_its_own_ground_states():
 
 
 def test_each_ground_names_the_shipped_being_its_population_is_made_of():
-    villager = dict(shipped_thing_kinds()[("villager", 1)].reference())
+    # From the eighth version, the villager's second version, which may say a line; the seventh
+    # named the first, which a society made under it records and keeps.
+    villager = dict(shipped_thing_kinds()[("villager", 2)].reference())
     grounds = load_society_grounds()
     assert [ground.population_kind for ground in grounds] == [villager] * len(grounds)
+    first = dict(shipped_thing_kinds()[("villager", 1)].reference())
+    assert [ground.population_kind for ground in load_society_grounds(version=7)] == [first] * len(
+        grounds
+    )
     # Every reader shares the loaded grounds, so none may change the kind for the others: it is
     # read-only, and a reader's copy is its own.
     with pytest.raises(TypeError):

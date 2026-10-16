@@ -46,6 +46,7 @@ from exulanica.world.town_people import people_frame, resident_of, town_people
 
 import test_walking_surfaces_v3 as town
 from living_town_support import before_floor_area, per_town_routine
+from things_society_support import FIRST_VILLAGER
 
 #: The town here is made as towns were made before their homes followed floor area, the town the
 #: digests below were read for; who its people are does not depend on which routine that is.
@@ -190,9 +191,11 @@ def test_an_input_with_no_frame_and_its_society_are_the_bytes_they_were(things: 
     placed = town._scene_things() if things == "scene" else []
     document = town._compose(*placed)
     # Reconstruct the retained input: it pins the ability modules that f676d996 composed, and
-    # predates recorded movement modules. Replay uses those pins and the first walking.
+    # predates recorded movement modules and the villager's second version. Replay uses those
+    # pins, the first walking and the first villager.
     document["modules"] = list(RECORDED_MODULES)
     del document["movement_modules"]
+    document["population_kind"] = dict(FIRST_VILLAGER)
     document = _resealed(document)
     assert "people" not in document
     genesis = _genesis(document)

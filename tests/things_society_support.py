@@ -37,6 +37,9 @@ SEED = "7" * 64
 SOCIETY = uuid.uuid5(authored.VERSION, "exulanica-society/v1")
 GRANT = uuid.UUID(int=0x9A)
 BRIDGE = "testbridge"
+#: The population a society made before the eighth ground catalog records: the villager's first
+#: version, which says nothing. A test rebuilding such a society's stored input states it.
+FIRST_VILLAGER: Mapping[str, Any] = dict(shipped_thing_kinds()[("villager", 1)].reference())
 
 
 def thing(

@@ -37,7 +37,7 @@ from exulanica.world.society_planner import (
 from exulanica.world.society_things import THINGS_PROFILE, advance_things, initial_things_society
 
 import test_society_hands as hands
-from things_society_support import SEED, SOCIETY, arrival, thing
+from things_society_support import FIRST_VILLAGER, SEED, SOCIETY, arrival, thing
 from things_society_support import compose as current_compose
 
 HISTORY = Path(__file__).parent / "fixtures" / "society-things-purposeful-v1.json"
@@ -266,8 +266,10 @@ def test_a_request_for_an_activity_its_kind_does_not_list_is_refused():
 
 def test_a_stored_society_of_the_first_version_replays_as_it_ran():
     history = json.loads(HISTORY.read_text(encoding="utf-8"))
-    # The input as it was stored: the same composition, recording the modules it recorded then.
-    document = _first_version(compose((GATE, SPIRIT, KNIGHT)), history["modules"])
+    # The input as it was stored: the same composition, recording the modules it recorded then and
+    # the villager's first version, which its people were.
+    stored = {**compose((GATE, SPIRIT, KNIGHT)), "population_kind": dict(FIRST_VILLAGER)}
+    document = _first_version(stored, history["modules"])
     assert PURPOSEFUL in document["modules"]
     assert document["document_sha256"] == history["input_sha256"]
     state = initial_things_society(

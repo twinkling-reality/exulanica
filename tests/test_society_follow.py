@@ -160,6 +160,8 @@ def test_a_society_made_before_follow_was_built_replays_as_it_ran():
     document["modules"] = history["modules"]
     # Stored before a first input recorded its movement modules: it walks by the first walking.
     del document["movement_modules"]
+    # Stored before the eighth ground catalog: its people are the villager's first version.
+    document["population_kind"] = dict(support.FIRST_VILLAGER)
     document["document_sha256"] = input_sha256(document)
     assert document["document_sha256"] == history["input_sha256"]
     state = initial_things_society(

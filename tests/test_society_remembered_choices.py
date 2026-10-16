@@ -47,7 +47,7 @@ from exulanica.world.society_things import (
     validate_things_state,
 )
 
-from things_society_support import SEED, SOCIETY, compose, thing
+from things_society_support import FIRST_VILLAGER, SEED, SOCIETY, compose, thing
 
 GATE = thing("gate", "gate", 1, 0, 9_000, yaw=3_141_593)
 KNIGHT = thing("knight", "knight", 2, 3_000, 3_000)
@@ -85,9 +85,11 @@ def _sha(value: Any) -> str:
 
 
 def _before(document: dict[str, Any]) -> dict[str, Any]:
-    """``document`` as a first input written before the two modules were built."""
+    """``document`` as a first input written before the two modules were built, whose people were
+    the villager's first version."""
     earlier = copy.deepcopy(document)
     earlier["modules"] = list(BEFORE)
+    earlier["population_kind"] = dict(FIRST_VILLAGER)
     earlier["document_sha256"] = input_sha256(earlier)
     return earlier
 

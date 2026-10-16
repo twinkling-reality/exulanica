@@ -589,9 +589,12 @@ def test_a_being_that_can_say_something_is_offered_to_say_it_to_whoever_hears_it
     # Under the role's own contract, as every other engine's people are asked, nothing is said.
     plain = choice_options(state, document, knight["id"], person_role().contract(), seed=SEED)
     assert not {o.kind for o in plain} & {"say_to", "say_all", "carry_on", "leave"}
-    # A villager's kind cannot say anything, so it is offered no line.
-    theirs = choice_options(state, document, villager["id"], contract, seed=SEED)
-    assert not {o.kind for o in theirs} & {"say_to", "say_all"}
+    # A villager's kind may say a line too (the villager's second version; the first's could
+    # not: tests/test_villagers_say_lines.py): with something under way beside the knight, it is
+    # offered to say something to it.
+    busy = _under_way(state, villager["id"])
+    theirs = choice_options(busy, document, villager["id"], contract, seed=SEED)
+    assert knight["id"] in {o.addressee_id for o in theirs if o.kind == "say_to"}
 
 
 def test_a_being_with_something_under_way_may_go_on_say_something_or_leave():
@@ -612,10 +615,19 @@ def test_a_being_with_something_under_way_may_go_on_say_something_or_leave():
     # A program deciding from outside is asked every minute; a model, only at a choice point.
     assert person_adapter.due_from_outside(away, visitor["id"])
     assert not person_adapter.due(away, visitor["id"])
-    # Somebody with nothing to say and no way to leave is not asked while something is under way.
+    # Somebody with nothing to say and no way to leave is not asked while something is under way:
+    # a villager of a society whose input recorded the villager's first version, which says nothing.
+    first = {**document, "population_kind": dict(support.FIRST_VILLAGER)}
+    first["document_sha256"] = input_sha256(first)
+    older = initial_things_society(SOCIETY, SEED, first, population=POPULATION)
+    villager = _person(older, came_by="populated")
+    idle = _under_way(older, villager["id"])
+    assert choice_options(idle, first, villager["id"], contract, seed=SEED) == ()
+    # The second version's villager, beside the same knight, is asked: it may say something.
     villager = _person(state, came_by="populated")
-    idle = _under_way(state, villager["id"])
-    assert choice_options(idle, document, villager["id"], contract, seed=SEED) == ()
+    assert choice_options(
+        _under_way(state, villager["id"]), document, villager["id"], contract, seed=SEED
+    )
 
 
 def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():

@@ -12,6 +12,7 @@ reader under test.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import replace
 
 import pytest
@@ -235,7 +236,7 @@ def test_a_town_refuses_nobody_and_no_head_count():
 
 
 def test_every_published_version_of_the_ground_catalog_still_reads():
-    assert CATALOG_VERSION == 7
+    assert CATALOG_VERSION == 8
     by_version = {
         version: {ground.key: ground for ground in load_society_grounds(version=version)}
         for version in range(1, CATALOG_VERSION + 1)
@@ -262,6 +263,77 @@ def test_every_published_version_of_the_ground_catalog_still_reads():
         added = ("site.loggia",) if key == "generated_site" else ()
         assert ground.record_subjects == tuple(sorted((*earlier.record_subjects, *added)))
         assert replace(ground, record_subjects=earlier.record_subjects) == earlier
+    # The eighth version's grounds are the seventh's, but that their people are the villager's
+    # second version, which may say a line; how many more asks that costs is stated below.
+    for key, ground in by_version[8].items():
+        earlier = by_version[7][key]
+        assert (earlier.population_kind["version"], ground.population_kind["version"]) == (1, 2)
+        assert replace(ground, population_kind=earlier.population_kind) == earlier
+
+
+def test_a_villager_a_model_decides_for_is_asked_once_more_after_each_line_said_to_it(
+    monkeypatch,
+):
+    """The eighth version's people may say a line, so what a minute of a society of things costs
+    in asks changes for a villager a model decides for, and only there. Such a villager is asked at
+    its own choice points as before, and never twice in a minute; it is now also asked in the
+    minute after a line was said to it while something is under way, where the first villager,
+    offered nothing to say, was asked nothing. So someone speaking to it costs one more ask, the
+    minute after each line said to it; a minute after none costs nothing more."""
+    from exulanica.world import society_grounds as grounds_module
+    from exulanica.world.role_decisions import FEWEST_OPTIONS
+    from exulanica.world.roles.person import IDLE_KIND, due
+    from exulanica.world.society_decision_contract import at_choice_point, choice_options
+    from exulanica.world.society_planner import advance_purposeful_society
+    from exulanica.world.society_things import advance_things
+
+    import test_society_recollection as square
+
+    def minutes(version: int) -> list[tuple[bool, bool, bool]]:
+        """For three minutes after the knight speaks to the villager nearest it: whether a line
+        was said to it in the minute before, whether it is at a choice point, and whether a model
+        deciding for it would be asked, as a run of minutes asks (``role_request``)."""
+        read = {g.navigation_profile: g for g in load_society_grounds(version=version)}
+        monkeypatch.setattr(grounds_module, "society_ground_for_navigation", read.__getitem__)
+        state, document = square._square(square.KNIGHT)
+        knight = square._placed(state, "knight")
+        villager = min(
+            square._villagers(state),
+            key=lambda p: math.dist(p["position_mm"], knight["position_mm"]),
+        )
+        assert villager["kind"]["version"] == {7: 1, 8: 2}[version]
+        said = [
+            square._receipt(knight, square._say(state, document, knight, to=villager), line="Hi")
+        ]
+        found = []
+        for _ in range(3):
+            planned, events = advance_purposeful_society(state, square.SEED, [document])
+            state, _, _ = advance_things(
+                state, planned, square.SEED, document, events, (), decisions=said
+            )
+            spoken_to = bool(said)
+            said = []
+            options = choice_options(
+                state, document, villager["id"], square._contract(), seed=square.SEED
+            )
+            asked = (
+                due(state, villager["id"])
+                and len(options) >= FEWEST_OPTIONS
+                and any(option.kind != IDLE_KIND for option in options)
+            )
+            person = next(p for p in state["inhabitants"] if p["id"] == villager["id"])
+            found.append((spoken_to, at_choice_point(person), asked))
+        return found
+
+    seventh, eighth = minutes(7), minutes(8)
+    # The same minutes either way: spoken to in the first while walking, then at a choice point.
+    assert [row[:2] for row in seventh] == [row[:2] for row in eighth]
+    assert seventh[0][:2] == (True, False)
+    assert any(at_choice for _, at_choice, _ in seventh)
+    for (spoken_to, at_choice, before), (_, _, after) in zip(seventh, eighth, strict=True):
+        # At most one ask a minute; one more only after a line said to it while under way.
+        assert after == (before or (spoken_to and not at_choice))
+    assert sum(row[2] for row in eighth) - sum(row[2] for row in seventh) == 1
 
 
 def test_a_released_catalog_is_not_held_to_the_engine_table_of_a_later_day(tmp_path, monkeypatch):

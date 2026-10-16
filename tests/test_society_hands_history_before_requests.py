@@ -32,7 +32,7 @@ from exulanica.world.society_planner import advance_purposeful_society, input_sh
 from exulanica.world.society_things import advance_things, initial_things_society
 
 from test_society_things_before_modules import _events_sha256
-from things_society_support import compose, thing
+from things_society_support import FIRST_VILLAGER, compose, thing
 
 HISTORY = Path(__file__).parent / "fixtures" / "society-things-before-hands-requests.json"
 GATE = thing("gate", "gate", 1, 0, 9_000, yaw=3_141_593)
@@ -53,9 +53,14 @@ RECORDED_MODULES = (
 
 
 def recorded(document: dict[str, Any]) -> dict[str, Any]:
-    """``document`` naming the modules the history was recorded with, and no movement modules,
-    which no first input recorded then, sealed again."""
-    document = {**document, "modules": list(RECORDED_MODULES)}
+    """``document`` naming the modules the history was recorded with, no movement modules, which
+    no first input recorded then, and the villager's first version, which its people were, sealed
+    again."""
+    document = {
+        **document,
+        "modules": list(RECORDED_MODULES),
+        "population_kind": dict(FIRST_VILLAGER),
+    }
     document.pop("movement_modules", None)
     document.pop("document_sha256")
     document["document_sha256"] = input_sha256(document)
