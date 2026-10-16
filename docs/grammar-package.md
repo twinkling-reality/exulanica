@@ -375,6 +375,15 @@ fill bound; `terrain_relief_mm` is gone, since the land is the town's relief. A 
 coast and upland land generates, its tiles validate and close, and its walking place reads nothing
 on the land that it does not read on level ground (`tests/test_city_grammar_v6.py`).
 
+On version 6 a flat roof's row of plant and tanks keeps no object farther than a rooftop record's
+`clearance_mm` bound (10 m) from its tier's edges. Placed along the tier's middle line, an object in
+the middle of a row on a tier more than about 21 m deep and long keeps more than that from every
+edge, and the record check refuses the town's candidate; version 6 stands such a row instead nearer
+the south edge, where the class reaching least far south keeps exactly the bound, the objects at the
+same places along it. A row that keeps within the bound stands on the middle line, and versions 1 to
+5 place every row there, so only a candidate earlier versions refused generates differently
+(`tests/test_city_rooftop_rows.py`).
+
 The record shapes are in `exulanica/grammar/grammars/city/` (`common.py` holds what every record
 shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data. Every version
 declares the same record kinds at the same versions; a facade's own `grammar_version` states the

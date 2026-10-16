@@ -26,7 +26,12 @@ well needs a rule for where it may stand that this version does not have.
 **Rooftop objects.** On a flat top tier, ``rooftop_plant_count`` plant units and then
 ``rooftop_tank_count`` tanks are placed in a row along the tier's middle, west to east, each
 keeping its class's clearance from every tier edge and from its neighbours. Each count is derived
-up to how many fit. A record's ``clearance_mm`` is the clearance the placement actually keeps.
+up to how many fit. A record's ``clearance_mm`` is the clearance the placement actually keeps. On
+city grammar version 6 (:data:`~exulanica.grammar.grammars.city.descriptor.CITY_LAND_VERSIONS`), a
+row on a tier so deep and long that an object on its middle would keep more than a rooftop record
+states from every edge stands instead nearer the south edge, where it keeps exactly that: the
+middle line placed it out of the record's bound, so no town that generates on an earlier version
+or on a smaller roof places anything differently.
 
 **Base and extent.** A building stands at its lot's grade. Its extent is its lot's, in plan (the
 lot's ring grown by the largest facade projection), and in height from its base to the highest of
@@ -53,6 +58,7 @@ from exulanica.grammar.geometry import Extent
 from exulanica.grammar.grammars.city import massing, parcels, streets
 from exulanica.grammar.grammars.city.catalogs import form_parts
 from exulanica.grammar.grammars.city.common import FormPart
+from exulanica.grammar.grammars.city.descriptor import CITY_LAND_VERSIONS
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
     catalog,
@@ -83,6 +89,11 @@ _DISTRICT: Final = 0
 STAGE_VERSION_3: Final = 3
 #: The attachment every typology this version lays has: it builds to every lot line.
 _TERRACED: Final = "terraced"
+#: The most clearance a rooftop record states (its shape's bound): on a version that lays a town on
+#: its land, a row stands where none of its objects keeps more.
+_ROOFTOP_KEPT_MOST_MM: Final = next(
+    field.maximum for field in massing.ROOFTOP_SHAPE.fields if field.name == "clearance_mm"
+)
 
 
 def weighted_typologies() -> list[str]:
@@ -132,15 +143,34 @@ def _typologies(frontage: int, high_street: bool) -> list[str]:
 
 
 def _place_row(
-    ring: tuple[tuple[int, int], ...], classes: Sequence[str]
+    ring: tuple[tuple[int, int], ...], classes: Sequence[str], kept_most_mm: int | None = None
 ) -> tuple[list[tuple[str, int, int, int]], int]:
     """Place objects of ``classes`` west to east along the ring's middle line, as many as fit.
 
+    With ``kept_most_mm``, a row in which some object would keep more than that from every edge
+    stands instead on the line where the class reaching least far south keeps exactly that from
+    the south edge, so no object keeps more than a rooftop record states; a row that keeps within
+    it stands on the middle line.
+
     Returns the placements ``(class, x, y, clearance kept)`` and how many of ``classes`` fit.
     """
+    min_y, max_y = min(y for _x, y in ring), max(y for _x, y in ring)
+    placed = _row_on(ring, classes, (min_y + max_y) // 2)
+    if kept_most_mm is not None and any(kept > kept_most_mm for *_, kept in placed):
+        south = max(
+            parts_extent(0, 0, 0, form_parts(entry("rooftop-object", key)["parts"])).min_y_mm
+            for key in classes
+        )
+        placed = _row_on(ring, classes, min_y + kept_most_mm - south)
+    return placed, len(placed)
+
+
+def _row_on(
+    ring: tuple[tuple[int, int], ...], classes: Sequence[str], middle_y: int
+) -> list[tuple[str, int, int, int]]:
+    """Objects of ``classes`` west to east along the line ``middle_y``, as many as fit."""
     min_x, max_x = min(x for x, _y in ring), max(x for x, _y in ring)
     min_y, max_y = min(y for _x, y in ring), max(y for _x, y in ring)
-    middle_y = (min_y + max_y) // 2
     cursor = min_x
     placed = []
     for key in classes:
@@ -163,7 +193,7 @@ def _place_row(
         )
         placed.append((key, x, middle_y, kept))
         cursor = x + box.max_x_mm
-    return placed, len(placed)
+    return placed
 
 
 def _on_high_street(lot: parcels.ParcelRecord, curbs: dict, segments: dict) -> bool:
@@ -421,8 +451,10 @@ def _generate(
                 maximum=tank_fit - plant,  # type: ignore[operator]
             )
             placements, _count = _place_row(
-                top.ring_mm, ["hvac_unit"] * plant + ["water_tank"] * tanks
-            )  # type: ignore[operator]
+                top.ring_mm,
+                ["hvac_unit"] * plant + ["water_tank"] * tanks,  # type: ignore[operator]
+                _ROOFTOP_KEPT_MOST_MM if context.grammar_version in CITY_LAND_VERSIONS else None,
+            )
             for index, (key, x, y, kept) in enumerate(placements):
                 parts = form_parts(entry("rooftop-object", key)["parts"])
                 objects.append(
