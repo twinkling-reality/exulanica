@@ -1057,11 +1057,11 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         build.invented_digest,
     ),
     # A request is named by 32 hexadecimal characters, so an invented one has that shape too.
-    "/world/github-projects/requests/{request_id}": Owned(
-        build.project_request, lambda: uuid.uuid4().hex
-    ),
     "/world/github-projects/publications/{request_id}": Owned(
         build.project_publication, lambda: uuid.uuid4().hex
+    ),
+    "/world/github-projects/requests/{request_id}": Owned(
+        build.project_request, lambda: uuid.uuid4().hex
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),

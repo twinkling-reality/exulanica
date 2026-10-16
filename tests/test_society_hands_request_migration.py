@@ -176,8 +176,9 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
             # thing's kind is gone; and the characters owners wrote for placed beings (0213), which
             # the runtime reads to compose a new society's input. Below the hands request none
             # exists; every thing here is a shipped kind, none was erased and nobody wrote a
-            # character, so a 'shipped' column and two empty views are facts. All three are dropped
-            # before the later migrations add them.
+            # character, so a 'shipped' column and two empty views are facts. A minute played here
+            # writes its moments and reads the earlier ones (0221), so an empty table of the same
+            # columns stands for them. All four are dropped before the later migrations add them.
             admin.execute(
                 "alter table world_alternate_thing "
                 "add column kind_source text not null default 'shipped'"
@@ -191,6 +192,15 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                 "null::text as world_id,null::uuid as version_id,null::text as placed_id,"
                 "null::bigint as revision,null::text as name,null::text as about,"
                 "null::timestamptz as written_at where false"
+            )
+            admin.execute(
+                "create table world_society_moment (workspace_id uuid not null,"
+                "moment_id uuid not null,society_id uuid not null,version_id uuid not null,"
+                "tick integer not null,kind text not null,rule_version text not null,"
+                "anchor_event_id uuid not null,event_ids uuid[] not null,request_id uuid,"
+                "subjects uuid[] not null,document jsonb not null,document_sha256 text not null,"
+                "recorded_at timestamptz not null default statement_timestamp(),"
+                "primary key (workspace_id, moment_id))"
             )
             admin.commit()
             base = env_get("TEST_DATABASE_URL")
@@ -288,6 +298,7 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                     assert world.replayed() is True
                 admin.execute("drop view thing_erasure")
                 admin.execute("drop view world_thing_character")
+                admin.execute("drop table world_society_moment")
                 admin.execute("alter table world_alternate_thing drop column kind_source")
                 for later in everything:
                     if later.version > hands.version:

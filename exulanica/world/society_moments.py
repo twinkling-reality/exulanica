@@ -371,8 +371,9 @@ def place_of(
 
 
 def _scene_person(one: Mapping[str, Any]) -> dict[str, Any]:
-    action = one.get("action") if isinstance(one.get("action"), Mapping) else {}
-    goal = one.get("goal") if isinstance(one.get("goal"), Mapping) else {}
+    held_action, held_goal = one.get("action"), one.get("goal")
+    action: Mapping[str, Any] = held_action if isinstance(held_action, Mapping) else {}
+    goal: Mapping[str, Any] = held_goal if isinstance(held_goal, Mapping) else {}
     path = one.get("motion_path_mm")
     return {
         "id": str(one.get("id")),

@@ -674,6 +674,10 @@ VERSION_ADAPTERS: Final[tuple[Callable[[VersionContext], list[Operation]], ...]]
 #: A test holds this table and the adapters to every such version route.
 NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
     {
+        ("PUT", "/world/versions/{version_id}/history/moments/{moment_id}/picture"): (
+            "keeps the picture the page made of a recorded moment, once, for History; it "
+            "changes nothing a version action reads"
+        ),
         ("POST", "/world/versions/{version_id}/inventory/query"): (
             "reads current appearance facts for typed inventory entities without changing the "
             "world; it is an inventory query, not a version action"
