@@ -44,9 +44,9 @@ def test_the_api_connects_as_the_judge_role_and_never_as_the_runtime_role():
 
     ``exulanica_judge`` holds SELECT everywhere, INSERT and UPDATE on the fourteen tables a judge
     writes, and DELETE on nothing. ``exulanica_app`` may write sources. The judge token's
-    permissions (``JUDGE_PERMISSIONS`` in ``exulanica/orchestration/judge_seed.py``) are per route
-    rather than per table: ``deletion.write`` reaches identity revocation, which only this role
-    refuses. So the role is still the boundary that decides it.
+    permissions (``JUDGE_PERMISSIONS`` in ``exulanica/orchestration/judge_seed_role.py``) are per
+    route rather than per table: ``deletion.write`` reaches identity revocation, which only this
+    role refuses. So the role is still the boundary that decides it.
     """
     directives = _directives(JUDGE_COMPOSE)
     runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]

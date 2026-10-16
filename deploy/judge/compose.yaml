@@ -13,7 +13,7 @@
 #      every table, INSERT and UPDATE on fourteen, and DELETE on none, so the database enforces
 #      "a judge cannot touch sources or deletion" whatever the API does. The judge's bearer token
 #      is also limited, to the permissions JUDGE_PERMISSIONS names in
-#      exulanica/orchestration/judge_seed.py, which the API checks on every route.
+#      exulanica/orchestration/judge_seed_role.py, which the API checks on every route.
 #   2. `web` and `api` are one origin. The browser client calls `window.location.origin + '/api'`
 #      and the API installs no CORS middleware, so a second origin does not work and cannot be
 #      made to work from the client side.

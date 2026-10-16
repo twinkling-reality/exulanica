@@ -71,11 +71,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the legacy app shell's boot and world mount, the picture of a saved world it keeps "
         "on the server once a frame holds the drawn world, and a site redrawn after a part changes",
     ),
-    "exulanica/orchestration/judge_seed.py": (
-        2_030,
-        "a workspace sealed into a verified archive; its refusals include a workspace that keeps "
-        "web pictures (0215) or a changed town's tiles (0219)",
-    ),
     "exulanica/world/saved_entries.py": (
         1_939,
         "reopening a personal world at a saved state, and making a town on its land",
