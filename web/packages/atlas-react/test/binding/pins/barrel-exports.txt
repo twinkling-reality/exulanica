@@ -36,6 +36,7 @@ PeopleCatalogNotServed
 PhysicalResidencyRuntime
 RepresentationRuntime
 SCALE_MILLI_UNIT
+SPLAT_OCCLUSION
 SceneObjectRuntime
 anchorKindSlot
 atlasPointFromRegion
@@ -52,6 +53,7 @@ createGroundRing
 createObjectContainerAsset
 createPointCloud
 createRegionRelief
+createSceneSplatAsset
 crs84IntegerToLocal
 decodeOpm
 defaultSemanticsFor
@@ -75,6 +77,7 @@ inhabitantCatalog
 inhabitantLook
 inhabitantRenderable
 isPresenceMarkerOnly
+layoutDepthOnly
 localizeNYCFeatures
 lookSha256
 mapCameraState

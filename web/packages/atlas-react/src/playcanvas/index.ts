@@ -47,7 +47,15 @@ export {
 } from './scene-objects.js';
 
 export type { TrainedSceneGeometry } from './scene-splats.js';
-export { PROOF_LENS_SPLAT_MODIFIER, validateSogBundle, validateTrainedSceneGeometry, trainedSceneFootprint } from './scene-splats.js';
+export {
+  PROOF_LENS_SPLAT_MODIFIER,
+  createSceneSplatAsset,
+  validateSogBundle,
+  validateTrainedSceneGeometry,
+  trainedSceneFootprint,
+} from './scene-splats.js';
+export type { LayoutDepthOnly, SplatOcclusionLook } from './splat-occlusion.js';
+export { SPLAT_OCCLUSION, layoutDepthOnly } from './splat-occlusion.js';
 export {
   opmPointInScene,
   scenePointMapFootprint,
