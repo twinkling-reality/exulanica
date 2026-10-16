@@ -7,6 +7,11 @@ export const CORNER_WORDS = Object.freeze({
   speed: 'Speed',
 });
 
+/** The world screen's own words (R-WORLD-BUILD-SHEET): the first-minute hint, the keys card and its button. */
+export const SCREEN_WORDS = Object.freeze({
+  firstHint: 'W A S D to walk, the mouse to look', keys: 'Keys', drag: 'Look', follow: 'Follow', clock: 'The world\'s clock', rail: 'The world',
+});
+
 /** The opening's words (frame 01): its label, the tip's label and its one tip. */
 export const OPENING_WORDS = Object.freeze({
   opening: 'Opening', tip: 'Tip',

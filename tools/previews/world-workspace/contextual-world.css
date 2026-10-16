@@ -6,5 +6,5 @@
 /* Beside a character or thing: the tag, prompt, ring and cards (character-presence.ts, world-ui.css). */
 #contextual-world .cw-beside { position:absolute; inset:0; pointer-events:none; }
 /* A page hides the corners (spec 5.7); the Running strip stays over it (5.9). */
-#contextual-world:has(> .wu-page) :is(.wu-back, .wu-clock, .wu-hints, .wu-reticle, .wu-mode) { visibility:hidden; }
+#contextual-world:has(> .wu-page) :is(.wu-corner, .wu-top, .wu-clock-pill, .wu-hints, .wu-reticle, .wu-first-hint, .wu-keys-button, .wu-keys-card) { visibility:hidden; }
 body.ux-world-cleared #atlas:focus { outline:none; }

@@ -1,0 +1,60 @@
+/* The world screen as r02 draws it (DESIGN's R-WORLD-BUILD-SHEET, APPROVALS item 12), on the redraws' shared
+   craft in world-ui.css: the rail and its tip at the top left, the one pill at the top, the clock at the top
+   right, the first-minute hint at the bottom, and the keyboard button with its keys card at the bottom right.
+   Sizes are reference pixels at 1920 by 1080 in world-ui's unit; a max() floor is the sheet's 1440 size. */
+
+.wu-screen-in { animation: wu-fade 300ms var(--ease) both; }
+
+/* ---------- The rail (section 1) ---------- */
+.wu-rail { position: absolute; left: var(--edge-inset); top: var(--edge-inset); display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4);
+  border-radius: calc(14 * var(--u)); pointer-events: auto; }
+.wu-rail-button { position: relative; display: grid; place-items: center; width: max(36px, calc(40 * var(--u))); height: max(36px, calc(40 * var(--u))); margin: 0; padding: 0;
+  border: 0; border-radius: calc(10 * var(--u)); background: none; color: var(--ink); cursor: pointer; }
+.wu-rail-button:hover, .wu-rail-button[data-lit="true"] { background: var(--lit-fill); }
+.wu-rail-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.wu-rail-button svg { width: max(18px, calc(20 * var(--u))); height: max(18px, calc(20 * var(--u))); fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.wu-rail-divider { height: 1px; margin: var(--space-4) var(--space-8); background: var(--rail-divider); }
+/* One tip at a time, 12 px right of the rail, centred on its button. */
+.wu-rail .wu-tip { position: absolute; left: calc(100% + 12 * var(--u)); transform: translateY(-50%); pointer-events: none; }
+
+/* The way back and a mode's pill take the rail's place (the sheet's amendment). */
+.wu-corner-pill { position: absolute; left: var(--edge-inset); top: var(--edge-inset); margin: 0; border: 0; color: var(--ink); cursor: pointer; pointer-events: auto; }
+.wu-corner-pill:focus-visible, .wu-clock-pill:focus-visible, .wu-keys-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* ---------- The top pill (section 2) ---------- */
+.wu-top { position: absolute; left: 50%; top: var(--edge-inset); transform: translateX(-50%); pointer-events: none; }
+.wu-top-rule { width: 1px; height: calc(16 * var(--u)); background: var(--pill-divider); }
+.wu-top-people { font-size: var(--pill-text-small); color: var(--ink-2); }
+
+/* ---------- The clock (section 3), and K13's offer in its place ---------- */
+.wu-clock-pill { position: absolute; right: var(--edge-inset); top: var(--edge-inset); margin: 0; border: 0; color: var(--ink); font-variant-numeric: tabular-nums; cursor: pointer; pointer-events: auto; }
+.wu-clock-pill:disabled { cursor: default; }
+.wu-clock-pill .wu-pause { display: flex; gap: 3px; }
+.wu-clock-pill .wu-pause i { width: 3px; height: calc(12 * var(--u)); border-radius: 1px; background: currentColor; }
+.wu-clock-pill .wu-play { width: 0; height: 0; border-left: calc(9 * var(--u)) solid currentColor; border-top: calc(5.5 * var(--u)) solid transparent; border-bottom: calc(5.5 * var(--u)) solid transparent; }
+.wu-clock-pill.wu-offer { cursor: pointer; }
+.wu-clock-pill.wu-waiting { cursor: default; color: var(--ink-2); }
+
+/* ---------- The first-minute hint (section 7) ---------- */
+.wu-first-hint { position: absolute; left: 50%; bottom: var(--edge-inset); transform: translateX(-50%); font-size: max(13px, calc(14 * var(--u))); pointer-events: none;
+  transition: opacity 400ms var(--ease); }
+.wu-first-hint[data-leaving="true"] { opacity: 0; }
+
+/* ---------- The keyboard button and the keys card (section 8) ---------- */
+.wu-keys-button { position: absolute; right: var(--edge-inset); bottom: var(--edge-inset); display: grid; place-items: center; width: var(--pill-height); height: var(--pill-height);
+  margin: 0; padding: 0; border: 0; border-radius: var(--pill-radius); color: var(--ink); cursor: pointer; pointer-events: auto; }
+.wu-keys-button[aria-expanded="true"] { background: var(--lit-fill); }
+.wu-keys-button svg { width: max(18px, calc(20 * var(--u))); height: max(18px, calc(20 * var(--u))); fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.wu-keys-card { position: absolute; right: var(--edge-inset); bottom: calc(var(--edge-inset) + var(--pill-height) + var(--space-8)); display: grid; grid-template-columns: auto auto;
+  align-items: center; gap: var(--space-8) var(--space-16); padding: var(--space-16); border-radius: calc(16 * var(--u)); font: 400 var(--pill-text-small)/1 var(--font-sans);
+  pointer-events: auto; animation: wu-fade var(--t-reveal) var(--ease) both; }
+.wu-keys-card .wu-caps { display: flex; justify-content: flex-end; gap: var(--space-4); }
+.wu-keys-card .wu-key { color: rgba(255, 255, 255, .85); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wu-screen-in, .wu-keys-card { animation-duration: 120ms; }
+  .wu-first-hint { transition-duration: 120ms; }
+}
+@media (prefers-contrast: more) {
+  .wu-rail, .wu-corner-pill, .wu-top, .wu-clock-pill, .wu-first-hint, .wu-keys-button, .wu-keys-card { background: rgba(13, 20, 27, .94); }
+}

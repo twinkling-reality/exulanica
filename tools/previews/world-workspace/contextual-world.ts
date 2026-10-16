@@ -25,7 +25,7 @@ import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-
 import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
-import { areaBanner, keyWord, mountUiScale } from './world-ui.ts';
+import { areaBanner, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
 import { endOpening } from './world-opening.ts';
 import { populationLine } from './opening-steps.mjs';
@@ -131,7 +131,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const writable = Boolean(send && binding) && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1';
   const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); },
     readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed,
-    canBringIn: writable, onBuild: writable ? () => { build?.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b' })); } : null });
+    canBringIn: writable, onBuild: writable ? () => { build?.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b' })); } : null,
+    // The world screen (r02): the pill's name, the rail's History and Fly as H and F do, and where the
+    // person stands for when the first-minute hint leaves (once per world on this computer).
+    title: entry.title, worldId: entry.worldId, onHistory: () => openHistory(), onFly: () => b.controls.toggleFly(),
+    pose: () => { const at = b.controls.state; return at ? { x: at.x, z: at.z, yaw: at.yaw, pitch: at.pitch } : null; } });
   const guidance = corners.hintsRoot, worlds = corners.backRoot, worldNotes = corners.notes;
   let rows = [], inventory = null, target = null, held = null;
   let dragging = null, serial = 0, lastPick = 0, frameId = 0;
@@ -147,13 +151,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   b.controls.onInteract = null;
   b.controls.onSummon = null;
   b.controls.onCameraToggle = null;
-  // Flying (F): the mode word at the top with its key, and the hints for flying while it lasts.
+  // Flying (F): Fly lit in the rail, its word Land, and the hints for flying while it lasts.
   // History opens in every world, a read-only copy's too: it only reads (history.ts). One flag for
   // its hint and its key, so the two never disagree.
   const historyHere = true;
   const worldHints = () => corners.worldHints(availableHints({ flying: Boolean(b.controls.flying), build: Boolean(build), history: historyHere }));
   b.controls.onFlyChange = (flying) => {
-    corners.mode(flying ? CORNER_WORDS.flying : null, flying ? keyWord({ keys: ['F'], word: CORNER_WORDS.land }) : null);
+    corners.flying(Boolean(flying));
     worldHints();
   };
   b.setControlsEnabled(true); b.setFreeCursorActive(false);
@@ -1010,6 +1014,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   window.addEventListener('keyup', event => { if (event.code === 'Tab') corners.hold(false); }, { signal: lifetime.signal });
   window.addEventListener('keydown', event => {
     if (!pageShown() && wakesHints(event)) corners.wake();
+    if (!pageShown() && !event.repeat) corners.pressed(event.code);
     if (!pageShown() && event.code === 'Tab') corners.hold(true);
     if (!pageShown() && !asking && build?.key(event)) { event.stopImmediatePropagation(); return; }
     // History takes its keys; what it leaves (Tab, Enter on a focused button) keeps the browser's own
@@ -1121,7 +1126,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
     if (fate === 'inspect') void choose();
-    else if (fate === 'leave') leaveWorld();
+    else if (fate === 'leave') { if (!corners.closeKeys()) leaveWorld(); }
     else if (fate === 'play') corners.togglePlay();
     else if (fate === 'bring-in') corners.bringIn();
     else if (fate === 'history') openHistory();
