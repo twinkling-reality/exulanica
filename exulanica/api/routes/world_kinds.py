@@ -18,8 +18,8 @@ Nothing here generates a site on the request's thread. A kind's sample checks, a
 and a drawing's records all run in the kind worker (:mod:`exulanica.world.kinds.worker`), bounded
 per job, per workspace and in all; work the worker does not finish in time, or cannot take, is
 answered 503 ``kind_work_overran``, ``kind_work_busy`` or ``kind_work_unavailable`` with a
-``Retry-After``, and finished checks and drawings are kept, so asking again reads them. The upload's
-body is bounded before it is read (:data:`BODY_LIMITS`).
+``Retry-After``, and finished checks, drawings and landscape drawings are kept, so asking again
+reads them. The upload's body is bounded before it is read (:data:`BODY_LIMITS`).
 
 ``POST /worlds/kinds/drafts`` asks a model to draft a kind of world from a person's words and
 answers at once with a draft the page polls at ``GET /worlds/kinds/drafts/{draft_id}``: the job
@@ -95,6 +95,7 @@ from exulanica.world.kinds.samples import SiteRefused
 from exulanica.world.kinds.worker import (
     CHECK_SECONDS,
     DRAWING_SECONDS,
+    LANDSCAPE_SECONDS,
     JobOutcome,
     KindWorkWaiting,
     WorkerComposer,
@@ -103,6 +104,8 @@ from exulanica.world.kinds.worker import (
     drawing_job,
     drawing_key,
     kind_worker,
+    landscape_job,
+    landscape_key,
     town_land_job,
     town_land_key,
 )
@@ -1149,13 +1152,14 @@ def _site_drawn(
     unavailable: tuple[str, str],
     *,
     not_a_site: Callable[[Any], dict[str, Any] | Response] | None = None,
+    landscape: bool = False,
 ) -> dict[str, Any] | Response:
-    """What the kind worker made with a site world's drawing (its land documents, and on a
-    landscape the landscape's drawing and documents), for a world whose site-plan composer version
-    is one of ``versions``; else the problem the route answers (``unavailable`` its code and
-    sentence where the version is another). A world that is no site is answered by
-    ``not_a_site``, handed the version's snapshot, where it is given: a site is read first and pays
-    no other read."""
+    """What the kind worker made with a site world's drawing (its land documents), or with
+    ``landscape`` its landscape's drawing and documents, made in a job of their own once the
+    drawing they name is, for a world whose site-plan composer version is one of ``versions``;
+    else the problem the route answers (``unavailable`` its code and sentence where the version is
+    another). A world that is no site is answered by ``not_a_site``, handed the version's
+    snapshot, where it is given: a site is read first and pays no other read."""
     from exulanica.api.world_edit import object_problem
     from exulanica.world.object_repository import WorldObjectRepository
     from exulanica.world.site_parts import changes_document, changes_sha256
@@ -1177,19 +1181,34 @@ def _site_drawn(
         # What the version's drawing names: made for its records with the changes a person made
         # to its parts (exulanica.world.site_parts), as the drawing route reads them.
         changes = repository.part_changes(version_id)
+        workspace, parts = str(session.workspace_id), changes_sha256(changes)
         worker = kind_worker()
         outcome = worker.run(
-            drawing_key(str(session.workspace_id), digest, changes_sha256(changes)),
+            drawing_key(workspace, digest, parts),
             DRAWING_SECONDS,
             drawing_job,
-            str(session.workspace_id),
+            workspace,
             world_id,
             dict(receipt),
             digest,
             changes_document(changes),
-            workspace=str(session.workspace_id),
+            workspace=workspace,
             kept=worker.drawings,
         )
+        if landscape and outcome.value is not None and outcome.value["status"] == "done":
+            # The landscape's drawing names the site's, and is kept by the same receipt and
+            # parts, so asking again after it overran reads it.
+            outcome = worker.run(
+                landscape_key(workspace, digest, parts),
+                LANDSCAPE_SECONDS,
+                landscape_job,
+                world_id,
+                dict(receipt),
+                digest,
+                outcome.value["sha256"],
+                workspace=workspace,
+                kept=worker.landscapes,
+            )
         if outcome.status != "done" or outcome.value is None:
             return _waiting(outcome, kept=True)
         answer = outcome.value
@@ -1378,20 +1397,21 @@ def _site_landscape_document(
     pick: tuple[str, str] | None,
 ) -> Response:
     """Serve a site world's landscape drawing, or (``pick`` a document kind, ``chunks`` or
-    ``tops``, and a digest) one document it names, made with its drawing in the kind worker."""
+    ``tops``, and a digest) one document it names, made in the kind worker after its site's
+    drawing, in a job of its own."""
     from exulanica.world.composers.site_plan import LANDSCAPE_COMPOSER_VERSION
 
-    answer = _site_drawn(
+    landscape = _site_drawn(
         version_id,
         connection,
         session,
         world_id,
         (LANDSCAPE_COMPOSER_VERSION,),
         ("landscape_unavailable", "this world stands on no landscape"),
+        landscape=True,
     )
-    if isinstance(answer, Response):
-        return answer
-    landscape = answer["landscape"]
+    if isinstance(landscape, Response):
+        return landscape
     if pick is None:
         body, digest = landscape["body"], landscape["sha256"]
     else:

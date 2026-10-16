@@ -189,21 +189,26 @@ validation report, `exulanica.world-kind-validation/v1`, which a kept kind store
 
 Everything generated from a kind runs in the kind worker
 ([`worker.py`](../exulanica/world/kinds/worker.py)), one spawned process apart from the request's
-thread, as a town's sample does: stage B, composing a world of a kind, and generating a site
-world's records again for its drawing or for the place its society walks. No site is generated on a request's thread: the reader every
+thread, as a town's sample does: stage B, composing a world of a kind, generating a site
+world's records again for its drawing or for the place its society walks, and drawing a site's
+landscape. No site is generated on a request's thread: the reader every
 other generated world's records go through refuses a site world, and a site world states no roads,
 so the reads that ask a world for its roads (capabilities, the clock, traffic and the role hosts)
-answer without generating it. The worker's bounds:
+answer without generating it. Composing a site on a landscape realizes none of its volumes: its
+landscape's drawing is a job of its own, made when the landscape routes first ask for it, so the
+time its volumes take is never counted against making the world. The worker's bounds:
 
-- a check waits at most 40 s, a world's composition 15 s, a drawing 15 s and a place 15 s;
+- a check waits at most 40 s, a world's composition 15 s, a drawing 15 s, a landscape drawing
+  40 s and a place 15 s;
 - one request waits for a job; asking for a job already running is answered at once;
 - at most four jobs wait besides the one running, and one workspace has at most two jobs waiting or
   running, each counting until it finishes, whoever stopped waiting for it;
 - finished checks (by the workspace and the kind document's digest, 32 kept, so one workspace is
   told nothing of another's check of the same document), drawings (by the receipt's digest, 16
-  kept) and places (by the receipt's digest and the place, 16 kept) are kept, so asking again reads
-  them; a composed world is never kept, since each is made for a fresh identity, and its drawing
-  and its society's place are kept as they are made;
+  kept), landscape drawings with their chunks and tops (by the receipt's digest, 16 kept) and
+  places (by the receipt's digest and the place, 16 kept) are kept, so asking again reads them; a
+  composed world is never kept, since each is made for a fresh identity, and its drawing and its
+  society's place are kept as they are made;
 - a process whose oldest job runs past 160 s is replaced, checked at every request.
 
 A job the worker does not finish in time, cannot take or loses answers 503 `kind_work_overran`,
@@ -467,7 +472,7 @@ stages.
 | `GET /world/versions/{version_id}/land/chunks/{chunk_x}/{chunk_y}` | world read | One chunk of a site's graded land (`exulanica.landform-chunk/v1`), with its digest as the entity tag, made and kept with the drawing; 404 `land_unavailable` for a level world, 404 `land_chunk_unavailable` for a chunk the land does not hold |
 | `GET /world/versions/{version_id}/land/backdrop` | world read | The site's land drawn to the horizon (`exulanica.landform-backdrop/v1`), with its digest as the entity tag; 404 `land_unavailable` for a level world |
 | `GET /world/versions/{version_id}/land` | world read | A town on its land's land section (`exulanica.town-land/v1`): the digests of its chunks and backdrop, served by the two routes above, and its water, with its digest as the entity tag, made in the kind worker and kept by the town's receipt ([landform contract](landform-contract.md#towns-on-land)); 404 `land_unavailable` for a town on level ground, 404 `unknown_reference` for any other world |
-| `GET /world/versions/{version_id}/landscape` | world read | A site on a landscape: its landscape drawing (`exulanica.landscape-drawing/v1`), with its digest as the entity tag, made and kept with the site's drawing; 404 `landscape_unavailable` for a world on no landscape |
+| `GET /world/versions/{version_id}/landscape` | world read | A site on a landscape: its landscape drawing (`exulanica.landscape-drawing/v1`), with its digest as the entity tag, made in the kind worker after the site's drawing and kept, 503 with a `Retry-After` while it cannot be; 404 `landscape_unavailable` for a world on no landscape |
 | `GET /world/versions/{version_id}/landscape/chunk?sha256=` | world read | One chunk of a placed volume's surface (`exulanica.volume-chunk/v1`) the landscape drawing names by that digest; 404 `landscape_document_unavailable` for a digest it does not name as a chunk |
 | `GET /world/versions/{version_id}/landscape/top?sha256=` | world read | One walkable top of a placed volume (`exulanica.volume-sheet/v1`) the landscape drawing names by that digest; 404 `landscape_document_unavailable` otherwise |
 

@@ -10,6 +10,8 @@ layers. The land and volume documents inside never change for it.
   volumes' own readers.
 * :mod:`.compose`: each placed volume realized under its own seed: chunks at each level and tops.
 * :mod:`.rules`: the landscape rules a world's receipt names, so its landscape rebuilds the same.
+* :mod:`.spacing`: placed volumes stand apart, no two placements' rock meeting where their reaches
+  meet.
 
 Nothing here opens a database, a store or evidence, and nothing reads a landscape yet.
 """
@@ -41,6 +43,7 @@ from exulanica.grammar.landscape.rules import (
     check_landscape_rules,
     landscape_rules,
 )
+from exulanica.grammar.landscape.spacing import check_volumes_apart, placement_reach
 
 __all__ = [
     "CATALOG_VERSION",
@@ -54,10 +57,12 @@ __all__ = [
     "PlacedVolume",
     "Placement",
     "check_landscape_rules",
+    "check_volumes_apart",
     "compose_volumes",
     "landscape_catalog",
     "landscape_rules",
     "load_landscape_catalog",
+    "placement_reach",
     "placement_seed",
     "read_landscape_document",
     "volume_bodies",

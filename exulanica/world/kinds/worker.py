@@ -2,35 +2,41 @@
 
 Stage B of a kind's checks (:func:`~exulanica.world.kinds.samples.check_samples`) builds up to 48
 sample worlds, making a world of a kind (:func:`~exulanica.world.composers.site_plan.compose_kind`)
-tries up to four candidates, and reading a site world's drawing, or the place its society walks
+tries up to four candidates, reading a site world's drawing, or the place its society walks
 (:func:`~exulanica.world.composers.site_plan.society_place`), generates its records again from its
-receipt (:func:`~exulanica.world.composers.site_plan.records`). All are pure Python, and pure
-Python on a request's thread holds the interpreter's lock from every other request. So each runs in
-one spawned worker process (:func:`~exulanica.world.episode_worker.worker_pool`), as a town's
-sample does (:mod:`exulanica.world.specification_samples`), and no site is generated on a request's
-thread. A request waits for its job without holding the lock, within these bounds:
+receipt (:func:`~exulanica.world.composers.site_plan.records`), and drawing a site's landscape
+(:func:`~exulanica.world.landscape_drawing.landscape_drawing`) realizes its volumes. All are pure
+Python, and pure Python on a request's thread holds the interpreter's lock from every other
+request. So each runs in one spawned worker process
+(:func:`~exulanica.world.episode_worker.worker_pool`), as a town's sample does
+(:mod:`exulanica.world.specification_samples`), and no site is generated on a request's thread. A
+request waits for its job without holding the lock, within these bounds:
 
 - **a time limit per job** (:data:`CHECK_SECONDS`, :data:`COMPOSE_SECONDS`,
-  :data:`DRAWING_SECONDS`): a job not done by then is answered ``overran``;
+  :data:`DRAWING_SECONDS`, :data:`LANDSCAPE_SECONDS`): a job not done by then is answered
+  ``overran``;
 - **one request waits for a job**: asking for a job already running is answered ``overran`` at
   once, rather than holding another thread, admission place and connection for it;
 - **a bound on jobs waiting** (:data:`JOBS_WAITING`) and **on one workspace's jobs**
   (:data:`WORKSPACE_JOBS`, a job counting until it finishes, whoever stopped waiting for it): past
   either a request is answered ``busy`` rather than queued;
-- **finished checks, drawings and places are kept** by their workspace and what they are made
-  from (:data:`CHECKS_KEPT`, :data:`DRAWINGS_KEPT`, :data:`PLACES_KEPT`; :func:`check_key`,
-  :func:`drawing_key`, :func:`place_key`), so asking again after ``overran`` reads the finished
-  work and no workspace reads or waits on another's; a composed world is never kept, since each is
-  made for a fresh identity, but its drawing and its society's place are, made with it. A kept
-  place is handed out as a copy of its own, so no request changes what another reads;
+- **finished checks, drawings, landscape drawings and places are kept** by their workspace and
+  what they are made from (:data:`CHECKS_KEPT`, :data:`DRAWINGS_KEPT`, :data:`LANDSCAPES_KEPT`,
+  :data:`PLACES_KEPT`; :func:`check_key`, :func:`drawing_key`, :func:`landscape_key`,
+  :func:`place_key`), so asking again after ``overran`` reads the finished work and no workspace
+  reads or waits on another's; a composed world is never kept, since each is made for a fresh
+  identity, but its drawing and its society's place are, made with it. A site's landscape is not
+  drawn with it: its drawing is a job of its own, made when it is first read. A kept place is
+  handed out as a copy of its own, so no request changes what another reads;
 - a worker that dies answers ``unavailable``, and the next job starts a new process; at every
   request, one whose oldest job runs past :data:`STUCK_SECONDS` is replaced and its process stopped.
 
 Nothing is handed to the pool, or taken from it, while this module's own lock is held: the pool
 runs its callbacks under a lock of its own, and they take this one.
 
-What a job answers is plain data: ``{"status": "done", ...}`` with the report, the composed world or
-the drawing, or ``{"status": "refused", ...}`` with the refusal's code and words.
+What a job answers is plain data: ``{"status": "done", ...}`` with the report, the composed world,
+the drawing or the landscape drawing, or ``{"status": "refused", ...}`` with the refusal's code and
+words.
 """
 
 from __future__ import annotations
@@ -60,6 +66,8 @@ __all__ = [
     "DRAWINGS_KEPT",
     "DRAWING_SECONDS",
     "JOBS_WAITING",
+    "LANDSCAPES_KEPT",
+    "LANDSCAPE_SECONDS",
     "PLACES_KEPT",
     "PLACE_SECONDS",
     "STUCK_SECONDS",
@@ -76,6 +84,8 @@ __all__ = [
     "drawing_job",
     "drawing_key",
     "kind_worker",
+    "landscape_job",
+    "landscape_key",
     "part_check_key",
     "part_job",
     "parts_job",
@@ -102,6 +112,16 @@ DRAWING_SECONDS: Final = 15.0
 #: generated again, as for its drawing, and its walking graph built (about 0.03 s near its 962
 #: places, measured 2026-10-06).
 PLACE_SECONDS: Final = 15.0
+#: The longest a request waits for a site's landscape drawing: its volumes realized at every level
+#: the landscape states, and their tops searched. Measured 2026-10-15 on the development machine:
+#: the largest landscapes made, five volumes of up to nine parts at the default 2 m finest cell
+#: (103 and 104 chunks), were drawn in 17.9 and 19.4 s at a load of 56 to 86. The limit is more
+#: than twice the slowest, rounded up to a whole 5 s, the rule the checks' limit is derived by, and
+#: is no more than that limit, so :data:`STUCK_SECONDS` stays four times the longest. A landscape
+#: the catalog admits beyond these (up to 64 volumes, cells down to 0.5 m) can take far longer:
+#: past this it is answered ``overran`` and read once finished, and past :data:`STUCK_SECONDS` its
+#: process is replaced.
+LANDSCAPE_SECONDS: Final = 40.0
 #: Jobs waiting for the worker besides the one it computes.
 JOBS_WAITING: Final = 4
 #: Jobs one workspace may have waiting or computing: a person's own work is one job at a time, and
@@ -112,6 +132,10 @@ WORKSPACE_JOBS: Final = 2
 CHECKS_KEPT: Final = 32
 #: Finished drawings kept by their receipt's digest: the site worlds being looked at.
 DRAWINGS_KEPT: Final = 16
+#: Finished landscape drawings, with every chunk and top they name, kept by their receipt's digest:
+#: the site worlds on a landscape being looked at, as many as their drawings. The largest made
+#: keeps about 0.8 MB (measured 2026-10-15, with the limit above).
+LANDSCAPES_KEPT: Final = DRAWINGS_KEPT
 #: Finished places kept by their receipt's digest and place: the site worlds people live in.
 PLACES_KEPT: Final = 16
 #: How long a job may run before its process is taken for stuck and replaced: four times the
@@ -219,6 +243,14 @@ def town_land_key(workspace: str, receipt_sha256: str) -> str:
     return f"town-land:{workspace}:{receipt_sha256}"
 
 
+def landscape_key(workspace: str, receipt_sha256: str, parts_sha256: str = "") -> str:
+    """Where a site world's landscape drawing is kept: by its workspace, its receipt and the digest
+    of the changes made to its parts (empty, the key unchanged, for none), as its drawing is, since
+    the landscape drawing names that drawing."""
+    key = f"landscape:{workspace}:{receipt_sha256}"
+    return f"{key}:{parts_sha256}" if parts_sha256 else key
+
+
 def place_key(workspace: str, receipt_sha256: str, place_id: str, parts_sha256: str = "") -> str:
     """Where the place a site world's society walks is kept: by its workspace, its receipt, its
     place and the digest of the changes made to its parts (empty, the key unchanged, for none)."""
@@ -287,13 +319,9 @@ def _drawn(
     world_id: str, receipt: Mapping[str, Any], receipt_sha256: str, records: tuple[object, ...]
 ) -> dict[str, Any]:
     """The drawing as the bytes a response carries (written as the API writes JSON, here rather
-    than on the request's thread) and its digest."""
-    from exulanica.world.composers.site_plan import (
-        LANDSCAPE_COMPOSER_VERSION,
-        ON_LAND_VERSIONS,
-        receipt_land,
-    )
-    from exulanica.world.landscape_drawing import landscape_drawing, landscape_drawing_sha256
+    than on the request's thread) and its digest. A site on a landscape's landscape drawing is not
+    made here: realizing its volumes is a job of its own (:func:`landscape_job`)."""
+    from exulanica.world.composers.site_plan import ON_LAND_VERSIONS, receipt_land
     from exulanica.world.site_drawing import site_drawing, site_drawing_sha256
 
     drawing = site_drawing(
@@ -307,27 +335,6 @@ def _drawn(
         # A site on land keeps its chunks and backdrop with its drawing: the land routes serve
         # them by the digests the drawing names.
         drawn["land"] = receipt_land(receipt, records).documents()
-    if receipt["composer"]["version"] == LANDSCAPE_COMPOSER_VERSION:
-        # A site on a landscape keeps the landscape's drawing and every volume chunk and top it
-        # names: the landscape routes serve them by digest.
-        landscape, bodies = landscape_drawing(world_id, receipt, receipt_sha256, drawn["sha256"])
-        drawn["landscape"] = {
-            "body": json.dumps(
-                landscape, ensure_ascii=False, allow_nan=False, separators=(",", ":")
-            ).encode("utf-8"),
-            "sha256": landscape_drawing_sha256(landscape),
-            **{
-                kind: {
-                    digest: json.dumps(document, separators=(",", ":")).encode("utf-8")
-                    for digest, document in bodies.items()
-                    if document["profile"] == profile
-                }
-                for kind, profile in (
-                    ("chunks", "exulanica.volume-chunk/v1"),
-                    ("tops", "exulanica.volume-sheet/v1"),
-                )
-            },
-        }
     return drawn
 
 
@@ -424,7 +431,8 @@ def compose_job(
     landscape: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose the world the kind makes with ``values`` for ``world_id`` and draw it, with the
-    place its society walks (the one its checks built), or say why not."""
+    place its society walks (the one its checks built), or say why not. A site on a landscape is
+    drawn without its landscape's: :func:`landscape_job` realizes its volumes when it is read."""
     from exulanica.grammar.landform import LandformRefused
     from exulanica.grammar.landscape import LandscapeRefused
     from exulanica.world.composers.site_plan import compose_kind
@@ -518,6 +526,43 @@ def drawing_job(
     if isinstance(found, str):
         return {"status": "refused", "detail": found}
     return {"status": "done", **_drawn(world_id, receipt, receipt_sha256, found)}
+
+
+def landscape_job(
+    world_id: str, receipt: dict[str, Any], receipt_sha256: str, site_drawing_sha256: str
+) -> dict[str, Any]:
+    """A site on a landscape's landscape drawing, naming the site's drawing by
+    ``site_drawing_sha256``: its volumes realized from the receipt alone, the drawing as the bytes
+    a response carries with its digest, and every chunk and top it names as bytes by its digest
+    (``chunks``, ``tops``), which the landscape routes serve; or the reason the receipt's
+    landscape no longer reads."""
+    from exulanica.world.errors import InvalidStructuralData
+    from exulanica.world.landscape_drawing import landscape_drawing, landscape_drawing_sha256
+
+    try:
+        landscape, bodies = landscape_drawing(
+            world_id, receipt, receipt_sha256, site_drawing_sha256
+        )
+    except InvalidStructuralData as exc:
+        return {"status": "refused", "detail": str(exc)}
+    return {
+        "status": "done",
+        "body": json.dumps(
+            landscape, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+        ).encode("utf-8"),
+        "sha256": landscape_drawing_sha256(landscape),
+        **{
+            kind: {
+                digest: json.dumps(document, separators=(",", ":")).encode("utf-8")
+                for digest, document in bodies.items()
+                if document["profile"] == profile
+            }
+            for kind, profile in (
+                ("chunks", "exulanica.volume-chunk/v1"),
+                ("tops", "exulanica.volume-sheet/v1"),
+            )
+        },
+    }
 
 
 #: The profile of a town on its land's land section (``GET /world/versions/{version_id}/land``).
@@ -749,6 +794,9 @@ class KindWorker:
         self.checks = Kept(CHECKS_KEPT)
         #: Finished drawings, by their workspace and receipt's digest.
         self.drawings = Kept(DRAWINGS_KEPT)
+        #: Finished landscape drawings and the chunks and tops they name, by their workspace and
+        #: receipt's digest.
+        self.landscapes = Kept(LANDSCAPES_KEPT)
         #: Finished places, by their workspace, receipt's digest and place, each read a copy.
         self.places = Kept(PLACES_KEPT, copies=True)
 
@@ -773,6 +821,7 @@ class KindWorker:
                 tuple(drawing_key(workspace, digest) for digest in digests)
                 + tuple(town_land_key(workspace, digest) for digest in digests)
             )
+            self.landscapes.forget(tuple(landscape_key(workspace, digest) for digest in digests))
             self.checks.forget((f"terrain-coverage:v1:{workspace}:",))
             self.places.forget(tuple(f"place:{workspace}:{digest}:" for digest in digests))
             executor, self._executor = self._executor, None
@@ -1031,8 +1080,6 @@ class WorkerComposer:
         drawn = {"status": "done", "body": answer["body"], "sha256": answer["sha256"]}
         if "land" in answer:
             drawn["land"] = answer["land"]
-        if "landscape" in answer:
-            drawn["landscape"] = answer["landscape"]
         self.drawn = (drawing_key(self.workspace, composed.receipt_sha256), drawn)
         self.placed = (
             place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),

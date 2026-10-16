@@ -29,6 +29,7 @@ belongs to the [world kinds contract](world-kinds-contract.md).
 - [Volume rules and landscape rules](#volume-rules-and-landscape-rules)
 - [A site on a landscape](#a-site-on-a-landscape)
 - [Readers in the browser](#readers-in-the-browser)
+- [Sky islands](#sky-islands)
 - [Refusals](#refusals)
 - [Limits](#limits)
 
@@ -164,6 +165,58 @@ the world, so the drawing's `volumes` section names each placement and the diges
 and tops, and the documents those digests name are kept and served by digest. The land is realized
 by its own realizer under its own rules.
 
+## Sea stacks
+
+`exulanica.sea-stack/v1` (`exulanica/grammar/stacks/document.py`) states one sea stack by a few
+values in its own frame, whose level 0 is the sea's surface where it is placed; the maker
+(`exulanica/grammar/stacks/maker.py`) turns a stack and a seed into an unchanged
+`exulanica.volume/v1` document with the stack's id. Nothing reads a sea stack yet.
+
+| Key | Meaning |
+| --- | --- |
+| `profile`, `id` | The profile and a lowercase key |
+| `height_mm` | How high its level top stands above level 0, 6 to 150 m |
+| `foot_mm` | How far its trunk reaches below level 0 to the sea floor, 2 to 64 m: a stack never ends in open water |
+| `base_radius_mm`, `top_radius_mm` | The trunk's radius at its foot and at its top; a wider top overhangs, at most twice the base |
+| `lean` | `tilt_mdeg` (at most 10 degrees) toward the compass bearing `toward_mdeg` |
+| `shoulders` | 0 to 4 rounded masses on its flanks |
+| `arch` | `none` (the default), or a passage: `width_mm`, `rise_mm` (its crown above the water), `floor_mm` (below the water, at least 6 m, 7 m by default) and `bearing_mdeg` (the bearing it runs along, below 180 degrees) |
+| `erosion`, `strata` | A volume's own sections, bounded by the volume catalogs at version 2 |
+| `look`, `top_look`, `walk` | `rock`; `grass` by default, or `rock`, `moss`, `sand`; `none` by default (nobody stands on a sea stack), or `tops` |
+
+Its values are bounded by `assets/catalogs/stacks/sea-stack-value.v1.json`, read with the volume
+value schema so every entry carries a reason and a licence; a look, top look or walk word must be
+one a volume admits. Defaults are written in, and its identity is the SHA-256 of its canonical JSON.
+Beyond its bounds a stack is held to four rules, each refused by its own code: the trunk's flank
+away from its lean faces up by at most 1 in 4 (about 14 degrees), its taper and its lean together;
+a passage is at most the trunk's radius wide where it passes, and its round head fits within its
+floor depth and rise; the rock over its crown is at least its width; and its floor lies at least
+the weathering (the erosion's and the strata's amplitudes) and 3 m above the foot.
+
+The maker's parts, in order, at most seven:
+
+1. A trunk column, rims rounded 1 m, leaned by the stack's lean with its axis crossing level 0 at
+   the origin. It reaches the weathering and 1 m below the foot, so weathering never lifts the foot
+   off the sea floor and the field is solid on its axis just above `-foot_mm`; its radius runs from
+   `base_radius_mm` at the foot to `top_radius_mm` at the top.
+2. Its shoulders: spheres blended 4 m into the trunk, a turn over their number apart from a drawn
+   first bearing, centred on the trunk's axis at a drawn 30 to 75 percent of its height, each 45 to
+   75 percent of the trunk's radius there.
+3. The passage: an arch carved along its bearing, centred on the trunk's axis at its floor, through
+   the whole stack.
+4. A cap at `height_mm`, so the top is level whatever the weathering below it.
+
+Its draws come from SHA-256 of the seed under the sea stack profile's prefix, the stack's id, what
+is drawn and its index, in whole numbers, so the same stack and seed make the same volume, digest
+for digest. The volume is read against volume catalog version 2 and its erosion and strata are the
+stack's own: beds varied every way read as rock, even beds read as rings, and no beds as soft clay.
+Shallow rock that faces up reads as a bright block in the bay's water, which is why a passage's
+floor lies at least 6 m under, shoulders swell above the water and the flank rule holds. The field
+lays bed 0 on level 0 with a recessed join, so the upper half of the bed below it faces up just
+under the water: across eight seeds, between 4 and 33 percent of a stack's rock in the top 3 m of
+water faced up by more than 17 degrees at the 2 m cell, a hand-made stack of the same sizes between
+3 and 29 percent. The tests hold the stacks they make to under 15 percent under their seed.
+
 ## Volume rules and landscape rules
 
 `volume_rules()` (`exulanica/grammar/volumes/rules.py`) names the volume rules version, which stands
@@ -194,13 +247,20 @@ beside them `landscape`, `landscape_sha256` and `landscape_rules`; its site draw
 grading and the place its people walk are version 5's. The landscape's extent is the site's (the
 land's frame is the site's extent), and every placed volume stands off the site: its whole extent,
 turned by its yaw and moved to its origin, reaches no part of the site's rectangle, so a site's
-people never meet rock their place does not know. Volumes stand on the land beyond the site's edge.
+people never meet rock their place does not know. A new world's placed volumes also stand apart
+(`exulanica/grammar/landscape/spacing.py`): where two reaches, each a volume's extent turned and
+moved the same way, meet, the box they share is sampled every 2 m and a point that is rock in both
+volumes, weathered as the drawing realizes them, is refused; a sliver of shared rock thinner than
+the cell can pass, the check costs at most two field evaluations a point, and a receipt is never
+held to it, so a world made before still reads and draws.
+Volumes stand on the land beyond the site's edge.
 
 `exulanica.landscape-drawing/v1` (`exulanica/world/landscape_drawing.py`) names the world, its
 receipt's digest, its site drawing's digest, its land's and its landscape's digests, the landscape
 rules version, and the `volumes` section, which also names each placed volume's `look` and
-`top_look` from its volume document; it is made with the site's drawing in the kind worker
-from a seed drawn from the world's identity and the landscape's digest, and kept with it. A reader
+`top_look` from its volume document; it is made in the kind worker, in a job of its own after the
+site's drawing it names, from a seed drawn from the world's identity and the landscape's digest,
+and kept by the world's receipt. A reader
 places a point `p` of a placed volume's chunk or top at `at_mm + R(yaw) p`, `R` the turn
 counterclockwise seen from above. The drawing, each chunk and each top are served by digest
 (`GET /world/versions/{version_id}/landscape`, `.../landscape/chunk?sha256=`,
@@ -228,6 +288,63 @@ volumes in rock throughout (`wearEach`, `volumeLook` in `style-pack/site-dresser
 cast and receive shadows and are counted in the site's triangles and draws. A landscape that
 cannot be read does not stop the site: it opens without its volumes and the page keeps the reason.
 
+## Sky islands
+
+`exulanica.sky-island/v1` (`exulanica/grammar/islands/document.py`) is a floating island stated as
+a closed object in whole millimetres, made into an unchanged `exulanica.volume/v1` document by rule.
+Nothing reads a sky island yet: a landscape does not place one.
+
+| Key | Meaning |
+| --- | --- |
+| `profile`, `id` | The profile and a lowercase key |
+| `radius_mm`, `lobes` | The top outline: how far it reaches from its centre (8 to 20 m), and 1 to 5 overlapping lobes |
+| `rim_mm` | The rim slab's thickness below the top, at most the radius and half the depth |
+| `depth_mm` | How far the underside hangs below the top, at most three times the radius |
+| `underside` | `cone` (one leaning keel ending in a blunt toe), `bowl` (a shallow, wide underside) or `spires` (several narrow keels) |
+| `fingers` | 0 to 4 thick, blunt rock limbs hanging from the underside |
+| `look`, `top_look`, `walk` | As a volume's: `rock` or `wall`; `grass`, `moss`, `rock` or `sand`; `tops` or `none` |
+| `erosion`, `strata` | A volume's sections exactly, read by the volume reader against volume catalog version 2 |
+
+Bounds, defaults and words are read from `assets/catalogs/islands/sky-island-value.v1.json`, an
+entry-shaped catalog with a reason and a licence on every entry, read with the volume value schema.
+Defaults are written in at reading, and the island's identity is the SHA-256 of its canonical JSON.
+Top land, a site, hangings and falls belong to later versions and are refused if stated.
+
+`make_island_volume` (`exulanica/grammar/islands/maker.py`) turns an island and a seed into a volume
+whose id is the island's: a slab whose top overhangs its base and smaller slabs for the further
+lobes, blended 1.5 to 2.5 m so their joins crease; the underside's parts; the fingers; and a cap at
+height 0, the top outline centred on the origin. Every value is a whole number drawn from SHA-256 of
+the seed under the island profile's prefix, one stream for each part, so the same island and seed
+make the same volume byte for byte. The rules the maker follows, from looking at volumes drawn in
+the application:
+
+- The underside narrows downward and never widens again below the slab: each part's top lies inside
+  the slab or the part it hangs from, and each part leans outward going up or tapers faster than it
+  leans. A part reaching past the slab's edge below it reads as a skirt or a pot.
+- A cone's keel hangs with its top under the slab's centre, inside the slab's base, its base
+  radius at least half its toe's width, leaned a few degrees, and ends in a blunt, flattened toe
+  block set slightly off its axis and blended into it over 2.5 to 3 m, its corners within the
+  foot's radius; two leaning roots and two lumps tilted 18 to 30 degrees sit inside the taper. A
+  narrow keel ending in a rounded part reads as a drop or a knob, and so does a toe reaching past
+  the keel's foot, which weathering narrows into a neck above it. A small island reads floating with a keel about 1.3 to 1.5 times its top
+  width deep.
+- A bowl is one wide, upright column rounded at its foot, with the two tilted lumps; spires are
+  three to five narrow keels, the first under the slab's centre to the full depth, each ending in
+  its own flat foot.
+- Fingers are thick, blunt columns, never thin tapering limbs, which read as melted drips. Keel
+  and spire feet and finger tops are at least three quarters of the weathering's amplitude and a
+  metre in radius wherever the island is wide enough, so weathering does not eat through one and
+  leave its end floating.
+- The slab reaches above the cap by its rounding and the weathering's amplitude, so the top is level
+  at 0 wherever rock lies under it.
+
+The maker reads the volume under the volume catalog version the island's catalog names, so the
+volume reader admits it; it lists at most 16 parts, within the volume catalog's limit. The radius is
+held to 20 m and the fingers to four so the costliest island the catalog admits, weathered as
+islands read well, realizes at the 2 m cell in about 5 s, within the share one island may take of a
+landscape's limit; the catalog's reasons state the measurement. The tests pin the catalog and two
+made volumes by digest.
+
 ## Refusals
 
 | Code | When |
@@ -249,6 +366,16 @@ cannot be read does not stop the site: it opens without its volumes and the page
 | `landscape_document_unavailable` | A chunk or top the world's landscape drawing does not name (404) |
 | `generated_world_landscape_rules_changed` | A receipt names landscape rules this server does not serve, or names them on a world on no landscape; the world is listed unavailable |
 | `generated_world_landscape_changed` | A receipt's landscape no longer reads, or is not the one its digest and land name |
+| `stack_invalid` | A sea stack document breaks its shape or a bound (by path) |
+| `stack_flank_faces_up` | A trunk's flank away from its lean faces up by more than 1 in 4, its taper and its lean together |
+| `stack_arch_too_wide` | A passage wider than the trunk's radius where it passes, or whose round head outgrows its floor depth and rise |
+| `stack_arch_too_high` | Less rock over a passage's crown than the passage is wide |
+| `stack_arch_below_foot` | A passage's floor less than the weathering and 3 m above the foot |
+| `landscape_volumes_overlap` | Two of a new site world's placed volumes are both rock at a sampled point where their reaches meet (by the later placement's path, naming both and the point) |
+| `island_invalid` | A sky-island document breaks its shape or a bound, its erosion and strata included (by path) |
+| `island_too_deep` | An island's depth is more than three times its radius |
+| `island_rim_too_thick` | An island's rim slab is thicker than its radius or half its depth |
+| `island_later_version` | An island states top land, a site, hangings or falls, which later versions state |
 
 ## Limits
 
@@ -265,9 +392,13 @@ cannot be read does not stop the site: it opens without its volumes and the page
   not walked by
   people; they stand only off a site;
   sky islands, spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
-- Realized chunks and tops are kept in the kind worker's memory with the site's drawing, as a site's
-  land chunks are, not in a store; a world read again later realizes them again.
-- A site world on a landscape is made, its landscape's drawing included, within the kind worker's
-  limit for making one world (15 s, `COMPOSE_SECONDS`), so that limit bounds how much rock one world
-  places: a world past it is answered `kind_work_overran` on every request.
+- Realized chunks and tops are kept in the kind worker's memory with the landscape's drawing, in a
+  keep of their own beside the site drawings, not in a store; a world read again after they are
+  let go realizes them again.
+- A site world on a landscape is made within the kind worker's limit for making one world (15 s,
+  `COMPOSE_SECONDS`) without realizing its volumes. Its landscape's drawing is made when first read,
+  within a request's wait for it (40 s, `LANDSCAPE_SECONDS`); a drawing past that is answered
+  `kind_work_overran` and read once finished, and one still running past the worker's stuck bound
+  (160 s) has its process replaced at the next request, so that bound limits how much rock one
+  world can show.
 - A world made from a person's words never stands on a landscape: no world tool names one.

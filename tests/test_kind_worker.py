@@ -1,5 +1,5 @@
-"""The kind worker: kind checks, world composition and site drawings off the request's thread,
-bounded.
+"""The kind worker: kind checks, world composition, site drawings and landscape drawings off the
+request's thread, bounded.
 
 Each test hands the worker a thread pool and a job of its own, so what is tested is the worker's
 bounds (kept results, a time limit, one waiting request per job, waiting bounds in all and per
@@ -9,6 +9,7 @@ the generation the real jobs run is tested through the routes in test_world_kind
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+import pytest
 from exulanica.world.kinds import worker as worker_module
 from exulanica.world.kinds.worker import (
     Kept,
@@ -26,6 +28,8 @@ from exulanica.world.kinds.worker import (
     check_job,
     compose_job,
     drawing_job,
+    landscape_job,
+    landscape_key,
     place_job,
     site_ground_place_id,
 )
@@ -218,6 +222,11 @@ def test_erased_receipts_drop_their_caches_and_late_compositions_only(monkeypatc
     town_key = worker_module.town_land_key("ours", erased)
     for key in (erased_key, other_key, foreign_key, town_key):
         worker.drawings.put(key, {"body": key})
+    # A landscape drawing, and the one drawn for the world with its parts changed, go with it.
+    landscapes = [landscape_key("ours", erased), landscape_key("ours", erased, "c" * 64)]
+    kept_landscapes = [landscape_key("ours", other), landscape_key("theirs", erased)]
+    for key in (*landscapes, *kept_landscapes):
+        worker.landscapes.put(key, {"body": key})
     place = worker_module.place_key("ours", erased, "place:1")
     worker.places.put(place, {"place": "private"})
     composer.drawn = (erased_key, {"body": "private late composition"})
@@ -235,6 +244,10 @@ def test_erased_receipts_drop_their_caches_and_late_compositions_only(monkeypatc
     assert worker.places.get(running_key) is None
     assert worker.drawings.get(other_key) == {"body": other_key}
     assert worker.drawings.get(foreign_key) == {"body": foreign_key}
+    assert [worker.landscapes.get(key) for key in landscapes] == [None, None]
+    assert [worker.landscapes.get(key) for key in kept_landscapes] == [
+        {"body": key} for key in kept_landscapes
+    ]
     worker.close()
 
 
@@ -366,6 +379,108 @@ def test_a_town_on_land_s_land_names_by_digest_every_chunk_and_the_backdrop_it_i
     refused = worker_module.town_land_job(world_id, dict(level.receipt), level.receipt_sha256)
     assert refused["status"] == "refused"
     assert refused["detail"].startswith("generated_world_land_changed")
+
+
+@pytest.fixture(scope="module")
+def on_a_landscape() -> tuple[dict[str, Any], int]:
+    """The test farm made by the compose job on a landscape (a stack in the sea off its south
+    edge), and how many of the stack's levels the making realized."""
+    from exulanica.grammar.landscape import compose as volumes
+
+    from test_landscape_world import WORLD, bay, compose
+    from test_site_land import TILT, kind
+
+    farm = kind("farm")
+    realized: list[int] = []
+    realize = volumes.realize_volume
+
+    def counted(*args: Any) -> Any:
+        realized.append(1)
+        return realize(*args)
+
+    landscape = bay(compose(land=TILT))
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(volumes, "realize_volume", counted)
+        composed = compose_job(
+            "w", dict(farm.document), farm.values(farm.presets[0][0]), WORLD, None, None, landscape
+        )
+    return composed, len(realized)
+
+
+def _landscape_of(composed: dict[str, Any]) -> tuple[str, dict[str, Any], str, str]:
+    """What the landscape job is handed for a composed world: its world, its receipt and digest,
+    and its site drawing's digest."""
+    from test_landscape_world import WORLD
+
+    made = composed["composed"]
+    return WORLD, dict(made.receipt), made.receipt_sha256, composed["sha256"]
+
+
+def test_a_site_on_a_landscape_is_made_without_its_volumes_and_its_landscape_drawn_by_its_own_job(
+    on_a_landscape: tuple[dict[str, Any], int],
+) -> None:
+    from exulanica.world.landscape_drawing import (
+        LANDSCAPE_DRAWING_PROFILE,
+        landscape_drawing_sha256,
+    )
+
+    composed, realized = on_a_landscape
+    assert composed["status"] == "done"
+    assert composed["composed"].receipt["composer"] == {"key": "site-plan", "version": 6}
+    # The making keeps the site's drawing, its land and its society's place, and realizes no
+    # volume: its landscape's drawing is not made with it.
+    assert composed["land"] and composed["placed"]["status"] == "done"
+    assert "landscape" not in composed and realized == 0
+    world_id, receipt, receipt_sha256, site_sha256 = _landscape_of(composed)
+    drawn = landscape_job(world_id, receipt, receipt_sha256, site_sha256)
+    assert drawn["status"] == "done"
+    drawing = json.loads(drawn["body"])
+    assert drawing["profile"] == LANDSCAPE_DRAWING_PROFILE
+    assert (drawing["receipt_sha256"], drawing["site_drawing_sha256"]) == (
+        receipt_sha256,
+        site_sha256,
+    )
+    assert drawn["sha256"] == landscape_drawing_sha256(drawing)
+    (stack,) = drawing["volumes"]
+    assert {named["sha256"] for named in stack["chunks"]} == set(drawn["chunks"])
+    assert {named["sha256"] for named in stack["tops"]} == set(drawn["tops"])
+    # A receipt whose landscape no longer reads is refused by name, never unavailable work.
+    changed = copy.deepcopy(receipt)
+    changed["landscape_sha256"] = "0" * 64
+    refused = landscape_job(world_id, changed, receipt_sha256, site_sha256)
+    assert refused["status"] == "refused"
+    assert refused["detail"].startswith("generated_world_landscape_changed")
+
+
+def _ran(*_: object) -> dict[str, str]:
+    return {"status": "refused", "detail": "ran"}
+
+
+def test_a_landscape_past_its_limit_is_kept_and_read_again_by_its_own_workspace_alone(
+    on_a_landscape: tuple[dict[str, Any], int],
+) -> None:
+    args = _landscape_of(on_a_landscape[0])
+    receipt_sha256 = args[2]
+    worker = KindWorker(lambda: ThreadPoolExecutor(1))
+    key = landscape_key("w", receipt_sha256)
+    try:
+        first = worker.run(key, 0.0001, landscape_job, *args, workspace="w", kept=worker.landscapes)
+        assert first.status == "overran"
+        for _ in range(1200):
+            if worker.landscapes.get(key) is not None:
+                break
+            time.sleep(0.05)
+        # Asking again reads the finished drawing, byte for byte, and draws nothing.
+        again = worker.run(key, 5.0, _ran, workspace="w", kept=worker.landscapes)
+        assert again.status == "done" and again.value == landscape_job(*args)
+        # Another workspace reads none of it: its own job runs.
+        theirs = landscape_key("x", receipt_sha256)
+        other = worker.run(theirs, 5.0, _ran, workspace="x", kept=worker.landscapes)
+        assert other.value == {"status": "refused", "detail": "ran"}
+        # The world's drawing is kept apart and is not the landscape's.
+        assert worker.drawings.get(worker_module.drawing_key("w", receipt_sha256)) is None
+    finally:
+        worker.close()
 
 
 def test_a_worker_process_that_dies_answers_unavailable_and_the_next_job_starts_a_new_one():

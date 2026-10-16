@@ -1,0 +1,283 @@
+{
+ "schema_version": 1,
+ "catalog_id": "sea-stack-value",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "stack_height_mm",
+   "owner": "stack",
+   "value": "height_mm",
+   "minimum": 6000,
+   "maximum": 150000,
+   "default": 6000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how high its level top stands above its level 0, the sea's surface where it is placed: from a 6 m rock to a 150 m stack, about as tall as the tallest sea stacks stand.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_foot_mm",
+   "owner": "stack",
+   "value": "foot_mm",
+   "minimum": 2000,
+   "maximum": 64000,
+   "default": 2000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far its trunk reaches below level 0, to the sea floor it stands on, so a stack never ends in open water: from 2 m, the shallowest sea a shore states, to 64 m, past the deepest sea floor a shore states (60 m) and within the land's near bound.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_base_radius_mm",
+   "owner": "stack",
+   "value": "base_radius_mm",
+   "minimum": 3000,
+   "maximum": 60000,
+   "default": 3000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the trunk's radius at its foot, from 3 m (a thinner trunk is under two cells across at the 2 m cell and breaks up) to 60 m, a broad stack 120 m across.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_top_radius_mm",
+   "owner": "stack",
+   "value": "top_radius_mm",
+   "minimum": 2000,
+   "maximum": 80000,
+   "default": 2000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the trunk's radius at its level top; wider than the base, it overhangs, and at most twice the base, past which it stands on a stem and reads as a mushroom; narrower, it tapers, as far as its flank under the water may face up.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_shoulders",
+   "owner": "stack",
+   "value": "shoulders",
+   "minimum": 0,
+   "maximum": 4,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how many rounded masses swell from its flanks above the water, each a ball blended about 4 m into the trunk at a drawn bearing, height and size; four keep each a quarter of the way round, and none is a plain trunk.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_look",
+   "owner": "stack",
+   "value": "look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "rock"
+   ],
+   "reason": "Authored: the look role its faces are dressed in; a sea stack is rock, and a built mass is a volume of its own.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_top_look",
+   "owner": "stack",
+   "value": "top_look",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "grass",
+    "rock",
+    "moss",
+    "sand"
+   ],
+   "reason": "Authored: the look role of its upward faces; grass by default, as on the stacks of northern coasts, or bare rock, moss or sand.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "stack_walk",
+   "owner": "stack",
+   "value": "walk",
+   "minimum": 0,
+   "maximum": 0,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [
+    "none",
+    "tops"
+   ],
+   "reason": "Authored: none by default, since nobody stands on a sea stack; tops makes its level top and upward faces with headroom walkable, as a volume's are.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "lean_tilt_mdeg",
+   "owner": "lean",
+   "value": "tilt_mdeg",
+   "minimum": 0,
+   "maximum": 10000,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far its trunk leans from upright, at most 10 degrees, where the sea has undercut one side; past that a 50 m stack's top stands a fifth of its height off its foot and reads as falling.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "lean_toward_mdeg",
+   "owner": "lean",
+   "value": "toward_mdeg",
+   "minimum": 0,
+   "maximum": 359999,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the compass bearing its trunk leans toward, clockwise from north, as a volume's part leans.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_width_mm",
+   "owner": "arch",
+   "value": "width_mm",
+   "minimum": 3000,
+   "maximum": 60000,
+   "default": 3000,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the passage's width, from 3 m (narrower closes at the 2 m cell) to 60 m; its head is a half circle of that width, and the trunk carries at most its own radius of passage, so each pier keeps a quarter of its width.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_rise_mm",
+   "owner": "arch",
+   "value": "rise_mm",
+   "minimum": 1500,
+   "maximum": 100000,
+   "default": 1500,
+   "required": 1,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how high the crown of the passage stands above the water, from 1.5 m, where the opening still shows above the sea, to 100 m.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_floor_mm",
+   "owner": "arch",
+   "value": "floor_mm",
+   "minimum": 6000,
+   "maximum": 60000,
+   "default": 7000,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: how far the passage's floor lies below the water, at least 6 m: shallow rock that faces up reads as a bright turquoise block in the bay's water, and on a stack with its arch floor 3 m under, 31 percent of its rock in the top 3 m of water faced up, with the floor 7 m under (the default), 6 percent.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  },
+  {
+   "key": "arch_bearing_mdeg",
+   "owner": "arch",
+   "value": "bearing_mdeg",
+   "minimum": 0,
+   "maximum": 179999,
+   "default": 0,
+   "required": 0,
+   "count": 1,
+   "words": [],
+   "reason": "Authored: the compass bearing the passage runs along, clockwise from north; a passage runs both ways, so one way of saying each is a bearing below 180 degrees.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica sea stacks; see the entry reasons"
+   }
+  }
+ ]
+}

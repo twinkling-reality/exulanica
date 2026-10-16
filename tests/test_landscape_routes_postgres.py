@@ -1,11 +1,13 @@
 """A site world made on a landscape through the normal route: kept by the database under the
 receipt check every site world meets, its site drawn on its land, its landscape drawn beside it
-and every chunk and top it names served by digest, and refused by name where it does not fit."""
+by a kind worker job of its own and every chunk and top it names served by digest, and refused by
+name where it does not fit."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import time
 import uuid
 
 import pytest
@@ -94,6 +96,31 @@ def test_a_site_made_on_a_landscape_is_kept_drawn_and_serves_its_volumes_by_dige
     )
     assert (unknown.status_code, unknown.json()["code"]) == (404, "landscape_document_unavailable")
     assert api.get(f"/world/versions/{version}/landscape?world_id={world}").json() == landscape
+
+
+def test_a_landscape_drawn_past_its_limit_is_read_when_asked_again(made, monkeypatch):
+    from exulanica.api.routes import world_kinds
+
+    api = made
+    response = _farm(api, "Farm by a slow stack", landscape=_landscape(api))
+    assert response.status_code == 201, response.text
+    entry = response.json()
+    path = f"/world/versions/{entry['authored_version_id']}/landscape?world_id={entry['world_id']}"
+    # Made without its landscape's drawing, which its own job makes once asked: past its limit the
+    # route says so, and the finished drawing is read when asked again.
+    monkeypatch.setattr(world_kinds, "LANDSCAPE_SECONDS", 0.001)
+    first = api.get(path)
+    assert (first.status_code, first.json()["code"]) == (503, "kind_work_overran"), first.text
+    assert first.headers["retry-after"] == "2"
+    for _ in range(600):
+        served = api.get(path)
+        if served.status_code != 503:
+            break
+        time.sleep(0.1)
+    assert served.status_code == 200, served.text
+    landscape = served.json()
+    assert landscape["profile"] == "exulanica.landscape-drawing/v1"
+    assert served.headers["etag"] == f'"{hashlib.sha256(canonical_json(landscape)).hexdigest()}"'
 
 
 def test_a_world_on_no_landscape_has_none_to_serve(made):

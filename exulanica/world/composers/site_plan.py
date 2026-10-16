@@ -48,7 +48,7 @@ from exulanica.grammar.grammars.site.layout import LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import plan_sha256
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SitePathRecord
 from exulanica.grammar.landform import LandformRefused, land_rules, read_land_document
-from exulanica.grammar.landscape import LandscapeRefused, landscape_rules
+from exulanica.grammar.landscape import LandscapeRefused, check_volumes_apart, landscape_rules
 from exulanica.world.composers import (
     RECEIPT_PROFILE,
     ComposedWorld,
@@ -67,6 +67,7 @@ from exulanica.world.kinds.document import (
 from exulanica.world.kinds.routine import kind_overlay, overlay_routine
 from exulanica.world.kinds.samples import SiteWorld, compose_site, layout_budget
 from exulanica.world.landscape_drawing import (
+    landscape_seed,
     place_landscape_on_site,
     read_site_landscape,
     receipt_landscape,
@@ -358,8 +359,10 @@ def compose_kind(
     land with a support declaration is not served. With ``landscape`` (an ``exulanica.landscape/v1``
     document) the site is laid out on the landscape's land as version 5 lays it out, and the
     receipt, composer version :data:`LANDSCAPE_COMPOSER_VERSION`, also carries the landscape, its
-    digest and the landscape rules; its extent is the site's and its volumes stand off the site
-    (:func:`~exulanica.world.landscape_drawing.place_landscape_on_site`), or it is refused as
+    digest and the landscape rules; its extent is the site's, its volumes stand off the site
+    (:func:`~exulanica.world.landscape_drawing.place_landscape_on_site`) and their rock apart,
+    realized as its drawing realizes it (:func:`~exulanica.grammar.landscape.check_volumes_apart`,
+    held for new worlds only: a receipt is never held to it), or it is refused as
     :class:`~exulanica.grammar.landscape.LandscapeRefused`. Refused as
     :func:`~exulanica.world.kinds.samples.compose_site` refuses
     (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate named)."""
@@ -436,6 +439,12 @@ def compose_kind(
     if stated_landscape is not None:
         extent = next(r for r in world.records if isinstance(r, SiteExtentRecord))
         place_landscape_on_site(stated_landscape, extent.width_mm, extent.depth_mm)
+        try:
+            check_volumes_apart(stated_landscape, landscape_seed(world_id, stated_landscape.sha256))
+        except LandscapeRefused as refused:
+            raise LandscapeRefused(
+                refused.detail, path=f"landscape.{refused.path}", code=refused.code
+            ) from refused
         receipt["landscape"] = stated_landscape.canonical()
         receipt["landscape_sha256"] = stated_landscape.sha256
         receipt["landscape_rules"] = landscape_rules()
