@@ -25,6 +25,7 @@ export const SEAMS = Object.freeze([
   };`,
   },
   { seam: 'Your worlds front door', file: MAIN, target: '  replaceSurface(shell, [yourWorlds.root]);' },
+  { seam: 'Your worlds create', file: MAIN, target: '        creating = showWorldCreation(closeCreate);' },
   { seam: 'land drawn', file: MAIN, target: '  const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null;' },
   { seam: 'opening first', file: BOOTSTRAP, target: "void import('./main.js')" },
 ]);
@@ -51,6 +52,8 @@ export const occurrences = (code, target) => code.split(target).length - 1;
  * A world's page shows its opening (world-opening.ts) from the app's first script, beside the app's
  * own start (its small module loads while the app's large one does), and the app reports each
  * loading stage to it as the stage ends: the world read, the land drawn, the people in.
+ * Create a world on the front door is the workspace's own (create-world.ts, frames 20 to 22), in
+ * place of the app's old dialog.
  */
 export function patchSource(file, code, here) {
   if (!SEAM_FILES.includes(file)) return null;
@@ -67,6 +70,7 @@ export function patchSource(file, code, here) {
   return `import { mountContextualWorld } from '/@fs/${here}/contextual-world.ts';
 import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here}/front-door.ts';
 import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-preview.ts';
+import { mountCreateWorld } from '/@fs/${here}/create-world.ts';
 ` + code
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
@@ -82,5 +86,6 @@ import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-pre
       else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects, send: sendPlanned, binding: activeEntryWriteBinding});`)
     .replace(seam('Your worlds pictures'), '    picture: (entry) => frontDoorPicture(entry) ?? worldPicture(entry),')
     .replace(seam('Your worlds open'), '  const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => openFromFrontDoor(entry.entryId);')
-    .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries });');
+    .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries });')
+    .replace(seam('Your worlds create'), '        creating = mountCreateWorld({ root: yourWorlds.root, credentials: state.credentials, entries: state.worldEntries, onClose: closeCreate });');
 }

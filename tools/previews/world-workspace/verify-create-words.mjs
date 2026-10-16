@@ -1,0 +1,147 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import {
+  CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, cardSub, ceilingAmount, countWords, madeSpent, priceLine,
+  refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime,
+} from './create-words.mjs';
+
+// Frame 20's words, as WORDS.md "Making a world" and N1 to N20 say them.
+assert.equal(CREATE_WORDS.wordmark, 'exulanica');
+assert.equal(CREATE_WORDS.title, 'Create a world');
+assert.equal(CREATE_WORDS.describeIt, 'Describe it');
+assert.equal(CREATE_WORDS.create, 'Create');
+assert.equal(CREATE_WORDS.orStartFrom, 'Or start from');
+assert.equal(CREATE_WORDS.noModelFree, 'No AI model · Free');
+assert.equal(CREATE_WORDS.blank, 'Blank');
+assert.equal(CREATE_WORDS.buildItYourself, 'Build it yourself');
+assert.equal(CREATE_WORDS.opensMyWorldAgain, 'Opens My world again');
+assert.equal(CREATE_WORDS.yourWorlds, 'Your worlds');
+assert.equal(CREATE_WORDS.loading, 'Reading what you can make here…');
+assert.equal(CREATE_WORDS.noModel, 'Making a world from your words needs an AI model, and none is connected here. You can still start from these:');
+assert.equal(CREATE_WORDS.budgetSpent, 'The budget for AI models here is spent. You can still start from these:');
+assert.equal(CREATE_WORDS.offline, 'Not connected to your world. Trying again.');
+assert.equal(priceLine('1.42270464'), 'An AI model makes it from your words: at most $1.43, and you see what it really spent.');
+assert.equal(countWords(86, 1000), '86 of 1000');
+assert.equal(countWords(1000, 1000), '1000 of 1000');
+assert.equal(countWords(0, 1000), null);
+assert.equal(startsLeftLine(2), '2 more worlds can be started this hour.');
+assert.equal(startsLeftLine(1), '1 more world can be started this hour.');
+assert.equal(startsLeftLine(4), null);
+assert.equal(startsLeftLine(0), null);
+assert.equal(cardSub(null), 'No AI model · Free');
+assert.equal(cardSub('0'), 'No AI model · Free');
+assert.equal(cardSub('0.4'), 'At most $0.40');
+// The placeholder is today's, read from the app's copy rather than retyped.
+const copy = readFileSync(new URL('../../../web/packages/app/src/ui/copy.ts', import.meta.url), 'utf8');
+assert.ok(copy.includes(`'worldSentence.placeholder': '${CREATE_WORDS.placeholder}'`), 'the placeholder is copy.ts\'s');
+
+// Frame 21's and 22's words.
+assert.equal(CREATE_WORDS.creating, 'Creating your world');
+assert.deepEqual({ ...STEP_WORDS }, { queued: 'Waiting to start', choosing: 'Worked out what to make', drafting: 'Planning the place', making: 'Building it', land: 'Drawing its land' });
+assert.equal(CREATE_WORDS.leave, 'You can leave this page. It carries on, and it waits in Your worlds.');
+assert.equal(CREATE_WORDS.beingMade, 'Being made…');
+assert.equal(spendLine({ spentUsd: 0.12 }, '1.43'), 'Spent $0.12 of the $1.43 set aside');
+assert.equal(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.12 of the $1.43 set aside, and up to $0.03 not known yet');
+assert.equal(CREATE_WORDS.madeFromYourWords, 'Made from your words');
+assert.deepEqual([CREATE_WORDS.inIt, CREATE_WORDS.set, CREATE_WORDS.notInItYet, CREATE_WORDS.spent], ['In it', 'Set', 'Not in it yet', 'Spent']);
+assert.equal(madeSpent({ spentUsd: 0.31 }, '1.4227'), '$0.31 of the $1.43 set aside');
+
+// Money (rule 5): a limit rounded up to the cent; under a cent four places; "less than $0.0001"; "$0".
+assert.equal(ceilingAmount('1.43'), '$1.43');
+assert.equal(ceilingAmount('1.4300001'), '$1.44');
+assert.equal(madeSpent({ spentUsd: 0.0042 }, '1.43'), '$0.0042 of the $1.43 set aside');
+assert.equal(madeSpent({ spentUsd: 0.00001 }, '1.43'), 'less than $0.0001 of the $1.43 set aside');
+assert.equal(madeSpent({ spentUsd: 0 }, '1.43'), '$0 of the $1.43 set aside');
+
+// Times (N11).
+assert.equal(stepTime(1), '1 s');
+assert.equal(stepTime(12), '12 s');
+assert.equal(stepTime(59), '59 s');
+assert.equal(stepTime(64), '1 min 4 s');
+assert.equal(stepTime(120), '2 min');
+assert.equal(stepTime(Number.NaN), '');
+
+// Refusals (build sheet section 3, N8, N9, N15): each code to its sentence, an unknown code to the last.
+const sentences = {
+  world_not_a_place: 'These words don’t describe a place, so no world could be made from them. Try a place and what is in it.',
+  world_draft_model_failed: 'The AI model didn’t answer, so nothing was made. Try again in a minute.',
+  kind_draft_model_failed: 'The AI model didn’t answer, so nothing was made. Try again in a minute.',
+  world_limit_reached: 'You have as many worlds as one person can keep. Remove one in Your worlds to make another.',
+  world_draft_price_expired: 'The price changed before it started. Here is the new most it can spend.',
+  world_draft_operation_changed: 'The price changed before it started. Here is the new most it can spend.',
+  world_draft_bound_too_small: 'The price changed before it started. Here is the new most it can spend.',
+  world_draft_failed: 'Something went wrong while making it, so nothing was made. Try again.',
+  kind_draft_failed: 'Something went wrong while making it, so nothing was made. Try again.',
+  kind_work_unavailable: 'Something went wrong while making it, so nothing was made. Try again.',
+  kind_draft_limit: 'You’ve started as many worlds as you can this hour. Try again later.',
+  kind_draft_busy: 'A world is being made already. It waits in Your worlds when it’s done.',
+  kind_draft_capacity: 'This computer is busy making other worlds. Try again in a few minutes.',
+  budget_exceeded: 'The budget for AI models here is spent.',
+  world_draft_unanswered: 'The AI model took too long, so nothing was made. Try again.',
+  world_draft_interrupted: 'Making stopped part way, so nothing was kept. Try again.',
+};
+for (const [code, sentence] of Object.entries(sentences)) assert.equal(refusalWords(code), sentence, code);
+for (const unknown of ['no_such_code', null, undefined, 42]) {
+  assert.equal(refusalWords(unknown), REFUSAL_WORDS.failed, String(unknown));
+}
+for (const key of Object.values(REFUSAL_BY_CODE)) assert.ok(Object.hasOwn(REFUSAL_WORDS, key), key);
+assert.equal(refusalSpent({ spentUsd: 0.02 }), 'Spent $0.02 before it stopped.');
+assert.equal(refusalSpent({ spentUsd: 0 }), null);
+
+// The Set value (TERRAIN's WORDING.md without its "Set", N13): the five cases.
+const coast = 'on a coast, with a beach below and a terraced hill behind';
+// N26: each starts with a capital; a setting is its titles, then the land, then the words.
+assert.equal(setValue({ title: 'on gentle hills, with mountains far off', chosen_by: 'default', words: [], fell_back: false }), 'On gentle hills, with mountains far off');
+assert.equal(setValue({ title: 'in a valley between two long ridges', chosen_by: 'words', words: ['valley'], fell_back: false }), 'In a valley between two long ridges, for your words “valley”');
+assert.equal(setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ axis: 'ground', key: 'sea', title: 'By the sea' }], words: ['by the sea'] }),
+  `By the sea, ${coast}, for your words “by the sea”`);
+assert.equal(setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'Night' }, { title: 'By the sea' }], words: ['at night', 'by the sea'] }),
+  `Night, by the sea, ${coast}, for your words “at night”, “by the sea”`);
+assert.equal(setValue({ title: coast, chosen_by: 'words', words: ['coast'], fell_back: true }), `On level ground, since this place did not fit the land ${coast}`);
+// N25's sentences and codes.
+assert.equal(CREATE_WORDS.notOffered, 'Making a world from your words isn’t offered here. You can still start from these:');
+assert.equal(refusalWords('world_draft_price_unavailable'), 'The price can’t be read right now. Trying again.');
+assert.equal(refusalWords('tile_budget_reached'), 'You’ve reached today’s limit for new worlds. Try again tomorrow.');
+assert.equal(refusalWords('world_not_drafted'), 'No world could be made from these words. Try again, or say it another way.');
+assert.equal(setValue(null), null);
+
+// Never on screen: a code, "US$", "provider", "session", an em dash; no line ends in the old "Design" line.
+const said = [
+  ...Object.values(CREATE_WORDS), ...Object.values(STEP_WORDS), ...Object.values(REFUSAL_WORDS),
+  priceLine('1.43'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2), refusalSpent({ spentUsd: 0.02 }),
+  setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'By the sea' }], words: ['by the sea'] }),
+];
+for (const line of said) {
+  assert.doesNotMatch(line, /\u2014|US\$|provider|session|[a-z]+_[a-z_]+|Design\./u, line);
+}
+for (const file of ['create-words.mjs', 'create-steps.mjs', 'world-ui-create.ts', 'world-ui-create.css', 'verify-create-steps.mjs']) {
+  assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /\u2014/u, file);
+}
+
+// The light plane's stylesheet: its inks once (N9, N16), more contrast's faint, every size through
+// --u, and text under 16 px never below 12 px (a key cap's glyph 9 px, L5).
+const css = readFileSync(new URL('world-ui-create.css', import.meta.url), 'utf8');
+for (const token of ['--l-ink: #121715', '--l-muted: #344750', '--l-faint: #5b6b72', '--refused-ink-light: #8f2f25', '--l-faint: #3d4a50']) {
+  assert.equal(css.split(token).length - 1, 1, token);
+}
+for (const query of ['prefers-reduced-motion: reduce', 'prefers-reduced-transparency: reduce', 'prefers-contrast: more']) assert.ok(css.includes(query), query);
+for (const [, size] of css.matchAll(/(?:font:\s*\d+\s+|font-size:\s*)calc\((\d+(?:\.\d+)?) \* var\(--u\)\)/gu)) {
+  assert.ok(Number(size) >= 16, `a ${size} px text scales below 12 px; wrap it in max(12px, ...)`);
+}
+assert.match(css, /\.wu-qcmd-key \{[^}]*font: 400 max\(9px, calc\(10 \* var\(--u\)\)\)/u);
+assert.doesNotMatch(css, /font:\s*\d+\s+\d+(?:\.\d+)?px/u, 'a fixed font size');
+
+// With WORDS_MD naming DESIGN's word list (kept outside the repository), each phrase here is in it.
+const words = process.env.WORDS_MD;
+if (words && existsSync(words)) {
+  const text = readFileSync(words, 'utf8').replace(/\s+/gu, ' ');
+  for (const line of [CREATE_WORDS.title, CREATE_WORDS.describeIt, CREATE_WORDS.orStartFrom, CREATE_WORDS.buildItYourself, CREATE_WORDS.loading,
+    CREATE_WORDS.noModel, CREATE_WORDS.budgetSpent, CREATE_WORDS.leave, CREATE_WORDS.madeFromYourWords, CREATE_WORDS.notInItYet,
+    STEP_WORDS.queued, STEP_WORDS.choosing, STEP_WORDS.drafting, STEP_WORDS.making, STEP_WORDS.land,
+    REFUSAL_WORDS.hourlyLimit.replace('’', "'"), REFUSAL_WORDS.capacity, REFUSAL_WORDS.tooSlow, REFUSAL_WORDS.interrupted, REFUSAL_WORDS.failed,
+    'Spent $0.12 of the $1.43 set aside', '2 more worlds can be started this hour.', 'Spent $0.02 before it stopped.']) {
+    assert.ok(text.includes(line) || text.includes(line.replaceAll('’', "'")), `WORDS.md says: ${line}`);
+  }
+}
+
+export default true;

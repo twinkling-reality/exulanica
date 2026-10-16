@@ -28,6 +28,9 @@ import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { areaBanner, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
 import { endOpening } from './world-opening.ts';
+import { MADE_HANDOFF_KEY, readMade } from './create-steps.mjs';
+import { CREATE_WORDS } from './create-words.mjs';
+import { madeNote } from './world-ui-create.ts';
 import { populationLine } from './opening-steps.mjs';
 import { OFFLINE_AFTER_FAILED_READS } from './world-ui-layout.mjs';
 import { worldKey, wakesHints } from './world-keys.mjs';
@@ -1239,9 +1242,32 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   await readInventory();
   canvas.focus({ preventScroll: true }); frameId = requestAnimationFrame(frame);
   // Arriving (frame 02): the opening gives way, and the world's name shows once with who lives here.
-  if (endOpening()) {
-    const banner = areaBanner({ name: entry.title, sub: populationLine(selection.people?.clock().population ?? null) ?? undefined });
+  // A world Create a world just made (frame 22, N14) says so instead, with no sub-line, and its made
+  // note waits until the first key or click, which still acts in the world; Blank opens in build
+  // mode, with neither (N4). The handoff is read once, for this world only.
+  let made = null;
+  try {
+    made = readMade(sessionStorage.getItem(MADE_HANDOFF_KEY), entry.entryId);
+    if (made !== null) sessionStorage.removeItem(MADE_HANDOFF_KEY);
+  } catch { /* No handoff: an ordinary arrival. */ }
+  const opened = endOpening();
+  if (made?.build) {
+    // The same act as a press of B.
+    build?.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b' }));
+  } else if (opened || made !== null) {
+    const banner = made !== null
+      ? areaBanner({ name: entry.title, over: CREATE_WORDS.madeFromYourWords })
+      : areaBanner({ name: entry.title, sub: populationLine(selection.people?.clock().population ?? null) ?? undefined });
     root.append(banner.root);
     void banner.play().then(() => banner.remove());
+    if (made !== null && made.columns.length > 0) {
+      const note = madeNote(made.columns);
+      root.append(note.root);
+      const gone = new AbortController();
+      lifetime.signal.addEventListener('abort', () => gone.abort(), { once: true });
+      const dismiss = () => { note.dismiss(); gone.abort(); };
+      window.addEventListener('keydown', dismiss, { capture: true, signal: gone.signal });
+      window.addEventListener('pointerdown', dismiss, { capture: true, signal: gone.signal });
+    }
   }
 }

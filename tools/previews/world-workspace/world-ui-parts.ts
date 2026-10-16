@@ -1,10 +1,17 @@
 // The parts page (world-ui-parts.html): every shared in-world part once, in its states, with the
 // example words of DESIGN's frames, so a reviewer sees the parts beside the frames before any
-// screen uses them. Nothing here reads a world.
+// screen uses them. Nothing here reads a world. ?view=create, creating, refused, no-model and made
+// show making a world's light parts (world-ui-create.ts) with stand-in answers; ?empty leaves the
+// field empty, ?chosen=<n> marks a card chosen and ?thumbs=<folder> draws the cards' pictures.
 import {
   areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
   nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
 } from './world-ui.ts';
+import {
+  createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, madeNote, quietCommand, sentenceField, sentenceRow,
+} from './world-ui-create.ts';
+import { CREATE_WORDS, madeSpent, priceLine, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
+import { draftSteps, madeColumns, startCards } from './create-steps.mjs';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
 
@@ -17,7 +24,54 @@ const add = <T extends Element>(part: T, host: Element = root): T => { host.appe
 const div = (className: string): HTMLDivElement => { const made = document.createElement('div'); made.className = className; return made; };
 const press = (): void => {};
 
-if (query.get('view') === 'page') {
+const view = query.get('view');
+if (view === 'create' || view === 'creating' || view === 'no-model' || view === 'refused') {
+  // Making a world's light parts (frames 20 and 21) with the frames' example words and stand-in
+  // answers; ?picture= is the chosen world's still picture behind them.
+  (root.querySelector('.parts-world') as HTMLElement).hidden = true;
+  const light = lightPage({ form: view === 'creating' ? 'creating' : 'create', picture, labelledBy: 'parts-create-title' });
+  add(light.root);
+  light.quiet.append(quietCommand({ onPress: press }));
+  const words = 'Glass terraces with glowing pools above the sea at night, and a grand hotel at the top';
+  if (view === 'creating') {
+    light.head.append(lightLabel(CREATE_WORDS.creating));
+    const quote = add(document.createElement('p'), light.head); quote.className = 'wu-light-quote'; quote.id = 'parts-create-title'; quote.textContent = `\u201c${words}\u201d`;
+    const reads = [{ state: 'choosing', elapsed_seconds: 0 }, { state: 'drafting', elapsed_seconds: 1 }, { state: 'making', elapsed_seconds: 6 }, { state: 'making', elapsed_seconds: 12 }];
+    light.lower.append(lightSteps(draftSteps(reads)).root, lightLine(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.4227'), { live: true }), lightLine(CREATE_WORDS.leave));
+  } else {
+    const title = add(document.createElement('h1'), light.head); title.className = 'wu-light-title'; title.id = 'parts-create-title'; title.tabIndex = -1; title.textContent = CREATE_WORDS.title;
+    if (view === 'no-model') {
+      const sentence = add(document.createElement('p'), light.head); sentence.className = 'wu-light-sentence'; sentence.textContent = CREATE_WORDS.noModel;
+    } else {
+      const field = sentenceField({ limit: 1000, value: query.get('empty') === null ? words : '' });
+      const ready = field.field.value.trim().length > 0;
+      light.head.append(sentenceRow(field, createOrb({ onPress: press, ready })));
+      if (view === 'refused') {
+        light.head.append(lightLine(refusalWords('world_not_a_place'), { tone: 'refused', live: true }), lightLine(refusalSpent({ spentUsd: 0.02 })!, { tone: 'refused' }));
+      } else {
+        light.head.append(lightLine(priceLine('1.4227')), lightLine(startsLeftLine(2)!));
+      }
+      createKeyRow(light.keys, { create: ready, start: false });
+    }
+    // Stand-in cards: the frames' names (the server's, never a list in code), one without a picture.
+    // ?thumbs=<folder address> draws their pictures; without it each is the quiet tile.
+    const thumbs = query.get('thumbs');
+    const thumb = (name: string): string | null => (thumbs ? `${thumbs}${name}.jpg` : null);
+    const cards = startCards([
+      { key: 'town', name: 'Small town', picture: thumb('town') }, { key: 'bay', name: 'Terraces on the bay', picture: thumb('bay') },
+      { key: 'canyon', name: 'Tower canyon', picture: thumb('canyon') },
+    ], [{ key: 'wall', name: 'Wall city', picture: null, priceUsd: '0.4' }]);
+    const strip = filmStrip(cards, press);
+    light.lower.append(strip.root);
+    if (query.get('chosen') !== null) strip.choose(Number(query.get('chosen')));
+    else strip.cards.forEach((card) => card.removeAttribute('aria-current'));
+  }
+} else if (view === 'made') {
+  // Frame 22's made note over the world, with the banner's made form.
+  add(areaBanner({ name: 'Glass terraces', over: CREATE_WORDS.madeFromYourWords }).root).style.opacity = '1';
+  const land = { title: 'on a coast, with a beach below and a terraced hill behind', chosen_by: 'words', words: ['by the sea'], fell_back: false };
+  add(madeNote(madeColumns({ inIt: 'Four pools, a hotel, two pavilions, 40 people', set: setValue(land), notInItYet: 'A lighthouse', spent: madeSpent({ spentUsd: 0.31 }, '1.4227') })).root);
+} else if (view === 'page') {
   const shown = page({ form: 'character' });
   shown.open(root);
   const column = add(div('parts-column'), shown.content);

@@ -3,6 +3,7 @@ import captures from 'virtual:front-door-captures';
 import { createScenePreview, scenePreviewPage } from './front-door-preview.ts';
 import { showWorldDetails } from './front-door-details.ts';
 import { endOpening, handOverOpening } from './world-opening.ts';
+import { showBeingMade } from './create-world.ts';
 import { capturedPicture, frontDoorAddress, openWorldAddress, worldAddress } from './front-door-routes.mjs';
 import { worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
@@ -29,6 +30,21 @@ export async function openFromFrontDoor(entryId: string): Promise<void> {
   const entry = shownEntries.find(one => one.entryId === entryId);
   if (entry) await handOverOpening(entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry));
   location.assign(worldAddress(entryId, location.origin));
+  return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
+}
+
+/** The chosen world's still picture, which Create a world draws behind its light page (N18); null for none. */
+let chosenPicture: string | null = null;
+export const chosenWorldPicture = (): string | null => chosenPicture;
+
+/**
+ * Opens a world Create a world just made (or reopened, for Blank): through its opening, with its
+ * name, as Open does for a saved world. Settles as this page goes.
+ */
+export async function openMadeWorld(entry: SavedWorldEntry): Promise<void> {
+  history.replaceState({ ...history.state, [CHOSEN]: entry.entryId }, '', location.href);
+  await handOverOpening(entry.entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry));
+  location.assign(worldAddress(entry.entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
 
@@ -130,7 +146,8 @@ export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: 
     title.textContent = entry.title;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduce) title.animate([{ opacity: 0, filter: 'blur(7px)', transform: 'translateY(5px)' }, { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0px)' }], { duration: 420, easing: 'cubic-bezier(.25,.46,.45,.94)' });
-    preview.select(entry, frontDoorPicture(entry) ?? card.querySelector('img')?.getAttribute('src') ?? null);
+    chosenPicture = frontDoorPicture(entry) ?? card.querySelector('img')?.getAttribute('src') ?? null;
+    preview.select(entry, chosenPicture);
     const inset = card.offsetLeft - strip.offsetLeft;
     if (inset < strip.scrollLeft || inset + card.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollTo({ left: Math.max(0, inset - 4), behavior: reduce ? 'instant' : 'smooth' });
     const cards = [...strip.querySelectorAll('.your-worlds-card')], index = cards.indexOf(card);
@@ -151,4 +168,6 @@ export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: 
   const again = remembered ? [...strip.querySelectorAll<HTMLElement>('.your-worlds-card')].find(card => card.dataset.entryId === remembered) : undefined;
   if (again) { again.click(); again.focus({ preventScroll: true }); }
   reflect();
+  // A world this person is having made still runs: its card waits here (N12).
+  void showBeingMade(root);
 }
