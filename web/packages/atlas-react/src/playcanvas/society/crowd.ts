@@ -212,6 +212,12 @@ interface Walker {
    * back from a talking partner recorded too near, and nothing otherwise.
    */
   aside: readonly [number, number];
+  /**
+   * Where they stand at rest, east and south in metres from their recorded point: where they got up
+   * from a seat that stands on that point (a bench's seat is the point a resting person is recorded
+   * at), so they stand before it and not in it; nothing otherwise. Their next walk starts there.
+   */
+  beside: readonly [number, number];
   /** Where they are drawn this frame: east, height of the root, south. */
   drawn: readonly [number, number, number];
   /** What draws them when they are a thing drawn by its own look, or null for one of the people. */
@@ -596,6 +602,11 @@ export class SocietyCrowd {
         startsAtMs = boundOnly ? nowMs : nowMs + this.startLagMs;
         jump(consecutive ? 'path-starts-elsewhere' : 'minutes-not-read', apart(previous.position, recorded[0]!));
       }
+      // Stood up before a seat, they start their next walk from there, never back through the seat.
+      const beside = jumped || previous === undefined ? NO_STEP : previous.beside;
+      const leaving = beside !== NO_STEP && route.length > 1
+        && route.slice(1).some((point) => apart(point, previous!.position) > SAME_POINT_METRES);
+      if (leaving) route = [[previous!.position[0] + beside[0], previous!.position[1] + beside[1]], ...route.slice(1)];
       const { lengths, total } = polyline(route);
       if (budget !== null && total - walked > budget * BEHIND_LIMIT_TICKS) {
         const skipped = total - walked - budget;
@@ -612,6 +623,15 @@ export class SocietyCrowd {
         misses.push({ inhabitantId: person.id, reason: 'activity-has-no-facing' });
       }
       const position = sampleMotionPath(route, total === 0 ? 1 : walked / total);
+      // Drawn here afresh (first seen, or moved without walking) at a point that is their place's
+      // seat, as a resting person is recorded on the seat: they stand before it, not in it, until
+      // they sit or walk on. Seen sitting, they are got up there by `settle`.
+      const fresh = previous === undefined || jumped;
+      const seat = found?.kind === 'place' ? found.drawing.seat : null;
+      const seatAt: Point | null = seat == null ? null : [seat.position[0], seat.position[2]];
+      const before = fresh && seatAt !== null && walked >= total && apart(seatAt, position) <= SAME_POINT_METRES
+        ? seatApproach(seatAt, seat!.facing, seatAt) : null;
+      const standing: readonly [number, number] = before === null ? beside : [before[0] - position[0], before[1] - position[1]];
       const endsIndoors = person.location_destination?.indoors ?? person.indoors === true;
       const walker: Walker = {
         id: person.id,
@@ -648,8 +668,9 @@ export class SocietyCrowd {
         settle: jumped ? null : previous?.settle ?? null,
         seatBlend: jumped ? 0 : previous?.seatBlend ?? 0,
         onSeat: jumped ? false : previous?.onSeat ?? false,
-        aside: jumped ? NO_STEP : previous?.aside ?? NO_STEP,
-        drawn: jumped || previous === undefined ? [position[0], this.groundUnder(position[0], position[1]), position[1]] : previous.drawn,
+        aside: before !== null ? standing : jumped || leaving ? NO_STEP : previous?.aside ?? NO_STEP,
+        beside: leaving ? NO_STEP : standing,
+        drawn: fresh ? [position[0] + standing[0], this.groundUnder(position[0] + standing[0], position[1] + standing[1]), position[1] + standing[1]] : previous.drawn,
         figure: this.figures?.figureFor(person) ?? null,
       };
       walkers.set(person.id, walker);
@@ -1126,10 +1147,13 @@ export class SocietyCrowd {
       const seat = place!.seat!;
       const posture = this.far.seatPostureOf(walker.id, this.seatActivity(walker))!;
       const at: Point = [seat.position[0], seat.position[2]];
-      const front = seatApproach(at, seat.facing, walker.position);
+      // From where they stand: their recorded point, or before a seat they got up from.
+      const from: Point = [walker.position[0] + walker.beside[0], walker.position[1] + walker.beside[1]];
+      walker.beside = NO_STEP;
+      const front = seatApproach(at, seat.facing, from);
       walker.settle = {
-        path: [walker.position, front, at],
-        toFront: apart(walker.position, front),
+        path: [from, front, at],
+        toFront: apart(from, front),
         ontoSeat: apart(front, at),
         lift: seat.position[1] - postureSeatMetres(this.far.appearanceOf(walker.id), posture),
         // A seat with no back is sat on facing as they came.
@@ -1153,7 +1177,10 @@ export class SocietyCrowd {
     // A seat that is no longer theirs, or no longer there, is got up from before another is sat on.
     const staying = wanted && settle.key === key;
     const end = settle.toFront + settle.ontoSeat;
-    const goal = staying ? end : 0;
+    // Getting up walks the path back, but never into a seat that stands where they started: from a
+    // seat on their own recorded point they rise to where they stood before it and stay there.
+    const rise = apart(settle.path[0], settle.path[2]) <= SAME_POINT_METRES ? settle.toFront : 0;
+    const goal = staying ? end : rise;
     const before = settle.progress;
     if (reduced) settle.progress = goal;
     else {
@@ -1191,8 +1218,12 @@ export class SocietyCrowd {
         ? heading(settle.path[0], settle.path[1], walker.facing)
         : heading(settle.path[1], settle.path[0], walker.facing));
     }
-    if (settle.progress <= 0 && !staying) {
+    if (settle.progress <= rise && !staying) {
       walker.settle = null;
+      const stood = sampleMotionPath(settle.path, end > 0 ? rise / end : 0);
+      const offset: [number, number] = [stood[0] - walker.position[0], stood[1] - walker.position[1]];
+      walker.beside = Math.hypot(offset[0], offset[1]) > SAME_POINT_METRES ? offset : NO_STEP;
+      walker.aside = walker.beside;
       if (walker.arrived) this.turn(walker, this.facingOf(walker));
       return false;
     }
@@ -1225,7 +1256,9 @@ export class SocietyCrowd {
    * point, at their own walking pace. Returns whether they are still on the way.
    */
   private stepAside(walker: Walker, dt: number, reduced: boolean): boolean {
-    const wanted = this.conversationStep(walker);
+    // At rest they stand where they are kept (before a seat they got up from), else on their point.
+    const talking = this.conversationStep(walker);
+    const wanted = talking === NO_STEP ? walker.beside : talking;
     const dx = wanted[0] - walker.aside[0], dz = wanted[1] - walker.aside[1];
     const left = Math.hypot(dx, dz);
     if (left === 0) return false;

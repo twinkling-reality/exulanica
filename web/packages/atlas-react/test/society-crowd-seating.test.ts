@@ -143,6 +143,62 @@ describe('a person using an object', () => {
     expect(last(poses,'resting').position[1]).toBe(0);
     expect(crowd.seatingMisses[0]?.reason).toBe('object-not-drawn');
   });
+  it('gets up from a seat on its own recorded point to stand before it, and walks on from there', () => {
+    // As the walk saw: "Just finished resting at the garden bench" stood the resident in the seat,
+    // where a bench's seat is the point a resting person is recorded at.
+    const { crowd, poses } = setup(true);
+    const fixtureLayout: SeatingLayout = {
+      uses: new Map(), objects: [], targets: new Map([['fixture-rest', 'bench-a']]),
+      fixtureSeats: [{ objectId: 'bench-a', heightHintM: .225, maximumHeightM: .46, facing: Math.PI / 2,
+        triangles: [1,.45,-3, 3,.45,-3, 1,.45,-1, 3,.45,-3, 3,.45,-1, 1,.45,-1],
+        normals: Array.from({length:6},()=>[0,1,0]).flat() }],
+    };
+    const at = [1800, -2400] as const;
+    const resting = person('resting', at, 'rest', 'fixture-rest');
+    crowd.set({ ...STATE, tick: 1, inhabitants: [resting] }, [0, 0], { nowMs: 0, intervalMs: 1000 }, fixtureLayout);
+    let now = run(crowd, 3);
+    expect(last(poses, 'resting').position[1] + postureSeatMetres(crowd.farAppearance('resting'), 'perched')).toBeCloseTo(.45);
+    // The rest is completed: they get up, onto the ground before the seat, and stay there.
+    const done = { ...resting, action: { ...resting.action, status: 'completed' as const, remaining_ticks: 0 } };
+    crowd.set({ ...STATE, tick: 2, inhabitants: [done] }, [0, 0], { nowMs: now, intervalMs: 1000 }, fixtureLayout);
+    now = run(crowd, 4, now);
+    const stood = last(poses, 'resting').position;
+    const away = Math.hypot(stood[0] - 1.8, stood[2] + 2.4);
+    expect(stood[1]).toBe(0);
+    expect(away).toBeCloseTo(SEAT_APPROACH_METRES, 2);
+    now = run(crowd, 4, now);
+    expect(last(poses, 'resting').position).toEqual(stood);
+    // Their next walk starts where they stand, never back through the seat.
+    const { action: _ended, ...walking } = done;
+    const leaving = { ...walking, position_mm: [6800, -2400] as const, motion_path_mm: [at, [6800, -2400]] as const };
+    crowd.set({ ...STATE, tick: 3, inhabitants: [leaving] }, [0, 0], { nowMs: now, intervalMs: 1000 }, fixtureLayout);
+    const from = poses.get('resting')!.length;
+    run(crowd, 3, now);
+    const walked = poses.get('resting')!.slice(from);
+    expect(walked.length).toBeGreaterThan(0);
+    // The first step leaves from before the seat (the line on from there is the recorded path's own).
+    expect(Math.hypot(walked[0]!.position[0] - stood[0], walked[0]!.position[2] - stood[2])).toBeLessThan(0.1);
+    expect(walked.at(-1)!.position[0]).toBeCloseTo(6.8, 1);
+  });
+
+  it('stands before a seat on its recorded point when first drawn there after the rest ended', () => {
+    // A page opened after "Just finished resting" never saw them sit: they still stand before the seat.
+    const { crowd, poses } = setup(true);
+    const fixtureLayout: SeatingLayout = {
+      uses: new Map(), objects: [], targets: new Map([['fixture-rest', 'bench-a']]),
+      fixtureSeats: [{ objectId: 'bench-a', heightHintM: .225, maximumHeightM: .46, facing: Math.PI / 2,
+        triangles: [1,.45,-3, 3,.45,-3, 1,.45,-1, 3,.45,-3, 3,.45,-1, 1,.45,-1],
+        normals: Array.from({length:6},()=>[0,1,0]).flat() }],
+    };
+    const rested = person('resting', [1800, -2400], 'rest', 'fixture-rest');
+    const done = { ...rested, action: { ...rested.action, status: 'completed' as const, remaining_ticks: 0 } };
+    crowd.set({ ...STATE, tick: 5, inhabitants: [done] }, [0, 0], { nowMs: 0, intervalMs: 1000 }, fixtureLayout);
+    run(crowd, 2);
+    const stood = last(poses, 'resting').position;
+    expect(stood[1]).toBe(0);
+    expect(Math.hypot(stood[0] - 1.8, stood[2] + 2.4)).toBeCloseTo(SEAT_APPROACH_METRES, 2);
+  });
+
   it('walks to stand before the seat, then lowers onto it at its height and facing', () => {
     const { crowd, poses } = setup(true);
     const { seat, lift } = benchSeat();
