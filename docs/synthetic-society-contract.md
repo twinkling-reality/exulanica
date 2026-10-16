@@ -85,7 +85,7 @@ owner's workspace and each guest's while the guest is there
 Implementation:
 
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
-- which engines exist and what each can do: `exulanica/world/society-engines.v5.json`, the newest
+- which engines exist and what each can do: `exulanica/world/society-engines.v6.json`, the newest
   version beside the module, read by
   `exulanica/world/society_engines.py`;
 - the grounds a society stands on, with what people walk, the population rule, lattice and
@@ -133,7 +133,7 @@ Implementation:
 
 ## Engines and what each can do
 
-`exulanica/world/society-engines.v5.json` states which engine profiles exist and, for each,
+`exulanica/world/society-engines.v6.json` states which engine profiles exist and, for each,
 whether a society may still be created with it, whether it consumes authorised inputs, whether the
 playback worker may play it (and the refusal it gives when not), whether it takes directed actions,
 model decisions or experiments, whether the world's owner may choose a model that decides for one
@@ -147,10 +147,13 @@ engine, and, from its third version, the engine a saved world takes instead wher
 a thing its author placed and the host offers societies of things (`creates_holding_things`: the
 society of things, over the society grounds it names, the ones a society of things stands on:
 from the fifth version every ground a saved world has, a world made from a world kind among them).
-A saved
+From the sixth version it states whether that engine needs a placed thing (`needs_a_placed_thing`),
+and the sixth needs none: on a host that offers societies of things a world's new society is one of
+things before anything is placed, so the ground's own people, the villager's second version, may
+say a line and answer one (`tests/test_bring_in_talks_postgres.py`). A saved
 world's entry and its version's capability read state that engine while the version holds no
-society; a society already held keeps its engine; and a creation naming another engine for such a
-world is refused by name (`409 society_engine_differs`). `model_decisions` means the engine's history may hold validated model decisions,
+society; a society already held keeps its engine; and a creation naming another engine for a world
+whose version holds a placed thing is refused by name (`409 society_engine_differs`). `model_decisions` means the engine's history may hold validated model decisions,
 which the schema's decision triggers admit; `owner_model_choice` requires it, and a comparison
 requires `owner_model_choice`. `exulanica/world/society_engines.py` reads and checks it, and every
 list of engines derives from it: the runtime's edit hook, the repositories' dispatch and population

@@ -12,7 +12,10 @@ from its third version, which engine a saved world takes instead where its versi
 its author placed and the host offers societies of things (``creates_holding_things``). From its
 fourth version an engine may state no maximum population: the engines a town's society is made
 with state none, because how many people a town holds is its homes', admitted by the measured
-cost of their minute on the host that makes the society (the society ground catalog).
+cost of their minute on the host that makes the society (the society ground catalog). From its
+sixth version ``creates_holding_things`` states whether that engine needs a thing its author placed
+(``needs_a_placed_thing``); the sixth states it needs none, so on a host that offers societies of
+things a world's new society is one of things before anything is placed. Earlier tables need one.
 Everything that used to restate a list of engines derives it from here: the runtime's edit hook,
 the repositories, the routes, the selection query's bound parameters and, through a generated
 module, the browser's parser. Where a copy cannot derive, because a migration's CHECK or trigger
@@ -24,8 +27,8 @@ Every earlier version stays beside it, because evaluation records, the compariso
 their day and the societies made under them name them; tests hold each to this one's rows.
 :func:`load_engine_table` reads every version from the second on by its number: what a table may
 state is what its version had come to state (an engine for a world holding things from the third,
-no maximum population from the fourth), so a new version is a new file and nothing here changes
-unless it states something new.
+no maximum population from the fourth, whether that engine needs a placed thing from the sixth),
+so a new version is a new file and nothing here changes unless it states something new.
 
 An engine that is not in the table is refused by name everywhere it is looked up, never guessed
 to behave like one that is.
@@ -71,11 +74,13 @@ __all__ = [
 _TABLE_FILE: Final = re.compile(r"society-engines\.v([1-9][0-9]*)\.json")
 _TABLE_PROFILE: Final = re.compile(r"exulanica\.society-engines/v([1-9][0-9]*)")
 #: The first version this module reads (the first table's shape is held to this one by a test),
-#: the first that may state an engine for a world holding things, and the first in which an
-#: engine may state no maximum population.
+#: the first that may state an engine for a world holding things, the first in which an engine
+#: may state no maximum population, and the first whose engine for a world holding things states
+#: whether it needs a placed thing.
 _READ_SINCE: Final = 2
 _HOLDING_SINCE: Final = 3
 _NO_MAXIMUM_SINCE: Final = 4
+_NEEDS_STATED_SINCE: Final = 6
 
 
 def _newest_table() -> tuple[int, Path]:
@@ -256,24 +261,36 @@ def _creates(document: Any, engines: Mapping[str, SocietyEngine]) -> dict[Ground
 
 @dataclass(frozen=True, slots=True)
 class HoldingThings:
-    """The engine a saved world's new society takes instead of its ground's where its version holds
-    a thing its author placed and the host offers societies of things, over the society grounds
-    named here (the society ground catalog's keys): the ones a society of things stands on."""
+    """The engine a saved world's new society takes instead of its ground's where the host offers
+    societies of things and, unless ``needs_a_placed_thing`` is false, its version holds a thing
+    its author placed, over the society grounds named here (the society ground catalog's keys):
+    the ones a society of things stands on. A table before the sixth needs a placed thing."""
 
     engine: str
     grounds: tuple[str, ...]
+    needs_a_placed_thing: bool = True
 
 
-def _holding_things(document: Any, engines: Mapping[str, SocietyEngine]) -> HoldingThings:
+def _holding_things(
+    document: Any, engines: Mapping[str, SocietyEngine], *, states_need: bool
+) -> HoldingThings:
     """The table's ``creates_holding_things``: a creatable engine of things that stands on a saved
-    world, the grounds it is created over (lowercase keys, each once, in order) and a reason."""
+    world, the grounds it is created over (lowercase keys, each once, in order), a reason and,
+    from the sixth table (``states_need``), whether it needs a placed thing."""
+    keys = {"engine", "grounds", "reason"} | ({"needs_a_placed_thing"} if states_need else set())
     if (
         not isinstance(document, dict)
-        or set(document) != {"engine", "grounds", "reason"}
+        or set(document) != keys
         or not isinstance(document["reason"], str)
         or not document["reason"].strip()
+        or (states_need and not isinstance(document["needs_a_placed_thing"], bool))
     ):
-        raise ValueError("creates_holding_things states an engine, its grounds and a reason")
+        raise ValueError(
+            "creates_holding_things states an engine, its grounds, a reason and whether it needs "
+            "a placed thing"
+            if states_need
+            else "creates_holding_things states an engine, its grounds and a reason"
+        )
     engine = engines.get(document["engine"])
     if (
         engine is None
@@ -292,7 +309,11 @@ def _holding_things(document: Any, engines: Mapping[str, SocietyEngine]) -> Hold
         or grounds != sorted(set(grounds))
     ):
         raise ValueError("creates_holding_things names its grounds once each, in order")
-    return HoldingThings(engine=engine.engine, grounds=tuple(grounds))
+    return HoldingThings(
+        engine=engine.engine,
+        grounds=tuple(grounds),
+        needs_a_placed_thing=document["needs_a_placed_thing"] if states_need else True,
+    )
 
 
 def load_engine_table(
@@ -331,7 +352,9 @@ def load_engine_table(
         engines,
         default.engine,
         _creates(document["creates"], by_name),
-        None if holding is None else _holding_things(holding, by_name),
+        None
+        if holding is None
+        else _holding_things(holding, by_name, states_need=version >= _NEEDS_STATED_SINCE),
     )
 
 

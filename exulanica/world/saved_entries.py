@@ -240,9 +240,9 @@ class SavedWorldEntry:
     #: for a world no ground is stated for.
     society_engine: str | None = None
     #: The engine a society over this world is created with on a host that offers societies of
-    #: things: the table's engine for a world holding things where its version holds a thing its
-    #: author placed and its ground is one the table names for it, else :attr:`society_engine`.
-    #: Read when the entry is read, so a thing placed since counts.
+    #: things: the table's engine for a world holding things where its ground is one the table
+    #: names for it and that engine needs no placed thing or its version holds one, else
+    #: :attr:`society_engine`. Read when the entry is read, so a thing placed since counts.
     society_engine_holding_things: str | None = None
 
 
@@ -1729,15 +1729,13 @@ class SavedWorldEntryRepository:
             society_engine = holding_things = None
         else:
             society_engine = created_engine(society_ground)
-            holding_things = created_engine(
-                society_ground,
-                holding_things=version_holds_things(
-                    self.connection,
-                    self.workspace_id,
-                    str(row["world_id"]),
-                    row["authored_version_id"],
-                ),
+            holds = version_holds_things(
+                self.connection,
+                self.workspace_id,
+                str(row["world_id"]),
+                row["authored_version_id"],
             )
+            holding_things = created_engine(society_ground, offers_things=True, holds_things=holds)
         source_kind = row["source_kind"]
         if source_kind not in {"personal", "authored", "generated"}:
             raise ValueError("unknown saved world source kind")

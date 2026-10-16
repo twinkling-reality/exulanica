@@ -570,19 +570,28 @@ def placed_affordance_refusal(ground: SocietyGroundKind) -> str | None:
     return UNREACHABLE if ground.navigation == "walking_surfaces" else None
 
 
-def created_engine(ground: SocietyGroundKind, *, holding_things: bool = False) -> str:
+def created_engine(
+    ground: SocietyGroundKind, *, offers_things: bool = False, holds_things: bool = False
+) -> str:
     """The engine the engine table creates a new society with over a saved world on this ground.
 
     The table states one engine for a saved world whose own records state its walking surfaces
     and homes (``town``), and one for a saved world whose people walk a lattice (``saved_world``).
-    ``holding_things`` says the world's version holds a thing its author placed and the host offers
-    societies of things: over a ground the table's ``creates_holding_things`` names, the society is
-    that engine instead, so the beings placed there live with the ground's own people; any other
+    ``offers_things`` says the host offers societies of things, and ``holds_things`` that the
+    world's version holds a thing its author placed: over a ground the table's
+    ``creates_holding_things`` names, where the host offers them and that entry needs no placed
+    thing (from the sixth table) or the version holds one, the society is that engine instead, so
+    the ground's own people may speak and every being placed there lives with them; any other
     ground keeps its engine. A creation still names its engine; this is the one the table says a
     person's own world takes.
     """
     holding = CREATES_HOLDING_THINGS
-    if holding_things and holding is not None and ground.key in holding.grounds:
+    if (
+        offers_things
+        and holding is not None
+        and ground.key in holding.grounds
+        and (holds_things or not holding.needs_a_placed_thing)
+    ):
         return holding.engine
     return CREATES["town" if ground.navigation == "walking_surfaces" else "saved_world"]
 

@@ -165,8 +165,9 @@ def _replayed(api, entry: dict) -> bool:
 def test_a_made_creature_placed_on_a_farm_acts_among_the_farm_s_own_people(made, tmp_path):
     api = made
     entry, society, _records = _site(api, "farm", "fixture_farm", "small_farm")
-    # With nothing placed the farm is the living town's, as it was.
-    assert entry["society_engine"] == CREATES["town"]
+    # With nothing placed the farm is already a society of things on this host, from the engine
+    # table's sixth version; under the fifth it was the living town's.
+    assert entry["society_engine"] == V7
     creature = _keep_creature(api, tmp_path)
     east, _height, south = entry["generated_site"]["arrival_mm"]
     _place(

@@ -156,6 +156,18 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
             lambda d: d.update(profile="exulanica.society-engines/v2"),
             "not a society engine table",
         ),
+        (
+            lambda d: d["creates_holding_things"].pop("needs_a_placed_thing"),
+            "whether it needs a placed thing",
+        ),
+        (
+            lambda d: d["creates_holding_things"].update(needs_a_placed_thing="no"),
+            "whether it needs a placed thing",
+        ),
+        (
+            lambda d: d.update(profile="exulanica.society-engines/v5"),
+            "an engine, its grounds and a reason",
+        ),
     ],
     ids=[
         "unordered",
@@ -176,6 +188,9 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         "holding-things-not-of-things",
         "holding-things-grounds-unordered",
         "holding-things-in-the-second-profile",
+        "holding-things-states-no-need-in-the-sixth-profile",
+        "holding-things-need-not-a-yes-or-no",
+        "holding-things-need-in-the-fifth-profile",
     ],
 )
 def test_a_malformed_table_is_refused(tmp_path, change, message):
@@ -355,9 +370,21 @@ def _without_maximum(engines):
 
 def test_the_earlier_tables_are_this_one_but_for_what_each_version_came_to_state():
     """Every earlier table stays beside this one, read by the same loader by its version. The
-    fourth is this one without a site among the grounds a society of things stands on; the third
+    fifth is this one but that its engine for a world holding things needs a placed thing; the
+    fourth is the fifth without a site among the grounds a society of things stands on; the third
     is the fourth with a maximum of 512 people stated for the engines a town's society is made
     with; the second is the third without its engine for a world holding things."""
+    fifth_path = ENGINES_PATH.with_name("society-engines.v5.json")
+    fifth = load_engine_table(fifth_path)
+    assert fifth[:3] == (ENGINES, DEFAULT_ENGINE, CREATES)
+    assert CREATES_HOLDING_THINGS is not None and not CREATES_HOLDING_THINGS.needs_a_placed_thing
+    assert fifth[3] == dataclasses.replace(CREATES_HOLDING_THINGS, needs_a_placed_thing=True)
+    current = json.loads(ENGINES_PATH.read_text(encoding="utf-8"))
+    stated = json.loads(fifth_path.read_text(encoding="utf-8"))
+    current["profile"] = stated["profile"]
+    current["creates_holding_things"].pop("needs_a_placed_thing")
+    current["creates_holding_things"]["reason"] = stated["creates_holding_things"]["reason"]
+    assert current == stated
     fourth_path = ENGINES_PATH.with_name("society-engines.v4.json")
     third_path = ENGINES_PATH.with_name("society-engines.v3.json")
     second_path = ENGINES_PATH.with_name("society-engines.v2.json")
@@ -368,7 +395,7 @@ def test_the_earlier_tables_are_this_one_but_for_what_each_version_came_to_state
     ) == list(range(1, society_engines.TABLE_VERSION + 1))
     fourth = load_engine_table(fourth_path)
     assert fourth[:3] == (ENGINES, DEFAULT_ENGINE, CREATES)
-    assert CREATES_HOLDING_THINGS is not None and fourth[3] is not None
+    assert fourth[3] is not None and fourth[3].needs_a_placed_thing
     assert fourth[3].engine == CREATES_HOLDING_THINGS.engine
     assert fourth[3].grounds == ("authored_starter", "generated_town", "made_world")
     assert CREATES_HOLDING_THINGS.grounds == (
@@ -429,16 +456,20 @@ def test_a_table_is_read_by_its_version_so_a_later_one_needs_no_new_reader(tmp_p
 def test_every_saved_world_s_ground_holding_things_is_a_society_of_things():
     """The grounds the table names for a world holding things are the society grounds the catalog
     states, a world made from a world kind among them: on a host that offers societies of things
-    a version holding a thing its author placed is one, whatever its ground."""
+    a version is one, whatever its ground, and from the sixth table whether or not it holds a
+    thing its author placed. A host that offers none keeps the ground's engine either way."""
     from exulanica.world.society_grounds import created_engine, society_grounds
 
     assert CREATES_HOLDING_THINGS is not None
     assert society_engine(CREATES_HOLDING_THINGS.engine).state_family == "things"
     grounds = {ground.key: ground for ground in society_grounds()}
     assert set(CREATES_HOLDING_THINGS.grounds) == set(grounds)
+    things = CREATES_HOLDING_THINGS.engine
     for key, ground in grounds.items():
-        assert created_engine(ground, holding_things=True) == CREATES_HOLDING_THINGS.engine, key
-        assert created_engine(ground) != CREATES_HOLDING_THINGS.engine, key
+        for holds in (False, True):
+            assert created_engine(ground, offers_things=True, holds_things=holds) == things, key
+            assert created_engine(ground, holds_things=holds) != things, key
+        assert created_engine(ground) != things, key
 
 
 def test_the_browser_copy_is_generated_from_the_table():

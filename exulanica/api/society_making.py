@@ -148,7 +148,7 @@ def engine_holding_things(
         ground = society_ground_for_composer(source.composer_key)
     except (UnknownSocietyGround, UnknownWorldResource):
         return None
-    engine = created_engine(ground, holding_things=True)
+    engine = created_engine(ground, offers_things=True, holds_things=True)
     if society_engine(engine).state_family != "things":
         return None
     held = version_holds_things(connection, session.workspace_id, world_id, version_id)

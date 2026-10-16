@@ -832,12 +832,13 @@ def version_context(
     if held_society is not None:
         engine = society_engine(held_society["engine_version"])
     elif ground is not None:
-        # On a host that offers societies of things, a version holding a thing its author placed
-        # is brought to life as one where the engine table says so, as its entry states.
-        holding = services.societies_of_things and version_holds_things(
+        # On a host that offers societies of things, a version is brought to life as one where
+        # the engine table says so, placed thing or not from its sixth version, as its entry states.
+        offers = services.societies_of_things
+        holds = offers and version_holds_things(
             connection, session.workspace_id, world_id, version_id
         )
-        engine = society_engine(created_engine(ground, holding_things=holding))
+        engine = society_engine(created_engine(ground, offers_things=offers, holds_things=holds))
     else:
         engine = None
     takes_in = None

@@ -1,11 +1,12 @@
 """A person's saved world holding things is brought to life as a society of things, as a deployment
-serves it (``creates_holding_things`` in the engine table, ``society-engines.v5.json``).
+serves it (``creates_holding_things`` in the engine table, ``society-engines.v6.json``).
 
 What is shown, through the routes a page reads and creates with:
 
 *   on a host that offers societies of things, a starter world's entry and its version's capability
-    read state its ground's engine while it holds no placed thing, and the engine of things once
-    its author places a knight; a host that does not offer them keeps the ground's engine;
+    read state the engine of things, before anything is placed and once its author places a knight
+    (the sixth table needs no placed thing); a host that does not offer them keeps the ground's
+    engine, the knight placed or not;
 *   a new society of the ground's engine is refused by name for that world
     (``society_engine_differs``), and the one the entry states is made: the knight lives there as
     a placed being, on its routine, and nobody is asked anything until a person picks a mind;
@@ -122,11 +123,13 @@ def test_a_saved_world_holding_things_is_brought_to_life_as_a_society_of_things(
     api = made
     _offering(api, True)
     entry = _starter(api)
+    assert _read(api, entry)["society_engine"] == THINGS
+    assert _capability_engine(api, entry) == THINGS
+    # A host that offers no society of things keeps the ground's engine, the knight placed or not.
+    _offering(api, False)
     assert _read(api, entry)["society_engine"] == PURPOSEFUL
     assert _capability_engine(api, entry) == PURPOSEFUL
     _place_knight(api, entry)
-    # A host that offers no society of things keeps the ground's engine, the knight placed or not.
-    _offering(api, False)
     assert _read(api, entry)["society_engine"] == PURPOSEFUL
     _offering(api, True)
     read = _read(api, entry)
