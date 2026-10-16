@@ -488,3 +488,76 @@ def test_a_made_world_s_part_changes_are_listed_and_not_applied():
         planned = review(client, merged, "main")
     assert planned["not_applied"]["parts"] == ["Moved the bench 2 m east", "Removed the pond"]
     assert world.writes == []
+
+
+# A town's residents, who are no placed things
+
+BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b001"
+SECOND_BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b002"
+FERRY_KEEPER = "0190a1b2-c3d4-7e5f-8a9b-00000000f001"
+
+
+def with_residents(project, *residents):
+    """The project keeping these residents, each with a model assignment of its own, as capture
+    keeps a resident a model decides for."""
+    project["residents"] = [dict(resident) for resident in residents]
+    [knight] = project["models"]
+    project["models"] += [{**knight, "thing_id": r["resident_id"]} for r in residents]
+    return project
+
+
+def test_a_resident_s_model_is_reported_by_its_name_or_role_and_never_written():
+    world = World()
+    project = with_residents(
+        edited(world),
+        {"resident_id": BAKER, "role": "baker"},
+        {"resident_id": SECOND_BAKER, "role": "baker"},
+        {"resident_id": FERRY_KEEPER, "role": "ferry_keeper", "name": "Odile Fenn"},
+    )
+    [baker] = [model for model in project["models"] if model["thing_id"] == BAKER]
+    baker.update(provider="nebius_token_factory", model_id="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
+    merged = read_merged("learner/world", 7, GitHub(project).request)
+    with reader(world) as client:
+        planned = review(client, merged, "main")
+        assert planned["not_applied"]["model_assignments"] == [
+            "change the baker's model to Nemotron 3 Nano 30B after the world is started",
+            "change the second baker's model to synthetic-model after the world is started",
+            "change Odile Fenn's model to synthetic-model after the world is started",
+            "change the knight's model to synthetic-model after the world is started",
+        ]
+        # A resident is no placed thing: the changes are the placed things' alone.
+        assert planned["changes"] == [
+            "remove the bench",
+            "move the knight 2 m east",
+            "add the lamp post",
+        ]
+        said = repr([planned[key] for key in ("changes", "refused", "notes", "not_applied")])
+        assert "0190a1b2" not in said
+        apply(
+            client,
+            merged,
+            "main",
+            reviewed_sha256=planned["review_sha256"],
+            allow_world_write=True,
+        )
+    version = world.writes[1][0].split("/")[3]
+    assert [path for path, _ in world.writes] == [
+        "/world/versions",
+        f"/world/versions/{version}/things/bench:1/remove",
+        f"/world/versions/{version}/things/knight:1/move",
+        f"/world/versions/{version}/things",
+    ]
+
+
+def test_a_town_kept_for_its_residents_alone_makes_no_version():
+    world = World()
+    project = with_residents(checkpoint(world, []), {"resident_id": BAKER, "role": None})
+    project["models"] = [m for m in project["models"] if m["thing_id"] == BAKER]
+    merged = read_merged("learner/world", 7, GitHub(project).request)
+    with reader(world) as client:
+        planned = review(client, merged, "main")
+    assert planned["mode"] == "nothing to apply" and planned["edits"] == []
+    assert planned["not_applied"]["model_assignments"] == [
+        "change the resident's model to synthetic-model after the world is started"
+    ]
+    assert world.writes == []

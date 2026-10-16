@@ -274,3 +274,55 @@ def test_decisions_asked_under_an_earlier_model_stay_under_that_model():
     assert "- The knight, with synthetic-model: 4 decisions, 4 done" in text
     assert "| Nemotron 3 Nano 30B | The knight | 2 |" in text
     assert "NVIDIA-Nemotron" not in text
+
+
+# A town's residents, who are no placed things
+
+BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b001"
+SECOND_BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b002"
+FERRY_KEEPER = "0190a1b2-c3d4-7e5f-8a9b-00000000f001"
+
+
+def in_town(world, evidence, residents, deciding):
+    """The world keeping these residents, each with a model assignment of its own, and the
+    evidence's decisions made in turn by `deciding` (the knight and residents)."""
+    from exulanica.canonical import canonical_json
+    from exulanica.world_package.projects.checkpoint import digest
+
+    [knight] = evidence["models"]
+    bindings = {"knight:1": knight}
+    bindings.update({r["resident_id"]: {**knight, "thing_id": r["resident_id"]} for r in residents})
+    evidence["models"] = list(bindings.values())
+    for n, decision in enumerate(evidence["decisions"]):
+        being = deciding[n % len(deciding)]
+        decision.update(thing_id=being, binding_sha256=digest(canonical_json(bindings[being])))
+    return document({**world, "residents": residents, "models": list(bindings.values())})
+
+
+def test_a_resident_is_told_by_its_name_or_role_and_a_public_repository_gets_its_role():
+    world, evidence = session(count=8)
+    world = in_town(
+        world,
+        evidence,
+        [
+            {"resident_id": BAKER, "role": "baker"},
+            {"resident_id": SECOND_BAKER, "role": "baker"},
+            {"resident_id": FERRY_KEEPER, "role": "ferry_keeper", "name": "Odile Fenn"},
+        ],
+        ["knight:1", BAKER, SECOND_BAKER, FERRY_KEEPER],
+    )
+    private = "\n".join(insight(world, {"session-one.json": evidence}, readable=True))
+    public = "\n".join(insight(world, {"session-one.json": evidence}, readable=False))
+    for line in (
+        "- The baker, with synthetic-model: 2 decisions, 2 done",
+        "- The second baker, with synthetic-model: 2 decisions, 2 done",
+        "- Odile Fenn, with synthetic-model: 2 decisions, 2 done",
+        "| synthetic-model | Odile Fenn, The baker, The knight and The second baker | 8 | 8 of 8 |",
+    ):
+        assert line in private
+    # A resident's name is written words: a public repository is told its role.
+    assert "Odile Fenn" not in public
+    assert "- The ferry keeper, with synthetic-model: 2 decisions, 2 done" in public
+    assert "| The baker, The ferry keeper, The knight and The second baker | 8 |" in public
+    for text in (private, public):
+        assert "0190a1b2" not in text and "A character" not in text and "_" not in text
