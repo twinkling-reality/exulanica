@@ -1314,10 +1314,10 @@ reconstruction never runs in a request.
 Its API connects as `exulanica_judge`, which may read every table, may insert and update only an
 allowlist of tables, and may delete nothing, so "may read, may not write a source or a deletion" is
 enforced by the database rather than intended. The reviewer's bearer token holds the permissions
-`JUDGE_PERMISSIONS` names in `exulanica/orchestration/judge_seed.py`: reads, the authored world and
-its appearance, the Companion, deleting a memory the reviewer made, acting as a being (`being.act`)
-and the model calls those need; intake, admission, consent writes, operations writes and tile
-materialisation are absent. On this stack no being is played whatever the token holds:
+`JUDGE_PERMISSIONS` names in `exulanica/orchestration/judge_seed_role.py`: reads, the authored
+world and its appearance, the Companion, deleting a memory the reviewer made, acting as a being
+(`being.act`) and the model calls those need; intake, admission, consent writes, operations writes
+and tile materialisation are absent. On this stack no being is played whatever the token holds:
 `exulanica_judge` writes no society table, and playing a being records a choice and an answer there.
 A minted reviewer plays a being on the public server (8.2), whose API connects as the application
 role.

@@ -596,7 +596,7 @@ def test_a_reset_keeps_the_index_of_generated_pieces_and_refuses_an_archive_carr
     loads it, and an archive whose manifest says it carries rows for it is refused before anything
     changes. The control resets the same archive untouched first."""
     from exulanica.generation import batches
-    from exulanica.orchestration.judge_seed import _row_files
+    from exulanica.orchestration.judge_seed_archive import _row_files
 
     from generated_piece_support import kept_output
 
