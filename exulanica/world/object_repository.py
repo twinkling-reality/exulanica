@@ -91,6 +91,7 @@ from exulanica.world.objects import (
     VersionEdit,
     object_document,
     override_document,
+    override_from_document,
     validate_behaviour,
     validate_object,
     validate_transform,
@@ -1465,7 +1466,7 @@ class WorldObjectRepository:
                 (edit_id, self.workspace_id, self.world_id, version_id, element_id),
             )
             return (None if current is None else override_document(current)), None
-        self._write_override(version_id, _override_from_document(before), edit_id)
+        self._write_override(version_id, override_from_document(before), edit_id)
         return (
             None if current is None else override_document(current),
             override_document({o.element_id: o for o in self._overrides(version_id)}[element_id]),
@@ -3589,26 +3590,6 @@ def version_holds_things(
         (workspace_id, world_id, version_id),
     ).fetchone()
     return bool(row["held"])
-
-
-def _override_from_document(document: Mapping[str, Any]) -> ElementOverride:
-    transform = document["transform"]
-    return ElementOverride(
-        element_id=document["element_id"],
-        suppressed=document["suppressed"],
-        transform=(
-            None
-            if transform is None
-            else Transform(
-                transform["x_mm"],
-                transform["y_mm"],
-                transform["z_mm"],
-                transform["yaw_microradians"],
-                transform["scale_milli"],
-            )
-        ),
-        storeys=document.get("storeys"),
-    )
 
 
 #: The first words of the binding trigger's refusal (migration 0126), which a withdrawal that

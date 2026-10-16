@@ -38,6 +38,7 @@ __all__ = [
     "VersionEdit",
     "object_document",
     "override_document",
+    "override_from_document",
     "validate_behaviour",
 ]
 
@@ -200,6 +201,28 @@ def override_document(override: ElementOverride) -> dict[str, Any]:
     if override.storeys is not None:
         document["storeys"] = override.storeys
     return document
+
+
+def override_from_document(document: Mapping[str, Any]) -> ElementOverride:
+    """The override an edit's document records (:func:`override_document`): what an undo or a
+    redo restores."""
+    transform = document["transform"]
+    return ElementOverride(
+        element_id=document["element_id"],
+        suppressed=document["suppressed"],
+        transform=(
+            None
+            if transform is None
+            else Transform(
+                transform["x_mm"],
+                transform["y_mm"],
+                transform["z_mm"],
+                transform["yaw_microradians"],
+                transform["scale_milli"],
+            )
+        ),
+        storeys=document.get("storeys"),
+    )
 
 
 def validate_object_id(object_id: str) -> str:

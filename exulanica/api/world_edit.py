@@ -1,4 +1,5 @@
-"""What every authored-world edit shares: bodies, repositories, problems and one transaction.
+"""What every authored-world edit shares: bodies, repositories, problems, one transaction, and the
+reversal every undo and redo route runs (:func:`reversal`).
 
 The authored-world routes (:mod:`~exulanica.api.routes.world_versions`,
 :mod:`~exulanica.api.routes.world_environments`, :mod:`~exulanica.api.routes.world_objects` and
@@ -35,6 +36,7 @@ from exulanica.api.dependencies import (
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView, rendered_version
+from exulanica.errors import ExulanicaError
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world import (
     MAX_SCALE_MILLI,
@@ -60,14 +62,21 @@ from exulanica.world import (
     Transform,
     WorldObjectRepository,
 )
+from exulanica.world.edit_kinds import EditSubject
 from exulanica.world.errors import (
     InvalidThingPlacement,
     ThingKindGone,
     ThingLandingRefused,
     ThingLimitReached,
 )
+from exulanica.world.generated_worlds import states_records
 from exulanica.world.kinds.worker import KindWorkWaiting
+from exulanica.world.object_edit_preview import read_only_snapshot
+from exulanica.world.objects import override_from_document
+from exulanica.world.site_parts import changes_of, part_identity
 from exulanica.world.society import SocietyPlaceWaiting, UnavailableSocietyInput
+from exulanica.world.town_parts import building_changes
+from exulanica.world.version_tiles import changed_tiles, queue_version_bakes, version_changes
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 from exulanica.world.worlds import require_world
 
@@ -373,3 +382,87 @@ def commit_edit(
         return problem
     # After the commit, which released any asset read lock the edit took.
     return rendered_version(repository, version, get_services(request).store)
+
+
+def reversal(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    base_state_sha256: str,
+    actor: uuid.UUID,
+    *,
+    redo: bool = False,
+) -> Callable[[], AlternateVersion]:
+    """An undo of the version's newest edit not yet reversed (with ``redo``, a redo of its newest
+    undo), as :func:`commit_edit` runs it. Every route that reverses an edit, whatever its subject,
+    reverses it here, since one rule reverses every kind
+    (:meth:`~exulanica.world.object_repository.WorldObjectRepository.undo`).
+
+    Where the edit reversed is a change to a made town's building, the version's changed tiles are
+    queued for baking in the edit's transaction, as a kept change queues them
+    (:func:`~exulanica.world.version_tiles.queue_version_bakes`). Finding them makes the town's
+    tile documents again, so they are found here first, for the changes the reversal would leave,
+    before the transaction takes the workspace's lock; the queue under the lock then finds them in
+    memory, unless another edit moved the version in between.
+    """
+    _find_tiles_left(repository, version_id, base_state_sha256, redo=redo)
+
+    def operation() -> AlternateVersion:
+        reverse = repository.redo if redo else repository.undo
+        version = reverse(version_id, base_state_sha256=base_state_sha256, actor=actor)
+        return _town_bakes_queued(repository, version)
+
+    return operation
+
+
+def _find_tiles_left(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    base_state_sha256: str,
+    *,
+    redo: bool,
+) -> None:
+    """Find, without a lock or a write, the tiles of a made town that its changes alter once the
+    reversal is made, the reversal read as its preview reads it. A refusal here is left for the
+    edit to answer, in the order it checks."""
+    connection, workspace_id, world_id = (
+        repository.connection,
+        repository.workspace_id,
+        repository.world_id,
+    )
+    validate = repository.validate_redo if redo else repository.validate_undo
+    try:
+        with read_only_snapshot(connection):
+            candidate = validate(version_id, base_state_sha256=base_state_sha256)
+            identity = part_identity(candidate.subject_id)
+            if candidate.subject is not EditSubject.ELEMENT or identity is None:
+                return
+            snapshot_id = repository.edit_base_row(version_id)["source_snapshot_id"]
+            if not states_records(connection, workspace_id, world_id, snapshot_id):
+                return
+            left = [c for c in repository.part_changes(version_id) if c.identity != identity]
+            if candidate.restores is not None:
+                left.extend(changes_of([override_from_document(candidate.restores)]))
+            changed_tiles(connection, workspace_id, world_id, snapshot_id, building_changes(left))
+    except ExulanicaError:
+        return
+
+
+def _town_bakes_queued(
+    repository: WorldObjectRepository, version: AlternateVersion
+) -> AlternateVersion:
+    """``version`` as an undo or redo wrote it, with its changed tiles queued for baking in the
+    edit's transaction when the edit reversed changed a made town's building. The undo or redo is
+    the newest edit, and repeats the subject of the edit it reverses. A site world's part, any
+    other subject or an undo back to no changes queues nothing: every tile is the public bake."""
+    newest = max(version.edits, key=lambda edit: edit.edit_seq, default=None)
+    if newest is None or part_identity(newest.element_id or "") is None:
+        return version
+    connection, workspace_id = repository.connection, repository.workspace_id
+    world_id, snapshot_id, version_id = (
+        version.world_id,
+        version.source_snapshot_id,
+        version.version_id,
+    )
+    changes = version_changes(connection, workspace_id, world_id, snapshot_id, version_id)
+    queue_version_bakes(connection, workspace_id, world_id, snapshot_id, version_id, changes)
+    return version

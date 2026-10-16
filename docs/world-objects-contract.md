@@ -1276,9 +1276,10 @@ the version's society lives or works in any of the building's premises, and a lo
 away a premises somebody lives or works in, naming them as above (`part_houses_people`: "Not removed:
 Ines lives there."). A taller building's new homes stay empty, since a town's people are counted when
 its society is made; a storeys preview that may be kept says what it would be (`landing.said`:
-"Taller: 4 storeys. Nobody lives in the new homes yet."). A kept change queues, in the edit's
-transaction, a bake of every tile the version's changes alter whose bake is neither stored nor
-already queued. The society over a changed town, and the landing for its placed things, read the
+"Taller: 4 storeys. Nobody lives in the new homes yet."). A kept change, and an undo or a redo
+that reverses one on any undo route, queues, in the edit's transaction, a bake of every tile the
+version's changes then alter whose bake is neither stored nor already queued or running, so a tile
+whose bake failed is queued again. The society over a changed town, and the landing for its placed things, read the
 town as the version's changes leave it: a removed building's premises and footprint are gone, a
 taller or lower one stands its own massing, and nobody is rehomed.
 

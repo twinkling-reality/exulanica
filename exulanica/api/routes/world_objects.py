@@ -2,7 +2,9 @@
 
 An object names a reviewed asset by content digest, a region-local transform, the origin role the
 person chose and optionally one reviewed behaviour with bounded parameters. Every edit names the
-version state it was made against and runs in :func:`exulanica.api.world_edit.commit_edit`.
+version state it was made against and runs in :func:`exulanica.api.world_edit.commit_edit`. Undo
+reverses the newest edit of any kind, a change to a made town's building among them, whose tiles it
+queues for baking as a kept change does (:func:`exulanica.api.world_edit.reversal`).
 
 Move, remove and undo each have a preview beside them that writes nothing
 (:mod:`exulanica.world.object_edit_preview`): the verdict the write would reach on the stored state,
@@ -27,6 +29,7 @@ from exulanica.api.world_edit import (
     TransformBody,
     WriteObjects,
     commit_edit,
+    reversal,
 )
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world import AuthoredObject, ObjectOrigin
@@ -199,9 +202,7 @@ def undo_authored_edit(
         repository,
         version_id,
         body,
-        lambda: repository.undo(
-            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
-        ),
+        reversal(repository, version_id, body.base_state_sha256, session.actor),
     )
 
 

@@ -589,9 +589,16 @@ for a running job of the session's workspace naming that version, tile and fold.
 serves it from that namespace to a version whose tiles name it, and to no other version or
 workspace. A world's erasure deletes its version bakes, cancels its queued ones and destroys their
 bytes on its tombstone; a workspace's erasure destroys every object of the namespace; a judge seed
-refuses a workspace holding any. Limits: no route changes a made town's buildings yet, so nothing
-queues a version's bakes (`queue_version_bakes` is the call that does); the changed tiles are
-found again on each read of an entry, kept in memory for the few towns read last.
+refuses a workspace holding any. A kept change to a building (the parts routes), and an undo or a
+redo that reverses one on any undo route, queues in its own transaction a bake of every tile the
+version's changes then alter whose bake is neither stored nor already queued or running
+(`queue_version_bakes`), so a tile whose bake failed when the version changed again is queued
+again when an undo brings the version back. The changed tiles are found before the edit takes its
+workspace's lock, and read from memory under it. Limits: the changed tiles are found again on each
+read of an entry, kept in memory for the few towns read last, and an edit that moves the version
+between the two finds makes the town's tile documents again under the lock; an undo that commits
+while the worker fails a running bake of the same tile does not queue it, and that tile reads
+failed until a later edit queues it again.
 
 ## 8. Budget
 

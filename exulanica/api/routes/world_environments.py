@@ -2,7 +2,8 @@
 
 An instance pins one exact admitted environment asset or feature. Every edit names the version state
 it was made against and runs in :func:`exulanica.api.world_edit.commit_edit`, like every other
-authored edit.
+authored edit. Undo reverses the newest edit of any kind, as every undo route does
+(:func:`exulanica.api.world_edit.reversal`).
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from exulanica.api.world_edit import (
     TransformBody,
     WriteObjects,
     commit_edit,
+    reversal,
 )
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world import EnvironmentPlacement, ObjectOrigin
@@ -152,7 +154,5 @@ def undo_environment_edit(
         repository,
         version_id,
         body,
-        lambda: repository.undo(
-            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
-        ),
+        reversal(repository, version_id, body.base_state_sha256, session.actor),
     )

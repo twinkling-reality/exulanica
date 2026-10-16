@@ -10,8 +10,10 @@ its maker stands it, and held to the ground when it is moved. A thing whose work
 (no longer held, or erased after it was placed) is moved nowhere (410 ``thing_kind_erased``) and is
 removed as any thing is. Every edit names the version state it was made against and runs in
 :func:`exulanica.api.world_edit.commit_edit`, like every other authored edit, and answers with the
-whole version. ``GET .../thing-looks`` answers the latest look chosen for each thing of the
-version (:mod:`exulanica.world.thing_looks`), never cached.
+whole version. An undo or redo of a change to a made town's building queues the version's changed
+tiles for baking in its own transaction, as a kept change does, here as on every undo route
+(:func:`exulanica.api.world_edit.reversal`). ``GET .../thing-looks`` answers the latest look
+chosen for each thing of the version (:mod:`exulanica.world.thing_looks`), never cached.
 
 ``GET .../society/things/{thing_id}`` answers one thing or being of the version's society of
 things as its card (``exulanica.thing-card/v1``, :mod:`exulanica.api.thing_card`), by the id the
@@ -42,6 +44,7 @@ from exulanica.api.world_edit import (
     WriteObjects,
     commit_edit,
     object_problem,
+    reversal,
 )
 from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView
@@ -274,9 +277,7 @@ def redo_thing_edit(
         repository,
         version_id,
         body,
-        lambda: repository.redo(
-            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
-        ),
+        reversal(repository, version_id, body.base_state_sha256, session.actor, redo=True),
     )
 
 
@@ -347,9 +348,7 @@ def undo_thing_edit(
         repository,
         version_id,
         body,
-        lambda: repository.undo(
-            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
-        ),
+        reversal(repository, version_id, body.base_state_sha256, session.actor),
     )
 
 
