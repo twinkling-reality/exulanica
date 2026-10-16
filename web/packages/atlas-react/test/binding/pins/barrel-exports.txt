@@ -38,6 +38,7 @@ RepresentationRuntime
 SCALE_MILLI_UNIT
 SPLAT_OCCLUSION
 SceneObjectRuntime
+StaticMeshPicker
 anchorKindSlot
 atlasPointFromRegion
 authoredGroundGeometry
