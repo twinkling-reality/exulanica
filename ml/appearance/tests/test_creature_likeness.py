@@ -110,3 +110,22 @@ def test_with_no_pixel_in_common_the_colours_stay_as_they_are():
     moved, match, before, after = match_to_picture(positions, triangles, colours, empty)
     assert match is None and before == after
     assert np.array_equal(moved, colours)
+
+
+def test_a_picture_whose_spread_is_its_light_keeps_the_mean_move_alone():
+    from exulanica_appearance.creatures.likeness import match_to_picture
+
+    positions, triangles, _ = _model()
+    # The model in two near shades; its picture one colour, a little lighter, lit in a checkerboard
+    # the model's shades do not follow. Matching the picture's spread stretches the model's shades
+    # apart and moves its pixels away; the mean's move alone comes closer.
+    colours = np.array([(150, 120, 90)] * 12 + [(130, 104, 78)] * 12, dtype=np.uint8)
+    one = np.array([(150, 118, 88)] * 24, dtype=np.uint8)
+    picture = _picture(positions, triangles, one, Camera(37.0, 15.0))
+    rows, columns = np.indices(picture.shape[:2])
+    light = np.where((rows // 12 + columns // 12) % 2 == 0, 1.0, 0.75)
+    picture[..., :3] = np.rint(picture[..., :3] * light[..., None]).astype(np.uint8)
+    moved, match, before, after = match_to_picture(positions, triangles, colours, picture)
+    assert match is not None and match.scale == (1.0, 1.0, 1.0)
+    assert after.colour_difference_milli < before.colour_difference_milli
+    assert not np.array_equal(moved, colours)

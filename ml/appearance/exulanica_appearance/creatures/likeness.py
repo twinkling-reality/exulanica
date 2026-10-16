@@ -268,8 +268,9 @@ def match_to_picture(
 ) -> tuple[np.ndarray, ColourMatch | None, Likeness, Likeness]:
     """The model's triangle colours moved toward its picture's (:func:`colour_match`, from the
     pixels both cover at the best-matching view), the match, and the likeness before and after,
-    the after measured at the same view. With no pixel in common, or when the match brings the
-    colours no closer, the colours stay as they are and the match is None."""
+    the after measured at the same view: the whole match, or its mean's move alone where that comes
+    closer. With no pixel in common, or when neither brings the colours closer, the colours stay as
+    they are and the match is None."""
     before, model, seen = _measure(
         positions,
         triangles,
@@ -281,14 +282,30 @@ def match_to_picture(
     )
     if not len(model):
         return np.asarray(triangle_colours, dtype=np.uint8), None, before, before
-    match = colour_match(model, seen, bound=bound, spread=spread)
-    after = _scored(
-        before.yaw_degrees,
-        before.pitch_degrees,
-        before.outline_overlap_per_mille,
-        match.apply(model),
-        seen,
-    )
+    whole = colour_match(model, seen, bound=bound, spread=spread)
+    # The mean's move and the spread's are kept or dropped apart. A picture's spread is partly its
+    # light, which the model's own pattern does not follow: matched to it, the spread can move each
+    # pixel further from its picture than the means' meeting brings it closer, and then the mean's
+    # move alone is kept.
+    mean_only = ColourMatch(centre=whole.centre, scale=(1.0, 1.0, 1.0), shift=whole.shift)
+
+    def scored(candidate: ColourMatch) -> Likeness:
+        return _scored(
+            before.yaw_degrees,
+            before.pitch_degrees,
+            before.outline_overlap_per_mille,
+            candidate.apply(model),
+            seen,
+        )
+
+    match, after = whole, scored(whole)
+    alone = scored(mean_only)
+    if (
+        alone.colour_difference_milli is not None
+        and after.colour_difference_milli is not None
+        and alone.colour_difference_milli < after.colour_difference_milli
+    ):
+        match, after = mean_only, alone
     if after.colour_difference_milli is None or (
         before.colour_difference_milli is not None
         and after.colour_difference_milli >= before.colour_difference_milli
