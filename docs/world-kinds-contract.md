@@ -763,7 +763,9 @@ town's receipt or digest depends on the adapter.
   or as many as bounds version 3 states for a kind that names it; every storey above the ground is
   drawn, not walked, and a taller structure adds no slot to the drawing and no place to the walk.
 - Roads and parking are drawn as surfaces and kept clear; nothing drives in a site world. Water is
-  never walked, and nothing moves on it.
+  never walked. A being of a society of things whose kind swims crosses it by the swimming module,
+  over the lattice the site's composer lays in it
+  ([movement modules contract](movement-modules-contract.md#swimming)); nothing else moves on it.
 - A kind's sample worlds house at most 128 people and lay at most 962 walking places, the bounds
   a living society's tick was measured on in towns; a site near them (879 places, 128 people)
   ticked within a town's in the same run (`scripts/measure_living_site.py`), measured on a loaded

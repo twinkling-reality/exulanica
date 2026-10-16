@@ -119,6 +119,7 @@ from exulanica.world.society_grounds import (
 )
 from exulanica.world.society_living import LivingPlace, _positions, town_routine
 from exulanica.world.society_walking_surfaces import place_residents, walking_surfaces_place
+from exulanica.world.society_water import land_water
 from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_SHA256
 from exulanica.world.structure import SpatialCandidate
 from exulanica.world.world_recipes import WorldRecipe, read_specification
@@ -141,6 +142,7 @@ __all__ = [
     "records_with",
     "region_point",
     "stated_extent",
+    "swim_nodes",
     "tile_documents",
     "tile_inputs",
 ]
@@ -735,6 +737,30 @@ def graded_land(receipt: Mapping[str, Any], generated: Sequence[object]) -> Site
             f"generated_world_land_changed: its land no longer grades for its records: {exc.detail}"
         ) from exc
     return SiteLand(land, frame, graded, own)
+
+
+#: The water of the last few towns on land, by their receipts' land, seed and output: grading a
+#: town's land again takes about a second, and every read of its society's next input asks for it.
+_WATER_KEPT: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+_WATER_KEPT_MOST: Final = 8
+
+
+def swim_nodes(receipt: Mapping[str, Any], generated: Sequence[object]) -> list[dict[str, Any]]:
+    """The water a town holds, as its society's composer lays a swimmer's lattice over it
+    (:mod:`exulanica.world.society_water`): for a town on its land, the land's own lakes, pools and
+    sea within the ground its frame covers, named by the land's own names (:func:`graded_land`),
+    kept for the process by its receipt. A level town holds none."""
+    if receipt.get("composer", {}).get("version") not in ON_LAND_VERSIONS:
+        return []
+    key = (str(receipt["land_sha256"]), str(receipt["seed"]), str(receipt["output_digest"]))
+    if key not in _WATER_KEPT:
+        land = graded_land(receipt, generated)
+        bounds = (0, 0, land.frame.width_mm, land.frame.depth_mm)
+        named = {f"land:{body.id}": body for body in land.water}
+        if len(_WATER_KEPT) >= _WATER_KEPT_MOST:
+            _WATER_KEPT.pop(next(iter(_WATER_KEPT)))
+        _WATER_KEPT[key] = land_water(named, land.height_at, bounds)
+    return [dict(body) for body in _WATER_KEPT[key]]
 
 
 def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:

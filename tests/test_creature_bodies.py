@@ -21,8 +21,11 @@ from exulanica.things.bodies import (
     BODY_RECIPE_CODES,
     BodyRefused,
     body_grammar,
+    body_grammars,
     build_body,
+    built_again,
     enabled_movements,
+    load_body_grammar,
     read_body_recipe,
 )
 from exulanica.things.catalogs import (
@@ -206,7 +209,8 @@ def test_a_body_moves_by_what_it_has_and_what_is_built():
     assert movers == set(CREATURES)
     assert "walking" not in enabled_movements(read_body_recipe(_recipe("floating_eight")))
     _r, floating = _built("floating_eight")
-    assert floating.plan["moves"] == []  # it can only fly, and flight is not built yet
+    # It swims with its tentacles, and flies by no module yet: flight for beings is not built.
+    assert floating.plan["moves"] == ["exulanica-movement/swimming/v1"]
     _r, dragon = _built("dragon")
     assert dragon.plan["moves"] == ["exulanica-movement/walking/v1"]
     assert "flight" in enabled_movements(read_body_recipe(_recipe("dragon")))
@@ -399,11 +403,11 @@ def test_a_creature_is_a_kind_of_its_drafted_plan_wearing_its_sketch():
             "This world has no flying creatures yet.",
         ),
         (
-            "serpent",
-            "long swimmer",
+            "three_heads",
+            "plain wader",
             ["walking", "swimming"],
-            "creature_movement_unbuilt",
-            "This world has no swimming yet.",
+            "creature_cannot_move_so",
+            "fins, four or more tentacles, or a long body",
         ),
         (
             "three_heads",
@@ -421,6 +425,42 @@ def test_what_a_body_or_this_world_cannot_do_is_refused_in_words(name, label, mo
         assemble_creature(_form(_recipe(name), label=label, moves=moves), by=BY)
     assert refused.value.code == code
     assert words in refused.value.detail
+
+
+def test_a_body_with_fins_is_drafted_to_swim_as_well_as_walk():
+    """Swimming is built, named by the body grammar's second version: a legged body with a pair of
+    fins asked to walk and swim is assembled moving by both modules, its plan and its kind alike."""
+    recipe = _recipe("ten_legs")
+    recipe["limbs"] = [
+        {"role": "leg", "count": 4, "segments": 3},
+        {"role": "fin", "count": 2, "segments": 2},
+    ]
+    form = _form(recipe, label="finned walker", moves=["walking", "swimming"])
+    creature = assemble_creature(form, by=BY)
+    swims, walks = "exulanica-movement/swimming/v1", "exulanica-movement/walking/v1"
+    assert body_grammar().version == 2
+    assert list(creature.plan.moves) == [swims, walks]
+    assert creature.kind.document["moves"] == [walks, swims]
+
+
+def test_a_plan_kept_from_an_older_grammar_is_built_again_by_that_grammar():
+    """A plan states the grammar version that built it, so one kept from before the newest is
+    built again exactly by its own version, and a plan no version builds from its recipe is
+    none."""
+    older = load_body_grammar(version=1)
+    recipe = read_body_recipe(_recipe("floating_eight"), grammar=older)
+    kept = build_body(
+        recipe, key="kept", version=1, title="a kept body", origin=DRAFTED, grammar=older
+    )
+    newest = build_body(recipe, key="kept", version=1, title="a kept body", origin=DRAFTED)
+    assert [grammar.version for grammar in body_grammars()] == [2, 1]
+    # The newest grammar builds the same recipe as another plan: it swims and names its version.
+    assert (kept.plan["moves"], newest.plan["moves"]) == ([], ["exulanica-movement/swimming/v1"])
+    again = built_again(recipe, dict(kept.plan))
+    assert again is not None
+    assert (dict(again.plan), dict(again.joints)) == (dict(kept.plan), dict(kept.joints))
+    assert dict(built_again(recipe, dict(newest.plan)).plan) == dict(newest.plan)
+    assert built_again(recipe, {**kept.plan, "moves": newest.plan["moves"]}) is None
 
 
 def test_abilities_a_body_cannot_serve_are_refused_by_the_kind_reader():

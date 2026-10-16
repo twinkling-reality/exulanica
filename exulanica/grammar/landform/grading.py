@@ -59,6 +59,7 @@ __all__ = [
     "Pad",
     "Wall",
     "grade_land",
+    "within_water",
 ]
 
 #: The steepest a bank is cut or filled: 1 in 2, the usual stable grassed bank.
@@ -367,6 +368,14 @@ def _within(body: WaterBody, x: int, y: int) -> bool:
         cx, cy = body.centre_mm
         return (x - cx) * (x - cx) + (y - cy) * (y - cy) < body.radius_mm * body.radius_mm
     return _reach(x, y, _ellipse(body.rect_mm)) < ONE
+
+
+def within_water(body: WaterBody, x_mm: int, y_mm: int) -> bool:
+    """Whether a point lies within a body of water's outline, the one the grading holds its water
+    to: anywhere for the sea, nowhere on a fall's sheet, a pool's rectangle, a lake's circle and a
+    pond's ellipse inscribed in its rectangle. The water there is where the land under the point
+    lies below the body's level."""
+    return _within(body, x_mm, y_mm)
 
 
 def _water_holds(work: _Work, bodies: Sequence[WaterBody]) -> None:

@@ -60,8 +60,10 @@ from exulanica.world.society_input_policy import (
     validate_unread_placements,
 )
 from exulanica.world.society_legacy import initial_society
+from exulanica.world.society_movement import Movers, walker_paces
 from exulanica.world.society_summaries import summary_name
 from exulanica.world.society_thing_inputs import MOVEMENT_MODULES_FIELD, validate_input_things
+from exulanica.world.society_water import WATER_FIELD
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"
@@ -309,9 +311,10 @@ def _validate_society_input(document: dict[str, Any]) -> None:
             fields.add("people")
         if "day" in document:
             fields.add("day")
-        # The run forms of the kinds its workspace keeps that a placed thing is of, and the
-        # placed things left out because theirs is gone: each stated only where there is one.
-        for made in ("kinds", "things_gone"):
+        # The run forms of the kinds its workspace keeps that a placed thing is of, the placed
+        # things left out because theirs is gone, and the water its swimmers cross: each stated
+        # only where there is one.
+        for made in ("kinds", "things_gone", WATER_FIELD):
             if made in document:
                 fields.add(made)
     _require(set(document) == fields, "invalid society input fields")
@@ -1102,8 +1105,11 @@ def _crowded(document: Mapping[str, Any]) -> frozenset[str]:
 
 def _input_routes(document: Mapping[str, Any], start: str, adjacent: Mapping[str, Any]) -> dict:
     """The routes from ``start`` over ``adjacent``, the input's own walking graph's neighbours
-    (read, never changed, by its callers)."""
-    return _input_value(document, ("routes", start), lambda: _paths(start, adjacent))
+    (read, never changed, by its callers); none from a node it does not have, a swimmer's in the
+    water (:mod:`exulanica.world.society_movement`)."""
+    return _input_value(
+        document, ("routes", start), lambda: _paths(start, adjacent) if start in adjacent else {}
+    )
 
 
 def _navigation_sha256(document: Mapping[str, Any]) -> str:
@@ -1831,66 +1837,6 @@ def _talk_pairs(
     return pairs
 
 
-def walker_paces(state: Mapping[str, Any]) -> Callable[[Mapping[str, Any]], int] | None:
-    """How a society's walkers are paced. None where its minutes run the first walking, which
-    spends one budget for everybody: every society whose first input recorded no movement module.
-    Where it recorded a walking that declares a pace, what answers each walker's own, in
-    thousandths of the society's: the one its kind states with the walking it moves by, or the
-    module's reference pace where its kind states none or it states no kind. A kind is read once
-    a call, from the run forms the state keeps."""
-    from exulanica.movement.walking_v2 import PACE_PARAMETER
-
-    row = recorded_movement(state.get(MOVEMENT_MODULES_FIELD), "walking")
-    if row is None or PACE_PARAMETER not in row.parameters:
-        return None
-    from exulanica.world.society_kinds import pace_permille_of
-
-    reference = row.value("reference_pace_permille")
-    held: dict[tuple[object, object], int] = {}
-
-    def pace(person: Mapping[str, Any]) -> int:
-        kind = person.get("kind")
-        if kind is None:
-            return reference
-        key = (kind.get("source"), kind["sha256"])
-        if key not in held:
-            stated = pace_permille_of(state, kind)
-            held[key] = reference if stated is None else stated
-        return held[key]
-
-    return pace
-
-
-def tick_budgets(state: Mapping[str, Any]) -> Callable[[Mapping[str, Any]], int]:
-    """What each walker of a society may spend along its route in one tick, in millimetres: the
-    budget its state records, for everybody where its minutes run the first walking, and scaled
-    by the walker's own pace where they run one that declares it (:func:`walker_paces`)."""
-    budget = state["movement_budget_mm_per_tick"]
-    pace = walker_paces(state)
-    if pace is None:
-        return lambda person: budget
-    from exulanica.movement.walking_v2 import own_budget_mm
-
-    return lambda person: own_budget_mm(budget, pace(person))
-
-
-def own_walk_budgets(state: Mapping[str, Any]) -> dict[str, int]:
-    """Each inhabitant whose kind states its own pace, by id: what one tick lets it walk, in
-    millimetres (:func:`tick_budgets`). Empty where the society's walking paces nobody or records
-    no budget. A served projection beside the state, never part of it: a page walks such a body
-    at this budget, and everyone not named here walks the budget the state records."""
-    if "movement_budget_mm_per_tick" not in state or walker_paces(state) is None:
-        return {}
-    from exulanica.world.society_kinds import pace_permille_of
-
-    budget = tick_budgets(state)
-    return {
-        str(person["id"]): budget(person)
-        for person in state.get("inhabitants", ())
-        if person.get("kind") is not None and pace_permille_of(state, person["kind"]) is not None
-    }
-
-
 def advance_purposeful_society(
     state: dict[str, Any],
     seed: str,
@@ -2024,6 +1970,7 @@ def _advance_purposeful_society(
     for prior, doc in pairwise(inputs):
         graph = _input_graph(doc)
         nodes, _, edges = graph
+        movers = Movers(result, doc, graph)
         targets = {t["target_id"]: t for t in doc["targets"]}
         local_failures = {
             t["target_id"]: t["reason"] for t in doc.get("unavailable_affordances", [])
@@ -2047,7 +1994,7 @@ def _advance_purposeful_society(
             reason = None
             if not available:
                 reason = doc["unavailable_reason"] or doc["navigation"]["unavailable_reason"]
-            elif not _location_valid(person, nodes, edges):
+            elif not _location_valid(person, *movers(person)):
                 reason = "current_position_invalidated"
                 if places_here and not ("day" in person and person["location"].get("indoors")):
                     loc = person["location"]
@@ -2094,7 +2041,7 @@ def _advance_purposeful_society(
                     )
                 elif not same_destination(person["target"], target):
                     reason = "target_changed"
-                elif not _route_valid(person, nodes, edges) or person[
+                elif not _route_valid(person, *movers(person)) or person[
                     "route_geometry_sha256"
                 ] != _navigation_sha256(doc):
                     reason = "route_invalidated"
@@ -2103,7 +2050,7 @@ def _advance_purposeful_society(
                     # starts a stay in that input's terms.
                     person["target"] = deepcopy(target)
             elif person["goal"] is not None and (
-                not _route_valid(person, nodes, edges)
+                not _route_valid(person, *movers(person))
                 or person["route_geometry_sha256"] != _navigation_sha256(doc)
             ):
                 # Only a walk to make room has a goal and no target, and only a place-stating
@@ -2136,6 +2083,7 @@ def _advance_purposeful_society(
     weights_by_person = routine_weights(result)
     drawn = routine.choice == "drawn"
     nodes, adjacent, edges = _input_graph(doc)
+    movers = Movers(result, doc, (nodes, adjacent, edges))
     targets = [t for t in doc["targets"] if t["enabled"]]
     paths_cache: dict[str, dict] = {}
 
@@ -2178,7 +2126,7 @@ def _advance_purposeful_society(
                     or _follows(policy)
                 )
                 and ends_on_request(routine, person)
-                and _location_valid(person, nodes, edges)
+                and _location_valid(person, *movers(person))
             ):
                 person["action"] = {
                     **person["action"],
@@ -2223,7 +2171,7 @@ def _advance_purposeful_society(
         if not available:
             block(person, unavailable or "input_unavailable", doc)
             continue
-        if not _location_valid(person, nodes, edges):
+        if not _location_valid(person, *movers(person)):
             block(person, "current_position_invalidated", doc)
             continue
         if stays_inside(person, (goal_policy or {}).get(person["id"])):
@@ -2279,7 +2227,7 @@ def _advance_purposeful_society(
                 continue
             loc = person["location"]
             start = loc["node_id"] if loc["edge"] is None else loc["edge"]["to_node_id"]
-            paths = paths_from(start)
+            paths = movers.routes(person, start, paths_from)
             candidates = [
                 t
                 for t in targets
@@ -2298,7 +2246,7 @@ def _advance_purposeful_society(
                 # at, so somebody waiting gets a turn; an activity needs a place nobody else holds,
                 # and nobody takes a node two others are about to talk at.
                 held = (
-                    held_nodes(result["inhabitants"], person, graph=(nodes, edges))
+                    held_nodes(result["inhabitants"], person, graph=movers.whole)
                     | {
                         other["place_node_id"]
                         for subject, other in (goal_policy or {}).items()
@@ -2477,7 +2425,7 @@ def _advance_purposeful_society(
                     (
                         (paths[node][0], node)
                         for node in paths
-                        if node not in crowded and node not in held
+                        if node in nodes and node not in crowded and node not in held
                     ),
                     default=None,
                 )
@@ -2578,7 +2526,7 @@ def _advance_purposeful_society(
             continue
         route = person["route"]
         figures = (budget_per_tick,) if pace is None else (budget_per_tick, pace(person))
-        for leg in walk(route, nodes, edges, *figures):
+        for leg in movers.legs(person, route, walk, figures):
             point = leg.point
             person["position_mm"] = point
             if point != person["motion_path_mm"][-1]:

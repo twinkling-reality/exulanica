@@ -463,4 +463,8 @@ as walls up to about 4 m.
 - A world does not name the land surface catalog it wears: a newer land look reaches every world on
   land. Naming it by the world's look is planned.
 - A cascade is straight, along one of the four main sides, and its water stands still: level pools
-  and fixed falls. No stream meanders, and nobody walks in the water or behind a fall.
+  and fixed falls. No stream meanders, and nobody walks in the water or behind a fall. A body that
+  swims crosses a pool, a lake, a pond or the sea where it lies inside its society's walkable area,
+  never a fall ([movement modules contract](movement-modules-contract.md#swimming)); where the water
+  is is the grading's own outline of each body (`within_water`) with the land under it below its
+  level.

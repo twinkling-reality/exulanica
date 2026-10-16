@@ -1587,7 +1587,7 @@ place of the seed, and so does every state and event document that holds one; th
 hold none. Beside the state, never inside it, a snapshot carries `walk_budgets_mm_per_tick`: for
 each inhabitant whose kind states its own pace under a walking module that paces walkers, what
 one tick lets it walk in millimetres, the engine's own figure (`own_walk_budgets` in
-`exulanica/world/society_planner.py`). It is absent where nobody walks at a pace of their own,
+`exulanica/world/society_movement.py`). It is absent where nobody walks at a pace of their own,
 and `state_sha256` does not cover it. A page walks such a body at that budget, and at that budget
 over the tick's simulated seconds when nothing hurries it.
 
@@ -2187,9 +2187,12 @@ The first input records, the same way, the movement modules that move the societ
 engine, one version of each kind of movement), and the state keeps the list. A new society
 records the second walking (`exulanica-movement/walking/v2`), which moves each being at the pace
 its kind states and every other at the society's own
-([movement modules contract](movement-modules-contract.md#walking)). A society whose first input
+([movement modules contract](movement-modules-contract.md#walking)), and swimming
+(`exulanica-movement/swimming/v1`), which moves a being whose kind's moves name a swimming across
+the water its input states (below, and the
+[movement modules contract](movement-modules-contract.md#swimming)). A society whose first input
 records none walks by the first walking, at one budget for everybody, as it always did
-(`tests/test_society_walking_paces.py`).
+(`tests/test_society_walking_paces.py`), and a society that records no swimming reads no water.
 
 **A recorded resident day.** The optional `exulanica-ability/day/v1` module runs a resident's
 needs, home stays, work shifts and visits through the shared living-day rules. It requires an
@@ -2307,6 +2310,32 @@ people stand and talk, which is all the purposeful routine offers where there is
 the day module is what gives them a day. An input that offers any target is read as it always
 was, so no society that exists starts anywhere else, and an input with neither a target nor
 people starts nobody (`409 no_reachable_targets`).
+
+**The water its swimmers cross.** A things input of a society that swims carries `water`
+(`exulanica.society-water/v1`, [`society_water.py`](../exulanica/world/society_water.py)), the
+graph laid over the water its world holds, beside its walking graph and apart from it: its
+`bodies`, each by identity, kind and level (a level site's ponds at its ground, 0; on land a
+pond's, a lake's or a cascade pool's graded level, and the sea at the datum); its `nodes`, a
+lattice inside each body, each named by where it is; and its `edges`, `swim` between lattice
+neighbours of one body and `shore` from the edge of a body's lattice to the nearest walking node
+within reach, never an activity's place
+([movement modules contract](movement-modules-contract.md#swimming) for the figures). A site's
+composer states its water areas and, on land, its land's lakes, pools and sea
+(`site_plan.swim_nodes`), and the kind worker hands that water over beside the site's place; a town
+on its land states its land's (`city_grammar_town.swim_nodes`), which on the lands its recipes make
+lies outside its ground; a site laid on a support declaration and a level town state none. A first
+input carries the water where the movement modules it records name a swimming, and every later
+input of such a society carries it as its world's records leave it, read again for each edit. An
+input of a society that does not swim, as every one made before swimming was built, and an input
+with no water inside its walkable area state none, so every stored input reads and replays as it
+did. Where an input is read, its water is held to its shape: an available input's alone, nodes on
+their lattice inside the walkable area and named by where they are, no node with a walking node's
+name, and edges that join two lattice neighbours of one body, or a water node to the walking
+graph, each as long as the straight way between its ends, rounded up. The walking graph is the one
+an input without water states, byte for byte, so no walking route enters the water
+(`tests/test_society_water.py`; the runtime's water for a farm's society,
+`tests/test_society_swimming_postgres.py`). A swimmer stands, stays and talks on land alone; what
+it crosses on the way is the movement modules contract's (`tests/test_society_swimming.py`).
 
 **On a town's ground.** A society of things over a generated town reads
 `exulanica.society-input/walking-surfaces-v3` (migration 0169): the town's walking-surfaces-v1
@@ -2577,14 +2606,16 @@ request (`decided_from_outside`); one the world decides for takes one as any bei
 the society and in the database alike (`society_person_may_be_directed`, migrations 0151 and
 0179).
 
-**What its state may state as it grows.** A being states `mode` only where it moves by more than
-walking (a walker states none), `height_mm` only while it flies, `velocity_mm_s` only while it flies
+**What its state may state as it grows.** A being states `mode` only while it flies (a walker
+states none, and nor does a swimmer, whose place on the water's graph says where it is), `height_mm`
+only while it flies, `velocity_mm_s` only while it flies
 and its module states one, and `size_class_mm` only where it is not the people's size; a placed
 object states `height_mm` only off the ground. A velocity is three whole millimetres a second, each
 within 100,000 either way: x and y along the ground (`position_mm`'s two axes) and z up (the rate of
 `height_mm`). The next minute's flight starts from it. The state check admits them from the first
 state, so a stored society of walkers needs nothing rewritten when another movement module lands.
-The things composition states one walking lattice, the people's. A being states `heard` only once it
+The things composition states one walking lattice, the people's, and for a society that swims the
+water beside it. A being states `heard` only once it
 heard a line (oldest first, each `{tick, from, from_kind, from_number, to, line}` and, in a society
 that records its modules, the speaker's name as the page showed it, `from_name`, and, where a model
 wrote it, its `model`, the line held to the line rule); in such a society a being also states `said`

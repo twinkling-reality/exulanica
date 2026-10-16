@@ -77,13 +77,13 @@ from exulanica.world.society_kinds import (
     reference_shape,
     validate_kinds,
 )
+from exulanica.world.society_movement import tick_budgets
 from exulanica.world.society_planner import (
     initial_purposeful_society,
     never_tired,
     open_node_near,
     routine_of,
     routine_withheld,
-    tick_budgets,
     validate_society_input,
 )
 from exulanica.world.society_summaries import SIMULATED, crossing_name, summary_name

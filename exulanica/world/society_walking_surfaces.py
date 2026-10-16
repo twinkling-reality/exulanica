@@ -100,7 +100,13 @@ from exulanica.world.society_planner import (
     input_sha256,
     validate_society_input,
 )
-from exulanica.world.society_thing_inputs import record_modules
+from exulanica.world.society_thing_inputs import MOVEMENT_MODULES_FIELD, record_modules
+from exulanica.world.society_water import (
+    WATER_FIELD,
+    WaterStatement,
+    records_swimming,
+    water_graph,
+)
 
 __all__ = [
     "SEAT_NODE_PREFIX",
@@ -783,6 +789,7 @@ def build_walking_surfaces_input(
     made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
     support_source: Any = None,
     made_records: Sequence[object] | None = None,
+    water: WaterStatement | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -796,7 +803,13 @@ def build_walking_surfaces_input(
     population is that of ``people``, what the town's people are made from
     (:func:`~exulanica.world.town_people.people_frame`), where one is given, and whose first input
     also records it;
-    without either, the walking-surfaces-v1 input the purposeful society reads."""
+    without either, the walking-surfaces-v1 input the purposeful society reads.
+
+    ``water`` is the water the world holds, as its composer states it (``swim_nodes``): a things
+    input of a society that swims carries the graph laid over it (:func:`~exulanica.world.
+    society_water.water_graph`), a first input where the movement modules it records name a
+    swimming, a later one where its caller hands it, having read that its society's first input
+    records one. Any other input states no water."""
     if (day_place is not None or day_routine is not None) and (
         not things
         or input_seq != 1
@@ -1090,6 +1103,18 @@ def build_walking_surfaces_input(
                     raise ValueError("resident day requires its place's routine")
                 document["day"] = make_frame(day_place, day_routine, people, document)
                 record_modules(document, day=True)
+        swims = input_seq != 1 or records_swimming(document.get(MOVEMENT_MODULES_FIELD))
+        if water is not None and reason is None and swims:
+            # The water its swimmers cross, joined to the walking graph at its shore and to no
+            # activity's place.
+            laid = water_graph(
+                water,
+                nodes=navigation["nodes"],
+                exclude={node for target in targets for node in target["place_node_ids"]},
+                area=navigation["walkable_area"],
+            )
+            if laid is not None:
+                document[WATER_FIELD] = laid
     if living is not None:
         document["living"] = {
             "routine": living.binding(),

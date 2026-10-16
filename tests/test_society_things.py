@@ -199,7 +199,7 @@ def test_the_first_edit_that_changes_nothing_read_is_no_new_input():
     """Only a society's first input records the modules it runs, so a later input of the same
     things, after an edit that changed nothing the society reads, reads the same as the first and
     the runtime appends none for it."""
-    from exulanica.api.society_runtime import _reads_the_same
+    from exulanica.world.society_input_policy import reads_the_same as _reads_the_same
 
     first = compose((GATE, KNIGHT))
     later = compose((GATE, KNIGHT), input_seq=2, edit_seq=EDITS + 1)

@@ -346,11 +346,12 @@ def _placed(
     """The place a site world's society walks, made from its records within the walking graph's
     budget, or why it cannot be, by name. With the place goes ``blocked``, the site's blocked
     boxes as plain figures: what a society of things keeps a placed thing's standing places clear
-    of, which only the records state and the place does not carry; and ``blocked_parts``, the same
+    of, which only the records state and the place does not carry; ``blocked_parts``, the same
     boxes each with what it is and its words, which a move of a placed thing is kept off and told
-    about by name."""
+    about by name; and ``water``, the water the records hold with the swim lattice's points inside
+    it (:func:`~exulanica.world.composers.site_plan.swim_nodes`), which a swimmer crosses."""
     from exulanica.grammar.errors import CatalogError
-    from exulanica.world.composers.site_plan import society_place
+    from exulanica.world.composers.site_plan import society_place, swim_nodes
     from exulanica.world.errors import InvalidStructuralData
     from exulanica.world.society_site_place import (
         GraphOverBudget,
@@ -373,6 +374,7 @@ def _placed(
             "place": society_place(place_id, receipt, records),
             "blocked": site_blocked_boxes(records),
             "blocked_parts": site_blocked_parts(records, _part_uses(receipt)),
+            "water": swim_nodes(receipt, records),
         }
     except GraphOverBudget as exc:
         return {
@@ -427,7 +429,7 @@ def compose_job(
     place its society walks (the one its checks built), or say why not."""
     from exulanica.grammar.landform import LandformRefused
     from exulanica.grammar.landscape import LandscapeRefused
-    from exulanica.world.composers.site_plan import compose_kind
+    from exulanica.world.composers.site_plan import compose_kind, swim_nodes
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
     from exulanica.world.society_site_place import site_blocked_boxes, site_blocked_parts
@@ -474,12 +476,13 @@ def compose_job(
         "composed": composed,
         **_drawn(world_id, composed.receipt, composed.receipt_sha256, records),
         "place_id": place_id,
-        # Kept as the place job keeps it: the place, and the site's blocked boxes beside it.
+        # Kept as the place job keeps it: the place, the site's blocked boxes and its water.
         "placed": {
             "status": "done",
             "place": composed.place,
             "blocked": site_blocked_boxes(records),
             "blocked_parts": site_blocked_parts(records, _part_uses(composed.receipt)),
+            "water": swim_nodes(composed.receipt, records),
         },
     }
 

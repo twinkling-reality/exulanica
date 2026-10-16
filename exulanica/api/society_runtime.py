@@ -107,6 +107,7 @@ from exulanica.world.society_input_policy import (
     WALKING_SURFACES_COMPOSITION_V3,
     input_profile,
     is_authored_ground,
+    reads_the_same,
 )
 from exulanica.world.society_input_policy import (
     composition_profile as policy_for_input,
@@ -121,6 +122,8 @@ from exulanica.world.society_walking_surfaces import (
     town_head_count,
     walking_surfaces_place,
 )
+from exulanica.world.society_water import WaterStatement
+from exulanica.world.society_water_sources import site_water, town_water, water_for_input
 from exulanica.world.town_people import TownPeopleRefused, people_frame
 from exulanica.world.version_town import TownKey, composed_town_key, town_and_made, town_key
 
@@ -215,6 +218,8 @@ class _TownRead:
     obstructions: CityObstructions | None = None
     made: tuple[object, ...] | None = None
     support_source: Any = None
+    #: The water the world holds, which a swimming society's things input lays swim nodes over.
+    water: WaterStatement | None = None
 
 
 def _stored_site_place(
@@ -290,7 +295,7 @@ def _site_read(
     ).fetchone()["present"]
     if bound:
         place = None  # A bound thing requires the canonical source place, not a derived history.
-    blocked = None
+    blocked = water = None
     if place is None:
         worker = kind_worker()
         workspace = str(binding.workspace_id)
@@ -316,7 +321,7 @@ def _site_read(
         if answer["status"] != "done":
             return _TownRead(None, None, None, place_refusal=str(answer["detail"]))
         place = answer["place"]
-        blocked = answer.get("blocked")
+        blocked, water = answer.get("blocked"), site_water(answer)
     support_source = None
     if bound and receipt.get("composer") == {"key": "site-plan", "version": 2}:
         from exulanica.world.kinds.worker import drawing_job, drawing_key
@@ -362,35 +367,8 @@ def _site_read(
         # place lifted from a stored living input comes with none, and a living society asks none.
         obstructions=None if blocked is None else site_obstructions(blocked),
         support_source=support_source,
+        water=water,
     )
-
-
-#: What a saved world's input says of the edit it follows, not of what its society reads: its
-#: place in the sequence, the version's edit cursor, and the digest over both.
-_EDIT_CURSOR_FIELDS: Final = frozenset({"input_seq", "authored_state", "document_sha256"})
-#: What only a society's first input states (the ability modules its minutes run for its whole
-#: life, the movement modules that move its people, and what a town's people are made from), so
-#: a later input's not stating it is no difference.
-_FIRST_INPUT_ONLY: Final = frozenset({"modules", "movement_modules", "people"})
-
-
-def _reads_the_same(previous: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
-    """Whether two successive inputs differ only in which edit they follow.
-
-    Such an edit changed nothing the society reads, so it appends no input: an object in another
-    region of the world, or a photograph hidden or moved. The modules only a first input states
-    are no difference either. Every other field is what the society reads, and any difference
-    there is a new input.
-    """
-
-    def read(document: Mapping[str, Any]) -> dict[str, Any]:
-        return {
-            key: value
-            for key, value in document.items()
-            if key not in _EDIT_CURSOR_FIELDS and key not in _FIRST_INPUT_ONLY
-        }
-
-    return read(previous) == read(current)
 
 
 def _reviewed_view(row: Mapping[str, Any] | None) -> ReviewedRow:
@@ -732,15 +710,17 @@ class SocietyRuntime:
             read.towns[key] = _TownRead(None, None, str(exc))
             return
         place = walking_surfaces_place(ground.place_id, generated.records, made_records=made)
+        # Held to their shapes by the place just made from them.
+        town = city_obstructions(generated.records, checked=True)
         read.towns[key] = _TownRead(
             generated.receipt_sha256,
             place,
             None,
             tuple(generated.records),
             receipt=generated.receipt,
-            # Held to their shapes by the place just made from them.
-            obstructions=city_obstructions(generated.records, checked=True),
+            obstructions=town,
             made=made,
+            water=town_water(generated.receipt, generated.records, town),
         )
 
     @staticmethod
@@ -2073,6 +2053,7 @@ class SocietyRuntime:
                 else None,
                 support_source=town.support_source,
                 made_records=town.made,
+                water=water_for_input(connection, binding, seq, town.water),
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"
@@ -2409,7 +2390,7 @@ class SocietyRuntime:
                 else None,
                 arrival=None if arrival_authority is None else arrival_authority.descriptor,
             )
-            if previous is not None and _reads_the_same(previous["document"], document):
+            if previous is not None and reads_the_same(previous["document"], document):
                 # The edit changed nothing this society reads, such as an object in another
                 # region of the world or a photograph hidden: its people have nothing to notice.
                 return

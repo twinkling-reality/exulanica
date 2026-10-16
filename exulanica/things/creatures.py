@@ -17,9 +17,10 @@ anything but the checks every thing passes:
     :func:`~exulanica.things.kinds.read_thing_kind`.
 
 What a body cannot do, and what this world cannot do yet, is refused by name in a sentence a
-person reads and a drafting model is told (:data:`CREATURE_CODES`): a creature asked to fly with
-no wings, or to swim where no swimming is built. A refusal from any reader keeps that reader's
-own code. Nothing names any particular creature: every creature is this function's data.
+person reads and a drafting model is told (:data:`CREATURE_CODES`): a creature asked to swim with
+no fins, tentacles or long body, or to fly where no flight for beings is built. A refusal from any
+reader keeps that reader's own code. Nothing names any particular creature: every creature is this
+function's data.
 
 Pure: no connection, no store, no model.
 """
@@ -93,7 +94,8 @@ CREATURE_CODES: Final = (
     (
         "creature_cannot_move_so",
         "A creature moves only in the ways its body allows: it walks on legs, four or more "
-        "tentacles or a long body, and flies with a pair of wings or a floating body.",
+        "tentacles or a long body, swims with fins, four or more tentacles or a long body, and "
+        "flies with a pair of wings or a floating body.",
     ),
     (
         "creature_movement_unbuilt",

@@ -46,7 +46,11 @@ from exulanica.grammar.grammars.site import (
 )
 from exulanica.grammar.grammars.site.layout import LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import plan_sha256
-from exulanica.grammar.grammars.site.records import SiteExtentRecord, SitePathRecord
+from exulanica.grammar.grammars.site.records import (
+    SiteAreaRecord,
+    SiteExtentRecord,
+    SitePathRecord,
+)
 from exulanica.grammar.landform import LandformRefused, land_rules, read_land_document
 from exulanica.grammar.landscape import LandscapeRefused, landscape_rules
 from exulanica.world.composers import (
@@ -78,6 +82,7 @@ from exulanica.world.society_site_place import (
     SiteSociety,
     place_from_site_records,
 )
+from exulanica.world.society_water import land_water, rectangle_water
 from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_SHA256
 from exulanica.world.structure import SpatialCandidate
 from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
@@ -103,6 +108,7 @@ __all__ = [
     "records",
     "society_place",
     "stated_extent",
+    "swim_nodes",
     "tile_inputs",
 ]
 
@@ -700,6 +706,40 @@ def society_place(
         node_limit=load_kind_catalogs().bound("walking_nodes")[1],
         ground=ground,
     )
+
+
+def swim_nodes(receipt: Mapping[str, Any], generated: tuple[object, ...]) -> list[dict[str, Any]]:
+    """The water a receipt's world holds, as its society's composer lays a swimmer's lattice over
+    it (:mod:`exulanica.world.society_water`): each area whose roles name water, named by its
+    record, filling its area at the level ground every site stands on (0), or on land standing at
+    the level the land graded its pond to, within the ellipse carved for it; and on land the land's
+    own lakes, pools and sea, named by the land's own names. A site laid on a support declaration
+    or as terrain states none: no ground this composer grades stands under its water."""
+    version = receipt["composer"]["version"]
+    if version != 1 and version not in ON_LAND_VERSIONS:
+        return []
+    extent = next(r for r in generated if isinstance(r, SiteExtentRecord))
+    bounds = (0, 0, extent.width_mm, extent.depth_mm)
+    areas = sorted(
+        (r for r in generated if isinstance(r, SiteAreaRecord) and "water" in r.roles),
+        key=lambda area: area.identity,
+    )
+    rects = {
+        area.identity: (area.min_x_mm, area.min_y_mm, area.max_x_mm, area.max_y_mm)
+        for area in areas
+    }
+    if version not in ON_LAND_VERSIONS:
+        return [
+            rectangle_water(f"site.area:{identity}", "pond", 0, rect, bounds)
+            for identity, rect in rects.items()
+        ]
+    land = receipt_land(receipt, generated)
+    ponds = {tuple(body.rect_mm): body for body in land.water if body.kind == "pond"}
+    named = {f"land:{body.id}": body for body in land.water if body.kind != "pond"}
+    for identity, rect in rects.items():
+        if rect in ponds:
+            named[f"site.area:{identity}"] = ponds[rect]
+    return land_water(named, land.height_at, bounds)
 
 
 def receipt_digest_of(topology: Mapping[str, Any]) -> str:
