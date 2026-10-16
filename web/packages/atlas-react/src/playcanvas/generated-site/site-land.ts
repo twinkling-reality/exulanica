@@ -6,8 +6,9 @@ import {
 import type { GeneratedTileHost } from '../generated-tile/binding-contract.js';
 import { buildSurfaceMesh } from '../generated-tile/surface-mesh.js';
 import { landSurfaceMaterial } from './land-slope.js';
-import type { SiteLandSection, SiteSlot, StructuredSiteDrawing } from './site-drawing.js';
+import type { SiteLandSection, SiteLandWall, SiteSlot, StructuredSiteDrawing } from './site-drawing.js';
 import type { DrawnSiteSlots } from './site-primitives.js';
+import { VOLUME_ROCK_RGB } from './site-volumes.js';
 
 /**
  * A site world's land, read and drawn: the near land a person walks in chunks, the backdrop to the
@@ -33,6 +34,8 @@ const PLAIN_WATER: readonly [number, number, number] = [0.24, 0.42, 0.55];
 const DRY_ABOVE_SEA_MM = 300;
 /** How far past the backdrop's reach the camera's far plane stands, as a share of it. */
 const FAR_MARGIN = 1.15;
+/** How far a retaining wall's coping stands above the upper level it holds. */
+const WALL_COPING_MM = 100;
 
 /** The land a site on land stands on, read and held to the digests its drawing names. */
 export interface SiteLand {
@@ -328,11 +331,88 @@ export interface DrawnSiteLand {
    * drawn over.
    */
   colourBackdrop(ground: Rgb | null): void;
+  /**
+   * Wear the land's retaining walls in `material` (the site's boundary wall, where the mount holds
+   * one), or in the plain rock they were drawn in again with null. The material stays the caller's.
+   * Nothing where the land states no walls.
+   */
+  wearWalls(material: pc.Material | null): void;
   destroy(): void;
 }
 
 type Rgb = readonly [number, number, number];
 const linear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const gamma = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+
+/** One step of a main side over the site's lattice, in site millimetres east and north. */
+const SIDE_STEP: Readonly<Record<SiteLandWall['high'], readonly [number, number]>> = {
+  north: [0, LAND_CELL_MM], east: [LAND_CELL_MM, 0], south: [0, -LAND_CELL_MM], west: [-LAND_CELL_MM, 0],
+};
+
+/**
+ * The faces of a land's retaining walls, in the scene's frame. For each metre of a run: a vertical
+ * face on the low line from the land there up to the land one cell toward the high side and the
+ * coping over it, the top over that cell strip at that height, and the coping's back down to the
+ * upper land; at each end of a run, a face across the strip from the land up to the top. Every
+ * height is the land's at a lattice point, and the land between two lattice points on a cell's edge
+ * is straight, so each face's foot lies on the land. Each face is wound to face out of the wall.
+ */
+function wallFaces(walls: readonly SiteLandWall[], groundMm: (eastMm: number, northMm: number) => number): {
+  readonly positions: number[]; readonly normals: number[]; readonly surfaceMm: number[]; readonly indices: number[];
+} {
+  const positions: number[] = [], normals: number[] = [], surfaceMm: number[] = [], indices: number[] = [];
+  type Corner = readonly [eastMm: number, northMm: number, heightMm: number];
+  // Four corners of a plane face, in site millimetres, with their surface coordinates, and the way
+  // out of the wall in the scene's frame.
+  const face = (corners: readonly Corner[], surface: readonly (readonly [number, number])[], out: readonly [number, number, number]): void => {
+    const at = corners.map(([x, y, h]) => [x / 1000, h / 1000, -y / 1000] as const);
+    const u = [0, 1, 2].map((k) => at[1]![k]! - at[0]![k]!), v = [0, 1, 2].map((k) => at[2]![k]! - at[0]![k]!);
+    let n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+    // Wound counterclockwise seen from outside, the renderer's front: (b - a) x (c - a) points out.
+    const order = n[0]! * out[0] + n[1]! * out[1] + n[2]! * out[2] >= 0 ? [0, 1, 2, 3] : [3, 2, 1, 0];
+    if (order[0] === 3) n = n.map((c) => -c);
+    const length = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
+    const base = positions.length / 3;
+    for (const k of order) {
+      positions.push(...at[k]!);
+      normals.push(n[0]! / length, n[1]! / length, n[2]! / length);
+      surfaceMm.push(...surface[k]!);
+    }
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+  for (const wall of walls) {
+    const [x0, y0] = wall.fromMm, [x1, y1] = wall.toMm;
+    const metres = (Math.abs(x1 - x0) + Math.abs(y1 - y0)) / LAND_CELL_MM;
+    const [sx, sy] = [Math.sign(x1 - x0) * LAND_CELL_MM, Math.sign(y1 - y0) * LAND_CELL_MM];
+    const [hx, hy] = SIDE_STEP[wall.high];
+    const away: readonly [number, number, number] = [-hx / LAND_CELL_MM, 0, hy / LAND_CELL_MM];
+    const toward: readonly [number, number, number] = [hx / LAND_CELL_MM, 0, -hy / LAND_CELL_MM];
+    const along: readonly [number, number, number] = [sx / LAND_CELL_MM, 0, -sy / LAND_CELL_MM];
+    // A point of the run, `k` metres from its start, on the low line or one cell toward the high side.
+    const low = (k: number): Corner => {
+      const x = x0 + k * sx, y = y0 + k * sy;
+      return [x, y, groundMm(x, y)];
+    };
+    const high = (k: number): Corner => {
+      const x = x0 + k * sx + hx, y = y0 + k * sy + hy;
+      return [x, y, groundMm(x, y)];
+    };
+    const top = (corner: Corner, k: number): Corner => [corner[0], corner[1], high(k)[2] + WALL_COPING_MM];
+    for (let k = 0; k < metres; k += 1) {
+      const a = low(k), b = low(k + 1), c = high(k), d = high(k + 1);
+      const s0 = k * LAND_CELL_MM, s1 = s0 + LAND_CELL_MM;
+      face([a, b, top(b, k + 1), top(a, k)], [[s0, a[2]], [s1, b[2]], [s1, d[2] + WALL_COPING_MM], [s0, c[2] + WALL_COPING_MM]], away);
+      face([top(a, k), top(b, k + 1), top(d, k + 1), top(c, k)], [[s0, 0], [s1, 0], [s1, LAND_CELL_MM], [s0, LAND_CELL_MM]], [0, 1, 0]);
+      face([c, d, top(d, k + 1), top(c, k)], [[s0, c[2]], [s1, d[2]], [s1, d[2] + WALL_COPING_MM], [s0, c[2] + WALL_COPING_MM]], toward);
+    }
+    const ends: readonly (readonly [number, readonly [number, number, number]])[] = [[0, [-along[0], 0, -along[2]]], [metres, along]];
+    for (const [k, out] of ends) {
+      const a = low(k), c = high(k);
+      face([a, c, top(c, k), top(a, k)], [[0, a[2]], [LAND_CELL_MM, c[2]], [LAND_CELL_MM, c[2] + WALL_COPING_MM], [0, c[2] + WALL_COPING_MM]], out);
+    }
+  }
+  return { positions, normals, surfaceMm, indices };
+}
 
 function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMaterial {
   const material = new pc.StandardMaterial();
@@ -472,6 +552,21 @@ export function drawSiteLand(
     draws += 1;
     triangles += mesh.primitive[0]!.count / 3;
   }
+  // The retaining walls where the land's levels meet: one mesh in one plain material, the surfaces'
+  // rock where they are handed, the engine's rock where they are not. Seen, never walked.
+  const walls = land.section.walls ?? [];
+  const rock = surfaces?.bands.find((band) => band.key === 'rock')?.linear;
+  const stone = walls.length === 0 ? null
+    : plainMaterial('site-land:walls', rock === undefined ? VOLUME_ROCK_RGB : [gamma(rock[0]), gamma(rock[1]), gamma(rock[2])], 0.1);
+  let walled: pc.MeshInstance | null = null;
+  if (stone !== null) {
+    made.push(stone);
+    const mesh = buildSurfaceMesh(device, wallFaces(walls, land.groundMm), (s, t) => [s / 1000, t / 1000]);
+    meshes.push(mesh);
+    walled = new pc.MeshInstance(mesh, stone);
+    add('site-land:walls', [walled], true);
+    triangles += mesh.primitive[0]!.count / 3;
+  }
   let destroyed = false;
   return {
     root,
@@ -495,6 +590,9 @@ export function drawSiteLand(
         block.mesh.setColors(colouredOver(over ?? groundLinear, block.positions, block.normals));
         block.mesh.update(pc.PRIMITIVE_TRIANGLES);
       }
+    },
+    wearWalls(material: pc.Material | null): void {
+      if (walled !== null) walled.material = material ?? stone!;
     },
     destroy(): void {
       if (destroyed) return;

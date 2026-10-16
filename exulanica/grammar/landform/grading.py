@@ -16,6 +16,10 @@ realized near land, in a fixed order:
 4. **Banks**: every cell not fixed above is held between the cones of the fixed cells at the bank
    grade, so no bank is steeper. Where two fixed cells are closer than their difference allows, the
    cones cross and a retaining wall takes the difference; walls are listed with their height.
+   Where the plan asks for them, every lattice edge whose samples differ by more than the bank
+   grade over one cell, one of them fixed, is a retaining wall's: a seam where two pads, or a pad
+   and a corridor, meet at levels a bank cannot join. Edges along one lattice line rising to the
+   same side join into one run, listed on the line of its low side. No height moves.
 5. **Ponds** are carved as ellipses inscribed in their rectangles, below a level that is the
    lowest ground on the ring just outside them less a freeboard, so the water holds.
 
@@ -35,7 +39,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Final
+from typing import Any, Final
 
 from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.landform.document import LandformRefused
@@ -57,6 +61,7 @@ __all__ = [
     "GradedLand",
     "GradingPlan",
     "Pad",
+    "RetainingWall",
     "Wall",
     "grade_land",
 ]
@@ -116,6 +121,20 @@ class Wall:
 
 
 @dataclass(frozen=True, slots=True)
+class RetainingWall:
+    """A retaining wall where two levels meet over one lattice cell: a run along x or y on the
+    lattice line of its low side, from ``from_mm`` to ``to_mm`` (lattice points, the first before
+    the second along the run), the land rising one cell toward ``high`` (a main side)."""
+
+    from_mm: tuple[int, int]
+    to_mm: tuple[int, int]
+    high: str
+
+    def document(self) -> dict[str, Any]:
+        return {"from_mm": list(self.from_mm), "to_mm": list(self.to_mm), "high": self.high}
+
+
+@dataclass(frozen=True, slots=True)
 class GradingPlan:
     corridors: tuple[Corridor, ...] = ()
     pads: tuple[Pad, ...] = ()
@@ -124,6 +143,7 @@ class GradingPlan:
     bank_grade_permille: int = BANK_GRADE_PERMILLE
     cut_fill_most_mm: int = CUT_FILL_MOST_MM
     walk_grade_permille: int = WALK_GRADE_PERMILLE
+    retaining_walls: bool = False
 
 
 @dataclass(frozen=True)
@@ -133,6 +153,9 @@ class GradedLand:
     water: tuple[WaterBody, ...]
     walls: tuple[Wall, ...]
     report: Mapping[str, int] = field(default_factory=dict)
+    #: The retaining walls where levels meet, sorted by axis (runs along x first), line and start;
+    #: None when the plan asked for none.
+    retaining: tuple[RetainingWall, ...] | None = None
 
 
 class _Work:
@@ -302,6 +325,51 @@ def _banks(work: _Work, grade: int) -> list[Wall]:
     return walls
 
 
+def _retaining(work: _Work, grade: int) -> tuple[RetainingWall, ...]:
+    """Every run of lattice edges where a fixed sample meets a neighbour more than a bank's step
+    above or below it, on the line of the edges' low samples, rising toward their high ones. A run
+    joins two lattice points at least: a lone edge makes none."""
+    n = work.near
+    step = grade * CELL_MM // 1000
+    h = work.h
+    edges: set[tuple[int, int]] = set()
+    for a, fixed in enumerate(work.locked):
+        if not fixed:
+            continue
+        r, c = divmod(a, n.nx)
+        for rr, cc in ((r, c + 1), (r, c - 1), (r + 1, c), (r - 1, c)):
+            if 0 <= rr < n.ny and 0 <= cc < n.nx:
+                b = rr * n.nx + cc
+                if abs(h[b] - h[a]) > step:
+                    edges.add((a, b) if h[a] < h[b] else (b, a))
+    lines: dict[tuple[str, int, str], list[int]] = {}
+    for low, high in edges:
+        (lx, ly), (hx, hy) = work.place(low), work.place(high)
+        if hy == ly:
+            lines.setdefault(("y", lx, "east" if hx > lx else "west"), []).append(ly)
+        else:
+            lines.setdefault(("x", ly, "north" if hy > ly else "south"), []).append(lx)
+    runs = []
+    for (axis, line, side), stations in lines.items():
+        stations.sort()
+        first = 0
+        for k in range(1, len(stations) + 1):
+            if k < len(stations) and stations[k] - stations[k - 1] == CELL_MM:
+                continue
+            if k - 1 > first:
+                start, end = stations[first], stations[k - 1]
+                runs.append((axis, line, start, end, side))
+            first = k
+    return tuple(
+        RetainingWall(
+            from_mm=(start, line) if axis == "x" else (line, start),
+            to_mm=(end, line) if axis == "x" else (line, end),
+            high=side,
+        )
+        for axis, line, start, end, side in sorted(runs)
+    )
+
+
 def _ellipse(rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
     x0, y0, x1, y1 = rect
     return (x0 + x1) // 2, (y0 + y1) // 2, max(1, (x1 - x0) // 2), max(1, (y1 - y0) // 2)
@@ -467,6 +535,7 @@ def grade_land(near: NearLand, plan: GradingPlan, water: Sequence[WaterBody] = (
             level = work.h[work.cell(*middle)]
         levels[pad.id] = _pad(work, pad, level, keep_fixed=True)
     walls = _banks(work, plan.bank_grade_permille)
+    retaining = _retaining(work, plan.bank_grade_permille) if plan.retaining_walls else None
     cut = fill = 0
     for index, (graded, natural) in enumerate(zip(work.h, near.heights, strict=True)):
         change = graded - natural
@@ -500,4 +569,5 @@ def grade_land(near: NearLand, plan: GradingPlan, water: Sequence[WaterBody] = (
             "max_corridor_grade_permille": steepest,
             "walls": len(walls),
         },
+        retaining=retaining,
     )

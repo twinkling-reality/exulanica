@@ -135,7 +135,8 @@ def test_a_world_on_land_names_the_land_rules_that_made_it_and_other_rules_are_r
 
 def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> None:
     """Land made before the cascade (rules version 1) is still served: the same receipt naming
-    version 1 regenerates the same records, the same drawing and the same land."""
+    version 1 regenerates the same records, the same drawing and the same land, the drawing listing
+    no retaining walls where the newest rules list them."""
     world = made("site")
     first = copy.deepcopy(world.receipt)
     first["land_rules"] = land_rules(1)
@@ -143,7 +144,9 @@ def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> No
     records = site_plan.records(first)
     assert records == world.records
     before, after = site_land_of(world.receipt, records, 4000), site_land_of(first, records, 4000)
-    assert after.drawing_section() == before.drawing_section()
+    now = before.drawing_section()
+    assert now.pop("walls"), "the site's terraces meet at levels a bank cannot join"
+    assert after.drawing_section() == now
     assert [c.sha256 for c in after.chunks()] == [c.sha256 for c in before.chunks()]
     drawing = site_drawing(
         world_id=first["world_id"], receipt=first, receipt_sha256="b" * 64, records=records
@@ -151,6 +154,7 @@ def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> No
     named_now = site_drawing(
         world_id=first["world_id"], receipt=world.receipt, receipt_sha256="b" * 64, records=records
     )
+    del named_now["land"]["walls"]
     assert site_drawing_sha256(drawing) == site_drawing_sha256(named_now)
 
 

@@ -5,8 +5,8 @@
 * :mod:`.noise`: integer value noise on axis grids.
 * :mod:`.realize`: ``H(x, y)``; near land in 128 m chunks on the city's tile grid; the backdrop
   drawn to the horizon; water bodies.
-* :mod:`.grading`: pads, corridors, banks and walls, ponds, and the checks a graded land meets,
-  a layout kept clear of cascades among them.
+* :mod:`.grading`: pads, corridors, banks and walls, retaining walls where levels meet, ponds,
+  and the checks a graded land meets, a layout kept clear of cascades among them.
 * :mod:`.rules`: the land rules a world's receipt names, so its land rebuilds the same.
 * :mod:`.recipes`: the land a world made from a sentence stands on, as data.
 
@@ -41,6 +41,7 @@ from exulanica.grammar.landform.grading import (
     GradedLand,
     GradingPlan,
     Pad,
+    RetainingWall,
     Wall,
     grade_land,
 )
@@ -107,6 +108,7 @@ __all__ = [
     "LandformRefused",
     "NearLand",
     "Pad",
+    "RetainingWall",
     "ValueBound",
     "Wall",
     "WaterBody",

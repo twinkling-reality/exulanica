@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from exulanica.grammar.landform import (
     CELL_MM,
@@ -11,6 +13,7 @@ from exulanica.grammar.landform import (
     GradingPlan,
     LandformRefused,
     Pad,
+    RetainingWall,
     WorldFrame,
     grade_land,
     read_land_document,
@@ -171,6 +174,78 @@ def test_grading_is_deterministic_and_never_changes_the_land_it_was_given():
     second = grade_land(before, plan(pads=(hall,)))
     assert first.near.heights == second.near.heights and first.walls == second.walls
     assert list(before.heights) == heights
+
+
+FLAT = land()
+
+
+def _seam(upper_mm: int):
+    """Two pads side by side on level land, one row apart: the south one at the land's level, the
+    north one ``upper_mm`` above it."""
+    low = Pad(id="low", rect_mm=(10_000, 10_000, 20_000, 20_000), level_mm=6000)
+    high = Pad(id="high", rect_mm=(10_000, 21_000, 20_000, 30_000), level_mm=6000 + upper_mm)
+    return plan(pads=(low, high), corridors=(), entry_mm=(15_000, 15_000), retaining_walls=True)
+
+
+def test_two_pads_meeting_at_levels_a_bank_cannot_join_list_one_retaining_wall():
+    graded = grade_land(region(FLAT), _seam(1200))
+    assert graded.retaining == (
+        RetainingWall(from_mm=(10_000, 20_000), to_mm=(20_000, 20_000), high="north"),
+    ), "one run on the low pad's edge, the land rising north to the upper pad"
+    assert grade_land(region(FLAT), _seam(400)).retaining == (), "a bank's step lists none"
+    assert graded.retaining[0].document() == {
+        "from_mm": [10_000, 20_000],
+        "to_mm": [20_000, 20_000],
+        "high": "north",
+    }
+
+
+def test_a_pad_meeting_a_sloping_corridor_lists_a_wall_only_where_the_difference_passes_a_bank():
+    yard = Pad(id="yard", rect_mm=(16_000, 10_000, 27_000, 50_000), door_mm=(30_000, 30_000))
+    graded = grade_land(region(), plan(pads=(yard,), retaining_walls=True))
+    near = graded.near
+    seam = [w for w in graded.retaining if w.from_mm[0] in (27_000, 28_000)]
+    walled = {
+        (wall.from_mm[0], y)
+        for wall in seam
+        for y in range(wall.from_mm[1], wall.to_mm[1] + 1, CELL_MM)
+    }
+    assert {wall.high for wall in seam} == {"east", "west"}, "the path climbs past the yard's level"
+    for y in range(10_000, 50_001, CELL_MM):
+        yard_side, path_side = near.at(27_000, y), near.at(28_000, y)
+        low_line = 27_000 if yard_side < path_side else 28_000
+        assert ((low_line, y) in walled) == (abs(path_side - yard_side) > 500), y
+    for wall in seam:
+        assert wall.from_mm[0] == wall.to_mm[0] and wall.from_mm[1] < wall.to_mm[1]
+        assert wall.high == ("east" if wall.from_mm[0] == 27_000 else "west")
+
+
+def test_a_pond_carved_into_its_pad_lists_no_retaining_wall():
+    yard = Pad(
+        id="yard",
+        rect_mm=(4_000, 20_000, 26_000, 40_000),
+        door_mm=(28_000, 30_000),
+        water_allowed=True,
+    )
+    pond = Basin(
+        id="pond", rect_mm=(8_000, 24_000, 22_000, 36_000), depth_mm=2500, shelf_mm=2000,
+        freeboard_mm=300,
+    )  # fmt: skip
+    graded = grade_land(region(FLAT), plan(pads=(yard,), basins=(pond,), retaining_walls=True))
+    assert min(graded.near.at(x, 30_000) for x in range(8_000, 22_001, CELL_MM)) < 4000
+    assert graded.retaining == ()
+
+
+@pytest.mark.parametrize("which", ["seam", "path"])
+def test_retaining_walls_move_no_height_and_none_are_listed_unless_asked(which: str):
+    yard = Pad(id="yard", rect_mm=(16_000, 10_000, 27_000, 50_000), door_mm=(30_000, 30_000))
+    asked = _seam(1200) if which == "seam" else plan(pads=(yard,), retaining_walls=True)
+    near = region(FLAT) if which == "seam" else region()
+    on = grade_land(near, asked)
+    off = grade_land(near, replace(asked, retaining_walls=False))
+    assert on.retaining and off.retaining is None
+    assert on.near.heights == off.near.heights
+    assert (on.pads, on.water, on.walls, on.report) == (off.pads, off.water, off.walls, off.report)
 
 
 # Water stepping east down the slope's foot, clear of the spine at x 28 to 32 m.

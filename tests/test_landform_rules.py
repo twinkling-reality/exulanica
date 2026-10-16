@@ -82,6 +82,15 @@ RULES = {
         },
         "golden_site": "0e949267edcd10fd4578e79247bc2f9bc402205bfd1681cdd080488b5d2d29bb",
     },
+    5: {
+        "catalogs": {
+            "landform-feature.v3": (
+                "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08"
+            ),
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+        },
+        "golden_site": "7885742eef2d4ad7547a4e74bdd911c4e42a1bf50b7e773b9fa8b0f5de06aa7c",
+    },
 }
 
 #: Every feature kind once, a valley and a filled basin beside a terraced hill above a shore.
@@ -119,7 +128,9 @@ GOLDEN_SITE = (
                    ("water",), "water", "pond", 32000, 36000),
 )  # fmt: skip
 #: Each served version's golden site: version 4's adds a pond to the other zone, the first area of
-#: its zone as the garden's pond is of its own, so the two ponds' ids differ only by their zones.
+#: its zone as the garden's pond is of its own, so the two ponds' ids differ only by their zones;
+#: version 5's adds an orchard north of the yard, touching it at another level, so a retaining wall
+#: stands where they meet.
 GOLDEN_SITES = {
     1: GOLDEN_SITE,
     2: GOLDEN_SITE,
@@ -130,6 +141,11 @@ GOLDEN_SITES = {
                        ("water",), "water", "pond", 14000, 16000),
     ),
 }  # fmt: skip
+GOLDEN_SITES[5] = (
+    *GOLDEN_SITES[4],
+    SiteZoneRecord("site:zone:2", 2, "orchard", 4000, 24000, 20000, 40000, "east", "open",
+                   "ground", "grass", 20000, 38000),
+)  # fmt: skip
 
 
 def test_no_shipped_landform_catalog_is_edited() -> None:
@@ -174,7 +190,7 @@ def test_land_made_by_other_rules_is_refused_saying_both(other: object) -> None:
 
 #: Each served version's golden land: version 1's as it was pinned, version 2's the same with a
 #: cascade from the terraced hill, past the site's west side, into the sea, version 3's with that
-#: cascade following the land, and version 4's as 3's, since version 4 changes no catalog.
+#: cascade following the land, and versions 4 and 5 as 3's, since they change no catalog.
 GOLDEN_LANDS = {
     1: GOLDEN_LAND,
     2: {
@@ -194,12 +210,13 @@ GOLDEN_LANDS = {
         ],
     },
 }  # fmt: skip
-GOLDEN_LANDS[4] = GOLDEN_LANDS[3]
+GOLDEN_LANDS[4] = GOLDEN_LANDS[5] = GOLDEN_LANDS[3]
 WATER = {
     1: {"sea", "lake", "pond"},
     2: {"sea", "lake", "pond", "pool", "fall"},
     3: {"sea", "lake", "pond", "pool", "fall"},
     4: {"sea", "lake", "pond", "pool", "fall"},
+    5: {"sea", "lake", "pond", "pool", "fall"},
 }
 #: Each served version's pond ids, in the golden site's drawing: by the area's number in its zone
 #: alone, and from version 4 by its zone and that number.
@@ -208,11 +225,23 @@ PONDS = {
     2: ["pond 0"],
     3: ["pond 0"],
     4: ["zone 1 pond 0", "zone 0 pond 0"],
+    5: ["zone 1 pond 0", "zone 0 pond 0"],
+}
+#: Each served version's retaining walls, in the golden site's drawing: none listed before version
+#: 5 (no ``walls`` at all), and from version 5 one along the yard's north edge, where the orchard
+#: stands above it.
+WALLS = {
+    1: None,
+    2: None,
+    3: None,
+    4: None,
+    5: [{"from_mm": [4000, 24000], "to_mm": [20000, 24000], "high": "north"}],
 }
 
 
 def test_every_served_version_and_only_those_are_pinned() -> None:
     assert set(SERVED_LAND_RULES) == set(RULES) == set(GOLDEN_LANDS) == set(GOLDEN_SITES)
+    assert set(SERVED_LAND_RULES) == set(WATER) == set(PONDS) == set(WALLS)
     assert max(SERVED_LAND_RULES) == LAND_RULES_VERSION
     for version in SERVED_LAND_RULES:
         assert land_rules(version) == {"version": version, "catalogs": RULES[version]["catalogs"]}
@@ -227,6 +256,7 @@ def test_a_graded_site_is_the_same_land_while_its_rules_version_is_served(versio
     section = graded.drawing_section()
     assert {body["kind"] for body in section["water"]} == WATER[version]
     assert [body["id"] for body in section["water"] if body["kind"] == "pond"] == PONDS[version]
+    assert section.get("walls") == WALLS[version]
     assert hashlib.sha256(canonical_json(section)).hexdigest() == RULES[version]["golden_site"], (
         f"the land a site is graded on moved under rules version {version}: the realizer, its "
         "grading or a site's grading plan changed. Worlds made on land name the rules that made "

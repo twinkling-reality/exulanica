@@ -17,6 +17,10 @@ cost:
   zone's number and its area's number in the zone (``zone 1 pond 0``); under land rules before
   :data:`POND_IDS_BY_ZONE` by its area's number alone (``pond 0``), so two zones' ponds may share
   an id;
+* where a zone meets another zone or a path at levels more than a bank's step apart over one
+  lattice cell, the grading lists a **retaining wall** along the face and the drawing states it,
+  moving no height; under land rules before :data:`RETAINING_WALLS` it lists none, and the
+  drawing's land section has no ``walls``;
 * the **entry** is where the first path meets the site's south edge; a path that ends within a
   lattice cell of the site's edge is graded to the edge, where the society's entry stands.
 
@@ -76,6 +80,7 @@ from exulanica.world.society_place import STEP_LIMIT_MM
 
 __all__ = [
     "POND_IDS_BY_ZONE",
+    "RETAINING_WALLS",
     "ROUNDING_MARGIN_MM",
     "SiteLand",
     "check_receipt_land_rules",
@@ -91,6 +96,9 @@ __all__ = [
 ROUNDING_MARGIN_MM: Final = 2
 #: The first land rules version whose pond ids name their zone, so no two ponds of a site share one.
 POND_IDS_BY_ZONE: Final = 4
+#: The first land rules version whose grading lists a retaining wall where levels meet, and whose
+#: drawing states them.
+RETAINING_WALLS: Final = 5
 
 
 def _along_y(path: SitePathRecord) -> bool:
@@ -202,6 +210,7 @@ def site_grading(records: Sequence[object], station_mm: int, *, rules_version: i
         basins=basins,
         entry_mm=_on_path(rects[paths[0].identity], _along_y(paths[0]), extent.entry_x_mm, 0),
         walk_grade_permille=min(corridor.grade_permille for corridor in corridors),
+        retaining_walls=rules_version >= RETAINING_WALLS,
     )
 
 
@@ -240,8 +249,9 @@ class SiteLand:
 
     def drawing_section(self) -> dict[str, Any]:
         """What a site drawing states of its land: the land's digest, each chunk's place and
-        digest, the backdrop's digest, and the water over the land with its levels."""
-        return {
+        digest, the backdrop's digest, the water over the land with its levels and, where its
+        grading asked for them, the retaining walls where levels meet."""
+        section: dict[str, Any] = {
             "land_sha256": self.land.sha256,
             "chunk_mm": CHUNK_MM,
             "chunks": [
@@ -251,6 +261,9 @@ class SiteLand:
             "backdrop_sha256": self.backdrop.sha256,
             "water": [body.document() for body in self.water],
         }
+        if self.graded.retaining is not None:
+            section["walls"] = [wall.document() for wall in self.graded.retaining]
+        return section
 
     def documents(self) -> dict[str, Any]:
         """The chunk and backdrop documents the land routes serve, each with its digest."""

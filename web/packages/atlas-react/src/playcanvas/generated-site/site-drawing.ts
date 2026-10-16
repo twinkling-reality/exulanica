@@ -1,5 +1,5 @@
 import {readTerrainDressing, type TerrainDressing} from './terrain-dressing.js';
-import { LAND_CHUNK_MM, readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type LandWater, type SupportNavigation } from '@exulanica/atlas-core';
+import { LAND_CELL_MM, LAND_CHUNK_MM, readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type LandWater, type SupportNavigation } from '@exulanica/atlas-core';
 import { sha256Hex, canonicalJson } from '../character/digest.js';
 /**
  * The drawing a site world's records make, in its level-floor or explicit-support profile.
@@ -84,13 +84,29 @@ export interface SiteSlot {
   readonly arcadeSides?: 2;
 }
 
-/** What a site on land states of its land: each chunk's place and digest, the backdrop's and the water's. */
+/**
+ * A retaining wall where two levels of a site's land meet: a run from `fromMm` to `toMm`, lattice
+ * points in site millimetres on the low side's lattice line, along x or along y, and the main side
+ * the land rises toward over one cell.
+ */
+export interface SiteLandWall {
+  readonly fromMm: readonly [x: number, y: number];
+  readonly toMm: readonly [x: number, y: number];
+  readonly high: 'north' | 'east' | 'south' | 'west';
+}
+
+/**
+ * What a site on land states of its land: each chunk's place and digest, the backdrop's and the
+ * water's, and the retaining walls its grading lists where its levels meet.
+ */
 export interface SiteLandSection {
   readonly landSha256: string;
   readonly chunkMm: number;
   readonly chunks: readonly { readonly chunk: readonly [x: number, y: number]; readonly sha256: string }[];
   readonly backdropSha256: string;
   readonly water: readonly LandWater[];
+  /** Absent where the section states no walls. */
+  readonly walls?: readonly SiteLandWall[];
 }
 
 export type SiteRectMm = readonly [x0: number, y0: number, x1: number, y1: number];
@@ -255,18 +271,39 @@ const WATER_FIELDS: Readonly<Record<string, string>> = {
   sea: 'id kind level_mm side', lake: 'id kind level_mm centre_mm radius_mm', pond: 'id kind level_mm rect_mm',
   pool: 'id kind level_mm rect_mm', fall: 'id kind level_mm bottom_mm rect_mm side',
 };
-/** The sides a cascade's fall may fall toward. */
-const FALL_SIDES: readonly string[] = ['north', 'east', 'south', 'west'];
+/** The main sides: where a cascade's fall falls toward, and where the land behind a retaining wall rises. */
+const MAIN_SIDES: readonly string[] = ['north', 'east', 'south', 'west'];
+
+/**
+ * A retaining wall of a site's land: two lattice points on the low side's line, the run from the
+ * first to the second along x or along y, and the main side across the run the land rises toward.
+ */
+function landWall(value: unknown, index: number): SiteLandWall {
+  const what = `land wall ${index}`;
+  const row = closed(value, 'from_mm to_mm high', what);
+  const from = pair(row['from_mm'], `${what} start`), to = pair(row['to_mm'], `${what} end`);
+  if ([...from, ...to].some((v) => v % LAND_CELL_MM !== 0)) fail(`The site drawing's ${what} is off the ${LAND_CELL_MM} mm lattice.`);
+  const alongX = from[1] === to[1], alongY = from[0] === to[0];
+  if (alongX && alongY) fail(`The site drawing's ${what} has no length.`);
+  if (!alongX && !alongY) fail(`The site drawing's ${what} runs along neither x nor y.`);
+  if (alongX ? from[0] > to[0] : from[1] > to[1]) fail(`The site drawing's ${what} does not run from its least end.`);
+  const high = text(row['high'], `${what} high side`);
+  if (!MAIN_SIDES.includes(high)) fail(`The site drawing's ${what} rises toward ${high}, not north, east, south or west.`);
+  if ((high === 'north' || high === 'south') !== alongX) fail(`The site drawing's ${what} rises toward ${high}, along its run and not across it.`);
+  return Object.freeze({ fromMm: from, toMm: to, high: high as SiteLandWall['high'] });
+}
 
 /**
  * The land section of a site on land, or of a town on its land (`exulanica.town-land/v1`): its
- * chunks and backdrop by digest, and its water, every field closed.
+ * chunks and backdrop by digest, its water, and the retaining walls it may list, every field closed.
  */
 export function parseSiteLandSection(value: unknown): SiteLandSection {
-  const row = closed(value, 'land_sha256 chunk_mm chunks backdrop_sha256 water', 'land');
+  const walled = object(value, 'land')['walls'] !== undefined;
+  const row = closed(value, `land_sha256 chunk_mm chunks backdrop_sha256 water${walled ? ' walls' : ''}`, 'land');
   if (row['chunk_mm'] !== LAND_CHUNK_MM) fail(`The site drawing's land chunks are not ${LAND_CHUNK_MM} mm.`);
-  const chunks = row['chunks'], water = row['water'];
+  const chunks = row['chunks'], water = row['water'], walls = row['walls'];
   if (!Array.isArray(chunks) || chunks.length === 0 || !Array.isArray(water)) fail("The site drawing's land states no chunks or no water list.");
+  if (walled && !Array.isArray(walls)) fail("The site drawing's land walls are not a list.");
   const read = chunks.map((one, index) => {
     const chunk = closed(one, 'chunk sha256', `land chunk ${index}`);
     return Object.freeze({ chunk: pair(chunk['chunk'], `land chunk ${index} place`), sha256: digest(chunk['sha256'], `land chunk ${index} digest`) });
@@ -297,9 +334,10 @@ export function parseSiteLandSection(value: unknown): SiteLandSection {
       const bottomMm = integer(body['bottom_mm'], `land water ${index} bottom`);
       if (bottomMm >= levelMm) fail(`The site drawing's land water ${index} is a fall that does not fall.`);
       const side = text(body['side'], `land water ${index} side`);
-      if (!FALL_SIDES.includes(side)) fail(`The site drawing's land water ${index} falls toward ${side}, not north, east, south or west.`);
+      if (!MAIN_SIDES.includes(side)) fail(`The site drawing's land water ${index} falls toward ${side}, not north, east, south or west.`);
       return Object.freeze({ id, kind: 'fall' as const, levelMm, bottomMm, rectMm, side: side as 'north' | 'east' | 'south' | 'west' });
     })),
+    ...(Array.isArray(walls) ? { walls: Object.freeze(walls.map(landWall)) } : {}),
   });
 }
 

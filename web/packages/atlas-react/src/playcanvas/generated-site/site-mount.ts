@@ -245,6 +245,13 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       // The backdrop over the colour the pack states for the ground the near land wears, so the two
       // meet in one colour at the near land's edge.
       if (drawnLand !== null && undress?.landGround !== undefined) drawnLand.colourBackdrop(undress.landGround);
+      // The land's retaining walls in what the site's own walls wear as dressed, a zone's parapet or
+      // the site's boundary wall (a wall no building owns); in rock where it has none, a fence or a
+      // hoarding among them.
+      const ownWall = drawnLand === null ? undefined : drawing.slots.find((slot) => slot.family === 'wall' && slot.structure === undefined);
+      const ownWallMaterial = ownWall === undefined ? null
+        : (slots.entities.get(ownWall.identity)?.findByName(`${ownWall.identity}:shape`) as pc.Entity | null)?.render?.meshInstances[0]?.material ?? null;
+      if (drawnLand !== null && ownWallMaterial !== null) drawnLand.wearWalls(ownWallMaterial);
       // Each volume in the look's rock with its upward faces in its top look, as the dresser makes
       // them; the engine's rock where it makes none.
       const volumeLook = undress?.volumeLook;

@@ -402,11 +402,14 @@ serves `exulanica.site-drawing/v5`: the version 1 slots, each standing at the gr
 under it, a pond's water at its level, the site's ground, zones, paths, dry areas and boundary walls
 marked `drape` (each point of a draped slot as far above the land under it as its base stands above
 the land under its base's centre), the arrival at its height, and a `land` section naming the
-land's digest, each chunk's place and digest, the backdrop's digest and the water over the land.
-The chunks and the backdrop are served by those digests. Every earlier version is unchanged. The
+land's digest, each chunk's place and digest, the backdrop's digest and the water over the land,
+and, for a site made under land rules 5 or later, the retaining walls where its levels meet
+(`walls`, an optional field; [landform contract](landform-contract.md#sites-on-land)). The chunks
+and the backdrop are served by those digests. Every earlier version is unchanged. The
 application reads version 5: it holds each chunk and the backdrop to the digest the drawing names,
 lays each draped slot on the land, draws the land in place of the site's base ground and the
-look's ground beyond, out to the backdrop's horizon, and stands the site's people and things on it.
+look's ground beyond, out to the backdrop's horizon, draws the walls the section lists, and stands
+the site's people and things on it.
 
 A site made on a landscape (composer version 6, [landscape contract](landscape-contract.md#a-site-on-a-landscape))
 is laid out on the landscape's land exactly as version 5 lays it out and serves the same

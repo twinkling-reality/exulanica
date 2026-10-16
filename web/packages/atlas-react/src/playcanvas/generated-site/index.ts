@@ -14,6 +14,7 @@ export type {
   TerrainSiteDrawing,
   SiteFit,
   SiteLandSection,
+  SiteLandWall,
   SitePrimitive,
   SiteRectMm,
   SiteSlot,
