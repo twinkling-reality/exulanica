@@ -890,8 +890,9 @@ long one usually takes. Make sends the person's line and reads the draft every s
 the drafter's timeout and ten seconds more; a draft still running when the sheet opens is followed,
 so a reload loses nothing. A kept creature is placed by its kind's digest alone in front of the
 person and turned to face them, at the pose the objects panel offers, or, in a world made from a recipe or a world kind,
-where that panel places nothing, the same distance ahead in the one region drawn there, on the plane
-its people stand on; through the same edit as a planned thing (the version's compare-and-swap, the
+where that panel places nothing, the same distance ahead in the one region drawn there, on the ground
+its people stand on: the plane at the arrival's height, a site's land, or, in a town on land, the
+ground its tiles walk and its land where they walk none; through the same edit as a planned thing (the version's compare-and-swap, the
 saved entry advancing). A creature stands with its middle at its place, so it is put half its body's
 stated length farther along the way the person faces: its head is then as far from them as any
 placed thing is, 3,500 mm, whatever its size, on the ground found at that distance; a kind whose
