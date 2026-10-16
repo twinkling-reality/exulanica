@@ -41,10 +41,14 @@ IDENTITY_COMPARISONS: dict[str, tuple[int, str]] = {
         "the purposeful engine's own presence transition checks its state and seed",
     ),
     "exulanica/world/society_repository.py": (
-        6,
+        4,
         "creation dispatches to the purposeful and social engines' own initializers (two), and "
         "the retired v3 engine's social block is read and advanced by that engine's own "
-        "functions (four)",
+        "functions (two)",
+    ),
+    "exulanica/world/society_repository_replay.py": (
+        2,
+        "a replay runs the retired v3 engine's social block again by that engine's own functions",
     ),
     "exulanica/world/society_social.py": (1, "the social engine checks its own state"),
     "exulanica/world/society_things.py": (

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import uuid
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable
 from contextlib import ExitStack
 from typing import Any
 
@@ -35,12 +34,10 @@ from exulanica.world.society_actions import (
     action_goal_policies,
     append_action_events,
     applied_hands,
-    validate_action_request,
 )
 from exulanica.world.society_decisions import validate_decision_receipt
 from exulanica.world.society_engines import (
     DEFAULT_ENGINE,
-    INPUT_ENGINES,
     UnknownSocietyEngine,
     creatable_engine,
     society_engine,
@@ -68,8 +65,27 @@ from exulanica.world.society_presence import (
     PresenceRefused,
     change_presence,
     presence_request,
-    validate_presence_request,
 )
+from exulanica.world.society_repository_reads import (
+    EVENT_KINDS_READ_MAXIMUM as EVENT_KINDS_READ_MAXIMUM,
+)
+from exulanica.world.society_repository_reads import (
+    EVENTS_READ_MAXIMUM as EVENTS_READ_MAXIMUM,
+)
+from exulanica.world.society_repository_reads import (
+    INPUT_PROFILES,
+    SocietyReads,
+)
+from exulanica.world.society_repository_reads import (
+    LINES_SAID_SQL as LINES_SAID_SQL,
+)
+from exulanica.world.society_repository_reads import (
+    InvalidEventCursor as InvalidEventCursor,
+)
+from exulanica.world.society_repository_reads import (
+    consumed_places as consumed_places,
+)
+from exulanica.world.society_repository_replay import SocietyReplay
 from exulanica.world.society_social import (
     SOCIAL_PROFILE,
     advance_social_society,
@@ -79,18 +95,6 @@ from exulanica.world.society_things import advance_things, initial_things_societ
 from exulanica.world.thing_kind_gone import THING_KIND_GONE_SQL
 from exulanica.world.world_clock_repository import WorldClockRepository
 
-#: Profiles that consume authorized inputs and record transition receipts, from the engine table.
-INPUT_PROFILES = INPUT_ENGINES
-#: The most events one read returns: the read's own bound, a page of a society's history.
-EVENTS_READ_MAXIMUM = 256
-#: A being's lines, newest first: what :meth:`SocietyRepository.snapshot_and_lines` asks, which
-#: migration 0167's index of said events by speaker serves.
-LINES_SAID_SQL = (
-    "select tick,document from world_society_event "
-    "where workspace_id=%s and society_id=%s and subject_id=%s and event_kind='said' "
-    "order by tick desc, (document->>'order')::integer nulls last, event_id limit %s"
-)
-
 
 class SocietyInputBehind(StaleSocietyState):
     """A society's latest input still lists a thing whose kind its workspace erased, and the
@@ -99,113 +103,16 @@ class SocietyInputBehind(StaleSocietyState):
     Answered as any society that changed since the caller read it."""
 
 
-class InvalidEventCursor(ValueError):
-    """A cursor that names no event of this society, or is not one this repository wrote."""
+class SocietyRepository(SocietyReads, SocietyReplay):
+    """A workspace's deterministic societies and their historical inputs.
 
-    code = "invalid_event_cursor"
-
-
-class InvalidEventsWindow(InvalidEventCursor):
-    """An events read whose window or kinds cannot be read: a window that ends before it begins,
-    ``before`` with a window or ``after`` without one, a cursor outside the window, or a kind that
-    is not an event kind's shape. Answered as an invalid cursor is, under its own code."""
-
-    code = "invalid_events_window"
-
-
-#: The most event kinds one read may name.
-EVENT_KINDS_READ_MAXIMUM = 16
-_EVENT_KIND = re.compile(r"[a-z][a-z_]{0,47}")
-
-
-def event_cursor(event: dict[str, Any]) -> str:
-    """Where a page of events ends, as the next page names it: the last event's tick, its order
-    within the tick (empty where it states none) and its id. Opaque to a client."""
-    order = event["document"].get("order")
-    return f"{event['tick']}:{'' if order is None else order}:{event['event_id']}"
-
-
-def _cursor_parts(cursor: str) -> tuple[int, int | None, uuid.UUID]:
-    try:
-        tick, order, event_id = cursor.split(":", 2)
-        return int(tick), None if order == "" else int(order), uuid.UUID(event_id)
-    except ValueError as exc:
-        raise InvalidEventCursor("this is not a cursor an events read gave") from exc
-
-
-def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
-    """Where inhabitants can go, as the input a society's current state consumed states it.
-
-    Read from the one input the state names, already authorized with it, and copied rather than
-    derived: the targets an inhabitant can be directed to, each object activity the input says no
-    inhabitant can reach, the area the society walks, and the authored edit the input was composed
-    from (``authored_state``: the version's edit and digest; null for an input that states none),
-    so a reader knows which of the version's edits the current state has taken in. A queued input
-    that no step has consumed yet is not described here, because nothing in the society has acted
-    on it.
+    This class creates a society, records its inputs, advances its minute and changes a person's
+    presence. Two parts hold the rest of its methods, each in its own module: ``SocietyReads``
+    (society_repository_reads) answers snapshots, lines said, input provenance and the events
+    window, and ``SocietyReplay`` (society_repository_replay) replays a stored society from its
+    inputs and records.
     """
-    navigation = document["navigation"]
-    living = document.get("living")
-    place = living.get("place") if isinstance(living, dict) else None
-    words = place.get("words") if isinstance(place, dict) else None
-    return {
-        "input_seq": document["input_seq"],
-        "input_sha256": document["document_sha256"],
-        "authored_state": (
-            None
-            if document.get("authored_state") is None
-            else {
-                "edit_seq": document["authored_state"]["edit_seq"],
-                "delta_sha256": document["authored_state"]["delta_sha256"],
-            }
-        ),
-        "availability": document["availability"],
-        "unavailable_reason": document["unavailable_reason"],
-        "walkable_area": navigation.get("walkable_area"),
-        "clearance_mm": navigation["clearance_mm"],
-        "targets": [dict(target) for target in document["targets"]],
-        "unavailable_affordances": [
-            dict(record) for record in document.get("unavailable_affordances", [])
-        ],
-        **(
-            {
-                "living_destinations": [
-                    {
-                        "destination_id": destination["destination_id"],
-                        "use_class": destination["use_class"],
-                        "label": destination["label"],
-                        "indoors": destination["indoors"],
-                    }
-                    for destination in document["living"]["place"]["destinations"]
-                    if destination["enabled"]
-                ]
-            }
-            if "living" in document
-            else {}
-        ),
-        # What is said of where a site world's people are and walk, keyed by the society ground
-        # the catalog states its words for; a town's place states none, and serves none.
-        **(
-            {
-                "place_words": {
-                    "ground": _ground_key(navigation["profile"]),
-                    "here": words["here"],
-                    "around": words["around"],
-                }
-            }
-            if isinstance(words, dict)
-            else {}
-        ),
-    }
 
-
-def _ground_key(navigation_profile: str) -> str:
-    from exulanica.world.society_grounds import society_ground_for_navigation
-
-    return society_ground_for_navigation(navigation_profile).key
-
-
-class SocietyRepository:
     def __init__(
         self,
         connection: psycopg.Connection,
@@ -735,77 +642,6 @@ class SocietyRepository:
             documents.append(document)
         return documents
 
-    def snapshot(self, version_id: uuid.UUID, *, places: bool = False) -> dict[str, Any]:
-        """The current state; ``places`` adds, for a society with inputs, where inhabitants go."""
-        snapshot, _lines, _left_out = self._read(version_id, places=places)
-        return snapshot
-
-    def snapshot_and_lines(
-        self, version_id: uuid.UUID, subject_id: uuid.UUID, *, limit: int = 8
-    ) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
-        """The current state as :meth:`snapshot` answers it, the lines ``subject_id`` said lately
-        (newest first, at most ``limit``, each said event's minute and document), and how many of
-        those were left out. The lines are read first, through migration 0167's index of said
-        events by speaker, and the inputs they were said under are announced with the state's own
-        before the first authorization, so a transaction that goes on holding the asset read lock
-        reads no stored bytes under it. A line whose input no longer authorizes is left out and
-        counted, and the rest are answered: the state's own inputs decide whether the society may
-        be read at all."""
-        return self._read(version_id, lines_of=subject_id, limit=limit)
-
-    def _read(
-        self,
-        version_id: uuid.UUID,
-        *,
-        places: bool = False,
-        lines_of: uuid.UUID | None = None,
-        limit: int = 8,
-    ) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
-        self._lock()
-        row = self._row(version_id)
-        if row is None:
-            raise UnknownSociety("society is unavailable")
-        said = (
-            []
-            if lines_of is None
-            else self.connection.execute(
-                LINES_SAID_SQL,
-                (self.workspace_id, row["society_id"], lines_of, max(1, min(limit, 64))),
-            ).fetchall()
-        )
-        current = None
-        left_out: set[int] = set()
-        if row["engine_version"] in INPUT_PROFILES:
-            # A historical snapshot is not a current rights grant. Authorizer checks dependencies
-            # of the current state plus queued input. Historical replay checks every input below.
-            consumed, latest = row["state"]["input_seq"], self._chain(row)
-            memories = self._memories(row)
-            spoken = sorted(
-                {value["document"]["input_seq"] for value in said} - {consumed, latest, *memories}
-            )
-            documents = self._inputs(row, [consumed, latest, *memories, *spoken])
-            current = documents[consumed]
-            with inputs_ahead(self.connection, documents.values()):
-                self._authorize(current)
-                if latest != consumed:
-                    self._authorize(documents[latest])
-                for sequence in memories:
-                    self._authorize(documents[sequence])
-                for sequence in spoken:
-                    try:
-                        self._authorize(documents[sequence])
-                    except UnavailableSocietyInput:
-                        left_out.add(sequence)
-        snapshot = self._snapshot(row)
-        if places and current is not None:
-            snapshot["places"] = consumed_places(current)
-        lines = [
-            {"tick": int(value["tick"]), "document": value["document"]}
-            for value in said
-            if value["document"]["input_seq"] not in left_out
-        ]
-        return snapshot, lines, len(said) - len(lines)
-
     def _decisions(self, row: dict, *, after: int = 0) -> list[dict]:
         """The stored receipts after ``after``, in decision order, each held to its request."""
         rows = self.connection.execute(
@@ -837,45 +673,6 @@ class SocietyRepository:
                 (self.workspace_id, row["society_id"]),
             ).fetchone()["seq"]
         )
-
-    def _bindings(self, row: dict) -> dict[int, list[dict]]:
-        """The receipts each committed minute consumed, with what each did, by minute and in
-        decision order: one read for a whole replay."""
-        by_tick: dict[int, list[dict]] = {}
-        for binding in self.connection.execute(
-            "select tick,decision_seq,disposition from world_society_transition_decision "
-            "where workspace_id=%s and society_id=%s order by decision_seq",
-            (self.workspace_id, row["society_id"]),
-        ).fetchall():
-            by_tick.setdefault(binding["tick"], []).append(binding)
-        return by_tick
-
-    def _actions(self, row: dict, documents: list[dict]) -> list[dict]:
-        rows = self.connection.execute(
-            "select request.action_seq,request.document,request.document_sha256,"
-            "binding.tick,binding.disposition,binding.event_id "
-            "from world_society_action_request request "
-            "left join world_society_transition_action binding "
-            "using(workspace_id,society_id,action_seq) "
-            "where request.workspace_id=%s and request.society_id=%s "
-            "order by request.action_seq",
-            (self.workspace_id, row["society_id"]),
-        ).fetchall()
-        actions = []
-        for expected_sequence, value in enumerate(rows, 1):
-            document = value["document"]
-            validate_action_request(document)
-            input_seq = document["input_seq"]
-            if (
-                value["action_seq"] != expected_sequence
-                or document["document_sha256"] != value["document_sha256"]
-                or document["branch_id"] != str(row["version_id"])
-                or input_seq > len(documents)
-                or document["input_sha256"] != documents[input_seq - 1]["document_sha256"]
-            ):
-                raise ValueError("stored society action sequence, scope or digest mismatch")
-            actions.append(dict(value))
-        return actions
 
     def advance(
         self,
@@ -1253,506 +1050,6 @@ class SocietyRepository:
                 ),
             )
             return self.snapshot(version_id)
-
-    def _presences(self, row: dict) -> dict[int, dict[str, Any]]:
-        """Every recorded presence request, by the tick of the minute it took."""
-        rows = self.connection.execute(
-            "select tick,document,document_sha256 from world_society_presence "
-            "where workspace_id=%s and society_id=%s order by tick",
-            (self.workspace_id, row["society_id"]),
-        ).fetchall()
-        requests = {}
-        for value in rows:
-            document = value["document"]
-            validate_presence_request(document)
-            if (
-                document["document_sha256"] != value["document_sha256"]
-                or document["base_tick"] + 1 != value["tick"]
-                or document["branch_id"] != str(row["version_id"])
-            ):
-                raise ValueError("stored presence request binding mismatch")
-            requests[value["tick"]] = document
-        return requests
-
-    def input_provenance(self, version_id: uuid.UUID, input_seq: int) -> dict[str, Any]:
-        """One stored input's identity and the authored state it followed, never the input itself.
-
-        Authorized as :meth:`events` authorizes the inputs it shows: the society's current rights
-        first (:meth:`snapshot`), then this input's own. ``authored_state`` is the input's own
-        record of the version's ``edit_seq`` and state digest (``delta_sha256``), which names the
-        edit it followed in the version's history, or None for an input that records none. A
-        society that takes no inputs, or a sequence its chain does not hold, is
-        :class:`UnknownSociety`.
-        """
-        self.snapshot(version_id)
-        row = self._row(version_id)
-        if row is None or row["engine_version"] not in INPUT_PROFILES:
-            raise UnknownSociety("society input is unavailable")
-        if not 1 <= input_seq <= self._chain(row):
-            raise UnknownSociety("society input is unavailable")
-        document = self._inputs(row, [input_seq])[input_seq]
-        self._authorize(document)
-        authored = document.get("authored_state")
-        return {
-            "version_id": str(version_id),
-            "society_id": str(row["society_id"]),
-            "input_seq": input_seq,
-            "input_sha256": document["document_sha256"],
-            "input_profile": document["profile"],
-            "authored_state": None
-            if authored is None
-            else {"edit_seq": authored["edit_seq"], "delta_sha256": authored["delta_sha256"]},
-        }
-
-    def events(self, version_id: uuid.UUID, *, limit: int = 256) -> tuple[dict[str, Any], ...]:
-        return self.events_page(version_id, limit=limit)[0]
-
-    def events_page(
-        self,
-        version_id: uuid.UUID,
-        *,
-        limit: int = EVENTS_READ_MAXIMUM,
-        before: str | None = None,
-        after: str | None = None,
-        kinds: Sequence[str] | None = None,
-        from_tick: int | None = None,
-        to_tick: int | None = None,
-    ) -> tuple[tuple[dict[str, Any], ...], str | None]:
-        """A page of the society's events, and the cursor that reads on from it.
-
-        Without a window the page is newest first: tick, newest first, then the order the engine
-        gave events within a tick, then id. ``before`` is a cursor a previous page gave
-        (:func:`event_cursor`); the page holds the events after it in that order. The cursor that
-        comes back is None when no older event is left.
-
-        With a window (``from_tick``, ``to_tick`` or both, inclusive; an open end is the first or
-        the latest minute) the page holds the window's events oldest first, in minute, then order,
-        then id, so a page can show the lines of the minutes it draws in the order they were said.
-        ``after`` is the cursor a previous page of the same window gave; the cursor that comes back
-        is None when the window holds no later event. ``kinds`` keeps the events of those kinds
-        alone, with or without a window. The inputs of the events a page shows are authorized
-        before it is answered, as the first page's are.
-        """
-        windowed = from_tick is not None or to_tick is not None
-        if windowed and before is not None:
-            raise InvalidEventsWindow("a window reads oldest first: continue it with after")
-        if after is not None and not windowed:
-            raise InvalidEventsWindow("after continues a window: name from_tick or to_tick")
-        if from_tick is not None and to_tick is not None and to_tick < from_tick:
-            raise InvalidEventsWindow("a window ends no earlier than it begins")
-        if kinds is not None and (
-            not kinds
-            or len(kinds) > EVENT_KINDS_READ_MAXIMUM
-            or any(not isinstance(k, str) or _EVENT_KIND.fullmatch(k) is None for k in kinds)
-        ):
-            raise InvalidEventsWindow(
-                f"kinds names 1 to {EVENT_KINDS_READ_MAXIMUM} event kinds, each a lowercase key"
-            )
-        self.snapshot(version_id)  # Current authorization applies to event materialization too.
-        row = self._row(version_id)
-        bound = max(1, min(limit, EVENTS_READ_MAXIMUM))
-        clauses = ""
-        values: dict[str, Any] = {
-            "workspace": self.workspace_id,
-            "society": row["society_id"],
-            "rows": bound + 1,
-        }
-        if kinds is not None:
-            clauses += " and event_kind = any(%(kinds)s)"
-            values["kinds"] = sorted(set(kinds))
-        if from_tick is not None:
-            clauses += " and tick>=%(from_tick)s"
-            values["from_tick"] = from_tick
-        if to_tick is not None:
-            clauses += " and tick<=%(to_tick)s"
-            values["to_tick"] = to_tick
-        cursor = before if before is not None else after
-        if cursor is not None:
-            tick, order, event_id = _cursor_parts(cursor)
-            named = self.connection.execute(
-                "select 1 from world_society_event where workspace_id=%s and society_id=%s "
-                "and event_id=%s and tick=%s "
-                "and (document->>'order')::integer is not distinct from %s::integer",
-                (self.workspace_id, row["society_id"], event_id, tick, order),
-            ).fetchone()
-            if named is None:
-                raise InvalidEventCursor("the cursor names no event of this society")
-            if windowed and not (
-                (from_tick is None or tick >= from_tick) and (to_tick is None or tick <= to_tick)
-            ):
-                raise InvalidEventsWindow("the cursor names an event outside the window")
-            values |= {"tick": tick, "order": order, "event": event_id}
-            # Within a minute both directions read order, then id, ascending; the minutes run
-            # newest first without a window and oldest first with one.
-            clauses += (
-                f" and (tick{'>' if windowed else '<'}%(tick)s or (tick=%(tick)s and ("
-                "(%(order)s::integer is not null and ((document->>'order')::integer>%(order)s "
-                "or document->>'order' is null or ((document->>'order')::integer=%(order)s "
-                "and event_id>%(event)s))) "
-                "or (%(order)s::integer is null and document->>'order' is null "
-                "and event_id>%(event)s))))"
-            )
-        rows = self.connection.execute(
-            "select "
-            "event_id,tick,event_kind,subject_id,object_id,place_id,document,document_sha256,"
-            "recorded_at from world_society_event "
-            "where workspace_id=%(workspace)s and society_id=%(society)s"
-            + clauses
-            + f" order by tick {'asc' if windowed else 'desc'}, "
-            "(document->>'order')::integer nulls last,event_id "
-            "limit %(rows)s",
-            values,
-        ).fetchall()
-        page, more = rows[:bound], len(rows) > bound
-        if row["engine_version"] in INPUT_PROFILES:
-            shown = {value["document"]["input_seq"] for value in page}
-            documents = self._inputs(row, shown)
-            for sequence in sorted(shown):
-                self._authorize(documents[sequence])
-        events = tuple(dict(value) for value in page)
-        return events, event_cursor(events[-1]) if more else None
-
-    def replay(self, version_id: uuid.UUID) -> dict[str, Any]:
-        # Hold the same lock as advances so state, inputs, and transitions cannot straddle a tick.
-        with self.connection.transaction():
-            self._lock()
-            row = self._row(version_id, lock=True)
-            if row is None:
-                raise UnknownSociety("society is unavailable")
-            expected_events: list[SocietyEvent] = []
-            engine = society_engine(row["engine_version"])
-            if engine.state_family == "legacy":
-                state = initial_society(
-                    row["society_id"], row["seed"], population=row["population_size"]
-                )
-                for _ in range(row["current_tick"]):
-                    state, events = advance_society(state, row["seed"])
-                    expected_events.extend(events)
-            elif engine.state_family == "living":
-                state, expected_events = self._replay_living(row)
-            elif engine.state_family in ("purposeful", "things"):
-                documents = self._validated_inputs(row)
-                with inputs_ahead(self.connection, documents):
-                    for document in documents:
-                        self._authorize(document)
-                actions = self._actions(row, documents)
-                initializer = (
-                    initial_social_society
-                    if row["engine_version"] == SOCIAL_PROFILE
-                    else initial_things_society
-                    if engine.state_family == "things"
-                    else initial_purposeful_society
-                )
-                state = initializer(
-                    row["society_id"], row["seed"], documents[0], population=row["population_size"]
-                )
-                transitions = self.connection.execute(
-                    "select * from world_society_transition where workspace_id=%s and "
-                    "society_id=%s order by tick",
-                    (self.workspace_id, row["society_id"]),
-                ).fetchall()
-                if len(transitions) != row["current_tick"]:
-                    raise ValueError("missing or extra society transition")
-                presences = self._presences(row)
-                # The crossings each minute consumed, as the door bound them, by minute.
-                consumed: dict[int, list[Any]] = {}
-                stream = crossing_stream()
-                if engine.state_family == "things" and stream is None:
-                    took = self.connection.execute(
-                        "select 1 from world_society_event where workspace_id=%s "
-                        "and society_id=%s and document->'thing' ? 'crossing_id' limit 1",
-                        (self.workspace_id, row["society_id"]),
-                    ).fetchone()
-                    if took is not None:
-                        raise ValueError(
-                            "a society that took crossings replays only with its door's stream "
-                            "registered"
-                        )
-                if engine.state_family == "things" and stream is not None:
-                    for taken in stream.consumed(
-                        self.connection, self.workspace_id, row["society_id"]
-                    ):
-                        consumed.setdefault(taken.tick, []).append(taken)
-                # Replayed from what was stored and bound, never asked again.
-                roles = decision_roles().hosted_by(row["engine_version"])
-                role_decisions, role_bindings = (
-                    ({d["decision_seq"]: d for d in self._decisions(row)}, self._bindings(row))
-                    if engine.owner_model_choice
-                    else ({}, {})
-                )
-                for transition in transitions:
-                    previous_state = state
-                    if (
-                        transition["tick"] != state["tick"] + 1
-                        or transition["from_input_seq"] != state["input_seq"]
-                        or transition["to_input_seq"] < transition["from_input_seq"]
-                        or transition["to_input_seq"] > len(documents)
-                        or transition["previous_state_sha256"] != society_state_sha256(state)
-                    ):
-                        raise ValueError("society transition lineage mismatch")
-                    inputs = documents[
-                        transition["from_input_seq"] - 1 : transition["to_input_seq"]
-                    ]
-                    transition_actions = [
-                        value
-                        for value in actions
-                        if value["document"]["base_tick"] == state["tick"]
-                    ]
-                    if any(value["tick"] != transition["tick"] for value in transition_actions):
-                        raise ValueError("society action transition binding mismatch")
-                    presence_request_document = presences.get(transition["tick"])
-                    if presence_request_document is not None:
-                        # A minute somebody sent everyone away or brought them back: regenerated
-                        # from the stored request and inputs, and it consumed no directed request.
-                        if transition_actions:
-                            raise ValueError("a presence minute cannot consume a directed request")
-                        state, events = change_presence(
-                            state,
-                            row["seed"],
-                            inputs,
-                            presence_request_document,
-                            population=row["population_size"],
-                        )
-                        if (
-                            transition["state_sha256"] != society_state_sha256(state)
-                            or transition["event_ids"] != [str(e.event_id) for e in events]
-                            or transition["events_sha256"]
-                            != society_state_sha256(ordered_events_document(events))
-                        ):
-                            raise ValueError("society transition replay mismatch")
-                        expected_events.extend(events)
-                        continue
-                    requests = [value["document"] for value in transition_actions]
-                    goal_policy, action_dispositions = action_goal_policies(
-                        state, inputs[-1], requests
-                    )
-                    if row["engine_version"] == SOCIAL_PROFILE:
-                        bindings = self.connection.execute(
-                            "select decision_seq,disposition "
-                            "from world_society_transition_decision where "
-                            "workspace_id=%s and society_id=%s and tick=%s order by decision_seq",
-                            (self.workspace_id, row["society_id"], transition["tick"]),
-                        ).fetchall()
-                        decisions = {d["decision_seq"]: d for d in self._decisions(row)}
-                        state, events, processed = advance_social_society(
-                            state,
-                            row["seed"],
-                            inputs,
-                            [decisions[b["decision_seq"]] for b in bindings],
-                            external_goal_policy=goal_policy,
-                        )
-                        if processed != [(b["decision_seq"], b["disposition"]) for b in bindings]:
-                            raise ValueError("social decision disposition replay mismatch")
-                    else:
-                        bindings = role_bindings.get(transition["tick"], [])
-                        receipts = [role_decisions[b["decision_seq"]] for b in bindings]
-                        policies, decided = apply_receipts(
-                            roles, state, inputs[-1], receipts, goal_policy
-                        )
-                        if [(d.decision_seq, d.disposition) for d in decided] != [
-                            (b["decision_seq"], b["disposition"]) for b in bindings
-                        ]:
-                            raise ValueError("person decision disposition replay mismatch")
-                        state, events = advance_purposeful_society(
-                            state, row["seed"], inputs, goal_policy=policies
-                        )
-                    events = append_action_events(
-                        previous_state,
-                        state,
-                        inputs[-1],
-                        requests,
-                        action_dispositions,
-                        events,
-                    )
-                    if engine.owner_model_choice:
-                        events = append_role_events(
-                            roles, previous_state, state, inputs[-1], receipts, decided, events
-                        )
-                    if engine.state_family == "things":
-                        taken = consumed.pop(transition["tick"], [])
-                        state, events, crossed = advance_things(
-                            previous_state,
-                            state,
-                            row["seed"],
-                            inputs[-1],
-                            events,
-                            [each.crossing for each in taken],
-                            decisions=consumed_receipts(receipts, decided),
-                            asked=applied_hands(requests, action_dispositions),
-                        )
-                        if list(crossed) != [each.bound for each in taken]:
-                            raise ValueError("society crossing replay mismatch")
-                    action_events = [
-                        event for event in events if event.kind == "user_action_requested"
-                    ]
-                    for binding, disposition, event in zip(
-                        transition_actions, action_dispositions, action_events, strict=True
-                    ):
-                        if (
-                            binding["disposition"] != disposition.disposition
-                            or binding["event_id"] != event.event_id
-                            or binding["document"]["request_id"] != str(disposition.request_id)
-                        ):
-                            raise ValueError("society action disposition replay mismatch")
-                    if (
-                        transition["state_sha256"] != society_state_sha256(state)
-                        or transition["event_ids"] != [str(e.event_id) for e in events]
-                        or transition["events_sha256"]
-                        != society_state_sha256(ordered_events_document(events))
-                    ):
-                        raise ValueError("society transition replay mismatch")
-                    expected_events.extend(events)
-                if consumed:
-                    raise ValueError("a crossing is bound to a minute the society never ran")
-                for action in actions:
-                    if action["tick"] is None and (
-                        action["document"]["base_tick"] != state["tick"]
-                        or action["document"]["base_state_sha256"] != society_state_sha256(state)
-                    ):
-                        raise ValueError("pending society action is not bound to current state")
-            else:
-                raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
-            self._verify_events(row, expected_events)
-            if society_state_sha256(state) != row["state_sha256"] or state != row["state"]:
-                raise ValueError("stored society state does not match deterministic replay")
-            return self._snapshot(row) | {"replay_verified": True}
-
-    def replay_living_minutes(
-        self,
-        version_id: uuid.UUID,
-        observe: Callable[[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[dict]], None],
-    ) -> dict[str, Any]:
-        """Replay a living society as :meth:`replay` does, under the same lock, handing ``observe``
-        each regenerated minute: the state before it, the state after it, its event documents and
-        the place documents it read. Asks no model. Answers the replayed state's digest."""
-        with self.connection.transaction():
-            self._lock()
-            row = self._row(version_id, lock=True)
-            if row is None:
-                raise UnknownSociety("society is unavailable")
-            if society_engine(row["engine_version"]).state_family != "living":
-                raise ValueError("only a living society's minutes are replayed with their places")
-            state, _events = self._replay_living(row, observe)
-            digest = society_state_sha256(state)
-            if digest != row["state_sha256"]:
-                raise ValueError("society replay final state mismatch")
-            return {"tick": state["tick"], "state_sha256": digest}
-
-    def _replay_living(
-        self,
-        row: dict[str, Any],
-        observe: Callable[[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[dict]], None]
-        | None = None,
-    ) -> tuple[dict[str, Any], list[SocietyEvent]]:
-        """Regenerate a living society from genesis over every retained input, transition and,
-        for an engine whose owner may choose models, every receipt each minute consumed: asked
-        again of nothing, and held to the dispositions the minutes recorded."""
-        documents = self._validated_inputs(row)
-        with inputs_ahead(self.connection, documents):
-            for document in documents:
-                self._authorize(document)
-        if self.connection.execute(
-            "select 1 from world_society_action_request where workspace_id=%s and society_id=%s",
-            (self.workspace_id, row["society_id"]),
-        ).fetchone():
-            raise ValueError("living society has user action requests it cannot consume")
-        routine = routine_for(row["state"])
-        held: dict = {}
-        [genesis] = living_places(documents[:1], routine, held)
-        state = initial_living_society(
-            row["society_id"],
-            row["seed"],
-            genesis,
-            routine,
-            branch_id=str(row["version_id"]),
-            population=row["state"]["population"]["requested"],
-            profile=row["engine_version"],
-        )
-        engine = society_engine(row["engine_version"])
-        roles = decision_roles().hosted_by(row["engine_version"])
-        role_decisions, role_bindings = (
-            ({d["decision_seq"]: d for d in self._decisions(row)}, self._bindings(row))
-            if engine.owner_model_choice
-            else ({}, {})
-        )
-        if state["population"]["size"] != row["population_size"]:
-            raise ValueError("living society population does not match its genesis")
-        transitions = self.connection.execute(
-            "select * from world_society_transition where workspace_id=%s and "
-            "society_id=%s order by tick",
-            (self.workspace_id, row["society_id"]),
-        ).fetchall()
-        if len(transitions) != row["current_tick"]:
-            raise ValueError("missing or extra society transition")
-        expected: list[SocietyEvent] = []
-        for transition in transitions:
-            if (
-                transition["tick"] != state["tick"] + 1
-                or transition["from_input_seq"] != state["input_seq"]
-                or transition["to_input_seq"] < transition["from_input_seq"]
-                or transition["to_input_seq"] > len(documents)
-                or transition["previous_state_sha256"] != society_state_sha256(state)
-            ):
-                raise ValueError("society transition lineage mismatch")
-            inputs = documents[transition["from_input_seq"] - 1 : transition["to_input_seq"]]
-            bindings = role_bindings.get(transition["tick"], [])
-            receipts = [role_decisions[b["decision_seq"]] for b in bindings]
-            previous_state = state
-            places = living_places(inputs, routine, held)
-            seam, decided = apply_receipts(
-                roles,
-                state,
-                inputs[-1],
-                receipts,
-                LivingSeam(row["seed"], places, routine),
-            )
-            if [(d.decision_seq, d.disposition) for d in decided] != [
-                (b["decision_seq"], b["disposition"]) for b in bindings
-            ]:
-                raise ValueError("person decision disposition replay mismatch")
-            state, events = living_step(state, row["seed"], seam)
-            events = append_role_events(
-                roles, previous_state, state, inputs[-1], receipts, decided, events
-            )
-            if (
-                transition["state_sha256"] != society_state_sha256(state)
-                or transition["event_ids"] != [str(e.event_id) for e in events]
-                or transition["events_sha256"]
-                != society_state_sha256(ordered_events_document(events))
-            ):
-                raise ValueError("society transition replay mismatch")
-            if observe is not None:
-                observe(
-                    previous_state,
-                    state,
-                    [event.document for event in events],
-                    [place.document for place in places],
-                )
-            expected.extend(events)
-        return state, expected
-
-    def _verify_events(self, row: dict[str, Any], events: list[SocietyEvent]) -> None:
-        stored = self.connection.execute(
-            "select "
-            "event_id,tick,event_kind,subject_id,object_id,place_id,document,document_sha256 "
-            "from world_society_event where workspace_id=%s and society_id=%s",
-            (self.workspace_id, row["society_id"]),
-        ).fetchall()
-        expected = {
-            event.event_id: {
-                "event_id": event.event_id,
-                "tick": event.tick,
-                "event_kind": event.kind,
-                "subject_id": event.subject_id,
-                "object_id": event.object_id,
-                "place_id": row["place_id"],
-                "document": event.document,
-                "document_sha256": event_document_sha256(event),
-            }
-            for event in events
-        }
-        if {value["event_id"]: dict(value) for value in stored} != expected:
-            raise ValueError("stored society events do not match deterministic replay")
 
     def _row(self, version_id: uuid.UUID, *, lock: bool = False) -> dict[str, Any] | None:
         suffix = " for update" if lock else ""

@@ -88,7 +88,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         1_888,
         "the authored objects surface: place, move, run, remove, undo",
     ),
-    "exulanica/world/society_repository.py": (1_789, "deterministic societies and their inputs"),
     "exulanica/world/society_decision_contract.py": (
         1_537,
         "the contract a model answers under when it runs a person",
