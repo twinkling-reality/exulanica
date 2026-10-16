@@ -100,6 +100,14 @@ def document(value: Any) -> dict[str, Any]:
             for key in ("label", "storeys"):
                 if part.get(key) is None:
                     part.pop(key, None)
+    if result.get("residents"):
+        result["residents"].sort(key=lambda item: item["resident_id"])
+        for resident in result["residents"]:
+            if resident.get("name") is None:
+                resident.pop("name", None)
+    else:
+        # No resident kept: the section is absent, as in every checkpoint made before it.
+        result.pop("residents", None)
     for key in ("title", "characters", "parts"):
         if result.get(key) is None:
             result.pop(key, None)

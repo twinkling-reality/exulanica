@@ -10,7 +10,9 @@ A name a person wrote appears only where the project kept it, which is only wher
 readable text; such a project publishes only to a private repository
 (:mod:`exulanica.world_package.projects.rights`). There a being of a made kind is called by its
 kind's label, drafted from its maker's words (ruling J20); without it, a character is called by
-its kind, and a being of a made kind "the creature made in this world".
+its kind, and a being of a made kind "the creature made in this world". A town's resident is
+called by the name its society gives it where the project kept it, else by its role ("the
+baker"), else "the resident".
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ from exulanica.world.placed_things import ThingKindReference, shipped_kind
 
 #: What a being of a kind its workspace made is called where no name is kept.
 MADE_BEING: Final = "creature made in this world"
+#: What a town's resident is called where neither its name nor its role is kept.
+RESIDENT: Final = "resident"
 #: What a part a world was made with is called where its label is not kept, by its kind: a Part
 #: is made with the world, as a Thing is placed by a person (WORDS.md).
 PART_NOUNS: Final = {
@@ -102,6 +106,13 @@ def _kind_noun(kind: Mapping[str, Any], label: str | None = None) -> str:
     return label[:1].lower() + label[1:]
 
 
+def role_noun(role: str | None) -> str:
+    """A resident's role as a noun, from the town's key for it ("ferry_keeper": "ferry keeper"),
+    or "resident" where none is kept."""
+    words = " ".join((role or "").replace("_", " ").replace("-", " ").split())
+    return words.lower() if words else RESIDENT
+
+
 def written_name(character: Mapping[str, Any] | None) -> str | None:
     """The name a character's owner wrote, where the project kept it."""
     words = (character or {}).get("words") or {}
@@ -109,20 +120,23 @@ def written_name(character: Mapping[str, Any] | None) -> str | None:
 
 
 def names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
-    """What each thing of these checkpoints is called, the later checkpoint's words first: the
-    name its owner wrote, else "the" and its kind (a made creature's kind's label where the
-    project keeps it), with "the second ..." where several things of one kind are unnamed (in the
-    order of their identities, which are never shown). A made kind's label is said only for a
-    thing the newest checkpoint still holds: once its thing has left (its kind erased, or no
-    longer selected), the label is never written again."""
+    """What each thing and resident of these checkpoints is called, the later checkpoint's words
+    first: the name its owner wrote (a resident's, the name its society gives it), else "the" and
+    its kind (a made creature's kind's label where the project keeps it) or a resident's role,
+    with "the second ..." where several of one kind or role are unnamed (in the order of their
+    identities, which are never shown). A made kind's label is said only for a thing the newest
+    checkpoint still holds: once its thing has left (its kind erased, or no longer selected), the
+    label is never written again."""
     things: dict[str, Mapping[str, Any]] = {}
     characters: dict[str, Mapping[str, Any]] = {}
+    residents: dict[str, Mapping[str, Any]] = {}
     newest: set[str] = set()
     for world in worlds:
         if world is None:
             continue
         things.update({thing["thing_id"]: thing for thing in world["things"]})
         characters.update({c["thing_id"]: c for c in world.get("characters") or []})
+        residents.update({r["resident_id"]: r for r in world.get("residents") or []})
         newest = {thing["thing_id"] for thing in world["things"]}
     called: dict[str, str] = {}
     unnamed: dict[str, list[str]] = {}
@@ -134,6 +148,12 @@ def names(worlds: Iterable[Mapping[str, Any] | None]) -> dict[str, str]:
             thing = things[thing_id]
             label = thing.get("label") if thing_id in newest else None
             unnamed.setdefault(_kind_noun(thing["kind"], label), []).append(thing_id)
+    for resident_id in sorted(residents):
+        resident = residents[resident_id]
+        if resident.get("name"):
+            called[resident_id] = resident["name"]
+        else:
+            unnamed.setdefault(role_noun(resident.get("role")), []).append(resident_id)
     for noun, ids in unnamed.items():
         for index, thing_id in enumerate(ids):
             if index == 0:
@@ -192,8 +212,8 @@ def quoted(text: str) -> str:
 
 def without_words(world: Mapping[str, Any]) -> dict[str, Any]:
     """A checkpoint with every word a person wrote left out (its title, its characters' names
-    and personalities, its made parts' labels, its made creatures' kinds' labels), as a
-    repository that is not private is told it."""
+    and personalities, its made parts' labels, its made creatures' kinds' labels, its residents'
+    names), as a repository that is not private is told it."""
     kept = {key: value for key, value in world.items() if key != "title"}
     kept["things"] = [
         {key: value for key, value in thing.items() if key != "label"} for thing in world["things"]
@@ -205,5 +225,9 @@ def without_words(world: Mapping[str, Any]) -> dict[str, Any]:
     if world.get("parts") is not None:
         kept["parts"] = [
             {key: value for key, value in part.items() if key != "label"} for part in world["parts"]
+        ]
+    if world.get("residents") is not None:
+        kept["residents"] = [
+            {key: value for key, value in r.items() if key != "name"} for r in world["residents"]
         ]
     return kept

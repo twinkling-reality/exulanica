@@ -39,13 +39,21 @@ from exulanica.world_package.projects.checkpoint import (
     document,
     evidence_document,
 )
-from exulanica.world_package.projects.schema import LABEL_MAXIMUM, TITLE_MAXIMUM, scan_values
+from exulanica.world_package.projects.schema import (
+    LABEL_MAXIMUM,
+    RESIDENT_NAME_MAXIMUM,
+    TITLE_MAXIMUM,
+    scan_values,
+)
 
 _SEGMENT = re.compile(r"^[A-Za-z0-9:._-]{1,200}$")
 _NAME = re.compile(r"^[a-zA-Z0-9:._/-]{1,200}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _OUTCOMES = {"applied": "applied", "rejected": "refused"}
 _MAX_EVENT_PAGES = 64
+#: How a being that is no resident of its town came into its society: placed there by a person,
+#: or come in from outside.
+_NOT_RESIDENTS: Final = ("placed", "crossed")
 
 
 def read_token(path: Path) -> str:
@@ -434,6 +442,43 @@ def _characters(
     return found
 
 
+def _role_key(person: Mapping[str, Any]) -> str | None:
+    """A resident's role by the town's key: a society of things states it on the resident's
+    entry, a living town on the person, an older society only by a word."""
+    resident = person.get("resident")
+    role = resident.get("role") if isinstance(resident, Mapping) else None
+    if not isinstance(role, Mapping):
+        role = person.get("role")
+    key = role.get("key") if isinstance(role, Mapping) else role
+    return key if isinstance(key, str) and _NAME.fullmatch(key) else None
+
+
+def _residents(
+    reader: WorldReader, version: str, wanted: set[str], readable: bool
+) -> dict[str, dict[str, Any]]:
+    """The town's people among the `wanted` subjects, by subject: each with its role's key and,
+    only with readable text, the name its society calls it by (a longer one than a checkpoint
+    keeps is left out). A placed being or a visitor is no resident. Read in one request
+    (``GET .../society``); a version with no society has none."""
+    snapshot = reader.json_if_found("GET society", f"/world/versions/{version}/society")
+    state = snapshot.get("state") if isinstance(snapshot, dict) else None
+    people = state.get("inhabitants") if isinstance(state, dict) else None
+    found: dict[str, dict[str, Any]] = {}
+    for person in people if isinstance(people, list) else []:
+        if (
+            not isinstance(person, dict)
+            or person.get("id") not in wanted
+            or person.get("came_by") in _NOT_RESIDENTS
+        ):
+            continue
+        entry: dict[str, Any] = {"resident_id": person["id"], "role": _role_key(person)}
+        name = _written(person.get("display_name")) if readable else None
+        if name is not None and len(name) <= RESIDENT_NAME_MAXIMUM:
+            entry["name"] = name
+        found[person["id"]] = entry
+    return found
+
+
 def _parts(
     reader: WorldReader,
     version: str,
@@ -591,6 +636,13 @@ def capture(
     character records, or, from an API without it, from each being's card where the version has
     a society. It keeps each made creature's kind's label too, from the kind bytes kept for it.
 
+    A town's own people, who are no placed things, are kept as residents where the project
+    follows every thing and a model decides for them or their decisions are kept: each by its
+    subject in the society, which its model assignment and decisions name as a thing's are named
+    by its placed id, with its role's key, and its name only with readable text. Whoever a choice
+    names that no placed thing is, the society is read once to find. A project of chosen things
+    keeps those things alone.
+
     A world made from a world kind also has its made parts kept, as the version has them
     (moved, turned or removed by a person); `parts_known` is what the project holds for them and
     the version state it holds them for, so they are read again only when the version changed.
@@ -684,6 +736,7 @@ def capture(
     skipped: dict[str, int] = {}
     # Every binding a decision of this capture is held under, by its digest.
     bindings_used: dict[str, dict[str, Any]] = {}
+    residents: dict[str, dict[str, Any]] = {}
     if include_models:
         society = reader.json("GET society models", f"/world/versions/{version}/society/models")
         contract = {
@@ -691,6 +744,22 @@ def capture(
             "sha256": society["contract"]["sha256"],
         }
         role = decision_roles().for_contract(contract)
+        # A town's own people are no placed things: whoever a choice names that no thing placed in
+        # the version is, the society is asked about, and its residents are held as themselves,
+        # by their subject, as a selected thing is held by its placed id. A project of chosen
+        # things keeps those alone.
+        placed_subjects = {subject_id(reader.world_id, thing_id) for thing_id in placed}
+        others = {
+            choice["subject_id"]
+            for choice in society.get("choices", [])
+            if isinstance(choice.get("subject_id"), str)
+            and _NAME.fullmatch(choice["subject_id"])
+            and choice["subject_id"] not in placed_subjects
+        }
+        if others and thing_ids is None:
+            residents = _residents(reader, version, others, readable)
+            subjects.update({subject: subject for subject in residents})
+            standing |= set(residents)
         latest: dict[str, dict[str, Any]] = {}
         for choice in society.get("choices", []):
             decider = choice.get("decider") or {}
@@ -843,11 +912,15 @@ def capture(
             decisions.append(decision)
             bindings_used[decision["binding_sha256"]] = binding
 
+    # A resident is kept where a model decides for them or a decision of theirs is kept.
+    decided = {model["thing_id"] for model in models} | {d["thing_id"] for d in decisions}
+    kept = [residents[subject] for subject in sorted(residents) if subject in decided]
     characters = _characters(reader, version, things, readable, cards=include_models)
     parts = _parts(reader, version, view["state_sha256"], readable, parts_known)
-    if not things and not parts:
+    if not things and not parts and not kept:
         raise NothingSelectable(
-            "this version holds no placed thing and no made part a project can hold yet"
+            "this version holds no placed thing, no made part and no resident a model decides "
+            "for that a project can hold yet"
         )
     source = {
         "world_id": reader.world_id,
@@ -892,6 +965,7 @@ def capture(
             **({"title": title} if (title := _title(view, readable)) is not None else {}),
             **({"characters": characters} if characters else {}),
             **({"parts": parts} if parts is not None else {}),
+            **({"residents": kept} if kept else {}),
         }
     )
     return Capture(
@@ -900,6 +974,7 @@ def capture(
         {
             "things": len(things),
             "things_not_held": unheld,
+            "residents": len(kept),
             "models": len(models),
             "decisions": len(evidence["decisions"]) if evidence else len(decisions),
             "decisions_in": "evidence" if evidence else "checkpoint",

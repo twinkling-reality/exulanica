@@ -2,10 +2,10 @@
 
 The sentences describe only the selected checkpoint fields, in the workspace's words
 (:mod:`exulanica.world_package.projects.words`): build mode's words for moves and removals, a
-character by its name or its kind, a model by the name the workspace gives it. Each sentence
-starts with what was done ("Moved", "Changed", "Recorded"), never with a name, and holds no
-identity, digest or code. The raw field diff from `changes` stays the authority; these words are
-a reading aid placed above it.
+character by its name or its kind, a town's resident by its name or its role, a model by the name
+the workspace gives it. Each sentence starts with what was done ("Moved", "Changed", "Recorded"),
+never with a name, and holds no identity, digest or code. The raw field diff from `changes` stays
+the authority; these words are a reading aid placed above it.
 """
 
 from __future__ import annotations

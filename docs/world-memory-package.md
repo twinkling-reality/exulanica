@@ -745,7 +745,12 @@ each building, garden fixture and area a person may change, as the version has i
 `storeys`, `removed`), and its `label` only with readable text, since a kind made from a person's words is worded from them. A
 placed thing of a kind its workspace made (a creature drafted from a person's words) keeps its
 kind's `label` the same way, only with readable text, taken from the kind bytes the project keeps
-for it; a thing of a shipped kind carries none. A checkpoint without these optional fields keeps
+for it; a thing of a shipped kind carries none. A town's own people, who are no placed things,
+are kept in an optional `residents` list where the project follows every thing and a model
+decides for them or their decisions are kept (a project of chosen things keeps those alone): each
+by its subject in the society (`resident_id`, which its model assignment and decision
+records name as their `thing_id`), its `role` by the town's key, and its `name` only with readable
+text, since a resident's name is written words. A checkpoint without these optional fields keeps
 its digest.
 
 Every string in a checkpoint or evidence file is also scanned by value. A value shaped like a

@@ -429,3 +429,88 @@ def test_a_made_creature_s_label_is_written_words():
     shipped["things"][0]["label"] = "Long necked marsh heron"
     with pytest.raises(ProjectError):
         document(shipped)
+
+
+# A town's residents, who are no placed things
+
+BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b001"
+SECOND_BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b002"
+FERRY_KEEPER = "0190a1b2-c3d4-7e5f-8a9b-00000000f001"
+NOBODY_SAID = "0190a1b2-c3d4-7e5f-8a9b-00000000a001"
+
+
+def with_residents(project, *residents, model=None):
+    """The sample checkpoint with these residents, each decided for by the knight's model (or
+    `model`), its binding naming the resident as a thing's names its placed id."""
+    world = deepcopy(project)
+    world["residents"] = [dict(resident) for resident in residents]
+    for resident in residents:
+        binding = {**project["models"][0], "thing_id": resident["resident_id"]}
+        if model is not None:
+            binding.update(provider=MODEL[0], model_id=model)
+        world["models"].append(binding)
+    return world
+
+
+def test_a_resident_is_called_by_its_kept_name_else_its_role_never_its_identity():
+    project, _ = sample()
+    world = with_residents(
+        project,
+        {"resident_id": BAKER, "role": "baker"},
+        {"resident_id": SECOND_BAKER, "role": "baker"},
+        {"resident_id": FERRY_KEEPER, "role": "ferry_keeper", "name": "Bram Tolley"},
+        {"resident_id": NOBODY_SAID, "role": None},
+    )
+    called = names([document(world)])
+    assert called[BAKER] == "the baker"
+    assert called[SECOND_BAKER] == "the second baker"  # by identity order, never shown
+    assert called[FERRY_KEEPER] == "Bram Tolley"
+    assert called[NOBODY_SAID] == "the resident"
+    assert called["knight:1"] == "the knight"
+    unnamed = with_residents(project, {"resident_id": FERRY_KEEPER, "role": "ferry_keeper"})
+    assert names([unnamed])[FERRY_KEEPER] == "the ferry keeper"
+
+
+def test_a_resident_s_model_reads_as_a_thing_s_does():
+    project, _ = sample()
+    project = edited(project, decisions=[])
+    before = with_residents(project, {"resident_id": BAKER, "role": "baker"})
+    after = with_residents(project, {"resident_id": BAKER, "role": "baker"}, model=MODEL[1])
+    assert summarize(before, after) == ["Changed the baker's model to Nemotron 3 Nano 30B"]
+    assert summarize(before, project) == ["Changed the baker's model to Routine"]
+    named = {"resident_id": BAKER, "role": "baker", "name": "Odile Fenn"}
+    assert summarize(
+        with_residents(project, named), with_residents(project, named, model=MODEL[1])
+    ) == ["Changed Odile Fenn's model to Nemotron 3 Nano 30B"]
+
+
+def test_residents_left_out_keep_an_old_checkpoint_s_digest_and_bindings():
+    from exulanica.world_package.projects.schema import ModelBinding, binding_sha256
+
+    project, _ = sample()
+    old = checkpoint_digest(project)
+    assert "residents" not in document(project)
+    assert checkpoint_digest(edited(project, residents=None)) == old
+    assert checkpoint_digest(edited(project, residents=[])) == old
+    # A binding keeps its fields, so a decision's binding digest is the one it always had.
+    binding = project["models"][0]
+    assert binding_sha256(ModelBinding.model_validate(binding)) == digest(canonical_json(binding))
+    # A resident's name is an optional addition too.
+    bare = with_residents(project, {"resident_id": BAKER, "role": "baker"})
+    assert checkpoint_digest(bare) == checkpoint_digest(
+        with_residents(project, {"resident_id": BAKER, "role": "baker", "name": None})
+    )
+
+
+def test_a_binding_names_a_selected_thing_or_a_kept_resident():
+    from exulanica.world_package.projects.checkpoint import ProjectError
+    from exulanica.world_package.projects.words import without_words
+
+    project, _ = sample()
+    kept = with_residents(project, {"resident_id": BAKER, "role": "baker", "name": "Odile Fenn"})
+    orphan = deepcopy(kept)
+    orphan["residents"] = []
+    with pytest.raises(ProjectError):
+        document(orphan)
+    # A resident's name is written words: left out for a repository that is not private.
+    assert without_words(document(kept))["residents"] == [{"resident_id": BAKER, "role": "baker"}]

@@ -310,3 +310,37 @@ def test_a_made_creature_s_label_reaches_only_a_private_repository(tmp_path):
     private = remote("PRIVATE")
     _, result = publish(RollingPullRequests(private.request), TARGET, local, None)
     assert result["published"] and "Long necked marsh heron" in received(private)
+
+
+#: A town's baker, who is no placed thing, decided for by the sample's model.
+BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b001"
+
+
+def with_baker(project, *, name=None):
+    resident = {"resident_id": BAKER, "role": "baker"}
+    if name is not None:
+        resident["name"] = name
+    models = [*project["models"], {**project["models"][0], "thing_id": BAKER}]
+    return {**project, "models": models, "residents": [resident]}
+
+
+@pytest.mark.parametrize("visibility", ["PUBLIC", "INTERNAL", None])
+def test_a_resident_s_name_reaches_only_a_private_repository(tmp_path, visibility):
+    project, _ = sample()
+    create(tmp_path / "named", with_baker(project, name="Odile Fenn"), author=AUTHOR)
+    named = Project(tmp_path / "named", author=AUTHOR)
+    repository = remote(visibility)
+    with pytest.raises(Conflict, match="a resident's name"):
+        RollingPullRequests(repository.request).review(TARGET, named)
+    assert repository.writes == [] and "Odile" not in received(repository)
+    private = remote("PRIVATE")
+    _, result = publish(RollingPullRequests(private.request), TARGET, named, None)
+    assert result["published"] and "Odile Fenn" in received(private)
+    # Kept without its name, the resident reaches any repository, called by its role.
+    create(tmp_path / "bare", with_baker(project), author=AUTHOR)
+    public = remote("PUBLIC")
+    _, result = publish(
+        RollingPullRequests(public.request), TARGET, Project(tmp_path / "bare", author=AUTHOR), None
+    )
+    assert result["published"] and "Odile" not in received(public)
+    assert "the baker's model" in public.pulls[0]["body"]

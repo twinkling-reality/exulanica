@@ -920,3 +920,150 @@ def test_a_made_creature_keeps_its_kind_s_label_with_readable_text_alone(world):
 def test_a_made_kind_s_label_shaped_like_a_credential_is_left_out(world):
     with_creature(world, "token ghp_" + "a" * 36)
     assert "label" not in captured_creature(world, readable=True)
+
+
+# A town's own people, who are no placed things
+
+BAKER = "0190a1b2-c3d4-7e5f-8a9b-00000000b001"
+FERRY_KEEPER = "0190a1b2-c3d4-7e5f-8a9b-00000000f001"
+VISITOR = "0190a1b2-c3d4-7e5f-8a9b-00000000c001"
+SOCIETY = f"/world/versions/{VERSION}/society"
+
+
+def town(world):
+    """The fake world's town: a baker a model decides for, with two decisions a minute took up,
+    and a ferry keeper the routine decides for; the knight stands in it as a placed being, and a
+    visitor a model decides for came in from outside."""
+    world.routes[SOCIETY] = {
+        "state": {
+            "inhabitants": [
+                {
+                    "id": world.knight,
+                    "came_by": "placed",
+                    "display_name": "A knight",
+                    "role": "knight",
+                },
+                {
+                    "id": BAKER,
+                    "came_by": "populated",
+                    "display_name": "Odile Fenn",
+                    "role": "baker",
+                    "resident": {"role": {"key": "baker", "label": "baker"}},
+                },
+                {
+                    "id": FERRY_KEEPER,
+                    "came_by": "populated",
+                    "display_name": "Bram Tolley",
+                    "role": "ferry keeper",
+                    "resident": {"role": {"key": "ferry_keeper", "label": "ferry keeper"}},
+                },
+                {
+                    "id": VISITOR,
+                    "came_by": "crossed",
+                    "display_name": "A visitor",
+                    "role": "visitor",
+                },
+            ]
+        }
+    }
+    world.routes[f"/world/versions/{VERSION}/society/models"]["choices"] += [
+        {
+            "subject_id": BAKER,
+            "choice_seq": 3,
+            "decider": {"kind": "model", "provider": "synthetic", "model_id": "synthetic-model"},
+        },
+        {"subject_id": FERRY_KEEPER, "choice_seq": 4, "decider": {"kind": "routine"}},
+        {
+            "subject_id": VISITOR,
+            "choice_seq": 5,
+            "decider": {"kind": "model", "provider": "synthetic", "model_id": "synthetic-model"},
+        },
+    ]
+    world.records["b1"] = record("b1", BAKER, 4, "bench, 3 m away")
+    world.records["b2"] = record("b2", BAKER, 5, "wait here a minute")
+    world.routes[("events", None)]["events"] += [
+        event("b2", BAKER, 5, "applied", seq=6),
+        event("b1", BAKER, 4, "applied", seq=5),
+    ]
+
+
+def captured_town(world, *, readable=False, thing_ids=None):
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        return capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=None if thing_ids is None else list(thing_ids),
+            readable=readable,
+        )
+
+
+def test_a_resident_a_model_decides_for_is_kept_with_its_model_and_decisions(world):
+    town(world)
+    result = captured_town(world)
+    project = result.checkpoint
+    # The baker is kept by its subject and role; the ferry keeper the routine decides for is not,
+    # nor the knight, which is a placed thing, nor the visitor from outside.
+    assert project["residents"] == [{"resident_id": BAKER, "role": "baker"}]
+    assert {m["thing_id"] for m in project["models"]} == {"knight:1", BAKER}
+    baker = {d["record_id"]: d["outcome"] for d in project["decisions"] if d["thing_id"] == BAKER}
+    assert baker == {"request:b1": "applied", "request:b2": "applied"}
+    assert result.report["residents"] == 1
+    # One read of the society finds who the residents are; no name without readable text.
+    assert sum(path.startswith(f"{SOCIETY}?") for _, path, _ in world.requests) == 1
+    assert "Odile" not in canonical_json(project).decode()
+    report = inspect(project, dependencies=result.dependencies)
+    assert report["unsupported"] == [] and report["invalid_dependencies"] == []
+
+
+def test_a_resident_s_name_is_kept_only_with_readable_text(world):
+    town(world)
+    assert captured_town(world, readable=True).checkpoint["residents"] == [
+        {"resident_id": BAKER, "role": "baker", "name": "Odile Fenn"}
+    ]
+    world.routes[SOCIETY]["state"]["inhabitants"][1]["display_name"] = "see /Users/someone/x"
+    assert captured_town(world, readable=True).checkpoint["residents"] == [
+        {"resident_id": BAKER, "role": "baker"}
+    ]
+
+
+def test_a_town_with_nothing_placed_is_kept_for_its_residents(world):
+    town(world)
+    world.routes[f"/world/versions/{VERSION}"]["things"] = []
+    project = captured_town(world, thing_ids=None).checkpoint
+    assert (project["things"], project["region_ids"]) == ([], [])
+    assert [r["resident_id"] for r in project["residents"]] == [BAKER]
+    assert [m["thing_id"] for m in project["models"]] == [BAKER]
+
+
+def test_a_project_of_chosen_things_keeps_those_alone_and_reads_no_society(world):
+    town(world)
+    project = captured_town(world, thing_ids=("knight:1",)).checkpoint
+    assert "residents" not in project
+    assert [m["thing_id"] for m in project["models"]] == ["knight:1"]
+    assert not any(d["thing_id"] == BAKER for d in project["decisions"])
+    assert not any(path.startswith(f"{SOCIETY}?") for _, path, _ in world.requests)
+
+
+def test_a_world_without_residents_keeps_no_residents_section_and_reads_no_society(world):
+    project = captured_town(world).checkpoint
+    assert "residents" not in project
+    assert not any(path.startswith(f"{SOCIETY}?") for _, path, _ in world.requests)
+
+
+def test_a_session_keeps_a_resident_s_decisions_beside_the_world(world):
+    town(world)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=None,
+            session_id="session:one",
+        )
+    assert result.checkpoint["residents"] == [{"resident_id": BAKER, "role": "baker"}]
+    assert result.checkpoint["decisions"] == []
+    assert {d["record_id"] for d in result.evidence["decisions"] if d["thing_id"] == BAKER} == {
+        "request:b1",
+        "request:b2",
+    }

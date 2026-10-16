@@ -31,6 +31,8 @@ LABEL_MAXIMUM: Final = 500
 Label = Annotated[str, Field(min_length=1, max_length=LABEL_MAXIMUM)]
 #: The longest world title a checkpoint keeps; capture leaves a longer one out.
 TITLE_MAXIMUM: Final = 200
+#: The longest resident's name a checkpoint keeps; capture leaves a longer one out.
+RESIDENT_NAME_MAXIMUM: Final = 200
 
 # Values that would publish where a file lives on someone's machine or a credential. Field names
 # are checked by the WMP scan; these are checked by value, in every string of a project file.
@@ -177,6 +179,19 @@ class Character(Closed):
     thing_id: Name
     revision: Annotated[int, Field(ge=1)]
     words: CharacterWords | None = None
+
+
+class Resident(Closed):
+    """One of a town's people who is no placed thing, kept where a model decides for them or
+    their decisions are kept. Its identity is its subject in the society, the one its model
+    assignment and decision records name as their `thing_id`; its role is the town's key for it
+    (null where the society states none a checkpoint can keep). Its name only where the project
+    keeps readable text: a name is written words, which never reach a repository that is not
+    private (:mod:`exulanica.world_package.projects.rights`)."""
+
+    resident_id: Name
+    role: Name | None
+    name: Annotated[str, Field(min_length=1, max_length=RESIDENT_NAME_MAXIMUM)] | None = None
 
 
 class Part(Closed):
@@ -411,6 +426,8 @@ class Checkpoint(Closed):
     characters: Annotated[list[Character], Field(max_length=256)] | None = None
     #: A site world's made parts as the version has them, where it was made from a world kind.
     parts: Annotated[list[Part], Field(max_length=2_048)] | None = None
+    #: The town's people a model decides for, or whose decisions are kept, who are no placed thing.
+    residents: Annotated[list[Resident], Field(max_length=256)] | None = None
 
     @model_validator(mode="after")
     def references(self) -> Self:
@@ -421,9 +438,15 @@ class Checkpoint(Closed):
         unique([t.thing_id for t in self.things], "thing")
         unique([c.thing_id for c in self.characters or []], "character")
         unique([p.part_id for p in self.parts or []], "part")
-        if not self.region_ids and (self.things or not self.parts):
+        residents = {r.resident_id for r in self.residents or []}
+        unique(
+            [t.thing_id for t in self.things] + [r.resident_id for r in self.residents or []],
+            "thing or resident",
+        )
+        if not self.region_ids and (self.things or not (self.parts or residents)):
             raise ValueError(
-                "a checkpoint holds a region, unless it keeps a made world's parts alone"
+                "a checkpoint holds a region, unless it keeps a made world's parts or its "
+                "residents alone"
             )
         unique([m.thing_id for m in self.models], "model assignment")
         unique([d.record_id for d in self.decisions], "decision")
@@ -442,8 +465,8 @@ class Checkpoint(Closed):
         bindings = {}
         for binding in self.models:
             thing = things.get(binding.thing_id)
-            if thing is None or thing.removed:
-                raise ValueError("a model assignment names an active selected thing")
+            if (thing is None or thing.removed) and binding.thing_id not in residents:
+                raise ValueError("a model assignment names an active selected thing or a resident")
             require("decision-contract", binding.contract_sha256)
             require("model-manifest", binding.model_manifest_sha256)
             bindings[binding.thing_id] = sha256_of_canonical(binding.model_dump()).hex()
