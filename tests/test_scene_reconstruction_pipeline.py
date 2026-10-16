@@ -29,14 +29,16 @@ from exulanica.graph.asset_read_policy import (
 )
 from exulanica.graph.geometry import point_map_descriptors, read_point_map
 from exulanica.graph.reconstruction_scenes import (
-    _MEMO_MAX_MEMBERS,
     _POSED_RUNG_THREE_WITHHELD,
-    _memo,
-    _memo_get,
-    _memo_put,
     clear_placement_memo,
     placement_memo_members,
     placement_memo_size,
+)
+from exulanica.graph.reconstruction_scenes_placement import (
+    _MEMO_MAX_MEMBERS,
+    _memo,
+    _memo_get,
+    _memo_put,
 )
 from exulanica.ingest.operations import reconstruction_scene_metrics
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -1971,7 +1973,7 @@ def test_withdrawing_a_member_refuses_the_projection(repository, tmp_path):
     assert payload["bindings"]["member_capture_refs"] == [str(item) for item in captures]
     assert _scene(repository, store).placement_state == "available"
 
-    from exulanica.graph.reconstruction_scenes import _PointMapRef, _projected
+    from exulanica.graph.reconstruction_scenes_placement import _PointMapRef, _projected
 
     rows = _projection_rows(repository, scene_id)
     references = tuple(

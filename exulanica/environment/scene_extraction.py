@@ -19,7 +19,7 @@ import psycopg
 
 from exulanica.canonical import canonical_json
 from exulanica.evidence.blob import BlobId
-from exulanica.graph import reconstruction_scenes as scene_reader
+from exulanica.graph import reconstruction_scenes_segments as scene_reader
 from exulanica.graph.asset_read_policy import (
     evaluation_time,
     final_check,

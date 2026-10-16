@@ -56,8 +56,8 @@ generation of the same key instead. Generation 0 is the key itself, so every pro
 before generations existed keeps its identity, and the worker, which writes a set of receipts'
 projection in the same acceptance that publishes those receipts, never needs any other.
 
-The reader half lives in ``exulanica/graph/reconstruction_scenes.py`` and parses these bytes
-independently rather than calling into this module, because ``graph`` and ``ingest`` are
+The reader half lives in ``exulanica/graph/reconstruction_scenes_placement.py`` and parses these
+bytes independently rather than calling into this module, because ``graph`` and ``ingest`` are
 siblings in the ``pyproject.toml`` layers contract and neither may import the other.
 ``POINT_MAP_KIND`` is spelled twice for the same reason and a test pins those spellings, and a
 test pins these.
@@ -98,9 +98,9 @@ __all__ = [
 SCENE_PROJECTION_PROFILE: Final = "exulanica.scene-graph-projection/v1"
 SCENE_PROJECTION_ENVELOPE: Final = "exulanica.scene-graph-projection-envelope/v1"
 
-#: Spelled here and again in ``exulanica/graph/reconstruction_scenes.py``, for the same reason
-#: ``POINT_MAP_KIND`` is spelled twice: the layers contract forbids ``graph`` and ``ingest``
-#: from importing each other, and a test pins the two spellings together.
+#: Spelled here and again in ``exulanica/graph/reconstruction_scenes_placement.py``, for the
+#: same reason ``POINT_MAP_KIND`` is spelled twice: the layers contract forbids ``graph`` and
+#: ``ingest`` from importing each other, and a test pins the two spellings together.
 #:
 #: The stage itself is declared in ``exulanica/ingest/stages/__init__.py`` with every other
 #: stage, so ``pipeline_digest`` covers it and ``stage_definition`` records it. A test pins that

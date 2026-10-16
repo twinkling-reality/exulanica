@@ -62,10 +62,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         2_257,
         "a visual gate record built from measured inputs",
     ),
-    "exulanica/graph/reconstruction_scenes.py": (
-        2_185,
-        "validated multi-photograph reconstruction scenes for the graph snapshot",
-    ),
     "exulanica/reconstruction/standpoint.py": (
         2_163,
         "photographs from one standpoint, joined by the rotation between them",
