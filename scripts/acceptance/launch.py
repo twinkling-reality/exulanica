@@ -55,7 +55,11 @@ imports the code it starts.
     with the synthetic token built in as ``VITE_EXULANICA_TOKEN``. With ``--production`` it is a
     ``vite build`` into the run directory, made in a clean environment with no ``VITE_`` variable,
     served by ``vite preview``; the page then asks for the token, which is in the run directory's
-    ``token`` file. Either way ``/api`` is proxied to the API through ``EXULANICA_API_URL``.
+    ``token`` file. With ``--personal`` it is the workspace page instead
+    (``tools/previews/world-workspace/serve.mjs``, which reads the run's state for the API's port
+    and token file), and ``up`` ends by printing its address alone; ``--production`` is then
+    refused, as the workspace has no production build. Either way ``/api`` is proxied to the API
+    through ``EXULANICA_API_URL``.
 
 With ``--society-playback``, ``up`` refuses unless the API's readiness says its playback worker runs
 for exactly one listed workspace, and records the base wait that readiness states.
@@ -340,6 +344,8 @@ REFUSALS = {
     "projects-shape": "--no-projects turns off a personal install's world projects: it needs "
     "--personal and refuses --projects",
     "projects-kept": "the run already keeps world projects; restart-api keeps its follower up",
+    "personal-production": "--personal serves the workspace page from its sources, which has no "
+    "production build: drop --production",
     "database-latency-shape": "--database-latency takes the slot's spare port, which "
     "--second-api also takes",
     "latency-proxy-startup": "the database latency proxy did not report a startup",
@@ -973,6 +979,32 @@ def api_url(slot_ports: Mapping[str, int]) -> str:
 
 def development_command(vite: Path, port: int) -> list[str]:
     return [str(vite), "--port", str(port), "--strictPort"]
+
+
+#: The page a person's own install (``--personal``) lands on: the workspace, served from its
+#: sources by its own server, which ``down`` finds by this path in its command.
+WORKSPACE_SERVER = ("tools", "previews", "world-workspace", "serve.mjs")
+WORKSPACE_MARKER = "world-workspace/serve.mjs"
+
+
+def workspace_command(worktree: Path) -> list[str]:
+    return ["node", str(worktree.joinpath(*WORKSPACE_SERVER))]
+
+
+def workspace_environment(
+    state_file: Path, port: int, environ: Mapping[str, str] | None = None
+) -> dict[str, str]:
+    """What the workspace page starts with: the run's own state as its runtime descriptor (the
+    API's port and the token file, which the page reads and never prints) and the slot's app port."""
+    environment = clean_environment(environ)
+    environment.update(
+        {
+            "EXULANICA_REVIEW_RUNTIME_STATE_FILE": str(state_file),
+            "EXULANICA_WORKSPACE_PORT": str(port),
+            "BROWSER": "none",
+        }
+    )
+    return environment
 
 
 def development_environment(
@@ -1701,6 +1733,8 @@ def up(arguments: argparse.Namespace) -> None:
         refuse("database-latency-shape", REFUSALS["database-latency-shape"])
     if arguments.depth_worker and not arguments.no_derivative_worker:
         refuse("depth-worker-shape", REFUSALS["depth-worker-shape"])
+    if arguments.personal and arguments.production:
+        refuse("personal-production", REFUSALS["personal-production"])
     projects = chosen_projects(arguments, worktree)
     if arguments.scripted_model is not None:
         if arguments.model:
@@ -2127,6 +2161,8 @@ def up(arguments: argparse.Namespace) -> None:
 
     if arguments.production:
         serve_production(worktree, run_dir, chosen, logs, state, state_file)
+    elif arguments.personal:
+        serve_workspace(worktree, chosen, logs, state, state_file)
     else:
         serve_development(worktree, chosen, token, logs, state, state_file)
     shown = ("worktree", "tree", "ports", "run_dir", "workspace_id", "api_imported_exulanica_from")
@@ -2137,7 +2173,38 @@ def up(arguments: argparse.Namespace) -> None:
         if key in state
     )
     print(json.dumps({key: state[key] for key in (*shown, "api_health", "app", *extra)}, indent=2))
-    print(f"app: http://localhost:{chosen['vite']}/  token file: {token_file}")
+    if arguments.personal:
+        print(f"workspace: http://127.0.0.1:{chosen['vite']}/")
+    else:
+        print(f"app: http://localhost:{chosen['vite']}/  token file: {token_file}")
+
+
+def serve_workspace(
+    worktree: Path, chosen: Mapping[str, int], logs: Path, state: dict, state_file: Path
+) -> None:
+    """A person's own install lands on the workspace page, on the slot's app port in place of the
+    application's development server, and through it on the run's API."""
+    pid = spawn(
+        workspace_command(worktree),
+        worktree,
+        workspace_environment(state_file, chosen["vite"]),
+        logs / "workspace.log",
+    )
+    state["pids"]["workspace"] = pid
+    write_state(state_file, state)
+    root_status, _ = wait_http(f"http://127.0.0.1:{chosen['vite']}/", APP_START_SECONDS)
+    proxied, proxied_body = wait_http(
+        f"http://127.0.0.1:{chosen['vite']}/api/healthz", PROXY_SECONDS
+    )
+    state["app"] = {
+        "mode": "workspace",
+        "root_status": root_status,
+        "api_proxy_healthz": [
+            proxied,
+            proxied_body.decode(errors="replace")[:HEALTH_EXCERPT_CHARACTERS],
+        ],
+    }
+    write_state(state_file, state)
 
 
 def serve_development(
@@ -2497,6 +2564,8 @@ def down(arguments: argparse.Namespace) -> None:
         stop(state["pids"]["depth_worker"], DEPTH_WORKER_NAME, "depth worker")
     if "vite" in state["pids"]:
         stop(state["pids"]["vite"], "vite", "app")
+    if "workspace" in state["pids"]:
+        stop(state["pids"]["workspace"], WORKSPACE_MARKER, "workspace")
     if "api_2" in state["pids"]:
         stop(state["pids"]["api_2"], API_MARKER, "api_2")
     if "api" in state["pids"]:

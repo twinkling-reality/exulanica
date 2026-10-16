@@ -21,7 +21,7 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from types import ModuleType
 
@@ -913,6 +913,71 @@ def test_the_society_of_things_is_offered_only_when_asked_and_to_the_api_alone(t
     parser = LAUNCH.build_parser()
     assert parser.parse_args(["up", "--worktree", "w"]).society_of_things is False
     assert parser.parse_args(["up", "--worktree", "w", "--society-of-things"]).society_of_things
+
+
+def test_a_personal_install_lands_on_the_workspace_page_served_from_the_run_s_own_state(tmp_path):
+    """The page a person lands on is the workspace, served by its own server from the checkout,
+    reading the API's port and the token file from the run's state, on the slot's app port. The
+    shell's own review settings and any built-in token never reach it."""
+    worktree = tmp_path / "checkout"
+    command = LAUNCH.workspace_command(worktree)
+    assert command == [
+        "node",
+        str(worktree / "tools" / "previews" / "world-workspace" / "serve.mjs"),
+    ]
+    assert LAUNCH.WORKSPACE_MARKER in " ".join(command)
+    # The server it names is this repository's own.
+    assert Path(LAUNCH.__file__).resolve().parents[2].joinpath(*LAUNCH.WORKSPACE_SERVER).is_file()
+    state_file = tmp_path / "state.json"
+    shell = {
+        "EXULANICA_REVIEW_RUNTIME_STATE_FILE": "/elsewhere/runtime.json",
+        "EXULANICA_REVIEW_PORT": "19974",
+        "EXULANICA_REVIEW_OBSERVER_ONLY": "1",
+        "VITE_EXULANICA_TOKEN": "a token from the shell",
+        "HOME": "/home/someone",
+    }
+    environment = LAUNCH.workspace_environment(state_file, 19202, shell)
+    assert environment["EXULANICA_REVIEW_RUNTIME_STATE_FILE"] == str(state_file)
+    assert environment["EXULANICA_WORKSPACE_PORT"] == "19202"
+    for scrubbed in (
+        "EXULANICA_REVIEW_PORT",
+        "EXULANICA_REVIEW_OBSERVER_ONLY",
+        "VITE_EXULANICA_TOKEN",
+    ):
+        assert scrubbed not in environment, scrubbed
+    assert environment["HOME"] == "/home/someone"
+
+
+def test_a_personal_install_refuses_a_production_build_before_it_starts_anything(
+    tmp_path, temporary
+):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--personal", "--production"]
+    )
+    assert _refusal(LAUNCH.up, arguments) == "personal-production"
+    assert not LAUNCH.state_dir(worktree).exists()
+
+
+def test_down_stops_the_workspace_page_by_its_own_command(tmp_path, temporary, monkeypatch):
+    worktree = _checkout(tmp_path / "checkout")
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    LAUNCH.state_dir(worktree).mkdir(parents=True)
+    (LAUNCH.state_dir(worktree) / "state.json").write_text(
+        json.dumps(
+            {
+                "pids": {"workspace": 4242},
+                "database": {"started_by_launcher": False},
+                "run_dir": str(run_dir),
+            }
+        )
+    )
+    stopped = []
+    monkeypatch.setattr(LAUNCH, "stop", lambda pid, marker, label: stopped.append((pid, marker)))
+    with redirect_stdout(io.StringIO()):
+        LAUNCH.down(LAUNCH.build_parser().parse_args(["down", "--worktree", str(worktree)]))
+    assert stopped == [(4242, LAUNCH.WORKSPACE_MARKER)]
 
 
 def test_a_personal_install_tells_the_api_so_and_a_shell_setting_never_does(tmp_path):

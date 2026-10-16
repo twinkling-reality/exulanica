@@ -10,9 +10,14 @@ const root = fileURLToPath(new URL('../../../', import.meta.url)).replace(/\/$/,
 const here = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '');
 const runtimeStateFile = process.env.EXULANICA_REVIEW_RUNTIME_STATE_FILE;
 if (!runtimeStateFile) throw Error('Set EXULANICA_REVIEW_RUNTIME_STATE_FILE to a private runtime descriptor.');
-const reviewPort = Number(process.env.EXULANICA_REVIEW_PORT || 19974);
+// A person's own install (scripts/acceptance/launch.py up --personal) names its slot's app port;
+// otherwise the primary review's 19974 or the pilot observer's 20032.
+const launchedPort = process.env.EXULANICA_WORKSPACE_PORT ? Number(process.env.EXULANICA_WORKSPACE_PORT) : null;
+const reviewPort = launchedPort ?? Number(process.env.EXULANICA_REVIEW_PORT || 19974);
 const observerOnly = process.env.EXULANICA_REVIEW_OBSERVER_ONLY === '1';
-if (![19974, 20032].includes(reviewPort) || observerOnly !== (reviewPort === 20032) || reviewPort === 20032 && !runtimeStateFile) throw Error('Use the primary19974 review or an explicitly configured pilot20032 observer.');
+if (launchedPort !== null) {
+  if (!Number.isInteger(launchedPort) || launchedPort < 1024 || launchedPort > 65535 || launchedPort === 20032 || observerOnly) throw Error('A launched workspace takes a private port of its own and is never the observer.');
+} else if (![19974, 20032].includes(reviewPort) || observerOnly !== (reviewPort === 20032) || reviewPort === 20032 && !runtimeStateFile) throw Error('Use the primary19974 review or an explicitly configured pilot20032 observer.');
 let runtime;
 try { runtime = JSON.parse(readFileSync(runtimeStateFile, 'utf8')); }
 catch { throw Error('The private runtime descriptor could not be read.'); }

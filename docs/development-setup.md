@@ -448,7 +448,13 @@ The API and worker entrypoints above exist; execution requires their stated data
 model and artifact prerequisites. The API and application start separately. `?preview=1` selects a
 development-only, read-only synthetic fixture, not the authenticated backend or a personal-world
 acceptance run. Stop the landing server before starting the application on its default port, or use
-the port printed by Vite. There is no single command that starts Exulanica end to end.
+the port printed by Vite.
+
+One command starts a person's own install on this computer:
+`python3 scripts/acceptance/launch.py up --worktree . --personal`. It starts the checkout's own
+disposable database server, the API with a personal install's settings and its workers, and the world
+workspace on the slot's app port, and prints that page's address. The database is the run's own and
+`down` stops it; a durable one is the [local database](local-database.md)'s.
 See [capability boundaries](README.md#capability-boundaries) and [product direction](product-direction.md).
 
 ### Opt-in world interface previews
@@ -472,7 +478,8 @@ EXULANICA_REVIEW_RUNTIME_STATE_FILE=/absolute/private/runtime.json \
   node tools/previews/product-uiux/serve.mjs
 ```
 
-The world workspace uses loopback port 19974. Its start page is the front door: the chosen saved world
+The world workspace uses loopback port 19974, or the port `EXULANICA_WORKSPACE_PORT` names, which
+the acceptance launcher's `--personal` sets to its slot's app port. Its start page is the front door: the chosen saved world
 drawn live behind its title, a filmstrip of saved worlds, Details (the world's kind, size and look) and
 Open, which goes to the workspace's world view of that world at `?entry=<entry-id>`; Esc in the world
 returns to the front door with that world still chosen. The live background is the same saved world in
