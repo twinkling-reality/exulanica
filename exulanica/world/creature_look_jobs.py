@@ -3,14 +3,18 @@
 ``POST /things/creatures/{kind_sha256}/looks`` asks for a made look of a creature the workspace
 keeps (:func:`ask_look`) and answers at once with the look job, queued; ``GET
 /things/creatures/looks/{look_id}`` reads it as it goes (:func:`read_look`), for any member of the
-workspace. Nothing here spends: the paid step is an operator's run, which takes the queued jobs of
-the workspaces it serves (:func:`queued_looks`), writes each one's request from the creature's kept
-documents, marks them staged under the run's id with the request's digest (:func:`stage_look`), and
-once its GPU job and the fit on its own machine are done ends each one (:func:`end_look`): made,
-naming the look the workspace now keeps by its document's digest, with the kind look appended so the
-creature wears it wherever it is placed (:func:`wear_by_kind`); refused, by the fit's code; failed,
-by why; or cancelled. A job moves forward once, and an ended one never changes (the migration
-refuses anything else). Each end records the job's share of what the run cost.
+workspace. A creature drafted from words alone has its made look asked as its draft keeps it, in the
+draft owner's name (:func:`ask_on_keep`, from :mod:`exulanica.selection.creature_drafts`): a made
+look is the default way a kept creature looks, its sketch worn until a run makes it and whenever the
+fit refuses; the draft reads its creature's newest job (:func:`newest_look`). Nothing here spends:
+the paid step is an operator's run, which takes the queued jobs of the workspaces it serves
+(:func:`queued_looks`), writes each one's request from the creature's kept documents, marks them
+staged under the run's id with the request's digest (:func:`stage_look`), and once its GPU job and
+the fit on its own machine are done ends each one (:func:`end_look`): made, naming the look the
+workspace now keeps by its document's digest, with the kind look appended so the creature wears it
+wherever it is placed (:func:`wear_by_kind`); refused, by the fit's code; failed, by why; or
+cancelled. A job moves forward once, and an ended one never changes (the migration refuses anything
+else). Each end records the job's share of what the run cost.
 
 :func:`kind_looks` reads the look each creature of a workspace wears by its kind: the newest kind
 look whose look the workspace still keeps and has not withdrawn. A thing's own choice still comes
@@ -49,9 +53,11 @@ __all__ = [
     "LookLimitReached",
     "LookNotAsked",
     "ask_look",
+    "ask_on_keep",
     "end_look",
     "keeps_creature",
     "kind_looks",
+    "newest_look",
     "queued_looks",
     "read_look",
     "stage_look",
@@ -167,6 +173,39 @@ def ask_look(
         ).fetchone()
         assert row is not None
     return _look(row)
+
+
+def ask_on_keep(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    *,
+    kind_sha256: str,
+    requested_by: uuid.UUID,
+) -> CreatureLook | None:
+    """The look job of a creature its draft has just kept, asked for the draft's owner as
+    :func:`ask_look` asks one; None, with nothing asked, when the owner is at their limits, the
+    workspace is being erased or the creature was erased since. The creature stays kept either way
+    and wears its sketch, and its owner may still ask for its look later."""
+    try:
+        return ask_look(
+            connection, workspace_id, kind_sha256=kind_sha256, requested_by=requested_by
+        )
+    except (LookLimitReached, LookNotAsked, TombstonedError):
+        return None
+
+
+def newest_look(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, kind_sha256: str
+) -> CreatureLook | None:
+    """The creature's newest look job, finished or not; None when none was asked or its creature
+    was erased (its jobs went with it)."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            f"select {_COLUMNS} from creature_look where workspace_id=%s and kind_sha256=%s "
+            "order by created_at desc, look_id desc limit 1",
+            (workspace_id, kind_sha256),
+        ).fetchone()
+    return None if row is None else _look(row)
 
 
 def read_look(

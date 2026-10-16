@@ -4,8 +4,10 @@ The application connects as provisioned runtime roles, with the drafter's replie
 worker played by the test, so each step is seen. What is shown:
 
 *   asking answers 202 with a queued draft at once; the requester reads it as it goes, and once kept
-    the draft names its kind and its sketch, which the workspace's look routes then serve; once the
-    creature is erased, the draft reads as erased and names nothing of it;
+    the draft names its kind and its sketch, which the workspace's look routes then serve, and its
+    creature's made look, asked as it was kept and read as the look route reads it; a draft
+    conditioned on a reference asks no look; once the creature is erased, the draft reads as erased
+    and names nothing of it;
 *   a refused draft answers its code, the form's field and the code's fixed sentence;
 *   another requester, another workspace and an absent draft all read as absent;
 *   words that are not one plain line are refused before anything is queued; a workspace this
@@ -115,7 +117,7 @@ def test_asking_queues_a_draft_that_is_kept_and_served(served):
     asked = _ask(client, "a gentle horse that walks the hills")
     assert asked.status_code == 202
     draft = asked.json()
-    assert "references" not in draft
+    assert "references" not in draft and "look_job" not in draft
     assert (draft["profile"], draft["status"], draft["kind"]) == (
         "exulanica.creature-draft/v1",
         "queued",
@@ -135,6 +137,15 @@ def test_asking_queues_a_draft_that_is_kept_and_served(served):
     look = _get(client, f"/things/looks/{kept['look']['sha256']}")
     assert look.status_code == 200 and look.json()["look"] == kept["look"]["look"]
     assert _get(client, f"/things/kinds/{kept['kind']['sha256']}").status_code == 200
+    # Kept, the creature's made look was asked for the requester: the draft names the job as the
+    # look route answers it, queued, spending nothing until an operator's run makes it.
+    asked_look = kept["look_job"]
+    assert (asked_look["profile"], asked_look["status"], asked_look["kind_sha256"]) == (
+        "exulanica.creature-look/v1",
+        "queued",
+        kept["kind"]["sha256"],
+    )
+    assert _get(client, f"/things/creatures/looks/{asked_look['look_id']}").json() == asked_look
 
 
 def test_reference_identity_is_opt_in_and_only_the_requester_reads_its_use(served):
@@ -170,8 +181,13 @@ def test_reference_identity_is_opt_in_and_only_the_requester_reads_its_use(serve
         ).run_once(workspace_id)
         == "kept"
     )
-    used = _get(client, path).json()["references"]
+    kept = _get(client, path).json()
+    used = kept["references"]
     assert used["state"] == "used" and used["reference_id"] == str(reference_id)
+    # Words conditioned on a reference may carry what notes read from a picture: no look is asked.
+    assert kept["status"] == "kept" and "look_job" not in kept
+    with database.session(workspace_id) as connection:
+        assert connection.execute("select count(*) as n from creature_look").fetchone()["n"] == 0
     assert used["basis"] == ["web_description"] and used["notes"] == 3
 
 
@@ -194,6 +210,8 @@ def test_a_kept_draft_reads_as_erased_once_its_creature_is_erased(served):
         None,
         None,
     )
+    # Its look job went with it.
+    assert "look_job" not in after
 
 
 def test_a_kept_draft_reads_as_erased_once_nothing_holds_its_kind(served, repository):

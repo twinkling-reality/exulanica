@@ -6,7 +6,9 @@ with a draft (``exulanica.creature-draft/v1``) that a worker in this process pla
 every check a thing passes, and keeps one that passes in the workspace's own store, its sketch its
 first look. ``GET /things/creatures/drafts/{draft_id}`` answers the draft as it goes: ``queued`` and
 ``running``; ``kept``, naming the kind made and its sketch by digest (served by
-:mod:`exulanica.api.routes.thing_store`) and the model that drafted it; ``erased``, a kept draft
+:mod:`exulanica.api.routes.thing_store`), the model that drafted it and, once one is asked, its
+creature's newest look job (``look_job``, as ``GET /things/creatures/looks/{look_id}`` answers it):
+a draft from words alone asks its creature's made look as it keeps it; ``erased``, a kept draft
 whose creature the workspace has erased since; ``refused``, with the check's code, the field of the
 drafter's form it refused and the code's fixed sentence; ``failed``, with why by code; or
 ``cancelled``, ended by its workspace's erasure (``workspace_deleted``).
@@ -127,6 +129,10 @@ def _view(connection: Any, workspace_id: uuid.UUID, draft: drafts.CreatureDraft)
         "started_at": None if draft.started_at is None else draft.started_at.isoformat(),
         "finished_at": None if draft.finished_at is None else draft.finished_at.isoformat(),
     }
+    if kind is not None:
+        asked = look_jobs.newest_look(connection, workspace_id, draft.kind_sha256)
+        if asked is not None:
+            view["look_job"] = _look_view(asked)
     if draft.reference_id is not None:
         view["references"] = {
             "reference_id": str(draft.reference_id),

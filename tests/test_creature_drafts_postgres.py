@@ -9,6 +9,9 @@ replies scripted (no network, no key, no money):
 *   a creature the checks refuse twice is refused by the check's code and the form's field, and a
     person reads the code's fixed sentence (an unbuilt movement in the grammar's own sentence),
     never the check's, which may quote the label; nothing is kept;
+*   a kept draft asks its creature's made look for the draft's owner, a queued job that calls no
+    model; an owner at their look limits keeps the creature with no job, and a refused draft asks
+    nothing;
 *   a drafter that does not answer fails the draft by name;
 *   a draft is queued only for a workspace a worker here serves, one open at a time for one
     requester, and is read by its requester alone;
@@ -44,6 +47,7 @@ from exulanica.models.transport import HttpResponse
 from exulanica.selection import creature_drafts as drafts
 from exulanica.selection.creature_drafting import CHECK_SENTENCES, NOT_DRAFTED_SENTENCE
 from exulanica.store.configured import local_content_stores
+from exulanica.world import creature_look_jobs as look_jobs
 from exulanica.world.thing_store import ThingStore
 
 from conftest import scratch_role_database
@@ -164,6 +168,48 @@ def test_a_draft_is_queued_played_and_kept_with_no_word_left_on_it(served):
         assert job["state"] == "done"
 
 
+def _look_jobs(connection) -> int:
+    return connection.execute("select count(*) as n from creature_look").fetchone()["n"]
+
+
+def test_a_kept_draft_asks_its_creature_s_made_look_for_its_owner(served):
+    database, workspace_id, stores = served
+    actor = uuid.uuid4()
+    with database.session(workspace_id) as connection:
+        _queue(connection, workspace_id, actor)
+    transport = _transport(form_of("horse", label="hill walker"))
+    assert _worker(database, workspace_id, stores, transport).run_once(workspace_id) == "kept"
+    with database.session(workspace_id) as connection:
+        kind = ThingStore(connection, workspace_id, None).kind("hill_walker", 1)
+        assert kind is not None
+        asked = look_jobs.newest_look(connection, workspace_id, kind.sha256)
+        assert asked is not None and _look_jobs(connection) == 1
+        assert (asked.status, asked.requested_by, asked.run_id, asked.cost_usd) == (
+            "queued",
+            actor,
+            None,
+            None,
+        )
+    # The drafter's one call is the only one: a queued look job calls no model and spends nothing.
+    assert transport.call_count == 1
+
+
+def test_an_owner_at_their_look_limits_keeps_the_creature_with_no_look_asked(served, monkeypatch):
+    database, workspace_id, stores = served
+    monkeypatch.setattr(look_jobs, "MAX_OPEN_PER_ACTOR", 0)
+    with database.session(workspace_id) as connection:
+        queued = _queue(connection, workspace_id, uuid.uuid4())
+    form = form_of("horse", label="hill walker")
+    assert _worker(database, workspace_id, stores, _transport(form)).run_once(workspace_id) == (
+        "kept"
+    )
+    with database.session(workspace_id) as connection:
+        kept = drafts.read_draft(connection, workspace_id, queued.draft_id)
+        assert kept is not None and kept.status == "kept" and kept.kind_sha256 is not None
+        assert look_jobs.newest_look(connection, workspace_id, kept.kind_sha256) is None
+        assert _look_jobs(connection) == 0
+
+
 def test_a_creature_the_checks_refuse_twice_is_refused_by_code_and_field(served):
     database, workspace_id, stores = served
     actor = uuid.uuid4()
@@ -183,6 +229,7 @@ def test_a_creature_the_checks_refuse_twice_is_refused_by_code_and_field(served)
         assert (
             connection.execute("select count(*) as n from thing_kind_version").fetchone()["n"] == 0
         )
+        assert _look_jobs(connection) == 0
         assert _payload(connection, queued) == {"draft_id": str(queued.draft_id)}
     # A person reads the grammar's own sentence for the movement, not one the check built.
     assert drafts.refusal_sentence(refused.refusal_code, refused.refusal_field) == (

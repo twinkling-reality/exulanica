@@ -37,6 +37,14 @@ once that tombstone is written (:func:`create_draft`). A worker that drafted for
 reads that its claim is gone and keeps nothing; a call it already sent finishes at the provider, and
 its answer is discarded.
 
+A draft that keeps its creature then asks for that creature's made look in its owner's name
+(:func:`exulanica.world.creature_look_jobs.ask_on_keep`), so a made look is the default way a kept
+creature looks: a queued look job spends nothing, an operator's run makes it, and the creature wears
+its sketch until then. The draft has ended ``kept`` before the ask, which never undoes it: an owner
+at their look limits, a workspace being erased or a creature erased since asks nothing. A draft
+conditioned on a reference asks nothing here, as its words may carry what notes read from a picture;
+its owner may still ask for the look.
+
 An optional reference ID is kept on the draft, never as copied note text in its job. Only the
 requester's completed or partial web notes for things may condition the draft. Usage distinguishes
 a response to that request, possible delivery without a response, and known non-delivery; neither
@@ -88,6 +96,7 @@ from exulanica.selection.creature_drafting import (
 from exulanica.store.base import ContentAddressedStore
 from exulanica.things.bodies import body_grammar
 from exulanica.things.lines import check_line
+from exulanica.world.creature_look_jobs import ask_on_keep
 from exulanica.world.thing_store import STORE_CODES, ThingStore, ThingStoreRefused
 from exulanica.world.workspace_lock import lock_workspace
 
@@ -997,4 +1006,19 @@ class CreatureDraftWorker:
                 failure=failure,
                 model_id=model_id,
             )
+        if (
+            finished
+            and status == "kept"
+            and kind_sha256 is not None
+            and claimed.draft.reference_id is None
+        ):
+            # The draft has ended kept: its creature's made look is asked for its owner, and
+            # an ask refused leaves the creature kept in its sketch.
+            with self._database.session(workspace_id) as connection:
+                ask_on_keep(
+                    connection,
+                    workspace_id,
+                    kind_sha256=kind_sha256,
+                    requested_by=claimed.draft.owner_actor_id,
+                )
         return status if finished else "lost"
