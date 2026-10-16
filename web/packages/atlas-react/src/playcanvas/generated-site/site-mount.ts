@@ -53,7 +53,7 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * disposer, which runs before the slots are taken away and puts back everything it changed. It
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
-export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null; readonly volumeLook?: (topLook: string | null) => pc.Material | null };
+export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void; readonly landWater?: (body: LandWater) => pc.Material | null; readonly landGround?: readonly [number, number, number]; readonly volumeLook?: (topLook: string | null) => pc.Material | null };
 export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment, land?: SiteLand) => SiteUndress;
 
 export interface SiteMountOptions {
@@ -242,6 +242,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       }
       // The land's sea and lakes in the look's water, as the dresser makes it; plain where it makes none.
       if (drawnLand !== null && undress?.landWater !== undefined) drawnLand.wearWater(undress.landWater);
+      // The backdrop over the colour the pack states for the ground the near land wears, so the two
+      // meet in one colour at the near land's edge.
+      if (drawnLand !== null && undress?.landGround !== undefined) drawnLand.colourBackdrop(undress.landGround);
       // Each volume in the look's rock with its upward faces in its top look, as the dresser makes
       // them; the engine's rock where it makes none.
       const volumeLook = undress?.volumeLook;

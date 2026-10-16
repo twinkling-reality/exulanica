@@ -8,6 +8,7 @@ import {
 import { growLandCover } from './land-cover.js';
 import type { StructuredSiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import { baseGroundSlot, type SiteDresser } from '../generated-site/site-mount.js';
+import { linearRgb } from './preset-look.js';
 import { SCENERY_STONES, SCENERY_TREES } from '../generated-site/site-scenery.js';
 import { attachTileInk } from '../generated-tile/ink.js';
 import type { RenderShading } from '../generated-tile/look.js';
@@ -588,6 +589,12 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish, { ripples: body.kind === 'pool', role: `water.${body.kind}` });
       if (!byDepth && finish !== null && applySeaFinish(device, material, finish)) water.animate(material);
     }
+    // The colour the pack states for the ground a site on land's near land wears, which its backdrop
+    // is coloured over (`landGround`): its up swatch where it states one, which faces the sky as the
+    // land does. A texture states no colour, and the backdrop keeps the one it was drawn over.
+    const baseDressing = land === undefined || baseSlot === null ? null : resolve(baseSlot);
+    const landGround = baseDressing?.kind === 'material' ? baseDressing.material.swatch.srgb8
+      : baseDressing?.kind === 'surface' && baseDressing.swatch !== null ? (baseDressing.up ?? baseDressing.swatch).srgb8 : null;
 
     // Where the site's waters are, from the engine's bounds of their planes as drawn (before any border
     // grows them), for the wet ground beside them and their own shallow edges; and the reflection in
@@ -801,6 +808,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       seatTriangles,
       animating: water.animating || (wind?.animating ?? false),
       landWater: (body: LandWater): pc.Material | null => landWaters.get(body.id) ?? null,
+      ...(landGround === null ? {} : { landGround: linearRgb(landGround) }),
       volumeLook,
       dressBeyond(instance: pc.MeshInstance, slot: SiteSlot): void {
         const resolved = catalog === null

@@ -322,6 +322,12 @@ export interface DrawnSiteLand {
    * caller's.
    */
   wearWater(material: (body: LandWater) => pc.Material | null): void;
+  /**
+   * Colour the backdrop over `ground`, linear RGB: the colour the near land wears once a pack
+   * dresses it, with the land's surfaces over it as before. Null colours it over the ground it was
+   * drawn over.
+   */
+  colourBackdrop(ground: Rgb | null): void;
   destroy(): void;
 }
 
@@ -404,8 +410,21 @@ export function drawSiteLand(
     add(`site-land:chunk:${chunk.chunkX}:${chunk.chunkY}`, [near], true);
   }
   // The backdrop: coloured by vertex, linear, by the land's surfaces over its ground, since it is
-  // drawn only and never dressed.
+  // drawn only and never dressed; a dresser hands it the colour the near land wears instead.
   const groundLinear = [linear(groundRgb[0]), linear(groundRgb[1]), linear(groundRgb[2])] as const;
+  const colouredOver = (ground: Rgb, positions: readonly number[], normals: readonly number[]): number[] => {
+    const colours: number[] = [];
+    for (let v = 0; v < positions.length; v += 3) {
+      if (surfaces === null) { colours.push(...ground, 1); continue; }
+      const x = positions[v]!, z = positions[v + 2]!;
+      const up = Math.min(1, Math.max(0.02, Math.abs(normals[v + 1]!)));
+      const slopePermille = Math.sqrt(Math.max(0, 1 - up * up)) / up * 1000;
+      const { broadM, fineM, fineShare } = surfaces.noise;
+      const shift = (2 * valueNoise(x / broadM, z / broadM) - 1) * (1 - fineShare) + (2 * valueNoise(x / fineM + 17, z / fineM + 3) - 1) * fineShare;
+      colours.push(...landBackdropColour(surfaces, ground, slopePermille, positions[v + 1]! * 1000, shift, sea), 1);
+    }
+    return colours;
+  };
   const far = new pc.StandardMaterial();
   far.name = 'site-land:backdrop';
   far.diffuse = new pc.Color(1, 1, 1);
@@ -417,27 +436,19 @@ export function drawSiteLand(
   made.push(far);
   let reach = 0;
   const blocks: pc.MeshInstance[] = [];
+  const backdrop: { readonly mesh: pc.Mesh; readonly positions: number[]; readonly normals: number[] }[] = [];
   for (const block of backdropMeshData(land.backdrop, { blocks: 4 })) {
     const positions = Array.from(block.positions), indices = Array.from(block.indices);
     const normals = pc.calculateNormals(positions, indices);
-    const colours: number[] = [];
-    for (let v = 0; v < positions.length; v += 3) {
-      const x = positions[v]!, z = positions[v + 2]!;
-      reach = Math.max(reach, Math.hypot(x, z));
-      if (surfaces === null) { colours.push(...groundLinear, 1); continue; }
-      const up = Math.min(1, Math.max(0.02, Math.abs(normals[v + 1]!)));
-      const slopePermille = Math.sqrt(Math.max(0, 1 - up * up)) / up * 1000;
-      const { broadM, fineM, fineShare } = surfaces.noise;
-      const shift = (2 * valueNoise(x / broadM, z / broadM) - 1) * (1 - fineShare) + (2 * valueNoise(x / fineM + 17, z / fineM + 3) - 1) * fineShare;
-      colours.push(...landBackdropColour(surfaces, groundLinear, slopePermille, positions[v + 1]! * 1000, shift, sea), 1);
-    }
+    for (let v = 0; v < positions.length; v += 3) reach = Math.max(reach, Math.hypot(positions[v]!, positions[v + 2]!));
     const mesh = new pc.Mesh(device);
     mesh.setPositions(positions);
     mesh.setNormals(normals);
-    mesh.setColors(colours);
+    mesh.setColors(colouredOver(groundLinear, positions, normals));
     mesh.setIndices(indices);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
     meshes.push(mesh);
+    backdrop.push({ mesh, positions, normals });
     blocks.push(new pc.MeshInstance(mesh, far));
     triangles += indices.length / 3;
   }
@@ -477,6 +488,13 @@ export function drawSiteLand(
     water: waters,
     wearWater(material: (body: LandWater) => pc.Material | null): void {
       for (const one of waters) one.instance.material = material(one.body) ?? water;
+    },
+    colourBackdrop(over: Rgb | null): void {
+      if (destroyed) return;
+      for (const block of backdrop) {
+        block.mesh.setColors(colouredOver(over ?? groundLinear, block.positions, block.normals));
+        block.mesh.update(pc.PRIMITIVE_TRIANGLES);
+      }
     },
     destroy(): void {
       if (destroyed) return;
