@@ -20,6 +20,7 @@ np = pytest.importorskip(
     "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
 )
 from exulanica.world.style_pack_pieces import (  # noqa: E402
+    PieceOutOfBounds,
     check_piece_profile,
     hold_pieces,
     read_textured_piece,
@@ -111,6 +112,66 @@ def test_the_same_row_makes_the_same_bytes(made):
     again = _tree(made, "olive", 6000, 41)
     assert (first.lod0, first.lod1, first.receipt) == (again.lod0, again.lod1, again.receipt)
     assert _tree(made, "olive", 6000, 42).lod0 != first.lod0
+
+
+def _pictures(data: bytes) -> tuple[str, ...]:
+    """The digests of the pictures a piece embeds, as the pack's count reads them."""
+    return check_piece_profile(data).image_sha256
+
+
+def _hold(grown: list[tree_maker.MadeTree], textures: int) -> dict[str, int]:
+    """Trees as one role's variants, each with its second level, held as a pack holds them beside
+    ``textures`` texture pictures of their own."""
+    pieces, files = {}, {}
+    for index, tree in enumerate(grown):
+        first, far = f"pieces/tree-{index}.glb", f"pieces/tree-{index}-far.glb"
+        variant = {
+            "file": first,
+            "lod1": far,
+            "size_mm": list(tree.size_mm),
+            "stretch_mm": [None, None, None],
+        }
+        pieces |= {first: ("plant", variant, False), far: ("plant", variant, True)}
+        files |= {first: tree.lod0, far: tree.lod1}
+    return hold_pieces(
+        pieces,
+        files.__getitem__,
+        BUDGETS.families,
+        BUDGETS.lod1_share_permille,
+        [f"{k:064x}" for k in range(textures)],
+    )
+
+
+def test_a_species_variants_carry_its_pictures_and_their_own_branches(made):
+    first, second = (_tree(made, "olive", 6000, seed) for seed in (41, 42))
+    for level in ("lod0", "lod1"):
+        a, b = getattr(first, level), getattr(second, level)
+        # Bark, its normal map and the leaf sheet: the same three for every olive.
+        assert _pictures(a) == _pictures(b) and len(set(_pictures(a))) == 3
+        assert a != b
+    assert [lod["pictures_sha256"] for lod in first.receipt["lods"]] == [
+        list(_pictures(first.lod0)),
+        list(_pictures(first.lod1)),
+    ]
+
+
+def test_two_species_carry_leaves_of_their_own(made):
+    olive, pine = (_tree(made, name, 6000, 41) for name in ("olive", "stone_pine"))
+    for level in ("lod0", "lod1"):
+        # The leaf sheet is each species' own; the tests' scans give every bark one picture.
+        assert _pictures(getattr(olive, level))[2] != _pictures(getattr(pine, level))[2]
+
+
+def test_a_species_several_variants_count_in_a_pack_as_one_variant_does(made):
+    one = [_tree(made, "olive", 6000, 51)]
+    three = one + [_tree(made, "olive", 6000, seed) for seed in (52, 53)]
+    room = 64 - len(set(_pictures(one[0].lod0) + _pictures(one[0].lod1)))
+    # One variant's pictures beside textures up to the bound fill the count, and so do three's.
+    assert _hold(one, room) and _hold(three, room)
+    for grown in (one, three):
+        with pytest.raises(PieceOutOfBounds) as over:
+            _hold(grown, room + 1)
+        assert str(over.value) == "files: draws with 65 pictures; at most 64"
 
 
 @pytest.mark.parametrize("species", ["broad_canopy", "italian_cypress", "fan_palm", "oleander"])

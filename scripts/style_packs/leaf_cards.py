@@ -2,7 +2,9 @@
 
 A card is a square RGBA picture whose stem starts at its bottom centre and grows up, so a tree's leaf
 quad, rooted on a branch, shows a twig rooted there. A sheet is a 2 by 2 grid of four cards of one
-recipe drawn from four seeds, so one tree varies its cards without another texture.
+recipe drawn from four seeds, so one plant varies its cards without another texture. A species
+draws its sheet from its recipe's own seed (``sheet_seed``), not a plant's, so every plant of one
+species carries the same sheet and a pack counts it once.
 
 A scan is a colour picture and an opacity picture of single leaves on nothing (a CC0 leaf set). The
 leaves are found by cutting the opacity along empty rows and columns, as many times as it takes;
@@ -15,6 +17,8 @@ Tooling only: numpy and Pillow, which the product's runtime does not need.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,7 +27,7 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageDraw
 
-__all__ = ["FORMS", "Leaf", "Rng", "compose_sheet", "load_leaves", "palette_png"]
+__all__ = ["FORMS", "Leaf", "Rng", "compose_sheet", "load_leaves", "palette_png", "sheet_seed"]
 
 #: How a card lays its leaves out.
 FORMS = ("twig", "tuft", "spray", "fan")
@@ -274,6 +278,13 @@ def compose_sheet(recipe: dict[str, Any], leaves: list[Leaf], size: int, seed: i
             compose_card(recipe, leaves, half, seed * 7 + k), ((k % 2) * half, (k // 2) * half)
         )
     return _bleed(sheet)
+
+
+def sheet_seed(card: dict[str, Any]) -> int:
+    """The seed a species' leaf sheet is drawn from: its card recipe's, read from the recipe's
+    canonical JSON, so a recipe always draws one sheet."""
+    canonical = json.dumps(card, sort_keys=True, separators=(",", ":")).encode()
+    return int.from_bytes(hashlib.sha256(canonical).digest()[:4], "big") & 0x7FFFFFFF
 
 
 def palette_png(image: Image.Image) -> bytes:

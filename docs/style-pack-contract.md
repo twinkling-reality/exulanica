@@ -465,7 +465,10 @@ grown to the box's proportions, never stretched to them; a crown that cannot be 
 cards is made at its narrowest and its receipt says how wide. Leaf cards are composed from scanned
 single leaves (`leaf_cards.py`) and the bark is a scanned bark; the scans are not in this repository,
 and the maker reads them from the folder `--sources` names, each held to the digest the catalog
-states, so a catalog, its scans and a row make the same bytes. Rows of one role become that role's
+states, so a catalog, its scans and a row make the same bytes. A tree's pictures are its species'
+alone (the leaf sheet drawn from the species' card recipe, the bark from its scan), so every variant
+of one species carries the same pictures and a pack counts them once (section 5), while its branches
+and cards follow its seed. Rows of one role become that role's
 variants, at most eight; what made each tree is written beside the packs (`<pack id>.trees.json`).
 `tests/test_tree_maker.py` makes trees from synthetic scans and holds them to the plant budget,
 both readers' rules and their boxes.

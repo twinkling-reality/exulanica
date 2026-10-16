@@ -32,7 +32,7 @@ import numpy as np
 from PIL import Image
 
 from scripts.style_packs import tree_maker
-from scripts.style_packs.leaf_cards import Rng, compose_sheet, palette_png
+from scripts.style_packs.leaf_cards import Rng, compose_sheet, palette_png, sheet_seed
 from scripts.style_packs.textured_glb import Material, Primitive, write_textured_glb
 
 PROFILE: Final = "exulanica.creeper-species/v1"
@@ -291,13 +291,6 @@ def _mesh(
         )
 
     return arrays(s_pos, s_nrm, s_uv, s_idx), arrays(c_pos, c_nrm, c_uv, c_idx)
-
-
-def sheet_seed(card: dict[str, Any]) -> int:
-    """The seed a species' leaf sheet is drawn from: its card recipe's, read from the recipe's
-    canonical JSON, so a recipe always draws one sheet."""
-    canonical = json.dumps(card, sort_keys=True, separators=(",", ":")).encode()
-    return int.from_bytes(hashlib.sha256(canonical).digest()[:4], "big") & 0x7FFFFFFF
 
 
 def _jpeg(image: Image.Image, quality: int) -> bytes:

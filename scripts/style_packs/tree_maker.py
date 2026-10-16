@@ -17,7 +17,10 @@ whole so its height is the one asked. Its second level is held inside the first 
 a scanned bark (``sources.barks``), leaves are cards composed by ``leaf_cards.py`` from scanned single
 leaves (``sources.leaves``); every source file is read from ``--sources`` and held to the digest the
 catalog states before it is used, so the same catalog, sources and row give the same bytes. A
-receipt records what made each tree. The pieces are textured pieces as
+tree's pictures are its species' alone: the leaf sheet is drawn from the species' card recipe, not
+the tree's seed, and the bark from its scan, so every tree of one species carries the same pictures
+and a pack counts them once (``docs/style-pack-contract.md``, section 5), while its branches and
+cards follow its seed. A receipt records what made each tree, each level's pictures among it. The pieces are textured pieces as
 ``docs/style-pack-contract.md`` (section 4.1) states, written by ``textured_glb.py``.
 
 Tooling only: numpy and Pillow, which the product's runtime does not need.
@@ -40,7 +43,15 @@ from PIL import Image
 
 ROOT: Final = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from scripts.style_packs.leaf_cards import FORMS, Leaf, Rng, compose_sheet, load_leaves, palette_png  # noqa: E402
+from scripts.style_packs.leaf_cards import (  # noqa: E402
+    FORMS,
+    Leaf,
+    Rng,
+    compose_sheet,
+    load_leaves,
+    palette_png,
+    sheet_seed,
+)
 from scripts.style_packs.textured_glb import Material, Primitive, write_textured_glb  # noqa: E402
 
 __all__ = [
@@ -53,7 +64,9 @@ __all__ = [
     "read_catalog",
 ]
 
-MAKER: Final = "exulanica.tree-maker/1"
+#: Version 2 draws a species' leaf sheet from its card recipe (version 1 drew it from each tree's
+#: seed), so a row made by either keeps its receipt's word for what made it.
+MAKER: Final = "exulanica.tree-maker/2"
 PROFILE: Final = "exulanica.tree-species/v1"
 CATALOG: Final = Path("assets/style-packs/makers/tree-species.v1.json")
 
@@ -734,9 +747,12 @@ def make_tree(
     bark_source = catalog["sources"]["barks"][grown["bark"]]
     bark_colour = Image.open(sources.path(bark_source["colour"]))
     bark_normal = Image.open(sources.path(bark_source["normal"]))
-    sheet = compose_sheet(grown["card"], sources.leaves(grown["card"]["source"]), 512, seed)
+    # The species' sheet, not this tree's: every tree of one species carries the same pictures.
+    sheet = compose_sheet(
+        grown["card"], sources.leaves(grown["card"]["source"]), 512, sheet_seed(grown["card"])
+    )
     tint = grown.get("bark_tint", [1.0, 1.0, 1.0])
-    out: list[tuple[bytes, list[int], int]] = []
+    out: list[tuple[bytes, list[int], int, list[str]]] = []
     for level, (bark, leaves) in zip(("lod0", "lod1"), meshes, strict=True):
         sides = textures[level]
         bark_px = tuple(sides["bark_px"])
@@ -774,7 +790,14 @@ def make_tree(
             math.ceil(2 * float(np.abs(points[:, 2]).max()) * 1000),
             math.ceil(float(points[:, 1].max()) * 1000),
         ]
-        out.append((glb, size, sum(len(p.indices) // 3 for p in primitives)))
+        # The level's pictures in the order the piece embeds them: each material's colour, then its normal map.
+        pictures = [
+            hashlib.sha256(image).hexdigest()
+            for m in materials
+            for image in (m.colour_image, m.normal_image)
+            if image is not None
+        ]
+        out.append((glb, size, sum(len(p.indices) // 3 for p in primitives), pictures))
     canonical = json.dumps(species, sort_keys=True, separators=(",", ":")).encode()
     receipt = {
         "maker": MAKER,
@@ -785,14 +808,16 @@ def make_tree(
         "seed": seed,
         "spread": round(spread, 6),
         "sources": dict(sorted(sources.read.items())),
+        # Each level's pictures (bark, its normal map, leaves), the species' alone: a pack counts them once.
         "lods": [
             {
                 "sha256": hashlib.sha256(glb).hexdigest(),
                 "bytes": len(glb),
                 "size_mm": size,
                 "triangles": triangles,
+                "pictures_sha256": pictures,
             }
-            for glb, size, triangles in out
+            for glb, size, triangles, pictures in out
         ],
     }
     size_mm = tuple(out[0][1])
