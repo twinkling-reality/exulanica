@@ -1105,11 +1105,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     build: build ? { undo: () => build.undo(), redo: () => build.redo() } : null,
     // Made creatures by their labels (J20): build mode's reader where it is mounted, else History's own.
     kindLabels: build?.kindLabels ?? createKindLabels(read, kindDocumentLabel),
-    worldTime(tick) {
+    worldClock(tick) {
       // The society's own first minute, as characterFacts reads it; with no society there is no clock (K5).
       const state = subjectReads.society?.state;
-      return worldTime(tick, state?.start_minute_of_day ?? state?.clock?.start_minute_of_day ?? null)?.hhmm ?? null;
+      return worldTime(tick, state?.start_minute_of_day ?? state?.clock?.start_minute_of_day ?? null);
     },
+    // The world's minute now, as the clock corner reads it, for Now where the moments read did not answer.
+    worldNow: () => selection.people?.clock().minute ?? null,
     open: (url) => { window.open(url, '_blank', 'noopener'); },
     closed() {
       otherPage = null;

@@ -449,3 +449,57 @@ export function keyAction(state, event) {
   if (event.code === 'Enter') return state.confirming ? 'confirm' : held ? (state.ready ? 'place' : 'held') : null;
   return null;
 }
+
+/**
+ * What an edit of the world's log did, as parts, for pages that word changes in their own forms (History's "You
+ * placed the bench"): `form` with what it names, read exactly as changeWords reads the edit (its kind, the thing by
+ * `nameOf(thingId)` or the made part by `partNameOf(partId)`, an undo by what it took back, a redo, an undo of an
+ * undo, as `{ form: 'again', again }`). Forms: placed, moved, removed, storeys_set, storeys_raised, storeys_lowered,
+ * placed_object, moved_object, removed_object, changed_object, changed_world, undid, did_again, brought_back,
+ * back_where_it_was, took_away, back_to_made_storeys, back_to_storeys.
+ */
+export function changeParts(edit, edits, nameOf, partNameOf = () => null) {
+  const byId = new Map(edits.map(each => [each.edit_id, each]));
+  const isPart = (one) => typeof one.element_id === 'string' && one.element_id.startsWith('part:');
+  const called = (one) => {
+    if (isPart(one)) return partCalled(one.element_id.slice('part:'.length), partNameOf);
+    const name = one.thing_id ? nameOf(one.thing_id) : null;
+    return name ? `the ${name}` : 'a thing';
+  };
+  const storeys = (one) => (Number.isInteger(one.storeys?.after) ? one.storeys : null);
+  const plain = (one) => {
+    if (isPart(one)) {
+      if (one.kind === 'suppress_element') return { form: 'removed', what: called(one) };
+      if (one.kind === 'transform_element' && storeys(one) !== null) {
+        const { before = null, after } = storeys(one);
+        if (before === null) return { form: 'storeys_set', what: called(one), after };
+        return { form: after > before ? 'storeys_raised' : 'storeys_lowered', what: called(one), before, after };
+      }
+      if (one.kind === 'transform_element') return { form: 'moved', what: called(one) };
+    }
+    const what = called(one);
+    if (one.kind === 'add_thing') return { form: 'placed', what };
+    if (one.kind === 'move_thing') return { form: 'moved', what };
+    if (one.kind === 'remove_thing') return { form: 'removed', what };
+    if (/_object$/.test(one.kind)) {
+      return { form: one.kind.startsWith('add') ? 'placed_object' : one.kind.startsWith('move') ? 'moved_object' : one.kind.startsWith('remove') ? 'removed_object' : 'changed_object' };
+    }
+    return { form: 'changed_world' };
+  };
+  if (edit.kind !== 'undo') return plain(edit);
+  const undone = byId.get(edit.undone_edit_id);
+  if (!undone) return { form: 'undid' };
+  if (undone.kind === 'undo') {
+    const again = byId.get(undone.undone_edit_id);
+    return again ? { form: 'again', again: plain(again) } : { form: 'did_again' };
+  }
+  const what = called(undone);
+  if (isPart(undone) && storeys(undone) !== null) {
+    const back = storeys(undone).before ?? null;
+    return back === null ? { form: 'back_to_made_storeys', what } : { form: 'back_to_storeys', what, before: back };
+  }
+  if (undone.kind === 'remove_thing' || undone.kind === 'suppress_element') return { form: 'brought_back', what };
+  if (undone.kind === 'move_thing' || undone.kind === 'transform_element') return { form: 'back_where_it_was', what };
+  if (undone.kind === 'add_thing') return { form: 'took_away', what };
+  return { form: 'undid' };
+}

@@ -1,32 +1,42 @@
-// History's words (DESIGN's WORDS.md: frame 23, rulings H1 to H4 and W2): every string the page
-// shows, made from what the server served. Money and time in WORDS.md's forms; a character by
-// its name, never "it".
+// History's words (r23, the user's yes on 16 October; DESIGN's R23 build sheet, amended 08:36): every string the
+// page shows, made from what the server served. The words of what happened are JOURNEY's catalog
+// (journey-2026-10-14/HISTORY-MOMENTS-R1.md section 6, the sheet's section 9); the person's own changes are build
+// mode's sentence kinds in History's "You" forms; money and time in WORDS.md's forms. A character by its name,
+// never "it"; never a topic, a summary of a line, "simulated", or counts or money on a moment.
 
 import { HISTORY } from './build-words.mjs';
 
-export const HISTORY_WORDS = Object.freeze({
-  title: HISTORY.title,
-  today: HISTORY.today,
-  yesterday: 'Yesterday',
-  empty: HISTORY.empty,
-  loading: 'Reading what changed…',
-  whatHappened: 'What happened',
-  onGitHub: 'On GitHub',
+export const PATH_WORDS = Object.freeze({
+  history: 'History',
+  madeFromWords: 'Made from your words',
+  blankWorld: 'Started from a blank world',
   now: 'Now',
+  personPlaying: 'By a person playing',
+  outsideProgram: 'By an outside program',
   earlierLater: 'Earlier, later',
-  undo: 'Undo',
-  openOnGitHub: 'Open on GitHub',
+  openMoment: 'Open this moment',
   back: 'Back',
-  tryAgain: 'Try again',
-  worldOffline: 'This world could not be read. Try again.',
-  githubOffline: 'GitHub could not be reached. Your changes are kept here and sent when it answers.',
-  notLinked: 'not linked to GitHub',
-  upToDate: 'up to date',
-  paused: 'sending to GitHub is paused',
-  notSent: 'Not sent to GitHub yet',
-  notKept: 'Not kept in the project yet: it is kept once the changes stop.',
-  sent: 'Sent to GitHub',
-  routine: 'Routine',
+  openOnGitHub: 'Open on GitHub',
+  chooseLine: 'Choose a line',
+  seeDecision: 'See the decision',
+  backToStory: 'Back to the story',
+  askedAgain: 'Asked again',
+  nothingYet: 'Nothing has happened here yet.',
+  momentsFailed: "The world's moments could not be read. Try again.",
+});
+
+/** The head's GitHub line (sheet section 2): `words`, and whether it is a refusal (drawn in refusal ink). */
+export const HEAD_WORDS = Object.freeze({
+  noProject: 'Not kept in a project',
+  localProject: 'Kept in a project on this computer, not on GitHub',
+  starting: 'Starting a project…',
+  unreachable: 'GitHub could not be reached. Your changes are kept here and sent when it answers.',
+  refusals: Object.freeze({
+    nothing_to_keep: 'Nothing to keep in a project yet: change something first.',
+    world_unreadable: 'Not kept: the world could not be read. Try again.',
+    too_many_projects: 'Not kept: this computer keeps as many projects as it can.',
+    failed: 'Not kept: the project could not be started. Try again.',
+  }),
 });
 
 const MONTHS = Object.freeze(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
@@ -40,12 +50,6 @@ export function money(usd) {
   return value >= 0.01 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 }
 
-/** A cost on a row: only money that was spent. */
-export function cost(usd) {
-  const value = Number(usd);
-  return Number.isFinite(value) && value > 0 ? money(value) : '';
-}
-
 export function plural(count, noun, many) {
   return count === 1 ? `${count} ${noun}` : `${count} ${many ?? `${noun}s`}`;
 }
@@ -54,10 +58,23 @@ export function possessive(name) {
   return `${name}'s`;
 }
 
+// -- Model names: a sentence holding one is a list of parts, plain text and `{ model }`, so the page keeps the
+// name on one line wherever it falls (sheet section 6: a model's name never breaks).
+
+/** A model's name inside a sentence's parts. */
+export const modelPart = (name) => Object.freeze({ model: name });
+
+/** A sentence's parts as plain text: what a reader hears and what the tests read. */
+export function partsText(parts) {
+  return parts.map((part) => (typeof part === 'string' ? part : part.model)).join('');
+}
+
+// -- Time: the world's clock for what the characters did, the person's clock for what the person did (sheet 3).
+
 const pad = (n) => String(n).padStart(2, '0');
 
 /** "09:44", in the reader's own time. */
-export function clockAt(at) {
+function clockAt(at) {
   const date = new Date(at);
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
@@ -66,139 +83,267 @@ function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function dayOf(at, now) {
+/** The day something was done: "Today", "Yesterday", "13 Oct" (H4). */
+export function dayHeading(at, now) {
   const date = new Date(at), today = new Date(now);
-  if (sameDay(date, today)) return 'today';
+  if (sameDay(date, today)) return HISTORY.today;
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (sameDay(date, yesterday)) return 'yesterday';
+  if (sameDay(date, yesterday)) return 'Yesterday';
   return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
-/** The list's day heading: "Today", "Yesterday", "13 Oct" (H3). */
-export function dayHeading(at, now) {
-  const day = dayOf(at, now);
-  if (day === 'today') return HISTORY_WORDS.today;
-  if (day === 'yesterday') return HISTORY_WORDS.yesterday;
-  return day;
+/** When the person did something, in their own time: "Yesterday · 21:40", "13 Oct · 21:40", today "08:30". */
+export function personWhen(at, now) {
+  const heading = dayHeading(at, now);
+  return heading === HISTORY.today ? clockAt(at) : `${heading} · ${clockAt(at)}`;
 }
 
-/** The chosen change's label: "09:44 today", "09:44 yesterday", "09:44, 14 Oct" (H3). */
-export function chosenLabel(at, now) {
-  const day = dayOf(at, now);
-  return day === 'today' || day === 'yesterday' ? `${clockAt(at)} ${day}` : `${clockAt(at)}, ${day}`;
+/** The creation's time, always with its day: "Today · 09:12", "Yesterday · 21:40", "13 Oct · 21:40" (H4). */
+export function creationWhen(at, now) {
+  return `${dayHeading(at, now)} · ${clockAt(at)}`;
 }
 
-/** The repository's name without its owner, as frame 23 writes it. */
-function repositoryName(repository) {
-  return String(repository).split('/').pop();
+/** "06:52 · Day 1" from the world's clock ({hhmm, day}); the time alone where the day is unknown. */
+export function worldWhen(clock) {
+  if (!clock) return null;
+  return clock.day ? `${clock.hhmm} · Day ${clock.day}` : clock.hhmm;
+}
+
+export function spanWhen(from, to) {
+  return from === to ? from : `${from} to ${to}`;
+}
+
+/** Where the world's day changes on the line. */
+export function dayMark(day) {
+  return `Day ${day}`;
+}
+
+// -- What happened (JOURNEY's catalog, the sheet's section 9).
+
+/** Names in a sentence: "Teo", "Teo and Ines", "Teo, Ines and Marco". */
+export function namesWords(names) {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** A place or a thing as the world names it, in a sentence: "bench" is "the bench". */
+export function labelWords(label) {
+  return label ? `the ${label}` : '';
 }
 
 /**
- * The sub-line: the world's title, then where it is kept: "Terraces on the bay · kept in your
- * GitHub project terraces-on-the-bay, private · up to date", or "· not linked to GitHub". Where
- * the projects could not be read (`project` undefined), the title alone: never "not linked" unread.
+ * A moment's title, from its kind: "Teo met Ines at the bench", "Teo talked with Ines", "Teo spoke to Ines" (at
+ * the bench when placed), "Marco asked Teo" when the first line asks, "Teo spoke up at the bench", "Ines went to
+ * the market", "Ines and Teo went to the market" (a follower), "Teo went to rest at the bench", "Ines and Teo went
+ * on" (no nameable target), "Teo followed Ines", "Teo stopped following Ines", "Teo picked up the lantern", "Teo put
+ * down the lantern", "Teo gave Ines the lantern", "Teo took the lantern from Ines", "Teo left" (WORDS.md H14).
+ * `place`, `to` and `thing` are names as the world gives them, or null; `activity` the going's, or null.
  */
-export function subLine(title, project) {
-  if (project === undefined) return title;
-  const parts = [title];
-  if (!project || !project.link) {
-    parts.push(HISTORY_WORDS.notLinked);
-    return parts.join(' · ');
+export function momentWords({ kind, place, to, activity, thing, firstLine }, actor, others) {
+  const at = place ? ` at ${labelWords(place)}` : '';
+  const them = namesWords(others);
+  switch (kind) {
+    case 'met':
+      return `${actor} met ${them}${at}`;
+    case 'talked':
+      return `${actor} talked with ${them}${at}`;
+    case 'spoke':
+      return firstLine && firstLine.trim().endsWith('?') ? `${actor} asked ${them}` : `${actor} spoke to ${them}${at}`;
+    case 'spoke_to_all':
+      return `${actor} spoke up${at}`;
+    case 'went':
+      if (activity === 'rest') return `${namesWords([actor, ...others])} went to rest${to ? ` at ${labelWords(to)}` : ''}`;
+      return to ? `${namesWords([actor, ...others])} went to ${labelWords(to)}` : `${namesWords([actor, ...others])} went on`;
+    case 'followed':
+      return `${actor} followed ${them}`;
+    case 'stopped_following':
+      return `${actor} stopped following ${them}`;
+    case 'picked_up':
+      return thing ? `${actor} picked up ${labelWords(thing)}` : `${actor} picked something up`;
+    case 'put_down':
+      return thing ? `${actor} put down ${labelWords(thing)}` : `${actor} put something down`;
+    case 'gave':
+      return thing ? `${actor} gave ${them} ${labelWords(thing)}` : `${actor} gave ${them} something`;
+    case 'took':
+      return thing ? `${actor} took ${labelWords(thing)} from ${them}` : `${actor} took something from ${them}`;
+    case 'left':
+      return `${actor} left`;
+    default:
+      return namesWords([actor, ...others]);
   }
+}
+
+/**
+ * What another model would have done at the same moment, with no full stop like a card's title (sheet sections
+ * 6 and 9, WORDS.md H14): "Teo would have gone to the market", "… rested at the bench" (a going to rest), "… said
+ * “…” to Ines", "… followed Ines", "… picked up the lantern", "… stood a while", "… waited a minute", "… carried
+ * on as before". `to` and `thing` are names, `withName` the one the answer named, `activity` a going's, or null.
+ */
+export function branchWords({ kind, to, activity, thing, withName, line }, actor) {
+  const would = (rest) => `${actor} would have ${rest}`;
+  switch (kind) {
+    case 'went':
+      if (activity === 'rest') return would(to ? `rested at ${labelWords(to)}` : 'gone to rest');
+      return would(to ? `gone to ${labelWords(to)}` : 'gone on');
+    case 'talked':
+    case 'met':
+      return would(withName ? `talked with ${withName}` : 'talked with someone');
+    case 'spoke':
+      return line ? would(`said “${line}”${withName ? ` to ${withName}` : ''}`) : would(withName ? `spoken to ${withName}` : 'spoken');
+    case 'spoke_to_all':
+      return line ? would(`said “${line}”`) : would('spoken up');
+    case 'followed':
+      return would(withName ? `followed ${withName}` : 'followed someone');
+    case 'stopped_following':
+      return would(withName ? `stopped following ${withName}` : 'stopped following');
+    case 'picked_up':
+      return would(thing ? `picked up ${labelWords(thing)}` : 'picked something up');
+    case 'put_down':
+      return would(thing ? `put down ${labelWords(thing)}` : 'put something down');
+    case 'gave':
+      return would(withName ? `given ${withName} ${thing ? labelWords(thing) : 'something'}` : 'given something away');
+    case 'took':
+      return would(`taken ${thing ? labelWords(thing) : 'something'}${withName ? ` from ${withName}` : ''}`);
+    case 'left':
+      return would('left');
+    case 'waited':
+      return would('waited a minute');
+    case 'stood':
+      return would('stood a while');
+    default:
+      return would('carried on as before');
+  }
+}
+
+/** The branch's head: "Asked again with Qwen3 235B". */
+export function askedAgainParts(modelName) {
+  return ['Asked again with ', modelPart(modelName)];
+}
+
+/** Another model chose what happened: one small line on the card, "Qwen3 235B chose the same". */
+export function sameChoiceParts(modelName) {
+  return [modelPart(modelName), ' chose the same'];
+}
+
+/** One answer in the opened moment: "Qwen3 235B: Teo would have gone to the market", or the same line. */
+export function answerParts(modelName, same, outcome) {
+  return same ? sameChoiceParts(modelName) : [modelPart(modelName), `: ${outcome}`];
+}
+
+/** Who decided, as parts: "By Nemotron 3 Nano 30B", "By a person playing", "By an outside program"; a routine's
+ * moment has none (null). */
+export function byParts(decider) {
+  if (decider?.kind === 'model' && decider.model?.name) return ['By ', modelPart(decider.model.name)];
+  if (decider?.kind === 'person') return [PATH_WORDS.personPlaying];
+  if (decider?.kind === 'external') return [PATH_WORDS.outsideProgram];
+  return null;
+}
+
+/** A line said, its speaker first: "Teo: “Morning, Ines.”" (quoted as said, never edited). */
+export function saidWords(speaker, line) {
+  return `${speaker}: “${line}”`;
+}
+
+/** Lines a card does not show: "3 more lines", "1 more line". */
+export function moreLinesWords(count) {
+  return `${plural(count, 'more line', 'more lines')}`;
+}
+
+// -- The person's own changes (sheet section 7): History's "You" form for each of build mode's sentence kinds
+// (build-words.mjs's changeParts), so no sentence is made by cutting another.
+
+const storeysWords = (count) => `${count} ${count === 1 ? 'storey' : 'storeys'}`;
+
+const YOU_FORMS = Object.freeze({
+  placed: ({ what }) => `You placed ${what}`,
+  moved: ({ what }) => `You moved ${what}`,
+  removed: ({ what }) => `You took out ${what}`,
+  storeys_set: ({ what, after }) => `You set ${what} to ${storeysWords(after)}`,
+  storeys_raised: ({ what, after }) => `You raised ${what} to ${storeysWords(after)}`,
+  storeys_lowered: ({ what, after }) => `You lowered ${what} to ${storeysWords(after)}`,
+  placed_object: () => 'You placed an object',
+  moved_object: () => 'You moved an object',
+  removed_object: () => 'You took out an object',
+  changed_object: () => 'You changed an object',
+  changed_world: () => 'You changed the world',
+  undid: () => 'You undid a change',
+  did_again: () => 'You did a change again',
+  brought_back: ({ what }) => `You brought back ${what}`,
+  back_where_it_was: ({ what }) => `You put ${what} back where it was`,
+  took_away: ({ what }) => `You took away ${what} you had placed`,
+  back_to_made_storeys: ({ what }) => `You put ${what} back to the storeys it was made with`,
+  back_to_storeys: ({ what, before }) => `You put ${what} back to ${storeysWords(before)}`,
+});
+
+/** A change of build mode's, in History's words: "You placed the bench", "You took out the fan palm". */
+export function youChangeWords(parts) {
+  if (parts.form === 'again') return `${youChangeWords(parts.again)} again`;
+  return (YOU_FORMS[parts.form] ?? YOU_FORMS.changed_world)(parts);
+}
+
+/** A personality written, changed or cleared: "You wrote Teo's personality". */
+export function youPersonalityWords(name, change) {
+  const verb = change === 'cleared' ? 'cleared' : change === 'changed' ? 'changed' : 'wrote';
+  return `You ${verb} ${possessive(name)} personality`;
+}
+
+/** A model given, changed or taken away, as parts: "You changed Teo's model to Qwen3 235B" ("… to routine"). */
+export function youModelParts(whose, modelName) {
+  return [`You changed ${whose} to `, modelName ? modelPart(modelName) : 'routine'];
+}
+
+/** Several changes between the same two moments: one dot. */
+export function changesWords(count) {
+  return `You made ${count} changes`;
+}
+
+// -- Runs, the creation, the head.
+
+/**
+ * A run over its moments (sheet section 8): "Teo's and Ines's models were deciding · 06:00 to 07:15 · spent
+ * $0.0042"; one character "Teo's model was deciding"; three or more "3 characters' models were deciding"; while on
+ * "… are deciding · 06:00 to now · 1:52 left"; without the clock "75 minutes of world time · …". `spent: null`
+ * leaves the money out (the opened moment's small print).
+ */
+export function runSpanWords({ names, from, to, worldMinutes, spent, running, left }) {
+  const verb = names.length === 1 ? (running ? 'is' : 'was') : running ? 'are' : 'were';
+  const whose = names.length === 1
+    ? `${possessive(names[0])} model`
+    : names.length === 2
+      ? `${namesWords(names.map((name) => possessive(name)))} models`
+      : names.length > 2 ? `${names.length} characters' models` : 'Models';
+  const parts = [`${whose} ${verb} deciding`];
+  if (from && (to || running)) parts.push(`${from} to ${running ? 'now' : to}`);
+  else if (Number.isSafeInteger(worldMinutes)) parts.push(`${plural(worldMinutes, 'minute')} of world time`);
+  if (running && left) parts.push(`${left} left`);
+  else if (!running && spent !== null && Number(spent) > 0) parts.push(`spent ${money(spent)}`);
+  return parts.join(' · ');
+}
+
+/** How the world began: made from the person's words, started from a ready world, or from a blank one. */
+export function creationPathWords(readyWorld, blank = false) {
+  if (blank) return PATH_WORDS.blankWorld;
+  return readyWorld ? `Started from ${readyWorld}` : PATH_WORDS.madeFromWords;
+}
+
+/**
+ * The head's GitHub line (sheet section 2), `{ words, refused }`; empty where the projects were not read.
+ * `request` is a request to keep the world in a project, waiting or refused.
+ */
+export function headLine(project, request = null) {
+  if (project === undefined) return { words: '', refused: false };
+  if (!project) {
+    if (request && !request.refused) return { words: HEAD_WORDS.starting, refused: false };
+    const refusal = request?.refused ? HEAD_WORDS.refusals[request.refused.code] : null;
+    return refusal ? { words: refusal, refused: true } : { words: HEAD_WORDS.noProject, refused: false };
+  }
+  if (!project.link) return { words: HEAD_WORDS.localProject, refused: false };
+  const name = String(project.link.repository).split('/').pop();
   const github = project.github;
+  if (github && !github.reached) return { words: HEAD_WORDS.unreachable, refused: false };
+  if (github?.paused) return { words: `Kept on GitHub in ${name} · sending is paused: ${github.paused.reason}`, refused: true };
   const visibility = github && github.visibility !== 'unstated' ? `, ${github.visibility.toLowerCase()}` : '';
-  parts.push(`kept in your GitHub project ${repositoryName(project.link.repository)}${visibility}`);
-  if (github && github.paused) parts.push(HISTORY_WORDS.paused);
-  else if (github && github.not_sent > 0) parts.push(`${plural(github.not_sent, 'change')} not sent yet`);
-  else if (github && github.reached) parts.push(HISTORY_WORDS.upToDate);
-  return parts.join(' · ');
-}
-
-/**
- * A change the project does not hold yet (H5): kept once nothing has changed for the project's
- * settle period, "2 minutes" or "90 seconds", as its follower states it; without one, once the
- * changes stop.
- */
-export function notKeptWords(settleSeconds) {
-  if (!Number.isSafeInteger(settleSeconds) || settleSeconds < 1) return HISTORY_WORDS.notKept;
-  const period = settleSeconds % 60 === 0 ? plural(settleSeconds / 60, 'minute') : plural(settleSeconds, 'second');
-  return `Not kept in the project yet: it is kept once nothing has changed for ${period}.`;
-}
-
-/**
- * What GitHub holds of a change made at `at`: in the open pull request, sent, not sent yet, or
- * not kept in the project yet; or the pause, or GitHub out of reach. Null where no project
- * follows the world (the sub-line says so).
- */
-export function onGitHub(project, at) {
-  if (!project || !project.link) return null;
-  const github = project.github;
-  const kept = project.last_checkpoint_at ? Date.parse(project.last_checkpoint_at) : null;
-  if (kept === null || at > kept) return notKeptWords(project.settle_seconds);
-  if (!github) return HISTORY_WORDS.notSent;
-  if (!github.reached) return HISTORY_WORDS.githubOffline;
-  const through = github.sent_through_at ? Date.parse(github.sent_through_at) : null;
-  if (through === null || at > through) {
-    return github.paused ? `${capital(HISTORY_WORDS.paused)}: ${github.paused.reason}.` : HISTORY_WORDS.notSent;
-  }
-  const pull = github.pull_request;
-  return pull ? `Pull request ${pull.number}, “${pull.title}”, waiting for you to merge` : HISTORY_WORDS.sent;
-}
-
-function capital(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** A run: "Ran 10 minutes with Teo's model"; several characters: "with 2 characters' models". */
-export function runWords(minutes, names) {
-  const whose = names.length === 1 ? `${possessive(names[0])} model` : `${names.length} characters' models`;
-  return `Ran ${plural(minutes, 'minute')} with ${whose}`;
-}
-
-export function runMark(minutes) {
-  return `Ran ${plural(minutes, 'minute')}`;
-}
-
-/**
- * A run's facts: "World time 06:00 to 07:15 · 12 decisions · spent $0.0042 of at most $0.05";
- * world time only where the world's clock is read.
- */
-export function runFacts({ from, to, decisions, spent, limit }) {
-  const parts = [];
-  if (from && to) parts.push(`World time ${from} to ${to}`);
-  parts.push(plural(decisions, 'decision'));
-  parts.push(`spent ${money(spent)}${limit ? ` of at most ${money(limit)}` : ''}`);
-  return parts.join(' · ');
-}
-
-/** What happened in a run, in counts until a read says where the character went (H1). */
-export function runHappened(decisions, done) {
-  return `${plural(decisions, 'decision')}, ${done} done.`;
-}
-
-/** A model given, changed or taken away: one sentence (P4). */
-export function modelWords(name, modelName) {
-  return `Changed ${possessive(name)} model to ${modelName ?? HISTORY_WORDS.routine}`;
-}
-
-export function modelMark(name) {
-  return `Changed ${possessive(name)} model`;
-}
-
-/** A personality written, changed or cleared (H6). */
-export function personalityWords(name, change) {
-  const verb = change === 'cleared' ? 'Cleared' : change === 'changed' ? 'Changed' : 'Wrote';
-  return `${verb} ${possessive(name)} personality`;
-}
-
-export function compareWords(name) {
-  return name ? `Compared two models for ${name}` : 'Compared two models';
-}
-
-export const COMPARE_MARK = 'Compared two models';
-
-/** How the world began: "Created from your words", or "Started from Canopy garden" (H6). */
-export function creationWords(readyWorld) {
-  return readyWorld ? `Started from ${readyWorld}` : 'Created from your words';
+  const state = github && github.not_sent > 0 ? `${plural(github.not_sent, 'change')} not sent yet` : 'up to date';
+  return { words: `Kept on GitHub in ${name}${visibility} · ${state}`, refused: false };
 }
