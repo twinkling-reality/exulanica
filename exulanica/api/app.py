@@ -153,6 +153,7 @@ from exulanica.api.routes import (
     world_flight,
     world_generation,
     world_github_projects,
+    world_history_moments,
     world_inventory,
     world_kinds,
     world_making,
@@ -561,6 +562,7 @@ def create_app(
     app.include_router(society_control.router)
     app.include_router(society_comparisons.router)
     app.include_router(society_decision_asks.router)
+    app.include_router(world_history_moments.router)
     app.include_router(society_models.router)
     app.include_router(society_play.router)
     app.include_router(society_district.router)

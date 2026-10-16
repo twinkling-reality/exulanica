@@ -1125,6 +1125,42 @@ each authorization reads the authored version with its whole edit list
 world's edit history (a median of 24 to 761 ms over the same range). Edits consumed in one minute
 leave events naming most of those inputs; a page holds at most 256 events.
 
+### A world's moments
+
+A minute also records its moments: what its characters did that a person would tell, the record a
+world's History is drawn from. A versioned rule (`exulanica/world/society-moment-rules.v1.json`,
+profile `exulanica.society-moment-rules/v1`) says which events make one: a line said to someone or a
+decision to talk with someone (the first between two characters is a meeting, `met`; later ones are
+`spoke` or `talked`), a line said to everyone near (`spoke_to_all`), a decision to go somewhere or to
+leave (`went`, with the place and activity chosen, or `left`, at most once in 15 of the world's minutes
+for one character), following someone, and a thing picked up, put down, given or taken. A routine's choices, waiting and carrying on are never moments; a first meeting is, whoever
+decided it. One character makes at most one moment a minute, the first kind in the rule's order.
+
+`exulanica/world/society_moments.py` writes them in the same transaction as the minute that made
+them, so a minute and its moments land together or not at all. Each is a row of
+`world_society_moment` (migration 0221): its kind, minute, subjects, the events it was formed from,
+the decision that made it where one did, who decided (a kind, and a model's provider and id), the
+thing its author placed nearest it, the thing handed over, and its scene (each person's position,
+last path, action and partner, as the live drawing reads them; never a camera or a pose). Its id is
+derived from its version, its rule and the event it is anchored on, so a back-fill of minutes played
+before (through the replay, for the purposeful and things engines) writes the same moments and a
+second write of one is nothing. Each minute is formed from the moments of the minutes before it alone,
+in the hook and in a back-fill alike, so a back-fill run after later minutes forms an earlier minute as
+its hook would have. A society played before moments were written is back-filled once, before it
+plays on: a minute played in between is formed without the earlier moments, so a meeting before it can
+be told twice. A moment holds no words of anyone's: the read joins each line from its `said` event.
+
+`GET /world/versions/{version_id}/history/moments` answers `exulanica.world-history-moments/v1`, newest
+last, at most `limit` (50 by default, 200 at most) before minute `before`, with `more`: each moment's
+kind, subjects, place, the lines said in it (a reply within 10 of the world's minutes is a line of the
+moment it answers, up to 4; two characters going to the same place in the same minute, or one
+following the other there, are one going, with the first one's time and decider), who decided (with a
+model's name), the run it happened in, its scene, and another model's answers to its decision (the
+asks of [decision roles](decision-roles-contract.md)) as branches, each naming whose decision it
+answers and marked when it chose the same; a going made together keeps every one of its people's
+branches. An ask that was not answered is no branch. It writes nothing and asks no model; a page
+words what it answers.
+
 ### Erasing a society
 
 A society is erased whole, never in part: its records are bound to each other by digest (a

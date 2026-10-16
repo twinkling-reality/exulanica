@@ -1,0 +1,65 @@
+{
+  "profile": "exulanica.society-moment-rules/v1",
+  "note": "Which of a society's records make a moment a person would tell, and how a moment records its scene. Read by exulanica/world/society_moments.py; a change is a new version, and moments keep the version they were formed under.",
+  "deciders": [
+    "model",
+    "person",
+    "external"
+  ],
+  "any_decider_kinds": [
+    "met",
+    "picked_up",
+    "put_down",
+    "gave",
+    "took"
+  ],
+  "order": [
+    "met",
+    "spoke",
+    "talked",
+    "spoke_to_all",
+    "gave",
+    "took",
+    "picked_up",
+    "put_down",
+    "followed",
+    "stopped_following",
+    "went",
+    "left"
+  ],
+  "decision_kinds": {
+    "target": "went",
+    "leave": "left",
+    "talk": "talked"
+  },
+  "event_kinds": {
+    "picked_up": "picked_up",
+    "put_down": "put_down",
+    "gave": "gave",
+    "took": "took",
+    "followed": "followed",
+    "stopped_following": "stopped_following"
+  },
+  "branch_kinds": {
+    "target": "went",
+    "leave": "left",
+    "talk": "talked",
+    "say_to": "spoke",
+    "say_all": "spoke_to_all",
+    "pick_up": "picked_up",
+    "put_down": "put_down",
+    "give": "gave",
+    "take": "took",
+    "follow": "followed",
+    "stop_following": "stopped_following",
+    "wait": "waited",
+    "stand": "stood",
+    "carry_on": "carried_on"
+  },
+  "exchange_minutes": 10,
+  "lines_most": 4,
+  "went_spacing_minutes": 15,
+  "place_radius_mm": 6000,
+  "scene_radius_mm": 25000,
+  "merge_minutes": 1
+}

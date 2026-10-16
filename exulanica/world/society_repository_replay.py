@@ -124,7 +124,12 @@ class SocietyReplay:
             requests[value["tick"]] = document
         return requests
 
-    def replay(self, version_id: uuid.UUID) -> dict[str, Any]:
+    def replay(
+        self,
+        version_id: uuid.UUID,
+        observe: Callable[[dict[str, Any], dict[str, Any], tuple[SocietyEvent, ...]], None]
+        | None = None,
+    ) -> dict[str, Any]:
         # Hold the same lock as advances so state, inputs, and transitions cannot straddle a tick.
         with self.connection.transaction():
             self._lock()
@@ -233,6 +238,8 @@ class SocietyReplay:
                         ):
                             raise ValueError("society transition replay mismatch")
                         expected_events.extend(events)
+                        if observe is not None:
+                            observe(previous_state, state, tuple(events))
                         continue
                     requests = [value["document"] for value in transition_actions]
                     goal_policy, action_dispositions = action_goal_policies(
@@ -314,6 +321,9 @@ class SocietyReplay:
                     ):
                         raise ValueError("society transition replay mismatch")
                     expected_events.extend(events)
+                    if observe is not None:
+                        # Each verified minute, as it was played: its states and its events.
+                        observe(previous_state, state, tuple(events))
                 if consumed:
                     raise ValueError("a crossing is bound to a minute the society never ran")
                 for action in actions:

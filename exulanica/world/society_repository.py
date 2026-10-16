@@ -52,6 +52,7 @@ from exulanica.world.society_living import (
     routine_for,
 )
 from exulanica.world.society_living_decisions import LivingSeam, living_step
+from exulanica.world.society_moments import record_moments
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     SocietyStartRefused,
@@ -913,6 +914,9 @@ class SocietyRepository(SocietyReads, SocietyReplay):
                     event_document_sha256(event),
                 ),
             )
+        # The moments this minute makes, written with it (society_moments): a person's History
+        # tells what characters did and said from them, and they land with the minute or not at all.
+        record_moments(self.connection, self.workspace_id, row, state, events)
         if row["engine_version"] in INPUT_PROFILES:
             self.connection.execute(
                 "insert into "

@@ -114,6 +114,7 @@ TABLE_PRIVILEGES = {
     "world_version_tile_object": {"SELECT"},
     # society_erase_rows deletes the asks of a society's recorded decisions (0216).
     "world_society_decision_ask": {"SELECT", "DELETE"},
+    "world_society_moment": {"SELECT", "DELETE"},
     "world_project": {"SELECT", "UPDATE", "DELETE"},
     "world_project_item": {"SELECT", "UPDATE", "DELETE"},
     "world_project_item_revision": {"SELECT", "UPDATE", "DELETE"},

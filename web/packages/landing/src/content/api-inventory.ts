@@ -4469,6 +4469,110 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/history/moments",
+    "method": "get",
+    "id": "read_version_moments_world_versions__version_id__history_moments_get",
+    "title": "Read Version Moments",
+    "description": "The version's moments, newest last.",
+    "group": "history",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "before",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Before"
+        }
+      },
+      {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "maximum": 200,
+          "minimum": 1,
+          "default": 50,
+          "title": "Limit"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Read Version Moments World Versions  Version Id  History Moments Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/society/models/history",
     "method": "get",
     "id": "society_model_history_world_versions__version_id__society_models_history_get",

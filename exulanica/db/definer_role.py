@@ -549,6 +549,9 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             "kind_look": frozenset(("SELECT", "DELETE")),
         }
     ),
+    # society_erase_rows, made again with one statement more, deletes a society's moments before
+    # the events they are anchored on (0221).
+    "0221": DefinerGrants(tables={"world_society_moment": frozenset(("SELECT", "DELETE"))}),
 }
 
 

@@ -326,6 +326,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0216 appends each recorded decision asked again of another model and refuses every
     # update of one; only its society's erasure deletes one.
     "world_society_decision_ask",
+    # Migration 0221 appends the moments a society's minute makes and refuses every update of one;
+    # only its society's erasure deletes one.
+    "world_society_moment",
     # Migration 0190 appends what a world may spend on its beings' model minds and refuses every
     # update and delete of one.
     "world_minds_budget",
