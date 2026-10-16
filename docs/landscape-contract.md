@@ -26,6 +26,7 @@ belongs to the [world kinds contract](world-kinds-contract.md).
 - [Walkable tops](#walkable-tops)
 - [The landscape document](#the-landscape-document)
 - [Realizing a landscape's volumes](#realizing-a-landscapes-volumes)
+- [Walkable surfaces and reach](#walkable-surfaces-and-reach)
 - [Volume rules and landscape rules](#volume-rules-and-landscape-rules)
 - [A site on a landscape](#a-site-on-a-landscape)
 - [Readers in the browser](#readers-in-the-browser)
@@ -217,6 +218,63 @@ under the water: across eight seeds, between 4 and 33 percent of a stack's rock 
 water faced up by more than 17 degrees at the 2 m cell, a hand-made stack of the same sizes between
 3 and 29 percent. The tests hold the stacks they make to under 15 percent under their seed.
 
+## Walkable surfaces and reach
+
+`exulanica.landscape-surfaces/v1` (`exulanica/grammar/landscape/surfaces.py`) names every surface a
+person can stand on in a landscape, the joins a person steps between them, and what the arrival
+reaches. It is made from the landscape, its volumes as `compose_volumes` realized them under the
+landscape's seed, and its land under the land's own seed; nothing the composition realized is
+realized again. Nothing reads it yet; it is what the walking layer is to stand people on.
+
+- **Surfaces.** `ground` is the land's walkable dry surface; `volume:<placement id>/top:<n>` is each
+  placed volume's walkable top, placements in the document's order. Each states its frame (the
+  world's for the ground, the placement's origin and turn for a top), its walkable cells and the
+  lowest and highest height of their corners in the world.
+- **Points on the world plan.** A surface's walkable points are the corners of its walkable cells.
+  A point `(x, y)` of a top's sheet lies `(c x - s y) // 2^30` east and `(s x + c y) // 2^30` north
+  of its placement's origin, `s` and `c` the yaw's sine and cosine at 2^30, floored once as the
+  spacing rule turns a volume's extent, and its height is raised by the origin's. A turned sheet's
+  lattice is not the world's, so its points are compared where they fall on the world plan, never
+  by their lattice indices.
+- **The ground** is walked in the 1 m cells of the land near the world (beyond it the land is
+  backdrop) whose four corners are dry and whose edges climb at most 1 in 4, the land's own walking
+  rule. A point is dry unless it lies within a water body less than 350 mm above its level; a
+  shore's sea lies everywhere at level 0. Only the ground near tops is realized: for each top, the
+  box on the world lattice holding every point within one cell of its walkable points, grown by a
+  cell for the cells round them. The ground states the walkable cells realized there, not the whole
+  land's.
+- **Joins.** Two surfaces join where a walkable point of one and a walkable point of the other lie
+  within one cell on the world plan (east and north each at most 1000 mm apart) and within 180 mm
+  in height, the place contract's step. A top joins the ground the same way. Each join is stated by
+  the pair of points with the least climb (the lowest points on a tie).
+- **Reach.** From the arrival, a stated point in a walkable ground cell or the ground as a whole
+  when none is stated, every surface reached through joins is listed, and every walkable surface
+  nothing reaches is listed as reached only by flight: a sea stack's top far above the water, an
+  island with no join. An arrival outside a walkable ground cell is refused
+  (`landscape_arrival_not_ground`, by `arrival_mm`).
+
+| Key | Meaning |
+| --- | --- |
+| `profile` | `exulanica.landscape-surfaces/v1` |
+| `landscape_sha256` | The landscape's digest |
+| `cell_mm`, `step_mm` | The lattice cell (1000) and the step a join climbs at most (180) |
+| `arrival_mm` | The stated arrival, east and north, or `null` for the ground as a whole |
+| `surfaces` | Each surface: `surface`, `sheet_sha256` (its top's digest, `null` for the ground), `at_mm`, `yaw_mdeg`, `cells`, `height_mm` (lowest and highest in the world, `null` with no cells) |
+| `joins` | Each join: `surfaces` (two, in the surfaces' order), `from_mm` and `to_mm` (its points in the world, on the first surface and the second), `climb_mm`, and `pairs` (how many pairs of points meet the rule) |
+| `reached`, `flight_only` | Surface names, in the surfaces' order |
+
+Every number is a whole number in millimetres, and the document's identity is the SHA-256 of its
+canonical JSON, the same in every interpreter. Points are kept in buckets of a cell on the world
+plan, so each is compared only with the points of the nine buckets round it. Measured result (15
+October 2026, one process, under a load average of 52 to 69 on 18 cores): on a bay with two stacks
+and three weathered sky islands holding fifteen tops, interleaved three times with the composition
+of its volumes, the surfaces took 0.06 to 0.12 s and the composition 9.0 to 9.2 s.
+
+The ground is one surface: two stretches of it divided by water or a cliff count as one, since the
+land's own reach is the site's grading's to judge. Ground under a volume's rock is not taken out,
+and land or water over a top is not checked. A join names a place to step, not a proven movement:
+the exact contact decides each step.
+
 ## Volume rules and landscape rules
 
 `volume_rules()` (`exulanica/grammar/volumes/rules.py`) names the volume rules version, which stands
@@ -376,6 +434,7 @@ made volumes by digest.
 | `island_too_deep` | An island's depth is more than three times its radius |
 | `island_rim_too_thick` | An island's rim slab is thicker than its radius or half its depth |
 | `island_later_version` | An island states top land, a site, hangings or falls, which later versions state |
+| `landscape_arrival_not_ground` | The arrival a landscape's surfaces are reached from is not walkable ground |
 
 ## Limits
 

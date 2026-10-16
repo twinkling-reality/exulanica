@@ -12,6 +12,8 @@ layers. The land and volume documents inside never change for it.
 * :mod:`.rules`: the landscape rules a world's receipt names, so its landscape rebuilds the same.
 * :mod:`.spacing`: placed volumes stand apart, no two placements' rock meeting where their reaches
   meet.
+* :mod:`.surfaces`: its walkable surfaces (the ground and each placed volume's tops), the joins a
+  person steps between them, and what is reached from the arrival or only by flight.
 
 Nothing here opens a database, a store or evidence, and nothing reads a landscape yet.
 """
@@ -44,6 +46,13 @@ from exulanica.grammar.landscape.rules import (
     landscape_rules,
 )
 from exulanica.grammar.landscape.spacing import check_volumes_apart, placement_reach
+from exulanica.grammar.landscape.surfaces import (
+    SURFACES_PROFILE,
+    LandscapeSurfaces,
+    SurfaceJoin,
+    WalkableSurface,
+    landscape_surfaces,
+)
 
 __all__ = [
     "CATALOG_VERSION",
@@ -51,16 +60,21 @@ __all__ = [
     "LANDSCAPE_RULES_VERSION",
     "PROFILE",
     "SERVED_LANDSCAPE_RULES",
+    "SURFACES_PROFILE",
     "LandscapeCatalog",
     "LandscapeDocument",
     "LandscapeRefused",
+    "LandscapeSurfaces",
     "PlacedVolume",
     "Placement",
+    "SurfaceJoin",
+    "WalkableSurface",
     "check_landscape_rules",
     "check_volumes_apart",
     "compose_volumes",
     "landscape_catalog",
     "landscape_rules",
+    "landscape_surfaces",
     "load_landscape_catalog",
     "placement_reach",
     "placement_seed",
