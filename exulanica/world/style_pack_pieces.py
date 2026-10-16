@@ -33,16 +33,18 @@ the accessor data the way the browser's reader does
 Both refuse with :class:`StylePieceRefused`, by reason and message. :func:`hold_pieces` holds each
 piece a manifest lists to the profile and its family's budget (a textured piece's images to the
 family's texture side, its variant to no stretch or repeat zone, its second level textured too, and
-the pack's pictures, its textures' and its pieces', to the shared count), the one place both the
-upload's admission and the check of a look made of generated pieces ask it.
+the pack's pictures, its textures' and its pieces', to the shared count, each picture once by its
+digest however many files carry it), the one place both the upload's admission and the check of a
+look made of generated pieces ask it.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import struct
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
@@ -114,6 +116,8 @@ class PieceProfile:
     materials: int
     #: Each image's width and height, for a textured piece; none for a palette piece.
     image_sizes: tuple[tuple[int, int], ...] = ()
+    #: Each image's SHA-256, in the order of its images, for the pack's count of pictures.
+    image_sha256: tuple[str, ...] = ()
 
     @property
     def textured(self) -> bool:
@@ -169,9 +173,12 @@ def check_piece_profile(payload: bytes) -> PieceProfile:
     ):
         raise _refuse("hidden_data", f"asset.generator is at most {NAME_MAX} plain characters")
     sizes: tuple[tuple[int, int], ...] = ()
+    digests: tuple[str, ...] = ()
     if document.get("images"):
         _check_textured_structure(document)
-        sizes = _walk_images(document, inspected.bin_chunk)
+        walked = _walk_images(document, inspected.bin_chunk)
+        sizes = tuple(size for size, _digest in walked)
+        digests = tuple(digest for _size, digest in walked)
     else:
         for name in _REFERENCES:
             if document.get(name):
@@ -181,6 +188,7 @@ def check_piece_profile(payload: bytes) -> PieceProfile:
         triangles=int(inspected.counts["rendered_triangles"]),
         materials=int(inspected.counts["materials"]),
         image_sizes=sizes,
+        image_sha256=digests,
     )
 
 
@@ -240,8 +248,11 @@ def _check_textured_structure(document: Mapping[str, Any]) -> None:
             raise _refuse("not_a_textured_piece", f"{where} is opaque or cut out, never blended")
 
 
-def _walk_images(document: Mapping[str, Any], bin_chunk: bytes) -> tuple[tuple[int, int], ...]:
-    """Each embedded image walked to its last byte by the pack's picture probe."""
+def _walk_images(
+    document: Mapping[str, Any], bin_chunk: bytes
+) -> tuple[tuple[tuple[int, int], str], ...]:
+    """Each embedded image walked to its last byte by the pack's picture probe: its width and
+    height, and the SHA-256 of its bytes."""
     views = document.get("bufferViews") or []
     sizes = []
     for number, image in enumerate(document.get("images") or []):
@@ -252,7 +263,7 @@ def _walk_images(document: Mapping[str, Any], bin_chunk: bytes) -> tuple[tuple[i
             probed = probe_pack_image(data, image.get("mimeType", ""))
         except PreviewRefused as refused:
             raise _refuse(f"image_{refused.reason}", f"images[{number}]: {refused}") from None
-        sizes.append((probed.width_px, probed.height_px))
+        sizes.append(((probed.width_px, probed.height_px), hashlib.sha256(data).hexdigest()))
     return tuple(sizes)
 
 
@@ -293,7 +304,7 @@ def hold_pieces(
     read: Callable[[str], bytes],
     budgets: Mapping[str, PieceBudget],
     lod1_share_permille: int,
-    texture_images: int = 0,
+    texture_images: Collection[str] = (),
 ) -> dict[str, int]:
     """Each piece held, in path order, to the canonical pack-piece profile and its family's budget:
     its file size, its triangles (a tiled family's limit scales with the variant's width, and a
@@ -301,16 +312,17 @@ def hold_pieces(
     size is held in one pass before any piece is opened, so a far level sorting before its first
     never opens the first unchecked. A textured piece's images are held to its family's texture
     side, its variant to no stretch zone, and a textured first level's second level to being
-    textured too; the pack's pictures, ``texture_images`` its textures draw with and every image its
-    pieces embed, to the shared count. Returns each piece's triangles by path, or raises
-    :class:`PieceOutOfBounds` for the first that fails."""
+    textured too; the pack's pictures, ``texture_images`` (the digests of those its textures draw
+    with, :func:`~exulanica.world.style_packs.texture_pictures`) and every image its pieces embed,
+    to the shared count, each picture once by its digest. Returns each piece's triangles by path, or
+    raises :class:`PieceOutOfBounds` for the first that fails."""
     data = {path: read(path) for path in sorted(pieces)}
     for path, (family, _variant, _lod1) in sorted(pieces.items()):
         if len(data[path]) > budgets[family].glb_bytes:
             raise PieceOutOfBounds("over_budget", "a piece is over its family's file size", path)
     measured: dict[str, int] = {}
     profiles: dict[str, PieceProfile] = {}
-    embedded = 0
+    embedded: set[str] = set()
     for path, (family, variant, lod1) in sorted(pieces.items()):
         budget = budgets[family]
         profile = profiles.get(path) or _profile(data[path], path)
@@ -355,10 +367,10 @@ def hold_pieces(
                     "a textured piece states no repeat zone: it is drawn whole",
                     path,
                 )
-            embedded += len(profile.image_sizes)
+            embedded.update(profile.image_sha256)
         measured[path] = profile.triangles
     try:
-        check_pack_images(texture_images, embedded)
+        check_pack_images(len(embedded | set(texture_images)))
     except StylePackRefused as refused:
         raise PieceOutOfBounds("over_budget", str(refused), "files") from None
     return measured

@@ -8,6 +8,7 @@ texture side, no stretch zone, a textured second level, and the pack's one count
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import hashlib
 import json
@@ -189,6 +190,11 @@ def _variant(**fields: Any) -> dict[str, Any]:
     }
 
 
+def _pictures(count: int, *, first: int = 0) -> list[str]:
+    """The digests of ``count`` texture pictures, each its own."""
+    return [f"{first + k:064x}" for k in range(count)]
+
+
 def test_a_textured_piece_is_held_to_its_familys_texture_side_and_drawn_whole():
     def hold(files: dict[str, bytes], variant: dict[str, Any], textures: int = 0) -> dict[str, int]:
         return hold_pieces(
@@ -196,7 +202,7 @@ def test_a_textured_piece_is_held_to_its_familys_texture_side_and_drawn_whole():
             files.__getitem__,
             BUDGETS.families,
             BUDGETS.lod1_share_permille,
-            textures,
+            _pictures(textures),
         )
 
     side = BUDGETS.families["plant"].texture_side_px
@@ -227,6 +233,46 @@ def test_a_textured_piece_is_held_to_its_familys_texture_side_and_drawn_whole():
         hold({"pieces/tree.glb": textured_piece()}, _variant(), style_packs.PACK_IMAGES_MAX - 1)
     assert (many.value.code, many.value.path) == ("over_budget", "files")
     assert "draws with 65 pictures; at most 64" in str(many.value)
+
+
+def _two_trees(first: bytes, second: bytes, textures: list[str]) -> dict[str, int]:
+    """Two variants of one plant role, each its own file, held with the textures' pictures."""
+    return hold_pieces(
+        {
+            "pieces/tree.glb": ("plant", _variant(), False),
+            "pieces/tree-b.glb": ("plant", _variant(file="pieces/tree-b.glb"), False),
+        },
+        {"pieces/tree.glb": first, "pieces/tree-b.glb": second}.__getitem__,
+        BUDGETS.families,
+        BUDGETS.lod1_share_permille,
+        textures,
+    )
+
+
+def test_a_pack_with_no_shared_picture_is_refused_at_65_as_before():
+    # Two pieces of two pictures each, none shared, beside 61 textures' pictures: 65.
+    with pytest.raises(PieceOutOfBounds) as many:
+        _two_trees(textured_piece(side=64), textured_piece(side=32), _pictures(61))
+    assert (many.value.code, many.value.path, str(many.value)) == (
+        "over_budget",
+        "files",
+        "files: draws with 65 pictures; at most 64",
+    )
+    assert _two_trees(textured_piece(side=64), textured_piece(side=32), _pictures(60))
+
+
+def test_a_picture_counts_once_by_its_digest_however_many_files_carry_it():
+    tree = textured_piece()
+    # Four copies of two pictures beside 62 textures': 66 copies, 64 pictures, admitted.
+    assert _two_trees(tree, tree, _pictures(62)) == {"pieces/tree.glb": 4, "pieces/tree-b.glb": 4}
+    with pytest.raises(PieceOutOfBounds) as over:
+        _two_trees(tree, tree, _pictures(63))
+    assert str(over.value) == "files: draws with 65 pictures; at most 64"
+    # A texture's map that is one of the pieces' pictures is that picture, counted once.
+    colour = hashlib.sha256(png(64, 64)).hexdigest()
+    assert _two_trees(tree, tree, [*_pictures(62), colour])
+    with pytest.raises(PieceOutOfBounds):
+        _two_trees(tree, tree, [*_pictures(63), colour])
 
 
 def _with_textured_tree(made: Upload) -> Upload:
@@ -260,6 +306,38 @@ def test_an_upload_carrying_a_textured_piece_is_admitted_and_its_pictures_counte
     with pytest.raises(StylePackAdmissionRefused) as refused:
         _admit(made)
     assert (refused.value.code, refused.value.path) == ("over_budget", "files")
+
+
+def _textured_tree_and_ground(colour: bytes, normal: bytes) -> Upload:
+    """The textured tree beside a ground texture of the pack's own, its maps the given pictures."""
+    made = _with_textured_tree(upload())
+    made.files["textures/ground-colour.jpg"] = colour
+    made.files["textures/ground-normal.png"] = normal
+    made.manifest["textures"] = {
+        "ground": {
+            "colour": "textures/ground-colour.jpg",
+            "normal": "textures/ground-normal.png",
+            "roughness": None,
+            "extent_mm": [2000, 2000],
+        }
+    }
+    made.manifest["surfaces"]["ground.default"] = {"texture": "ground", "up": None}
+    made.relist()
+    next(f for f in made.manifest["files"] if f["path"].endswith(".png"))["media_type"] = (
+        "image/png"
+    )
+    return made
+
+
+def test_an_upload_counts_its_textures_and_pieces_pictures_once_each_by_digest(monkeypatch):
+    # Two pictures allowed: the tree's two and the ground's two of their own are four.
+    monkeypatch.setattr(style_packs, "PACK_IMAGES_MAX", 2)
+    with pytest.raises(StylePackAdmissionRefused) as refused:
+        _admit(_textured_tree_and_ground(jpeg(32, 32), png(32, 32)))
+    assert (refused.value.code, refused.value.path) == ("over_budget", "files")
+    assert "draws with 4 pictures; at most 2" in str(refused.value)
+    # The ground's maps are the tree's own pictures, carried in other files: two pictures.
+    assert _admit(_textured_tree_and_ground(jpeg(64, 64), png(64, 64)))
 
 
 def test_a_cover_piece_is_admitted_textured_and_refused_by_name_as_a_palette_piece():
@@ -378,3 +456,79 @@ def test_the_check_reads_a_textured_piece_by_its_images_and_a_palette_piece_by_i
     assert (failure, message) == (None, None)
     assert report["pieces"]["pieces/tree.glb"] == {"triangles": 4, "images": 2}
     assert report["pieces"]["pieces/bus.glb"]["colours"] > 0
+
+
+class _GeneratedRepository(_Repository):
+    """A generated look's version: its pieces read from one store, as the shared store's are."""
+
+    def store_for(self, _file: PackFile) -> _Store:
+        return self.store
+
+
+def test_the_check_of_a_generated_look_counts_its_textures_pictures_as_admission_does(
+    monkeypatch,
+):
+    manifest = json.loads((COZY / "manifest.json").read_text("utf-8"))
+    files = {
+        file["path"]: (COZY / file["path"]).read_bytes()
+        for file in manifest["files"]
+        if file["path"].endswith(".glb")
+    }
+    files["pieces/tree.glb"] = textured_piece()
+
+    def check(colour: bytes, normal: bytes) -> tuple[str | None, str | None]:
+        stated = copy.deepcopy(manifest)
+        stated["textures"] = {
+            "stone": {
+                "colour": "textures/stone-colour.png",
+                "normal": "textures/stone-normal.jpg",
+                "roughness": None,
+                "extent_mm": [2000, 2000],
+            }
+        }
+        stated["files"] += [
+            {"path": path, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+            for path, data in (
+                ("textures/stone-colour.png", colour),
+                ("textures/stone-normal.jpg", normal),
+            )
+        ]
+        repository = _GeneratedRepository(files)
+        failure, message, _report = check_version(
+            repository,  # type: ignore[arg-type]
+            _Stores(repository.store),  # type: ignore[arg-type]
+            StylePackVersionRecord(
+                manifest_sha256="0" * 64,
+                pack_id="generated.cozy-barn",
+                version=1,
+                manifest_canonical=style_packs.canonical_json(stated).encode(),
+                manifest_byte_size=0,
+                rights_basis="own_work",
+                licence_id=style_packs.OWN_WORK,
+                base=None,
+                file_count=len(files),
+                file_byte_size=0,
+                preview_sha256=None,
+                declaration_sha256="0" * 64,
+                created_by=uuid.UUID(int=2),
+                created_at=dt.datetime(2026, 10, 15, tzinfo=dt.UTC),
+                erased=False,
+                state="checking",
+                failure_class=None,
+                failure_message=None,
+                attempts=0,
+                withdrawn=False,
+                origin="generated",
+            ),
+            table=colour_table(ROOT),
+            library=lambda _sha: None,
+        )
+        return failure, message
+
+    # Three pictures allowed: the tree's two and the texture's two of their own are four.
+    monkeypatch.setattr(style_packs, "PACK_IMAGES_MAX", 3)
+    failure, message = check(png(32, 32), jpeg(32, 32))
+    assert failure == "refused"
+    assert message == "files: over_budget: files: draws with 4 pictures; at most 3"
+    # The texture's maps are the tree's own pictures: two pictures in all.
+    assert check(png(64, 64), jpeg(64, 64)) == (None, None)

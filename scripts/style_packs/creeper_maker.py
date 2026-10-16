@@ -5,7 +5,10 @@ A patch stands on its base at the origin with its wall in the plane z = 0 behind
 toward +Z and +Y up. Stems rise from roots spaced along its foot, wander and branch as they climb,
 and stay inside the patch; leaf cards (``leaf_cards.py``, from the scans the tree species catalog
 names) hug the wall along them, each rooted on its stem, leaning a little out of the wall, fewer
-toward a stem's growing end. The species is data (``assets/style-packs/makers/creeper-species.v1.json``,
+toward a stem's growing end. A patch's pictures are its species' alone: the leaf sheet is drawn from
+the species' card recipe, not the patch's seed, and the stem from its bark, so every patch of one
+species carries the same pictures and a pack counts them once (``docs/style-pack-contract.md``,
+section 5) while the stems and cards vary by seed. The species is data (``assets/style-packs/makers/creeper-species.v1.json``,
 profile ``exulanica.creeper-species/v1``), every figure held to its range when the catalog is read;
 a species, its scans, a size and a seed always make the same bytes.
 
@@ -290,6 +293,13 @@ def _mesh(
     return arrays(s_pos, s_nrm, s_uv, s_idx), arrays(c_pos, c_nrm, c_uv, c_idx)
 
 
+def sheet_seed(card: dict[str, Any]) -> int:
+    """The seed a species' leaf sheet is drawn from: its card recipe's, read from the recipe's
+    canonical JSON, so a recipe always draws one sheet."""
+    canonical = json.dumps(card, sort_keys=True, separators=(",", ":")).encode()
+    return int.from_bytes(hashlib.sha256(canonical).digest()[:4], "big") & 0x7FFFFFFF
+
+
 def _jpeg(image: Image.Image, quality: int) -> bytes:
     import io
 
@@ -346,9 +356,11 @@ def make_creeper(
     textures = catalog["textures"]
     bark = sources.catalog["sources"]["barks"][species["stem"]["bark"]]
     stem_colour = Image.open(sources.path(bark["colour"]))
-    sheet = compose_sheet(species["card"], sources.leaves(species["card"]["source"]), 512, seed)
+    sheet = compose_sheet(
+        species["card"], sources.leaves(species["card"]["source"]), 512, sheet_seed(species["card"])
+    )
     tint = species["stem"]["tint"]
-    out: list[tuple[bytes, int]] = []
+    out: list[tuple[bytes, int, list[str]]] = []
     depth = 0.0
     for level, level_stems, level_cards, level_size in (
         ("lod0", stems, cards, size),
@@ -384,6 +396,7 @@ def make_creeper(
             (
                 write_textured_glb(primitives, materials, MAKER),
                 sum(len(p.indices) // 3 for p in primitives),
+                [hashlib.sha256(m.colour_image).hexdigest() for m in materials],
             )
         )
     canonical = json.dumps(species, sort_keys=True, separators=(",", ":")).encode()
@@ -398,9 +411,15 @@ def make_creeper(
         "seed": seed,
         "cards": {"grown": grown, "kept": len(cards), "size_m": round(size, 6)},
         "sources": dict(sorted(sources.read.items())),
+        # Each level's pictures (stem, then leaves), the species' alone: a pack counts them once.
         "lods": [
-            {"sha256": hashlib.sha256(glb).hexdigest(), "bytes": len(glb), "triangles": triangles}
-            for glb, triangles in out
+            {
+                "sha256": hashlib.sha256(glb).hexdigest(),
+                "bytes": len(glb),
+                "triangles": triangles,
+                "pictures_sha256": pictures,
+            }
+            for glb, triangles, pictures in out
         ],
     }
     return MadeCreeper(out[0][0], out[1][0], size_mm, species["sway_permille"], receipt)

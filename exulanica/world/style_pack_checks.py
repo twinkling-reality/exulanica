@@ -44,6 +44,7 @@ from exulanica.world.style_pack_pieces import (
     read_palette_piece,
     read_textured_piece,
 )
+from exulanica.world.style_packs import texture_pictures
 from exulanica.world.workspace_style_packs import (
     StylePackNotReady,
     StylePackVersionRecord,
@@ -258,12 +259,15 @@ def _hold_generated(
         read[path] = data
         return data
 
+    manifest = json.loads(record.manifest_canonical)
     try:
+        # Its textures' pictures count beside its pieces', as at an upload's admission.
         hold_pieces(
-            piece_roles(json.loads(record.manifest_canonical)),
+            piece_roles(manifest),
             lambda path: read.get(path) or fetch(path),
             budgets.families,
             budgets.lod1_share_permille,
+            texture_pictures(manifest),
         )
     except _Late:
         return "interrupted", f"the check ran past its {seconds:g} s bound"

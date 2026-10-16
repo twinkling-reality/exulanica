@@ -56,6 +56,11 @@ describe('the shared style pack cases', () => {
     const reasons = new Set(CASES.cases.map((c) => c.expect.refusal ?? 'valid'));
     expect([...reasons].sort()).toEqual(['duplicate', 'licence', 'range', 'reference', 'shape', 'valid']);
   });
+  it('refuses textures of 65 pictures of their own with the message it always gave, and counts a picture once by its digest', () => {
+    const refused = (): unknown => readStylePackManifest(CASES.cases.find((c) => c.name.startsWith('textures drawing with 65'))!.manifest, context);
+    expect(refused).toThrow(new StylePackRefusal('range', 'files', 'draws with 65 pictures; at most 64'));
+    expect(() => named('65 texture map files carrying 64 pictures, one picture in two files')).not.toThrow();
+  });
 });
 
 describe('a variant that repeats a zone', () => {

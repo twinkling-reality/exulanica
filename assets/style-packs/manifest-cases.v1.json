@@ -23575,6 +23575,1813 @@
    }
   },
   {
+   "name": "textures drawing with 65 pictures, each its own",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": "preview.jpg",
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture": "stone",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "preview.jpg",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 200000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/stone-colour.jpg",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 600000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/stone-normal.jpg",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 400000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t00-colour.jpg",
+      "sha256": "0000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t00-normal.jpg",
+      "sha256": "0001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t00-roughness.jpg",
+      "sha256": "0002aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t01-colour.jpg",
+      "sha256": "0100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t01-normal.jpg",
+      "sha256": "0101aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t01-roughness.jpg",
+      "sha256": "0102aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t02-colour.jpg",
+      "sha256": "0200aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t02-normal.jpg",
+      "sha256": "0201aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t02-roughness.jpg",
+      "sha256": "0202aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t03-colour.jpg",
+      "sha256": "0300aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t03-normal.jpg",
+      "sha256": "0301aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t03-roughness.jpg",
+      "sha256": "0302aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t04-colour.jpg",
+      "sha256": "0400aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t04-normal.jpg",
+      "sha256": "0401aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t04-roughness.jpg",
+      "sha256": "0402aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t05-colour.jpg",
+      "sha256": "0500aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t05-normal.jpg",
+      "sha256": "0501aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t05-roughness.jpg",
+      "sha256": "0502aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t06-colour.jpg",
+      "sha256": "0600aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t06-normal.jpg",
+      "sha256": "0601aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t06-roughness.jpg",
+      "sha256": "0602aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t07-colour.jpg",
+      "sha256": "0700aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t07-normal.jpg",
+      "sha256": "0701aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t07-roughness.jpg",
+      "sha256": "0702aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t08-colour.jpg",
+      "sha256": "0800aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t08-normal.jpg",
+      "sha256": "0801aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t08-roughness.jpg",
+      "sha256": "0802aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t09-colour.jpg",
+      "sha256": "0900aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t09-normal.jpg",
+      "sha256": "0901aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t09-roughness.jpg",
+      "sha256": "0902aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t10-colour.jpg",
+      "sha256": "0a00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t10-normal.jpg",
+      "sha256": "0a01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t10-roughness.jpg",
+      "sha256": "0a02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t11-colour.jpg",
+      "sha256": "0b00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t11-normal.jpg",
+      "sha256": "0b01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t11-roughness.jpg",
+      "sha256": "0b02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t12-colour.jpg",
+      "sha256": "0c00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t12-normal.jpg",
+      "sha256": "0c01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t12-roughness.jpg",
+      "sha256": "0c02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t13-colour.jpg",
+      "sha256": "0d00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t13-normal.jpg",
+      "sha256": "0d01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t13-roughness.jpg",
+      "sha256": "0d02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t14-colour.jpg",
+      "sha256": "0e00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t14-normal.jpg",
+      "sha256": "0e01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t14-roughness.jpg",
+      "sha256": "0e02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t15-colour.jpg",
+      "sha256": "0f00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t15-normal.jpg",
+      "sha256": "0f01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t15-roughness.jpg",
+      "sha256": "0f02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t16-colour.jpg",
+      "sha256": "1000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t16-normal.jpg",
+      "sha256": "1001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t16-roughness.jpg",
+      "sha256": "1002aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t17-colour.jpg",
+      "sha256": "1100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t17-normal.jpg",
+      "sha256": "1101aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t17-roughness.jpg",
+      "sha256": "1102aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t18-colour.jpg",
+      "sha256": "1200aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t18-normal.jpg",
+      "sha256": "1201aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t18-roughness.jpg",
+      "sha256": "1202aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t19-colour.jpg",
+      "sha256": "1300aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t19-normal.jpg",
+      "sha256": "1301aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t19-roughness.jpg",
+      "sha256": "1302aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t20-colour.jpg",
+      "sha256": "1400aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t20-normal.jpg",
+      "sha256": "1401aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t20-roughness.jpg",
+      "sha256": "1402aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     }
+    ],
+    "textures": {
+     "stone": {
+      "colour": "textures/stone-colour.jpg",
+      "normal": "textures/stone-normal.jpg",
+      "roughness": null,
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t00": {
+      "colour": "textures/t00-colour.jpg",
+      "normal": "textures/t00-normal.jpg",
+      "roughness": "textures/t00-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t01": {
+      "colour": "textures/t01-colour.jpg",
+      "normal": "textures/t01-normal.jpg",
+      "roughness": "textures/t01-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t02": {
+      "colour": "textures/t02-colour.jpg",
+      "normal": "textures/t02-normal.jpg",
+      "roughness": "textures/t02-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t03": {
+      "colour": "textures/t03-colour.jpg",
+      "normal": "textures/t03-normal.jpg",
+      "roughness": "textures/t03-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t04": {
+      "colour": "textures/t04-colour.jpg",
+      "normal": "textures/t04-normal.jpg",
+      "roughness": "textures/t04-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t05": {
+      "colour": "textures/t05-colour.jpg",
+      "normal": "textures/t05-normal.jpg",
+      "roughness": "textures/t05-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t06": {
+      "colour": "textures/t06-colour.jpg",
+      "normal": "textures/t06-normal.jpg",
+      "roughness": "textures/t06-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t07": {
+      "colour": "textures/t07-colour.jpg",
+      "normal": "textures/t07-normal.jpg",
+      "roughness": "textures/t07-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t08": {
+      "colour": "textures/t08-colour.jpg",
+      "normal": "textures/t08-normal.jpg",
+      "roughness": "textures/t08-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t09": {
+      "colour": "textures/t09-colour.jpg",
+      "normal": "textures/t09-normal.jpg",
+      "roughness": "textures/t09-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t10": {
+      "colour": "textures/t10-colour.jpg",
+      "normal": "textures/t10-normal.jpg",
+      "roughness": "textures/t10-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t11": {
+      "colour": "textures/t11-colour.jpg",
+      "normal": "textures/t11-normal.jpg",
+      "roughness": "textures/t11-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t12": {
+      "colour": "textures/t12-colour.jpg",
+      "normal": "textures/t12-normal.jpg",
+      "roughness": "textures/t12-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t13": {
+      "colour": "textures/t13-colour.jpg",
+      "normal": "textures/t13-normal.jpg",
+      "roughness": "textures/t13-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t14": {
+      "colour": "textures/t14-colour.jpg",
+      "normal": "textures/t14-normal.jpg",
+      "roughness": "textures/t14-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t15": {
+      "colour": "textures/t15-colour.jpg",
+      "normal": "textures/t15-normal.jpg",
+      "roughness": "textures/t15-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t16": {
+      "colour": "textures/t16-colour.jpg",
+      "normal": "textures/t16-normal.jpg",
+      "roughness": "textures/t16-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t17": {
+      "colour": "textures/t17-colour.jpg",
+      "normal": "textures/t17-normal.jpg",
+      "roughness": "textures/t17-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t18": {
+      "colour": "textures/t18-colour.jpg",
+      "normal": "textures/t18-normal.jpg",
+      "roughness": "textures/t18-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t19": {
+      "colour": "textures/t19-colour.jpg",
+      "normal": "textures/t19-normal.jpg",
+      "roughness": "textures/t19-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t20": {
+      "colour": "textures/t20-colour.jpg",
+      "normal": "textures/t20-normal.jpg",
+      "roughness": "textures/t20-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     }
+    }
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "files"
+   }
+  },
+  {
+   "name": "65 texture map files carrying 64 pictures, one picture in two files",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": "preview.jpg",
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture": "stone",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "preview.jpg",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 200000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/stone-colour.jpg",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 600000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/stone-normal.jpg",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 400000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t00-colour.jpg",
+      "sha256": "0000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t00-normal.jpg",
+      "sha256": "0001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t00-roughness.jpg",
+      "sha256": "0002aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t01-colour.jpg",
+      "sha256": "0100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t01-normal.jpg",
+      "sha256": "0101aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t01-roughness.jpg",
+      "sha256": "0102aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t02-colour.jpg",
+      "sha256": "0200aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t02-normal.jpg",
+      "sha256": "0201aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t02-roughness.jpg",
+      "sha256": "0202aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t03-colour.jpg",
+      "sha256": "0300aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t03-normal.jpg",
+      "sha256": "0301aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t03-roughness.jpg",
+      "sha256": "0302aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t04-colour.jpg",
+      "sha256": "0400aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t04-normal.jpg",
+      "sha256": "0401aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t04-roughness.jpg",
+      "sha256": "0402aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t05-colour.jpg",
+      "sha256": "0500aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t05-normal.jpg",
+      "sha256": "0501aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t05-roughness.jpg",
+      "sha256": "0502aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t06-colour.jpg",
+      "sha256": "0600aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t06-normal.jpg",
+      "sha256": "0601aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t06-roughness.jpg",
+      "sha256": "0602aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t07-colour.jpg",
+      "sha256": "0700aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t07-normal.jpg",
+      "sha256": "0701aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t07-roughness.jpg",
+      "sha256": "0702aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t08-colour.jpg",
+      "sha256": "0800aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t08-normal.jpg",
+      "sha256": "0801aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t08-roughness.jpg",
+      "sha256": "0802aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t09-colour.jpg",
+      "sha256": "0900aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t09-normal.jpg",
+      "sha256": "0901aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t09-roughness.jpg",
+      "sha256": "0902aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t10-colour.jpg",
+      "sha256": "0a00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t10-normal.jpg",
+      "sha256": "0a01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t10-roughness.jpg",
+      "sha256": "0a02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t11-colour.jpg",
+      "sha256": "0b00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t11-normal.jpg",
+      "sha256": "0b01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t11-roughness.jpg",
+      "sha256": "0b02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t12-colour.jpg",
+      "sha256": "0c00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t12-normal.jpg",
+      "sha256": "0c01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t12-roughness.jpg",
+      "sha256": "0c02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t13-colour.jpg",
+      "sha256": "0d00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t13-normal.jpg",
+      "sha256": "0d01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t13-roughness.jpg",
+      "sha256": "0d02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t14-colour.jpg",
+      "sha256": "0e00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t14-normal.jpg",
+      "sha256": "0e01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t14-roughness.jpg",
+      "sha256": "0e02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t15-colour.jpg",
+      "sha256": "0f00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t15-normal.jpg",
+      "sha256": "0f01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t15-roughness.jpg",
+      "sha256": "0f02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t16-colour.jpg",
+      "sha256": "1000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t16-normal.jpg",
+      "sha256": "1001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t16-roughness.jpg",
+      "sha256": "1002aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t17-colour.jpg",
+      "sha256": "1100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t17-normal.jpg",
+      "sha256": "1101aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t17-roughness.jpg",
+      "sha256": "1102aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t18-colour.jpg",
+      "sha256": "1200aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t18-normal.jpg",
+      "sha256": "1201aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t18-roughness.jpg",
+      "sha256": "1202aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t19-colour.jpg",
+      "sha256": "1300aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t19-normal.jpg",
+      "sha256": "1301aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t19-roughness.jpg",
+      "sha256": "1302aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t20-colour.jpg",
+      "sha256": "1400aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t20-normal.jpg",
+      "sha256": "1401aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     },
+     {
+      "path": "textures/t20-roughness.jpg",
+      "sha256": "0000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 100000,
+      "media_type": "image/jpeg"
+     }
+    ],
+    "textures": {
+     "stone": {
+      "colour": "textures/stone-colour.jpg",
+      "normal": "textures/stone-normal.jpg",
+      "roughness": null,
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t00": {
+      "colour": "textures/t00-colour.jpg",
+      "normal": "textures/t00-normal.jpg",
+      "roughness": "textures/t00-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t01": {
+      "colour": "textures/t01-colour.jpg",
+      "normal": "textures/t01-normal.jpg",
+      "roughness": "textures/t01-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t02": {
+      "colour": "textures/t02-colour.jpg",
+      "normal": "textures/t02-normal.jpg",
+      "roughness": "textures/t02-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t03": {
+      "colour": "textures/t03-colour.jpg",
+      "normal": "textures/t03-normal.jpg",
+      "roughness": "textures/t03-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t04": {
+      "colour": "textures/t04-colour.jpg",
+      "normal": "textures/t04-normal.jpg",
+      "roughness": "textures/t04-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t05": {
+      "colour": "textures/t05-colour.jpg",
+      "normal": "textures/t05-normal.jpg",
+      "roughness": "textures/t05-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t06": {
+      "colour": "textures/t06-colour.jpg",
+      "normal": "textures/t06-normal.jpg",
+      "roughness": "textures/t06-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t07": {
+      "colour": "textures/t07-colour.jpg",
+      "normal": "textures/t07-normal.jpg",
+      "roughness": "textures/t07-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t08": {
+      "colour": "textures/t08-colour.jpg",
+      "normal": "textures/t08-normal.jpg",
+      "roughness": "textures/t08-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t09": {
+      "colour": "textures/t09-colour.jpg",
+      "normal": "textures/t09-normal.jpg",
+      "roughness": "textures/t09-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t10": {
+      "colour": "textures/t10-colour.jpg",
+      "normal": "textures/t10-normal.jpg",
+      "roughness": "textures/t10-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t11": {
+      "colour": "textures/t11-colour.jpg",
+      "normal": "textures/t11-normal.jpg",
+      "roughness": "textures/t11-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t12": {
+      "colour": "textures/t12-colour.jpg",
+      "normal": "textures/t12-normal.jpg",
+      "roughness": "textures/t12-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t13": {
+      "colour": "textures/t13-colour.jpg",
+      "normal": "textures/t13-normal.jpg",
+      "roughness": "textures/t13-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t14": {
+      "colour": "textures/t14-colour.jpg",
+      "normal": "textures/t14-normal.jpg",
+      "roughness": "textures/t14-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t15": {
+      "colour": "textures/t15-colour.jpg",
+      "normal": "textures/t15-normal.jpg",
+      "roughness": "textures/t15-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t16": {
+      "colour": "textures/t16-colour.jpg",
+      "normal": "textures/t16-normal.jpg",
+      "roughness": "textures/t16-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t17": {
+      "colour": "textures/t17-colour.jpg",
+      "normal": "textures/t17-normal.jpg",
+      "roughness": "textures/t17-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t18": {
+      "colour": "textures/t18-colour.jpg",
+      "normal": "textures/t18-normal.jpg",
+      "roughness": "textures/t18-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t19": {
+      "colour": "textures/t19-colour.jpg",
+      "normal": "textures/t19-normal.jpg",
+      "roughness": "textures/t19-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     },
+     "t20": {
+      "colour": "textures/t20-colour.jpg",
+      "normal": "textures/t20-normal.jpg",
+      "roughness": "textures/t20-roughness.jpg",
+      "extent_mm": [
+       2000,
+       2000
+      ]
+     }
+    }
+   },
+   "expect": {
+    "sha256": "be17ea7b17d217e552de8d57ccfb1f20420fe88925a222804e093c6b3525bc52"
+   }
+  },
+  {
    "name": "a water finish stating its own ripple and caustics",
    "manifest": {
     "profile": "exulanica.style-pack/v1",

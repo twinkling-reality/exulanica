@@ -41,7 +41,7 @@ export const STYLE_PACK_PREVIEW_MAX_BYTES = 512 * 1024;
 export const STYLE_PACK_TEXTURE_IMAGE_MEDIA_TYPES = ['image/jpeg', 'image/png'] as const;
 /** One texture image, at most. Its side is held to the server's picture walk (2,048 pixels). */
 export const STYLE_PACK_TEXTURE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
-/** The images one pack may draw with, its textures' and its pieces' together. */
+/** The pictures one pack may draw with, its textures' and its pieces' together, each once by its digest. */
 export const STYLE_PACK_IMAGES_MAX = 64;
 /** The textures one pack may carry. */
 export const STYLE_PACK_MAX_TEXTURES = 32;
@@ -1070,7 +1070,7 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
       if (!(STYLE_PACK_TEXTURE_IMAGE_MEDIA_TYPES as readonly string[]).includes(file.media_type)) fail('shape', where, 'a texture image is a JPEG or a PNG');
       if (file.bytes > STYLE_PACK_TEXTURE_IMAGE_MAX_BYTES) fail('range', where, `a texture image is at most ${STYLE_PACK_TEXTURE_IMAGE_MAX_BYTES} bytes`);
       used.add(path);
-      images.add(path);
+      images.add(file.sha256);
     }
   }
   checkPackImages(images.size);
@@ -1079,8 +1079,8 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
 }
 
 /**
- * Refuse a pack that draws with more pictures than `STYLE_PACK_IMAGES_MAX`: its textures' distinct
- * images and the images its pieces embed, counted together.
+ * Refuse a pack that draws with more pictures than `STYLE_PACK_IMAGES_MAX`: its textures' and its
+ * pieces' pictures, each counted once by its digest, however many files carry it.
  */
 export function checkPackImages(textureImages: number, embeddedImages = 0): void {
   if (textureImages + embeddedImages > STYLE_PACK_IMAGES_MAX) {

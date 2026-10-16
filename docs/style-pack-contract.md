@@ -239,8 +239,11 @@ piece is made against the numbers a pack's piece is held to.
 
 A textured piece is held to the same file size, triangles and materials, and each of its images to
 its family's largest texture side (a plant's 512 pixels, a structure's 1,024). Its pictures count
-toward the pack's one bound of 64 pictures, beside its textures' (section 2), at admission
-(`hold_pieces`, given the textures' count by `style_pack_admission.py`).
+toward the pack's one bound of 64 pictures, beside its textures' (section 2), at admission and in
+the check of a look made of generated pieces (`hold_pieces`, given the textures' pictures by
+`style_packs.texture_pictures`). A picture counts once by its SHA-256, however many files or maps
+carry it (the page decodes a piece's picture once by its digest), so variants that share a picture
+spend one place.
 
 ## 6. Readers
 
@@ -251,7 +254,7 @@ it, then the rules across sections, and refuses with the first fault by reason a
 | Reason | What it refuses |
 | --- | --- |
 | `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, text holding a lone surrogate, a control character or a bidirectional control character, a file whose media type is not its extension's, a texture's picture that is not a JPEG or a PNG |
-| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch or repeat zone outside its piece or of no length, a preview over 512 KiB, a texture's picture over 4 MiB, a texture repeating over less than 100 mm, a pack drawing with more than 64 pictures (its textures' and its pieces' together), a cover's least scale above its most, a climb's least height above its most or a wall it does not know, a wind swaying no family, a facade's window as wide as its bay or wider, a facade's day sun not above its dusk sun, a facade's fade ending where it starts, a land cover window with its least above its most |
+| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch or repeat zone outside its piece or of no length, a preview over 512 KiB, a texture's picture over 4 MiB, a texture repeating over less than 100 mm, a pack drawing with more than 64 pictures (its textures' and its pieces' together, each once by its digest), a cover's least scale above its most, a climb's least height above its most or a wall it does not know, a wind swaying no family, a facade's window as wide as its bay or wider, a facade's day sun not above its dusk sun, a facade's fade ending where it starts, a land cover window with its least above its most |
 | `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, texture, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch or a repeat on a piece of a family that is not fill, cover on a role that is not a surface, a cover piece that is not a plant or (with no base) not one of the pack's modules, a climb on a role that is not a structure, a climbing piece that is not a plant or (with no base) not one of the pack's modules, a wind swaying a family the context does not know, a facade on a role that is not a wall's, a land cover piece that is not a plant or a prop |
 | `duplicate` | Two swatches of one key or one colour, two files of one path, a wall a climb rule names twice |
 | `licence` | CC-BY-4.0 without attribution, attribution on CC0-1.0, the own-work id on a pack that is not uploaded or with an attribution |
@@ -495,7 +498,10 @@ the catalog is read; it names the tree species catalog version whose scans it re
 stated twice. A patch is held to the plant budget: past it every other card is dropped and the rest
 grown larger to cover the same wall, and its receipt says how many were kept; its second level keeps
 a share of the cards on stems of fewer points, within the share of the first level's triangles a
-second level may hold. Rows of one role become its variants, each with its species' `sway_permille`,
+second level may hold. A patch's pictures are its species' alone (the leaf sheet drawn from the
+species' card recipe, the stem from its bark), so every variant of one species carries the same
+pictures and a pack counts them once (section 5), while its stems and cards follow its seed. Rows of
+one role become its variants, each with its species' `sway_permille`,
 and what made each is written beside the packs (`<pack id>.creepers.json`). A kit variant may state
 `climb`, copied to its manifest. `tests/test_creeper_maker.py` makes patches from synthetic scans and
 holds them to the plant budget, the product's readers, their patch and the catalog's ranges.
@@ -767,7 +773,7 @@ first refusal:
 | The manifest's bytes: at most 256 KiB, the declared digest and size, UTF-8 JSON with no duplicate key, no `NaN` or `Infinity`, at most 32 deep, and exactly its canonical bytes | 422 `content_digest_mismatch` or `invalid_style_data` |
 | The manifest, through the reader (section 6), then origin `uploaded`, an id outside `exulanica.` and not beginning `erased.` (the ids an erasure gives), the declaration's licence and attribution, and a base that is a library version or one of the workspace's own versions that may be worn | 422 `invalid_style_data` with its `path`, `licence_mismatch`, or `style_pack_base_unavailable` |
 | The parts: exactly the manifest's files, each at its listed size and digest, a piece within its family's file size before it is opened | 422 `invalid_style_pack_body`, `content_digest_mismatch` or `over_budget` |
-| Each piece's profile (`exulanica/world/style_pack_pieces.py`): an `exulanica.static-glb/v1` container with one buffer, the binary chunk that buffer and at most three zero bytes, every buffer view packed tightly, used and read byte for byte by its accessors, no `extras`, no images, textures or samplers in a palette piece, a textured piece as section 4.1 states with each picture walked to its end, names and `asset.generator` at most 64 plain characters, `asset` holding nothing else; and its family's triangles (a second level of detail a quarter of the first's), materials and, for a textured piece, texture side, no stretch or repeat zone and a textured second level, from accessor counts; the pictures of every piece and texture at most 64 together; every piece a cover or climb rule names textured | 422 `style_pack_piece_refused` or `over_budget`, with the piece's `path` |
+| Each piece's profile (`exulanica/world/style_pack_pieces.py`): an `exulanica.static-glb/v1` container with one buffer, the binary chunk that buffer and at most three zero bytes, every buffer view packed tightly, used and read byte for byte by its accessors, no `extras`, no images, textures or samplers in a palette piece, a textured piece as section 4.1 states with each picture walked to its end, names and `asset.generator` at most 64 plain characters, `asset` holding nothing else; and its family's triangles (a second level of detail a quarter of the first's), materials and, for a textured piece, texture side, no stretch or repeat zone and a textured second level, from accessor counts; the pictures of every piece and texture at most 64 together, each once by its digest; every piece a cover or climb rule names textured | 422 `style_pack_piece_refused` or `over_budget`, with the piece's `path` |
 | The preview, walked to its end without decoding (`exulanica/world/style_pack_preview.py`) | 422 `style_pack_preview_refused` |
 | Each texture's pictures, walked the same way (`style_packs.probe_pack_image`, JPEG and PNG only, at most 2,048 pixels a side), its maps one size | 422 `style_pack_texture_refused` |
 

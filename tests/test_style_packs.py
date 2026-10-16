@@ -170,3 +170,16 @@ def test_a_pack_draws_with_at_most_its_bound_of_pictures_textures_and_pieces_tog
     with pytest.raises(style_packs.StylePackRefused) as refused:
         style_packs.check_pack_images(40, style_packs.PACK_IMAGES_MAX - 39)
     assert (refused.value.reason, refused.value.path) == ("range", "files")
+
+
+def test_textures_drawing_with_65_pictures_of_their_own_are_refused_as_before() -> None:
+    # The shared cases state the reason and path; the message is as it was before pictures were
+    # counted by digest.
+    case = next(c for c in CASES["cases"] if c["name"].startswith("textures drawing with 65"))
+    with pytest.raises(style_packs.StylePackRefused) as refused:
+        style_packs.read_manifest(case["manifest"], _context())
+    assert str(refused.value) == "files: draws with 65 pictures; at most 64"
+    shared = next(c for c in CASES["cases"] if c["name"].startswith("65 texture map files"))
+    read = style_packs.read_manifest(shared["manifest"], _context())
+    # 65 map files, one picture in two of them.
+    assert len(style_packs.texture_pictures(read)) == style_packs.PACK_IMAGES_MAX

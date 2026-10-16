@@ -65,6 +65,7 @@ __all__ = [
     "require_chain_catalog",
     "role_offer",
     "split_look_role",
+    "texture_pictures",
 ]
 
 PROFILE: Final = "exulanica.style-pack/v1"
@@ -91,7 +92,8 @@ PREVIEW_MAX_BYTES: Final = 512 * 1024
 TEXTURE_IMAGE_MEDIA_TYPES: Final = ("image/jpeg", "image/png")
 #: One texture image, at most. Its side is held to the picture walk's own bound (2,048 pixels).
 TEXTURE_IMAGE_MAX_BYTES: Final = 4 * 1024 * 1024
-#: The images one pack may draw with, its textures' and its pieces' together.
+#: The pictures one pack may draw with, its textures' and its pieces' together, each counted once
+#: by its digest.
 PACK_IMAGES_MAX: Final = 64
 #: The textures one pack may carry.
 MAX_TEXTURES: Final = 32
@@ -1355,7 +1357,7 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             if listed[path]["bytes"] > TEXTURE_IMAGE_MAX_BYTES:
                 _fail("range", where, f"a texture image is at most {TEXTURE_IMAGE_MAX_BYTES} bytes")
             used.add(path)
-            images.add(path)
+            images.add(listed[path]["sha256"])
     check_pack_images(len(images))
     for path in listed:
         if path not in used:
@@ -1381,9 +1383,21 @@ def probe_pack_image(data: bytes, media_type: str) -> PackImage:
     return PackImage(size.width_px, size.height_px, media_type)
 
 
+def texture_pictures(manifest: Mapping[str, Any]) -> frozenset[str]:
+    """The pictures a read manifest's textures draw with, each by the SHA-256 its files list states:
+    a picture two maps or two paths carry is one picture."""
+    listed = {file["path"]: file["sha256"] for file in manifest.get("files", [])}
+    return frozenset(
+        listed[texture[map_name]]
+        for texture in manifest.get("textures", {}).values()
+        for map_name in ("colour", "normal", "roughness")
+        if texture[map_name] is not None
+    )
+
+
 def check_pack_images(texture_images: int, embedded_images: int = 0) -> None:
     """Refuse a pack that draws with more pictures than :data:`PACK_IMAGES_MAX`: its textures'
-    distinct images and the images its pieces embed, counted together."""
+    and its pieces' pictures, each counted once by its digest, however many files carry it."""
     if texture_images + embedded_images > PACK_IMAGES_MAX:
         _fail(
             "range",

@@ -21,6 +21,7 @@ np = pytest.importorskip(
     "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
 )
 from exulanica.world.style_pack_pieces import (  # noqa: E402
+    PieceOutOfBounds,
     check_piece_profile,
     hold_pieces,
     read_textured_piece,
@@ -158,6 +159,76 @@ def test_the_same_row_makes_the_same_bytes_and_another_seed_another_patch(made):
     assert _creeper(made, "ivy", 2000, 6000, 41).lod0 == first.lod0
     assert _creeper(made, "ivy", 2000, 6000, 42).lod0 != first.lod0
     assert first.receipt["species"] == "ivy" and first.receipt["seed"] == 41
+
+
+def _pictures(data: bytes) -> tuple[str, ...]:
+    """The digests of the pictures a piece embeds, as the pack's count reads them."""
+    return check_piece_profile(data).image_sha256
+
+
+def _positions(data: bytes) -> list[bytes]:
+    """Each primitive's vertex positions, as the piece's binary chunk holds them."""
+    length = int.from_bytes(data[12:16], "little")
+    document = json.loads(data[20 : 20 + length])
+    binary = data[20 + length + 8 :]
+    views = [
+        document["bufferViews"][document["accessors"][p["attributes"]["POSITION"]]["bufferView"]]
+        for p in document["meshes"][0]["primitives"]
+    ]
+    return [binary[v["byteOffset"] : v["byteOffset"] + v["byteLength"]] for v in views]
+
+
+def _hold(grown: list[creeper_maker.MadeCreeper], textures: int) -> dict[str, int]:
+    """Patches as one role's variants, each with its second level, held as a pack holds them beside
+    ``textures`` texture pictures of their own."""
+    pieces, files = {}, {}
+    for index, patch in enumerate(grown):
+        first, far = f"pieces/creeper-{index}.glb", f"pieces/creeper-{index}-far.glb"
+        variant = {
+            "file": first,
+            "lod1": far,
+            "size_mm": list(patch.size_mm),
+            "stretch_mm": [None, None, None],
+        }
+        pieces |= {first: ("plant", variant, False), far: ("plant", variant, True)}
+        files |= {first: patch.lod0, far: patch.lod1}
+    return hold_pieces(
+        pieces,
+        files.__getitem__,
+        BUDGETS.families,
+        BUDGETS.lod1_share_permille,
+        [f"{k:064x}" for k in range(textures)],
+    )
+
+
+def test_a_species_variants_carry_its_pictures_and_their_own_geometry(made):
+    first, second = (_creeper(made, "ivy", 2000, 3000, seed) for seed in (21, 22))
+    for level in ("lod0", "lod1"):
+        a, b = getattr(first, level), getattr(second, level)
+        assert _pictures(a) == _pictures(b) and len(set(_pictures(a))) == 2
+        assert _positions(a) != _positions(b)
+    assert [lod["pictures_sha256"] for lod in first.receipt["lods"]] == [
+        list(_pictures(first.lod0)),
+        list(_pictures(first.lod1)),
+    ]
+
+
+def test_two_species_carry_pictures_of_their_own(made):
+    ivy, bougainvillea = (_creeper(made, name, 2000, 3000, 21) for name in ("ivy", "bougainvillea"))
+    for level in ("lod0", "lod1"):
+        # The leaf sheet is each species' own; the tests' scans give every bark one picture.
+        assert _pictures(getattr(ivy, level))[1] != _pictures(getattr(bougainvillea, level))[1]
+
+
+def test_a_species_several_variants_count_in_a_pack_as_one_variant_does(made):
+    one = [_creeper(made, "ivy", 2000, 3000, 31)]
+    three = one + [_creeper(made, "ivy", 2000, 3000, seed) for seed in (32, 33)]
+    # One variant's four pictures beside 60 of the textures' fill the count, and so do three's.
+    assert _hold(one, 60) and _hold(three, 60)
+    for grown in (one, three):
+        with pytest.raises(PieceOutOfBounds) as over:
+            _hold(grown, 61)
+        assert str(over.value) == "files: draws with 65 pictures; at most 64"
 
 
 def test_past_its_budget_a_patch_keeps_fewer_larger_cards(made):

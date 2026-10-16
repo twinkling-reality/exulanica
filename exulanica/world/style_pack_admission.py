@@ -321,17 +321,15 @@ def admit(
                 "a file is not the size and digest its manifest lists",
                 path=path,
             )
-    # The pictures the pack's textures draw with, counted once each, beside every picture its pieces
-    # embed, against the one shared count.
-    texture_images = {
-        texture[map_name]
-        for texture in manifest.get("textures", {}).values()
-        for map_name in ("colour", "normal", "roughness")
-        if texture[map_name] is not None
-    }
+    # The pictures the pack's textures draw with beside every picture its pieces embed, each once by
+    # its digest, against the one shared count.
     try:
         measured = hold_pieces(
-            pieces, files.__getitem__, budgets, lod1_share_permille, len(texture_images)
+            pieces,
+            files.__getitem__,
+            budgets,
+            lod1_share_permille,
+            style_packs.texture_pictures(manifest),
         )
     except PieceOutOfBounds as refused:
         raise StylePackAdmissionRefused(refused.code, str(refused), path=refused.path) from None
