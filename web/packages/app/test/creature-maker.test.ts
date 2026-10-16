@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import { atlasVec3 } from '@exulanica/atlas-core';
-import { DEFAULT_PLACEMENT_DISTANCE_MM, generatedRegionName } from '@exulanica/atlas-react/playcanvas';
+import { DEFAULT_PLACEMENT_DISTANCE_MM, generatedRegionName, type WorldGround } from '@exulanica/atlas-react/playcanvas';
 import { ApiError } from '@exulanica/graph-client';
 import { fartherAhead, mountCreatureMaker, offerWords, placementInGeneratedRegion, planPlacement } from '../src/composition/creature-maker.js';
+import { rememberTownLand, type TownLand } from '../src/composition/town-land.js';
 import type { CreatureDraft, CreatureDraftsClient, CreatureOffer } from '../src/creature-drafts-api.js';
 import type { CreatureSheet, CreatureSheetOffer } from '../src/ui/creature-sheet.js';
 
@@ -123,6 +124,34 @@ describe('making a creature from the open world', () => {
     // Never where this page would not show it: another region drawn, or no town at all.
     expect(placementInGeneratedRegion(town, generatedRegionName('region:other'), pose)).toBeNull();
     expect(placementInGeneratedRegion(null, generatedRegionName('region:city'), pose)).toBeNull();
+  });
+
+  it('stands a creature placed in a town on land on the ground its tiles walk, and on its land where they walk none', () => {
+    const town = { regionId: 'region:city', arrivalMm: [0, 2_000, 0] };
+    const drawn = generatedRegionName('region:city');
+    const ahead = -20_000 - DEFAULT_PLACEMENT_DISTANCE_MM;
+    const facing = (east: number) => ({ position: atlasVec3(east, 3.6, -20), forward: atlasVec3(0, 0, -1) });
+    // The town's tiles walk at 7.25 m west of 5 m east; its land, where they walk none, rises eastward.
+    const tiles = { form: 'generated-tile', tile: { navigationWorld: {
+      surface: { sample: (east: number) => (east < 5 ? { height: 7.25 } : null) },
+    } } } as unknown as WorldGround;
+    rememberTownLand('entry-1', { land: { groundM: (east: number) => 3 + east / 10 } } as unknown as TownLand);
+    try {
+      expect(placementInGeneratedRegion(town, drawn, facing(2), tiles, 'entry-1')?.transform)
+        .toMatchObject({ x_mm: 2_000, y_mm: 7_250, z_mm: ahead });
+      expect(placementInGeneratedRegion(town, drawn, facing(10), tiles, 'entry-1')?.transform)
+        .toMatchObject({ x_mm: 10_000, y_mm: 4_000, z_mm: ahead });
+      // A Companion plan adds a thing on the same ground.
+      expect(planPlacement(null, town, drawn, facing(10), tiles, 'entry-1')?.transform)
+        .toEqual({ ...placementInGeneratedRegion(town, drawn, facing(10), tiles, 'entry-1')?.transform, scale_milli: 1000 });
+      // A town whose land was not read for this entry, or no entry named, stands at the arrival's height.
+      for (const entryId of ['entry-2', null, undefined]) {
+        expect(placementInGeneratedRegion(town, drawn, facing(10), tiles, entryId)?.transform)
+          .toEqual(placementInGeneratedRegion(town, drawn, facing(10))?.transform);
+      }
+    } finally {
+      rememberTownLand('entry-1', null);
+    }
   });
 
   it('gives a Companion plan that ground in a made town, and the objects panel\'s own placement untouched', () => {

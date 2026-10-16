@@ -1634,7 +1634,7 @@ async function mountWorld(): Promise<void> {
       state.activeWorldEntry?.generatedGround ?? state.activeWorldEntry?.generatedSite,
       state.atlas?.binding.authoredSociety?.root.parent?.name,
       state.atlas?.binding.playerPose(),
-      state.atlas?.binding.worldKind?.ground,
+      state.atlas?.binding.worldKind?.ground, state.activeWorldEntry?.entryId,
     ),
     // The made kind's own stated length, read from the workspace by its digest as its figure is.
     bodyLengthMm: async (sha256) => {
@@ -1789,7 +1789,7 @@ async function mountWorld(): Promise<void> {
         active.generatedGround ?? active.generatedSite,
         state.atlas?.binding.authoredSociety?.root.parent?.name,
         state.atlas?.binding.playerPose(),
-        state.atlas?.binding.worldKind?.ground,
+        state.atlas?.binding.worldKind?.ground, active.entryId,
       );
       return {
         versionId: active.authoredVersionId,

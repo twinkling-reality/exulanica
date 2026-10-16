@@ -26,6 +26,7 @@ import {
 import { ApiError } from '@exulanica/graph-client';
 import { draftEnded, type CreatureDraft, type CreatureDraftsClient, type CreatureOffer } from '../creature-drafts-api.js';
 import type { CreatureSheet } from '../ui/creature-sheet.js';
+import { townGround } from './town-land.js';
 
 /** Where a made creature is put: a region and a pose in front of the person, as the objects panel offers one. */
 export interface CreaturePlacement {
@@ -121,25 +122,29 @@ export function fartherAhead(placement: CreaturePlacement, extraMm: number): Cre
  * thing, facing the way they face, in the one region that world's people live in. That region's
  * frame is the city's, raised to the height where a person arrives (`hostGeneratedSociety`), so a
  * point in it is the person's atlas position less that height, on the plane its people stand on.
- * A site on land (`ground`, the world's drawn ground, a site with land) hangs that region at the
- * land's datum, and the creature stands on the land there. Null unless that region is the one drawn
- * here (`drawnRegion`, the entity its people and things hang from), so a creature is never placed
- * where this page would not show it.
+ * A site on land and a town on land (`ground`, the world's drawn ground: a site with land, or a
+ * town's tiles over the land kept for the saved entry `entryId`) hang that region at the land's
+ * datum, and the creature stands on the ground there: the site's land, or the ground the town's
+ * tiles walk and its land where they walk none (`townGround`), as the town's people do. Null unless
+ * that region is the one drawn here (`drawnRegion`, the entity its people and things hang from), so
+ * a creature is never placed where this page would not show it.
  */
 export function placementInGeneratedRegion(
   generated: { readonly regionId: string; readonly arrivalMm: readonly number[] } | null | undefined,
   drawnRegion: string | null | undefined,
   pose: CameraPose | undefined,
   ground?: WorldGround,
+  entryId?: string | null,
 ): CreaturePlacement | null {
   if (generated == null || pose === undefined || drawnRegion !== generatedRegionName(generated.regionId)) return null;
-  const land = ground?.form === 'generated-site' ? ground.site.land : undefined;
-  if (land !== undefined) {
+  const groundM = ground?.form === 'generated-site' ? ground.site.land?.groundM
+    : ground?.form === 'generated-tile' && entryId != null ? townGround(entryId, ground.tile.navigationWorld) : undefined;
+  if (groundM !== undefined) {
     const there = placementPoseBeforeVisitor({ position: atlasVec3(0, 0, 0), yaw: 0, scale: 1 }, pose, DEFAULT_PLACEMENT_DISTANCE_MM);
     return {
       region_id: generated.regionId,
       transform: {
-        x_mm: there.xMm, y_mm: Math.round(land.groundM(there.xMm / 1000, there.zMm / 1000) * 1000),
+        x_mm: there.xMm, y_mm: Math.round(groundM(there.xMm / 1000, there.zMm / 1000) * 1000),
         z_mm: there.zMm, yaw_microradians: there.yawMicroradians,
       },
     };
@@ -177,9 +182,10 @@ export function planPlacement(
   drawnRegion: string | null | undefined,
   pose: CameraPose | undefined,
   ground?: WorldGround,
+  entryId?: string | null,
 ): PlanPlacement | null {
   if (panel !== null) return panel;
-  const ahead = ground === undefined ? placementInGeneratedRegion(generated, drawnRegion, pose) : placementInGeneratedRegion(generated, drawnRegion, pose, ground);
+  const ahead = placementInGeneratedRegion(generated, drawnRegion, pose, ground, entryId);
   if (ahead === null) return null;
   return { region_id: ahead.region_id, transform: { ...ahead.transform, scale_milli: 1000 } };
 }
