@@ -74,14 +74,17 @@ def test_whole_world_cold_outcome_and_calls_do_not_restore_erased_identity_words
     if tool == "town":
         responses += _plain()
     transport.responses.extend(echoed(response) for response in responses)
+    # A world made from the person's words keeps them with the world (0222); nothing else may
+    # carry them, and a refused draft keeps nothing.
+    kept = "a quiet town " + ECHO if tool == "town" else ""
     with factory() as client:
         started = _start(client, "a quiet town " + ECHO)
         assert started.status_code == 202, started.text
         ident = started.json()["draft_id"]
         ended = _ended(client, ident)
         assert ended["state"] == ("ready" if tool == "town" else "refused"), ended
-        assert ended["description"] == "" and ended["model_name"] is None
-        assert ECHO not in json.dumps(ended)
+        assert ended["description"] == kept and ended["model_name"] is None
+        assert ECHO not in json.dumps({**ended, "description": ""})
         assert len(ended["execution"]["calls"]) == (4 if tool == "town" else 2)
         for call in ended["execution"]["calls"]:
             assert (
@@ -111,5 +114,6 @@ def test_whole_world_cold_outcome_and_calls_do_not_restore_erased_identity_words
     with factory(model=False) as reader:
         cold = _read(reader, ident)
         assert cold.status_code == 200, cold.text
-        assert cold.json()["state"] == ended["state"] and ECHO not in cold.text
+        assert cold.json()["state"] == ended["state"] and cold.json()["description"] == kept
+        assert ECHO not in json.dumps({**cold.json(), "description": ""})
         assert cold.json()["execution"]["calls"] == ended["execution"]["calls"]

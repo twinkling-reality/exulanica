@@ -272,10 +272,13 @@ def test_every_world_table_names_a_registered_world(repository):
     # reserves its deterministic generated identity before a world exists, and its anchor
     # survives removal; only a ready outcome must bind to a registered saved world. The version
     # tiles inventory is never deleted, so a tombstone finds the bytes of a world erased before it.
+    # A made world's sentence is keyed to its draft's anchor and taken by the world's erasure and
+    # the workspace tombstone (0222).
     assert unkeyed == [
         "society_erasure",
         "world_draft_start",
         "world_erasure",
+        "world_made_from",
         "world_version_tile_object",
     ]
     generated = {
