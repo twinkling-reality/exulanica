@@ -5,13 +5,15 @@
  * The land is synthetic, a real chunk on the 1 m lattice read by the page's own interpolation
  * (`chunkHeightMm`), from a formula per case: a level pad 10 m above the datum under a zone 16 m by
  * 12 m, with a drop, a bank or a rise past its sides. The slots are drawn as a site drawing on land
- * draws them: draped, each a few millimetres above the land by its layer.
+ * draws them: draped, each a few millimetres above the land by its layer. The plants are stood in
+ * for by their authored sizes alone; nothing is drawn.
  */
 import { chunkHeightMm, type LandChunk } from '@exulanica/atlas-core';
 import { describe, expect, it } from 'vitest';
+import { CLIMB_STANDOFF_M } from '../src/playcanvas/style-pack/climbers.js';
 import {
-  TRAIL_DROP_LEAST_MM, TRAIL_SLOPE_LEAST_PERMILLE, findTrailEdges,
-  type TrailLand, type TrailSide, type TrailSlot, type TrailStation,
+  TRAIL_DROP_LEAST_MM, TRAIL_SLOPE_LEAST_PERMILLE, findTrailEdges, growTrailers, trailMatrix, trailRuns,
+  type TrailKept, type TrailLand, type TrailPoint, type TrailRule, type TrailSide, type TrailSlot, type TrailStation,
 } from '../src/playcanvas/style-pack/trailers.js';
 
 const LEVEL = 10_000;
@@ -174,5 +176,104 @@ describe('finding a terrace edge', () => {
     expect(new Set(reasons(away))).toEqual(new Set(['sun']));
     // With no sun drawn, the test passes every side.
     expect(kept(sideOf(findTrailEdges(zone, land, [zone], { sun_within_mdeg: 45_000 }), 'east').stations[0]!).dropMm).toBe(2000);
+  });
+});
+
+const RULE: TrailRule = { pieces: ['plant.ivy', 'plant.fern'], share_permille: 500, hang_permille: [400, 800], seed: 7 };
+const SIZES: Readonly<Record<string, readonly [number, number, number]>> = { 'plant.ivy': [400, 100, 800], 'plant.fern': [600, 150, 600] };
+const sizeOf = (piece: string): readonly [number, number, number] | null => SIZES[piece] ?? null;
+/** A face 1 m out and 2 m down, top to foot. */
+const STEEP_FACE_MM = Math.hypot(1000, 2000);
+
+/** The east side's plants over the steep cell, in order along it. */
+function grownEast(rule: TrailRule = RULE, identity = 'zone:terrace'): readonly TrailPoint[] {
+  const land = landOf((east) => LEVEL + eastFall(2000)(east));
+  const zone = { ...zoneOf(land), identity };
+  return growTrailers([{ slot: zone, rule }], land, [baseOf(land), zone], { sizeOf }).points;
+}
+
+describe('hanging plants over a terrace edge', () => {
+  it('covers the rule\'s share of a run with plants spaced evenly along it, each hanging its share of the face', () => {
+    const points = [...grownEast()].sort((a, b) => a.alongMm - b.alongMm);
+    expect(points.length).toBeGreaterThan(3);
+    const widths = points.reduce((sum, one) => sum + one.widthMm, 0);
+    // The run is the whole east side, 12 m: plants are chosen until they cover half of it.
+    expect(widths).toBeGreaterThanOrEqual(6000);
+    expect(widths).toBeLessThan(6000 + Math.max(...points.map((one) => one.widthMm)));
+    const edges = [20_000, ...points.flatMap((one) => [one.alongMm - one.widthMm / 2, one.alongMm + one.widthMm / 2]), 32_000];
+    const gaps = edges.flatMap((edge, k) => (k % 2 === 0 ? [edges[k + 1]! - edge] : []));
+    for (const gap of gaps) expect(gap).toBeCloseTo(gaps[0]!, 6);
+    for (const one of points) {
+      expect(one.side).toBe('east');
+      expect(one.topM).toEqual([36, one.alongMm / 1000, LEVEL / 1000]);
+      expect(one.hangM * 1000).toBeGreaterThanOrEqual(0.4 * STEEP_FACE_MM - 1e-6);
+      expect(one.hangM * 1000).toBeLessThanOrEqual(0.8 * STEEP_FACE_MM + 1e-6);
+      expect(one.wall).toBeNull();
+    }
+  });
+
+  it('grows the same plants for the same seed and slot, and others for another slot', () => {
+    expect(grownEast()).toEqual(grownEast());
+    const picks = (points: readonly TrailPoint[]): number[] => points.map((one) => one.pick);
+    expect(picks(grownEast(RULE, 'zone:other'))).not.toEqual(picks(grownEast()));
+    expect(picks(grownEast({ ...RULE, seed: 8 }))).not.toEqual(picks(grownEast()));
+  });
+
+  it('counts the plants its guard leaves out and the stations its bound never reads', () => {
+    const land = landOf((east) => LEVEL + eastFall(2000)(east));
+    const zone = zoneOf(land);
+    const north = slotOf(land, 'zone:upper', 'ground', [20_000, 40_000, 36_000, 52_000]);
+    const ruled = [{ slot: zone, rule: RULE }, { slot: north, rule: RULE }];
+    const all = growTrailers(ruled, land, [baseOf(land), zone, north], { sizeOf });
+    expect(all.terraces).toBe(2);
+    expect(all.leftOut).toBe(0);
+    expect(all.untried).toBe(0);
+    const guarded = growTrailers(ruled, land, [baseOf(land), zone, north], { sizeOf, most: 3 });
+    expect(guarded.points).toEqual(all.points.slice(0, 3));
+    expect(guarded.leftOut).toBe(all.points.length - 3);
+    // Each zone's four sides take 24 + 32 + 24 + 32 stations; a bound of 150 reads the first alone.
+    const bounded = growTrailers(ruled, land, [baseOf(land), zone, north], { sizeOf, stations: 150 });
+    expect(bounded.untried).toBe(112);
+    expect(bounded.terraces).toBe(1);
+    expect(bounded.points).toEqual(all.points.filter((one) => one.topM[1] < 32));
+  });
+
+  it('hangs a plant turned, never mirrored: +Y down the face, +Z away from the land, its back proud of the face', () => {
+    const point = grownEast()[0]!;
+    const bounds = [-0.2, 0, -0.05, 0.2, 0.8, 0.05];
+    const m = trailMatrix(point, bounds);
+    const scale = point.hangM / 0.8;
+    const column = (k: number): number[] => [m[4 * k]! / scale, m[4 * k + 1]! / scale, m[4 * k + 2]! / scale];
+    const [x, y, z] = [column(0), column(1), column(2)];
+    const det = x[0]! * (y[1]! * z[2]! - y[2]! * z[1]!) - y[0]! * (x[1]! * z[2]! - x[2]! * z[1]!) + z[0]! * (x[1]! * y[2]! - x[2]! * y[1]!);
+    expect(det).toBeCloseTo(1, 5);
+    // Renderer frame (east, up, south): down the face is 1 east for 2 down; away from the land is 2 east for 1 up.
+    const root5 = Math.sqrt(5);
+    [1 / root5, -2 / root5, 0].forEach((value, k) => expect(y[k]).toBeCloseTo(value, 5));
+    [2 / root5, 1 / root5, 0].forEach((value, k) => expect(z[k]).toBeCloseTo(value, 5));
+    [0, 0, 1].forEach((value, k) => expect(x[k]).toBeCloseTo(value, 5));
+    const out = CLIMB_STANDOFF_M + 0.05 * scale;
+    [36 + (2 / root5) * out, LEVEL / 1000 + (1 / root5) * out, -point.topM[1] + 0].forEach((value, k) => expect(m[12 + k]).toBeCloseTo(value, 5));
+    expect(m[15]).toBe(1);
+  });
+
+  it('hangs no plant past the foot of any face it spans', () => {
+    // The drop past the east side grows from 1.5 m at its south end to 2 m at its north end.
+    const drop = (north: number): number => 1500 + (500 * Math.min(12_000, Math.max(0, north - 20_000))) / 12_000;
+    const land = landOf((east, north) => LEVEL + (east <= 36_000 ? 0 : -(drop(north) * Math.min(1000, east - 36_000)) / 1000));
+    const zone = zoneOf(land);
+    const rule: TrailRule = { ...RULE, hang_permille: [1000, 1000] };
+    const side = sideOf(findTrailEdges(zone, land, [zone], rule), 'east');
+    expect(trailRuns(side)).toHaveLength(1);
+    const faces = side.stations.map((one) => {
+      const kept = one as TrailKept;
+      return { from: one.alongMm - side.stepMm / 2, to: one.alongMm + side.stepMm / 2, lengthMm: Math.hypot(...[0, 1, 2].map((k) => kept.footMm[k]! - kept.topMm[k]!)) };
+    });
+    const points = growTrailers([{ slot: zone, rule }], land, [zone], { sizeOf }).points;
+    expect(points.length).toBeGreaterThan(0);
+    for (const one of points) {
+      const spanned = faces.filter((face) => face.to > one.alongMm - one.widthMm / 2 && face.from < one.alongMm + one.widthMm / 2);
+      expect(one.hangM * 1000).toBeLessThanOrEqual(Math.min(...spanned.map((face) => face.lengthMm)) + 1e-6);
+    }
   });
 });

@@ -1,8 +1,9 @@
 import { LAND_CELL_MM } from '@exulanica/atlas-core';
 import type { SiteLand } from '../generated-site/site-land.js';
 import { SITE_WALKER_RADIUS_M } from '../generated-site/site-navigation.js';
-import { towardSun } from './climbers.js';
+import { CLIMB_STANDOFF_M, towardSun } from './climbers.js';
 import { slotRectMm, type CoverSlot } from './ground-cover.js';
+import { generator, seedOf } from './seeded.js';
 
 /**
  * Where plants may hang over a terrace's edge: for a ground plane of a site on land, each side of its
@@ -20,9 +21,32 @@ import { slotRectMm, type CoverSlot } from './ground-cover.js';
  * sun the rule asks for, and where a path or road, a box other than the wall hung over, or water lies
  * across the strip from the level to a walker's reach past the foot, or the foot is under water.
  *
+ * Plants grow along runs of neighbouring stations whose lips and faces agree, as climbers grow along
+ * a wall: chosen in turn until their widths cover the rule's share of the run, spaced evenly, each
+ * hanging a share of the run's shortest face, so none reaches past a foot. A plant piece is authored
+ * with its foot at y = 0 and its stems toward +Y, leaves toward +Z; the page lays +Y down the face.
+ *
  * PRESENTATION ONLY: what this finds places plants that are drawn and never walked, picked or
- * listed. Heights are millimetres above the land's datum, in the site's frame (x east, y north).
+ * listed. Heights are millimetres above the land's datum, in the site's frame (x east, y north). A
+ * site grows at most `TRAIL_PLACEMENTS_MAX` plants, counting only plants that grow: past it the
+ * plants met first keep their places and the rest are counted as left out. A run takes at most
+ * `TRAIL_PER_RUN_MAX`, and a site reads at most `TRAIL_STATIONS_MAX` stations.
  */
+
+/** The most trailing plants one site grows: a guard on the page's work, not a look's choice. */
+export const TRAIL_PLACEMENTS_MAX = 2_000;
+
+/** The most plants one run takes: a bound on a rule over a long run with narrow plants. */
+export const TRAIL_PER_RUN_MAX = 64;
+
+/**
+ * The most stations one site reads, about 70 land samples each: a bound on the work of finding edges.
+ * A slot whose stations would pass it is not read, and its stations are counted as untried.
+ */
+export const TRAIL_STATIONS_MAX = 16_000;
+
+/** Neighbouring stations are one run while their faces turn by no more than this, millidegrees: a rigid plant spans them without floating off either. */
+export const TRAIL_RUN_TURN_MDEG = 10_000;
 
 /** A drop shallower than this grows nothing by default: more than three 180 mm kerb steps, so a step or a kerb never trails. */
 export const TRAIL_DROP_LEAST_MM = 600;
@@ -124,7 +148,21 @@ export type TrailStation = {
 export interface TrailSide {
   readonly side: TrailSideName;
   readonly outward: readonly [number, number];
+  /** The stations' spacing along the side, millimetres: each stands for that much of it, centred on it. */
+  readonly stepMm: number;
   readonly stations: readonly TrailStation[];
+}
+
+/** A station where a plant may hang. */
+export type TrailKept = Extract<TrailStation, { leftOut: null }>;
+
+/** How many stations a side of this length takes: one every `TRAIL_STATION_MM`, at least one. */
+const stationsAlong = (lengthMm: number): number => Math.max(1, Math.floor(lengthMm / TRAIL_STATION_MM));
+
+/** How many stations the finder reads round a slot's four sides. */
+export function trailStationCount(slot: CoverSlot): number {
+  const [west, south, east, north] = slotRectMm(slot);
+  return 2 * stationsAlong(east - west) + 2 * stationsAlong(north - south);
 }
 
 /** The sides in the order they are read: a fixed order, since the plants hung on them are drawn from one seed in turn. */
@@ -190,7 +228,7 @@ export function findTrailEdges(
     /** How far past the side a rectangle's outer face lies. */
     const outerOf = (rect: Rect): number => side === 'west' ? edge - rect[0] : side === 'east' ? rect[2] - edge : side === 'south' ? edge - rect[1] : rect[3] - edge;
     const spans = (rect: Rect, along: number): boolean => acrossEast ? along >= rect[1] && along <= rect[3] : along >= rect[0] && along <= rect[2];
-    const count = Math.max(1, Math.floor((to - from) / TRAIL_STATION_MM));
+    const count = stationsAlong(to - from);
     const sunny = sun === null || (Math.acos(Math.max(-1, Math.min(1, outward[0] * sun[0] + outward[1] * sun[1]))) * 180_000) / Math.PI <= figures.sun_within_mdeg!;
     /** What one station finds, `along` the side. */
     const stationAt = (along: number): TrailStation => {
@@ -258,6 +296,222 @@ export function findTrailEdges(
     };
     const stations: TrailStation[] = [];
     for (let i = 0; i < count; i += 1) stations.push(stationAt(from + ((to - from) * (i + 0.5)) / count));
-    return { side, outward, stations };
+    return { side, outward, stepMm: (to - from) / count, stations };
   });
+}
+
+/** A run of neighbouring stations a plant may hang along: its side, its span along it, its stations, its shortest face. */
+export interface TrailRun {
+  readonly side: TrailSideName;
+  readonly outward: readonly [number, number];
+  /** Where the run starts and ends along the side, millimetres east or north. */
+  readonly fromMm: number;
+  readonly toMm: number;
+  readonly stations: readonly TrailKept[];
+  /** The shortest face of its stations, from top to foot, millimetres. */
+  readonly leastFaceMm: number;
+}
+
+/** Down a station's face from its top to its foot, site millimetres (east, north, up), and its length. */
+function faceOf(station: TrailKept): { readonly down: readonly [number, number, number]; readonly lengthMm: number } {
+  const v = [0, 1, 2].map((k) => station.footMm[k]! - station.topMm[k]!) as [number, number, number];
+  const lengthMm = Math.hypot(v[0], v[1], v[2]);
+  return { down: [v[0] / lengthMm, v[1] / lengthMm, v[2] / lengthMm], lengthMm };
+}
+
+/**
+ * A side's runs: its kept stations next to each other whose lips lie within `TRAIL_STRAIGHT_WITHIN_MM`
+ * of each other out from the side and up, that hang from the same wall or none, and whose faces turn
+ * by at most `TRAIL_RUN_TURN_MDEG`.
+ */
+export function trailRuns(side: TrailSide): TrailRun[] {
+  const runs: TrailRun[] = [];
+  const across = side.outward[0] !== 0 ? 0 : 1;
+  const tilt = (station: TrailKept): number => {
+    const { down } = faceOf(station);
+    return (Math.atan2(Math.hypot(down[0], down[1]), -down[2]) * 180_000) / Math.PI;
+  };
+  let current: TrailKept[] = [];
+  const close = (): void => {
+    if (current.length === 0) return;
+    const half = side.stepMm / 2;
+    runs.push({
+      side: side.side, outward: side.outward,
+      fromMm: current[0]!.alongMm - half, toMm: current[current.length - 1]!.alongMm + half,
+      stations: current, leastFaceMm: Math.min(...current.map((one) => faceOf(one).lengthMm)),
+    });
+    current = [];
+  };
+  for (const station of side.stations) {
+    if (station.leftOut !== null) { close(); continue; }
+    const last = current[current.length - 1];
+    if (last !== undefined && !(
+      Math.abs(station.lipMm[across] - last.lipMm[across]) <= TRAIL_STRAIGHT_WITHIN_MM
+      && Math.abs(station.lipMm[2] - last.lipMm[2]) <= TRAIL_STRAIGHT_WITHIN_MM
+      && station.wall === last.wall
+      && Math.abs(tilt(station) - tilt(last)) <= TRAIL_RUN_TURN_MDEG)) close();
+    current.push(station);
+  }
+  close();
+  return runs;
+}
+
+/** A trail rule as its manifest states it: its plant pieces, the share of a run they cover, how much of the face each hangs, its seed and figures. */
+export interface TrailRule extends TrailFigures {
+  readonly pieces: readonly string[];
+  readonly share_permille: number;
+  readonly hang_permille: readonly [number, number];
+  readonly seed: number;
+}
+
+/** One plant to hang: which, where along its side, how wide, where it hangs from, which way the face runs, how far it hangs. */
+export interface TrailPoint {
+  readonly piece: string;
+  /** A draw in [0, 1) that chooses among the piece's variants. */
+  readonly pick: number;
+  readonly side: TrailSideName;
+  /** The middle of the plant along its side, millimetres east or north. */
+  readonly alongMm: number;
+  readonly widthMm: number;
+  /** Where the plant hangs from, metres: east, north, up. */
+  readonly topM: readonly [number, number, number];
+  /** Down the face, a unit vector: east, north, up. */
+  readonly down: readonly [number, number, number];
+  /** The face's normal away from the land, a unit vector: east, north, up. */
+  readonly normal: readonly [number, number, number];
+  readonly hangM: number;
+  /** The wall it hangs over, by identity, or null. */
+  readonly wall: string | null;
+}
+
+/**
+ * A site's trailing plants, how many slots grow any, how many hang over a wall, how many the guard
+ * left out, and how many stations the bound on stations never read.
+ */
+export interface GrownTrail {
+  readonly points: readonly TrailPoint[];
+  readonly terraces: number;
+  readonly walled: number;
+  readonly leftOut: number;
+  readonly untried: number;
+}
+
+/** Where and how much a site's trailing plants grow: their pieces' sizes, the sun and the guards. */
+export interface TrailOptions {
+  /** The authored size (width, depth, height, millimetres) of the variant `pick` chooses of a plant role; null when the pack has none. */
+  readonly sizeOf: (piece: string, pick: number) => readonly [number, number, number] | null;
+  /** The sun's azimuth the look is drawn with, degrees; a rule's sun test passes every side when none. */
+  readonly sunAzimuthDeg?: number | null;
+  /** The most plants grown; `TRAIL_PLACEMENTS_MAX` when absent. */
+  readonly most?: number;
+  /** The most stations read; `TRAIL_STATIONS_MAX` when absent. */
+  readonly stations?: number;
+}
+
+/**
+ * Hang each ruled slot's plants over its edges, in the order given: one generator a slot from the
+ * rule's seed and the slot's identity, its sides in the finder's order, along each run plants chosen
+ * in turn until their widths cover the rule's share of it, spaced evenly, each hanging the run's
+ * shortest face times a share drawn in the rule's `hang_permille`; at most `most` in all.
+ */
+export function growTrailers(
+  ruled: readonly { readonly slot: TrailSlot; readonly rule: TrailRule }[],
+  land: TrailLand,
+  slots: readonly TrailSlot[],
+  { sizeOf, sunAzimuthDeg = null, most = TRAIL_PLACEMENTS_MAX, stations = TRAIL_STATIONS_MAX }: TrailOptions,
+): GrownTrail {
+  const points: TrailPoint[] = [];
+  let leftOut = 0;
+  let untried = 0;
+  let read = 0;
+  let terraces = 0;
+  let walled = 0;
+  for (const { slot, rule } of ruled) {
+    const count = trailStationCount(slot);
+    if (read + count > stations) {
+      untried += count;
+      continue;
+    }
+    read += count;
+    const next = generator(seedOf(rule.seed, slot.identity));
+    const [least, most_] = rule.hang_permille;
+    let grew = 0;
+    for (const side of findTrailEdges(slot, land, slots, rule, { sunAzimuthDeg })) {
+      const across = side.outward[0] !== 0 ? 0 : 1;
+      for (const run of trailRuns(side)) {
+        const lengthMm = run.toMm - run.fromMm;
+        const wanted = (lengthMm * rule.share_permille) / 1000;
+        const chosen: { piece: string; pick: number; widthMm: number; hangMm: number }[] = [];
+        let covered = 0;
+        while (covered < wanted && chosen.length < TRAIL_PER_RUN_MAX) {
+          const piece = rule.pieces[Math.floor(next() * rule.pieces.length) % rule.pieces.length]!;
+          const pick = next();
+          const hangMm = (run.leastFaceMm * (least + (most_ - least) * next())) / 1000;
+          const size = sizeOf(piece, pick);
+          if (size === null || !(size[2] > 0)) break;
+          const widthMm = (size[0] * hangMm) / size[2];
+          if (covered + widthMm > lengthMm) break;
+          chosen.push({ piece, pick, widthMm, hangMm });
+          covered += widthMm;
+        }
+        // The run's length less the plants', shared evenly before, between and after them.
+        const gap = (lengthMm - covered) / (chosen.length + 1);
+        let at = run.fromMm + gap;
+        for (const plant of chosen) {
+          const middle = at + plant.widthMm / 2;
+          at += plant.widthMm + gap;
+          if (points.length >= most) {
+            leftOut += 1;
+            continue;
+          }
+          // The face of the station the plant's middle stands at, its top moved along the side to the plant.
+          const index = Math.min(run.stations.length - 1, Math.max(0, Math.floor((middle - run.fromMm) / side.stepMm)));
+          const station = run.stations[index]!;
+          const { down } = faceOf(station);
+          const top = [...station.topMm];
+          top[1 - across] = middle;
+          // Away from the land: down the face turned a quarter up, in the plane of the side's outward and up.
+          const reach = down[0] * side.outward[0] + down[1] * side.outward[1];
+          points.push({
+            piece: plant.piece,
+            pick: plant.pick,
+            side: side.side,
+            alongMm: middle,
+            widthMm: plant.widthMm,
+            topM: [top[0]! / 1000, top[1]! / 1000, top[2]! / 1000],
+            down,
+            normal: [-down[2] * side.outward[0], -down[2] * side.outward[1], reach],
+            hangM: plant.hangMm / 1000,
+            wall: station.wall,
+          });
+          grew += 1;
+          if (station.wall !== null) walled += 1;
+        }
+      }
+    }
+    if (grew > 0) terraces += 1;
+  }
+  return { points, terraces, walled, leftOut, untried };
+}
+
+/**
+ * The column-major matrix that hangs a plant piece (glTF metres, bounds least x, y, z then most) at
+ * `point`, in renderer metres (east, up, south): +Y down the face, +Z the face's normal away from the
+ * land, +X their cross, so it turns and never mirrors; scaled whole so its height is the hang; its
+ * back (its least z) set `CLIMB_STANDOFF_M` in front of the face at the plant's top.
+ */
+export function trailMatrix(point: TrailPoint, bounds: readonly number[]): Float32Array {
+  const scale = point.hangM / bounds[4]!;
+  // Site (east, north, up) to renderer (east, up, south).
+  const y = [point.down[0], point.down[2], -point.down[1]] as const;
+  const z = [point.normal[0], point.normal[2], -point.normal[1]] as const;
+  const x = [y[1] * z[2] - y[2] * z[1], y[2] * z[0] - y[0] * z[2], y[0] * z[1] - y[1] * z[0]] as const;
+  const out = CLIMB_STANDOFF_M - bounds[2]! * scale;
+  const [east, north, up] = point.topM;
+  return new Float32Array([
+    x[0] * scale, x[1] * scale, x[2] * scale, 0,
+    y[0] * scale, y[1] * scale, y[2] * scale, 0,
+    z[0] * scale, z[1] * scale, z[2] * scale, 0,
+    east + z[0] * out, up + z[1] * out, -north + z[2] * out, 1,
+  ]);
 }
