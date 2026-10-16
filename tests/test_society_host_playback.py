@@ -16,6 +16,7 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.services import (
     KINDS_FROM_PEOPLE_ENV,
+    PERSONAL_INSTALL_ENV,
     SOCIETY_CONTROL_WORKSPACES_ENV,
     SOCIETY_OF_THINGS_ENV,
     SOCIETY_SETTING_REFUSALS,
@@ -163,6 +164,7 @@ _one = "84f363b2-eb09-4699-9711-97cda3022ff6"
         ("EXULANICA_SOCIETY_CONTROL_WORKER", "automatic", "society_control_worker_not_boolean"),
         (SOCIETY_OF_THINGS_ENV, "sometimes", "society_of_things_not_boolean"),
         (KINDS_FROM_PEOPLE_ENV, "for guests", "kinds_from_people_not_boolean"),
+        (PERSONAL_INSTALL_ENV, "mine", "personal_install_not_boolean"),
     ],
 )
 def test_a_malformed_setting_stops_startup_by_name(tmp_path, variable, value, code):
@@ -178,6 +180,65 @@ def test_a_host_makes_societies_of_things_through_its_routes_only_when_it_says_s
     for value, offered in (("on", True), ("1", True), ("off", False), ("", False)):
         services = _settings_only(tmp_path, **{SOCIETY_OF_THINGS_ENV: value})
         assert services.societies_of_things is offered, value
+
+
+def test_a_personal_install_makes_societies_of_things_unless_it_says_otherwise(tmp_path):
+    personal = {PERSONAL_INSTALL_ENV: "on"}
+    assert _settings_only(tmp_path, **personal).societies_of_things is True
+    for value, offered in (("on", True), ("", True), ("off", False), ("0", False)):
+        services = _settings_only(tmp_path, **personal, **{SOCIETY_OF_THINGS_ENV: value})
+        assert services.societies_of_things is offered, value
+    # A shared server states it, and an explicit off of the install is the same as absence.
+    assert _settings_only(tmp_path, **{PERSONAL_INSTALL_ENV: "off"}).societies_of_things is False
+    # A value that is no boolean is refused on a personal install too, never read as its default.
+    with pytest.raises(SocietySettingRefused) as refused:
+        _settings_only(tmp_path, **personal, **{SOCIETY_OF_THINGS_ENV: "sometimes"})
+    assert refused.value.code == "society_of_things_not_boolean"
+
+
+def _tokens(*grants: tuple[uuid.UUID, list[str]]) -> str:
+    """A token directory of one token per grant: its workspace and its permissions."""
+    return json.dumps(
+        {
+            f"token-{index}-{uuid.uuid4().hex}": {
+                "workspace_id": str(workspace),
+                "actor": str(uuid.uuid4()),
+                "permissions": permissions,
+            }
+            for index, (workspace, permissions) in enumerate(grants)
+        }
+    )
+
+
+def test_a_personal_install_plays_the_workspaces_its_tokens_may_write_when_it_lists_none(
+    tmp_path,
+):
+    """A person's own install plays their own worlds without a list naming them: every workspace a
+    configured token may write, which a world's playback control asks for, and no other. A list it
+    states is played instead, and a shared server plays none it does not list."""
+    first, second, read_only = sorted((uuid.uuid4() for _ in range(3)), key=str)
+    tokens = _tokens(
+        (second, ["world.read", "world.write"]),
+        (first, ["world.write"]),
+        (first, ["world.read"]),
+        (read_only, ["world.read", "library.read"]),
+    )
+    personal = {PERSONAL_INSTALL_ENV: "on", "EXULANICA_API_TOKENS": tokens}
+    services = _settings_only(tmp_path, **personal)
+    assert services.society_control_workspaces == (first, second)
+    worker = services.build_society_control_worker()
+    assert worker is not None and set(worker.workspaces) == {first, second}
+    # The positive control: an empty list is the same as none, and a stated one is played as is.
+    assert _settings_only(
+        tmp_path, **personal, **{SOCIETY_CONTROL_WORKSPACES_ENV: "[]"}
+    ).society_control_workspaces == (first, second)
+    listed = _settings_only(
+        tmp_path, **personal, **{SOCIETY_CONTROL_WORKSPACES_ENV: json.dumps([str(read_only)])}
+    )
+    assert listed.society_control_workspaces == (read_only,)
+    # The same tokens on a shared server play nothing until it lists them.
+    shared = _settings_only(tmp_path, EXULANICA_API_TOKENS=tokens)
+    assert shared.society_control_workspaces == () and not shared.society_control_enabled
 
 
 def test_a_host_takes_a_kind_of_place_from_a_person_only_when_it_says_so(tmp_path):

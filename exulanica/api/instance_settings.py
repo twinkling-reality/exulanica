@@ -84,6 +84,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_worker_not_boolean": "must be an explicit boolean",
     "society_of_things_not_boolean": "must be an explicit boolean",
     "kinds_from_people_not_boolean": "must be an explicit boolean",
+    "personal_install_not_boolean": "must be an explicit boolean",
     "worlds_on_land_not_boolean": "must be an explicit boolean",
     "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
@@ -124,15 +125,21 @@ class SocietySettingRefused(ValueError):
 #: precedence for the version it names. Nothing is ever registered or created by saving a world;
 #: a society exists only once somebody asks for it.
 SOCIETY_AUTHORED_WORLDS_ENV: Final = env_name("SOCIETY_AUTHORED_WORLDS")
-#: Whether a world's owner may make a society of things through the routes: off unless it is set
-#: on, since its people do not yet pick things up, hand them over or follow anybody, and a society
-#: made now is one every later version of its engine must keep replaying.
+#: Whether a world's owner may make a society of things through the routes. A society made is one
+#: every later version of its engine must keep replaying, so a shared server makes none unless it is
+#: set on; a personal install (:data:`PERSONAL_INSTALL_ENV`) makes them unless it is set off.
 SOCIETY_OF_THINGS_ENV: Final = env_name("SOCIETY_OF_THINGS")
 #: Whether the routes take a kind of place from a person and keep its document: drafted from
 #: their words (``POST /worlds/drafts``, ``POST /worlds/kinds/drafts``) or written by them
 #: (``POST /worlds/kinds``). Off unless it is set on. The document is the person's own and is kept
 #: in rows no removal reaches, so a deployment states this only where it can be destroyed again.
 KINDS_FROM_PEOPLE_ENV: Final = env_name("KINDS_FROM_PEOPLE")
+#: Whether this instance is a person's own install on their own computer (the acceptance launcher's
+#: ``--personal``), where every configured token is that person's own: off unless it is set on. A
+#: personal install plays the workspaces its tokens may write when
+#: ``EXULANICA_SOCIETY_CONTROL_WORKSPACES`` lists none, and makes a society of things unless
+#: ``EXULANICA_SOCIETY_OF_THINGS`` is set off. A shared server leaves it off and states both.
+PERSONAL_INSTALL_ENV: Final = env_name("PERSONAL_INSTALL")
 #: Whether a place made from a sentence stands on land chosen from its words (a land recipe,
 #: :mod:`exulanica.world.land_choice`), or on level ground as a place made before it does. Off
 #: unless it is set on.
@@ -204,6 +211,20 @@ def _explicitly_enabled(
     if normalized in ("1", "true", "on", "yes"):
         return True
     raise SocietySettingRefused(code, variable)
+
+
+def _personal_install(value: str | None) -> bool:
+    """Whether this instance is a person's own install (:data:`PERSONAL_INSTALL_ENV`), or a named
+    refusal. Absence is a shared server's answer: off."""
+    return _explicitly_enabled(value, "personal_install_not_boolean", PERSONAL_INSTALL_ENV)
+
+
+def _societies_of_things(value: str | None, *, personal: bool) -> bool:
+    """Whether the routes make a society of things (:data:`SOCIETY_OF_THINGS_ENV`), or a named
+    refusal: as stated, and when it is absent, on for a personal install and off for any other."""
+    if value is None or not value.strip():
+        return personal
+    return _explicitly_enabled(value, "society_of_things_not_boolean", SOCIETY_OF_THINGS_ENV)
 
 
 def _society_control_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:

@@ -74,6 +74,7 @@ from exulanica.api.instance_settings import (
     DATA_DIR_ENV,
     DERIVATIVE_WORKER_ENV,
     KINDS_FROM_PEOPLE_ENV,
+    PERSONAL_INSTALL_ENV,
     PLAYBACK_WORKER_ENV,
     PLAYBACK_WORKERS_ENV,
     READONLY_DATABASE_URL_ENV,
@@ -90,8 +91,10 @@ from exulanica.api.instance_settings import (
     _explicitly_enabled,
     _kinds_from_people,
     _minute_cost_scale_milli,
+    _personal_install,
     _playback_player,
     _playback_workers,
+    _societies_of_things,
     _society_control_workspaces,
     _society_opening,
     _society_tick_interval_ms,
@@ -101,6 +104,7 @@ from exulanica.api.instance_settings import (
     SOCIETY_SETTING_REFUSALS as SOCIETY_SETTING_REFUSALS,
 )
 from exulanica.api.kind_drafts import KindDrafts
+from exulanica.api.permissions import Permission
 from exulanica.api.runtime_wiring import (
     AUTHORED_WORLDS_PROFILE as AUTHORED_WORLDS_PROFILE,
 )
@@ -196,6 +200,7 @@ __all__ = [
     "DATA_DIR_ENV",
     "DERIVATIVE_WORKER_ENV",
     "KINDS_FROM_PEOPLE_ENV",
+    "PERSONAL_INSTALL_ENV",
     "PLAYBACK_WORKERS_ENV",
     "PLAYBACK_WORKER_ENV",
     "READONLY_DATABASE_URL_ENV",
@@ -331,7 +336,8 @@ class Services(ServiceRefusals, WorkerFactories):
     #: polls (:mod:`exulanica.api.kind_drafts`). Each Services holds its own.
     kind_drafts: KindDrafts = field(default_factory=KindDrafts)
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
-    #: ``build_services`` reads it from ``EXULANICA_SOCIETY_CONTROL_WORKSPACES``.
+    #: ``build_services`` reads it from ``EXULANICA_SOCIETY_CONTROL_WORKSPACES``, or on a personal
+    #: install that lists none (:data:`PERSONAL_INSTALL_ENV`), the workspaces its tokens may write.
     society_control_workspaces: tuple[uuid.UUID, ...] = ()
     #: Explicit host opt-in to discover all currently active account-owned workspaces.
     runs_society_control_worker: bool = False
@@ -1148,6 +1154,22 @@ class Services(ServiceRefusals, WorkerFactories):
         )
 
 
+def _writable_workspaces(tokens: TokenDirectory) -> tuple[uuid.UUID, ...]:
+    """The workspaces a personal install plays when it lists none: every one a configured token may
+    write (``world.write``, which a world's playback control asks for), in a stable order, so the
+    playback configuration's digest is the same at every start."""
+    return tuple(
+        sorted(
+            {
+                session.workspace_id
+                for digest, session in tokens.sessions.items()
+                if Permission.WORLD_WRITE in tokens.permissions.get(digest, frozenset())
+            },
+            key=str,
+        )
+    )
+
+
 def build_services(
     environ: Mapping[str, str] | None = None,
     *,
@@ -1212,6 +1234,7 @@ def build_services(
     store = stores.blobs
     comparison_player = _comparison_player(env_get("COMPARISON_WORKER", environ))
     playback_player = _playback_player(env_get("PLAYBACK_WORKER", environ))
+    personal = _personal_install(env_get("PERSONAL_INSTALL", environ))
 
     return Services(
         database=database,
@@ -1240,8 +1263,9 @@ def build_services(
         society_runtime=_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
-        society_control_workspaces=_society_control_workspaces(
-            env_get("SOCIETY_CONTROL_WORKSPACES", environ)
+        society_control_workspaces=(
+            _society_control_workspaces(env_get("SOCIETY_CONTROL_WORKSPACES", environ))
+            or (_writable_workspaces(tokens) if personal else ())
         ),
         society_base_tick_interval_ms=_society_tick_interval_ms(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
@@ -1251,10 +1275,8 @@ def build_services(
         ),
         society_playback_workers=_playback_workers(env_get("PLAYBACK_WORKERS", environ)),
         playback_player=playback_player,
-        societies_of_things=_explicitly_enabled(
-            env_get("SOCIETY_OF_THINGS", environ),
-            "society_of_things_not_boolean",
-            SOCIETY_OF_THINGS_ENV,
+        societies_of_things=_societies_of_things(
+            env_get("SOCIETY_OF_THINGS", environ), personal=personal
         ),
         kinds_from_people=_kinds_from_people(environ),
         worlds_on_land=_explicitly_enabled(

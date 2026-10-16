@@ -915,6 +915,34 @@ def test_the_society_of_things_is_offered_only_when_asked_and_to_the_api_alone(t
     assert parser.parse_args(["up", "--worktree", "w", "--society-of-things"]).society_of_things
 
 
+def test_a_personal_install_tells_the_api_so_and_a_shell_setting_never_does(tmp_path):
+    """The API plays a person's own workspaces and makes societies of things only on a run
+    started with ``--personal``, recorded in the run's state for a restart; the setting in the
+    shell that starts the launcher is scrubbed either way."""
+    exports = {
+        "EXULANICA_DATABASE_URL": "u",
+        "EXULANICA_READONLY_DATABASE_URL": "r",
+        "EXULANICA_PURGE_DATABASE_URL": "p",
+    }
+
+    def environment(personal: bool) -> dict[str, str]:
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={},
+            data_dir=tmp_path,
+            model=False,
+            derivative_worker=True,
+            society_playback={},
+            personal=personal,
+            environ={"EXULANICA_PERSONAL_INSTALL": "on", "HOME": "/home/someone"},
+        )
+
+    assert environment(True)["EXULANICA_PERSONAL_INSTALL"] == "on"
+    assert "EXULANICA_PERSONAL_INSTALL" not in environment(False)
+    # Nothing else of a personal install is stated here: the API derives its defaults.
+    assert set(environment(True)) - set(environment(False)) == {"EXULANICA_PERSONAL_INSTALL"}
+
+
 # -- a guest entry behind the local HTTPS edge ----------------------------------------------------
 
 

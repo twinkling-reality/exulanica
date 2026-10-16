@@ -86,7 +86,10 @@ starts exactly what it always did:
   names another or ``--no-projects`` turns them off, so a person keeps a world in a project from
   its History with no command. A run without it starts no follower unasked. Either way the
   directory must be the person's own and writable by nobody else, since the follower starts
-  whatever project folder or request it finds there.
+  whatever project folder or request it finds there. The API is told it is a person's own install
+  (``EXULANICA_PERSONAL_INSTALL=on``): with no ``--society-playback`` list it plays the workspaces
+  the run's tokens may write, so Run works from the workspace page, and it makes a society of
+  things where a world holds a placed thing, unless the environment sets either off.
 - ``--door-bridges FILE`` admits the outside programs a JSON array of bridge declarations names
   (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
   the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
@@ -876,6 +879,7 @@ def api_environment(
     creatures: Sequence[str] | None = None,
     worlds_held: int | None = None,
     projects: Path | None = None,
+    personal: bool = False,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     # The stack states the generated worlds its workspaces may hold, as a deployment does: the
@@ -900,6 +904,10 @@ def api_environment(
         environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
     if society_of_things:
         environment["EXULANICA_SOCIETY_OF_THINGS"] = "on"
+    if personal:
+        # A person's own install: the API plays the workspaces the run's tokens may write when
+        # playback lists none, and makes societies of things, as such an install does by default.
+        environment["EXULANICA_PERSONAL_INSTALL"] = "on"
     if projects is not None:
         # The API reads where each world is kept on GitHub from the directory its worker follows.
         environment["EXULANICA_PROJECTS_DIRECTORY"] = str(projects)
@@ -1992,6 +2000,7 @@ def up(arguments: argparse.Namespace) -> None:
         workspace_style_packs=bool(state.get("workspace_style_packs")),
         worlds_held=arguments.worlds_held,
         projects=projects,
+        personal=arguments.personal,
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -2347,6 +2356,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         projects=None
         if not isinstance(state.get("project_worker"), Mapping)
         else Path(str(state["project_worker"]["projects"])),
+        personal=bool(state.get("personal")),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")

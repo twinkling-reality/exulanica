@@ -323,3 +323,25 @@ def test_every_spending_process_shares_the_witness_volume():
         assert re.search(
             r"^      - spending-witness:/var/lib/exulanica-spending-witness$", block, re.M
         ), name
+
+
+#: The settings a person's own server states in its environment file and only the API reads, each
+#: with the default the composition gives it when the file is silent: off, or empty.
+_API_ONLY_OFFERS = {
+    "EXULANICA_KINDS_FROM_PEOPLE": "off",
+    "EXULANICA_SOCIETY_OF_THINGS": "off",
+    "EXULANICA_CREATURE_WORKSPACES": "",
+    "EXULANICA_PROJECTS_DIRECTORY": "",
+}
+
+
+def test_an_offer_written_in_the_environment_file_reaches_the_api_and_nothing_else():
+    """A setting the environment file names but the composition does not pass is silently off,
+    the opposite of what its author wrote. Each is passed to the API alone, off or empty when the
+    file is silent, and the example file names every one."""
+    services = _services(COMPOSE)
+    for variable, default in _API_ONLY_OFFERS.items():
+        line = f"      {variable}: ${{{variable}:-{default}}}"
+        assert re.search(f"^{re.escape(line)}$", services["api"], re.M), variable
+        assert [name for name, block in services.items() if variable in block] == ["api"]
+        assert re.search(f"^{variable}=$", ENV_EXAMPLE, re.M), variable

@@ -578,13 +578,17 @@ def test_only_the_api_makes_a_society_of_things_and_prepare_towns_dresses_the_ar
         if name != "api":
             assert "EXULANICA_SOCIETY_OF_THINGS" not in block, name
     # Off unless public.env turns it on: a server deployed from these files plays no society of
-    # things until its operator says so.
+    # things until its operator says so, in the base composition as in the overlay.
     assert re.search(
         r"^      EXULANICA_SOCIETY_OF_THINGS: \$\{EXULANICA_SOCIETY_OF_THINGS:-off\}$",
         OVERLAY_SERVICES["api"],
         re.M,
     )
-    assert "EXULANICA_SOCIETY_OF_THINGS" not in BASE_SERVICES["api"]
+    assert re.search(
+        r"^      EXULANICA_SOCIETY_OF_THINGS: \$\{EXULANICA_SOCIETY_OF_THINGS:-off\}$",
+        BASE_SERVICES["api"],
+        re.M,
+    )
     prepare = _directives(SCRIPT.read_text(encoding="utf-8")).split("  prepare-towns)", 1)[1]
     prepare = prepare.split(";;", 1)[0]
     assert "exec -T api python -m exulanica.api.arrival_dressing prepare" in prepare

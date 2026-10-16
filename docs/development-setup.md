@@ -368,6 +368,11 @@ A world's people move when playback advances their society. The API instance adv
 societies of the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, or, when
 `EXULANICA_SOCIETY_CONTROL_WORKER` is on, of every active owner's workspace and the guests' who
 are there and hold a playing place ([deployment](deployment.md)).
+A person's own install says so with `EXULANICA_PERSONAL_INSTALL=on`, which the acceptance launcher
+sets with `--personal`: with no list it plays every workspace its tokens may write, so Run works from
+the workspace page, and people brought into a world that holds a placed thing join a society of
+things, where a being can say something to someone near it, unless `EXULANICA_SOCIETY_OF_THINGS`
+is `off`.
 For a model to decide for a person, the owner's token needs `model.invoke`, and the API needs
 `NEBIUS_API_KEY` and the egress allowlist above; the owner then chooses the model in the
 application's Who decides panel. A comparison of models runs from

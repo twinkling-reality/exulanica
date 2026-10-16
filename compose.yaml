@@ -139,6 +139,14 @@ services:
       # machines themselves, so a slower host that leaves it empty admits by their figures. Only
       # this process makes a society.
       EXULANICA_MINUTE_COST_SCALE: ${EXULANICA_MINUTE_COST_SCALE:-}
+      # What a person's own server offers beyond a shared one, each off or empty unless .env says
+      # so (docs/deployment.md): kinds of place taken from a person, societies of things, creatures
+      # drafted from words for the workspaces listed, and the directory of the world projects this
+      # process reads, a path inside this container that the operator mounts. Only the API reads them.
+      EXULANICA_KINDS_FROM_PEOPLE: ${EXULANICA_KINDS_FROM_PEOPLE:-off}
+      EXULANICA_SOCIETY_OF_THINGS: ${EXULANICA_SOCIETY_OF_THINGS:-off}
+      EXULANICA_CREATURE_WORKSPACES: ${EXULANICA_CREATURE_WORKSPACES:-}
+      EXULANICA_PROJECTS_DIRECTORY: ${EXULANICA_PROJECTS_DIRECTORY:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.
