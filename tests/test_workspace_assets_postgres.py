@@ -13,6 +13,7 @@ import json
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import IO
 
@@ -499,24 +500,40 @@ def test_withdrawal_is_final_hides_everything_and_destroys_nothing(api: AssetsAp
         api.sql("delete from workspace_asset_withdrawal")
 
 
+#: Set in the test's thread while :func:`_sessions_opened` records. The test client starts each
+#: request from the calling thread in a copy of that thread's context, and each thread the request
+#: hands work to (a dependency, the route, the iteration of its body) runs in a copy of the
+#: request's. A thread the application started before the request, such as a background worker,
+#: runs in a context of its own and never sees it set.
+_RECORDING_REQUEST: ContextVar[bool] = ContextVar("recording_request", default=False)
+
+
+@contextmanager
 def _sessions_opened(
     monkeypatch: pytest.MonkeyPatch, database: Database
-) -> list[psycopg.Connection]:
-    """Every connection the application opens through its own ``database``, as it opens them.
-    A session another database opens in this process, such as an earlier test's background
-    worker still running, is not the application's and is not recorded."""
+) -> Iterator[list[psycopg.Connection]]:
+    """Every connection a request made inside this block opens through the application's own
+    ``database``, as it opens them. The application's background workers open sessions through
+    the same database on schedules of their own, such as the kind draft worker reading each
+    workspace's queue about twice a second; those are not the request's and are not recorded,
+    whatever moment of the request they fall in. Neither is a session another database opens in
+    this process, such as an earlier test's background worker still running."""
     opened: list[psycopg.Connection] = []
     session = Database.session
 
     @contextmanager
     def recording(self: Database, workspace_id: uuid.UUID) -> Iterator[psycopg.Connection]:
         with session(self, workspace_id) as connection:
-            if self is database:
+            if self is database and _RECORDING_REQUEST.get():
                 opened.append(connection)
             yield connection
 
     monkeypatch.setattr(Database, "session", recording)
-    return opened
+    marked = _RECORDING_REQUEST.set(True)
+    try:
+        yield opened
+    finally:
+        _RECORDING_REQUEST.reset(marked)
 
 
 def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
@@ -527,7 +544,6 @@ def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
     held every prepared output in memory, is not used."""
     view = api.admitted(cube(offset=(0.0, 0.0, 0.0), texture=png(64, 64)).build())
     asset, output = view["asset_id"], view["preparation"]["output"]
-    opened = _sessions_opened(monkeypatch, api.database)
     closed_at_first_chunk: list[bool] = []
     chunks = AuthorizedOutput.chunks
 
@@ -540,7 +556,8 @@ def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
 
     monkeypatch.setattr(AuthorizedOutput, "chunks", watched)
     monkeypatch.setattr(LocalContentAddressedStore, "get", whole)
-    delivered = api.get(f"/workspace-assets/{asset}/prepared/bytes")
+    with _sessions_opened(monkeypatch, api.database) as opened:
+        delivered = api.get(f"/workspace-assets/{asset}/prepared/bytes")
     assert delivered.status_code == 200, delivered.text
     assert hashlib.sha256(delivered.content).hexdigest() == output["content_sha256"]
     assert delivered.headers["content-length"] == str(len(delivered.content))
