@@ -154,6 +154,14 @@ class SocietyReads:
         snapshot, _lines, _left_out = self._read(version_id, places=places)
         return snapshot
 
+    def stored_state(self, version_id: uuid.UUID) -> dict[str, Any] | None:
+        """The society's state as stored, or None where the version holds no society: no input is
+        authorized and nothing is composed, so a writer may read it under the workspace's lock
+        without taking the asset read lock before its own write composes the society's next input.
+        For a check that compares; a read that answers a person is :meth:`snapshot`."""
+        row = self._row(version_id)
+        return None if row is None else dict(row["state"])
+
     def snapshot_and_lines(
         self, version_id: uuid.UUID, subject_id: uuid.UUID, *, limit: int = 8
     ) -> tuple[dict[str, Any], list[dict[str, Any]], int]:

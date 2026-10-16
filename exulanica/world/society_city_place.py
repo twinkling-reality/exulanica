@@ -91,6 +91,7 @@ __all__ = [
     "city_street_names",
     "place_from_city_documents",
     "place_from_city_records",
+    "town_homes",
 ]
 
 CITY_RECORDS_PROFILE: Final = "exulanica.city-records/v2"
@@ -779,6 +780,33 @@ def city_people_as_made(
     return sum(
         _people_living(_made_reached(made_records, curbs, doors_stand, routine), routine).values()
     )
+
+
+def town_homes(
+    records: Sequence[object],
+    made_records: Sequence[object],
+    routine: RoutineModel,
+    navigation: CityNavigation | None = None,
+) -> dict[str, int]:
+    """How many people the homes of each premises hold in a town as a version's changes to its
+    buildings leave it (``records``; ``made_records`` the town as made), by premises identity: the
+    residents the town's place gives each premises it reaches under ``routine``
+    (:func:`place_from_city_records`, :func:`_people_living_after`), so a lower premises holds the
+    homes its people would have. A premises the place does not reach, or that holds no homes, is
+    absent."""
+    place = place_from_city_records(
+        place_id="town-homes",
+        records=records,
+        routine=routine,
+        navigation=navigation,
+        made_records=made_records,
+    )
+    return {
+        destination["destination_id"].removeprefix("premises:"): destination["resident_capacity"]
+        for destination in place["destinations"]
+        if destination["destination_id"].startswith("premises:")
+        and destination.get("resident_capacity")
+    }
 
 
 def place_from_city_records(

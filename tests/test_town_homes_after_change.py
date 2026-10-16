@@ -27,13 +27,14 @@ from exulanica.grammar.grammars.city.generation.massing import (
 from exulanica.grammar.grammars.city.premises import PremisesRecord
 from exulanica.world.composers import composer_module
 from exulanica.world.generated_worlds import compose_generated_world
+from exulanica.world.society_city_place import town_homes
 from exulanica.world.society_living import town_routine_of
 from exulanica.world.society_walking_surfaces import (
     place_residents,
     town_head_count,
     walking_surfaces_place,
 )
-from exulanica.world.town_parts import town_buildings
+from exulanica.world.town_parts import premises_of, premises_taken, town_buildings
 from exulanica.world.town_people import people_frame
 from exulanica.world.world_recipes import town_recipe
 
@@ -200,3 +201,29 @@ def test_changes_that_leave_every_premises_alone_read_the_town_as_made():
     assert canonical_json(again) == canonical_json(made)
     assert town_head_count(made, None, routine) is None
     assert town_head_count(again, records, routine) == place_residents(made)
+
+
+def test_town_homes_are_the_homes_the_changed_town_s_place_gives_each_premises():
+    """What a lowering is refused by (``world_parts``): the homes each premises holds as the
+    changes leave the town, read from the place the society reads."""
+    routine, made = _routine(), _made().records
+    made_homes = _homes(walking_surfaces_place(PLACE, made, routine))
+    for building in town_buildings(made):
+        try:
+            lower = _with({building.identity: BuildingChange(storeys=building.storeys - 1)})
+        except BuildingStoreysRefused:
+            continue
+        kept = set(premises_of(lower, building.identity)) - set(
+            premises_taken(made, lower, building.identity)
+        )
+        homes = town_homes(lower, made, routine)
+        if any(homes.get(i, 0) < made_homes.get(i, 0) for i in kept):
+            break
+    else:
+        raise AssertionError("no lowering of the town keeps a premises that loses homes")
+    place = walking_surfaces_place(PLACE, lower, routine, made_records=made)
+    assert homes == {i: n for i, n in _homes(place).items() if n}
+    # A lower building never houses more than it did, and its neighbours house what they did.
+    assert all(homes.get(i, 0) <= made_homes.get(i, 0) for i in kept)
+    others = set(made_homes) - set(premises_of(made, building.identity))
+    assert {i: homes.get(i, 0) for i in others} == {i: made_homes[i] for i in others}

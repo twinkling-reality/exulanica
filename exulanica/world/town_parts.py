@@ -43,9 +43,12 @@ from exulanica.world.site_parts import (
 __all__ = [
     "TownBuilding",
     "building_changes",
+    "homes_refusal",
     "people_of_building",
     "people_refusal",
+    "premises_of",
     "premises_taken",
+    "residents_by_premises",
     "storeys_refusal",
     "storeys_words",
     "town_buildings",
@@ -144,25 +147,46 @@ def people_of_building(
     )
 
 
+def residents_by_premises(state: Mapping[str, Any], premises: Sequence[str]) -> dict[str, int]:
+    """How many people of a society's ``state`` live in each of ``premises``, by identity, read as
+    :func:`people_of_building` reads who is there: a society of things names a home by the town's
+    record subject (``city.premises:<identity>``), a living town by its place's destination
+    (``premises:<identity>``)."""
+    from exulanica.world.town_people import resident_of
+
+    counts = dict.fromkeys(sorted(set(premises)), 0)
+    for person in state.get("inhabitants", ()):
+        resident = resident_of(state, person)
+        home = None if resident is None else resident["home"]
+        if home is None:
+            continue
+        for key, prefix in (("subject_id", "city.premises:"), ("destination_id", "premises:")):
+            named = home.get(key)
+            identity = named[len(prefix) :] if isinstance(named, str) else None
+            if identity in counts and named.startswith(prefix):
+                counts[identity] += 1
+                break
+    return counts
+
+
+def premises_of(records: Sequence[object], building: str) -> tuple[str, ...]:
+    """The premises of ``building`` among a town's records, in identity order."""
+    return tuple(
+        sorted(
+            record.identity
+            for record in records
+            if isinstance(record, PremisesRecord) and record.building_identity == building
+        )
+    )
+
+
 def premises_taken(
     before: Sequence[object], after: Sequence[object], building: str
 ) -> tuple[str, ...]:
     """The premises of ``building`` the changed records no longer hold: what lowering it to one
     storey, or removing it, takes away."""
-    held = {
-        record.identity
-        for record in after
-        if isinstance(record, PremisesRecord) and record.building_identity == building
-    }
-    return tuple(
-        sorted(
-            record.identity
-            for record in before
-            if isinstance(record, PremisesRecord)
-            and record.building_identity == building
-            and record.identity not in held
-        )
-    )
+    held = set(premises_of(after, building))
+    return tuple(identity for identity in premises_of(before, building) if identity not in held)
 
 
 def people_refusal(
@@ -184,6 +208,18 @@ def people_refusal(
         "part_houses_people",
         {**where, "storeys": storeys},
         f"Not lower: {who}, in the storeys it would lose.",
+    )
+
+
+def homes_refusal(lost: int, *, building: str, storeys: int) -> PartChangeRefused:
+    """A lowering to ``storeys`` refused because the premises it keeps would hold fewer homes than
+    the people who live there: ``lost`` of them would lose a home, and nobody moves house. The
+    refusal's words are kept here alone."""
+    who = "1 person lives" if lost == 1 else f"{lost} people live"
+    return PartChangeRefused(
+        "part_homes_lived_in",
+        {"part_id": building, "storeys": storeys, "homes_lost": lost},
+        f"Not lowered: {who} in the homes it would lose.",
     )
 
 

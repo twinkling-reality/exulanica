@@ -1281,8 +1281,16 @@ count outside the lot's range (its typology's storeys within the district's band
 (`part_not_changeable`): a town's building stands on its lot. A removal is refused while anybody of
 the version's society lives or works in any of the building's premises, and a lowering when it takes
 away a premises somebody lives or works in, naming them as above (`part_houses_people`: "Not removed:
-Ines lives there."). A taller building's new homes stay empty, since a town's people are counted when
-its society is made; a storeys preview that may be kept says what it would be (`landing.said`:
+Ines lives there."). A lowering is refused too when a premises it keeps would hold fewer homes than
+the people of the version's society who live there, the homes counted as the town's place counts
+them under the routine its receipt names, naming how many would lose a home, since nobody moves
+house (`part_homes_lived_in`, `where.homes_lost`: "Not lowered: 3 people live in the homes it would
+lose."). Both hold for a society of things and for a living town. A write asks again under the
+workspace's lock it takes, which a society is made and steps under: a change that a society made or
+changed since the check would now refuse is refused as stale (`stale_object_base`) and nothing is
+kept; asked again, it is refused for that society's people. A taller building's new homes stay empty,
+since a town's people are counted when its society is made; a storeys preview that may be kept
+says what it would be (`landing.said`:
 "Taller: 4 storeys. Nobody lives in the new homes yet."). A kept change, and an undo or a redo
 that reverses one on any undo route, queues, in the edit's transaction, a bake of every tile the
 version's changes then alter whose bake is neither stored nor already queued or running, so a tile

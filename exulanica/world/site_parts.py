@@ -92,6 +92,8 @@ PART_CODES: Final = frozenset(
         "part_records_refused",
         "part_strands_people",
         "part_houses_people",
+        # A lowering whose kept premises would hold fewer homes than the people who live there.
+        "part_homes_lived_in",
         "parts_not_served",
         "part_storeys_refused",
         # A world on land: the land grader's own codes (LAND_WORDS).

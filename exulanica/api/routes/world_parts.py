@@ -27,7 +27,10 @@ previews (:mod:`exulanica.world.town_parts`): the city grammar makes the town ag
 version's changes and this one (:func:`~exulanica.world.generated_worlds.town_records_with`), and a
 storey count outside the lot's range is the grammar's refusal, in words. A removal is refused while
 anybody lives or works in any of the building's premises, and a lowering when it takes away a
-premises somebody lives or works in, naming them; a storeys preview says what the change would be
+premises somebody lives or works in, naming them, or leaves fewer homes than the people who live
+there, by how many. A write asks again under the workspace's lock it takes, the lock a society
+is made and steps under, and refuses as stale a change that a society made or changed since the
+request read the town would refuse; a storeys preview says what the change would be
 (``landing.said``: taller adds homes nobody lives in yet). A building is not moved: it stands on its
 lot. A kept change queues a bake of every tile it alters, in the edit's transaction
 (:func:`~exulanica.world.version_tiles.queue_version_bakes`). The parts read lists the town's
@@ -60,7 +63,12 @@ from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.grammar.errors import GrammarError
 from exulanica.grammar.grammars.city.generation.massing import BuildingStoreysRefused
 from exulanica.world.authored_delta import AlternateVersion
-from exulanica.world.errors import InvalidObjectData, InvalidStructuralData, UnknownWorldResource
+from exulanica.world.errors import (
+    InvalidObjectData,
+    InvalidStructuralData,
+    StaleObjectBase,
+    UnknownWorldResource,
+)
 from exulanica.world.generated_worlds import (
     generation_receipt,
     states_records,
@@ -93,16 +101,22 @@ from exulanica.world.site_parts import (
     refused_people_words,
 )
 from exulanica.world.society import UnknownSociety
+from exulanica.world.society_city_place import town_homes
+from exulanica.world.society_living import town_routine_of
 from exulanica.world.town_parts import (
     building_changes,
+    homes_refusal,
     people_of_building,
     people_refusal,
+    premises_of,
     premises_taken,
+    residents_by_premises,
     storeys_refusal,
     storeys_words,
     town_buildings,
 )
 from exulanica.world.version_tiles import changed_tiles, queue_version_bakes, version_changes
+from exulanica.world.workspace_lock import lock_workspace
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -283,7 +297,9 @@ def _check(world: _Site | _Town, change: PartChange) -> dict[str, Any]:
 def _town_check(town: _Town, change: PartChange) -> dict[str, Any]:
     """The town made again with ``change``: refused where its grammar refuses it, else the
     building's words, the town's buildings, the storeys it stood and the premises the change
-    takes away (those it held as made or as the version holds it, and holds no longer)."""
+    takes away (those it held as made or as the version holds it, and holds no longer); for a
+    lowering, the homes each premises it keeps would hold (``homes_after``, by the town's place
+    under the routine its receipt names, :func:`~exulanica.world.society_city_place.town_homes`)."""
     buildings = {building.identity: building for building in town_buildings(town.made.records)}
     building = buildings.get(change.identity)
     if building is None:
@@ -300,11 +316,16 @@ def _town_check(town: _Town, change: PartChange) -> dict[str, Any]:
         set(premises_taken(town.made.records, after, change.identity))
         | set(premises_taken(before, after, change.identity))
     )
+    homes_after: dict[str, int] = {}
+    if change.storeys is not None and change.storeys < stood:
+        homes = town_homes(after, town.made.records, town_routine_of(town.made.receipt))
+        homes_after = {p: homes.get(p, 0) for p in premises_of(after, change.identity)}
     return {
         "label": building.label,
         "part_ids": list(buildings),
         "storeys": stood,
         "premises_taken": taken,
+        "homes_after": homes_after,
     }
 
 
@@ -345,59 +366,64 @@ def _site_check(site: _Site, change: PartChange) -> dict[str, Any]:
 
 
 def _state(
-    request: Request, repository: WorldObjectRepository, session: Any, version_id: uuid.UUID
+    request: Request,
+    repository: WorldObjectRepository,
+    session: Any,
+    version_id: uuid.UUID,
+    *,
+    stored: bool = False,
 ) -> Any:
-    """The version's society's state, or None where the version has no society."""
+    """The version's society's state, or None where the version has no society. ``stored`` reads it
+    as stored, no input authorized, for the check a write repeats under the workspace's lock:
+    authorizing there would take the asset read lock before the write composes the society's next
+    input."""
     society = _society(repository.connection, session, request, repository.world_id)
+    if stored:
+        return society.stored_state(version_id)
     try:
         return society.snapshot(version_id)["state"]
     except UnknownSociety:
         return None
 
 
-def _town_people(
-    request: Request,
-    repository: WorldObjectRepository,
-    session: Any,
-    version_id: uuid.UUID,
-    change: PartChange,
-    answer: dict[str, Any],
-) -> None:
-    """Refuse a town's change that takes away a premises somebody of the version's society lives
-    or works in (all of a removed building's, a lowered one's upper premises), by name."""
-    if not answer["premises_taken"]:
-        return
-    state = _state(request, repository, session, version_id)
-    if state is None:
-        return
-    people = people_of_building(state, answer["premises_taken"])
+def _reads_people(world: _Site | _Town, change: PartChange, answer: dict[str, Any]) -> bool:
+    """Whether the people of the version's society may refuse a change: a site part's removal, and
+    a town's change that takes premises away or lowers a building's homes."""
+    if isinstance(world, _Town):
+        return bool(answer["premises_taken"] or answer.get("homes_after"))
+    return change.removed
+
+
+def _people_refusal(
+    world: _Site | _Town, change: PartChange, answer: dict[str, Any], state: Any
+) -> PartChangeRefused | None:
+    """Why the people of a society's ``state`` refuse a change, or None: a site part removed that
+    somebody lives or works in, or a town's premises taken away from somebody (all of a removed
+    building's, a lowered one's upper premises), by name; and a town's lowering whose kept premises
+    would hold fewer homes than the people who live there, by how many would lose a home, since
+    nobody moves house."""
+    if isinstance(world, _Site):
+        people = people_of_part(state, change.identity)
+        if not people:
+            return None
+        return PartChangeRefused(
+            "part_houses_people",
+            {"part_id": change.identity, "people": [name for name, _verb in people]},
+            refused_people_words(answer["label"], people),
+        )
+    taken, homes = answer["premises_taken"], answer.get("homes_after") or {}
+    people = people_of_building(state, taken) if taken else []
     if people:
-        raise people_refusal(
+        return people_refusal(
             people,
             building=change.identity,
             storeys=None if change.removed else change.storeys,
         )
-
-
-def _people(
-    request: Request,
-    repository: WorldObjectRepository,
-    session: Any,
-    version_id: uuid.UUID,
-    part_id: str,
-    label: str,
-) -> None:
-    """Refuse removing a part somebody of the version's society lives or works in, by name."""
-    state = _state(request, repository, session, version_id)
-    if state is None:
-        return
-    people = people_of_part(state, part_id)
-    if people:
-        raise PartChangeRefused(
-            "part_houses_people",
-            {"part_id": part_id, "people": [name for name, _verb in people]},
-            refused_people_words(label, people),
-        )
+    living = residents_by_premises(state, list(homes))
+    lost = sum(max(0, count - homes[identity]) for identity, count in living.items())
+    if lost and change.storeys is not None:
+        return homes_refusal(lost, building=change.identity, storeys=change.storeys)
+    return None
 
 
 def _answered(operation: Any) -> Any:
@@ -475,11 +501,37 @@ def _held(
     answer: dict[str, Any],
 ) -> None:
     """Refuse a change for the people of the version's society it would leave without their home
-    or their work: a site part removed, or a town's premises taken away (:func:`_town_people`)."""
-    if isinstance(world, _Town):
-        _town_people(request, repository, session, version_id, change, answer)
-    elif change.removed:
-        _people(request, repository, session, version_id, change.identity, answer["label"])
+    or their work (:func:`_people_refusal`), the society read as a person reads it: a preview and
+    the change, before it is written."""
+    if not _reads_people(world, change, answer):
+        return
+    state = _state(request, repository, session, version_id)
+    refusal = None if state is None else _people_refusal(world, change, answer, state)
+    if refusal is not None:
+        raise refusal
+
+
+def _held_still(
+    request: Request,
+    repository: WorldObjectRepository,
+    session: Any,
+    version_id: uuid.UUID,
+    world: _Site | _Town,
+    change: PartChange,
+    answer: dict[str, Any],
+) -> None:
+    """Refuse as stale a checked change that the version's society would now refuse: the write
+    asks again under the workspace's lock, which a society is made and steps under, so a society
+    made or changed since :func:`_held` read it is counted. The society is read as stored and its
+    people are not named here; asked again, the change or its preview names them."""
+    if not _reads_people(world, change, answer):
+        return
+    state = _state(request, repository, session, version_id, stored=True)
+    if state is not None and _people_refusal(world, change, answer, state) is not None:
+        raise StaleObjectBase(
+            "who lives or works where changed since the change was checked; "
+            "read it again and re-issue the edit"
+        )
 
 
 def _kept(
@@ -490,11 +542,21 @@ def _kept(
     world: _Site | _Town,
     change: PartChange,
     answer: dict[str, Any],
+    *,
+    held: Callable[[], None] | None = None,
 ) -> Callable[[], AlternateVersion]:
     """The write of a checked change: its override in the version's edit log and, for a made town,
-    a bake queued for every tile the version's changes now alter, in the same transaction."""
+    a bake queued for every tile the version's changes now alter, in the same transaction.
+
+    ``held`` asks again whether the people of the version's society refuse the change
+    (:func:`_held_still`), under the workspace's lock taken here, which the write takes again, and
+    before the override is written: a society of things reads its people from the version as it
+    stands."""
 
     def keep() -> AlternateVersion:
+        if held is not None:
+            lock_workspace(repository.connection, repository.workspace_id)
+            held()
         version = repository.set_part_change(
             version_id,
             part_override(change),
@@ -579,6 +641,29 @@ def _removal(
     return world, change, answer
 
 
+def _kept_held(
+    request: Request,
+    repository: WorldObjectRepository,
+    session: Any,
+    version_id: uuid.UUID,
+    body: EntryBoundEditBody,
+    checked: Checked,
+) -> Callable[[], AlternateVersion]:
+    """The write of a checked removal or storeys change, asked again under the edit's lock for the
+    people of the version's society it would leave without their home or work."""
+    world, change, answer = checked
+    return _kept(
+        repository,
+        version_id,
+        body,
+        session.actor,
+        world,
+        change,
+        answer,
+        held=lambda: _held_still(request, repository, session, version_id, world, change, answer),
+    )
+
+
 @router.post(
     "/versions/{version_id}/parts/{part_id}/remove",
     response_model=AlternateVersionView,
@@ -600,7 +685,7 @@ def remove_part(
         repository,
         version_id,
         body,
-        _kept(repository, version_id, body, session.actor, *checked),
+        _kept_held(request, repository, session, version_id, body, checked),
     )
 
 
@@ -678,7 +763,7 @@ def part_storeys(
         repository,
         version_id,
         body,
-        _kept(repository, version_id, body, session.actor, *checked),
+        _kept_held(request, repository, session, version_id, body, checked),
     )
 
 
