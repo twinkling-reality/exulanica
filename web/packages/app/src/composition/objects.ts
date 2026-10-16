@@ -51,32 +51,20 @@
  * a small built-in catalogue and says, every time, that what it drew was not saved.
  */
 
-import { generatedObjectHeight, type GeneratedObjectGround } from './generated-object-ground.js';
+import type { GeneratedObjectGround } from './generated-object-ground.js';
 import {
   BEHAVIOUR_REGISTRY,
   BOUNDED_PATH_KEY,
   BOUNDED_PATH_VERSION,
-  DISPLAY_EYE_HEIGHT,
-  identityDisplayFrame,
-  atlasVec3,
-  type AtlasScene,
-  type Island,
   type IslandId,
-  type SceneDisplayFrame,
 } from '@exulanica/atlas-core';
 import { tierPolicy } from '@exulanica/companion-runtime';
 import type { ConfirmationBand, ConfirmationSummary } from '@exulanica/companion-runtime';
 import {
-  AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
   DEFAULT_PLACEMENT_DISTANCE_MM,
-  MM_PER_METRE,
   fetchVerifiedObjectAsset,
   nudgedPose,
-  placementLandingPose,
-  placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
-  regionPointFromAtlas,
-  type AuthoredGround,
   type PlacedAuthoredObject,
   type RegionPose,
 } from '@exulanica/atlas-react/playcanvas';
@@ -111,7 +99,7 @@ import {
   type CompositionExplanation,
   type CompositionVerdictView,
 } from '../ui/composition-preview.js';
-import { buildConfirm, type GatedConfirmPanel } from '../ui/confirm.js';
+import { buildConfirm } from '../ui/confirm.js';
 import {
   buildObjectPlacement,
   objectUseWords,
@@ -119,13 +107,10 @@ import {
   type MotionAxisKey,
   type MotionDraft,
   type ObjectPlacementDraft,
-  type ObjectOperationGate,
-  type ObjectPlacementPanel,
   type PlacedObjectRow,
 } from '../ui/object-placement.js';
 import {
   OBJECT_ROLE_LABELS,
-  WorldObjectsClient,
   isObjectRole,
   objectWriteFailure,
   type AlternateVersion,
@@ -135,138 +120,37 @@ import {
   type ObjectWriteResult,
   type ReviewedAsset,
 } from '../world-objects-api.js';
-import type { AppEnvironment, SessionState } from './session-state.js';
-import type { DeclaredFloor } from '../world-entry-api.js';
-import type { Credentials } from '../config.js';
+import type {
+  CompanionSelectionContext,
+  DistrictObjectPlacement,
+  MountedObjects,
+  ObjectRegion,
+  ObjectsDependencies,
+} from './objects-types.js';
+import { objectRegions } from './objects-regions.js';
+import {
+  axisWords,
+  boundedPath,
+  editWords,
+  motionWords,
+  offsetWords,
+  poseOf,
+  storedMotionOf,
+} from './objects-words.js';
 
-/**
- * A world edit in words, by every edit kind the server states (`EDIT_KINDS` in
- * exulanica/world/edit_kinds.py, held to it by edit-words-parity.test.ts), `undo` aside.
- */
-export const EDIT_WORDS: Readonly<Record<string, string>> = {
-  add_object: 'an object you added',
-  move_object: 'a move',
-  remove_object: 'a removal',
-  set_object_behaviour: 'a change to an object’s motion',
-  suppress_element: 'a part of the world you hid',
-  transform_element: 'a part of the world you moved',
-  add_environment: 'an environment you added',
-  move_environment: 'an environment you moved',
-  remove_environment: 'an environment you removed',
-  add_point_map: 'a photograph’s points you placed',
-  move_point_map: 'a photograph’s points you moved',
-  remove_point_map: 'a photograph’s points you removed',
-  add_thing: 'a thing you placed',
-  move_thing: 'a thing you moved',
-  remove_thing: 'a thing you removed',
-};
+export type {
+  AuthoredObjectRegion,
+  CompanionSelectionContext,
+  DistrictObjectPlacement,
+  MountedObjects,
+  ObjectsDependencies,
+} from './objects-types.js';
+export { EDIT_WORDS } from './objects-words.js';
 
 /** How far one arrow key moves an object, in millimetres. A quarter of a step. */
 const NUDGE_STEP_MM = 250;
 /** How far one bracket key turns it, in radians. */
 const TURN_STEP = Math.PI / 12;
-
-export interface DistrictObjectPlacement {
-  readonly versionId: string;
-  readonly regionId: string;
-  readonly translationMm: readonly [number, number, number];
-  readonly boundsMm: readonly [number, number, number, number];
-}
-
-/**
- * The authored region this world places objects on, and the ground it states.
- *
- * The ground is passed through from the descriptor rather than reduced to numbers here, because a
- * ground that states it has no extent has no numbers to reduce to and the difference is the whole
- * question this surface has to answer.
- */
-export type AuthoredObjectRegion = { readonly regionId: string } & AuthoredGround;
-
-/** The scene of a region whose only surface is its declared floor. */
-const DECLARED_FLOOR_SCENE = 'declared-floor';
-
-interface ObjectRegion {
-  readonly regionId: IslandId;
-  readonly placement: Island['placement'];
-  readonly footprintRadiusLocal: number;
-  readonly sceneId: string;
-}
-
-export interface ObjectsDependencies {
-  readonly env: AppEnvironment;
-  readonly state: SessionState;
-  readonly credentials: Credentials;
-  /** The scene this mount is drawn from, for the regions an object may stand in. */
-  readonly scene: AtlasScene;
-  readonly showTravelStatus: (message: string, kind?: 'progress' | 'failure') => void;
-  /** True while the world itself is the primary surface, so the key does not fight a dialog. */
-  readonly isWorldPrimary: () => boolean;
-  readonly onOpen?: () => void;
-  /** Refresh dependent views after an accepted write; it cannot undo that write. */
-  readonly onAuthoredEdit?: (versionId: string) => Promise<void>;
-  /** Current, byte-verified authored district binding. Never a reconstructed memory frame. */
-  readonly districtPlacement?: () => DistrictObjectPlacement | null;
-  /** Exact source-independent region pinned by an authored starter entry. */
-  readonly authoredRegion?: AuthoredObjectRegion;
-  /** Late read of the active saved generated region and its authoritative navigation surface. */
-  readonly generatedGround?: () => GeneratedObjectGround | null;
-  /**
-   * The floor every region of a world that states no ground has (a world made from photographs),
-   * as its saved entry serves it: objects stand on it, in any region, reconstructed or not.
-   */
-  readonly declaredFloor?: DeclaredFloor;
-  /** The write path's confirmation panel, hidden before this surface shows its own. */
-  readonly hideWritePathConfirm: () => void;
-  /** Injectable for tests. Production builds the real authority client. */
-  readonly client?: WorldObjectsClient;
-  /** Injectable for tests. Production fetches the verified container bytes. */
-  readonly loadBytes?: (asset: ReviewedAsset, islandId: IslandId) => Promise<ArrayBuffer>;
-}
-
-/** The page's own part of a Companion plan request, in the wire's names. */
-export interface CompanionSelectionContext {
-  readonly placement: {
-    readonly region_id: string;
-    readonly transform: {
-      readonly x_mm: number; readonly y_mm: number; readonly z_mm: number;
-      readonly yaw_microradians: number; readonly scale_milli: number;
-    };
-  } | null;
-  readonly viewer: {
-    readonly x_mm: number; readonly z_mm: number; readonly yaw_microradians: number; readonly region_id?: string;
-  } | null;
-  readonly selected_object_id: string | null;
-}
-
-export interface MountedObjects {
-  readonly panel: ObjectPlacementPanel;
-  readonly confirm: GatedConfirmPanel;
-  toggle(): void;
-  /** Inspect a resident object from this selected saved version, using the same controls as its list. */
-  inspect(objectId: string): boolean;
-  close(): void;
-  /** Where the Create panel offers a small square: a saved world with an authored ground. */
-  smallSquareOffered(): boolean;
-  /** The Create panel's own small square, asked for from elsewhere with the role the person chose. */
-  arrangeSmallSquare(role: ObjectRole): void;
-  /** Stage taking back the last change, through the same confirmation as the panel's own control. */
-  undo(): void;
-  /** Whether this world holds a change that can still be taken back. */
-  undoable(): boolean;
-  /** What the world's capability descriptors allow; see `ObjectPlacementPanel.setOperationGate`. */
-  setOperationGate(gate: ObjectOperationGate): void;
-  /**
-   * Where the person points and stands, and what is selected, as a Companion plan request's
-   * `context` takes it (`ActionContextBody`): the ground ahead of them in the region they stand
-   * in, the place they stand for an arrangement, and the selected object. It engages nothing.
-   */
-  selectionContext(): CompanionSelectionContext;
-  /** A reviewed object's title by its asset key, or a placed object's by its id; null if unknown. */
-  titleOf(key: { readonly assetKey?: string | null; readonly objectId?: string | null }): string | null;
-  /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
-  begin(versionId?: string): Promise<void>;
-  dispose(): void;
-}
 
 interface Pending {
   readonly kind: 'place' | 'arrange' | 'move' | 'remove' | 'behaviour' | 'undo' | 'bootstrap';
@@ -331,6 +215,22 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   /** Refusals and clamps the runtime reported, by object, so a row can keep showing them. */
   const notices = new Map<string, string>();
   /** Objects the preview drew for this session only. Never sent anywhere. */
+
+  // Where an object may stand and where it lands, from objects-regions.ts. These are const
+  // bindings, not hoisted declarations, so they are bound before anything this mount runs.
+  const {
+    placementRegion,
+    drawnRegions,
+    regionOf,
+    floorHolds,
+    authoredContains,
+    districtContains,
+    groundIsMeasured,
+    groundMmIn,
+    placementPose,
+    showPlacementLandingMark,
+    clearPlacementLandingMark,
+  } = objectRegions(deps, env, state, currentGeneratedGround, currentDistrict);
 
   const confirm = buildConfirm({
     onConfirm: () => void commit(),
@@ -540,161 +440,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     );
   }
 
-  const poseOf = (record: AuthoredObject): RegionPose => Object.freeze({
-    xMm: record.transform.xMm,
-    yMm: record.transform.yMm,
-    zMm: record.transform.zMm,
-    yawMicroradians: record.transform.yawMicroradians,
-    scaleMilli: record.transform.scaleMilli,
-  });
-
   // -- where an object goes ------------------------------------------------------------------------
 
-  /**
-   * The region an object is placed in: the one the visitor is STANDING IN, or none.
-   *
-   * Nearest by ground-plane distance among the regions that actually draw reconstructed geometry,
-   * because an object placed in a region with nothing in it would stand on an absent floor.
-   *
-   * NEAREST IS NOT ENOUGH, and the browser check is what proved it. A visitor standing in a region
-   * with no reconstruction still has a nearest reconstructed region, on the other side of the
-   * world. Placing there converts their position into that region's frame and drops the object
-   * onto THAT region's ground, so it lands at a height they are not standing at and disappears the
-   * moment the distant region falls back to a stub. The person sees nothing and is told the
-   * placement succeeded, which is the worst of the available outcomes.
-   */
-  function placementRegion(): ObjectRegion | null {
-    const authored = authoredObjectRegion();
-    const authoredPose = state.atlas?.binding.playerPose();
-    if (authored !== null && authoredPose !== undefined && authoredContains(
-      authoredPose.position.x * MM_PER_METRE,
-      authoredPose.position.z * MM_PER_METRE,
-    )) return authored;
-    const district = currentDistrict();
-    const visitor = state.atlas?.binding.playerPose();
-    if (district !== null && visitor !== undefined && districtContains(district, visitor.position.x * MM_PER_METRE, visitor.position.z * MM_PER_METRE)) {
-      const island = regionOf(district.regionId);
-      if (island !== null) return { ...island, sceneId: 'authored-district' };
-    }
-    const drawn = drawnRegions();
-    if (drawn.length === 0) return null;
-    const pose = state.atlas?.binding.playerPose();
-    if (pose === undefined) return drawn[0]!;
-    let best: ObjectRegion | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (const candidate of drawn) {
-      const distance = Math.hypot(
-        candidate.placement.position.x - pose.position.x,
-        candidate.placement.position.z - pose.position.z,
-      );
-      const reach = candidate.footprintRadiusLocal * candidate.placement.scale * 1.5;
-      // On a declared floor, standing in a region is standing on its floor, however far its
-      // photographs reach.
-      const standing = deps.declaredFloor === undefined
-        ? distance <= reach
-        : floorHolds(regionPointFromAtlas(candidate.placement, [pose.position.x, pose.position.y, pose.position.z]));
-      if (distance < bestDistance && standing) {
-        bestDistance = distance;
-        best = candidate;
-      }
-    }
-    return best;
-  }
-
-  function drawnRegions(): readonly ObjectRegion[] {
-    const scenes = new Map<IslandId, string>();
-    for (const placed of state.placedPointMaps ?? []) scenes.set(placed.islandId, placed.sceneId);
-    for (const trained of state.trainedGeometry) scenes.set(trained.islandId, trained.sceneId);
-    for (const islandId of state.pointMaps?.keys() ?? []) {
-      if (!scenes.has(islandId)) scenes.set(islandId, `legacy:${islandId}`);
-    }
-    const reconstructed = deps.scene.islands.flatMap((island) => {
-      const sceneId = scenes.get(island.islandId)
-        ?? (deps.declaredFloor === undefined ? undefined : DECLARED_FLOOR_SCENE);
-      return sceneId === undefined ? [] : [{
-        regionId: island.islandId,
-        placement: island.placement,
-        footprintRadiusLocal: island.footprintRadiusLocal,
-        sceneId,
-      }];
-    });
-    const authored = authoredObjectRegion();
-    return authored === null ? reconstructed : [authored, ...reconstructed];
-  }
-
-  function regionOf(regionId: string): ObjectRegion | null {
-    const authored = authoredObjectRegion();
-    if (authored !== null && String(authored.regionId) === regionId) return authored;
-    const island = deps.scene.islands.find((item) => String(item.islandId) === regionId);
-    if (island === undefined) return null;
-    const district = currentDistrict();
-    if (district?.regionId === regionId) {
-      const [x, y, z] = district.translationMm;
-      return {
-        regionId: island.islandId,
-        placement: { position: atlasVec3(x / MM_PER_METRE, y / MM_PER_METRE, z / MM_PER_METRE), yaw: 0, scale: 1 },
-        footprintRadiusLocal: island.footprintRadiusLocal,
-        sceneId: 'authored-district',
-      };
-    }
-    // A live district without its authorized binding cannot fall back to an arbitrary memory root.
-    if (deps.districtPlacement !== undefined && !env.preview && !drawnRegions().some(item => String(item.regionId) === regionId)) return null;
-    return {
-      regionId: island.islandId,
-      placement: island.placement,
-      footprintRadiusLocal: island.footprintRadiusLocal,
-      sceneId: drawnRegions().find((item) => item.regionId === island.islandId)?.sceneId ?? 'unavailable',
-    };
-  }
-
-  function authoredObjectRegion(): ObjectRegion | null {
-    const region = deps.authoredRegion;
-    if (region === undefined) {
-      const generated = currentGeneratedGround();
-      return generated === null ? null : {
-        regionId: generated.regionId as IslandId,
-        placement: { position: atlasVec3(0, 0, 0), yaw: 0, scale: 1 },
-        footprintRadiusLocal: generated.navigation.fieldRadius,
-        sceneId: 'generated-region',
-      };
-    }
-    return {
-      regionId: region.regionId as IslandId,
-      placement: {
-        position: atlasVec3(0, region.elevationMm / MM_PER_METRE, 0), yaw: 0, scale: 1,
-      },
-      /*
-       * How far from the region origin somebody still counts as standing at this region.
-       *
-       * For a bounded ground that is the inscribed circle of its rectangle. For a ground with no
-       * extent it is the distance the renderer supports, because there is no nearer place the
-       * region stops being under your feet. The value stays finite either way: it is compared
-       * against real distances, and an infinity would be a number no refusal could read back.
-       */
-      footprintRadiusLocal: region.kind === 'endless'
-        ? AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M
-        : Math.min(region.halfWidthMm, region.halfDepthMm) / MM_PER_METRE,
-      sceneId: 'authored-starter',
-    };
-  }
-
-  /**
-   * Whether this world will draw and save an object at that spot on its authored ground.
-   *
-   * A bounded ground answers with its own declared rectangle: outside it there is no described
-   * surface. An endless ground has no rectangle, so the only honest limit left is how far this
-   * renderer can still draw a position, which is what
-   * `AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M` states and what the walking surface uses too.
-   * Both remain a browser constraint. `docs/saved-world-entry.md` says so: the general authored
-   * object API validates region ownership and transforms and enforces neither bound.
-   */
-  /** Whether a region-local point, in millimetres, is on its region's declared floor. */
-  function floorHolds(point: readonly [number, number, number] | readonly [number, number]): boolean {
-    const floor = deps.declaredFloor;
-    if (floor === undefined) return false;
-    const [xMm, zMm] = point.length === 3 ? [point[0], point[2]] : [point[0], point[1]];
-    return Math.abs(xMm) <= floor.halfExtentMm && Math.abs(zMm) <= floor.halfExtentMm;
-  }
+  // The rest of where an object goes is in objects-regions.ts; these two read the held version.
 
   function currentGeneratedGround(): GeneratedObjectGround | null {
     const generated = deps.generatedGround?.() ?? null;
@@ -702,119 +450,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       && generated.worldId === version.worldId && generated.versionId === version.versionId ? generated : null;
   }
 
-  function authoredContains(xMm: number, zMm: number): boolean {
-    const region = deps.authoredRegion;
-    if (region === undefined) {
-      const generated = currentGeneratedGround();
-      return generated !== null && generatedObjectHeight(generated, xMm, zMm) !== null;
-    }
-    if (region.kind === 'endless') {
-      return Math.hypot(xMm, zMm) <= AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M * MM_PER_METRE;
-    }
-    return Math.abs(xMm) <= region.halfWidthMm && Math.abs(zMm) <= region.halfDepthMm;
-  }
-
   function currentDistrict(): DistrictObjectPlacement | null {
     const district = deps.districtPlacement?.() ?? null;
     return district !== null && district.versionId === version?.versionId && !version.sourceInvalidated
       && deps.scene.islands.some(island => String(island.islandId) === district.regionId)
       ? district : null;
-  }
-
-  function districtContains(district: DistrictObjectPlacement, xMm: number, zMm: number): boolean {
-    const [west, north, east, south] = district.boundsMm;
-    return xMm >= west && xMm <= east && zMm >= north && zMm <= south;
-  }
-
-  /**
-   * A region's display frame, or the identity when it has none.
-   *
-   * The frame is not part of an object's transform: the contract poses objects region-local and
-   * the renderer draws them there directly. It is still read HERE, for one question only, which
-   * is whether `y = 0` in that region is a measured ground or an arbitrary origin.
-   */
-  function frameFor(sceneId: string): SceneDisplayFrame {
-    return state.displayFrames.get(sceneId) ?? identityDisplayFrame();
-  }
-
-  /** True when this region's ground was estimated from recovered cameras rather than assumed. */
-  function groundIsMeasured(sceneId: string): boolean {
-    return frameFor(sceneId).cameraCount > 0;
-  }
-
-  /**
-   * What counts as the ground in a region, in region-local millimetres.
-   *
-   * A display frame derived from recovered cameras puts the estimated ground at `y = 0`, so an
-   * object placed there stands on the same surface the geometry does. A region with no recovered
-   * cameras has the IDENTITY frame, whose origin is the scene's own arbitrary one, and placing at
-   * `y = 0` there drops the object under the floor the visitor is walking on. In that case the
-   * ground is taken to be the visitor's own feet, which is an approximation and is said to be one
-   * on the confirmation the person reads.
-   */
-  function groundMmIn(
-    region: ObjectRegion,
-    sceneId: string,
-    pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number } },
-  ): number {
-    if (sceneId === 'authored-starter') return 0;
-    if (sceneId === 'generated-region') {
-      const generated = currentGeneratedGround();
-      return generated === null ? Number.NaN : generatedObjectHeight(generated, pose.position.x * 1000, pose.position.z * 1000) ?? Number.NaN;
-    }
-    if (sceneId === 'authored-district') return -(currentDistrict()?.translationMm[1] ?? 0);
-    // Every region of a world made from photographs stands on its declared floor.
-    if (deps.declaredFloor !== undefined) return deps.declaredFloor.elevationMm;
-    if (groundIsMeasured(sceneId)) return 0;
-    return regionPointFromAtlas(
-      region.placement,
-      [pose.position.x, pose.position.y - DISPLAY_EYE_HEIGHT, pose.position.z],
-    )[1];
-  }
-
-  /**
-   * Where a new object lands: on an engaged anchor, or a step in front of the visitor.
-   *
-   * The focused anchor is what "the focused point" means in this application: there is no picked
-   * world point, and `engageFocusedAnchor` is the one public read of what the reticle has settled
-   * on. When nothing is engaged, the object goes on the ground ahead, facing the person.
-   */
-  function placementPose(region: ObjectRegion, sceneId: string): RegionPose | null {
-    const binding = state.atlas?.binding;
-    if (binding === undefined) return null;
-    const pose = binding.playerPose();
-    const ground = groundMmIn(region, sceneId, pose);
-    const index = sceneId === 'authored-district' || sceneId === 'authored-starter' || sceneId === 'generated-region'
-      ? null : binding.engageFocusedAnchor();
-    if (index !== null) {
-      const at = index * 3;
-      const positions = binding.table.atlasPositions;
-      if (at + 2 < positions.length) {
-        return placementPoseAtAtlasPoint(
-          region.placement,
-          [positions[at]!, positions[at + 1]!, positions[at + 2]!],
-          pose,
-          ground,
-        );
-      }
-    }
-    const candidate = placementPoseBeforeVisitor(region.placement, pose, DEFAULT_PLACEMENT_DISTANCE_MM, ground);
-    if (sceneId !== 'generated-region') return candidate;
-    const generated = currentGeneratedGround();
-    const height = generated === null ? null : generatedObjectHeight(generated, candidate.xMm, candidate.zMm);
-    return height === null ? null : { ...candidate, yMm: height };
-  }
-
-  /**
-   * Draw the pose held for confirmation on the ground: the same `RegionPose` preview and apply
-   * send. The field mark is the world field's placement landing, not the Map visitor triangle.
-   */
-  function showPlacementLandingMark(region: ObjectRegion, pose: RegionPose): void {
-    state.atlas?.binding.field.setPlacementLandingPose(placementLandingPose(region.placement, pose));
-  }
-
-  function clearPlacementLandingMark(): void {
-    state.atlas?.binding.field.setPlacementLandingPose(null);
   }
 
   // -- proposing -----------------------------------------------------------------------------------
@@ -1602,57 +1242,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   function selectedRecord(): AuthoredObject | null {
     return selectedId === null ? null : recordOf(selectedId);
-  }
-
-  function axisWords(axis: MotionAxisKey): string {
-    return { x: 'side to side', y: 'up and down', z: 'forward and back' }[axis] ?? String(axis);
-  }
-
-  /** The reviewed behaviour a motion draft names, in the registry's own parameter names. */
-  function boundedPath(motion: MotionDraft): ObjectBehaviour {
-    return {
-      behaviourKey: BOUNDED_PATH_KEY,
-      behaviourVersion: BOUNDED_PATH_VERSION,
-      parameters: {
-        axis: motion.axis,
-        easing: motion.easing,
-        travel_mm: motion.travelMm,
-        period_milliseconds: motion.periodMilliseconds,
-      },
-    };
-  }
-
-  function motionWords(motion: MotionDraft): string {
-    return `${axisWords(motion.axis)}, ${(motion.travelMm / MM_PER_METRE).toFixed(2)} m out and `
-      + `back every ${(motion.periodMilliseconds / 1000).toFixed(1)} s, `
-      + (motion.easing === 'linear' ? 'at an even pace' : 'easing in and out');
-  }
-
-  /** The stored motion in the panel's own controls, or null when they cannot show it exactly. */
-  function storedMotionOf(record: AuthoredObject): MotionDraft | null {
-    const behaviour = record.behaviour;
-    if (behaviour === null || behaviour.behaviourKey !== BOUNDED_PATH_KEY
-      || behaviour.behaviourVersion !== BOUNDED_PATH_VERSION) return null;
-    const read = BEHAVIOUR_REGISTRY.readParameters(
-      behaviour.behaviourKey, behaviour.behaviourVersion, behaviour.parameters,
-    );
-    if (!read.ok || read.clamped.length > 0) return null;
-    return Object.freeze({
-      axis: String(read.parameters['axis']),
-      easing: String(read.parameters['easing']),
-      travelMm: Number(read.parameters['travel_mm']),
-      periodMilliseconds: Number(read.parameters['period_milliseconds']),
-    });
-  }
-
-  function editWords(kind: string): string {
-    return EDIT_WORDS[kind] ?? 'a change the page has no words for';
-  }
-
-  function offsetWords(record: AuthoredObject, pose: RegionPose): string {
-    const saved = poseOf(record);
-    const moved = Math.hypot(pose.xMm - saved.xMm, pose.yMm - saved.yMm, pose.zMm - saved.zMm);
-    return moved === 0 ? '' : `, about ${(moved / MM_PER_METRE).toFixed(2)} of a step from where it is saved`;
   }
 
   function motionOf(record: AuthoredObject): PlacedObjectRow['motion'] {

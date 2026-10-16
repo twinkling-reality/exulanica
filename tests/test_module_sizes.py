@@ -84,10 +84,6 @@ LIMITS: dict[str, tuple[int, str]] = {
         1_939,
         "reopening a personal world at a saved state, and making a town on its land",
     ),
-    "web/packages/app/src/composition/objects.ts": (
-        1_888,
-        "the authored objects surface: place, move, run, remove, undo",
-    ),
     "exulanica/world/society_decision_contract.py": (
         1_537,
         "the contract a model answers under when it runs a person",
