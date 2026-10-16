@@ -76,7 +76,7 @@ from typing import Final, TypeAlias
 
 from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.landform import CELL_MM as LAND_CELL_MM
-from exulanica.grammar.landform import LandformRefused, WorldFrame, realize_region
+from exulanica.grammar.landform import LandformRefused, NearLand, WorldFrame, realize_region
 from exulanica.grammar.volumes.document import (
     PROFILE,
     PartValue,
@@ -97,8 +97,10 @@ __all__ = [
     "TOP_LAND_CELL_MM",
     "TopLandSurface",
     "VolumeField",
+    "realize_top_land",
     "smooth_max",
     "smooth_min",
+    "top_land_frame",
 ]
 
 #: Within this distance of a surface every value is the whole field's value.
@@ -387,6 +389,25 @@ class _Beds:
         return max(-self.bedding, min(self.bedding, value))
 
 
+def top_land_frame(top: TopLand, volume_id: str) -> WorldFrame:
+    """The frame a volume's top land is realized in: its square, its seed drawn from the volume's
+    id alone."""
+    seed = hashlib.sha256(PROFILE.encode() + b"\x1ftop_land\x1f" + volume_id.encode())
+    return WorldFrame(width_mm=top.side_mm, depth_mm=top.side_mm, seed=seed.hexdigest())
+
+
+def realize_top_land(top: TopLand, volume_id: str) -> NearLand:
+    """A volume's natural top: its land realized over its square on the land's own lattice, in the
+    square's frame (its south-west corner the land's origin), or a refusal by its path under
+    ``top_land.land``. The one realization a top land's surface and anything laid out on it read."""
+    side = top.side_mm
+    try:
+        return realize_region(top.land, top_land_frame(top, volume_id), 0, 0, side, side)
+    except LandformRefused as refused:
+        inner = f"top_land.land.{refused.path}" if refused.path else "top_land.land"
+        raise VolumeRefused(f"{volume_id}: {refused.detail}", path=inner) from refused
+
+
 class TopLandSurface:
     """A top land's surface: its heights realized once on its square's lattice, read between them
     by the floor of their bilinear blend and outside the square at its nearest edge point."""
@@ -395,13 +416,7 @@ class TopLandSurface:
 
     def __init__(self, top: TopLand, volume_id: str) -> None:
         side = top.side_mm
-        seed = hashlib.sha256(PROFILE.encode() + b"\x1ftop_land\x1f" + volume_id.encode())
-        frame = WorldFrame(width_mm=side, depth_mm=side, seed=seed.hexdigest())
-        try:
-            near = realize_region(top.land, frame, 0, 0, side, side)
-        except LandformRefused as refused:
-            inner = f"top_land.land.{refused.path}" if refused.path else "top_land.land"
-            raise VolumeRefused(f"{volume_id}: {refused.detail}", path=inner) from refused
+        near = realize_top_land(top, volume_id)
         self._half = side // 2
         self._count = near.nx
         self._heights = near.heights

@@ -29,6 +29,7 @@ belongs to the [world kinds contract](world-kinds-contract.md).
 - [Walkable surfaces and reach](#walkable-surfaces-and-reach)
 - [Volume rules and landscape rules](#volume-rules-and-landscape-rules)
 - [A site on a landscape](#a-site-on-a-landscape)
+- [Grading a site on a volume's top](#grading-a-site-on-a-volumes-top)
 - [Readers in the browser](#readers-in-the-browser)
 - [Sky islands](#sky-islands)
 - [Refusals](#refusals)
@@ -354,6 +355,28 @@ counterclockwise seen from above. The drawing, each chunk and each top are serve
 `.../landscape/top?sha256=`, world read). A receipt whose landscape no longer reads under the rules it
 names, or is not the one its digest and land name, is refused by name and listed unavailable.
 
+## Grading a site on a volume's top
+
+`site_top` (`exulanica/world/site_top.py`) grades a volume's top land for a site laid out on it, as
+a site's land is graded; no route or composer uses it yet, so no world stands on a volume's top. The
+site keeps its own frame: its south-west corner stands at a whole-metre point of the volume's
+frame, and its height zero is the volume's level 0, the top land's datum, whatever the volume's
+altitude. The natural top is the same realization the field caps the rock by
+(`realize_top_land`), moved into the site's frame on the same 1 m lattice. The site's records grade
+it with the land's grader over the whole square, so banks run out to the rim, every zone is a level
+pad and every walking edge stays within one step, as on land; the deepest cut or fill is the bound
+the site states. A top is graded under the land rules the volume rules name for a top land (land
+rules 3 under volume rules 3), never the newest land rules, so a later land version never moves a
+graded top. `compose_site` takes the top in place of land. Heights between lattice points
+follow the graded land's triangle rule. The graded top is a document, `exulanica.site-top/v1`: the
+graded heights from the south-west corner, rows from the south, and the water standing on them.
+
+A site that does not lie inside the square, or not at whole metres, is refused
+(`landscape_site_outside_top`), and so is a top whose land has a shore
+(`landscape_site_top_has_sea`: the sea is the ground's); every refusal of the grader holds as on
+land. Whether the rock under a graded top holds it, where a fill rises above the natural top, is
+not checked here.
+
 ## Readers in the browser
 
 `readLandscapeDrawing` and `readVolumeChunk` (`web/packages/atlas-core/src/landscape.ts`) read the
@@ -478,6 +501,8 @@ made volumes by digest.
 | `island_too_deep` | An island's depth is more than three times its radius |
 | `island_rim_too_thick` | An island's rim slab is thicker than its radius or half its depth |
 | `island_later_version` | An island states a site, hangings or falls, which later versions state, or a top under island catalog version 1 |
+| `landscape_site_outside_top` | A site graded on a volume's top does not lie inside its square, or not at whole metres |
+| `landscape_site_top_has_sea` | A site is graded on a top whose land has a shore |
 | `landscape_arrival_not_ground` | The arrival a landscape's surfaces are reached from is not walkable ground |
 
 ## Limits

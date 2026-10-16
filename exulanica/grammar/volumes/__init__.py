@@ -44,6 +44,8 @@ from exulanica.grammar.volumes.field import (
     TOP_LAND_CELL_MM,
     TopLandSurface,
     VolumeField,
+    realize_top_land,
+    top_land_frame,
 )
 from exulanica.grammar.volumes.noise3 import Noise3
 from exulanica.grammar.volumes.realize import (
@@ -107,8 +109,10 @@ __all__ = [
     "read_volume_document",
     "read_volume_sheet",
     "realize_chunk",
+    "realize_top_land",
     "realize_volume",
     "sin_cos",
+    "top_land_frame",
     "turn_matrix",
     "volume_catalog",
     "volume_chunks",

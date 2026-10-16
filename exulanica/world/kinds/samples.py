@@ -26,7 +26,7 @@ and every candidate's sentence. The outcome of every sample is the validation re
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -40,6 +40,7 @@ from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused
 from exulanica.world.kinds.routine import kind_routine
 from exulanica.world.site_land import land_seed, site_land
+from exulanica.world.site_top import OnTop, site_top
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_place import validate_place
 from exulanica.world.society_site_place import (
@@ -221,6 +222,7 @@ def compose_site(
     candidates: int | None = None,
     budget: LayoutBudget | None = None,
     land: LandDocument | None = None,
+    top: OnTop | None = None,
 ) -> SiteWorld:
     """The world ``kind`` makes with ``values`` for ``world_id``: the first seed candidate whose
     site is laid out within ``budget`` (by default each candidate within the bounds catalog's
@@ -230,7 +232,11 @@ def compose_site(
     With ``land``, each candidate's layout grades the land (:mod:`exulanica.world.site_land`) under
     the land rules new worlds name, and its place stands on the graded land; a layout the land
     cannot take is refused with the grading's sentence and the next candidate tried, and the kind's
-    needs are checked on the graded place. Without it, nothing here differs from a level site."""
+    needs are checked on the graded place. With ``top`` instead, the same is done on a volume's top
+    land under the land rules the top names (:mod:`exulanica.world.site_top`). Without either,
+    nothing here differs from a level site."""
+    if land is not None and top is not None:
+        raise ValueError("a site is laid out on land or on a volume's top, not both")
     bounds = load_kind_catalogs().bounds
     tries = bounds["candidates"][0] if candidates is None else candidates
     budget = layout_budget() if budget is None else budget
@@ -274,26 +280,26 @@ def compose_site(
             )
             continue
         records = site_records(generation)
-        ground = None
-        if land is not None:
-            try:
-                graded = site_land(
-                    land,
-                    records,
-                    land_seed(world_id, land.sha256),
-                    routine.policy["footway_station_spacing_mm"],
-                    rules_version=LAND_RULES_VERSION,
-                )
-            except LandformRefused as exc:
-                refused.append(
-                    {
-                        "candidate": candidate,
-                        "code": "kind_generation_refused",
-                        "refusal": f"its land cannot take this layout: {exc.detail}"[:500],
-                    }
-                )
-                continue
-            ground = graded.height_at
+        ground: Callable[[int, int], int] | None = None
+        try:
+            if land is not None:
+                station = routine.policy["footway_station_spacing_mm"]
+                realized = land_seed(world_id, land.sha256)
+                ground = site_land(
+                    land, records, realized, station, rules_version=LAND_RULES_VERSION
+                ).height_at
+            elif top is not None:
+                station = routine.policy["footway_station_spacing_mm"]
+                ground = site_top(top, records, station).height_at
+        except LandformRefused as exc:
+            refused.append(
+                {
+                    "candidate": candidate,
+                    "code": "kind_generation_refused",
+                    "refusal": f"its land cannot take this layout: {exc.detail}"[:500],
+                }
+            )
+            continue
         try:
             # The graph's budget is held while it is built, so an oversized site stops early.
             place = place_from_site_records(

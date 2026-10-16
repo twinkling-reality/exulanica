@@ -69,6 +69,7 @@ from exulanica.grammar.landform import (
     LandChunk,
     LandDocument,
     LandformRefused,
+    NearLand,
     Pad,
     WaterBody,
     WorldFrame,
@@ -90,8 +91,10 @@ __all__ = [
     "ROUNDING_MARGIN_MM",
     "SiteLand",
     "check_receipt_land_rules",
+    "graded_height_at",
     "land_seed",
     "path_grade_permille",
+    "records_digest",
     "site_grading",
     "site_land",
     "site_land_of",
@@ -229,6 +232,23 @@ def site_grading(records: Sequence[object], station_mm: int, *, rules_version: i
     )
 
 
+def graded_height_at(near: NearLand, x_mm: int, y_mm: int) -> int:
+    """Graded heights' height at a point of the site's frame, millimetres above the datum, floored:
+    the plane of the triangle the point lies in (each cell split along its south-west to
+    north-east diagonal), and beyond the heights the nearest edge's."""
+    gx, gy = x_mm - near.x0, y_mm - near.y0
+    i = min(near.nx - 2, max(0, gx // CELL_MM))
+    j = min(near.ny - 2, max(0, gy // CELL_MM))
+    fx = min(CELL_MM, max(0, gx - i * CELL_MM))
+    fy = min(CELL_MM, max(0, gy - j * CELL_MM))
+    h = near.heights
+    h00, h10 = h[j * near.nx + i], h[j * near.nx + i + 1]
+    h01, h11 = h[(j + 1) * near.nx + i], h[(j + 1) * near.nx + i + 1]
+    if fx >= fy:
+        return h00 + ((h10 - h00) * fx + (h11 - h10) * fy) // CELL_MM
+    return h00 + ((h11 - h01) * fx + (h01 - h00) * fy) // CELL_MM
+
+
 @dataclass(frozen=True)
 class SiteLand:
     """A site's land, graded by its layout."""
@@ -239,21 +259,8 @@ class SiteLand:
     water: tuple[WaterBody, ...]
 
     def height_at(self, x_mm: int, y_mm: int) -> int:
-        """The graded land's height at a point of the site's frame, millimetres above the datum,
-        floored: the plane of the triangle the point lies in (each cell split along its
-        south-west to north-east diagonal)."""
-        near = self.graded.near
-        gx, gy = x_mm - near.x0, y_mm - near.y0
-        i = min(near.nx - 2, max(0, gx // CELL_MM))
-        j = min(near.ny - 2, max(0, gy // CELL_MM))
-        fx = min(CELL_MM, max(0, gx - i * CELL_MM))
-        fy = min(CELL_MM, max(0, gy - j * CELL_MM))
-        h = near.heights
-        h00, h10 = h[j * near.nx + i], h[j * near.nx + i + 1]
-        h01, h11 = h[(j + 1) * near.nx + i], h[(j + 1) * near.nx + i + 1]
-        if fx >= fy:
-            return h00 + ((h10 - h00) * fx + (h11 - h10) * fy) // CELL_MM
-        return h00 + ((h11 - h01) * fx + (h01 - h00) * fy) // CELL_MM
+        """The graded land's height at a point of the site's frame (:func:`graded_height_at`)."""
+        return graded_height_at(self.graded.near, x_mm, y_mm)
 
     def chunks(self) -> tuple[LandChunk, ...]:
         return self.graded.near.chunks()
@@ -304,7 +311,8 @@ def land_seed(world_id: str, land_sha256: str) -> str:
     return hashlib.sha256(f"exulanica.landform:{world_id}:{land_sha256}".encode()).hexdigest()
 
 
-def _records_digest(records: Sequence[object]) -> str:
+def records_digest(records: Sequence[object]) -> str:
+    """The digest of a site's records, in their order: what a kept graded land is keyed by."""
     from exulanica.grammar.records import canonical_record
 
     digest = hashlib.sha256()
@@ -329,7 +337,7 @@ def site_land(
     or refuse by name. Kept for the process by the land, the records, the seed, the station spacing
     and the rules version: the composer, the drawing, the land routes and the place each ask for
     the same graded land."""
-    key = (land.sha256, _records_digest(records), seed, station_mm, rules_version)
+    key = (land.sha256, records_digest(records), seed, station_mm, rules_version)
     if key not in _KEPT:
         extent = next(r for r in records if isinstance(r, SiteExtentRecord))
         frame = WorldFrame(width_mm=extent.width_mm, depth_mm=extent.depth_mm, seed=seed)
