@@ -76,6 +76,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the contract a model answers under when it runs a person",
     ),
     "exulanica/selection/kind_brief.py": (1_529, "a kind of world as a model drafts it"),
+    "tools/previews/world-workspace/contextual-world.ts": (
+        1_518,
+        "the world view's host: its corners, people, speech, building and History hooks",
+    ),
     "exulanica/world/society_catalogs.py": (1_509, "the living society routine model as data"),
 }
 
