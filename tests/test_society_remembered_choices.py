@@ -62,6 +62,8 @@ BEFORE = [
     "exulanica-ability/remember/v1",
     "exulanica-ability/say/v2",
 ]
+#: What it recorded of movement, swimming being built after both.
+BEFORE_MOVEMENT = ["exulanica-movement/walking/v2"]
 #: The prompt such a society's stored requests record.
 BEFORE_PROMPT = "society-person-choice/v6"
 #: The kinds of option the script answers with, in turn, whenever the knight is asked: a walk to a
@@ -90,6 +92,7 @@ def _before(document: dict[str, Any]) -> dict[str, Any]:
     earlier = copy.deepcopy(document)
     earlier["modules"] = list(BEFORE)
     earlier["population_kind"] = dict(FIRST_VILLAGER)
+    earlier["movement_modules"] = list(BEFORE_MOVEMENT)
     earlier["document_sha256"] = input_sha256(earlier)
     return earlier
 

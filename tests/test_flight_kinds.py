@@ -99,8 +99,8 @@ def _bird(document: dict[str, Any]) -> dict[str, Any]:
     ("mutate", "match"),
     [
         (
-            lambda e: e.update(module="exulanica-movement/swimming/v1"),
-            "unknown movement module 'exulanica-movement/swimming/v1'",
+            lambda e: e.update(module="exulanica-movement/no-such-movement/v1"),
+            "unknown movement module 'exulanica-movement/no-such-movement/v1'",
         ),
         (
             lambda e: e.update(module="exulanica-movement/walking/v1"),

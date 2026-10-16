@@ -15,7 +15,7 @@ from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.canonical import sha256_of_canonical
-from exulanica.things.bodies import BodyRecipe, BuiltBody, build_body
+from exulanica.things.bodies import BodyRecipe, BuiltBody, built_again
 from exulanica.things.catalogs import read_body_plan
 from exulanica.things.looks import LOOK_PROFILE, Look, read_look
 from exulanica.things.pieces import MeshPart, Node, write_container
@@ -231,14 +231,8 @@ def author_surface_look(
     """
     spec = _closed(document, {"profile", "plan_sha256", "recipe_sha256", "parts"}, "surface")
     plan = read_body_plan(dict(built.plan))
-    expected = build_body(
-        recipe,
-        key=plan.key,
-        version=plan.version,
-        title=str(built.plan["title"]),
-        origin=built.plan["origin"],
-    )
-    if dict(expected.plan) != dict(built.plan) or dict(expected.joints) != dict(built.joints):
+    expected = built_again(recipe, built.plan)
+    if expected is None or dict(expected.joints) != dict(built.joints):
         raise BodySurfaceRefused("surface body and rest joints must match the recipe's builder")
     if (
         spec["profile"] != SURFACE_PROFILE

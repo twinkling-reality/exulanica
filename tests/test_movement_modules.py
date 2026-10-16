@@ -51,7 +51,7 @@ from exulanica.world.society_planner import (
 from living_square_support import run as run_square
 from society_living_fixtures import GRID_SOCIETY, SEEDS, grid_input, grid_place, routine
 
-UNKNOWN = "exulanica-movement/swimming/v1"
+UNKNOWN = "exulanica-movement/no-such-movement/v1"
 
 
 def _table() -> dict:
@@ -69,7 +69,7 @@ def _load(tmp_path: Path, document: dict):
 
 def test_an_unknown_module_is_refused_by_name():
     for lookup in (movement_module, built_module, steps.step_of):
-        with pytest.raises(UnknownMovementModule, match="swimming/v1"):
+        with pytest.raises(UnknownMovementModule, match="no-such-movement/v1"):
             lookup(UNKNOWN)
     with pytest.raises(UnknownMovementModule, match="None"):
         movement_module(None)

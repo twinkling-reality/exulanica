@@ -173,7 +173,7 @@
     "width": 1400
    },
    "plan": "fixture_spider/v1",
-   "plan_sha256": "38faeec68db9587f530412d12de4390d96da63e079baf8f15130d91a206bc43a"
+   "plan_sha256": "fae2b8292f65070cb70e6ec67637469908555817871dbcb3e4b0e020e925c062"
   },
   "class": "being",
   "deciders": {
@@ -190,7 +190,7 @@
   "looks": [
    {
     "look": "fixture-spider-sketch",
-    "sha256": "8bb67ca35f9e7294ce0bd304d16d13330a6f09f696cd11de692184be0aa70a5d",
+    "sha256": "a609246f3eb0e93b0d35cc0b0e71ebfb080b2e9546e21633db28ee26ece0b947",
     "version": 1
    }
   ],
@@ -235,7 +235,7 @@
    "lineage": {
     "ingredients": [
      "1a2f68e3ad92c53afd03b1a7f65eb33305ac25a3b259e26982049d3dab5b3218",
-     "38faeec68db9587f530412d12de4390d96da63e079baf8f15130d91a206bc43a"
+     "fae2b8292f65070cb70e6ec67637469908555817871dbcb3e4b0e020e925c062"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -284,7 +284,7 @@
    "lineage": {
     "ingredients": [
      "1a2f68e3ad92c53afd03b1a7f65eb33305ac25a3b259e26982049d3dab5b3218",
-     "38faeec68db9587f530412d12de4390d96da63e079baf8f15130d91a206bc43a"
+     "fae2b8292f65070cb70e6ec67637469908555817871dbcb3e4b0e020e925c062"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -602,7 +602,7 @@
   },
   "profile": "exulanica.body-plan/v1",
   "reach_mm": 600,
-  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 1a2f68e3ad92c53afd03b1a7f65eb33305ac25a3b259e26982049d3dab5b3218): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 1a2f68e3ad92c53afd03b1a7f65eb33305ac25a3b259e26982049d3dab5b3218): every bone, chain, socket and range follows from the recipe and the body grammar version 2.",
   "size": {
    "extent_mm": {
     "height": {

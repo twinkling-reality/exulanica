@@ -33,6 +33,7 @@ from exulanica.movement.registry import (
     FLIGHT_V2,
     MODULES,
     ROADS,
+    SWIMMING,
     WALKING,
     WALKING_V2,
     MovementError,
@@ -47,14 +48,13 @@ from exulanica.things.run_forms import RunFormRefused, read_run_form
 from exulanica.world.society_engines import ENGINES
 from exulanica.world.society_grounds import society_grounds
 from exulanica.world.society_kinds import pace_permille_of
+from exulanica.world.society_movement import tick_budgets, walker_paces
 from exulanica.world.society_planner import (
     NAVIGATION_PROFILES,
     THING_INPUTS,
     advance_purposeful_society,
     input_sha256,
-    tick_budgets,
     validate_society_input,
-    walker_paces,
 )
 from exulanica.world.society_thing_inputs import (
     MOVEMENT_MODULES_FIELD,
@@ -112,7 +112,7 @@ def test_the_second_walking_moves_the_society_of_things_alone_and_declares_a_pac
 
 
 def test_a_new_society_records_the_newest_walking_that_moves_its_engine():
-    assert current_engine_modules(THINGS_PROFILE) == (WALKING_V2,)
+    assert current_engine_modules(THINGS_PROFILE) == (SWIMMING, WALKING_V2)
     for engine in ENGINES:
         if engine.state_family not in ("legacy", "things"):
             assert current_engine_modules(engine.engine) == (WALKING,), engine.engine
@@ -133,7 +133,7 @@ def test_a_new_society_records_the_newest_walking_that_moves_its_engine():
         ([WALKING, WALKING_V2], "one version of each kind"),
         ([FLIGHT_V2], "does not move the people"),
         ([ROADS], "does not move the people"),
-        (["exulanica-movement/swimming/v1"], "unknown movement module"),
+        (["exulanica-movement/no-such-movement/v1"], "unknown movement module"),
         ([7], "unknown movement module"),
     ],
 )
@@ -251,7 +251,7 @@ def test_every_first_things_input_records_both_lists_and_no_later_one_either():
     for composer, (first, later) in composed.items():
         assert first["profile"] in THING_INPUTS, composer
         assert first["modules"] == list(current_modules()), composer
-        assert first[MOVEMENT_MODULES_FIELD] == [WALKING_V2], composer
+        assert first[MOVEMENT_MODULES_FIELD] == [SWIMMING, WALKING_V2], composer
         assert "modules" not in later and MOVEMENT_MODULES_FIELD not in later, composer
         validate_society_input(first)
         validate_society_input(later)
@@ -271,7 +271,7 @@ def test_the_one_function_writes_a_first_input_s_lists_and_nothing_into_a_later_
     assert first == {
         "input_seq": 1,
         "modules": list(current_modules()),
-        MOVEMENT_MODULES_FIELD: [WALKING_V2],
+        MOVEMENT_MODULES_FIELD: [SWIMMING, WALKING_V2],
     }
     later: dict[str, Any] = {"input_seq": 2}
     record_modules(later)
@@ -299,7 +299,7 @@ def _recording(document: dict[str, Any], modules: object) -> dict[str, Any]:
         ([], "movement modules"),
         ([WALKING, WALKING_V2], "one version of each kind"),
         ([FLIGHT_V2], "does not move the people"),
-        (["exulanica-movement/swimming/v1"], "unknown movement module"),
+        (["exulanica-movement/no-such-movement/v1"], "unknown movement module"),
         (WALKING_V2, "movement modules"),
     ],
 )
@@ -320,7 +320,7 @@ def test_a_later_input_that_records_movement_modules_is_refused():
 
 
 def test_a_later_input_that_records_none_reads_the_same_as_the_first():
-    from exulanica.api.society_runtime import _reads_the_same
+    from exulanica.world.society_input_policy import reads_the_same as _reads_the_same
 
     first = compose((KNIGHT,))
     later = compose((KNIGHT,), input_seq=2, edit_seq=9)
@@ -350,15 +350,15 @@ def _minute(state: dict[str, Any], document: dict[str, Any]) -> tuple[dict[str, 
 def test_genesis_keeps_the_list_its_first_input_records_and_none_where_it_records_none():
     first = compose((KNIGHT,))
     state = _genesis(first)
-    assert state[MOVEMENT_MODULES_FIELD] == first[MOVEMENT_MODULES_FIELD] == [WALKING_V2]
+    assert state[MOVEMENT_MODULES_FIELD] == first[MOVEMENT_MODULES_FIELD] == [SWIMMING, WALKING_V2]
     assert state[MOVEMENT_MODULES_FIELD] is not first[MOVEMENT_MODULES_FIELD]
     assert MOVEMENT_MODULES_FIELD not in _genesis(_recording(first, None))
     after, _events = _minute(state, first)
-    assert after[MOVEMENT_MODULES_FIELD] == [WALKING_V2]
+    assert after[MOVEMENT_MODULES_FIELD] == [SWIMMING, WALKING_V2]
 
 
 @pytest.mark.parametrize(
-    "modules", [[], [WALKING, WALKING_V2], [FLIGHT_V2], ["exulanica-movement/swimming/v1"]]
+    "modules", [[], [WALKING, WALKING_V2], [FLIGHT_V2], ["exulanica-movement/no-such-movement/v1"]]
 )
 def test_a_state_recording_a_list_out_of_shape_is_refused(modules):
     state = _genesis(compose((KNIGHT,)))
@@ -460,7 +460,7 @@ def _walked(document: dict[str, Any], state: dict[str, Any], minutes: int) -> di
 
 def test_a_society_that_records_the_second_walking_moves_each_body_by_its_own_budget():
     document, _names = _creatures()
-    assert document[MOVEMENT_MODULES_FIELD] == [WALKING_V2]
+    assert document[MOVEMENT_MODULES_FIELD] == [SWIMMING, WALKING_V2]
     moved = _walked(document, _genesis(document), 120)
     # Everybody was seen walking a whole minute through, so the figures below are not vacuous.
     assert set(moved) == {"bat", "horse", "dragon", "shipped"}
@@ -545,7 +545,7 @@ def test_a_society_of_shipped_kinds_lives_the_same_hour_whether_or_not_it_record
     the budget a new society records (None here) and at a small one."""
     recording = compose((WELL, KNIGHT))
     stored = _recording(recording, None)
-    assert recording[MOVEMENT_MODULES_FIELD] == [WALKING_V2]
+    assert recording[MOVEMENT_MODULES_FIELD] == [SWIMMING, WALKING_V2]
     one, other = _genesis(recording, budget=budget), _genesis(stored, budget=budget)
     walked = 0
     for _ in range(60):

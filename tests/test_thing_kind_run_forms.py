@@ -381,8 +381,14 @@ def test_a_run_form_is_built_only_from_a_kind_its_plan_and_that_plan_s_recipe():
 
 def test_a_moves_list_is_no_longer_than_the_modules_and_names_each_once():
     form = _run_form("dragon")
+    # The grammar names two movement modules, walking and swimming: three moves are too many.
+    thrice = copy.deepcopy(form)
+    thrice["moves"] = [form["moves"][0]] * 3
+    with pytest.raises(RunFormRefused) as refused:
+        read_run_form(thrice)
+    assert refused.value.where == "moves"
     twice = copy.deepcopy(form)
     twice["moves"] = [form["moves"][0], form["moves"][0]]
     with pytest.raises(RunFormRefused) as refused:
         read_run_form(twice)
-    assert refused.value.where == "moves"
+    assert refused.value.where == "moves[1].module"

@@ -1,7 +1,7 @@
 """A society response serves each kind-paced inhabitant's walk budget beside its state.
 
 The engine walks a body whose kind states its own pace at the society's budget times that pace
-over a thousand (:func:`exulanica.world.society_planner.tick_budgets`). The page draws that figure
+over a thousand (:func:`exulanica.world.society_movement.tick_budgets`). The page draws that figure
 as the server serves it (``walk_budgets_mm_per_tick``, from
 :func:`~exulanica.world.society.served_snapshot`) instead of working it out again. The states
 here are synthetic: a made kind stated at 685 per mille in a society whose budget is 60 m a tick.
@@ -13,7 +13,7 @@ from copy import deepcopy
 from typing import Any
 
 from exulanica.world.society import served_snapshot
-from exulanica.world.society_planner import own_walk_budgets, tick_budgets
+from exulanica.world.society_movement import own_walk_budgets, tick_budgets
 
 PACED = "exulanica-movement/walking/v2"
 UNPACED = "exulanica-movement/walking/v1"

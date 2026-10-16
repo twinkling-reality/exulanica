@@ -17,11 +17,12 @@ from collections.abc import Callable, Mapping
 from types import MappingProxyType
 from typing import Any, Final
 
-from exulanica.movement import flight, flight_v2, walking, walking_v2
+from exulanica.movement import flight, flight_v2, swimming, walking, walking_v2
 from exulanica.movement.registry import (
     FLIGHT,
     FLIGHT_V2,
     ROADS,
+    SWIMMING,
     WALKING,
     WALKING_V2,
     MovementError,
@@ -32,12 +33,13 @@ __all__ = ["HOSTED", "STEPS", "MovementStepHosted", "step_of"]
 
 #: One entry per built module this package runs. Each module's step has its own signature, stated
 #: where it is defined: walking's traverses a route, its second version at the walker's own pace,
-#: flight's computes a window of steps, flight for beings flies one flyer through one society
-#: minute.
+#: swimming's a route over water at the swimmer's pace in it, flight's computes a window of steps,
+#: flight for beings flies one flyer through one society minute.
 STEPS: Final[Mapping[str, Callable[..., Any]]] = MappingProxyType(
     {
         WALKING: walking.traverse,
         WALKING_V2: walking_v2.traverse_paced,
+        SWIMMING: swimming.traverse_swimming,
         FLIGHT: flight.flight_window,
         FLIGHT_V2: flight_v2.fly_minute,
     }

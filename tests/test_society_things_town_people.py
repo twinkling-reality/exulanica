@@ -179,7 +179,7 @@ def test_a_town_s_first_things_input_carries_its_people_s_frame_and_holds_no_see
 def test_a_later_input_that_states_no_people_reads_the_same_as_the_first():
     """An edit that changes nothing the society reads appends no input: the people only a first
     input states are no difference, and a thing placed is."""
-    from exulanica.api.society_runtime import _reads_the_same
+    from exulanica.world.society_input_policy import reads_the_same as _reads_the_same
 
     first = _housed()
     assert _reads_the_same(first, _housed(input_seq=2))

@@ -53,7 +53,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from exulanica.evidence.blob import BlobId
-from exulanica.things.bodies import build_body, read_body_recipe
+from exulanica.things.bodies import built_again, read_body_recipe
 from exulanica.things.creature_looks import creature_look_request
 from exulanica.things.looks import Look
 from exulanica.world import creature_look_jobs as look_jobs
@@ -114,20 +114,13 @@ MADE_LOOK_LICENCE: Final[Mapping[str, Any]] = {
 }
 
 
-def _plain(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {str(key): _plain(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_plain(item) for item in value]
-    return value
-
-
 def look_request(
     connection: psycopg.Connection, workspace_id: uuid.UUID, kind_sha256: str, looks: Any
 ) -> bytes:
     """The creature look request (:func:`~exulanica.things.creature_looks.creature_look_request`)
     of the creature of ``kind_sha256``, written from what the workspace keeps: its drafted plan,
-    the recipe it was built from, its body rebuilt from that recipe and held to the plan as kept,
+    the recipe it was built from, its body rebuilt from that recipe by the body grammar version
+    that built it and held to the plan as kept (:func:`~exulanica.things.bodies.built_again`),
     and its sketch's container read from the workspace's ``looks`` namespace. A creature the
     workspace no longer keeps whole is :class:`~exulanica.world.creature_look_jobs.LookNotAsked`."""
     store = ThingStore(connection, workspace_id, looks)
@@ -150,14 +143,8 @@ def look_request(
     if plan_document is None or row is None:
         raise look_jobs.LookNotAsked("this workspace no longer keeps the creature's plan whole")
     recipe = read_body_recipe(row["document"])
-    built = build_body(
-        recipe,
-        key=plan_document["key"],
-        version=plan_document["version"],
-        title=plan_document["title"],
-        origin=plan_document["origin"],
-    )
-    if _plain(built.plan) != _plain(plan_document):
+    built = built_again(recipe, plan_document)
+    if built is None:
         raise look_jobs.LookNotAsked(
             "the creature's body, built again from its recipe, is not its plan"
         )

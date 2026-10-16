@@ -268,6 +268,14 @@
     "parameters": {}
    },
    {
+    "key": "stand",
+    "parameters": {}
+   },
+   {
+    "key": "follow",
+    "parameters": {}
+   },
+   {
     "key": "say",
     "parameters": {}
    }
@@ -280,7 +288,7 @@
     "width": 1600
    },
    "plan": "fixture_floating_eight/v1",
-   "plan_sha256": "d178090209031df4938f80dce1e350ccacfee60bbf35e9fe820a961b27c5e65e"
+   "plan_sha256": "3c1d17d007551ae162e0773b8e889ac21b9bdb57c2960ebe243c1aa54b6377a2"
   },
   "class": "being",
   "deciders": {
@@ -297,11 +305,13 @@
   "looks": [
    {
     "look": "fixture-floating-eight-sketch",
-    "sha256": "17a80c109747e4f2272caaf6a0605e2e252a2b3e316b085dca65b8a8c586cbc3",
+    "sha256": "875210ab6f8452c055deaab0f4f5c0f440650f454c4870d5147f8e698c582a41",
     "version": 1
    }
   ],
-  "moves": [],
+  "moves": [
+   "exulanica-movement/swimming/v1"
+  ],
   "offers": [
    {
     "key": "talk_to",
@@ -340,7 +350,7 @@
    "lineage": {
     "ingredients": [
      "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
-     "d178090209031df4938f80dce1e350ccacfee60bbf35e9fe820a961b27c5e65e"
+     "3c1d17d007551ae162e0773b8e889ac21b9bdb57c2960ebe243c1aa54b6377a2"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -389,7 +399,7 @@
    "lineage": {
     "ingredients": [
      "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
-     "d178090209031df4938f80dce1e350ccacfee60bbf35e9fe820a961b27c5e65e"
+     "3c1d17d007551ae162e0773b8e889ac21b9bdb57c2960ebe243c1aa54b6377a2"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -797,7 +807,9 @@
     "idle"
    ]
   },
-  "moves": [],
+  "moves": [
+   "exulanica-movement/swimming/v1"
+  ],
   "origin": {
    "authors": [],
    "by": {
@@ -831,7 +843,7 @@
   },
   "profile": "exulanica.body-plan/v1",
   "reach_mm": null,
-  "reason": "Built by exulanica-body-builder/v1 from a floating body recipe (sha256 8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "reason": "Built by exulanica-body-builder/v1 from a floating body recipe (sha256 8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1): every bone, chain, socket and range follows from the recipe and the body grammar version 2.",
   "size": {
    "extent_mm": {
     "height": {

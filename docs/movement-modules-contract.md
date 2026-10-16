@@ -1,19 +1,22 @@
 # Movement modules contract
 
-Status: **WALKING, FLIGHT, FLIGHT FOR BEINGS AND ROADS BUILT; ROADS SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**.
+Status: **WALKING, SWIMMING, FLIGHT, FLIGHT FOR BEINGS AND ROADS BUILT; ROADS SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**.
 No engine calls flight for beings. Flight air is composed from the ground of one saved world
 version.
 
 Movement in a world is one engine module per kind of movement, chosen by data. A module states the
 space it moves in, the catalog its agents come from, its clock, the bounded parameters every agent's
 figures are checked against, and what it hands a renderer. Walking moves the people of a society
-over a route graph; flight moves flying kinds through a saved world's air; flight for beings flies a
+over a route graph; swimming moves a being whose kind swims across the water a society of things'
+input states, walking the land on either side; flight moves flying kinds through a saved world's
+air; flight for beings flies a
 world's flying things, one society minute at a time, through its air columns; roads drive vehicles
 over a generated city's streets, served for a baked city on the development preview. A bird, a
 dragon and a plane are kinds of the flight kind catalog, or thing kinds whose moves name flight for
 beings, never code of their own.
 
-This contract owns the module registry and its dispatch, the walking and flight steps, the air a
+This contract owns the module registry and its dispatch, the walking, swimming and flight steps,
+the water lattice a swimmer crosses, the air a
 flight happens in, the flight kind catalog, the flight route and the flight renderer, and the flight
 for beings step and the air columns it reads. The society's goals, stays and replay are the
 [society contract](synthetic-society-contract.md)'s; where objects declare perches and host flyers
@@ -25,6 +28,7 @@ is the [world objects contract](world-objects-contract.md)'s; the traffic simula
 
 - [The registry and its dispatch](#the-registry-and-its-dispatch)
 - [Walking](#walking)
+- [Swimming](#swimming)
 - [Flight](#flight)
 - [Flight for beings (v2)](#flight-for-beings-v2)
 - [Roads](#roads)
@@ -43,7 +47,7 @@ order. A row states:
 | Field | Meaning |
 | --- | --- |
 | `module` | The identity, `exulanica-movement/<kind>/v<N>` |
-| `space` | What it moves in: `ground-lattice`, `road-graph`, `air-volume` or `air-columns`, with the input profiles it reads |
+| `space` | What it moves in: `ground-lattice`, `water-lattice`, `road-graph`, `air-volume` or `air-columns`, with the input profiles it reads |
 | `agents` | The catalog its agents come from, and which of its kinds, or all |
 | `clock` | Its step length and whose clock it is: the society's persisted tick, a host's, or shared real time (`wall`) |
 | `parameters` | Integer bounds, a unit and a reason for each figure; with a `value` where the module uses one figure for every agent, without one where each kind states its own |
@@ -115,7 +119,8 @@ engine it lists. A society of things records, in its first input alone, the move
 move its people (`movement_modules`: sorted, each once, each a built row that lists its engine,
 one version of each kind of movement), beside the ability modules it runs, and its minutes walk
 by exactly those for its whole life, whatever a later table adds. A new one records the newest
-built version of each kind (`current_engine_modules`). One whose first
+built version of each kind (`current_engine_modules`): `exulanica-movement/swimming/v1` and
+`exulanica-movement/walking/v2`. One whose first
 input records none, every society made before the field, walks by the first version at the one
 budget, whatever pace its creatures' run forms state, and its minutes replay as they ran. The
 planner looks the step up through `step_of` by the recorded name and hands a step that declares a
@@ -123,6 +128,67 @@ pace each walker's own after the budget. One function writes both lists into a f
 (`record_modules` in
 [`society_thing_inputs.py`](../exulanica/world/society_thing_inputs.py)), and every composer of a
 things input calls it, so a society on any ground records the same.
+
+## Swimming
+
+`exulanica-movement/swimming/v1` ([`swimming.py`](../exulanica/movement/swimming.py)) moves a being
+of a society of things across the water its input states, and moves no other engine's people. A
+being swims where its society's first input records the module, its input states water, and its
+kind's moves name a swimming; every other being, and every being of a society that records none,
+reads and walks the walking graph alone, as it always did, and never enters the water.
+
+- **The space** (`water-lattice`, profile `exulanica.society-water/v1`, under a things input's
+  `water`; the [society contract](synthetic-society-contract.md#the-society-of-things-v7)
+  owns the field). A lattice over each body of water, `lattice_mm` (2,000 mm) apart at multiples of
+  it about the region's origin, each node `clearance_mm` (450 mm) inside the water's edge along
+  both axes. Each node joins its lattice neighbours of the same body (`swim`); each node at the
+  edge of its body's lattice joins the nearest walking node within `shore_reach_mm` (4,000 mm)
+  whose straight way is clear of everything a walker keeps clear of but the water (`shore`), and
+  no activity's place. An input states at most `max_nodes` (16,384) swim nodes: bodies are laid in
+  order, and a body that would pass the bound is left unlaid rather than laid in part. The walking
+  graph is not changed, so no walking route enters the water.
+- **Routes** (`quickest_routes`). A swimmer takes the quickest route over the walking graph and the
+  water together: an edge on land costs its length times the swimmer's pace in water, an edge in
+  water its length times its walking pace, which is the time each takes in units both paces
+  share. Ties go to the lexicographically least node path, so over a graph with no water a
+  swimmer's route is walking's own. Where it is going is chosen as anybody's is: a swimmer stands,
+  stays and talks on land alone.
+- **The step** (`traverse_swimming`). A swimmer's own budget in water is the society's scaled by
+  its pace there, `budget * pace_permille // 1000` millimetres, a whole number by floor division
+  and never less than one, spent along a route by walking's `traverse`, called and not copied. The
+  row declares `pace_permille`, from 1 to 10,000, which a kind may state with the swimming it moves
+  by, and `reference_pace_permille`, 400, the pace of a swimmer whose kind states none: 24,000 mm in
+  a minute where a new society walks 60,000 mm.
+- **A minute** (`crossing`). A swimmer's route is taken a stretch at a time, a stretch being its
+  edges from where the swimmer is to the next change between land and water; a shore edge is
+  water. A stretch of land is walked by the walking step the society records, at the swimmer's
+  own walking pace where that step paces walkers; a stretch of water is swum by this step. Each
+  stretch is handed what is left of the society's budget and spends `ceil(moved * 1000 / pace)` of
+  it. A stretch its step does not finish ends the minute, and so does a remainder too small for
+  the next stretch's pace to move a millimetre. A swimmer may end a minute in the water, on a swim
+  node or edge, and goes on from there the next. A route of land alone is one stretch handed the
+  whole budget, so it is walked exactly as walking walks it.
+
+The planner reads each person of a minute through `Movers`
+([`society_movement.py`](../exulanica/world/society_movement.py)): a swimmer's place, route and
+legs against the walking graph and the water together, and everybody else's against the walking
+graph by exactly what it called before swimming was built. What depends on the water is built once
+a minute and only where a swimmer may need it, so a society that records no swimming reads no
+water at all.
+
+What swimming does not do:
+
+- No kind states a pace in water: a drafted body's run form states its walking pace alone, so every
+  swimmer swims at the reference pace. A body's own pace in water, how a swimmer is drawn in the
+  water and a swimming activity in the routine are not built.
+- The choices a decider is offered, a person's direct request and the routine's choice of where
+  to go are read over the walking graph: a place reached only across water is not offered, and a
+  swimmer in the water is offered nothing until it is ashore. Once a goal is chosen, a swimmer's
+  route to it may cross water.
+- A page draws a swimmer along its motion path at its walking budget, as a walker; the minute's
+  share of time in the water is not drawn apart.
+- The hands module times an act at the end of a being's walk from the length of its path at its
+  walking budget, the water's slower pace not read.
 
 ## Flight
 
@@ -588,7 +654,8 @@ viewers could share them.
 | --- | --- | --- |
 | Registry, dispatch | `exulanica/movement/registry.py`, `steps.py`, `movement-modules.v1.json` | `tests/test_movement_modules.py` |
 | Walking | `exulanica/movement/walking.py` | `tests/test_movement_modules.py`, the society replay pins above, `tests/test_society_living_crossings_unchanged.py` |
-| Walking at a body's own pace, what a society records | `exulanica/movement/walking_v2.py`, `registry.py` (`current_engine_modules`, `check_recorded`, `recorded_movement`), `exulanica/world/society_thing_inputs.py` (`record_modules`), `society_planner.py` (`walker_paces`, `tick_budgets`) | `tests/test_society_walking_paces.py` (budgets worked by hand from the paces `tests/test_creature_gaits.py` works by hand; each walker's progress read from its route; a society of shipped kinds the same hour either way; a society that records none walking by the first module) |
+| Swimming: the row, the step, routes and a minute's stretches | `exulanica/movement/swimming.py`, its row in `movement-modules.v1.json` and its step in `steps.py`, `exulanica/world/society_movement.py` (`Movers`) | `tests/test_society_swimming.py` (the budget, the quickest route and a minute's stretches worked by hand; a body with fins on the fixture farm walking to the pond's shore, swimming across and walking on, minute by minute, against figures worked by hand from the farm's own graph; its society replayed; nobody who does not swim entering the water; the same body walking round in a society made before swimming and when its kind does not swim) |
+| Walking at a body's own pace, what a society records | `exulanica/movement/walking_v2.py`, `registry.py` (`current_engine_modules`, `check_recorded`, `recorded_movement`), `exulanica/world/society_thing_inputs.py` (`record_modules`), `society_movement.py` (`walker_paces`, `tick_budgets`) | `tests/test_society_walking_paces.py` (budgets worked by hand from the paces `tests/test_creature_gaits.py` works by hand; each walker's progress read from its route; a society of shipped kinds the same hour either way; a society that records none walking by the first module) |
 | Air, grid, perches | `exulanica/movement/air.py`, `fixed.py` | `tests/test_flight.py` |
 | Flight step, choices, episodes, search bounds | `exulanica/movement/flight.py` | `tests/test_flight.py`, `tests/test_flight_search_bounds.py` |
 | Episodes and their worker | `exulanica/movement/flight_episodes.py`, `exulanica/world/episode_worker.py`, `exulanica/world/flight_worker.py` | `tests/test_flight_worker.py` (a real worker process, killed), `tests/test_world_flight_api.py` |

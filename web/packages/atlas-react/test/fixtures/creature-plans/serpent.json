@@ -128,7 +128,7 @@
     "width": 600
    },
    "plan": "fixture_serpent/v1",
-   "plan_sha256": "360ebe606c25f5f72fce5029adaac111fa3156c35a515be09acb8276210ccbdd"
+   "plan_sha256": "91143a95fa51944ff0c8eca503b3200360c9615494a5bae17452da82bd357463"
   },
   "class": "being",
   "deciders": {
@@ -145,11 +145,12 @@
   "looks": [
    {
     "look": "fixture-serpent-sketch",
-    "sha256": "72683e6257353d8d5dccec28cfcf1a7c739d865e7f4e38d44383817ca6e55b2e",
+    "sha256": "f51fce9c0debed52848d410cc88920be26217af5ff23c860c029e25ae3837a93",
     "version": 1
    }
   ],
   "moves": [
+   "exulanica-movement/swimming/v1",
    "exulanica-movement/walking/v1"
   ],
   "offers": [
@@ -190,7 +191,7 @@
    "lineage": {
     "ingredients": [
      "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
-     "360ebe606c25f5f72fce5029adaac111fa3156c35a515be09acb8276210ccbdd"
+     "91143a95fa51944ff0c8eca503b3200360c9615494a5bae17452da82bd357463"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -239,7 +240,7 @@
    "lineage": {
     "ingredients": [
      "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
-     "360ebe606c25f5f72fce5029adaac111fa3156c35a515be09acb8276210ccbdd"
+     "91143a95fa51944ff0c8eca503b3200360c9615494a5bae17452da82bd357463"
     ],
     "receipts": [],
     "translation_manifest_sha256": null
@@ -412,6 +413,7 @@
    ]
   },
   "moves": [
+   "exulanica-movement/swimming/v1",
    "exulanica-movement/walking/v1"
   ],
   "origin": {
@@ -447,7 +449,7 @@
   },
   "profile": "exulanica.body-plan/v1",
   "reach_mm": 900,
-  "reason": "Built by exulanica-body-builder/v1 from a serpentine body recipe (sha256 1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "reason": "Built by exulanica-body-builder/v1 from a serpentine body recipe (sha256 1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1): every bone, chain, socket and range follows from the recipe and the body grammar version 2.",
   "size": {
    "extent_mm": {
     "height": {

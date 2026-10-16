@@ -272,9 +272,9 @@ def served_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
     Beside the state, never inside it, ``walk_budgets_mm_per_tick`` names what one tick lets each
     inhabitant whose kind states its own pace walk
-    (:func:`~exulanica.world.society_planner.own_walk_budgets`), so a page draws the engine's own
+    (:func:`~exulanica.world.society_movement.own_walk_budgets`), so a page draws the engine's own
     figure; it is absent where nobody walks at a pace of their own."""
-    from exulanica.world.society_planner import own_walk_budgets
+    from exulanica.world.society_movement import own_walk_budgets
 
     served = {key: value for key, value in snapshot.items() if key != "seed"}
     served["seed_digest"] = seed_digest(snapshot["seed"])

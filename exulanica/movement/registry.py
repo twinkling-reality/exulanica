@@ -39,6 +39,7 @@ __all__ = [
     "MODULES",
     "MODULES_PATH",
     "ROADS",
+    "SWIMMING",
     "WALKING",
     "WALKING_V2",
     "MovementError",
@@ -52,6 +53,7 @@ __all__ = [
     "check_recorded",
     "current_engine_modules",
     "load_movement_modules",
+    "movement_kind",
     "movement_module",
     "recorded_movement",
 ]
@@ -65,6 +67,7 @@ WALKING_V2: Final = "exulanica-movement/walking/v2"
 FLIGHT: Final = "exulanica-movement/flight/v1"
 FLIGHT_V2: Final = "exulanica-movement/flight/v2"
 ROADS: Final = "exulanica-movement/roads/v1"
+SWIMMING: Final = "exulanica-movement/swimming/v1"
 #: The agents catalog of a row that moves a society engine's people: such a row lists the engines.
 ENGINE_AGENTS: Final = "society-engines"
 #: A module's identity: the kind of movement and its version.
@@ -72,7 +75,7 @@ _IDENTITY: Final = re.compile(r"exulanica-movement/([a-z][a-z0-9-]*)/v([1-9][0-9
 
 Status = Literal["built", "not_connected"]
 _STATUSES: Final = ("built", "not_connected")
-_SPACES: Final = ("air-columns", "air-volume", "ground-lattice", "road-graph")
+_SPACES: Final = ("air-columns", "air-volume", "ground-lattice", "road-graph", "water-lattice")
 _CLOCKS: Final = ("host", "society", "wall")
 _ROW_KEYS: Final = frozenset(
     {"agents", "clock", "module", "output", "parameters", "reason", "refusal", "space", "status"}
@@ -315,6 +318,12 @@ def _identity(module: str) -> tuple[str, int]:
     return match.group(1), int(match.group(2))
 
 
+def movement_kind(module: str) -> str:
+    """The kind of movement a module's identity names (``swimming`` for
+    ``exulanica-movement/swimming/v1``), refused by name where it names none."""
+    return _identity(module)[0]
+
+
 def current_engine_modules(engine: str) -> tuple[str, ...]:
     """What a new society of ``engine`` records: of the built rows that move its people, the
     newest version of each kind of movement, in module order."""
@@ -345,9 +354,9 @@ def check_recorded(modules: object, engine: str) -> tuple[str, ...]:
 
 
 def recorded_movement(modules: Sequence[str] | None, kind: str) -> MovementModule | None:
-    """The built row of the ``kind`` of movement (``walking``) a society recorded among
-    ``modules``, at the version it recorded, or None where it recorded none of that kind: its
-    figures are that version's, whatever later rows state."""
+    """The built row of the ``kind`` of movement (``walking``, ``swimming``) a society recorded
+    among ``modules``, at the version it recorded, or None where it recorded none of that kind:
+    its figures are that version's, whatever later rows state."""
     for name in modules or ():
         if _identity(name)[0] == kind:
             return built_module(name)

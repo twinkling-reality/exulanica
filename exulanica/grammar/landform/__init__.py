@@ -44,6 +44,7 @@ from exulanica.grammar.landform.grading import (
     RetainingWall,
     Wall,
     grade_land,
+    within_water,
 )
 from exulanica.grammar.landform.realize import (
     BACKDROP_PROFILE,
@@ -132,4 +133,5 @@ __all__ = [
     "realize_near",
     "realize_region",
     "water_bodies",
+    "within_water",
 ]

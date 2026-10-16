@@ -1,4 +1,5 @@
-"""Versioned projection policy and local activity failures, without invented access nodes."""
+"""Versioned projection policy and local activity failures, without invented access nodes, and
+whether two successive inputs differ in anything their society reads (:func:`reads_the_same`)."""
 
 from __future__ import annotations
 
@@ -299,3 +300,31 @@ def validate_unread_placements(document: dict[str, Any]) -> None:
         raise ValueError("unread placements must be sorted and unique")
     if document["availability"] == "unavailable" and records:
         raise ValueError("unavailable input cannot expose local placement records")
+
+
+#: What a saved world's input says of the edit it follows, not of what its society reads: its
+#: place in the sequence, the version's edit cursor, and the digest over both.
+_EDIT_CURSOR_FIELDS: Final = frozenset({"input_seq", "authored_state", "document_sha256"})
+#: What only a society's first input states (the ability modules its minutes run for its whole
+#: life, the movement modules that move its people, and what a town's people are made from), so
+#: a later input's not stating it is no difference.
+_FIRST_INPUT_ONLY: Final = frozenset({"modules", "movement_modules", "people"})
+
+
+def reads_the_same(previous: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
+    """Whether two successive inputs differ only in which edit they follow.
+
+    Such an edit changed nothing the society reads, so it appends no input: an object in another
+    region of the world, or a photograph hidden or moved. The modules only a first input states
+    are no difference either. Every other field is what the society reads, and any difference
+    there is a new input.
+    """
+
+    def read(document: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in document.items()
+            if key not in _EDIT_CURSOR_FIELDS and key not in _FIRST_INPUT_ONLY
+        }
+
+    return read(previous) == read(current)

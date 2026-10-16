@@ -232,7 +232,9 @@ def record_modules(document: dict[str, Any], *, day: bool = False) -> None:
 def validate_input_things(document: Mapping[str, Any]) -> None:
     """The things a v5 input carries, held to their shape: each placed thing once, in id order,
     with its kind's semantics, a ground position, a yaw within one turn, and an arrival point
-    exactly where its kind offers arrival through it. An unavailable input carries none."""
+    exactly where its kind offers arrival through it, and the water its swimmers cross where it
+    states any (:func:`~exulanica.world.society_water.validate_water`). An unavailable input
+    carries neither."""
     from exulanica.abilities.registry import DAY
     from exulanica.world.society_input_policy import WALKING_SURFACES_INPUT_V3
     from exulanica.world.society_resident_day import validate_frame
@@ -346,6 +348,9 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
         raise ValueError("placed things must be unique and sorted")
     validate_kinds(document, made)
     validate_things_gone(document, set(names))
+    from exulanica.world.society_water import validate_water
+
+    validate_water(document)
 
 
 def input_things(document: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:

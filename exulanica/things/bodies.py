@@ -6,8 +6,10 @@ horizontal, serpentine or floating), how many torso segments, its heads and thei
 its limbs by role (legs, arms, wings, fins in left and right pairs; tentacles in a ring), its tail,
 whether a long body rises into an upright torso at the front, its extent in
 millimetres, what it carries things with, the named colours its sketch is drawn in and a short
-appearance for the sculptor. Every choice and bound comes from the body grammar catalog
-(``assets/catalogs/things/body-grammar.v1.json``), so the vocabulary is data.
+appearance for the sculptor. Every choice and bound comes from the newest version of the body
+grammar catalog (``assets/catalogs/things/body-grammar.v<N>.json``), so the vocabulary is data;
+every version is kept as it was published, and :func:`built_again` builds a kept plan again under
+its own.
 
 :func:`build_body` is written once and serves every creature: it turns a recipe into a body plan
 document (:data:`~exulanica.things.catalogs.BODY_PLAN_PROFILE`): bones with parents in one naming
@@ -38,7 +40,6 @@ from typing import Any, Final
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.errors import CanonicalisationError
 from exulanica.grammar.catalogs import (
-    Catalog,
     CatalogSchema,
     catalog_digest,
     load_catalog,
@@ -62,7 +63,9 @@ __all__ = [
     "BodyRefused",
     "BuiltBody",
     "body_grammar",
+    "body_grammars",
     "build_body",
+    "built_again",
     "load_body_grammar",
     "read_body_recipe",
     "stance_mm",
@@ -170,19 +173,22 @@ def _schema(version: int) -> CatalogSchema:
     )
 
 
-def _newest(directory: Path) -> Catalog:
+def _versions(directory: Path) -> list[int]:
     versions = sorted(
         split_versioned_name(path)[1] for path in directory.glob(f"{_CATALOG_ID}.v*.json")
     )
     if not versions:
         raise ThingCatalogError(f"{directory} holds no {_CATALOG_ID} catalog")
-    return load_catalog(directory / f"{_CATALOG_ID}.v{versions[-1]}.json", _schema(versions[-1]))
+    return versions
 
 
-def load_body_grammar(directory: Path = CATALOG_DIRECTORY) -> BodyGrammar:
-    """The newest body grammar catalog in ``directory``, its entries grouped and their
-    specifications parsed back from canonical text."""
-    catalog = _newest(directory)
+def load_body_grammar(
+    directory: Path = CATALOG_DIRECTORY, version: int | None = None
+) -> BodyGrammar:
+    """The body grammar catalog ``version`` in ``directory``, the newest where none is named, its
+    entries grouped and their specifications parsed back from canonical text."""
+    version = _versions(directory)[-1] if version is None else version
+    catalog = load_catalog(directory / f"{_CATALOG_ID}.v{version}.json", _schema(version))
     groups: dict[str, dict[str, Any]] = {group: {} for group in _GROUPS}
     words: dict[str, str] = {}
     for entry in catalog.entries:
@@ -219,6 +225,15 @@ def _parse(text: str) -> dict[str, Any]:
 def body_grammar() -> BodyGrammar:
     """The grammar this process reads, once."""
     return load_body_grammar(CATALOG_DIRECTORY)
+
+
+@cache
+def body_grammars() -> tuple[BodyGrammar, ...]:
+    """Every version of the grammar this process reads, newest first, once each."""
+    return tuple(
+        load_body_grammar(CATALOG_DIRECTORY, version)
+        for version in reversed(_versions(CATALOG_DIRECTORY))
+    )
 
 
 # -- the recipe ---------------------------------------------------------------------------------
@@ -1370,3 +1385,26 @@ def build_body(
         radii=MappingProxyType(dict(skeleton.radii)),
         membranes=MappingProxyType(dict(skeleton.membranes)),
     )
+
+
+def built_again(recipe: BodyRecipe, plan: Mapping[str, Any]) -> BuiltBody | None:
+    """The body ``recipe`` builds as the kept plan document ``plan``, under its own key, version,
+    title and origin and the version of the body grammar that built it; None where no version
+    builds that plan from that recipe.
+
+    A plan states the grammar version it was built under, and no published version is ever
+    edited, so a plan kept from before a newer grammar is built again exactly by its own. Each
+    version is tried, newest first."""
+    kept = canonical_json(dict(plan))
+    for grammar in body_grammars():
+        built = build_body(
+            recipe,
+            key=str(plan["key"]),
+            version=int(plan["version"]),
+            title=str(plan["title"]),
+            origin=plan["origin"],
+            grammar=grammar,
+        )
+        if canonical_json(dict(built.plan)) == kept:
+            return built
+    return None

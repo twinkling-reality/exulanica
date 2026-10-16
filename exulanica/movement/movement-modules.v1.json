@@ -147,6 +147,40 @@
     {
       "agents": {
         "catalog": "society-engines",
+        "kinds": ["exulanica-society/v7"],
+        "reason": "Every being of a society of things whose first input records this module and whose kind's moves name it. Such a being walks its input's walking graph by the walking the society records and swims the water the input states by this module; every other being, and every being of a society that records none, walks as it always did and never enters the water."
+      },
+      "clock": {
+        "kind": "society",
+        "reason": "One tick is one simulated minute of the society's persisted history, as a walking tick is. A swimmer's minute is shared between the land it walks and the water it swims: each stretch spends the part of the society's budget its pace there takes to cover it, rounded up, and the next stretch goes on with the rest.",
+        "step_ms": 60000
+      },
+      "module": "exulanica-movement/swimming/v1",
+      "output": {
+        "profile": "exulanica.motion-path/v1",
+        "reason": "Every swimmer's motion_path_mm, as walking hands it: each segment traversed in the tick, start and end included, on land and in water alike. The input's water states which segments are swum; how a swimmer is drawn is a renderer's."
+      },
+      "parameters": [
+        {"maximum": 1000000000, "minimum": 1, "name": "budget_mm_per_tick", "reason": "The travel a tick holds at the society's own pace: the movement budget its state records, within the walking module's bounds.", "unit": "mm/tick", "value": null},
+        {"maximum": 450, "minimum": 450, "name": "clearance_mm", "reason": "How far a swimmer's centre keeps from the water's edge: the lattice is laid this far inside every body of water, the clearance a walker keeps from whatever blocks walking.", "unit": "mm", "value": 450},
+        {"maximum": 2000, "minimum": 2000, "name": "lattice_mm", "reason": "The spacing of the lattice laid over a body of water, at multiples of it about the region's origin as a saved world's ground lattice is laid: 2 m, so a 30 m pond is crossed in about fifteen steps.", "unit": "mm", "value": 2000},
+        {"maximum": 16384, "minimum": 16384, "name": "max_nodes", "reason": "The most swim nodes one input states, as many as its walking graph may: 65,536 square metres of water at the lattice's spacing. Bodies are laid in order, and a body that would pass the bound is left unlaid rather than laid in part.", "unit": "node", "value": 16384},
+        {"maximum": 10000, "minimum": 1, "name": "pace_permille", "reason": "A swimmer's own pace in water, in thousandths of the society's, stated by its kind with the swimming it moves by. The bounds are walking's, a guard on a stored figure; a kind that states none swims at the reference pace.", "unit": "permille", "value": null},
+        {"maximum": 400, "minimum": 400, "name": "reference_pace_permille", "reason": "The pace in water of a swimmer whose kind states none: two fifths of the society's own, 24 m a minute where a new society walks 60 m, since a body swims at about a third to a half of the speed it walks. A swimmer takes the quickest way, so it swims across water only where walking round would take longer.", "unit": "permille", "value": 400},
+        {"maximum": 4000, "minimum": 4000, "name": "shore_reach_mm", "reason": "How far a swim node at the edge of its lattice reaches for the walking graph: it joins the nearest walking node within this distance whose straight way is clear of everything a walker keeps clear of but the water. The footway station spacing, so the lattice meets the walking graph wherever a walking line runs along the water.", "unit": "mm", "value": 4000}
+      ],
+      "reason": "Swimming across the water a society's input states: the quickest route over its walking graph and its water together, each edge costing its length over the pace it is crossed at, with lexicographic node-path ties, and a budgeted traversal that walks each stretch of land by the walking the society records and swims each stretch of water at the swimmer's pace by the walking module's traversal, every point by integer floor division.",
+      "refusal": null,
+      "space": {
+        "kind": "water-lattice",
+        "profiles": ["exulanica.society-water/v1"],
+        "reason": "The water a things input states beside its walking graph: a lattice over each body of water at its level, joined to the walking graph only at shore nodes, which no walking route enters."
+      },
+      "status": "built"
+    },
+    {
+      "agents": {
+        "catalog": "society-engines",
         "kinds": ["exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4", "exulanica-society/v5", "exulanica-society/v7"],
         "reason": "The inhabitants of every society engine that routes its people over a graph. Version 1 keeps its frozen seeded motion, which has no routes, and is not moved by any module."
       },

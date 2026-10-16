@@ -80,6 +80,7 @@ DRAWING_MODULES: Final = (
     "exulanica.models.manifest",
     "exulanica.movement.registry",
     "exulanica.movement.steps",
+    "exulanica.movement.swimming",
     "exulanica.movement.walking",
     "exulanica.movement.walking_v2",
     "exulanica.things.bodies",
@@ -114,6 +115,7 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_living",
     "exulanica.world.society_living_decisions",
     "exulanica.world.society_model_decisions",
+    "exulanica.world.society_movement",
     "exulanica.world.society_planner",
     "exulanica.world.society_person_label",
     "exulanica.world.society_place",
@@ -125,6 +127,7 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_surroundings",
     "exulanica.world.society_thing_inputs",
     "exulanica.world.society_things",
+    "exulanica.world.society_water",
     "exulanica.world.town_people",
 )
 #: What a stored drawing names in place of a model's name: the name is filled in on read.

@@ -16,6 +16,8 @@ and the command admits what the fit made. What is shown, against PostgreSQL:
 *   a job whose creature was erased between staging and admitting keeps nothing;
 *   admitting again after an end that failed once the look was kept wears that look, and keeps no
     second one of the same fit.
+*   a creature kept from before the body grammar's newest version is asked its look from its own
+    plan, its body built again by the grammar version that built it.
 """
 
 from __future__ import annotations
@@ -31,12 +33,20 @@ import psycopg
 import pytest
 from exulanica.db.session import set_workspace
 from exulanica.env import env_get
-from exulanica.hosting.creature_look_command import FITS_PROFILE, made_admits, main
+from exulanica.hosting.creature_look_command import (
+    FITS_PROFILE,
+    look_request,
+    made_admits,
+    main,
+)
 from exulanica.store.configured import content_stores
+from exulanica.things.bodies import load_body_grammar
+from exulanica.things.creatures import assemble_creature
 from exulanica.world import creature_look_jobs as look_jobs
 from exulanica.world.thing_store import ThingStore, ThingStoreRefused
 from psycopg.rows import dict_row
 
+from test_creature_bodies import BY, _form, _recipe
 from test_thing_store_postgres import ACTOR, _creature
 
 pytestmark = pytest.mark.postgres
@@ -312,3 +322,21 @@ def test_admitting_again_after_a_failed_end_wears_the_look_already_kept(
             assert row["n"] == 1, key
             job = look_jobs.read_look(connection, workspace, look.look_id)
             assert job.status == "made" and worn[creature.kind.sha256].sha256 == job.look_sha256
+
+
+def test_a_creature_kept_under_an_older_body_grammar_is_asked_from_its_own_plan(
+    cli_database, tmp_path, monkeypatch
+):
+    monkeypatch.delenv("EXULANICA_STORE_KIND", raising=False)
+    workspace = uuid.uuid4()
+    older = load_body_grammar(version=1)
+    creature = assemble_creature(
+        _form(_recipe("ten_legs"), label="kept ten legs"), by=BY, grammar=older
+    )
+    assert creature.plan_document["reason"].endswith("the body grammar version 1.")
+    with _connect() as connection:
+        set_workspace(connection, workspace)
+        looks = content_stores(data_dir=tmp_path / "data").looks.for_workspace(workspace)
+        ThingStore(connection, workspace, looks).keep_creature(creature, created_by=ACTOR)
+        request = json.loads(look_request(connection, workspace, creature.kind.sha256, looks))
+    assert request["plan"]["sha256"] == creature.plan.sha256
