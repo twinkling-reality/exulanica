@@ -227,6 +227,22 @@ def test_a_world_named_by_land_rules_3_keeps_its_pond_ids_and_rules_4_moves_no_h
     assert unnamed(now) == unnamed(before), "the same land, chunks, backdrop and water levels"
 
 
+def test_a_world_named_by_land_rules_5_regenerates_and_rules_6_grades_the_same_land() -> None:
+    """A world named by rules 5 regenerates byte for byte, and the same receipt naming rules 6
+    grades the very same land, walls and water: rules 6 holds a terrace in a wall only where its
+    bank would cut or fill past the bound, which this world's never does."""
+    world = made("site")
+    fifth, sixth = copy.deepcopy(world.receipt), copy.deepcopy(world.receipt)
+    fifth["land_rules"], sixth["land_rules"] = land_rules(5), land_rules(6)
+    records = site_plan.records(fifth)
+    assert records == site_plan.records(sixth) == world.records
+    before, now = site_land_of(fifth, records, 4000), site_land_of(sixth, records, 4000)
+    assert now.graded == before.graded
+    assert now.drawing_section() == before.drawing_section()
+    assert site_grading(records, 4000, rules_version=5).held_most_mm == 0
+    assert site_grading(records, 4000, rules_version=6).held_most_mm == 3000
+
+
 def test_a_site_stands_beside_a_cascade_and_its_drawing_lists_the_pools_and_falls() -> None:
     falls = {"id": "falls", "kind": "cascade", "side": "south", "offset_mm": -70_000,
              "from_mm": -140_000, "to_mm": 90_000}  # fmt: skip

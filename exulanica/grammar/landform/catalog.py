@@ -20,6 +20,12 @@ one; a world is read against the version its receipt's land rules name
 (:mod:`exulanica.grammar.landform.rules`). Version 2 adds the ``cascade``; version 3 adds its
 ``course`` and ``least_fall_mm``.
 
+A third file, ``landform-grading.vN.json``, states the figures a layout's grading of its land is
+held to (the bank grade, the deepest cut or fill, the most a terrace's retaining wall holds), one
+entry each with its bounds and its value. It shapes no land document and is versioned on its own;
+land rules from version 6 name it (:mod:`exulanica.grammar.landform.rules`), and earlier rules
+grade by the figures the grading module states.
+
 Read on first use, never at import, and kept for the process: a catalog is authored data and
 changes only with a release.
 """
@@ -46,10 +52,14 @@ __all__ = [
     "CATALOG_VERSIONS",
     "COMPOSITIONS",
     "DOMAINS",
+    "GRADING_CATALOG_VERSIONS",
     "FeatureKind",
+    "GradingFigures",
     "LandformCatalog",
     "ValueBound",
     "feature_schema",
+    "grading_figures",
+    "grading_schema",
     "landform_catalog",
     "load_landform_catalog",
     "value_schema",
@@ -61,6 +71,10 @@ CATALOG_DIRECTORY: Final = (
 #: Every version of the landform catalogs this code reads, and the newest, which reads new land.
 CATALOG_VERSIONS: Final = (1, 2, 3)
 CATALOG_VERSION: Final = 3
+#: Every version of the grading figures' catalog this code reads.
+GRADING_CATALOG_VERSIONS: Final = (1,)
+#: The figures a grading catalog states, every version.
+GRADING_FIGURES: Final = ("bank_grade_permille", "cut_fill_most_mm", "held_most_mm")
 DOMAINS: Final = ("near_and_far", "far")
 COMPOSITIONS: Final = ("additive", "shaping")
 #: Wider than any bound a value states, so the file, not this schema, says what a value may be.
@@ -85,6 +99,17 @@ class ValueBound:
     default: int
     required: bool
     words: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class GradingFigures:
+    """The figures a layout's grading of its land is held to: the bank grade, the deepest a cell
+    may be cut or filled, and the most a terrace's retaining wall holds where its bank would pass
+    that."""
+
+    bank_grade_permille: int
+    cut_fill_most_mm: int
+    held_most_mm: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +214,45 @@ def load_landform_catalog(
             words=tuple(fields["words"]),  # type: ignore[arg-type]
         )
     return LandformCatalog(features=features, values=values)
+
+
+def _grading_check(where: str, fields: dict) -> None:
+    if not fields["minimum"] <= fields["value"] <= fields["maximum"]:
+        raise CatalogError(f"{where}: the value lies within the bounds")
+
+
+def grading_schema(version: int) -> CatalogSchema:
+    """The grading figures' catalog schema at ``version``: the same fields at every version."""
+    return CatalogSchema(
+        "landform-grading",
+        version,
+        (
+            ("minimum", integer_field(0, _ANY)),
+            ("maximum", integer_field(0, _ANY)),
+            ("value", integer_field(0, _ANY)),
+            ("reason", text_field),
+        ),
+        entry_check=_grading_check,
+    )
+
+
+@functools.cache
+def grading_figures(version: int) -> GradingFigures:
+    """The grading figures the shipped catalog states at ``version``, read once per process; a
+    catalog that states other figures than :data:`GRADING_FIGURES` is refused."""
+    if version not in GRADING_CATALOG_VERSIONS:
+        raise CatalogError(
+            f"landform grading catalogs are versions {GRADING_CATALOG_VERSIONS}, not {version}"
+        )
+    catalog = load_catalog(
+        CATALOG_DIRECTORY.joinpath(f"landform-grading.v{version}.json"), grading_schema(version)
+    )
+    stated = {entry.key: int(dict(entry.values)["value"]) for entry in catalog.entries}  # type: ignore[arg-type]
+    if sorted(stated) != sorted(GRADING_FIGURES):
+        raise CatalogError(
+            f"landform-grading v{version} states {sorted(stated)}, not {sorted(GRADING_FIGURES)}"
+        )
+    return GradingFigures(**stated)
 
 
 @functools.cache

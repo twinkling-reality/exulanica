@@ -20,6 +20,11 @@ realized near land, in a fixed order:
    grade over one cell, one of them fixed, is a retaining wall's: a seam where two pads, or a pad
    and a corridor, meet at levels a bank cannot join. Edges along one lattice line rising to the
    same side join into one run, listed on the line of its low side. No height moves.
+   Where the plan lets a terrace hold a wall and a bank would cut or fill a cell past the bound, the
+   pad whose cone set that cell stands in a retaining wall instead: its cones start that much above
+   and below its level, raised by the excess up to the most a wall holds, and the banks are graded
+   again, so the land behind the wall keeps more of its own shape. A plan within the bound grades as
+   though no wall could be held; a corridor never holds one.
 5. **Ponds** are carved as ellipses inscribed in their rectangles, below a level that is the
    lowest ground on the ring just outside them less a freeboard, so the water holds.
 
@@ -144,6 +149,9 @@ class GradingPlan:
     cut_fill_most_mm: int = CUT_FILL_MOST_MM
     walk_grade_permille: int = WALK_GRADE_PERMILLE
     retaining_walls: bool = False
+    #: The most a pad's retaining wall holds where its bank would cut or fill past the bound; 0
+    #: holds none, and the layout is refused there as it always was.
+    held_most_mm: int = 0
 
 
 @dataclass(frozen=True)
@@ -281,14 +289,15 @@ def _conflict(pins: list[tuple[int, int, str]], step: int) -> tuple:
     return worst[1], worst[2]
 
 
-def _banks(work: _Work, grade: int) -> list[Wall]:
+def _banks(work: _Work, grade: int, held: Mapping[str, int] | None = None) -> list[Wall]:
     n = work.near
     nx, ny = n.nx, n.ny
     step = grade * CELL_MM // 1000
     diagonal = step * 1414 // 1000
     size = len(work.h)
-    low = [work.h[i] if work.locked[i] else -_FAR for i in range(size)]
-    high = [work.h[i] if work.locked[i] else _FAR for i in range(size)]
+    held = held or {}
+    low = [work.h[i] - held.get(work.owner[i], 0) if work.locked[i] else -_FAR for i in range(size)]
+    high = [work.h[i] + held.get(work.owner[i], 0) if work.locked[i] else _FAR for i in range(size)]
     low_owner = list(work.owner)
     high_owner = list(work.owner)
     forward = ((0, -1, step), (-1, -1, diagonal), (-1, 0, step), (-1, 1, diagonal))
@@ -323,6 +332,34 @@ def _banks(work: _Work, grade: int) -> list[Wall]:
                 work.owner[i] = low_owner[i] if clamped == low[i] else high_owner[i]
             work.h[i] = clamped
     return walls
+
+
+def _held_banks(work: _Work, plan: GradingPlan) -> list[Wall]:
+    """The banks, with each pad whose bank would cut or fill a free cell past the bound held in a
+    retaining wall: its cones start the wall's height above and below its level, raised by the
+    excess up to :attr:`GradingPlan.held_most_mm`, and the banks graded again from the fixed cells,
+    until no pad that set an offending cell can hold more. A plan whose banks stay within the bound
+    is graded once, as though no wall could be held."""
+    pads = {pad.id for pad in plan.pads}
+    heights, owners = list(work.h), list(work.owner)
+    held: dict[str, int] = {}
+    while True:
+        walls = _banks(work, plan.bank_grade_permille, held)
+        over: dict[str, int] = {}
+        for index, (graded, natural) in enumerate(zip(work.h, work.near.heights, strict=True)):
+            excess = abs(graded - natural) - plan.cut_fill_most_mm
+            owner = work.owner[index]
+            if excess > 0 and not work.locked[index] and owner in pads:
+                over[owner] = max(over.get(owner, 0), excess)
+        grown = False
+        for owner, excess in sorted(over.items()):
+            wanted = min(plan.held_most_mm, held.get(owner, 0) + excess)
+            if wanted > held.get(owner, 0):
+                held[owner] = wanted
+                grown = True
+        if not grown:
+            return walls
+        work.h, work.owner = list(heights), list(owners)
 
 
 def _retaining(work: _Work, grade: int) -> tuple[RetainingWall, ...]:
@@ -534,7 +571,7 @@ def grade_land(near: NearLand, plan: GradingPlan, water: Sequence[WaterBody] = (
             middle = ((x0 + x1) // 2 // CELL_MM * CELL_MM, (y0 + y1) // 2 // CELL_MM * CELL_MM)
             level = work.h[work.cell(*middle)]
         levels[pad.id] = _pad(work, pad, level, keep_fixed=True)
-    walls = _banks(work, plan.bank_grade_permille)
+    walls = _held_banks(work, plan)
     retaining = _retaining(work, plan.bank_grade_permille) if plan.retaining_walls else None
     cut = fill = 0
     for index, (graded, natural) in enumerate(zip(work.h, near.heights, strict=True)):

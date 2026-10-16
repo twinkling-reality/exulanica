@@ -88,6 +88,12 @@ and adds to it: version 2 adds the `cascade`, version 3 its `course` and `least_
 is read against the newest version, and a world's land against the version its
 [land rules](#a-worlds-land-rules) name.
 
+A third catalog, `landform-grading.vN.json`, states the figures a layout's [grading](#grading) is
+held to, one entry each with its bounds and its `value`: `bank_grade_permille` (500, 1 in 2),
+`cut_fill_most_mm` (8,000) and `held_most_mm` (3,000, the most a terrace's retaining wall holds). It
+shapes no land document; land rules from version 6 name it, and earlier versions grade by the same
+first two figures, stated in the grading module, and hold no wall.
+
 | Kind | What it makes |
 | --- | --- |
 | `tilt` | The land rising toward a side, held level beyond its reach |
@@ -202,7 +208,13 @@ backdrop and a site's drawing list them with the land's other water.
    land's height at its middle.
 4. Every other sample is held between the cones of the fixed samples at the bank grade (1 in 2).
    Where two fixed samples are closer than their difference allows, a retaining wall takes the
-   difference and is listed with its height. Where the plan asks for them, every lattice edge
+   difference and is listed with its height. Where the plan lets a terrace hold a wall
+   (`held_most_mm`) and a bank would cut or fill a sample past the bound, the terrace whose cone set
+   that sample stands in a retaining wall instead: its cones start the wall's height above and below
+   its level, raised by the excess up to the most a wall holds, and the banks are graded again, so
+   the land behind the wall keeps more of its own shape; a corridor never holds one, and a plan
+   whose banks stay within the bound grades as though no wall could be held. Where the plan asks for
+   them, every lattice edge
    between a fixed sample and a neighbour more than one cell's bank step above or below it (500 mm
    at 1 in 2) is a **retaining wall**'s: a seam where two terraces, or a terrace and a path, meet
    at levels a bank cannot join. Edges along one lattice line rising toward the same side join
@@ -215,7 +227,7 @@ backdrop and a site's drawing list them with the land's other water.
 Before any of these, a layout whose pads or corridors would cross a cascade's pools or falls is
 refused: a layout stands beside a cascade, and the next layout candidate is tried.
 
-Then the checks: cut and fill within 8,000 mm; every water body holds (every dry sample beside a
+Then the checks: cut and fill within the bound (8,000 mm); every water body holds (every dry sample beside a
 wet one stands at or above its level; a fall is a cascade's drop and is not held); every door
 reachable from the entry over ground walked at 1
 in 4 or less, never through a wall or within 350 mm of a water's level; heights within the near
@@ -377,7 +389,8 @@ land, so the receipt also names the rules that made it, `land_rules`
 ([`rules.py`](../exulanica/grammar/landform/rules.py)):
 
 ```json
-{"version": 5, "catalogs": {"landform-feature.v3": "<sha256>", "landform-value.v3": "<sha256>"}}
+{"version": 6, "catalogs": {"landform-feature.v3": "<sha256>", "landform-value.v3": "<sha256>",
+  "landform-grading.v1": "<sha256>"}}
 ```
 
 - `version` stands for the realizer, its grading and the grading plan a site's layout asks of its
@@ -392,17 +405,21 @@ as other land, and its saved entry is listed unavailable by the same name
 ([saved world entry](saved-world-entry.md)). A level world's receipt names no land rules, and one
 that does is refused the same way.
 
-Every rules version this code makes the same land by is served: versions 1 to 5, each reading the
-catalog version `SERVED_LAND_RULES` names (versions 1 to 3 their own, versions 4 and 5 version 3's,
-since they change no catalog). The realizer and grading are one code for all; version 2 only adds the
+Every rules version this code makes the same land by is served: versions 1 to 6, each reading the
+catalog version `SERVED_LAND_RULES` names (versions 1 to 3 their own, versions 4 to 6 version 3's,
+since they change no feature or value catalog), and version 6 the grading catalog
+`GRADING_OF_LAND_RULES` names as well. The realizer and grading are one code for all; version 2 only adds the
 `cascade` and version 3 its `follow` course, so land an earlier version admits is the same land
 under a later one. Version 4 moves no height and changes what a site's drawing states: a site's
 grading plan names each pond by its zone and its area's number in the zone (`zone 1 pond 0`) where
 versions 1 to 3 name it by that number alone (`pond 0`), so two zones' ponds no longer share an id.
 Version 5 moves no height either: a site's grading lists its retaining walls where levels meet and
-its drawing states them (`walls`), where versions 1 to 4 list none. The grading plan takes the rules
+its drawing states them (`walls`), where versions 1 to 4 list none. Version 6 grades a site by the
+grading catalog's figures and lets a terrace stand in a retaining wall where its bank would cut or
+fill past the bound: a layout whose banks stay within the bound grades the same land as under
+version 5, and one that version 5 refuses there may grade. The grading plan takes the rules
 version the receipt names, so a world made under an earlier version regenerates byte for byte, its
-ponds named and its walls unlisted as they were. New worlds name version 5. The
+ponds named and its walls unlisted as they were. New worlds name version 6. The
 tests pin every shipped landform catalog byte for byte, and each served version with the catalogs
 it names and the graded land of its own golden site, its water's ids and its walls among it
 ([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a change that would move a served
@@ -504,10 +521,13 @@ as walls up to about 4 m.
 - A corridor steeper than its grade is refused rather than given stairs.
 - Below the datum a shore's sea covers everything; a valley carved below it floods.
 - Performance is measured only on the development machine's tests; no drawing cost is stated here.
-- The server serves land rules versions 1 to 5. A world made under any other is refused, not
+- The server serves land rules versions 1 to 6. A world made under any other is refused, not
   realized by the rules it names. A world made under versions 1 to 3 keeps its ponds' ids, so two
   of its zones' ponds may share one, and one made under versions 1 to 4 draws no retaining walls:
   its terraces meet their neighbours in a steep face of land.
+- A terrace holds a wall of at most `held_most_mm` (3,000 mm): a hill steeper than a bank behind
+  a terrace still shaves the land beyond the wall, up to the bound, and past that the layout is
+  refused. A town on land is graded by the town's own figures and holds no wall.
 - A retaining wall is drawn only: one cell thick, with no parapet, never walked on or along and
   casting nothing. Where a terrace meets a sloping path the wall runs only where the difference
   passes 500 mm, so its ends meet a short steep face of land. A town on land lists none.

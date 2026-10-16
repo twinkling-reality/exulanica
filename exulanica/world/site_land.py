@@ -21,6 +21,10 @@ cost:
   lattice cell, the grading lists a **retaining wall** along the face and the drawing states it,
   moving no height; under land rules before :data:`RETAINING_WALLS` it lists none, and the
   drawing's land section has no ``walls``;
+* the banks are graded by the figures the land rules' grading catalog states, where they name one
+  (``landform-grading.v1.json`` from version 6), and by the grading module's own before; under a
+  catalog a zone whose bank would cut or fill past the deepest it may stands in a retaining wall,
+  up to the most the catalog says a wall holds, rather than being refused;
 * the **entry** is where the first path meets the site's south edge; a path that ends within a
   lattice cell of the site's edge is graded to the edge, where the society's entry stands.
 
@@ -44,7 +48,7 @@ from __future__ import annotations
 import functools
 import hashlib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
@@ -76,6 +80,8 @@ from exulanica.grammar.landform import (
     realize_near,
     water_bodies,
 )
+from exulanica.grammar.landform.catalog import grading_figures
+from exulanica.grammar.landform.rules import GRADING_OF_LAND_RULES
 from exulanica.world.society_place import STEP_LIMIT_MM
 
 __all__ = [
@@ -204,13 +210,22 @@ def site_grading(records: Sequence[object], station_mm: int, *, rules_version: i
         for area in areas
         if "water" in area.roles
     )
-    return GradingPlan(
+    plan = GradingPlan(
         corridors=corridors,
         pads=tuple(pads),
         basins=basins,
         entry_mm=_on_path(rects[paths[0].identity], _along_y(paths[0]), extent.entry_x_mm, 0),
         walk_grade_permille=min(corridor.grade_permille for corridor in corridors),
         retaining_walls=rules_version >= RETAINING_WALLS,
+    )
+    if rules_version not in GRADING_OF_LAND_RULES:
+        return plan
+    figures = grading_figures(GRADING_OF_LAND_RULES[rules_version])
+    return replace(
+        plan,
+        bank_grade_permille=figures.bank_grade_permille,
+        cut_fill_most_mm=figures.cut_fill_most_mm,
+        held_most_mm=figures.held_most_mm,
     )
 
 

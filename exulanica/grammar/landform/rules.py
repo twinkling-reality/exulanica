@@ -2,12 +2,12 @@
 
 A world made on land keeps its land document; its land is realized and graded again from that
 document whenever it is asked for. The same document under other rules would be other land, so a
-receipt also names the rules that made it: :data:`LAND_RULES_VERSION`, which stands for the
-realizer (:mod:`exulanica.grammar.landform.realize`), its grading
-(:mod:`exulanica.grammar.landform.grading`) and the grading plan a site's layout asks of its land
-(:mod:`exulanica.world.site_land`), and the digest of each catalog that shapes land (the feature
-kinds and their values). A world whose receipt names other rules than this code's is refused by
-name; it is never drawn as other land.
+receipt also names the rules that made it: :data:`LAND_RULES_VERSION`, which stands for the realizer
+(:mod:`exulanica.grammar.landform.realize`), its grading (:mod:`exulanica.grammar.landform.grading`)
+and the grading plan a site's layout asks of its land (:mod:`exulanica.world.site_land`), and the
+digest of each catalog that shapes land (the feature kinds and their values, and from version 6 the
+figures a grading is held to). A world whose receipt names other rules than this code's is refused
+by name; it is never drawn as other land.
 
 A change to any of those rules is a new version, and a change to a catalog is a new catalog version
 (``landform-value.v2.json``), never an edit of a shipped one: the tests pin both. The land's look
@@ -15,17 +15,20 @@ A change to any of those rules is a new version, and a change to a catalog is a 
 
 **Every version this code can make the same land by is served.** The realizer and its grading are
 one code for every served version: a later version only adds what an earlier one could not state
-(version 2 adds the ``cascade``, version 3 its ``follow`` course), so a document an earlier
-version admits is the same land under this code. Version 4 is the first that states an admitted
-document differently: a site's grading plan names each pond by its zone (``zone 1 pond 0``), where
-earlier versions name it by its area's number in its zone alone (``pond 0``), and moves no height.
-Version 5 lists a retaining wall wherever a site's terraces and paths meet at levels a bank cannot
-join over one cell, in its grading and in what its drawing states, and moves no height either.
-So a site's grading plan takes the rules version its receipt names, and such a change applies
-from its version on. A receipt's land is read against the catalog
-version its rules name, and the tests pin each served version's golden site, so a change that would
-move an earlier version's land or what its drawing states fails until that version is no longer
-served. New worlds name :data:`LAND_RULES_VERSION`.
+(version 2 adds the ``cascade``, version 3 its ``follow`` course), so a document an earlier version
+admits is the same land under this code. Version 4 is the first that states an admitted document
+differently: a site's grading plan names each pond by its zone (``zone 1 pond 0``), where earlier
+versions name it by its area's number in its zone alone (``pond 0``), and moves no height. Version 5
+lists a retaining wall wherever a site's terraces and paths meet at levels a bank cannot join over
+one cell, in its grading and in what its drawing states, and moves no height either. Version 6
+grades by the figures ``landform-grading.v1.json`` states, today's bank grade and deepest cut and
+fill among them, and lets a terrace stand in a retaining wall where its bank would cut or fill past
+the deepest it may: a layout that grades within the bound grades the same land as under version 5,
+and one that earlier versions refused may grade. So a site's grading plan takes the rules version
+its receipt names, and such a change applies from its version on. A receipt's land is read against
+the catalog version its rules name, and the tests pin each served version's golden site, so a change
+that would move an earlier version's land or what its drawing states fails until that version is no
+longer served. New worlds name :data:`LAND_RULES_VERSION`.
 """
 
 from __future__ import annotations
@@ -35,17 +38,31 @@ from collections.abc import Mapping
 from typing import Any, Final
 
 from exulanica.grammar.catalogs import catalog_digest, load_catalog
-from exulanica.grammar.landform.catalog import CATALOG_DIRECTORY, feature_schema, value_schema
+from exulanica.grammar.landform.catalog import (
+    CATALOG_DIRECTORY,
+    feature_schema,
+    grading_schema,
+    value_schema,
+)
 from exulanica.grammar.landform.document import LandformRefused
 
-__all__ = ["LAND_RULES_VERSION", "SERVED_LAND_RULES", "check_land_rules", "land_rules"]
+__all__ = [
+    "GRADING_OF_LAND_RULES",
+    "LAND_RULES_VERSION",
+    "SERVED_LAND_RULES",
+    "check_land_rules",
+    "land_rules",
+]
 
 #: The rules new land is made by. A change to the realizer, its grading or a site's grading plan
 #: that moves land, or what a site's drawing states of it, is a new version.
-LAND_RULES_VERSION: Final = 5
+LAND_RULES_VERSION: Final = 6
 #: Every rules version this code makes land by, and the landform catalog version each reads.
-#: Versions 4 and 5 change no catalog, so they read version 3's.
-SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3, 4: 3, 5: 3}
+#: Versions 4 to 6 change no feature or value catalog, so they read version 3's.
+SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3, 4: 3, 5: 3, 6: 3}
+#: The rules versions that grade by a grading catalog, and its version. Earlier versions grade by
+#: the figures the grading module states, which version 1 of the catalog repeats.
+GRADING_OF_LAND_RULES: Final = {6: 1}
 
 
 @functools.cache
@@ -68,11 +85,23 @@ def _catalog_digests(version: int) -> tuple[tuple[str, str], ...]:
     )
 
 
+@functools.cache
+def _grading_digest(version: int) -> tuple[str, str]:
+    """The grading catalog at ``version``, by the name a receipt gives it, and its digest."""
+    path = CATALOG_DIRECTORY.joinpath(f"landform-grading.v{version}.json")
+    return f"landform-grading.v{version}", catalog_digest(
+        [load_catalog(path, grading_schema(version))]
+    )
+
+
 def land_rules(version: int | None = None) -> dict[str, Any]:
     """The rules ``version`` (the newest unless one is named): its number and each shaping
     catalog's digest. A new mapping each time, since a receipt keeps it."""
     named = LAND_RULES_VERSION if version is None else version
-    return {"version": named, "catalogs": dict(_catalog_digests(SERVED_LAND_RULES[named]))}
+    catalogs = dict(_catalog_digests(SERVED_LAND_RULES[named]))
+    if named in GRADING_OF_LAND_RULES:
+        catalogs.update([_grading_digest(GRADING_OF_LAND_RULES[named])])
+    return {"version": named, "catalogs": catalogs}
 
 
 def _said(rules: object) -> str:

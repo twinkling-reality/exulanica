@@ -34,6 +34,7 @@ SHIPPED = {
     "landform-feature.v1.json": "5da02f1b42b263f9d54981f34baedcd56a62af2df81c2878a94cb1f5977fbc50",
     "landform-feature.v2.json": "1cc522bbccff9650e92d7f5fd46fc7d2300318c3da5496ab4cc3eb64bb385110",
     "landform-feature.v3.json": "e320f5e8642aa57b5dfedbe3f2a24a7d8691321017a3776c9e95bfbfd58e131f",
+    "landform-grading.v1.json": "dd66a572d6acf6c7477bd09cb515cc99d656200c25d9bcd79bc99ad2482bce53",
     "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
     "landform-recipe.v2.json": "8e805cc75d229af096aa458d34b4d98e2db2e8e08ee62972dd55eecb483ffb97",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
@@ -91,6 +92,20 @@ RULES = {
         },
         "golden_site": "7885742eef2d4ad7547a4e74bdd911c4e42a1bf50b7e773b9fa8b0f5de06aa7c",
     },
+    # Version 6 grades by the grading catalog's figures and may hold a terrace in a wall; its golden
+    # site is version 5's, held within the bound, so it grades the very same land.
+    6: {
+        "catalogs": {
+            "landform-feature.v3": (
+                "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08"
+            ),
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+            "landform-grading.v1": (
+                "6c47ddd80d975a7aede4e66149dc4710e2a96b11d6bcd3a424d0b86e07463a4a"
+            ),
+        },
+        "golden_site": "7885742eef2d4ad7547a4e74bdd911c4e42a1bf50b7e773b9fa8b0f5de06aa7c",
+    },
 }
 
 #: Every feature kind once, a valley and a filled basin beside a terraced hill above a shore.
@@ -130,7 +145,7 @@ GOLDEN_SITE = (
 #: Each served version's golden site: version 4's adds a pond to the other zone, the first area of
 #: its zone as the garden's pond is of its own, so the two ponds' ids differ only by their zones;
 #: version 5's adds an orchard north of the yard, touching it at another level, so a retaining wall
-#: stands where they meet.
+#: stands where they meet; version 6's is version 5's.
 GOLDEN_SITES = {
     1: GOLDEN_SITE,
     2: GOLDEN_SITE,
@@ -146,6 +161,7 @@ GOLDEN_SITES[5] = (
     SiteZoneRecord("site:zone:2", 2, "orchard", 4000, 24000, 20000, 40000, "east", "open",
                    "ground", "grass", 20000, 38000),
 )  # fmt: skip
+GOLDEN_SITES[6] = GOLDEN_SITES[5]
 
 
 def test_no_shipped_landform_catalog_is_edited() -> None:
@@ -190,7 +206,8 @@ def test_land_made_by_other_rules_is_refused_saying_both(other: object) -> None:
 
 #: Each served version's golden land: version 1's as it was pinned, version 2's the same with a
 #: cascade from the terraced hill, past the site's west side, into the sea, version 3's with that
-#: cascade following the land, and versions 4 and 5 as 3's, since they change no catalog.
+#: cascade following the land, and versions 4 to 6 as 3's, since they change no catalog that shapes
+#: a land document.
 GOLDEN_LANDS = {
     1: GOLDEN_LAND,
     2: {
@@ -210,13 +227,14 @@ GOLDEN_LANDS = {
         ],
     },
 }  # fmt: skip
-GOLDEN_LANDS[4] = GOLDEN_LANDS[5] = GOLDEN_LANDS[3]
+GOLDEN_LANDS[4] = GOLDEN_LANDS[5] = GOLDEN_LANDS[6] = GOLDEN_LANDS[3]
 WATER = {
     1: {"sea", "lake", "pond"},
     2: {"sea", "lake", "pond", "pool", "fall"},
     3: {"sea", "lake", "pond", "pool", "fall"},
     4: {"sea", "lake", "pond", "pool", "fall"},
     5: {"sea", "lake", "pond", "pool", "fall"},
+    6: {"sea", "lake", "pond", "pool", "fall"},
 }
 #: Each served version's pond ids, in the golden site's drawing: by the area's number in its zone
 #: alone, and from version 4 by its zone and that number.
@@ -226,6 +244,7 @@ PONDS = {
     3: ["pond 0"],
     4: ["zone 1 pond 0", "zone 0 pond 0"],
     5: ["zone 1 pond 0", "zone 0 pond 0"],
+    6: ["zone 1 pond 0", "zone 0 pond 0"],
 }
 #: Each served version's retaining walls, in the golden site's drawing: none listed before version
 #: 5 (no ``walls`` at all), and from version 5 one along the yard's north edge, where the orchard
@@ -236,6 +255,7 @@ WALLS = {
     3: None,
     4: None,
     5: [{"from_mm": [4000, 24000], "to_mm": [20000, 24000], "high": "north"}],
+    6: [{"from_mm": [4000, 24000], "to_mm": [20000, 24000], "high": "north"}],
 }
 
 

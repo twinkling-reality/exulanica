@@ -12,6 +12,7 @@ from exulanica.grammar.landform import (
     Corridor,
     GradingPlan,
     LandformRefused,
+    NearLand,
     Pad,
     RetainingWall,
     WorldFrame,
@@ -276,3 +277,59 @@ def test_a_layout_crossing_a_cascade_is_refused_by_name():
     with pytest.raises(LandformRefused) as caught:
         grade_land(region(CASCADE), plan(pads=(yard,)), water=water)
     assert caught.value.code == "landform_cascade_crossed" and "yard" in str(caught.value)
+
+
+def _hill(grade_permille: int) -> NearLand:
+    """Level ground at 6 m, and north of y = 40 m a hill climbing at ``grade_permille``, steeper
+    than a bank: a terrace below it banks into it more the further the bank runs."""
+    xs, ys = range(-10_000, 70_001, CELL_MM), range(-10_000, 70_001, CELL_MM)
+    heights = tuple(6000 + max(0, y - 40_000) * grade_permille // 1000 for y in ys for _x in xs)
+    return NearLand(-10_000, -10_000, len(xs), len(ys), heights)
+
+
+TERRACE = Pad(id="terrace", rect_mm=(20_000, 20_000, 40_000, 40_000), level_mm=6000)
+
+
+def _terrace(held_most_mm: int) -> GradingPlan:
+    return GradingPlan(
+        pads=(TERRACE,), entry_mm=(30_000, 30_000), held_most_mm=held_most_mm, retaining_walls=True
+    )
+
+
+def test_a_terrace_under_a_hill_steeper_than_its_bank_stands_in_a_wall_instead_of_refused():
+    near = _hill(800)
+    with pytest.raises(LandformRefused) as refused:
+        grade_land(near, _terrace(0))
+    assert refused.value.code == "landform_cut_too_deep" and "terrace" in str(refused.value)
+    graded = grade_land(near, _terrace(3000))
+    assert graded.pads == (("terrace", 6000),), "the terrace stands at its own level"
+    assert max(abs(g - n) for g, n in zip(graded.near.heights, near.heights, strict=True)) <= 8000
+    assert graded.retaining is not None
+    assert RetainingWall(from_mm=(20_000, 40_000), to_mm=(40_000, 40_000), high="north") in (
+        graded.retaining
+    ), "the wall stands along the terrace's north edge"
+    assert graded.near.at(30_000, 41_000) == near.at(30_000, 41_000), "the land behind it stays"
+
+
+def test_a_terrace_holds_no_more_than_the_most_a_wall_holds():
+    with pytest.raises(LandformRefused) as refused:
+        grade_land(_hill(900), _terrace(3000))
+    assert refused.value.code == "landform_cut_too_deep"
+
+
+def test_a_corridor_holds_no_wall():
+    # On the steep slope a bank of 60 per mille from the spine fills past 2.5 m beside it.
+    gentle = plan(bank_grade_permille=60, cut_fill_most_mm=2500, held_most_mm=3000)
+    with pytest.raises(LandformRefused) as refused:
+        grade_land(region(STEEP), gentle)
+    assert refused.value.code == "landform_cut_too_deep" and "spine" in str(refused.value)
+
+
+@pytest.mark.parametrize("which", ["hill", "slope"])
+def test_a_plan_within_the_bound_grades_the_same_land_whether_or_not_a_wall_could_be_held(
+    which: str,
+):
+    yard = Pad(id="yard", rect_mm=(16_000, 10_000, 27_000, 50_000), door_mm=(30_000, 30_000))
+    near = _hill(700) if which == "hill" else region()
+    asked = _terrace(0) if which == "hill" else plan(pads=(yard,), retaining_walls=True)
+    assert grade_land(near, asked) == grade_land(near, replace(asked, held_most_mm=3000))
