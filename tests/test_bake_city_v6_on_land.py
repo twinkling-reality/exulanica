@@ -13,6 +13,7 @@ walked at the footway's height, not lifted toward the lot.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import struct
@@ -25,7 +26,7 @@ from typing import Any
 import pytest
 from exulanica.grammar.grammars.city.common import TILE_SIZE_MM
 from exulanica.grammar.grammars.city.document import document_bytes
-from exulanica.grammar.grammars.city.land import footway_top_at
+from exulanica.grammar.grammars.city.land import footway_surface_at, footway_top_at
 from exulanica.grammar.grammars.city.parcels import ParcelRecord
 from exulanica.grammar.grammars.city.streets import CurbEdgeRecord
 from exulanica.grammar.landform import land_recipes
@@ -59,18 +60,16 @@ def _town():  # type: ignore[no-untyped-def]
     )
 
 
-@pytest.fixture(scope="module")
-def baked(tmp_path_factory) -> list[dict[str, Any]]:  # type: ignore[no-untyped-def]
-    """Every tile of the town, baked: its header and its triangles by projection."""
+def _bakes(made: Any, directory: Path) -> list[tuple[tuple[int, int], bytes]]:
+    """Every tile of a made town, baked by the tessellator's own command line: its place and its
+    container."""
     if not TSX.exists():
         pytest.skip(
             f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/"
         )
     if shutil.which("node") is None:
         pytest.skip("node is not on PATH")
-    made = _town()
-    directory = tmp_path_factory.mktemp("bake-on-land")
-    tiles = []
+    containers = []
     for document in town.tile_documents(made.receipt, made.records):
         name = f"tile-{document.tile.tile_x}-{document.tile.tile_y}"
         source, output = directory / f"{name}.json", directory / f"{name}.owd"
@@ -83,10 +82,35 @@ def baked(tmp_path_factory) -> list[dict[str, Any]]:  # type: ignore[no-untyped-
             check=True,
             timeout=600,
         )
-        tiles.append(
-            _read(output.read_bytes()) | {"tile": (document.tile.tile_x, document.tile.tile_y)}
-        )
-    return tiles
+        containers.append(((document.tile.tile_x, document.tile.tile_y), output.read_bytes()))
+    return containers
+
+
+@pytest.fixture(scope="module")
+def baked(tmp_path_factory) -> list[dict[str, Any]]:  # type: ignore[no-untyped-def]
+    """Every tile of the town, baked: its header and its triangles by projection."""
+    return [
+        _read(container) | {"tile": place}
+        for place, container in _bakes(_town(), tmp_path_factory.mktemp("bake-on-land"))
+    ]
+
+
+#: The level small town on this file's world id, each tile's container digest by its place: what a
+#: level town bakes to. The rules for a town on land (a footway's ramp into a mitred corner, the
+#: ground a halo record takes from the tile beside its owner) leave it alone, and its two tiles
+#: share records over their seam.
+LEVEL_TOWN_TILES = {
+    (0, 0): "503404ddd2b3e5a01da8f43a27784e9cb3544231a9bd8b9d3cf19390b6d433c3",
+    (1, 0): "c9840d3f6444bb3f0290d3f7f77717874583b3ad3fad3340d0e0729ceb2ffe26",
+}
+
+
+def test_a_level_town_bakes_byte_for_byte_as_it_did(tmp_path: Path) -> None:
+    made = compose_generated_world(town_recipe("small_town"), WORLD)
+    digests = {
+        place: hashlib.sha256(container).hexdigest() for place, container in _bakes(made, tmp_path)
+    }
+    assert digests == LEVEL_TOWN_TILES
 
 
 def _read(container: bytes) -> dict[str, Any]:
@@ -298,6 +322,86 @@ def test_a_footway_beside_a_lot_above_it_is_walked_at_its_own_height(baked):
     assert walked > 0, "no footway beside a raised lot was sampled"
 
 
+#: How far along its kerb line, every so often, a footway is sampled for the walk along it.
+STATION_MM = 2000
+
+
+def _ramp_mm(curb: CurbEdgeRecord, crossing: CurbEdgeRecord, radius: int) -> int:
+    """How far from its kerb line's end a footway ramps into the corner there: twice as far as the
+    mitre's frontage corner stands back from that end, where the corner mitres; none where it
+    does not."""
+    reach = curb.kerb_width_mm + curb.footway_width_mm
+    other = crossing.kerb_width_mm + crossing.footway_width_mm
+    if radius == 0 or (reach < radius and other < radius):
+        return 0
+    return 2 * max(0, other - radius)
+
+
+def test_a_footway_is_walked_at_its_own_height_along_its_whole_length(baked):
+    """Every curb's footway, sampled across its middle along its kerb line, outside the ramps into
+    its mitred corners: no tile walks anything there above the footway's height as the walking
+    graph reads it (``footway_surface_at``), and the tile that draws the footway walks it at that
+    height, both to :data:`ROUNDING_MM`. A footway over a tile seam is drawn whole by the tile that
+    owns it, and the other tile's terrain yields to it."""
+    made = _town()
+    curbs = {c.identity: c for c in made.records if isinstance(c, CurbEdgeRecord)}
+    approached = {after: curb for curb in curbs.values() for after in curb.next_curb_identity}
+    owner: dict[str, tuple[int, int]] = {}
+    for tile in baked:
+        for kind, entry in _entries(tile, "nav_envelope"):
+            identity = tile["header"]["records"][entry["record"]].get("identity")
+            if kind == "city.curb_edge" and entry["state"] == "drawn":
+                owner[identity] = tile["tile"]
+    tiles = {tile["tile"]: tile["triangles"]["nav_envelope"] for tile in baked}
+    sampled = 0
+    for curb in curbs.values():
+        (x0, y0, _), (x1, y1, _) = curb.kerb_line_mm[0], curb.kerb_line_mm[-1]
+        axis = 0 if y0 == y1 else 1
+        start, end = (x0, x1) if axis == 0 else (y0, y1)
+        forward = 1 if end > start else -1
+        # Left of the line's own direction for a left curb, right of it for a right curb.
+        left = (0, forward) if axis == 0 else (-forward, 0)
+        out = left if curb.side == "left" else (-left[0], -left[1])
+        # The corner at the walk's end is the curb's own, at its walk's start its predecessor's.
+        ends: dict[int, int] = {}
+        follower = curbs.get(curb.next_curb_identity[0]) if curb.next_curb_identity else None
+        before = approached.get(curb.identity)
+        walk_end, walk_start = (end, start) if curb.side == "left" else (start, end)
+        if follower is not None:
+            ends[walk_end] = _ramp_mm(curb, follower, curb.corner_radius_mm)
+        if before is not None:
+            ends[walk_start] = _ramp_mm(curb, before, before.corner_radius_mm)
+        middle = curb.kerb_width_mm + curb.footway_width_mm // 2
+        for along in range(min(start, end), max(start, end) + 1, STATION_MM):
+            if any(abs(along - at) <= ramp for at, ramp in ends.items()):
+                continue
+            on_line = (along, y0) if axis == 0 else (x0, along)
+            point = (on_line[0] + out[0] * middle, on_line[1] + out[1] * middle)
+            stated = footway_surface_at(curb, point)
+            here = (point[0] // TILE_SIZE_MM, point[1] // TILE_SIZE_MM)
+            for key, nav in tiles.items():
+                heights = [z for z in (_height_at(t, point) for t in nav) if z is not None]
+                assert max(heights, default=stated) <= stated + ROUNDING_MM, (
+                    curb.identity,
+                    point,
+                    key,
+                    here,
+                    max(heights),
+                    stated,
+                )
+            drawn_by = tiles[owner[curb.identity]]
+            walked = [z for z in (_height_at(t, point) for t in drawn_by) if z is not None]
+            if walked:
+                sampled += 1
+                assert any(abs(z - stated) <= ROUNDING_MM for z in walked), (
+                    curb.identity,
+                    point,
+                    walked,
+                    stated,
+                )
+    assert sampled > 0, "no footway was sampled"
+
+
 def _height_at(triangle: list[list[int]], point: tuple[int, int]) -> float | None:
     """The height of a non-upright triangle at a plan point inside it, or None."""
     (ax, ay, az), (bx, by, bz), (cx, cy, cz) = triangle
@@ -311,3 +415,31 @@ def _height_at(triangle: list[list[int]], point: tuple[int, int]) -> float | Non
     if min(u, v, w) < 0:
         return None
     return u * az + v * bz + w * cz
+
+
+def test_a_town_of_three_tiles_bakes_every_tile_beside_the_corners_it_does_not_carry(tmp_path):
+    """A market town on land covers three tiles, and a street the middle tile owns turns rounded
+    corners into curbs an edge tile does not carry. The edge tile takes that street's ground as a
+    halo and leaves its corners to the middle tile, rather than refusing the whole tile."""
+    [upland] = [recipe for recipe in land_recipes() if recipe.key == "upland"]
+    made = compose_generated_world(
+        town.on_land(town_recipe("market_town"), dict(upland.land)), WORLD
+    )
+    corners_elsewhere = 0
+    for document in town.tile_documents(made.receipt, made.records):
+        carried = {r.identity for g in document.grammars for r in (*g.owned, *g.halo)}
+        corners_elsewhere += sum(
+            1
+            for g in document.grammars
+            for r in g.halo
+            if isinstance(r, CurbEdgeRecord)
+            and r.corner_radius_mm > 0
+            and any(follower not in carried for follower in r.next_curb_identity)
+        )
+    assert corners_elsewhere > 0, "no halo curb turns a corner into a curb its tile does not carry"
+    baked = [_read(container) for _place, container in _bakes(made, tmp_path)]
+    assert len(baked) == 3
+    for tile in baked:
+        for kind, entry in _entries(tile, "render_batch"):
+            if kind in ("city.street_segment", "city.curb_edge", "city.junction"):
+                assert entry["state"] in ("drawn", "halo"), (kind, entry)

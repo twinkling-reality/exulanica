@@ -429,18 +429,47 @@ export function curbSurfaces(
     const reachesWalkStart = onLeft ? index === 0 : index === pieces - 1;
     const backs = [back0, back1];
     const fronts = [footway0, footway1];
-    const ring: Space[] = [backs[walkStartIndex]!, backs[walkEndIndex]!];
     const turnedHere = reachesWalkEnd ? turnedMitre : undefined;
     const metHere = reachesWalkStart ? metMitre : undefined;
-    if (turnedHere === undefined) ring.push(fronts[walkEndIndex]!);
+    const [from, to] = [[k0, k1][walkStartIndex]!, [k0, k1][walkEndIndex]!];
+    // A footway whose kerb line climbs or falls stands on its own heights up to a ramp into each
+    // mitred corner it meets: the mitre's points stand at the corner's level, which one ring would
+    // carry along the whole strip. Each ramp is its own ring, and so is the strip between them. A
+    // level kerb line, or a strip whose two ramps would cross, keeps its one ring.
+    const sloping = line.some((point) => point[2] !== line[0]![2]);
+    let endRamp = sloping && turnedHere !== undefined ? rampStart(from, to, turnedHere.frontage, where) : undefined;
+    let startRamp = sloping && metHere !== undefined ? rampStart(to, from, metHere.frontage, where) : undefined;
+    if (endRamp !== undefined && startRamp !== undefined && !before(from, to, startRamp, endRamp)) {
+      endRamp = undefined;
+      startRamp = undefined;
+    }
+    // The kerb top's back and the footway's far edge, across the strip from a point of the kerb line.
+    const across = (onKerb: Plan): readonly [Space, Space] => {
+      const kerb: Space = [onKerb[0], onKerb[1], heightOn(line, direction, onKerb, where)];
+      return [out(kerb, kerbWidth, height), out(kerb, add(kerbWidth, footwayWidth, where), add(height, rise, where))];
+    };
+    const ringOf = (points: readonly Space[]): void => {
+      const kept = points.filter((point, at) => !samePoint(point, points[(at + points.length - 1) % points.length]!));
+      appended(built.footway!, {
+        ...horizontal(kept, origin, direction, where),
+        triangles: [...triangulateRing(kept.map(plan), where)],
+      });
+    };
+    const startEdge = startRamp === undefined ? undefined : across(startRamp);
+    const endEdge = endRamp === undefined ? undefined : across(endRamp);
+    if (startEdge !== undefined) ringOf([backs[walkStartIndex]!, startEdge[0], startEdge[1], metHere!.frontage, metHere!.centre]);
+    if (endEdge !== undefined) ringOf([endEdge[0], backs[walkEndIndex]!, turnedHere!.centre, turnedHere!.frontage, endEdge[1]]);
+    const ring: Space[] = [
+      startEdge === undefined ? backs[walkStartIndex]! : startEdge[0],
+      endEdge === undefined ? backs[walkEndIndex]! : endEdge[0],
+    ];
+    if (endEdge !== undefined) ring.push(endEdge[1]);
+    else if (turnedHere === undefined) ring.push(fronts[walkEndIndex]!);
     else ring.push(turnedHere.centre, turnedHere.frontage);
-    if (metHere === undefined) ring.push(fronts[walkStartIndex]!);
+    if (startEdge !== undefined) ring.push(startEdge[1]);
+    else if (metHere === undefined) ring.push(fronts[walkStartIndex]!);
     else ring.push(metHere.frontage, metHere.centre);
-    const footwayRing = ring.filter((point, at) => !samePoint(point, ring[(at + ring.length - 1) % ring.length]!));
-    appended(built.footway!, {
-      ...horizontal(footwayRing, origin, direction, where),
-      triangles: [...triangulateRing(footwayRing.map(plan), where)],
-    });
+    ringOf(ring);
   }
   for (const corner of corners) {
     const turned = curbCorner(curb, corner, origin, direction, where);
@@ -456,6 +485,30 @@ export function curbSurfaces(
       piece(built.footway!, built.footway!.triangles, 'footway', 'horizontal'),
     ],
   };
+}
+
+/**
+ * Where a footway whose kerb line climbs or falls begins its ramp into the mitred corner at `far`:
+ * the point of the kerb line from `near` to `far` (a piece along x or along y, walked toward `far`)
+ * as far before the mitre's frontage corner as `far` lies beyond it, so the ramp is as long as the
+ * stretch of strip the mitre gives the corner. Undefined where the piece runs along neither axis or
+ * that point does not lie strictly between `near` and the frontage corner.
+ */
+function rampStart(near: Space, far: Space, frontage: Space, where: string): Plan | undefined {
+  const axis = near[1] === far[1] ? 0 : near[0] === far[0] ? 1 : undefined;
+  if (axis === undefined) return undefined;
+  const start = subtract(multiply(2, frontage[axis], where), far[axis], where);
+  const inside = near[axis] < frontage[axis]
+    ? near[axis] < start && start < frontage[axis]
+    : frontage[axis] < start && start < near[axis];
+  if (!inside) return undefined;
+  return axis === 0 ? [start, near[1]] : [near[0], start];
+}
+
+/** Whether, walking a piece along x or along y from `near` to `far`, `first` comes before `second`. */
+function before(near: Space, far: Space, first: Plan, second: Plan): boolean {
+  const axis = near[1] === far[1] ? 0 : 1;
+  return near[axis] < far[axis] ? first[axis] < second[axis] : second[axis] < first[axis];
 }
 
 /** What a curb's corner waits on when this version does not draw it. */

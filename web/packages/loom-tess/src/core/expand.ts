@@ -256,6 +256,11 @@ export interface ExpandContext {
   readonly coverings: readonly CoveringTriangle[];
   /** Every record the document carries, owned or halo, that states an identity, by that identity. */
   readonly carried: ReadonlyMap<string, CarriedRecord>;
+  /**
+   * Whether the record is carried as a halo, expanded only for the ground it takes from this tile's
+   * terrain (a town on its land): the tile that owns it draws it whole.
+   */
+  readonly halo?: boolean;
 }
 
 export type Expansion =
@@ -586,7 +591,9 @@ function approachesOf(fields: Fields, context: ExpandContext): ApproachContext[]
  * geometry and half of a record is not a record. A STRAIGHT JOIN (a corner radius of 0) reads
  * nothing from its follower: `curbCorner` and `cornerMitre` return before they look at it, so its
  * context adds no vertex, and a follower the tile does not carry is left to the tile that owns it.
- * Every tile that drew such a curb before draws the same bytes.
+ * Every tile that drew such a curb before draws the same bytes. A HALO curb is expanded only for the
+ * ground it takes, and the tile that owns it turns its corners: a rounded corner into a follower
+ * this tile does not carry is that tile's, as a straight join's is, and takes no ground here.
  */
 function cornersOf(fields: Fields, context: ExpandContext, where: string): CornerContext[] {
   const blocks: Plan[][] = [];
@@ -602,6 +609,7 @@ function cornersOf(fields: Fields, context: ExpandContext, where: string): Corne
     const follower = context.carried.get(identity);
     if (follower === undefined) {
       if (straightJoin) continue;
+      if (context.halo === true) continue;
       throw new TessellationError(`${where} names a following curb the tile does not carry`);
     }
     if (follower.kind !== 'city.curb_edge') throw new TessellationError(`${where} names ${follower.kind} as its following curb`);

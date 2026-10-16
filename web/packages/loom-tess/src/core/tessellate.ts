@@ -21,7 +21,7 @@
  *     surface, the tile is refused. An entry repeats a role only on another orientation.
  */
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
-import type { Membership, RecordPayload, TileDocument } from './document.js';
+import type { GrammarEntry, Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
 import { baseRingOf, capsuleOf, obstructionsOf, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
 import type { CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, PlanBox } from './expand.js';
@@ -156,6 +156,17 @@ function planBox(document: TileDocument, record: PlacedRecord): PlanBox | undefi
   return { min_x: extent.min[0]!, min_y: extent.min[1]!, max_x: extent.max[0]!, max_y: extent.max[1]! };
 }
 
+/** The city grammar version that lays a town on its land. */
+const CITY_ON_LAND_VERSION = 6;
+
+/**
+ * Whether a grammar lays its records on land, so a halo record's ground can stand above this tile's
+ * terrain: every other version's terrain is level below what it draws, and yields as it always did.
+ */
+function onItsLand(grammar: GrammarEntry): boolean {
+  return grammar.grammar_id === 'city' && grammar.grammar_version >= CITY_ON_LAND_VERSION;
+}
+
 /**
  * Every region a walking capsule must keep its radius clear of, from the navigation table's
  * obstruction axis, over every record the tile carries. A halo record obstructs too: a building
@@ -270,6 +281,7 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     capsuleRadiusMm: capsuleOf(tableOf(document.grammars[record.grammar]!))?.radiusMm,
     coverings,
     carried,
+    halo: record.membership === 'halo',
   });
   const dressed = dressings(placed);
   const materialFor = (record: PlacedRecord, role: string): MaterialRef => {
@@ -290,16 +302,20 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     // navigation table says drawn records take: the horizontal surfaces a `support` kind has drawn,
     // and the base ring a `cover` kind stands on once it is drawn. An undrawn record takes no ground,
     // so the world never shows a hole where it will stand. Entries are still written in record order.
+    // In a town laid on its land a halo record takes its ground too, as the tile that owns it draws
+    // it whole: a footway drawn by the tile over the seam would otherwise have this tile's terrain,
+    // graded up to a raised lot, drawn and walked through it. Its entry stays a halo.
     const expansions = new Map<number, Expansion>();
     const coverings: CoveringTriangle[] = [];
     placed.forEach((record, recordIndex) => {
-      if (record.membership === 'halo') return;
+      const halo = record.membership === 'halo';
+      if (halo && !onItsLand(document.grammars[record.grammar]!)) return;
       if (!document.grammars[record.grammar]!.declared_semantics.admissible_uses.includes(name)) return;
       const rule = ruleFor(name, record.payload.kind);
       if (rule.rule !== 'expand') return;
       if (rule.readsCoverings) return;
       const expansion = rule.expand(record.payload.fields, contextFor(record, name, []));
-      expansions.set(recordIndex, expansion);
+      if (!halo) expansions.set(recordIndex, expansion);
       if (expansion.state !== 'drawn') return;
       const row = navigationRowOf(tableOf(document.grammars[record.grammar]!), record.payload.kind);
       // A cover kind's base ring takes the ground it is drawn on. In a projection that carries no

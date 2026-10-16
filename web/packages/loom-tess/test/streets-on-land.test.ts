@@ -167,6 +167,71 @@ describe('a corner between curbs whose kerb lines bend in height', () => {
   });
 });
 
+describe('a footway that climbs into a mitred corner', () => {
+  // A left curb walking +x along y = 3.5 m from x = 10 m to its corner at 30 m, its follower walking
+  // +y from (32, 5.5) m: a convex corner of radius 2 m, which the 3 m footway reaches past, so the
+  // two strips meet on the mitre from the arc's centre (30, 5.5) to the frontage corner (29, 6.5),
+  // 1 m before the kerb's end. Its ramp begins as far before the frontage corner: at 28 m.
+  const owner = (from: number, to: number): Fields => ({
+    ...curbFields('left', [[10_000, 3_500, from], [30_000, 3_500, to]]),
+    identity: 'corner-owner',
+    corner_radius_mm: 2_000,
+    next_curb_identity: ['corner-follower'],
+  });
+  const follower = (from: number, to: number): Fields => ({
+    ...curbFields('left', [[32_000, 5_500, from], [32_000, 25_500, to]]),
+    identity: 'corner-follower',
+  });
+  const street: Fields = { ...segment, centreline_mm: [[10_000, 0, 1_000], [30_000, 0, 1_400]] };
+  const footway = (curb: Fields, next: Fields): Piece => {
+    const result = curbSurfaces(curb, street, [{ follower: next, blocks: [], resolutionMm: 1 }], [], 'case');
+    if (result.state !== 'drawn') throw new Error('the case waits');
+    return result.pieces.find((piece) => piece.surface?.role === 'footway')!;
+  };
+  /** The drawn height over a plan point: the one footway triangle that holds it, read linearly. */
+  const drawnAt = (piece: Piece, x: number, y: number): number => {
+    for (const [a, b, c] of triangles(piece)) {
+      const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+      const l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+      const l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+      if (l1 >= -1e-9 && l2 >= -1e-9 && 1 - l1 - l2 >= -1e-9) return l1 * a[2] + l2 * b[2] + (1 - l1 - l2) * c[2];
+    }
+    throw new Error(`no footway over ${x} ${y}`);
+  };
+  /** The footway's own height by its kerb line: the kerb's top, then the crossfall to the far edge. */
+  const own = (x: number, y: number): number => {
+    const kerb = 900 + Math.floor((400 * (x - 10_000)) / 20_000);
+    return kerb + 150 + ((y - 3_800) * Math.floor((2_700 * 20_000) / 1_000_000)) / 2_700;
+  };
+
+  it("stands on its kerb line's heights up to its ramp, wherever the corner's level stands", () => {
+    const drawn = footway(owner(900, 1_300), follower(1_300, 1_700));
+    for (let x = 10_000; x <= 28_000; x += 500) {
+      for (const y of [3_800, 5_000, 6_500]) {
+        // The ramp starts on a whole kerb point, so the strip before it is exactly one plane.
+        expect(Math.abs(drawnAt(drawn, x, y) - own(x, y)), `${x} ${y}`).toBeLessThan(1);
+      }
+    }
+  });
+
+  it("meets the corner on the mitre's own points, shared with the strip it meets", () => {
+    const curb = owner(900, 1_300), next = follower(1_300, 1_700);
+    const mitre = cornerMitre(curb, next, 'case')!;
+    expect(mitre.frontage).toEqual([29_000, 6_500, 1_300 + 150 + 54]);
+    const at = points(footway(curb, next));
+    for (const point of [mitre.centre, mitre.frontage]) expect(at, JSON.stringify(point)).toContainEqual(point);
+    // The ramp's start on both its edges, at the kerb line's own heights there.
+    expect(at).toContainEqual([28_000, 3_800, 1_260 + 150]);
+    expect(at).toContainEqual([28_000, 6_500, 1_260 + 150 + 54]);
+  });
+
+  it('keeps one ring where its kerb line is level, with no point at a ramp', () => {
+    const drawn = footway(owner(900, 900), follower(900, 900));
+    expect(points(drawn).some(([x]) => x === 28_000)).toBe(false);
+    for (let x = 10_000; x <= 28_000; x += 2_000) expect(drawnAt(drawn, x, 6_500)).toBe(900 + 150 + 54);
+  });
+});
+
 describe('the steps at a frontage, between a footway and the lot behind it', () => {
   // A lot behind the north footway, counter-clockwise, its frontage the edge on the back line.
   const ring = (from: number, to: number): [number, number][] => [[from, BACK], [to, BACK], [to, BACK + 20_000], [from, BACK + 20_000]];

@@ -315,7 +315,12 @@ worlds on land, a town drafted from a sentence ([below](#land-for-a-world-made-f
 `POST /worlds/kinds/town/worlds` with `land` make one, trying one identity; elsewhere the route
 answers 422 `landform_not_served`. The tessellator bakes a town on land: its street lines bend in
 height at the mouths, and its terrain closes the steps round lots at other heights than their
-footways and their neighbours ([loom-tess](../web/packages/loom-tess/README.md)).
+footways and their neighbours ([loom-tess](../web/packages/loom-tess/README.md)). Where a
+corner's footways reach past its radius, the two meet on a mitre at the junction's level a
+little back along both streets; a footway that climbs or falls stands on its own kerb line's
+heights up to a ramp into that corner, as long again as the mitre reaches back. A footway over a
+tile seam is drawn whole by the tile that owns its curb, and the other tile's terrain yields to
+it.
 
 The land round a town on land is served as a site's is. `GET /world/versions/{version_id}/land`
 (world read) answers its land section (`exulanica.town-land/v1`): the land document's digest, every
@@ -463,6 +468,10 @@ as walls up to about 4 m.
 - Positions in a society stay two integers and plan distance stays the walking cost; walking uphill
   takes no longer.
 - One heightfield per chunk: no overhangs, arches or passages under terraces.
+- In a town on land, where a corner's footways reach past its radius on a street that climbs or
+  falls, the footway is drawn ramping into the corner's level while the walking graph reads the
+  street's own slope up to the corner: near the corner the two differ, by up to 121 mm at the
+  mitre's frontage point over 20 measured towns (median about 30 mm).
 - A corridor steeper than its grade is refused rather than given stairs.
 - Below the datum a shore's sea covers everything; a valley carved below it floods.
 - Performance is measured only on the development machine's tests; no drawing cost is stated here.
