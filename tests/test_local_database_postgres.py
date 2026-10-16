@@ -54,7 +54,7 @@ from exulanica.db.local.passwords import (
     write_passwords,
 )
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
-from exulanica.db.local.upgrade import migrate, rehearse
+from exulanica.db.local.upgrade import FILE_BACKUPS, migrate, rehearse
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import RUNTIME_ROLE
 from exulanica.db.session import Database
@@ -347,6 +347,14 @@ def test_an_upgrade_takes_a_backup_before_and_after(servers, module_machine, tmp
     result = cli("upgrade", "--directory", database.root)
 
     assert result.status == 0, result.err
+    # A file copy of the stopped data, beside it, taken before anything was migrated.
+    assert "file backup before upgrade:" in result.out
+    (copied,) = (database.root / FILE_BACKUPS).iterdir()
+    assert copied.name.endswith("-before-upgrade")
+    assert (copied / "data" / "PG_VERSION").read_bytes() == (
+        database.data / "PG_VERSION"
+    ).read_bytes()
+    assert (copied / "data" / "postgresql.conf").is_file()
     before = _only_backup(database, "before-upgrade")
     after = _only_backup(database, "after-upgrade")
     for backup in (before, after):
@@ -377,10 +385,11 @@ def test_a_failed_rehearsal_leaves_the_real_database_untouched(servers, module_m
     }
 
     with migration_files(tmp_path / "newer-code", extra=failing):
-        result = cli("upgrade", "--directory", database.root)
+        result = cli("upgrade", "--directory", database.root, "--no-file-backup")
 
     assert result.status == 2
     assert "refused (rehearsal-failed)" in result.err
+    assert not (database.root / FILE_BACKUPS).exists(), "--no-file-backup takes no copy"
     assert "division by zero" in result.err
     assert database.cluster.running() and database.cluster.running_port() == port
     versions_after, counts_after = _state(database)

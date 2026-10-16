@@ -27,9 +27,10 @@ from exulanica.api.services import READONLY_DATABASE_URL_ENV
 from exulanica.db.account_roles import ACCOUNT_ROLE
 from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV
 from exulanica.db.local import cluster, locations
+from exulanica.db.local import upgrade as upgrade_module
 from exulanica.db.local.cli import CONNECTIONS, main
 from exulanica.db.local.cluster import OWNER_FILE
-from exulanica.db.local.database import LocalDatabase
+from exulanica.db.local.database import LocalDatabase, MaintenanceSession
 from exulanica.db.local.locations import (
     CONVENTIONAL_TEMPORARY_DIRECTORIES,
     LOCAL_DATABASE_MARKER,
@@ -38,6 +39,7 @@ from exulanica.db.local.locations import (
     refuse_location,
 )
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
+from exulanica.db.local.upgrade import FILE_BACKUPS, copy_stopped_data
 from exulanica.db.roles import EXECUTOR_ROLE, PURGE_ROLE, RUNTIME_ROLE
 from exulanica.db.session import DATABASE_URL_ENV
 from exulanica.deletion.cli import PURGE_DATABASE_URL_ENV
@@ -359,3 +361,92 @@ def test_every_command_first_removes_scratch_copies_whose_owner_has_exited(machi
     assert not orphan.exists()
     assert in_use.is_dir()
     assert marked.is_dir()
+
+
+# -- the file copy an upgrade takes of the stopped data -------------------------------------------
+
+
+class _Cluster:
+    """A cluster that records its stops and starts; each start serves on a port of its own."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def stop(self) -> None:
+        self.calls.append("stop")
+
+    def start_on_a_free_port(self) -> int:
+        self.calls.append("start")
+        return 5999
+
+
+@dataclass(frozen=True)
+class _Database:
+    root: Path
+    cluster: _Cluster
+
+    @property
+    def data(self) -> Path:
+        return self.root / "data"
+
+    @contextlib.contextmanager
+    def connect(self, port: int):
+        yield port
+
+
+def _stopped_session(root: Path, monkeypatch) -> tuple[MaintenanceSession, _Cluster]:
+    (root / "data" / "base").mkdir(parents=True)
+    (root / "data" / "PG_VERSION").write_text("18\n")
+    (root / "data" / "base" / "1").write_bytes(b"x" * 8192)
+    monkeypatch.setattr(upgrade_module, "server_identity", lambda port: {"port": port, "run": 2})
+    database = _Database(root=root, cluster=_Cluster())
+    return MaintenanceSession(
+        database=database, port=5432, identity={"port": 5432}
+    ), database.cluster
+
+
+def test_an_upgrade_copies_the_stopped_data_and_serves_again_on_a_new_port(tmp_path, monkeypatch):
+    session, cluster = _stopped_session(tmp_path / "database", monkeypatch)
+    copied = copy_stopped_data(session)
+    assert cluster.calls == ["stop", "start"]
+    assert (copied.files, copied.size) == (2, 8195)
+    assert copied.path.parent == tmp_path / "database" / FILE_BACKUPS
+    assert (copied.path / "data" / "base" / "1").read_bytes() == b"x" * 8192
+    assert copied.path.stat().st_mode & 0o777 == 0o700
+    # The session names the server as it now runs, so the backup taken next is this session's.
+    assert (session.port, session.identity) == (5999, {"port": 5999, "run": 2})
+
+
+def test_a_copy_that_differs_from_the_stopped_data_is_refused_and_the_server_runs_again(
+    tmp_path, monkeypatch
+):
+    session, cluster = _stopped_session(tmp_path / "database", monkeypatch)
+    real_copy = upgrade_module.shutil.copytree
+
+    def short_copy(source, target, *arguments, **keywords):
+        # copytree calls itself for each directory below; only the whole copy loses a file.
+        real_copy(source, target, *arguments, **keywords)
+        if Path(target).name == "data":
+            (Path(target) / "base" / "1").unlink()
+
+    monkeypatch.setattr(upgrade_module.shutil, "copytree", short_copy)
+    with pytest.raises(LocalDatabaseRefused) as refused:
+        copy_stopped_data(session)
+    assert refused.value.refusal is Refusal.FILE_BACKUP_INCOMPLETE
+    assert "1 files" in refused.value.detail and "2 and 8195" in refused.value.detail
+    assert cluster.calls == ["stop", "start"] and session.port == 5999
+
+
+def test_a_copy_that_fails_is_refused_and_the_server_runs_again(tmp_path, monkeypatch):
+    session, cluster = _stopped_session(tmp_path / "database", monkeypatch)
+
+    def no_room(source, target, **keywords):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(upgrade_module.shutil, "copytree", no_room)
+    with pytest.raises(LocalDatabaseRefused) as refused:
+        copy_stopped_data(session)
+    assert refused.value.refusal is Refusal.FILE_BACKUP_INCOMPLETE
+    assert "No space left on device" in refused.value.detail
+    assert refused.value.exit_status == 2, "nothing was migrated, so it is a refusal"
+    assert cluster.calls == ["stop", "start"]

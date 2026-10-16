@@ -334,7 +334,8 @@ def _restored_application_roles(backup: Backup) -> list[str]:
 
 
 def _upgrade(arguments: argparse.Namespace, stream: TextIO) -> None:
-    upgrade(LocalDatabase.open(arguments.directory), stream)
+    database = LocalDatabase.open(arguments.directory)
+    upgrade(database, stream, file_backup=not arguments.no_file_backup)
 
 
 def _require_passwords(arguments: argparse.Namespace, stream: TextIO) -> None:
@@ -426,12 +427,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="The port to serve on; the one the backed-up database used otherwise.",
     )
 
-    directory(
-        command(
-            "upgrade",
-            "Back up, rehearse the pending migrations on a scratch copy, migrate, back up again.",
-            _upgrade,
-        )
+    upgrading = command(
+        "upgrade",
+        "Copy the stopped data, back up, rehearse the pending migrations on a scratch copy, "
+        "migrate, back up again.",
+        _upgrade,
+    )
+    directory(upgrading)
+    upgrading.add_argument(
+        "--no-file-backup",
+        action="store_true",
+        help="Skip the file copy of the stopped data, for a database too large to hold twice.",
     )
 
     directory(

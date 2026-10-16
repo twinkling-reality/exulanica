@@ -22,7 +22,7 @@ uv run exulanica-local-db stop --directory ~/Exulanica/database     # stops, the
 uv run exulanica-local-db status --directory ~/Exulanica/database
 uv run exulanica-local-db backup --directory ~/Exulanica/database
 uv run exulanica-local-db verify --directory ~/Exulanica/database   # restores the newest backup to check it
-uv run exulanica-local-db upgrade --directory ~/Exulanica/database  # backup, rehearsal, migration, backup
+uv run exulanica-local-db upgrade --directory ~/Exulanica/database  # file copy, backup, rehearsal, migration, backup
 uv run exulanica-local-db restore --directory ~/Exulanica/restored <backup>.pgdump
 uv run exulanica-local-db adopt --directory ~/Exulanica/database    # take on a cluster made another way
 uv run exulanica-local-db require-passwords --directory ~/Exulanica/database  # a trusting cluster asks for passwords
@@ -34,7 +34,7 @@ A refusal prints `refused (<name>)` and exits 2; a step that was attempted and f
 
 ## Where it lives
 
-The directory holds `data/`, `backups/` and `server.log`. `init` and `restore` refuse a directory
+The directory holds `data/`, `backups/`, `file-backups/` once an upgrade has run, and `server.log`. `init` and `restore` refuse a directory
 inside the system temporary directory (`TMPDIR`, or the platform's default), `/tmp` or `/var/tmp`,
 anything under the test servers' directory, and a directory that already holds files. Durability
 settings stay at PostgreSQL's defaults. The server listens on the loopback interface only, over TCP.
@@ -65,11 +65,13 @@ server reads them.
 ## Backups
 
 `stop` takes a backup after the server stops, `backup` takes one on request, and `upgrade` takes one
-before and one after. Each is a custom-format `pg_dump` with its SHA-256 (`.pgdump.sha256`, which
+before and one after, and before those a file copy of the stopped `data/` (below). Each is a custom-format `pg_dump` with its SHA-256 (`.pgdump.sha256`, which
 `shasum -a 256 -c` reads) and a manifest (`.json`) holding every table's row count and the applied
 migrations, read in the dump's own snapshot, and the database's roles without their passwords.
 Nothing deletes a backup. They share a disk with the database, so copy `backups/` elsewhere to
-survive the loss of that disk.
+survive the loss of that disk. A backup or a file copy keeps what the database held when it was taken,
+so something erased from the database later stays in the backups and file copies taken before; they are
+the person's own files, and removing them is the person's own step.
 
 ## Verify and restore
 
@@ -86,9 +88,13 @@ between its schema and its rows, so one taken before 0106 stops at its first rec
 ## Upgrade
 
 `upgrade` refuses while another client is connected, so stop the API and the workers first. It
-restarts the server on a private port, backs up, applies the pending migrations and role
-provisioning to a scratch copy of that backup with the schema check the API runs at boot, and
-migrates the real database only after that rehearsal passes. A failed rehearsal leaves the database
+restarts the server on a private port and, when migrations are pending, stops it again to copy
+`data/` file by file into `file-backups/<UTC time>-before-upgrade/`, at 0700, while nothing writes
+it. The copy must hold as many files and bytes as the data, or the upgrade is refused
+(`file-backup-incomplete`) before anything is migrated; nothing deletes a copy. `--no-file-backup`
+skips it, for a database too large to hold twice. Then it backs up, applies the pending migrations
+and role provisioning to a scratch copy of that backup with the schema check the API runs at boot,
+and migrates the real database only after that rehearsal passes. A failed rehearsal leaves the database
 untouched. A migration that fails after a passing rehearsal leaves the server stopped and names the
 backup to restore.
 

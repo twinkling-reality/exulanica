@@ -5,15 +5,18 @@ migrates it. Inside one maintenance session (the server on a private port, so th
 only client) it:
 
 1.  refuses a database that records a migration this code does not have or has with other bytes;
-2.  takes a backup, the way back;
-3.  rehearses: restores that backup into a scratch server, checks the copy against the backup's
+2.  stops the server, copies its data directory file by file into ``file-backups/`` beside it,
+    checks the copy holds as many files and bytes, and starts it again on a private port (unless
+    asked not to: a database too large to hold twice);
+3.  takes a backup, the way back;
+4.  rehearses: restores that backup into a scratch server, checks the copy against the backup's
     manifest, and applies the pending migrations and the role provisioning there, followed by the
     schema check the API runs at boot;
-4.  migrates the real database only after a rehearsal of that same fresh backup passed, and
+5.  migrates the real database only after a rehearsal of that same fresh backup passed, and
     refuses otherwise (:func:`migrate`);
-5.  gives a password to any role the application connects as that provisioning created and the
+6.  gives a password to any role the application connects as that provisioning created and the
     password file lacks, when the database asks for passwords;
-6.  takes a second backup of the migrated database.
+7.  takes a second backup of the migrated database.
 
 A rehearsal that fails leaves the real database exactly as it was, because nothing but the
 scratch copy has been written. A migration that fails after its rehearsal passed leaves the
@@ -24,10 +27,13 @@ holds it as it was.
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import io
 import os
+import shutil
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Final, TextIO
 
 import psycopg
@@ -49,7 +55,9 @@ from exulanica.db.local.database import (
     MaintenanceSession,
     applied_versions,
     schema_state,
+    server_identity,
 )
+from exulanica.db.local.files import PRIVATE_DIRECTORY_MODE
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 from exulanica.db.migrate import applied_migrations, verify_schema
 from exulanica.db.session import DATABASE_URL_ENV, Database
@@ -57,7 +65,10 @@ from exulanica.db.session import DATABASE_URL_ENV, Database
 __all__ = [
     "AFTER_UPGRADE",
     "BEFORE_UPGRADE",
+    "FILE_BACKUPS",
+    "FileBackup",
     "Rehearsal",
+    "copy_stopped_data",
     "migrate",
     "migrate_and_provision",
     "rehearse",
@@ -68,6 +79,10 @@ __all__ = [
 #: The reasons an upgrade's two backups are named by.
 BEFORE_UPGRADE: Final = "before-upgrade"
 AFTER_UPGRADE: Final = "after-upgrade"
+
+#: Where an upgrade keeps the file copies of the stopped data it takes, beside ``data/``. Nothing
+#: deletes one, as nothing deletes a backup.
+FILE_BACKUPS: Final = "file-backups"
 
 #: The parts of a server's identity that must be equal for a backup to be this session's.
 _SESSION_IDENTITY: Final = ("system_identifier", "started_at", "port")
@@ -85,6 +100,63 @@ def _owner_url_for_provisioning(owner_url: str) -> Iterator[None]:
             os.environ.pop(DATABASE_URL_ENV, None)
         else:
             os.environ[DATABASE_URL_ENV] = previous
+
+
+@dataclass(frozen=True, slots=True)
+class FileBackup:
+    """A file copy of a stopped data directory, and what both held when it was checked."""
+
+    path: Path
+    files: int
+    size: int
+
+    def describe(self) -> str:
+        return f"{self.path}: {self.files} files, {self.size} bytes, as the stopped data holds"
+
+
+def _files_and_bytes(directory: Path) -> tuple[int, int]:
+    """How many files ``directory`` holds below it and their bytes, links counted as themselves."""
+    files = size = 0
+    for parent, _, names in os.walk(directory):
+        for name in names:
+            files += 1
+            size += (Path(parent) / name).lstat().st_size
+    return files, size
+
+
+def copy_stopped_data(session: MaintenanceSession, reason: str = BEFORE_UPGRADE) -> FileBackup:
+    """Stop the session's server, copy its data directory into ``file-backups/``, check the copy
+    holds as many files and bytes as the data, and start the server again on a private port, which
+    the session then names. The copy is taken with nothing writing the files, so it is the database
+    as it stood, beside the dump the upgrade takes next; a copy that fails or differs is refused
+    before anything is migrated."""
+    database = session.database
+    cluster = database.cluster
+    stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
+    target = database.root / FILE_BACKUPS / f"{stamp}-{reason}"
+    cluster.stop()
+    try:
+        (database.root / FILE_BACKUPS).mkdir(mode=PRIVATE_DIRECTORY_MODE, exist_ok=True)
+        target.mkdir(mode=PRIVATE_DIRECTORY_MODE)
+        copy = target / database.data.name
+        shutil.copytree(database.data, copy, symlinks=True)
+        held, copied = _files_and_bytes(database.data), _files_and_bytes(copy)
+    except OSError as error:
+        raise LocalDatabaseRefused(
+            Refusal.FILE_BACKUP_INCOMPLETE,
+            f"copying {database.data} to {target} failed ({error}); nothing was migrated",
+        ) from error
+    finally:
+        port = cluster.start_on_a_free_port()
+        with database.connect(port) as connection:
+            session.port, session.identity = port, server_identity(connection)
+    if copied != held:
+        raise LocalDatabaseRefused(
+            Refusal.FILE_BACKUP_INCOMPLETE,
+            f"{target} holds {copied[0]} files and {copied[1]} bytes; the stopped data held "
+            f"{held[0]} and {held[1]}. Nothing was migrated",
+        )
+    return FileBackup(path=target, files=copied[0], size=copied[1])
 
 
 def migrate_and_provision(owner_url: str) -> tuple[str, ...]:
@@ -214,8 +286,9 @@ def migrate(session: MaintenanceSession, rehearsal: Rehearsal) -> tuple[tuple[st
     return applied, after
 
 
-def upgrade(database: LocalDatabase, stream: TextIO) -> None:
-    """Back up, rehearse, migrate and back up again, or say the schema is already current."""
+def upgrade(database: LocalDatabase, stream: TextIO, *, file_backup: bool = True) -> None:
+    """Copy the stopped data, back up, rehearse, migrate and back up again, or say the schema is
+    already current. ``file_backup`` off skips the copy, for a database too large to hold twice."""
     with database.maintenance() as session:
         with database.connect(session.port) as connection:
             state = schema_state(connection)
@@ -225,6 +298,9 @@ def upgrade(database: LocalDatabase, stream: TextIO) -> None:
             print(f"schema: {state.describe()}; nothing to upgrade", file=stream)
             return
         print(f"pending: {', '.join(state.pending)}", file=stream)
+        if file_backup:
+            copied = copy_stopped_data(session)
+            print(f"file backup before upgrade: {copied.describe()}", file=stream)
         before = take_backup(database, session.port, BEFORE_UPGRADE)
         print(f"backup before upgrade: {before.describe()}", file=stream)
         rehearsal = rehearse(before)

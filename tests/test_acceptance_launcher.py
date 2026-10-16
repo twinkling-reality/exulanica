@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -1006,6 +1007,225 @@ def test_a_personal_install_tells_the_api_so_and_a_shell_setting_never_does(tmp_
     assert "EXULANICA_PERSONAL_INSTALL" not in environment(False)
     # Nothing else of a personal install is stated here: the API derives its defaults.
     assert set(environment(True)) - set(environment(False)) == {"EXULANICA_PERSONAL_INSTALL"}
+
+
+# -- a person's own install keeps its worlds -------------------------------------------------------
+
+#: What exulanica-local-db prints for a database it serves, as its cli's _connections writes it.
+_LOCAL_DB_CONNECTIONS = (
+    "export EXULANICA_DATABASE_URL=postgresql://exulanica_app@localhost:5500/exulanica?passfile=/p\n"
+    "export EXULANICA_READONLY_DATABASE_URL=postgresql://exulanica_ro@localhost:5500/exulanica?passfile=/p\n"
+    "export EXULANICA_PURGE_DATABASE_URL=postgresql://exulanica_purge@localhost:5500/exulanica?passfile=/p\n"
+    "owner (migrations and provisioning only; the API refuses it): "
+    "postgresql://exulanica@localhost:5500/exulanica?passfile=/p\n"
+    "authentication: asks every connection for a password (scram-sha-256)\n"
+)
+
+
+def test_the_connections_are_read_from_either_database_s_lines():
+    local = LAUNCH.served_exports(_LOCAL_DB_CONNECTIONS)
+    assert local["OWNER_URL"] == "postgresql://exulanica@localhost:5500/exulanica?passfile=/p"
+    assert LAUNCH.url_port(local["EXULANICA_DATABASE_URL"]) == 5500
+    # The test server prints its owner on a line of its own words: "owner    <url>   (...)".
+    lines = [line for line in _LOCAL_DB_CONNECTIONS.splitlines() if line.startswith("export ")]
+    owner = "postgresql://exulanica@localhost:5500/exulanica?passfile=/p"
+    lines.append(f"owner    {owner}   (migrations and provisioning only)")
+    test_server = LAUNCH.served_exports("\n".join(lines))
+    assert test_server["OWNER_URL"] == "postgresql://exulanica@localhost:5500/exulanica?passfile=/p"
+
+
+def _local_db(monkeypatch, outputs: dict[str, list[str]]) -> list[str]:
+    """Stand in for exulanica-local-db: each verb answers its next printed output, in order."""
+    verbs: list[str] = []
+
+    def answer(command, cwd, env=None):
+        assert command[1:3] == ["-m", "exulanica.db.local.cli"]
+        verbs.append(command[3])
+        return outputs[command[3]].pop(0)
+
+    monkeypatch.setattr(LAUNCH, "run", answer)
+    return verbs
+
+
+def _started(already: bool, schema: str) -> str:
+    first = "already running: d on port 5500" if already else "started d on port 5500"
+    return f"{first}\nschema: {schema}\n{_LOCAL_DB_CONNECTIONS}"
+
+
+def test_a_person_s_database_is_made_once_then_started_and_upgraded_only_when_behind(
+    tmp_path, monkeypatch
+):
+    directory, logs = tmp_path / "database", tmp_path / "logs"
+    logs.mkdir()
+    python, worktree = tmp_path / "python", tmp_path / "checkout"
+
+    verbs = _local_db(monkeypatch, {"init": [_LOCAL_DB_CONNECTIONS]})
+    assert LAUNCH.personal_database(python, worktree, directory, logs) == (
+        _LOCAL_DB_CONNECTIONS,
+        True,
+    )
+    assert verbs == ["init"]
+
+    (directory / "data").mkdir(parents=True)
+    current = "220 migrations applied, last 0220; none pending"
+    verbs = _local_db(monkeypatch, {"start": [_started(False, current)]})
+    assert LAUNCH.personal_database(python, worktree, directory, logs)[1] is True
+    assert verbs == ["start"]
+    # A server already running before this run is not this run's to stop.
+    verbs = _local_db(monkeypatch, {"start": [_started(True, current)]})
+    assert LAUNCH.personal_database(python, worktree, directory, logs)[1] is False
+
+    behind = "219 migrations applied, last 0219; 1 pending (0220); run `exulanica-local-db upgrade`"
+    verbs = _local_db(
+        monkeypatch,
+        {"start": [_started(False, behind), _started(True, current)], "upgrade": ["migrated"]},
+    )
+    served, began = LAUNCH.personal_database(python, worktree, directory, logs)
+    assert verbs == ["start", "upgrade", "start"] and began is True
+    assert "none pending" in served and (logs / "database-upgrade.txt").read_text() == "migrated"
+
+    unread = "started d on port 5500\n" + _LOCAL_DB_CONNECTIONS
+    verbs = _local_db(monkeypatch, {"start": [unread]})
+    assert _refusal(LAUNCH.personal_database, python, worktree, directory, logs) == (
+        "personal-schema-unread"
+    )
+    assert verbs == ["start"], "a database whose state was not said is neither upgraded nor served"
+    verbs = _local_db(monkeypatch, {"start": [_started(False, "219 applied; DRIFT: 0219 differs")]})
+    assert _refusal(LAUNCH.personal_database, python, worktree, directory, logs) == (
+        "personal-schema-drift"
+    )
+    assert verbs == ["start"], "a drifted database is neither upgraded nor served"
+
+
+def test_a_person_s_workspace_and_token_are_made_once_and_kept(tmp_path):
+    folder = tmp_path / "Exulanica"
+    folder.mkdir()
+    first = LAUNCH.personal_identity(folder)
+    install = folder / LAUNCH.PERSONAL_INSTALL
+    assert install.stat().st_mode & 0o777 == 0o700
+    for name in ("token", "workspace.json"):
+        assert (install / name).stat().st_mode & 0o777 == 0o600, name
+    assert LAUNCH.personal_identity(folder) == first
+    (install / "token").chmod(0o640)
+    assert _refusal(LAUNCH.personal_identity, folder) == "personal-install"
+    (install / "token").chmod(0o600)
+    (install / "workspace.json").write_text('{"workspace_id": "not one"}')
+    assert _refusal(LAUNCH.personal_identity, folder) == "personal-install"
+
+
+def test_a_planted_link_in_install_is_refused_and_nothing_is_written_through_it(tmp_path):
+    folder = tmp_path / "Exulanica"
+    folder.mkdir(mode=0o700)
+    made = LAUNCH.personal_identity(folder)
+    install = folder / LAUNCH.PERSONAL_INSTALL
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(mode=0o700)
+    for name in ("token", "workspace.json"):
+        kept = (install / name).read_bytes()
+        (install / name).unlink()
+        # A dangling link reads as nothing there; it is refused, and nothing is written through it.
+        (install / name).symlink_to(elsewhere / name)
+        assert _refusal(LAUNCH.personal_identity, folder) == "personal-install", name
+        assert not (elsewhere / name).exists(), name
+        # A link to a private file of this account's is not read through either.
+        (elsewhere / name).write_bytes(kept)
+        (elsewhere / name).chmod(0o600)
+        assert _refusal(LAUNCH.personal_identity, folder) == "personal-install", name
+        (install / name).unlink()
+        (elsewhere / name).rename(install / name)
+    assert LAUNCH.personal_identity(folder) == made
+    # The install folder itself may not be a link, nor writable by another account.
+    install.rename(elsewhere / "install")
+    install.symlink_to(elsewhere / "install")
+    assert _refusal(LAUNCH.personal_identity, folder) == "personal-install"
+    install.unlink()
+    (elsewhere / "install").rename(install)
+    install.chmod(0o770)
+    assert _refusal(LAUNCH.personal_identity, folder) == "personal-install"
+    install.chmod(0o700)
+    assert LAUNCH.personal_identity(folder) == made
+
+
+def test_an_install_is_made_whole_or_not_at_all(tmp_path, monkeypatch):
+    folder = tmp_path / "Exulanica"
+    folder.mkdir(mode=0o700)
+    rename = os.rename
+
+    def fail_into_install(source, target):
+        if Path(target).name == LAUNCH.PERSONAL_INSTALL:
+            raise OSError("the disk filled")
+        return rename(source, target)
+
+    monkeypatch.setattr(LAUNCH.os, "rename", fail_into_install)
+    with pytest.raises(OSError):
+        LAUNCH.personal_identity(folder)
+    monkeypatch.undo()
+    assert not os.path.lexists(folder / LAUNCH.PERSONAL_INSTALL), "no half-made install"
+    made = LAUNCH.personal_identity(folder)
+    assert LAUNCH.personal_identity(folder) == made
+
+
+def test_a_person_s_store_is_held_to_its_folder_s_rule(tmp_path):
+    folder = tmp_path / "Exulanica"
+    folder.mkdir(mode=0o700)
+    store = LAUNCH.personal_store(folder)
+    assert store == folder / LAUNCH.PERSONAL_STORE and store.stat().st_mode & 0o777 == 0o700
+    store.chmod(0o777)
+    assert _refusal(LAUNCH.personal_store, folder) == "personal-folder"
+    store.rmdir()
+    (tmp_path / "elsewhere").mkdir(mode=0o700)
+    store.symlink_to(tmp_path / "elsewhere")
+    assert _refusal(LAUNCH.personal_store, folder) == "personal-folder"
+
+
+def test_a_person_s_folder_is_their_own_and_nobody_else_writes_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    folder = LAUNCH.personal_folder()
+    assert folder == tmp_path / "Exulanica" and folder.stat().st_mode & 0o777 == 0o700
+    folder.chmod(0o775)
+    assert _refusal(LAUNCH.personal_folder) == "personal-folder"
+    folder.rmdir()
+    (tmp_path / "elsewhere").mkdir(mode=0o700)
+    folder.symlink_to(tmp_path / "elsewhere")
+    assert _refusal(LAUNCH.personal_folder) == "personal-folder"
+
+
+def test_a_personal_install_refuses_another_database_before_it_starts_anything(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--personal", "--reuse-database"]
+    )
+    assert _refusal(LAUNCH.up, arguments) == "personal-reuse-database"
+    assert not LAUNCH.state_dir(worktree).exists()
+
+
+def test_down_stops_a_person_s_database_through_its_own_command_and_only_its_own(
+    tmp_path, temporary, monkeypatch
+):
+    worktree = _checkout(tmp_path / "checkout")
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    verbs = _local_db(monkeypatch, {"stop": ["stopped d; taking the backup a stop takes"]})
+    LAUNCH.state_dir(worktree).mkdir(parents=True)
+    state = {
+        "pids": {},
+        "run_dir": str(run_dir),
+        "database": {
+            "kind": "personal",
+            "directory": str(tmp_path / "db"),
+            "started_by_launcher": True,
+        },
+    }
+    (LAUNCH.state_dir(worktree) / "state.json").write_text(json.dumps(state))
+    with redirect_stdout(io.StringIO()):
+        LAUNCH.down(LAUNCH.build_parser().parse_args(["down", "--worktree", str(worktree)]))
+    assert verbs == ["stop"]
+    # One that was running before the run is left running.
+    state["database"]["started_by_launcher"] = False
+    (LAUNCH.state_dir(worktree) / "state.json").write_text(json.dumps(state))
+    with redirect_stdout(io.StringIO()):
+        LAUNCH.down(LAUNCH.build_parser().parse_args(["down", "--worktree", str(worktree)]))
+    assert verbs == ["stop"]
 
 
 # -- a guest entry behind the local HTTPS edge ----------------------------------------------------

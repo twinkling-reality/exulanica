@@ -26,11 +26,17 @@ imports the code it starts.
 2.  Starts the checkout's own disposable test server with ``scripts/test_postgres.py serve``. On
     first use the server's port file is written first, so it lands on the slot's database port. A
     server already running is refused unless ``--reuse-database``, and ``down`` never stops a
-    reused one. The database it prints must be that server, on the port the server recorded.
+    reused one. The database it prints must be that server, on the port the server recorded. With
+    ``--personal`` it is instead the person's durable database in ``~/Exulanica/database``, run
+    through ``exulanica-local-db``: made on the first run, started on later ones and upgraded first
+    when migrations are pending; ``down`` stops it with that command's ``stop``, which backs it up.
 3.  Makes a fresh synthetic workspace: new workspace and actor ids and a new bearer token, granted
     the account owner's permissions, and provisions the workspace's embedding partition. With
     ``--tiles`` the token is also granted ``tiles.materialise`` and the workspace a tile quota of
-    ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile. Then
+    ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile. With
+    ``--personal`` the workspace is the person's own, made once in ``~/Exulanica/install`` (its record
+    and token at 0600) and the same on every later run, and the data directory is
+    ``~/Exulanica/store``. Then
     publishes the character catalogs the checkout carries (``exulanica-character-catalog publish
     --apply``) over the owner connection into the run's data directory, as every serving database
     must be before anybody is drawn; its lines are kept in ``logs/character-catalogs.txt`` and the
@@ -177,6 +183,7 @@ import hashlib
 import json
 import os
 import secrets
+import stat
 import shlex
 import shutil
 import signal
@@ -236,6 +243,13 @@ PROJECT_WORKER_GRACE_SECONDS = 10
 #: Where a person's own install keeps its world projects, under their home directory, unless
 #: ``--projects`` names another: outside every checkout and run, which ``down`` may remove.
 PERSONAL_PROJECTS = ("Exulanica", "projects")
+#: A person's own install keeps what it makes in one folder of their home: its durable database
+#: (``exulanica-local-db``'s directory), its workspace's identity and token, its content store and
+#: its world projects. No other account may write it.
+PERSONAL_FOLDER = ("Exulanica",)
+PERSONAL_DATABASE = "database"
+PERSONAL_INSTALL = "install"
+PERSONAL_STORE = "store"
 
 #: Where run state and run records live, under the system temporary directory: disposable, and
 #: never inside a checkout.
@@ -344,6 +358,16 @@ REFUSALS = {
     "projects-shape": "--no-projects turns off a personal install's world projects: it needs "
     "--personal and refuses --projects",
     "projects-kept": "the run already keeps world projects; restart-api keeps its follower up",
+    "personal-reuse-database": "--personal keeps its own database in ~/Exulanica/database: drop "
+    "--reuse-database",
+    "personal-folder": "~/Exulanica must be a folder of this account's, no link, that no other account "
+    "can write",
+    "personal-schema-drift": "the person's database records a migration this checkout lacks, or has "
+    "with other bytes",
+    "personal-schema-unread": "exulanica-local-db start did not say whether the person's database is "
+    "current",
+    "personal-install": "~/Exulanica/install holds a workspace record or token this launcher did not "
+    "write, or one another account can read",
     "personal-production": "--personal serves the workspace page from its sources, which has no "
     "production build: drop --production",
     "database-latency-shape": "--database-latency takes the slot's spare port, which "
@@ -1292,6 +1316,127 @@ def personal_projects_directory() -> Path:
     return path
 
 
+def own_directory(path: Path) -> bool:
+    """Whether ``path`` is a folder of this account's, no link, that no other account can write;
+    made at 0700 when absent."""
+    if not os.path.lexists(path):
+        path.mkdir(mode=0o700, parents=True)
+    status = path.lstat()
+    return (
+        stat.S_ISDIR(status.st_mode)
+        and status.st_uid == os.getuid()
+        and not status.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+    )
+
+
+def personal_folder() -> Path:
+    """A person's own install's folder, ``~/Exulanica``, held to :func:`own_directory`, since it
+    holds their database, their token and their worlds' files."""
+    folder = Path.home().joinpath(*PERSONAL_FOLDER)
+    if not own_directory(folder):
+        refuse("personal-folder", str(folder))
+    return folder
+
+
+def personal_store(folder: Path) -> Path:
+    """The person's content store, ``~/Exulanica/store``, held to the same rule as its folder."""
+    store = folder / PERSONAL_STORE
+    if not own_directory(store):
+        refuse("personal-folder", str(store))
+    return store
+
+
+def local_database_command(python: Path, *arguments: str) -> list[str]:
+    """``exulanica-local-db`` as the checkout's own interpreter runs it."""
+    return [str(python), "-m", "exulanica.db.local.cli", *arguments]
+
+
+def personal_database(
+    python: Path, worktree: Path, directory: Path, logs: Path
+) -> tuple[str, bool]:
+    """The person's durable database, serving: its connections as ``exulanica-local-db`` prints
+    them, and whether this run started it. Made with ``init`` when absent; otherwise started, and
+    where migrations are pending, upgraded first (a file copy of the stopped data, a backup, a
+    rehearsal on a scratch copy, the migration, a backup) and asked for its connections again. A
+    database that records a migration this checkout lacks is refused, never served."""
+    if not (directory / "data").exists():
+        made = run(local_database_command(python, "init", "--directory", str(directory)), worktree)
+        (logs / "database-init.txt").write_text(made)
+        return made, True
+    started = run(local_database_command(python, "start", "--directory", str(directory)), worktree)
+    (logs / "database-start.txt").write_text(started)
+    began = not started.startswith("already running")
+    schema = next((line for line in started.splitlines() if line.startswith("schema: ")), None)
+    if schema is None:
+        refuse("personal-schema-unread", started)
+    if "DRIFT" in schema:
+        refuse("personal-schema-drift", schema)
+    if "none pending" in schema:
+        return started, began
+    if " pending (" not in schema:
+        refuse("personal-schema-unread", schema)
+    upgraded = run(
+        local_database_command(python, "upgrade", "--directory", str(directory)), worktree
+    )
+    (logs / "database-upgrade.txt").write_text(upgraded)
+    return run(
+        local_database_command(python, "start", "--directory", str(directory)), worktree
+    ), began
+
+
+def read_private(path: Path) -> str:
+    """A file of this account's that no other account can read, read without following a link."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(descriptor) as handle:
+        status = os.fstat(handle.fileno())
+        if (
+            not stat.S_ISREG(status.st_mode)
+            or status.st_uid != os.getuid()
+            or status.st_mode & 0o077
+        ):
+            raise PermissionError(f"{path} is not a file only this account can read")
+        return handle.read()
+
+
+def personal_identity(folder: Path) -> tuple[str, str, str]:
+    """The person's workspace id, actor and bearer token: made once in ``install/`` and the same on
+    every later run, so their worlds stay theirs from one run to the next. Made whole or not at all:
+    both files are written at 0600 in a new folder of their own and renamed into place, so a failure
+    part way leaves no ``install/`` (a leftover ``.install-*`` folder is never read). Read with no
+    link followed, from a folder held to :func:`own_directory`."""
+    install = folder / PERSONAL_INSTALL
+    if os.path.lexists(install):
+        if not own_directory(install):
+            refuse(
+                "personal-install",
+                f"{install} is a link, another account's, or others can write it",
+            )
+        try:
+            held = json.loads(read_private(install / "workspace.json"))
+            workspace_id = str(uuid.UUID(str(held["workspace_id"])))
+            actor = str(uuid.UUID(str(held["actor"])))
+            token = read_private(install / "token").strip()
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            refuse("personal-install", f"{install}: {error}")
+        if not token:
+            refuse("personal-install", f"{install / 'token'} is empty")
+        return workspace_id, actor, token
+    workspace_id, actor, token = str(uuid.uuid4()), str(uuid.uuid4()), secrets.token_urlsafe(48)
+    staging = Path(tempfile.mkdtemp(prefix=f".{PERSONAL_INSTALL}-", dir=folder))
+    for name, text in (
+        ("token", token),
+        (
+            "workspace.json",
+            json.dumps({"workspace_id": workspace_id, "actor": actor}, indent=2) + "\n",
+        ),
+    ):
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        with os.fdopen(os.open(staging / name, flags, 0o600), "w") as handle:
+            handle.write(text)
+    os.rename(staging, install)
+    return workspace_id, actor, token
+
+
 def chosen_projects(arguments: argparse.Namespace, worktree: Path) -> Path | None:
     """The projects directory ``up`` follows: ``--projects``, else a personal install's own
     unless ``--no-projects``, else none."""
@@ -1597,7 +1742,10 @@ def served_exports(served: str) -> dict[str, str]:
         if line.startswith("export "):
             key, value = line[len("export ") :].split("=", 1)
             exports[key] = value
-        if line.startswith("owner "):
+        if line.startswith("owner ("):
+            # exulanica-local-db: "owner (migrations and provisioning only; ...): <url>".
+            exports["OWNER_URL"] = line.rsplit(": ", 1)[1].strip()
+        elif line.startswith("owner "):
             exports["OWNER_URL"] = line.split()[1]
     for key in (
         "EXULANICA_DATABASE_URL",
@@ -1735,6 +1883,8 @@ def up(arguments: argparse.Namespace) -> None:
         refuse("depth-worker-shape", REFUSALS["depth-worker-shape"])
     if arguments.personal and arguments.production:
         refuse("personal-production", REFUSALS["personal-production"])
+    if arguments.personal and arguments.reuse_database:
+        refuse("personal-reuse-database", REFUSALS["personal-reuse-database"])
     projects = chosen_projects(arguments, worktree)
     if arguments.scripted_model is not None:
         if arguments.model:
@@ -1792,30 +1942,48 @@ def up(arguments: argparse.Namespace) -> None:
     if not Path(resolved).is_relative_to(worktree):
         refuse("exulanica-elsewhere", f"exulanica resolves to {resolved}, outside {worktree}")
 
+    # A person's own install keeps its database, workspace and store in their folder; any other
+    # run keeps everything in its run directory and the checkout's disposable test server.
+    folder = personal_folder() if arguments.personal else None
     run_id = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     run_dir = directory / run_id
-    data_dir = run_dir / "data"
-    data_dir.mkdir(parents=True)
+    data_dir = run_dir / "data" if folder is None else personal_store(folder)
+    run_dir.mkdir(parents=True)
+    if folder is None:
+        data_dir.mkdir()
     logs = run_dir / "logs"
     logs.mkdir()
 
-    # The database: the checkout's own disposable test server.
-    server = lane_server(worktree, python)
-    started_database = False
-    if server["running"]:
-        if not arguments.reuse_database:
-            refuse(
-                "database-running",
-                f"port {server['port']} ({server['root']}); pass --reuse-database to use it "
-                "without owning it",
-            )
+    if folder is None:
+        # The database: the checkout's own disposable test server.
+        server = lane_server(worktree, python)
+        started_database = False
+        if server["running"]:
+            if not arguments.reuse_database:
+                refuse(
+                    "database-running",
+                    f"port {server['port']} ({server['root']}); pass --reuse-database to use it "
+                    "without owning it",
+                )
+        else:
+            root = Path(server["root"])
+            port_file = root / "port"
+            if not server["initialised"] and not port_file.exists():
+                root.mkdir(parents=True, exist_ok=True)
+                port_file.write_text(str(chosen["database"]))
+            started_database = True
+        database_record: dict = {
+            "started_by_launcher": started_database,
+            "lane_server_root": server["root"],
+            "postgres_bin": server["bin"],
+        }
     else:
-        root = Path(server["root"])
-        port_file = root / "port"
-        if not server["initialised"] and not port_file.exists():
-            root.mkdir(parents=True, exist_ok=True)
-            port_file.write_text(str(chosen["database"]))
-        started_database = True
+        # The person's durable database, which down stops through exulanica-local-db.
+        database_record = {
+            "kind": "personal",
+            "directory": str(folder / PERSONAL_DATABASE),
+            "started_by_launcher": True,
+        }
     # Recorded before serve starts anything, so down can stop the server after any later refusal.
     token_file = run_dir / "token"
     state: dict = {
@@ -1828,28 +1996,30 @@ def up(arguments: argparse.Namespace) -> None:
         "run_dir": str(run_dir),
         "data_dir": str(data_dir),
         "token_file": str(token_file),
-        "database": {
-            "started_by_launcher": started_database,
-            "lane_server_root": server["root"],
-            "postgres_bin": server["bin"],
-        },
+        "database": database_record,
         "pids": {},
         "started_at": dt.datetime.now(dt.UTC).isoformat(),
     }
     write_state(state_file, state)
-    served = run([str(python), "scripts/test_postgres.py", "serve"], worktree)
+    if folder is None:
+        served = run([str(python), "scripts/test_postgres.py", "serve"], worktree)
+    else:
+        served, began = personal_database(python, worktree, folder / PERSONAL_DATABASE, logs)
+        state["database"]["started_by_launcher"] = began
+    # restart-api reads the connections from here, whichever database printed them.
     (logs / "database-serve.txt").write_text(served)
     exports = served_exports(served)
     database_port = url_port(exports["EXULANICA_DATABASE_URL"])
-    after = lane_server(worktree, python)
     state["database"].update(
         {
             "port": database_port,
             "runtime_url": exports["EXULANICA_DATABASE_URL"],
             "owner_url_for_evidence_reads": exports["OWNER_URL"],
-            "lane_server_root": after["root"],
         }
     )
+    after = lane_server(worktree, python) if folder is None else None
+    if after is not None:
+        state["database"]["lane_server_root"] = after["root"]
     # The purge role's URL, for a client that runs the purge as an installation does: in a file of
     # its own at 0600, named by the state and never printed with it.
     purge_url_file = run_dir / PURGE_URL_NAME
@@ -1857,7 +2027,7 @@ def up(arguments: argparse.Namespace) -> None:
     purge_url_file.chmod(0o600)
     state["purge_url_file"] = str(purge_url_file)
     write_state(state_file, state)
-    if not after["running"] or database_port != after["port"]:
+    if after is not None and (not after["running"] or database_port != after["port"]):
         refuse(
             "database-not-its-own",
             f"serve printed port {database_port}; the test server at {after['root']} records "
@@ -1866,10 +2036,11 @@ def up(arguments: argparse.Namespace) -> None:
     if "exulanica_app@" not in exports["EXULANICA_DATABASE_URL"]:
         refuse("runtime-role", "the application URL does not name exulanica_app")
 
-    # A fresh synthetic workspace and an explicit grant.
-    workspace_id = str(uuid.uuid4())
-    actor = str(uuid.uuid4())
-    token = secrets.token_urlsafe(48)
+    # A fresh synthetic workspace and an explicit grant, or a person's own, kept from run to run.
+    if folder is None:
+        workspace_id, actor, token = str(uuid.uuid4()), str(uuid.uuid4()), secrets.token_urlsafe(48)
+    else:
+        workspace_id, actor, token = personal_identity(folder)
     token_file.write_text(token)
     token_file.chmod(0o600)
     grant = {
@@ -2545,6 +2716,22 @@ def recorded_checkout(path: str) -> Path:
     return Path(path).resolve()
 
 
+def stop_personal_database(worktree: Path, database: Mapping[str, object]) -> None:
+    """Stop a person's database through ``exulanica-local-db stop``, which takes a backup after the
+    server stops; one that was already running before this run is left running."""
+    directory = str(database["directory"])
+    if not database["started_by_launcher"]:
+        print(f"database: {directory} was running before this run; left running")
+        return
+    python = worktree / ".venv" / "bin" / "python"
+    if not python.exists():
+        print(
+            f"database: the checkout is gone; stop it with exulanica-local-db stop --directory {directory}"
+        )
+        return
+    print(run(local_database_command(python, "stop", "--directory", directory), worktree).strip())
+
+
 def down(arguments: argparse.Namespace) -> None:
     worktree = recorded_checkout(arguments.worktree)
     state_file = state_dir(worktree) / "state.json"
@@ -2570,7 +2757,9 @@ def down(arguments: argparse.Namespace) -> None:
         stop(state["pids"]["api_2"], API_MARKER, "api_2")
     if "api" in state["pids"]:
         stop(state["pids"]["api"], API_MARKER, "api")
-    if state["database"]["started_by_launcher"]:
+    if state["database"].get("kind") == "personal":
+        stop_personal_database(worktree, state["database"])
+    elif state["database"]["started_by_launcher"]:
         python = worktree / ".venv" / "bin" / "python"
         if python.exists():
             print(run([str(python), "scripts/test_postgres.py", "stop"], worktree).strip())

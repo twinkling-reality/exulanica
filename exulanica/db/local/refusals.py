@@ -68,6 +68,9 @@ class Refusal(StrEnum):
     REHEARSAL_FAILED = "rehearsal-failed"
     #: A migration was asked for without a backup taken in the same maintenance session.
     NO_FRESH_BACKUP = "no-fresh-backup"
+    #: The file copy an upgrade takes of the stopped data failed, or holds other files or bytes than
+    #: the data, so nothing was migrated.
+    FILE_BACKUP_INCOMPLETE = "file-backup-incomplete"
     #: ``initdb`` or ``pg_ctl`` failed.
     SERVER_FAILED = "server-failed"
     #: ``pg_dump`` failed.

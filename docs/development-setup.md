@@ -451,10 +451,14 @@ acceptance run. Stop the landing server before starting the application on its d
 the port printed by Vite.
 
 One command starts a person's own install on this computer:
-`python3 scripts/acceptance/launch.py up --worktree . --personal`. It starts the checkout's own
-disposable database server, the API with a personal install's settings and its workers, and the world
-workspace on the slot's app port, and prints that page's address. The database is the run's own and
-`down` stops it; a durable one is the [local database](local-database.md)'s.
+`python3 scripts/acceptance/launch.py up --worktree . --personal`. It keeps everything the person
+makes in `~/Exulanica`, a folder of theirs that no other account can write: the durable
+[local database](local-database.md) in `database/` (made on the first run, started on every later one,
+and upgraded first when this checkout has migrations it lacks, after a file copy of the stopped data),
+the workspace's identity and token in `install/`, the content store in `store/` and the world projects
+in `projects/`. It then starts the API with a personal install's settings and its workers, and the
+world workspace on the slot's app port, and prints that page's address. `down` stops the database
+through `exulanica-local-db stop`, which takes a backup.
 See [capability boundaries](README.md#capability-boundaries) and [product direction](product-direction.md).
 
 ### Opt-in world interface previews
