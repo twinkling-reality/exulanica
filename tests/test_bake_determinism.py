@@ -70,6 +70,7 @@ from exulanica.ingest.stages import (
     STAGES,
     StageSpec,
     baked_tile_id,
+    baked_tile_key,
     baked_tile_record_shapes,
     edit_delta_digest_of,
     idempotency_key,
@@ -270,6 +271,19 @@ def test_a_nonempty_edit_subsequence_moves_the_key():
         ),
     }
     assert len(keys) == 4, "a nonempty or reordered edit subsequence left the key unmoved"
+
+
+def test_the_fixture_tile_s_key_is_the_one_every_bake_of_it_was_stored_under():
+    """A known key, so a change to how the key is derived shows as a changed id: the fixture
+    tile's, from its record and from its inputs digest alone (the database's publish holds the
+    digest, not the record)."""
+    spec = stage("baked_tile")
+    tile = fixture_document().tile
+    known = uuid.UUID("490c2c65-2b97-5cb9-a6ba-5f5e87712135")
+    assert baked_tile_id(spec, tile) == known
+    assert baked_tile_key(spec, tile_inputs_digest(tile)) == known
+    with pytest.raises(ValueError, match="64 lowercase"):
+        baked_tile_key(spec, tile_inputs_digest(tile).upper())
 
 
 def test_the_key_is_the_scene_group_shape_with_the_tile_key_last():

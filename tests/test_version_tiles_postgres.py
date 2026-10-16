@@ -34,8 +34,9 @@ from exulanica.db.session import set_workspace
 from exulanica.db.tiles_role import assert_tiles_role, provision_tiles_role
 from exulanica.deletion.worker import PurgeWorker
 from exulanica.evidence.blob import BlobId
+from exulanica.ingest import generated_tiles
 from exulanica.ingest.generated_tiles import GeneratedTileBaker, claim_bake
-from exulanica.ingest.stages import ARTIFACT_NAMESPACE, STAGES
+from exulanica.ingest.stages import STAGES, baked_tile_key
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import version_tile_lock_key
@@ -290,12 +291,8 @@ NEVER_STORED = hashlib.sha256(b"never stored").digest()
 
 
 def _key(inputs: bytes) -> uuid.UUID:
-    """The bake's id these inputs give, as the tile worker derives it
-    (``exulanica.ingest.stages.baked_tile_id``)."""
-    spec = STAGES["baked_tile"]
-    return uuid.uuid5(
-        ARTIFACT_NAMESPACE, f"{spec.key}:{spec.version}:{spec.params_digest.hex()}:{inputs.hex()}"
-    )
+    """The bake's id these inputs give, by the tile worker's own derivation."""
+    return baked_tile_key(STAGES["baked_tile"], inputs.hex())
 
 
 def _publish(connection, job, token, **changed):  # type: ignore[no-untyped-def]
@@ -608,3 +605,24 @@ def test_a_purge_started_while_a_bake_s_bytes_are_put_waits_and_destroys_them(to
         seen["digest"],
     )
     assert stored["purged_at"] is not None
+
+
+def test_a_bake_whose_bytes_lock_stays_held_goes_back_to_the_queue(town, monkeypatch):
+    """A version's bake waits a bounded time for the purger's lock on its bytes: a lock held past
+    the wait sends the job back to the queue with the reason, rather than holding its claim."""
+    assert town.queue()
+    held = "a version tile's bytes, held by the test"
+    monkeypatch.setattr(generated_tiles, "LOCK_WAIT_SECONDS", 0.2)
+    monkeypatch.setattr(generated_tiles, "version_tile_lock_key", lambda _workspace, _content: held)
+    with town.session() as holder:
+        holder.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (held,))
+        try:
+            outcomes = town.baker.drain([town.workspace_id])
+        finally:
+            holder.execute("select pg_advisory_unlock(hashtextextended(%s, 0))", (held,))
+    assert outcomes and {outcome.status for outcome in outcomes} == {"requeued"}
+    assert all("lock on a version tile's bytes" in outcome.detail for outcome in outcomes)
+    jobs = town.owner_rows(
+        "select state, run_after > now() as later from job where kind = 'bake_version_tile'"
+    )
+    assert jobs and all(job["state"] == "queued" and job["later"] for job in jobs)

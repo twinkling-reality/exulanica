@@ -63,6 +63,7 @@ __all__ = [
     "StageSpec",
     "artifact_id_for",
     "baked_tile_id",
+    "baked_tile_key",
     "baked_tile_record_shapes",
     "binding_digest_of",
     "edit_delta_digest_of",
@@ -1039,7 +1040,15 @@ def baked_tile_id(spec: StageSpec, tile: TileRecord) -> uuid.UUID:
     """
     if spec.key != "baked_tile":
         raise ValueError(f"stage {spec.key!r} is not the tile bake")
-    inputs = tile_inputs_digest(tile)
+    return baked_tile_key(spec, tile_inputs_digest(tile))
+
+
+def baked_tile_key(spec: StageSpec, inputs: str) -> uuid.UUID:
+    """The key :func:`baked_tile_id` gives a tile whose ``tile_inputs_digest`` is ``inputs`` (64
+    lowercase hexadecimal characters): the one derivation, for a caller that holds the digest and
+    not the record, as the database's publish of a version's bake does."""
+    if spec.key != "baked_tile":
+        raise ValueError(f"stage {spec.key!r} is not the tile bake")
     if _HEX64.fullmatch(inputs) is None:
         raise ValueError("tile_inputs_digest is 64 lowercase hexadecimal characters")
     return uuid.uuid5(

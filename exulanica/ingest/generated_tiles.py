@@ -77,6 +77,7 @@ from exulanica.world.version_tiles import (
 
 __all__ = [
     "BAKE_TIMEOUT_SECONDS",
+    "LOCK_WAIT_SECONDS",
     "MAXIMUM_CLAIMS",
     "PUBLISH_RETRY_DELAYS",
     "REQUEUE_SECONDS",
@@ -105,6 +106,10 @@ PUBLISH_RETRY_DELAYS: Final = (0.05, 0.1, 0.2, 0.4, 0.8, 1.6)
 #: How long a job whose publish was still refused waits before its next claim, times the claims it
 #: has had: a reader that held the lock through every try is given longer each time.
 REQUEUE_SECONDS: Final = 30.0
+#: How long a version's bake waits for the purger's lock on its bytes before it goes back to the
+#: queue: a purge holds it while it destroys one object's bytes, far less than this, and the wait is
+#: bounded so a holder that never lets go cannot hold the job past its claim.
+LOCK_WAIT_SECONDS: Final = 30.0
 #: What a publish may meet and be tried again for. SQLSTATE 40001 (``SerializationFailure``, an
 #: ``OperationalError``) is migration 0041's refusal while a reader holds the asset read lock; the
 #: rest of ``OperationalError`` is a connection that dropped. The write is one function call, so a
@@ -132,8 +137,18 @@ def child_environment(environ: Mapping[str, str]) -> dict[str, str]:
 @contextmanager
 def _holding(connection: psycopg.Connection, key: str) -> Iterator[None]:
     """Hold a session advisory lock on ``key`` (the purger takes the transaction-scoped one),
-    across commits, as a stored object's write does (``ingest/spine/blobs.py``)."""
-    connection.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (key,))
+    across commits, as a stored object's write does (``ingest/spine/blobs.py``). It is waited for
+    at most :data:`LOCK_WAIT_SECONDS`, inside a transaction of its own that sets the bound (a
+    session lock outlives the transaction that took it); a lock still held then is a publish
+    refused for the moment, and the job goes back to the queue."""
+    try:
+        with connection.transaction():
+            connection.execute(f"set local lock_timeout = '{int(LOCK_WAIT_SECONDS * 1000)}ms'")
+            connection.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (key,))
+    except psycopg.errors.LockNotAvailable as exc:
+        raise PublishRefused(
+            f"the lock on a version tile's bytes was held for {LOCK_WAIT_SECONDS:g} s"
+        ) from exc
     try:
         yield
     finally:
