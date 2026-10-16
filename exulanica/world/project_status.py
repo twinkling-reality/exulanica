@@ -85,6 +85,9 @@ class ProjectStatus(_Closed):
     profile: Literal["exulanica.world-project-status/v1"]
     world_id: _Id
     version_id: _Id
+    #: The project's own identity, by which a page asks for it to be put on GitHub; absent in a
+    #: status written before the follower stated it.
+    project_id: _Id | None = None
     written_at: _Instant
     #: Saved checkpoints in the project, and when the newest was saved.
     checkpoints: Annotated[int, Field(ge=0)]

@@ -61,12 +61,16 @@ def test_the_state_is_closed_and_holds_no_path_or_credential():
         {**status(), "checkpoints": -1},
         {**status(), "written_at": "yesterday"},
         {**status(), "settle_seconds": 0},
+        {**status(), "project_id": "a project"},
     ):
         with pytest.raises(StatusRefused):
             status_document(broken)
     # The settle period History states: whole seconds, absent from a status written before it.
     assert status_document(status(settle_seconds=120))["settle_seconds"] == 120
     assert status_document(status())["settle_seconds"] is None
+    # The project's identity, by which a page asks for it on GitHub; absent in an older status.
+    assert status_document(status(project_id="project:demo"))["project_id"] == "project:demo"
+    assert status_document(status())["project_id"] is None
 
 
 def test_only_the_configured_directory_s_own_folders_are_read(tmp_path):

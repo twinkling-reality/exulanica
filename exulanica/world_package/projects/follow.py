@@ -17,15 +17,19 @@ between two polls, or while no follower ran, is still recorded. A closed session
 evidence of a followed thing is passed over. A world with no society is followed for its edits
 alone, a world made from a world kind with nothing placed for its made parts alone, and a version
 with neither waits. It writes only the project folders, never the world, and a remote only where
-the project's link says to publish on its own: after each checkpoint it records, such a project's
-rolling pull request follows it
+a person asked for a project on GitHub (below) or the project's link says to publish on its own:
+after each checkpoint it records, such a project's rolling pull request follows it
 (:mod:`exulanica.world_package.projects.publish`, at most `limits.publications_per_day` attempts a
 day). One follower holds a projects directory at a time; one project's fault never stops the
 others. A person may also ask through the server for a world to be kept
 (:mod:`exulanica.world.project_requests`): the follower takes one such request a scan, makes and
 names the folder itself, starts the project as following a world does, and removes the request,
-or leaves it refused by a code where the project cannot start. When it stops, each project with
-pending changes records them once, and nothing more is published.
+or leaves it refused by a code where the project cannot start. A person may ask the same way for
+a project it follows to be put on their own GitHub: the follower reviews with their GitHub CLI,
+then, once the person said yes to that review, creates the private repository and links the
+project to publish on its own (:mod:`exulanica.world_package.projects.publication`). One request
+of either kind is taken a scan. When it stops, each project with pending changes records them
+once, and nothing more is published.
 """
 
 from __future__ import annotations
@@ -45,7 +49,14 @@ from pydantic import Field, ValidationError, model_validator
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
-from exulanica.world.project_requests import read_requests, refuse_request, remove_request
+from exulanica.world.project_requests import (
+    read_publications,
+    read_requests,
+    refuse_request,
+    remove_request,
+    review_publication,
+    start_publication,
+)
 from exulanica.world.project_status import (
     PROFILE as STATUS_PROFILE,
 )
@@ -55,6 +66,7 @@ from exulanica.world.project_status import (
     status_document,
     write_status,
 )
+from exulanica.world_package.projects import publication
 from exulanica.world_package.projects.capture import (
     Capture,
     NothingSelectable,
@@ -410,6 +422,8 @@ class Follower:
         finish_seconds: float = FINISH_SECONDS,
         author: Author | None = None,
         github: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        github_rest: Callable[[str, str, dict[str, Any]], dict[str, Any]] | None = None,
+        github_ready: Callable[[], str | None] | None = None,
     ) -> None:
         self.directory = Path(os.path.abspath(directory))
         if self.directory.is_symlink() or not self.directory.is_dir():
@@ -426,6 +440,8 @@ class Follower:
         self.author = author
         #: GitHub's GraphQL, for a project linked to publish on its own (the gh CLI when None).
         self.github = github
+        #: The person's GitHub, to put a project on it when they ask (the gh CLI when None).
+        self.access = publication.Access(github, github_rest, github_ready)
         self._items: dict[str, _Followed] = {}
         self._refused: dict[str, str] = {}
         self._unreadable = False
@@ -529,10 +545,75 @@ class Follower:
             return [{"project": None, "state": "refused", "error": code}]
         return []
 
+    def take_publication(self) -> list[dict[str, Any]]:
+        """Act on one request to put a followed project on the person's GitHub
+        (:mod:`exulanica.world.project_requests`), oldest first: review it, or, once the person
+        said yes to its review, create the repository, link the project, publish it and leave
+        its state beside it, then remove the request. A request for no project this follower
+        follows, or for a version its workspace no longer holds (a world erased since), leaves;
+        one refused, or waiting for the person's yes, is passed over. One found started was being
+        created when a follower stopped: its outcome cannot be read here, so it is refused
+        ``failed`` and never retried."""
+        for request in read_publications(self.directory):
+            if request["refused"] is not None:
+                continue
+            request_id = request["request_id"]
+            now = datetime.fromtimestamp(self.clock(), UTC)
+            if request["started_at"] is not None:
+                refuse_request(self.directory, request_id, "failed", now)
+                return [{"project": None, "state": "refused", "error": "failed"}]
+            asked = (request["project_id"], request["world_id"], request["version_id"])
+            held = [
+                item
+                for item in self._items.values()
+                if (item.project_id, item.settings["world_id"], item.settings["version_id"])
+                == asked
+            ]
+            if len(held) != 1:
+                remove_request(self.directory, request_id)
+                return [{"project": None, "state": "gone"}]
+            item = held[0]
+            if request["review"] is not None and request["confirmed"] is None:
+                continue  # waits for the person's yes
+            # Only a version this follower's own workspace still holds is reviewed or put on GitHub,
+            # as for a request to keep a world: one erased since leaves as gone, nothing made.
+            version = f"/world/versions/{segment(request['version_id'])}"
+            try:
+                still_held = item.reader.holds("GET version", version)
+            except ProjectError:
+                continue  # the World API did not answer: asked again at the next scan
+            if not still_held:
+                remove_request(self.directory, request_id)
+                return [{"project": item.name, "state": "gone"}]
+            try:
+                if request["review"] is None:
+                    review = publication.review(
+                        item.project, item.settings, request, self.access, now
+                    )
+                    review_publication(self.directory, request_id, review)
+                    return [{"project": item.name, "state": "reviewed"}]
+                started = start_publication(self.directory, request_id, now)
+                if started is None:
+                    continue
+                publication.create(item.project, item.settings, started, self.access)
+            except publication.Refused as refused:
+                code = refused.code
+            except Exception:
+                # Its class names it in the follower's own events; the request says "failed".
+                code = "failed"
+            else:
+                told = [{"project": item.name, "state": "linked"}, *self._publish(item)]
+                remove_request(self.directory, request_id)
+                return told
+            refuse_request(self.directory, request_id, code, now)
+            return [{"project": item.name, "state": "refused", "error": code}]
+        return []
+
     def scan(self) -> list[dict[str, Any]]:
-        """Start a project a person asked for, then follow the folders that gained a follow file,
-        by the settings they now state, and leave the ones that lost theirs."""
-        told: list[dict[str, Any]] = self.take_request()
+        """Act on one request a person made (to keep a world, else to put a project on GitHub),
+        then follow the folders that gained a follow file, by the settings they now state, and
+        leave the ones that lost theirs."""
+        told: list[dict[str, Any]] = self.take_request() or self.take_publication()
         try:
             entries = sorted(self.directory.iterdir())
         except OSError:
@@ -651,6 +732,7 @@ class Follower:
                 "profile": STATUS_PROFILE,
                 "world_id": item.settings["world_id"],
                 "version_id": item.settings["version_id"],
+                "project_id": item.project_id,
                 "written_at": _stamp(self.clock()),
                 "checkpoints": len(saved),
                 "last_checkpoint_at": _stamp(float(saved[0])) if saved else None,
