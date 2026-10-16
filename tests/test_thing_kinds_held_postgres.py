@@ -8,7 +8,9 @@ here. What is shown:
     and body (a drafted creature's extent) as its own document states them, and when it was kept,
     never cached;
 *   another workspace lists none of them, an erased creature leaves the list, and the route needs a
-    session.
+    session;
+*   a kept kind whose document the reader now refuses (a catalog moved under it) is left out, the
+    others still listed: each is read again, never served from what was kept.
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ from datetime import datetime
 
 import pytest
 from exulanica.things.creatures import assemble_creature
+from exulanica.things.kinds import ThingKindRefused
+from exulanica.world import thing_store
 from exulanica.world.thing_store import ThingStore
 
 from test_creature_bodies import BY, _form, _recipe
@@ -78,3 +82,21 @@ def test_another_workspace_lists_none_an_erased_creature_leaves_and_a_session_is
     )
     assert erased.status_code == 204, erased.text
     assert _get(client, "/things/kinds", token=_OWNER).json()["kinds"] == []
+
+
+def test_a_kind_the_reader_now_refuses_is_left_out_and_the_others_are_listed(served, monkeypatch):
+    client, first, database, workspace, services = served
+    refused = _keep(database, workspace, services, "serpent", "refused serpent")
+    read = thing_store.read_thing_kind
+
+    def reader_refusing_the_serpent(document, **given):  # type: ignore[no-untyped-def]
+        if document.get("label") == "refused serpent":
+            raise ThingKindRefused("thing_kind_invalid", "body", "no longer read by this catalog")
+        return read(document, **given)
+
+    listed = [k["sha256"] for k in _get(client, "/things/kinds").json()["kinds"]]
+    assert listed == [refused.kind.sha256, first.kind.sha256]
+    monkeypatch.setattr(thing_store, "read_thing_kind", reader_refusing_the_serpent)
+    answered = _get(client, "/things/kinds")
+    assert answered.status_code == 200, answered.text
+    assert [k["sha256"] for k in answered.json()["kinds"]] == [first.kind.sha256]

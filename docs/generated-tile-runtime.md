@@ -591,9 +591,9 @@ workspace. A world's erasure deletes its version bakes, cancels its queued ones 
 bytes on its tombstone; a workspace's erasure destroys every object of the namespace; a judge seed
 refuses a workspace holding any. A kept change to a building (the parts routes), and an undo or a
 redo that reverses one on any undo route, queues in its own transaction a bake of every tile the
-version's changes then alter whose bake is neither stored nor already queued or running
-(`queue_version_bakes`), so a tile whose bake failed when the version changed again is queued
-again when an undo brings the version back. The changed tiles are found before the edit takes its
+version's changes then alter whose bake is neither stored and servable nor already queued or
+running (`queue_version_bakes`), so a tile whose bake failed when the version changed again, or
+whose stored bake has a fault, is queued again when an undo brings the version back. The changed tiles are found before the edit takes its
 workspace's lock, and read from memory under it. Limits: the changed tiles are found again on each
 read of an entry, kept in memory for the few towns read last, and an edit that moves the version
 between the two finds makes the town's tile documents again under the lock; an undo that commits
