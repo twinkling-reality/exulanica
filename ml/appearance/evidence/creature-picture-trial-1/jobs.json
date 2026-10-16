@@ -1,0 +1,32 @@
+{
+ "jobs": [
+  {
+   "attempt": 1,
+   "code_sha256": "18236c50b15d754a0ed85086754699e7b6b901376b38f185368267737d43534b",
+   "container_finished_at": "2026-10-15T11:30:22.580943557Z",
+   "container_started_at": "2026-10-15T11:17:04.809674685Z",
+   "created_at": "2026-10-15T11:14:27.969746Z",
+   "deleted_at": "2026-10-15T11:32:17.127452Z",
+   "image": "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
+   "job_id": "aijob-e05twx6gdhn5q4vkh5",
+   "job_script_sha256": "f8bbb0c5cd5e2d3443f61770ef09a68affa73fba58dca542173d361211aca11c",
+   "job_sha256": "afc61a9f1b6c1db5cc3941cd19bba2303143ac998c3dac84d1279a08f3105fa9",
+   "outcome": "completed: the service reports COMPLETED; deleted after the terminal state and read back as not found; the bucket held no object before staging or after clearing",
+   "platform": "gpu-rtx6000-a",
+   "preset": "1gpu-24vcpu-218gb",
+   "pricing": "on demand",
+   "provider": "Nebius AI Cloud, uk-south2, Serverless AI job",
+   "rate_cents_per_hour": 180,
+   "rate_source": "the rate the job's runner bounded it by: one RTX PRO 6000 on demand per GPU-hour, the price page's figure as ml/appearance/evidence/gpu-run-aijob-e05agpmk7zw9z89jqv.json records it",
+   "route": "P",
+   "service_timeout_seconds": 3600,
+   "stop_seconds": 2400,
+   "submitted_at": "2026-10-15T11:14:33.030882192Z",
+   "terminal_seen_at": "2026-10-15T11:30:53Z",
+   "terminal_state": "COMPLETED",
+   "times": "created_at and container times from the job's status, submitted_at from the create operation, deleted_at from the delete operation; terminal_seen_at and the upper bound's ends from the watcher's log (whole seconds, read on a clock at UTC-4)",
+   "upper_bound_from": "2026-10-15T11:14:27Z",
+   "upper_bound_to": "2026-10-15T11:32:19Z"
+  }
+ ]
+}

@@ -1,0 +1,162 @@
+{
+ "rows": [
+  {
+   "index": 0,
+   "description_sha256": "f81aebac1aeb4ed4b9e11e378042450148d25f761bcf7e4b9d9c553a7f96cfcf",
+   "attempts": [
+    "passed"
+   ],
+   "refusals": [],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00508440"
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "description_sha256": "05aaff3cdd0d61280f8da38c13e12c45f4a9b9577d9483d25435dbacd3c045be",
+   "attempts": [
+    "passed"
+   ],
+   "refusals": [],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00350010"
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "description_sha256": "73436e24d386512fb7b051e15eff396fea57a63dec77f7a7e8ebb31742d3c862",
+   "attempts": [
+    "passed"
+   ],
+   "refusals": [],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00412500"
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "description_sha256": "612abc96b14d4694cfa64746fdb8058fe97d4af90554ae1282b114400eac06dd",
+   "attempts": [
+    "passed"
+   ],
+   "refusals": [],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00579480"
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "description_sha256": "3ea6fc7c8329b5f56709818a7dd42c7a6e2697111545db7afa915de74b1a4ab4",
+   "attempts": [
+    "check:body_recipe_out_of_bounds",
+    "passed"
+   ],
+   "refusals": [
+    [
+     "body_recipe_out_of_bounds",
+     "length_mm",
+     "is from 200 to 40000. Every count, segment number and size lies within the bounds the body grammar states."
+    ]
+   ],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00352440"
+    },
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00496350"
+    }
+   ]
+  },
+  {
+   "index": 5,
+   "description_sha256": "fd69f879d58fd9540149b28cd6f0c38f782c4a7e19b4325cbdb800beb3b6ad9c",
+   "attempts": [
+    "passed"
+   ],
+   "refusals": [],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00435930"
+    }
+   ]
+  },
+  {
+   "index": 6,
+   "description_sha256": "6489971a8000177222096b3fb14d02bae3257c49a68d007684842fa61b694a36",
+   "attempts": [
+    "passed"
+   ],
+   "refusals": [],
+   "drafted": true,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00370950"
+    }
+   ]
+  },
+  {
+   "index": 7,
+   "description_sha256": "5f93ef3a61b7010a0e9bed3f4e5311e979eb0146dee05c254a3b96160a9a9af2",
+   "attempts": [
+    "check:creature_cannot_move_so",
+    "check:creature_movement_unbuilt"
+   ],
+   "refusals": [
+    [
+     "creature_cannot_move_so",
+     "moves_swimming",
+     "a creature that swims needs fins, four or more tentacles, or a long body; this body has none of them. A creature moves only in the ways its body allows: it walks on legs, four or more tentacles or a long body, and flies with a pair of wings or a floating body."
+    ],
+    [
+     "creature_movement_unbuilt",
+     "moves_swimming",
+     "This world has no swimming yet.. A creature may ask only for movements this world has built; the movement's own sentence says which are not built yet."
+    ]
+   ],
+   "drafted": false,
+   "calls": [
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00511740"
+    },
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "outcome": "completed",
+     "usd": "0.00416400"
+    }
+   ]
+  }
+ ],
+ "spent_usd": "0.04434240"
+}

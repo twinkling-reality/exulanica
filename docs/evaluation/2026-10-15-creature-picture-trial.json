@@ -1,0 +1,1751 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "compute": {
+   "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+   "gpu_memory_mib": 97249,
+   "model": "microsoft/TRELLIS-image-large",
+   "platform": "gpu-rtx6000-a",
+   "preset": "1gpu-24vcpu-218gb",
+   "provider": "Nebius AI Cloud, uk-south2, Serverless AI job",
+   "rate_cents_per_hour": 180,
+   "rate_source": "the rate the job's runner bounded it by: one RTX PRO 6000 on demand per GPU-hour, the price page's figure as ml/appearance/evidence/gpu-run-aijob-e05agpmk7zw9z89jqv.json records it"
+  },
+  "creatures": [
+   {
+    "answer": "yes",
+    "counted": true,
+    "description": 0,
+    "draft_attempts": [
+     "passed"
+    ],
+    "draft_refusals": [],
+    "drafted": true,
+    "items": [
+     0,
+     7
+    ],
+    "judged_item": 7,
+    "judged_item_by_the_rule": 7,
+    "letter": "F",
+    "passing": true,
+    "words": "a stout mossy tortoise with a domed shell and short thick legs"
+   },
+   {
+    "answer": "yes",
+    "counted": false,
+    "description": 1,
+    "draft_attempts": [
+     "passed"
+    ],
+    "draft_refusals": [],
+    "drafted": true,
+    "items": [
+     1,
+     8
+    ],
+    "judged_item": 1,
+    "judged_item_by_the_rule": 1,
+    "letter": "G",
+    "passing": false,
+    "words": "a long-necked grazing beast with a spotted tan hide and four slender legs"
+   },
+   {
+    "answer": "yes",
+    "counted": true,
+    "description": 2,
+    "draft_attempts": [
+     "passed"
+    ],
+    "draft_refusals": [],
+    "drafted": true,
+    "items": [
+     2,
+     9
+    ],
+    "judged_item": 9,
+    "judged_item_by_the_rule": 9,
+    "letter": "B",
+    "passing": true,
+    "words": "a small round frog creature with big back legs and a wide mouth"
+   },
+   {
+    "answer": "yes",
+    "counted": true,
+    "description": 3,
+    "draft_attempts": [
+     "passed"
+    ],
+    "draft_refusals": [],
+    "drafted": true,
+    "items": [
+     3,
+     10
+    ],
+    "judged_item": 3,
+    "judged_item_by_the_rule": 3,
+    "letter": "C",
+    "passing": true,
+    "words": "a fox with russet fur, bat wings, four legs and a bushy tail"
+   },
+   {
+    "answer": "yes",
+    "counted": true,
+    "description": 4,
+    "draft_attempts": [
+     "check:body_recipe_out_of_bounds",
+     "passed"
+    ],
+    "draft_refusals": [
+     "body_recipe_out_of_bounds"
+    ],
+    "drafted": true,
+    "items": [
+     4,
+     11
+    ],
+    "judged_item": 11,
+    "judged_item_by_the_rule": 11,
+    "letter": "E",
+    "passing": true,
+    "words": "a six-legged beetle beast with a glossy green shell and short horns"
+   },
+   {
+    "answer": "yes",
+    "counted": true,
+    "description": 5,
+    "draft_attempts": [
+     "passed"
+    ],
+    "draft_refusals": [],
+    "drafted": true,
+    "items": [
+     5,
+     12
+    ],
+    "judged_item": 5,
+    "judged_item_by_the_rule": 5,
+    "letter": "D",
+    "passing": true,
+    "words": "a tall wading bird with grey feathers, long thin legs and a long beak"
+   },
+   {
+    "answer": "yes",
+    "counted": true,
+    "description": 6,
+    "draft_attempts": [
+     "passed"
+    ],
+    "draft_refusals": [],
+    "drafted": true,
+    "items": [
+     6,
+     13
+    ],
+    "judged_item": 6,
+    "judged_item_by_the_rule": 6,
+    "letter": "A",
+    "passing": true,
+    "words": "a squat clay golem with thick arms, short legs and a cracked grey body"
+   },
+   {
+    "answer": null,
+    "counted": false,
+    "description": 7,
+    "draft_attempts": [
+     "check:creature_cannot_move_so",
+     "check:creature_movement_unbuilt"
+    ],
+    "draft_refusals": [
+     "creature_cannot_move_so",
+     "creature_movement_unbuilt"
+    ],
+    "drafted": false,
+    "items": [],
+    "judged_item": null,
+    "judged_item_by_the_rule": null,
+    "letter": null,
+    "passing": false,
+    "words": "a sleek river otter with webbed feet and a long flat tail"
+   }
+  ],
+  "development": {
+   "deep_glide_serpent": {
+    "items": [
+     18,
+     26
+    ],
+    "outcomes": [
+     "passed",
+     "passed"
+    ],
+    "passing": true
+   },
+   "drifting_tendril_spirit": {
+    "items": [
+     15,
+     23
+    ],
+    "outcomes": [
+     "refused: rig_nothing_moves",
+     "refused: rig_bone_outside"
+    ],
+    "passing": false
+   },
+   "forest_sentinel": {
+    "items": [
+     16,
+     24
+    ],
+    "outcomes": [
+     "refused: rig_limb_drags_body",
+     "refused: rig_limb_drags_body"
+    ],
+    "passing": false
+   },
+   "giant_leggy_crawler": {
+    "items": [
+     19,
+     27
+    ],
+    "outcomes": [
+     "refused: rig_chain_not_found",
+     "refused: rig_chain_not_found"
+    ],
+    "passing": false
+   },
+   "golden_clawwing": {
+    "items": [
+     21,
+     29
+    ],
+    "outcomes": [
+     "passed",
+     "refused: rig_bone_outside"
+    ],
+    "passing": true
+   },
+   "swiftstride_runner": {
+    "items": [
+     17,
+     25
+    ],
+    "outcomes": [
+     "passed",
+     "passed"
+    ],
+    "passing": true
+   },
+   "tower_wyvern": {
+    "items": [
+     14,
+     22
+    ],
+    "outcomes": [
+     "passed",
+     "passed"
+    ],
+    "passing": true
+   },
+   "twinhead_lion": {
+    "items": [
+     20,
+     28
+    ],
+    "outcomes": [
+     "passed",
+     "passed"
+    ],
+    "passing": true
+   }
+  },
+  "evidence": {
+   "descriptions_sha256": "f10e1fbd6caab9058e2bf12cd163633c671f44c9448eb32891f480885836bea5",
+   "folder": "ml/appearance/evidence/creature-picture-trial-1",
+   "job_sha256": "afc61a9f1b6c1db5cc3941cd19bba2303143ac998c3dac84d1279a08f3105fa9",
+   "results": "results-afc61a9f1b6c1db5cc3941cd19bba2303143ac998c3dac84d1279a08f3105fa9-20261015T113020Z.json",
+   "results_sha256": "d6a2d275e2725e0a33a25d880154fdc603c8a3903412ca76868aa025bc28c86d"
+  },
+  "items": [
+   {
+    "body": null,
+    "description": 0,
+    "fit_seconds": {
+     "frame": 5
+    },
+    "fit_simplifier": null,
+    "gpu_seconds": {
+     "cutout": 1,
+     "mesh": 14,
+     "picture": 10
+    },
+    "item": 0,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "46180fc5e1b9abd8c49da2e7a03831be9f6d86c5cb7bc3a454ccb1e7446683a3",
+    "mesh_triangles": 1140940,
+    "moving_bones": 0,
+    "name": "held-out 0",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "mossy_domeback",
+    "plan_sha256": "0ed8adc4d9772116a4cfd5d804c931fa78cc1d03f046d04b8e6cbd2e26b23cde",
+    "receipt": "6e790ebf4575b3b1bc6143d98dd9148ec803aff42cb9806d83143e12ee210ad8",
+    "refusal": "rig_chain_not_found",
+    "refusal_detail": "the model has no limb end for chain leg1Left",
+    "request_sha256": "4f3c16dd393cdd890de198404fb3736dc21d005a945fb89acee923d48324f89c",
+    "role": "held_out",
+    "seed": 11,
+    "still": null,
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 1,
+    "fit_seconds": {
+     "embed": 5,
+     "frame": 1,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 1,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "16f368e08407c427d7baafb33167b5bc4adb4acfdcaeb81475f1dcd28f848ba2",
+    "mesh_triangles": 282364,
+    "moving_bones": 28,
+    "name": "held-out 1",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "spotted_tan_grazer",
+    "plan_sha256": "2c6e886bb5166db15bad7656435ea46682a7f7383e3cab2552289fba868329f4",
+    "receipt": "4f912c1816985845821bae99a3dd9aed2320d22f006deb5ec268b084e95265ae",
+    "refusal": "rig_limb_drags_body",
+    "refusal_detail": "swinging leg1Left moves 4% of head1Neck",
+    "request_sha256": "8f6ddcec847a64a9c229a68ac7ebe4d052d4d642681a893d6ec249b78d55ddcd",
+    "role": "held_out",
+    "seed": 11,
+    "still": [],
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 2,
+    "fit_seconds": {
+     "frame": 1
+    },
+    "fit_simplifier": null,
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 2,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "d64897c489dc09f530dfc133fb9ce2432c652ba4300552bcc210cd7d2941591e",
+    "mesh_triangles": 563448,
+    "moving_bones": 0,
+    "name": "held-out 2",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "muddy_hopper",
+    "plan_sha256": "a8c6193893ae78fc11f1f347e8952a0c3b90dc7694f878a034dcc866a5efbb6a",
+    "receipt": "779c1896b49006c53ef2351499c14c4d3960553d261963b29a0d59ca965b6e8c",
+    "refusal": "rig_chain_not_found",
+    "refusal_detail": "the model has no limb end for chain leg2Left",
+    "request_sha256": "a5dc56556919e0af51ed9e82beed7d0e23dabfc6daf11fc861cdd634258548cd",
+    "role": "held_out",
+    "seed": 11,
+    "still": null,
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 3,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 12,
+     "frame": 1,
+     "likeness": 3,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 3,
+    "likeness": {
+     "colour_difference_milli": 83,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 701
+    },
+    "made": true,
+    "mesh_sha256": "e48bc71b05dabc2512d243f1d926b5a37b787b5da41f5fa5ef455d159c440328",
+    "mesh_triangles": 342108,
+    "moving_bones": 16,
+    "name": "held-out 3",
+    "outcome": "passed",
+    "output_sha256": "59e2d16fb34ce1d545525904f558aa27a4dfd3212d48504a7448e60dddbace46",
+    "passes": true,
+    "plan_key": "rustwing_prowler",
+    "plan_sha256": "bad4c88cd6d747dc9b61e27ebfafb19e11c55d7d40723cb894eedc8656db3b06",
+    "receipt": "1b8d853b3074eefe6fafc04c3d47fa340378e729071c3a20d2bd790e51a5ed68",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "e04d5dbb9a80992b9e582ab6cc0816232f5a21090841eeffd35e3e4b0c113b08",
+    "role": "held_out",
+    "seed": 11,
+    "still": [
+     "spine4",
+     "head1Neck1",
+     "head1",
+     "head1Jaw",
+     "tail1",
+     "tail2",
+     "tail3",
+     "tail4",
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 4,
+    "fit_seconds": {
+     "frame": 2
+    },
+    "fit_simplifier": null,
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 4,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "11d3de5bbeb08c4b1d4d60f8b15afda7a96132201cf9c5b7714c15a8e3562922",
+    "mesh_triangles": 534112,
+    "moving_bones": 0,
+    "name": "held-out 4",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "emerald_horn_beetle",
+    "plan_sha256": "b98fe0d116d8d20d48c9ab174cbbe6ffdd04a1505afe9b7ea450ed3658d82fee",
+    "receipt": "3980bc46912820949f4d1b3be2aa1719e3c2fcf02350603b1b1e0b1a178e0779",
+    "refusal": "rig_chain_not_found",
+    "refusal_detail": "the model has no limb end for chain leg2Left",
+    "request_sha256": "c3575b9758c8c693d028fc59265403024baa0738c147bfb733453913fb0f090d",
+    "role": "held_out",
+    "seed": 11,
+    "still": null,
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 5,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 8,
+     "frame": 1,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 5,
+    "likeness": {
+     "colour_difference_milli": 64,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 801
+    },
+    "made": true,
+    "mesh_sha256": "f7e14cfb2cafe108225fd98383d00af924c7fce6eaf24c4ece67156757992323",
+    "mesh_triangles": 417272,
+    "moving_bones": 17,
+    "name": "held-out 5",
+    "outcome": "passed",
+    "output_sha256": "b0ee0cd3d9862f749c613e1f27b50d1cf5dff2ca0c30e9cc14fe133709ab1357",
+    "passes": true,
+    "plan_key": "marsh_stalker",
+    "plan_sha256": "41138eb04be6aa541ea133e089e161724b4ca66bafa788ebafdeb8eabac31c43",
+    "receipt": "4935ccd70142d5ef184e885d95d2074190d6119912583e185f0985a9cadb3b8e",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "509e748723bbc3302b955be9f76ac6e2080105e2a0234bb5d019e722bd3b6007",
+    "role": "held_out",
+    "seed": 11,
+    "still": [
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 6,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 11,
+     "frame": 6,
+     "likeness": 4,
+     "rig": 0,
+     "simplify": 1
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 6,
+     "picture": 3
+    },
+    "item": 6,
+    "likeness": {
+     "colour_difference_milli": 45,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 859
+    },
+    "made": true,
+    "mesh_sha256": "b66a1f1133cedf063a75397b36d59de84a8a55baef934b167465ba3792ef0713",
+    "mesh_triangles": 649364,
+    "moving_bones": 13,
+    "name": "held-out 6",
+    "outcome": "passed",
+    "output_sha256": "a48ac6f97f70b4a4a72214b922aa194caec98a95bfa0c72f3e04611e70973207",
+    "passes": true,
+    "plan_key": "stout_clay_sentinel",
+    "plan_sha256": "c5494755fc9824b1f09c0df8b29d897989417ea3c2509d5e4ccb949e2bfc154e",
+    "receipt": "c444eaaa86fba00f2537b35f5dc982209ef8181eeffd16304aaed49fc8066884",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "86f95f15eb1459f451d696ff6144bfc679bfbfb345b1f361da4dc77d06932ca9",
+    "role": "held_out",
+    "seed": 11,
+    "still": [
+     "arm1Left1",
+     "arm1Left2",
+     "arm1Left3"
+    ],
+    "variant": 0
+   },
+   {
+    "body": null,
+    "description": 0,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 20,
+     "frame": 2,
+     "likeness": 5,
+     "rig": 0,
+     "simplify": 1
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 6,
+     "picture": 3
+    },
+    "item": 7,
+    "likeness": {
+     "colour_difference_milli": 106,
+     "colour_matched": false,
+     "outline_overlap_per_mille": 925
+    },
+    "made": true,
+    "mesh_sha256": "74c8de77ba06bb4031a52bcd21a47e14e244b77e871697ab653af40a87d198b8",
+    "mesh_triangles": 960044,
+    "moving_bones": 12,
+    "name": "held-out 0",
+    "outcome": "passed",
+    "output_sha256": "583a6bfb99bafbcc46622bca068041d4aa4a8db4a94b5f776e79e729ff1d0153",
+    "passes": true,
+    "plan_key": "mossy_domeback",
+    "plan_sha256": "0ed8adc4d9772116a4cfd5d804c931fa78cc1d03f046d04b8e6cbd2e26b23cde",
+    "receipt": "bf52a062d3bd85fac35f5d041baaf53ac31521b076792b384d5c770661cedf8f",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "4f3c16dd393cdd890de198404fb3736dc21d005a945fb89acee923d48324f89c",
+    "role": "held_out",
+    "seed": 23,
+    "still": [
+     "head1",
+     "tail1"
+    ],
+    "variant": 1
+   },
+   {
+    "body": null,
+    "description": 1,
+    "fit_seconds": {
+     "embed": 4,
+     "frame": 2,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 8,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "d9122fdc91637a4df67877908e55803589426d36e456c5cb09a2b1d3d732fc0e",
+    "mesh_triangles": 292528,
+    "moving_bones": 28,
+    "name": "held-out 1",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "spotted_tan_grazer",
+    "plan_sha256": "2c6e886bb5166db15bad7656435ea46682a7f7383e3cab2552289fba868329f4",
+    "receipt": "b4fe1156fbe420c920f2f2a45b6bfa0a1b2c4791591acd468f2cc0b98affe69e",
+    "refusal": "rig_bone_outside",
+    "refusal_detail": "bone leg1Right3 lies mostly outside the body",
+    "request_sha256": "8f6ddcec847a64a9c229a68ac7ebe4d052d4d642681a893d6ec249b78d55ddcd",
+    "role": "held_out",
+    "seed": 23,
+    "still": [],
+    "variant": 1
+   },
+   {
+    "body": null,
+    "description": 2,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 6,
+     "frame": 2,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 9,
+    "likeness": {
+     "colour_difference_milli": 69,
+     "colour_matched": false,
+     "outline_overlap_per_mille": 877
+    },
+    "made": true,
+    "mesh_sha256": "e0b9a16b53ed17acd4f370c50fec6fe695ddb68e7df3435ba9233387823a534c",
+    "mesh_triangles": 437744,
+    "moving_bones": 17,
+    "name": "held-out 2",
+    "outcome": "passed",
+    "output_sha256": "769f42026583f5c11b16b29ddc30cbf192e07528d8053686392b6cdfbe2eff7a",
+    "passes": true,
+    "plan_key": "muddy_hopper",
+    "plan_sha256": "a8c6193893ae78fc11f1f347e8952a0c3b90dc7694f878a034dcc866a5efbb6a",
+    "receipt": "f4a3b2944d2f602844409e6f12acbf3ba8fce5274764fcd47c55c4a7d07df0e2",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "a5dc56556919e0af51ed9e82beed7d0e23dabfc6daf11fc861cdd634258548cd",
+    "role": "held_out",
+    "seed": 23,
+    "still": [],
+    "variant": 1
+   },
+   {
+    "body": null,
+    "description": 3,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 11,
+     "frame": 1,
+     "likeness": 4,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 10,
+    "likeness": {
+     "colour_difference_milli": 113,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 739
+    },
+    "made": true,
+    "mesh_sha256": "b9170bcadd9a2c6a2a592a62af39f6935ed156e70a1c9aacf3d55d490c2e64ed",
+    "mesh_triangles": 342726,
+    "moving_bones": 16,
+    "name": "held-out 3",
+    "outcome": "passed",
+    "output_sha256": "fb0106debf857b73e41493f9733edbfb02db575ab96812bf69d18562a652cd6f",
+    "passes": true,
+    "plan_key": "rustwing_prowler",
+    "plan_sha256": "bad4c88cd6d747dc9b61e27ebfafb19e11c55d7d40723cb894eedc8656db3b06",
+    "receipt": "c2ebf62d08a240f00d5463b73eac1e322bb56ff36ebabc5684d9b7772330430e",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "e04d5dbb9a80992b9e582ab6cc0816232f5a21090841eeffd35e3e4b0c113b08",
+    "role": "held_out",
+    "seed": 23,
+    "still": [
+     "spine4",
+     "head1Neck1",
+     "head1",
+     "head1Jaw",
+     "tail1",
+     "tail2",
+     "tail3",
+     "tail4",
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 1
+   },
+   {
+    "body": null,
+    "description": 4,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 8,
+     "frame": 2,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 11,
+    "likeness": {
+     "colour_difference_milli": 120,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 758
+    },
+    "made": true,
+    "mesh_sha256": "4ef0d21fef982d955f5eee789b4ba152c5007dc6815f64a5f55fa7d54fb2c306",
+    "mesh_triangles": 492660,
+    "moving_bones": 25,
+    "name": "held-out 4",
+    "outcome": "passed",
+    "output_sha256": "fdb628d4e2253a9ceacb1d6ae2625717c41c362866f1c5b0376548b679c2a0da",
+    "passes": true,
+    "plan_key": "emerald_horn_beetle",
+    "plan_sha256": "b98fe0d116d8d20d48c9ab174cbbe6ffdd04a1505afe9b7ea450ed3658d82fee",
+    "receipt": "8b27c54dd16d42dc3328056c87aab7b70fbea3ece1a4e50c3eac30a6bf2a5c62",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "c3575b9758c8c693d028fc59265403024baa0738c147bfb733453913fb0f090d",
+    "role": "held_out",
+    "seed": 23,
+    "still": [],
+    "variant": 1
+   },
+   {
+    "body": null,
+    "description": 5,
+    "fit_seconds": {
+     "embed": 5,
+     "frame": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 12,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "e4c8cc4f45ca20054869073767bd1c7e32cb3e502454991f30f929d69d8b77c4",
+    "mesh_triangles": 250628,
+    "moving_bones": 17,
+    "name": "held-out 5",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "marsh_stalker",
+    "plan_sha256": "41138eb04be6aa541ea133e089e161724b4ca66bafa788ebafdeb8eabac31c43",
+    "receipt": "fca73950d180fe253bd453ce1805f9f055a34164c8067b7ded12982d9549ddcb",
+    "refusal": "rig_limb_drags_body",
+    "refusal_detail": "swinging leg1Left moves 6% of leg1Right",
+    "request_sha256": "509e748723bbc3302b955be9f76ac6e2080105e2a0234bb5d019e722bd3b6007",
+    "role": "held_out",
+    "seed": 23,
+    "still": [
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 1
+   },
+   {
+    "body": null,
+    "description": 6,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 8,
+     "frame": 1,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 13,
+    "likeness": {
+     "colour_difference_milli": 43,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 954
+    },
+    "made": true,
+    "mesh_sha256": "5007b477e801cf0f7c62d3d5df106d40b37f44e30703a39a987d9ac3cf7b3e31",
+    "mesh_triangles": 580292,
+    "moving_bones": 10,
+    "name": "held-out 6",
+    "outcome": "passed",
+    "output_sha256": "044ad4e0d7566c75823293cb339c5b58dc25e9b85083ff8d11a54381e1b13e5e",
+    "passes": true,
+    "plan_key": "stout_clay_sentinel",
+    "plan_sha256": "c5494755fc9824b1f09c0df8b29d897989417ea3c2509d5e4ccb949e2bfc154e",
+    "receipt": "5a252fe5d3da2fcab58a6e6343ed4de1e3cfaf20d4993909f903776731455829",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "86f95f15eb1459f451d696ff6144bfc679bfbfb345b1f361da4dc77d06932ca9",
+    "role": "held_out",
+    "seed": 23,
+    "still": [
+     "arm1Left1",
+     "arm1Left2",
+     "arm1Left3",
+     "arm1Right1",
+     "arm1Right2",
+     "arm1Right3"
+    ],
+    "variant": 1
+   },
+   {
+    "body": "tower_wyvern",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 7,
+     "frame": 1,
+     "likeness": 3,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 14,
+    "likeness": {
+     "colour_difference_milli": 101,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 858
+    },
+    "made": true,
+    "mesh_sha256": "cfa42fb3a6583e6be621ce5404078e62f5968ac4f70af120de3343aa461fbb8d",
+    "mesh_triangles": 462440,
+    "moving_bones": 10,
+    "name": "development tower_wyvern",
+    "outcome": "passed",
+    "output_sha256": "b33291d1b2f149dda11470c79ae50223d6b0625b969f9321435663bdc2703c33",
+    "passes": true,
+    "plan_key": "tower_wyvern",
+    "plan_sha256": "9ee1b58e398d3fa2984e97e8461ba301bbb0e4612b5543585f31c366b2182c91",
+    "receipt": "fc74c99c9b0d5f5d20fec3a3b09ea160dcf9ccdfd7d06ebf91f8a561990c7b3a",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "c8a5aea3ebe882174ed3b518bb758d441b8fdcfc30596f644ba8c45940df7598",
+    "role": "development",
+    "seed": 11,
+    "still": [
+     "spine4",
+     "spine5",
+     "head1Neck1",
+     "head1Neck2",
+     "head1",
+     "head1Jaw",
+     "tail1",
+     "tail2",
+     "tail3",
+     "tail4",
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 0
+   },
+   {
+    "body": "drifting_tendril_spirit",
+    "description": null,
+    "fit_seconds": {
+     "embed": 8,
+     "frame": 1,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 15,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "c2e566c33d929739005cd73a501b4b15e6403b57122175c3143b1e94db4e1761",
+    "mesh_triangles": 539028,
+    "moving_bones": 0,
+    "name": "development drifting_tendril_spirit",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "drifting_tendril_spirit",
+    "plan_sha256": "c08a690e79ae0df2924e67a629cd3f98d65022f80a235ac086b3957738541dbb",
+    "receipt": "add45814d4b2735c22bfbd9ed8e458e7736d9e4295c07bb387f2327fe792c7c3",
+    "refusal": "rig_nothing_moves",
+    "refusal_detail": "no chain of the plan was laid in the model",
+    "request_sha256": "bdedf254a3864ae0b6b9c1e6e959655207ca2460ff64d8bb1b656de5da9c826b",
+    "role": "development",
+    "seed": 11,
+    "still": [
+     "spine1",
+     "spine2",
+     "head1",
+     "tentacle1Segment1",
+     "tentacle1Segment2",
+     "tentacle1Segment3",
+     "tentacle1Segment4",
+     "tentacle1Segment5",
+     "tentacle1Segment6",
+     "tentacle2Segment1",
+     "tentacle2Segment2",
+     "tentacle2Segment3",
+     "tentacle2Segment4",
+     "tentacle2Segment5",
+     "tentacle2Segment6",
+     "tentacle3Segment1",
+     "tentacle3Segment2",
+     "tentacle3Segment3",
+     "tentacle3Segment4",
+     "tentacle3Segment5",
+     "tentacle3Segment6",
+     "tentacle4Segment1",
+     "tentacle4Segment2",
+     "tentacle4Segment3",
+     "tentacle4Segment4",
+     "tentacle4Segment5",
+     "tentacle4Segment6"
+    ],
+    "variant": 0
+   },
+   {
+    "body": "forest_sentinel",
+    "description": null,
+    "fit_seconds": {
+     "embed": 10,
+     "frame": 3,
+     "simplify": 1
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 16,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "73d006e12b9370651114d9d49e218620f96b3d9858bc3f9c17ced3628d3f1610",
+    "mesh_triangles": 694956,
+    "moving_bones": 17,
+    "name": "development forest_sentinel",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "forest_sentinel",
+    "plan_sha256": "e05c64f346fdac12c949b3eb30f847a7a81ba2f05c9ac9a5c8bd9eef3e33ce06",
+    "receipt": "2fbcf490cd487e2cd8b41eebb0eb233eaac1e72df92b2526dba8f8f50a9363a0",
+    "refusal": "rig_limb_drags_body",
+    "refusal_detail": "swinging leg1Left moves 7% of head1Neck",
+    "request_sha256": "33ef91302a34abad37a51e97dd0719db9510b4189497e3e1960edcdf2aa3bb4b",
+    "role": "development",
+    "seed": 11,
+    "still": [
+     "arm1Left1",
+     "arm1Left2",
+     "arm1Left3",
+     "arm1Right1",
+     "arm1Right2",
+     "arm1Right3",
+     "arm2Left1",
+     "arm2Left2",
+     "arm2Left3",
+     "arm2Right1",
+     "arm2Right2",
+     "arm2Right3"
+    ],
+    "variant": 0
+   },
+   {
+    "body": "swiftstride_runner",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 8,
+     "frame": 1,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 17,
+    "likeness": {
+     "colour_difference_milli": 75,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 810
+    },
+    "made": true,
+    "mesh_sha256": "aab10e145945e96331b76b9a8997ea7ce6028b7e31bea48dab4545162839d7c3",
+    "mesh_triangles": 456742,
+    "moving_bones": 30,
+    "name": "development swiftstride_runner",
+    "outcome": "passed",
+    "output_sha256": "ec380162356243c0743596a05637db10de7d2617ece4c6dc8848ba263b369e2b",
+    "passes": true,
+    "plan_key": "swiftstride_runner",
+    "plan_sha256": "d1e11dd79d6f552cd3c5013137b54cd01db9a8b936925d2dc1cf247c88035c34",
+    "receipt": "0b862c3f418196f26db3e928ed8c5c422baf5ca89a7dfead3ba7773f6624b36c",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "83c198d971f998d2d8cb256248a80ace2941210629acc6a03c0199533b7cfbaa",
+    "role": "development",
+    "seed": 11,
+    "still": [
+     "wing1Left1",
+     "wing1Left2"
+    ],
+    "variant": 0
+   },
+   {
+    "body": "deep_glide_serpent",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 2,
+     "frame": 0,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 18,
+    "likeness": {
+     "colour_difference_milli": 68,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 875
+    },
+    "made": true,
+    "mesh_sha256": "bcae64b40be89e2543b422f3f157621f21f332ea46532619010678920bf52bb3",
+    "mesh_triangles": 132828,
+    "moving_bones": 17,
+    "name": "development deep_glide_serpent",
+    "outcome": "passed",
+    "output_sha256": "adbcceb504776ee5cbbea33947131643c0b084b0f465ac6889f3c308ab4c9b8d",
+    "passes": true,
+    "plan_key": "deep_glide_serpent",
+    "plan_sha256": "4a080ff21fe3e1474642e696751e81a733843031d5fabd4dc2bd8a492b38e50e",
+    "receipt": "e7965cbae6d338b0aac92d5b8c5617edcd1649543867b1c6548224ffe62a21ad",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "1c10f7ffec806189e675454ad155aa8e272e6bdd4126f19639301784630fb1a6",
+    "role": "development",
+    "seed": 11,
+    "still": [],
+    "variant": 0
+   },
+   {
+    "body": "giant_leggy_crawler",
+    "description": null,
+    "fit_seconds": {
+     "frame": 1
+    },
+    "fit_simplifier": null,
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 19,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "fee0017ae65e998fba6ff5d50f1be7443a20595fd719a093ab643ff906081e5c",
+    "mesh_triangles": 281100,
+    "moving_bones": 0,
+    "name": "development giant_leggy_crawler",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "giant_leggy_crawler",
+    "plan_sha256": "0eb8d46cd3e6d01583cdaf32af826c78524896cd3cddd93e11ba57e0d693a6a4",
+    "receipt": "e536d07ea68693e9909f0bb289fd5b670d4e5703b52bf76e4d92341cafc6be98",
+    "refusal": "rig_chain_not_found",
+    "refusal_detail": "the model has no limb end for chain leg4Left",
+    "request_sha256": "e73a3ad70ca51e94164722dfa15b14e12cf97b1840c26dc335b91e9a5c308970",
+    "role": "development",
+    "seed": 11,
+    "still": null,
+    "variant": 0
+   },
+   {
+    "body": "twinhead_lion",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 6,
+     "frame": 1,
+     "likeness": 3,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 20,
+    "likeness": {
+     "colour_difference_milli": 77,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 817
+    },
+    "made": true,
+    "mesh_sha256": "85426b1895dad9c16f8676bfa325402633e0869eb78f30af3081c6d24eb6e060",
+    "mesh_triangles": 451988,
+    "moving_bones": 16,
+    "name": "development twinhead_lion",
+    "outcome": "passed",
+    "output_sha256": "27de89a94af5b4864e2f0279a2c0167bdbb345c1ca4e53962fd2c2eaa047d3b6",
+    "passes": true,
+    "plan_key": "twinhead_lion",
+    "plan_sha256": "14a8b6348ee46294ea1f28db106a105341299190f699d27fd004b7cfcd4dd09e",
+    "receipt": "7ab54ddacce517a4e5fcf9fdd6531e76bf76172636b85fe90165372592dd2fb9",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "61f5e6c9f8f982a6e505ab314d3bab2e6e6663dd2dc9b2afa44f2c03fd48a38e",
+    "role": "development",
+    "seed": 11,
+    "still": [
+     "spine4",
+     "head1Neck1",
+     "head1",
+     "head1Jaw",
+     "head2Neck1",
+     "head2",
+     "head2Jaw",
+     "tail1",
+     "tail2",
+     "tail3"
+    ],
+    "variant": 0
+   },
+   {
+    "body": "golden_clawwing",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 12,
+     "frame": 1,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 21,
+    "likeness": {
+     "colour_difference_milli": 91,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 772
+    },
+    "made": true,
+    "mesh_sha256": "62104de7e425b712e12b1d4c40bc449a691c94c79a5c60c77b16ceddd335a0e6",
+    "mesh_triangles": 404818,
+    "moving_bones": 23,
+    "name": "development golden_clawwing",
+    "outcome": "passed",
+    "output_sha256": "633ef08f5b3ec013907cb1120ee2ec68af9d13c8ef847f16e86e78e800fa3d28",
+    "passes": true,
+    "plan_key": "golden_clawwing",
+    "plan_sha256": "e7bab2e9faac8ff89791ea7c607e3c95f93ceb8c7976f279b553435eebf3bd24",
+    "receipt": "f651b748b403332f070aeef07a3afc748bb4638bb620231cb9e31e2c429f49d6",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "6c3bfaa5651567f0c9005ff0f5176b4ea28982b8931299c78f3193531f228618",
+    "role": "development",
+    "seed": 11,
+    "still": [
+     "head1Neck1",
+     "head1",
+     "head1Jaw",
+     "tail1",
+     "tail2"
+    ],
+    "variant": 0
+   },
+   {
+    "body": "tower_wyvern",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 7,
+     "frame": 1,
+     "likeness": 4,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 22,
+    "likeness": {
+     "colour_difference_milli": 115,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 837
+    },
+    "made": true,
+    "mesh_sha256": "fdff16028fd3c21559678164d659626f3abfa5eebba180398474e6e5a2f61a7e",
+    "mesh_triangles": 486472,
+    "moving_bones": 10,
+    "name": "development tower_wyvern",
+    "outcome": "passed",
+    "output_sha256": "e85a837aedd8ec685d8a517c204b673b7baed7fe05427d0be00f0f53759997d8",
+    "passes": true,
+    "plan_key": "tower_wyvern",
+    "plan_sha256": "9ee1b58e398d3fa2984e97e8461ba301bbb0e4612b5543585f31c366b2182c91",
+    "receipt": "ecbfeeed333353756d3b73e6f5f3f12c4440953ba041ce72032ca2bd9d1450e5",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "c8a5aea3ebe882174ed3b518bb758d441b8fdcfc30596f644ba8c45940df7598",
+    "role": "development",
+    "seed": 23,
+    "still": [
+     "spine4",
+     "spine5",
+     "head1Neck1",
+     "head1Neck2",
+     "head1",
+     "head1Jaw",
+     "tail1",
+     "tail2",
+     "tail3",
+     "tail4",
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 1
+   },
+   {
+    "body": "drifting_tendril_spirit",
+    "description": null,
+    "fit_seconds": {
+     "embed": 16,
+     "frame": 13,
+     "simplify": 1
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 6,
+     "picture": 3
+    },
+    "item": 23,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "b86d996a8cd0c1c6d680f61e25a94216e784ac00998e2cc614b3d14ad190ee0d",
+    "mesh_triangles": 915892,
+    "moving_bones": 13,
+    "name": "development drifting_tendril_spirit",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "drifting_tendril_spirit",
+    "plan_sha256": "c08a690e79ae0df2924e67a629cd3f98d65022f80a235ac086b3957738541dbb",
+    "receipt": "693464d3ba0a58cab83b16702686efdaca65a4bde4feb51de2c58a66e3f051cf",
+    "refusal": "rig_bone_outside",
+    "refusal_detail": "bone tentacle2Segment1 lies mostly outside the body",
+    "request_sha256": "bdedf254a3864ae0b6b9c1e6e959655207ca2460ff64d8bb1b656de5da9c826b",
+    "role": "development",
+    "seed": 23,
+    "still": [
+     "spine1",
+     "spine2",
+     "head1",
+     "tentacle1Segment1",
+     "tentacle1Segment2",
+     "tentacle1Segment3",
+     "tentacle1Segment4",
+     "tentacle1Segment5",
+     "tentacle1Segment6",
+     "tentacle3Segment1",
+     "tentacle3Segment2",
+     "tentacle3Segment3",
+     "tentacle3Segment4",
+     "tentacle3Segment5",
+     "tentacle3Segment6"
+    ],
+    "variant": 1
+   },
+   {
+    "body": "forest_sentinel",
+    "description": null,
+    "fit_seconds": {
+     "embed": 14,
+     "frame": 4,
+     "simplify": 1
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 6,
+     "picture": 3
+    },
+    "item": 24,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "6bb9d14c78ee478deef9428c871f787cb77359d3fad327bdefba11235faeeff8",
+    "mesh_triangles": 887652,
+    "moving_bones": 23,
+    "name": "development forest_sentinel",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "forest_sentinel",
+    "plan_sha256": "e05c64f346fdac12c949b3eb30f847a7a81ba2f05c9ac9a5c8bd9eef3e33ce06",
+    "receipt": "68658c55ef96da312340e1cc7a5b10c447ddf0955877020aa9b7abafb9ed0d04",
+    "refusal": "rig_limb_drags_body",
+    "refusal_detail": "swinging head1Neck moves 7% of arm1Right",
+    "request_sha256": "33ef91302a34abad37a51e97dd0719db9510b4189497e3e1960edcdf2aa3bb4b",
+    "role": "development",
+    "seed": 23,
+    "still": [
+     "arm2Left1",
+     "arm2Left2",
+     "arm2Left3",
+     "arm2Right1",
+     "arm2Right2",
+     "arm2Right3"
+    ],
+    "variant": 1
+   },
+   {
+    "body": "swiftstride_runner",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 6,
+     "frame": 1,
+     "likeness": 6,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 25,
+    "likeness": {
+     "colour_difference_milli": 70,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 778
+    },
+    "made": true,
+    "mesh_sha256": "5e1abd5d4421ff0b8afd10403aaae530108519640204b790582e3a88a0f47b96",
+    "mesh_triangles": 310648,
+    "moving_bones": 28,
+    "name": "development swiftstride_runner",
+    "outcome": "passed",
+    "output_sha256": "21911101fc65198e519a4475c4149adf7079917bbd8734731af8f0385871a8fd",
+    "passes": true,
+    "plan_key": "swiftstride_runner",
+    "plan_sha256": "d1e11dd79d6f552cd3c5013137b54cd01db9a8b936925d2dc1cf247c88035c34",
+    "receipt": "60964530f492b5b2abdb93a3b79c83b8a9943be264d382d342c0f769ff286638",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "83c198d971f998d2d8cb256248a80ace2941210629acc6a03c0199533b7cfbaa",
+    "role": "development",
+    "seed": 23,
+    "still": [
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Right1",
+     "wing1Right2"
+    ],
+    "variant": 1
+   },
+   {
+    "body": "deep_glide_serpent",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 3,
+     "frame": 0,
+     "likeness": 2,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 26,
+    "likeness": {
+     "colour_difference_milli": 53,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 895
+    },
+    "made": true,
+    "mesh_sha256": "d96dff8f713546e7d57df23f0aeb325c1209711fffa8be2a91b125e6ecd720e9",
+    "mesh_triangles": 123656,
+    "moving_bones": 17,
+    "name": "development deep_glide_serpent",
+    "outcome": "passed",
+    "output_sha256": "3e1fc35e664afa8a11f5b9daafda0e9f75ef94a80f4017f83ecfa772c9a00bd2",
+    "passes": true,
+    "plan_key": "deep_glide_serpent",
+    "plan_sha256": "4a080ff21fe3e1474642e696751e81a733843031d5fabd4dc2bd8a492b38e50e",
+    "receipt": "540cdfc71119fad30634de29b303c7200d0720f6fc2d87486e1afe96f9c96de7",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "1c10f7ffec806189e675454ad155aa8e272e6bdd4126f19639301784630fb1a6",
+    "role": "development",
+    "seed": 23,
+    "still": [],
+    "variant": 1
+   },
+   {
+    "body": "giant_leggy_crawler",
+    "description": null,
+    "fit_seconds": {
+     "frame": 1
+    },
+    "fit_simplifier": null,
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 4,
+     "picture": 3
+    },
+    "item": 27,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "1bb68c2be31cf4f6b8d73e5b6a2b5ed50479382e06c9173450a21077197363af",
+    "mesh_triangles": 212608,
+    "moving_bones": 0,
+    "name": "development giant_leggy_crawler",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "giant_leggy_crawler",
+    "plan_sha256": "0eb8d46cd3e6d01583cdaf32af826c78524896cd3cddd93e11ba57e0d693a6a4",
+    "receipt": "61022ac95a1fa113ca54b7810faace0e2e159e4765e30c9b0643cd2015707291",
+    "refusal": "rig_chain_not_found",
+    "refusal_detail": "the model has no limb end for chain leg2Left",
+    "request_sha256": "e73a3ad70ca51e94164722dfa15b14e12cf97b1840c26dc335b91e9a5c308970",
+    "role": "development",
+    "seed": 23,
+    "still": null,
+    "variant": 1
+   },
+   {
+    "body": "twinhead_lion",
+    "description": null,
+    "fit_seconds": {
+     "container": 0,
+     "embed": 6,
+     "frame": 2,
+     "likeness": 3,
+     "rig": 0,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 28,
+    "likeness": {
+     "colour_difference_milli": 73,
+     "colour_matched": true,
+     "outline_overlap_per_mille": 822
+    },
+    "made": true,
+    "mesh_sha256": "736c14b25be94572cf2cae12d4e904c118831443576596a29bb7aa978a265c08",
+    "mesh_triangles": 424864,
+    "moving_bones": 16,
+    "name": "development twinhead_lion",
+    "outcome": "passed",
+    "output_sha256": "7f876b1bac212fd5f640f202a9b7c6f11fdd5def54ce335a07de066c7cf80e2a",
+    "passes": true,
+    "plan_key": "twinhead_lion",
+    "plan_sha256": "14a8b6348ee46294ea1f28db106a105341299190f699d27fd004b7cfcd4dd09e",
+    "receipt": "203745d6d5d63e252968d32e1c575f511fa2318465a6b84fc1b8d87371db65b7",
+    "refusal": null,
+    "refusal_detail": null,
+    "request_sha256": "61f5e6c9f8f982a6e505ab314d3bab2e6e6663dd2dc9b2afa44f2c03fd48a38e",
+    "role": "development",
+    "seed": 23,
+    "still": [
+     "spine4",
+     "head1Neck1",
+     "head1",
+     "head1Jaw",
+     "head2Neck1",
+     "head2",
+     "head2Jaw",
+     "tail1",
+     "tail2",
+     "tail3"
+    ],
+    "variant": 1
+   },
+   {
+    "body": "golden_clawwing",
+    "description": null,
+    "fit_seconds": {
+     "embed": 11,
+     "frame": 1,
+     "simplify": 0
+    },
+    "fit_simplifier": "cluster-stand-in/v1",
+    "gpu_seconds": {
+     "cutout": 0,
+     "mesh": 5,
+     "picture": 3
+    },
+    "item": 29,
+    "likeness": null,
+    "made": true,
+    "mesh_sha256": "2fd49a7599a2cc94d79f2ea588d24995390b57eaa9a5fc8e7647c8a5c18c0659",
+    "mesh_triangles": 426844,
+    "moving_bones": 20,
+    "name": "development golden_clawwing",
+    "outcome": "refused",
+    "output_sha256": null,
+    "passes": false,
+    "plan_key": "golden_clawwing",
+    "plan_sha256": "e7bab2e9faac8ff89791ea7c607e3c95f93ceb8c7976f279b553435eebf3bd24",
+    "receipt": "4ad9bba13cb191f08724402bfc861a60dfd6c9f4e0b304e1bac3382849c2a331",
+    "refusal": "rig_bone_outside",
+    "refusal_detail": "bone hips lies mostly outside the body",
+    "request_sha256": "6c3bfaa5651567f0c9005ff0f5176b4ea28982b8931299c78f3193531f228618",
+    "role": "development",
+    "seed": 23,
+    "still": [
+     "head1Neck1",
+     "head1",
+     "head1Jaw",
+     "tail1",
+     "tail2",
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "variant": 1
+   }
+  ],
+  "job": {
+   "code_sha256": "18236c50b15d754a0ed85086754699e7b6b901376b38f185368267737d43534b",
+   "container_finished_at": "2026-10-15T11:30:22.580943557Z",
+   "container_started_at": "2026-10-15T11:17:04.809674685Z",
+   "created_at": "2026-10-15T11:14:27.969746Z",
+   "deleted_at": "2026-10-15T11:32:17.127452Z",
+   "job_id": "aijob-e05twx6gdhn5q4vkh5",
+   "job_sha256": "afc61a9f1b6c1db5cc3941cd19bba2303143ac998c3dac84d1279a08f3105fa9",
+   "outcome": "completed: the service reports COMPLETED; deleted after the terminal state and read back as not found; the bucket held no object before staging or after clearing",
+   "submitted_at": "2026-10-15T11:14:33.030882192Z",
+   "terminal_seen_at": "2026-10-15T11:30:53Z",
+   "terminal_state": "COMPLETED"
+  },
+  "judging": {
+   "answers": {
+    "A": "yes",
+    "B": "yes",
+    "C": "yes",
+    "D": "yes",
+    "E": "yes",
+    "F": "yes",
+    "G": "yes"
+   },
+   "asked": "2026-10-15T09:31:58-0400",
+   "letter_order_seed": 15,
+   "sheet_sha256": "215f5cceafe7ba3355076fe7eead204fdff5c978db8a41e57868f09e4c10dca2"
+  },
+  "kind": "exulanica.creature-picture-trial/v1",
+  "preregistration_sha256": "3bba6c989a2acec5550fb87f8b8c365c5f97ca59ef6c0a52eb3497d943e95aad",
+  "reported": {
+   "fit_simplifiers": [
+    "cluster-stand-in/v1"
+   ],
+   "held_out_creatures_whose_seeds_disagree": [
+    0,
+    2,
+    4,
+    5
+   ],
+   "likeness_of_passed_items": {
+    "colour_difference_milli_median_low": 75,
+    "colour_matched": 15,
+    "items": 17,
+    "outline_overlap_per_mille_median_low": 822
+   },
+   "note": "reported, never deciding the rule: the bones each fit keeps still, the likeness of each passed item to its picture, the seconds of each stage, and the development rows",
+   "passed_items_with_still_bones": 13,
+   "seconds": {
+    "fit_per_stage_total": {
+     "container": 0,
+     "embed": 214,
+     "frame": 59,
+     "likeness": 51,
+     "rig": 0,
+     "simplify": 5
+    },
+    "gpu_item_first": 25,
+    "gpu_item_median_low": 8,
+    "gpu_item_most": 25,
+    "gpu_per_stage_total": {
+     "cutout": 1,
+     "mesh": 154,
+     "picture": 97
+    },
+    "results_ended_at": "2026-10-15T11:30:20Z",
+    "results_milliseconds": 254000,
+    "results_started_at": "2026-10-15T11:26:06Z"
+   }
+  },
+  "rule": {
+   "counted": "a held-out creature counts when one of its two items passes every rig check with chains that move and its blind answer is yes",
+   "default_at": 5,
+   "verdict": "the picture-led route is the default look path"
+  },
+  "script": "scripts/record_creature_picture_trial.py",
+  "script_sha256": "a74b15e39c95ff5d435a2024d99b7437fe1b6171e1e4053d93f1a668de4caba5",
+  "spend": {
+   "authoritative_total": "the providers' billing: Nebius AI Cloud's for the GPU job, Nebius Token Factory's for the drafts",
+   "drafts": {
+    "calls": 10,
+    "models": [
+     "nvidia/nemotron-3-super-120b-a12b"
+    ],
+    "usd": "0.04434240"
+   },
+   "gpu": {
+    "container_cost_microdollars": 398886,
+    "container_milliseconds": 797772,
+    "rate_cents_per_hour": 180,
+    "upper_bound_cost_microdollars": 536000,
+    "upper_bound_from": "2026-10-15T11:14:27Z",
+    "upper_bound_holds_the_service_window": true,
+    "upper_bound_milliseconds": 1072000,
+    "upper_bound_to": "2026-10-15T11:32:19Z"
+   }
+  },
+  "totals": {
+   "creatures": 8,
+   "creatures_answered_yes": 7,
+   "creatures_counted": 6,
+   "creatures_drafted": 7,
+   "creatures_passing": 6,
+   "development_bodies": 8,
+   "development_bodies_passing": 5,
+   "development_items": 16,
+   "development_items_passed": 9,
+   "held_out_items": 14,
+   "held_out_items_passed": 8,
+   "items": 30,
+   "items_made": 30,
+   "items_passed": 17,
+   "refusals": {
+    "rig_bone_outside": 3,
+    "rig_chain_not_found": 5,
+    "rig_limb_drags_body": 4,
+    "rig_nothing_moves": 1
+   }
+  }
+ },
+ "record_sha256": "a69b3ee6b9e7609b7f25ed38fba6a64ab421f282cf84bf9af79e56ec21bfc701"
+}

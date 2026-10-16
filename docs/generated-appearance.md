@@ -691,13 +691,37 @@ route P keeps the model's own shape and fits the plan's skeleton into it. It run
   the model's colours toward its picture's in OKLab within a bound, kept only when they come
   closer; and writes the skinned container, read back by the product's reader, with a receipt.
 
-**Status of route P:** built as code, not yet run as built on a rented machine and not judged in a
-pre-registered trial. On a development set of 22 models made from pictures by the same three models
-on Nebius AI Cloud, 11 passed the fit's checks with chains that move. The refusals were a model with no
-legs in its picture, legs that do not reach the ground, legs too thin for the grid, a leg whose swing
-moved the other leg, and a bone mostly outside the body. Counts the words ask for are not always
-drawn (two heads drawn as one, four arms as two), so a pre-registered trial counts a missing chain
-as not looking like its words.
+**Status of route P:** run as built on a rented machine and judged in a pre-registered trial
+([record](evaluation/2026-10-15-creature-picture-trial.json), from
+`ml/appearance/evidence/creature-picture-trial-1/` by `scripts/record_creature_picture_trial.py`).
+Eight held-out creatures were described in words; each was drafted by the product's creature
+drafter and, where a draft passed, made by route P from two seeds on Nebius AI Cloud, and the fit
+ran on a CPU after the fetch. A creature counts when one of its items passes every rig check with
+chains that move and a blind judge, shown its words and its made model, answers that it looks like
+them:
+
+- **The result.** Six of the eight counted, against the five the rule asks for, so by the trial's
+  rule route P is the default look path. Eight of the 14 held-out items passed. One more creature
+  was judged a likeness, but neither of its items passed; one was never made, because its drafts
+  asked to swim and were refused. The second rig trial's eight bodies, made the same way, as
+  development rows that are reported and never counted, passed 9 of their 16 items.
+- **The refusals.** Over all 30 items: five with no limb in the model for a leg chain, four with a
+  limb whose swing moved another part, three with a bone mostly outside the body, and one with no
+  chain laid at all (`rig_nothing_moves`).
+- **The limits.** One judge answered. The seed matters: for four of the creatures one seed passed
+  and the other was refused. A passing fit can keep parts still: the winged four-legged body passed
+  on both seeds with its wings and tail kept still. No swimming creature can be drafted while the
+  world has no swimming. The fit simplified with the stand-in clusterer (`cluster-stand-in/v1`),
+  as its receipts record.
+
+On a separate development set of 22 models made from pictures by the same three models, 9 passed
+the fit's checks with chains that move when each was scaled to its plan's height. Two more kept
+every bone still, a fit the checks refuse by name (`rig_nothing_moves`); both pass with chains that
+move when scaled by length, as a plan at least eight times longer than tall is. The refusals were a
+model with no legs in its picture, legs that do not reach the ground, legs too thin for the grid, a
+leg whose swing moved the other leg, and a bone mostly outside the body. Counts the words ask for
+are not always drawn (two heads drawn as one, four arms as two); the fit keeps a chain with no
+matching part still, and the trial reported such chains and left the likeness to the judge.
 
 **Route P's open parts:** a picture showing a person must be refused before a request names it, and
 no local detector does that yet, so only concepts drawn from words, or a picture the person kept
