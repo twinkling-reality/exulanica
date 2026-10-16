@@ -71,7 +71,8 @@ __all__ = ["PREPARER_QUEUE_QUERY", "QUEUE_QUERIES", "Maintenance", "MaintenanceS
 
 #: How old the oldest item each queued component is waiting on, read across workspaces. Items
 #: that are waiting for a retry time are not late, so the derivative and tile queues count only
-#: what is eligible now.
+#: what is eligible now. The tile worker bakes a town's public tiles and a changed version's own,
+#: so the tile queue counts both kinds.
 QUEUE_QUERIES: Final[Mapping[str, str]] = {
     "derivatives": (
         "select min(run_after) as oldest from job "
@@ -79,7 +80,8 @@ QUEUE_QUERIES: Final[Mapping[str, str]] = {
     ),
     "generated_tiles": (
         "select min(run_after) as oldest from job "
-        "where kind = 'bake_generated_tile' and state = 'queued' and run_after <= now()"
+        "where kind in ('bake_generated_tile', 'bake_version_tile') and state = 'queued' "
+        "and run_after <= now()"
     ),
     "pose_scene": "select min(created_at) as oldest from reconstruction_scene_job "
     "where status = 'queued'",
