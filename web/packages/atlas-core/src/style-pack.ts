@@ -279,6 +279,24 @@ export interface StylePackClimb {
 }
 
 /**
+ * What hangs over the edges of a ground look role's terraces, down the land past them: one to
+ * eight `plant` module roles (textured, one named more than once grows more often), the share of
+ * an edge's length they cover, the least and most share of the face below a plant hangs down, a
+ * seed that with each ground's identity picks every plant, and optionally only the edges within an
+ * angle of the direction toward the sun, the least drop (millimetres) and the least slope of a face
+ * (per mille) that grow; each absent takes the page's default.
+ */
+export interface StylePackTrail {
+  readonly pieces: readonly string[];
+  readonly share_permille: number;
+  readonly hang_permille: readonly [number, number];
+  readonly seed: number;
+  readonly sun_within_mdeg?: number;
+  readonly drop_mm?: number;
+  readonly slope_permille?: number;
+}
+
+/**
  * One rule of what grows on the near land, by its own key: the surface role the land is drawn in
  * where it grows (`land`, or a band of the land's surface catalog), one to eight `plant` or `prop`
  * module roles, how many a hectare, at what sizes, from which seed, optionally within a slope (per
@@ -429,6 +447,8 @@ export interface StylePackManifest {
   readonly facade?: Readonly<Record<string, StylePackFacade>>;
   /** Absent in a pack that grows nothing on its walls. */
   readonly climb?: Readonly<Record<string, StylePackClimb>>;
+  /** Absent in a pack that hangs nothing over its terraces' edges. */
+  readonly trail?: Readonly<Record<string, StylePackTrail>>;
   /** Absent in a pack that grows nothing on the land. */
   readonly land_cover?: Readonly<Record<string, StylePackLandCover>>;
   readonly modules: Readonly<Record<string, { readonly variants: readonly StylePackVariant[] }>>;
@@ -880,6 +900,25 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
       },
       seed: integer(0, 2_147_483_647),
     }), 64)),
+    // Added within the profile: a pack written before it hangs nothing over its terraces' edges.
+    trail: optional(record(lookRoleKey(['surface', 'both']), (v, p) => object(v, p, {
+      pieces: list((role, q) => {
+        if (typeof role !== 'string') return fail('shape', q, 'must be a look role');
+        lookRoleKey(['module', 'both'])(role, q);
+        return role;
+      }, 1, 8),
+      share_permille: integer(1, 1000),
+      hang_permille: (h, q) => {
+        if (!Array.isArray(h) || h.length !== 2) return fail('shape', q, 'must be a least and a most share of the face');
+        const read = h.map((n, i) => integer(1, 1000)(n, `${q}[${i}]`)) as number[];
+        if (read[0]! > read[1]!) fail('range', q, 'must not have its least above its most');
+        return read;
+      },
+      seed: integer(0, 2_147_483_647),
+      sun_within_mdeg: optional(integer(0, 180_000)),
+      drop_mm: optional(integer(200, 20_000)),
+      slope_permille: optional(integer(300, 20_000)),
+    }), 64)),
     // Added within the profile: a pack written before it grows nothing on the land.
     land_cover: optional(record((key, path) => { if (!KEY.test(key)) fail('shape', path, 'must be a rule key'); }, (v, p) => {
       const pair = (least: number, most: number, says: string) => (w: Json, q: string): number[] => {
@@ -995,6 +1034,14 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
     rule.pieces.forEach((piece, index) => {
       const where = `climb.${role}.pieces[${index}]`;
       if (splitLookRole(piece, where).family !== 'plant') fail('reference', where, 'a climbing piece is a plant');
+      if (manifest.base === null && manifest.modules[piece] === undefined) fail('reference', where, `names no module ${JSON.stringify(piece)}`);
+    });
+  }
+  for (const [role, rule] of Object.entries(manifest.trail ?? {})) {
+    if (splitLookRole(role, `trail.${role}`).family !== 'ground') fail('reference', `trail.${role}`, 'plants trail only over a ground\'s edge');
+    rule.pieces.forEach((piece, index) => {
+      const where = `trail.${role}.pieces[${index}]`;
+      if (splitLookRole(piece, where).family !== 'plant') fail('reference', where, 'a trailing piece is a plant');
       if (manifest.base === null && manifest.modules[piece] === undefined) fail('reference', where, `names no module ${JSON.stringify(piece)}`);
     });
   }
@@ -1135,6 +1182,8 @@ export interface ResolvedStylePack {
   readonly facade: Readonly<Record<string, StylePackFacade>>;
   /** What climbs each structure look role's walls, the nearest manifest's rule for a role. */
   readonly climb: Readonly<Record<string, StylePackClimb>>;
+  /** What hangs over each ground look role's terraces' edges, the nearest manifest's rule for a role. */
+  readonly trail: Readonly<Record<string, StylePackTrail>>;
   /** What grows on the land, by rule key, the nearest manifest's rule for a key. */
   readonly land_cover: Readonly<Record<string, StylePackLandCover>>;
   readonly modules: Readonly<Record<string, ResolvedModule>>;
@@ -1190,6 +1239,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   const cover: Record<string, StylePackCover> = {};
   const facade: Record<string, StylePackFacade> = {};
   const climb: Record<string, StylePackClimb> = {};
+  const trail: Record<string, StylePackTrail> = {};
   const landCover: Record<string, StylePackLandCover> = {};
   const modules: Record<string, ResolvedModule> = {};
   let light: StylePackManifest['light'] = null;
@@ -1206,6 +1256,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     Object.assign(cover, manifest.cover ?? {});
     Object.assign(facade, manifest.facade ?? {});
     Object.assign(climb, manifest.climb ?? {});
+    Object.assign(trail, manifest.trail ?? {});
     Object.assign(landCover, manifest.land_cover ?? {});
     for (const [role, module] of Object.entries(manifest.modules)) modules[role] = { variants: module.variants, files, stated: index };
     if (manifest.light !== null) light = manifest.light;
@@ -1216,7 +1267,7 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
   }
   return {
     chain, light: light!, shading: shading!, edge: edge ?? null, ...(water === undefined ? {} : { water }),
-    ...(fallingWater === undefined ? {} : { falling_water: fallingWater }), swatches, surfaces, textures, cover, facade, climb, land_cover: landCover, modules,
+    ...(fallingWater === undefined ? {} : { falling_water: fallingWater }), swatches, surfaces, textures, cover, facade, climb, trail, land_cover: landCover, modules,
   };
 }
 

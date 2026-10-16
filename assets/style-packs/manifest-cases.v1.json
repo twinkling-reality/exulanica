@@ -40656,6 +40656,2845 @@
     "refusal": "range",
     "path": "land_cover.flowers.clump.share_permille"
    }
+  },
+  {
+   "name": "a pack hanging plants over its grounds' edges, one rule stating every figure and one none",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "ground.lawn": {
+      "pieces": [
+       "plant.wildflowers",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       300,
+       900
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 800,
+      "slope_permille": 500
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    }
+   },
+   "expect": {
+    "sha256": "7db0b9fe81e54753782e0176ec507c4eb0ab344090ade43106c49777ebfeba72"
+   }
+  },
+  {
+   "name": "a trail on a look role that is not a ground",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "path.footway": {
+      "pieces": [
+       "plant.wildflowers",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       300,
+       900
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 800,
+      "slope_permille": 500
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    }
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "trail.path.footway"
+   }
+  },
+  {
+   "name": "a trailing piece that is no plant",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "ground.lawn": {
+      "pieces": [
+       "vehicle.car",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       300,
+       900
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 800,
+      "slope_permille": 500
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    }
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "trail.ground.lawn.pieces[0]"
+   }
+  },
+  {
+   "name": "a trail whose least hang is past its most",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "ground.lawn": {
+      "pieces": [
+       "plant.wildflowers",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       800,
+       200
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 800,
+      "slope_permille": 500
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    }
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "trail.ground.lawn.hang_permille"
+   }
+  },
+  {
+   "name": "a trail over a drop of 100 mm",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "ground.lawn": {
+      "pieces": [
+       "plant.wildflowers",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       300,
+       900
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 100,
+      "slope_permille": 500
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    }
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "trail.ground.lawn.drop_mm"
+   }
+  },
+  {
+   "name": "a trail rule with a key the profile does not state",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "ground.lawn": {
+      "pieces": [
+       "plant.wildflowers",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       300,
+       900
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 800,
+      "slope_permille": 500,
+      "spread": 3
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    }
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "trail.ground.lawn"
+   }
+  },
+  {
+   "name": "a climb and a trail each with a key the profile does not state, the climb named first",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       },
+       "haze": {
+        "density_micro": 600,
+        "falloff_micro": 1000,
+        "base_mm": -2000,
+        "max_depth_permille": 3000,
+        "colour": null
+       },
+       "wind": {
+        "direction_mdeg": 30000,
+        "sway_mm": 120,
+        "pace_millirad_per_s": 1500,
+        "gust_scale_mm": 24000,
+        "gust_share_permille": 600,
+        "flutter_mm": 15,
+        "sway_families": [
+         "plant"
+        ]
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway": {
+      "texture_set": "cc0.footway-paving",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     },
+     "plant.grass_tuft": {
+      "variants": [
+       {
+        "file": "pieces/grass-tuft.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         350
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "plant.wildflowers": {
+      "variants": [
+       {
+        "file": "pieces/wildflowers.glb",
+        "lod1": null,
+        "size_mm": [
+         500,
+         500,
+         400
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/grass-tuft.glb",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "bytes": 9192,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/wildflowers.glb",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "bytes": 11048,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ],
+    "trail": {
+     "ground.lawn": {
+      "pieces": [
+       "plant.wildflowers",
+       "plant.grass_tuft",
+       "plant.wildflowers"
+      ],
+      "share_permille": 600,
+      "hang_permille": [
+       300,
+       900
+      ],
+      "seed": 11,
+      "sun_within_mdeg": 120000,
+      "drop_mm": 800,
+      "slope_permille": 500,
+      "spread": 3
+     },
+     "ground.default": {
+      "pieces": [
+       "plant.grass_tuft"
+      ],
+      "share_permille": 250,
+      "hang_permille": [
+       500,
+       500
+      ],
+      "seed": 0
+     }
+    },
+    "climb": {
+     "roof.default": {
+      "pieces": [
+       "plant.wildflowers"
+      ],
+      "walls": [
+       "back"
+      ],
+      "share_permille": 400,
+      "height_permille": [
+       300,
+       700
+      ],
+      "seed": 7,
+      "spread": 3
+     }
+    }
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "climb.roof.default"
+   }
   }
  ]
 }

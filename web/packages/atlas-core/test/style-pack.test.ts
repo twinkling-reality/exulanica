@@ -133,6 +133,61 @@ describe('a climb rule', () => {
   });
 });
 
+describe('a trail rule', () => {
+  const base = CASES.cases[0]!;
+  const RULE = { pieces: ['plant.ivy'], share_permille: 500, hang_permille: [400, 800], seed: 7, sun_within_mdeg: 90_000, drop_mm: 800, slope_permille: 450 };
+  const withPlant = (trail: Record<string, unknown>, manifest: unknown = base.manifest): unknown => {
+    const out = structuredClone(manifest) as { modules: Record<string, unknown>; trail?: unknown };
+    if (out.modules['vehicle.car'] !== undefined) out.modules['plant.ivy'] = structuredClone(out.modules['vehicle.car']);
+    out.trail = trail;
+    return out;
+  };
+  const refusal = (manifest: unknown): { reason: string; path: string } | null => {
+    try {
+      readStylePackManifest(manifest, context);
+      return null;
+    } catch (error) {
+      if (!(error instanceof StylePackRefusal)) throw error;
+      return { reason: error.reason, path: error.path };
+    }
+  };
+  it('is read over a ground\'s edges as stated, with no default written in, and a pack stating none keeps its bytes', () => {
+    expect(readStylePackManifest(withPlant({ 'ground.default': RULE }), context).trail).toEqual({ 'ground.default': RULE });
+    const least = { pieces: ['plant.ivy', 'plant.ivy'], share_permille: 1, hang_permille: [1000, 1000], seed: 0 };
+    expect(readStylePackManifest(withPlant({ 'ground.lawn': least }), context).trail).toEqual({ 'ground.lawn': least });
+    expect(resolveStylePack([readStylePackManifest(withPlant({ 'ground.default': RULE }), context)]).trail).toEqual({ 'ground.default': RULE });
+    expect(resolveStylePack([readStylePackManifest(base.manifest, context)]).trail).toEqual({});
+    expect('trail' in readStylePackManifest(base.manifest, context)).toBe(false);
+    expect(sha256(canonicalStylePackBytes(readStylePackManifest(base.manifest, context)))).toBe(base.expect.sha256);
+  });
+  it('is refused as the Python reader refuses it, by reason and path', () => {
+    const rule = (changed: Record<string, unknown>): unknown => withPlant({ 'ground.default': { ...RULE, ...changed } });
+    // Not a ground: a path is drawn as a surface but has no terrace's edge; a plant is not a surface at all.
+    expect(refusal(withPlant({ 'path.footway': RULE }))).toEqual({ reason: 'reference', path: 'trail.path.footway' });
+    expect(refusal(withPlant({ 'plant.ivy': RULE }))).toEqual({ reason: 'reference', path: 'trail.plant.ivy' });
+    expect(refusal(rule({ pieces: ['vehicle.car'] }))).toEqual({ reason: 'reference', path: 'trail.ground.default.pieces[0]' });
+    expect(refusal(rule({ pieces: ['plant.fern'] }))).toEqual({ reason: 'reference', path: 'trail.ground.default.pieces[0]' });
+    expect(refusal(rule({ hang_permille: [800, 400] }))).toEqual({ reason: 'range', path: 'trail.ground.default.hang_permille' });
+    expect(refusal(rule({ hang_permille: [0, 400] }))).toEqual({ reason: 'range', path: 'trail.ground.default.hang_permille[0]' });
+    expect(refusal(rule({ hang_permille: [400] }))).toEqual({ reason: 'shape', path: 'trail.ground.default.hang_permille' });
+    expect(refusal(rule({ drop_mm: 100 }))).toEqual({ reason: 'range', path: 'trail.ground.default.drop_mm' });
+    expect(refusal(rule({ drop_mm: 20_001 }))).toEqual({ reason: 'range', path: 'trail.ground.default.drop_mm' });
+    expect(refusal(rule({ slope_permille: 299 }))).toEqual({ reason: 'range', path: 'trail.ground.default.slope_permille' });
+    expect(refusal(rule({ sun_within_mdeg: 180_001 }))).toEqual({ reason: 'range', path: 'trail.ground.default.sun_within_mdeg' });
+    expect(refusal(rule({ share_permille: 0 }))).toEqual({ reason: 'range', path: 'trail.ground.default.share_permille' });
+    expect(refusal(rule({ spread: 3 }))).toEqual({ reason: 'shape', path: 'trail.ground.default' });
+    expect(refusal(withPlant(Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`ground.terrace_${i}`, RULE])))))
+      .toEqual({ reason: 'range', path: 'trail' });
+  });
+  it('is the nearest pack\'s along a chain, role by role', () => {
+    const root = readStylePackManifest(withPlant({ 'ground.default': RULE, 'ground.lawn': { ...RULE, seed: 1 } }), context);
+    const drafted = CASES.cases.find((c) => c.name === 'a pack drafted on a base, stating only what it changes')!.manifest;
+    const near = { ...RULE, seed: 2, hang_permille: [200, 300] };
+    const dusk = readStylePackManifest(withPlant({ 'ground.default': near }, drafted), context);
+    expect(resolveStylePack([dusk, root]).trail).toEqual({ 'ground.default': near, 'ground.lawn': { ...RULE, seed: 1 } });
+  });
+});
+
 describe('canonical bytes', () => {
   it('sorts keys, drops whitespace and escapes past ASCII as Python does', () => {
     // Python: json.dumps({"b": 1, "a": "é☃", "c": [True, None]}, sort_keys=True, separators=(",", ":"))

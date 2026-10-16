@@ -890,6 +890,27 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
 
         return read
 
+    def trail(value: Any, path: str) -> dict[str, Any]:
+        # What hangs over the edges of a ground look role where its land falls away: which plant
+        # pieces, the share of an overhanging run covered, the least and most share of the face
+        # below a plant hangs down, a seed, and optionally a sun test, the least drop under the
+        # edge and the least slope of its face. An absent figure is the page's, never written in.
+        return _object(
+            value,
+            path,
+            {
+                "pieces": _list(piece_role, 1, 8),
+                "share_permille": _integer(1, 1000),
+                "hang_permille": pair_of(
+                    1, 1000, "must be a least and a most share of the face's length"
+                ),
+                "seed": _integer(0, 2_147_483_647),
+                "sun_within_mdeg": _Optional(_integer(0, 180_000)),
+                "drop_mm": _Optional(_integer(200, 20_000)),
+                "slope_permille": _Optional(_integer(300, 20_000)),
+            },
+        )
+
     def land_cover(value: Any, path: str) -> dict[str, Any]:
         # What grows on the near land where it is drawn in a surface role (`land`, or a band of
         # the land's surface catalog): which plant or prop pieces, how many a hectare, at what
@@ -1115,6 +1136,9 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             "facade": _Optional(_record(look_role_key(("surface", "both")), facade, 64)),
             # Added within the profile: a pack that grows nothing on its walls states none.
             "climb": _Optional(_record(look_role_key(("module", "both")), climb, 64)),
+            # Added within the profile: a pack that hangs nothing over its grounds' edges states
+            # none.
+            "trail": _Optional(_record(look_role_key(("surface", "both")), trail, 64)),
             # Added within the profile: a pack written before it grows nothing on the land.
             "land_cover": _Optional(_record(land_cover_key, land_cover, 16)),
             "modules": _record(
@@ -1262,6 +1286,15 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             where = f"climb.{role}.pieces[{index}]"
             if split_look_role(piece, where)[0] != "plant":
                 _fail("reference", where, "a climbing piece is a plant")
+            if manifest["base"] is None and piece not in manifest["modules"]:
+                _fail("reference", where, f"names no module {json.dumps(piece)}")
+    for role, rule in manifest.get("trail", {}).items():
+        if split_look_role(role, f"trail.{role}")[0] != "ground":
+            _fail("reference", f"trail.{role}", "plants trail only over a ground's edge")
+        for index, piece in enumerate(rule["pieces"]):
+            where = f"trail.{role}.pieces[{index}]"
+            if split_look_role(piece, where)[0] != "plant":
+                _fail("reference", where, "a trailing piece is a plant")
             if manifest["base"] is None and piece not in manifest["modules"]:
                 _fail("reference", where, f"names no module {json.dumps(piece)}")
     for role, rule in manifest.get("land_cover", {}).items():
