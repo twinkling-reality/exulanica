@@ -108,14 +108,9 @@ export function removeLine() {
   return 'Nobody can use it from the next minute.';
 }
 
-/** What was done, said after it is kept. */
-export function removedNote(name) {
-  return `Removed the ${name}.`;
-}
-
 /**
- * An undone change as the note, History and the pull request all say it (ruling W2), without the
- * full stop: by the kind of the edit it reverses and what that edit changed ("the bench").
+ * An undone change as changeWords says it, without the full stop: by the kind of the edit it reverses and
+ * what that edit changed ("the bench").
  */
 function undoneWords(kind, what, storeysBack) {
   // A storeys change taken back says the storeys it leaves (null: as the world made the building).
@@ -152,44 +147,38 @@ const partCalled = (partId, partNameOf) => {
 };
 
 /**
- * What an undo did, from its preview's `would_change`: the edit it reverses and the thing's
- * document as it stands and as the undo leaves it (named as `thingName` names it, with `kindLabel`),
- * or the made part it names (`partNameOf`).
+ * What an undo or a redo will do, from its preview's `would_change`, as History's parts (changeParts reads it as
+ * the edits it makes, so the note says what History's row will): the undo and the edit it takes back, by that
+ * edit's kind and subject; a redo's first edit is read from the documents, since a redo is the undo of an undo.
+ * A thing is named as `thingName` names it (with `kindLabel`), a made part by `partNameOf`.
  */
-export function undoneNote(change, partNameOf = () => null, kindLabel = () => null) {
-  const undoes = change?.undoes?.kind, subject = change?.subject_id;
-  const part = typeof subject === 'string' && subject.startsWith('part:');
-  const what = part
-    ? partCalled(subject.slice('part:'.length), partNameOf)
-    : `the ${thingName(change?.after ?? change?.before, kindLabel)}`;
-  // A building's storeys change and a move are both element transforms: the storeys tell them apart.
-  const before = storeysOf(change?.before), after = storeysOf(change?.after);
-  const storeysBack = part && undoes === 'transform_element' && before !== after ? after : undefined;
-  return `${undoneWords(undoes, what, storeysBack)}.`;
-}
-
-/**
- * What a redo did, from its preview's `would_change`: the thing's or the made part's document as it
- * stands and as the redo leaves it, read from the documents, since a redo is the undo of an undo;
- * a part named by `partNameOf`, a thing as `thingName` names it with `kindLabel`.
- */
-export function redoneNote(change, partNameOf = () => null, kindLabel = () => null) {
-  const before = change?.before ?? null, after = change?.after ?? null;
+export function previewParts(change, redo, partNameOf = () => null, kindLabel = () => null) {
   const subject = change?.subject_id;
-  if (typeof subject === 'string' && subject.startsWith('part:')) {
-    const what = partCalled(subject.slice('part:'.length), partNameOf);
-    const was = storeysOf(before), now = storeysOf(after);
-    if (now !== null && was !== now) return `${storeysDone(what, was, now)} again.`;
-    if (after?.suppressed === true && before?.suppressed !== true) return `Removed ${what} again.`;
-    if (JSON.stringify(before?.transform ?? null) !== JSON.stringify(after?.transform ?? null)) return `Moved ${what} again.`;
-    return 'Did the change again.';
-  }
+  const part = typeof subject === 'string' && subject.startsWith('part:');
+  const before = change?.before ?? null, after = change?.after ?? null;
   const name = thingName(after ?? before, kindLabel);
-  if (before !== null && after !== null && !before.removed && after.removed) return `Removed the ${name} again.`;
-  if ((before === null || before.removed) && after !== null && !after.removed) return `Placed the ${name} again.`;
-  const a = before?.transform, b = after?.transform;
-  if (a && b && (a.x_mm !== b.x_mm || a.z_mm !== b.z_mm || a.yaw_microradians !== b.yaw_microradians)) return `Moved the ${name} again.`;
-  return 'Did the change again.';
+  const of = part ? { element_id: subject } : { thing_id: typeof subject === 'string' && subject ? subject : 'thing' };
+  const was = storeysOf(before), now = storeysOf(after);
+  const edit = (kind, more = {}) => ({ edit_id: 'done', kind, ...of, ...more });
+  let done = null;
+  if (!redo) {
+    // The edit an undo takes back, as it was made: a storeys change from what the undo leaves to what stands now.
+    const kind = change?.undoes?.kind;
+    done = part && kind === 'transform_element' && was !== now ? edit(kind, { storeys: { before: now, after: was } })
+      : typeof kind === 'string' ? edit(kind) : null;
+  } else if (part) {
+    if (now !== null && was !== now) done = edit('transform_element', { storeys: { before: was, after: now } });
+    else if (after?.suppressed === true && before?.suppressed !== true) done = edit('suppress_element');
+    else if (JSON.stringify(before?.transform ?? null) !== JSON.stringify(after?.transform ?? null)) done = edit('transform_element');
+  } else {
+    const a = before?.transform, b = after?.transform;
+    if (before !== null && after !== null && !before.removed && after.removed) done = edit('remove_thing');
+    else if ((before === null || before.removed) && after !== null && !after.removed) done = edit('add_thing');
+    else if (a && b && (a.x_mm !== b.x_mm || a.z_mm !== b.z_mm || a.yaw_microradians !== b.yaw_microradians)) done = edit('move_thing');
+  }
+  const undo = { edit_id: 'undo', kind: 'undo', ...(done ? { undone_edit_id: 'done' } : {}) };
+  const edits = redo ? [...(done ? [done] : []), undo, { edit_id: 'redo', kind: 'undo', undone_edit_id: 'undo' }] : [...(done ? [done] : []), undo];
+  return changeParts(edits[edits.length - 1], edits, () => name, partNameOf);
 }
 
 /** The redo preview's refusal when nothing is left to do again. */
@@ -260,32 +249,6 @@ export function clockWords(recordedAt) {
 /** The undo preview's refusal when nothing is left to take back. */
 export function undoRefusalWords(code, detail) {
   return code === 'invalid_object_state' ? 'Nothing left to undo.' : refusalWords(code, detail);
-}
-
-/** Whole metres where whole, else to a tenth: "6.5", "2". */
-const metres = mm => { const value = Math.round(Math.abs(mm) / 100) / 10; return String(value); };
-
-/**
- * A move in words, from where a thing stands to where it would stand (region frame: east, south,
- * millimetres; a yaw in microradians): "6.5 m east, 2 m north, turned 45°", or "where it was".
- */
-export function moveWords(from, to) {
-  const parts = [];
-  const east = to.x - from.x, south = to.z - from.z;
-  if (Math.abs(east) >= 50) parts.push(`${metres(east)} m ${east > 0 ? 'east' : 'west'}`);
-  if (Math.abs(south) >= 50) parts.push(`${metres(south)} m ${south > 0 ? 'south' : 'north'}`);
-  const turn = Math.round(((((to.yaw - from.yaw) / 1e6) * 180 / Math.PI) % 360 + 540) % 360 - 180);
-  if (turn !== 0 && Math.abs(turn) !== 180) parts.push(`turned ${Math.abs(turn)}°`);
-  else if (Math.abs(turn) === 180) parts.push('turned round');
-  return parts.length ? parts.join(', ') : 'where it was';
-}
-
-/**
- * What a kept move did, from its words (moveWords): "Moved the bench 3.5 m west, turned 15°.", and
- * a turn alone "Turned the bench 90°." or "Turned the bench round.".
- */
-export function movedNote(name, words) {
-  return words.startsWith('turned ') ? `Turned the ${name} ${words.slice('turned '.length)}.` : `Moved the ${name} ${words}.`;
 }
 
 /** The card's line for a thing a person placed. */
@@ -379,11 +342,6 @@ export function namesTogether(names) {
   if (said.length >= 4 || unnamed > 1) return `${said[0]} and ${said.length - 1} more`;
   if (said.length === 3) return `${said[0]}, ${said[1]} and ${said[2]}`;
   return said.length === 2 ? `${said[0]} and ${said[1]}` : said[0];
-}
-
-/** What placing a new thing did, said after it is kept. */
-export function placedNote(name) {
-  return `Placed the ${name}.`;
 }
 
 /** The largest yaw a pose may state (one revolution, in microradians, as the server bounds it). */

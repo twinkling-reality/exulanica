@@ -24,7 +24,8 @@ import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/ind
 import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
-import { BUSY, TRAY, buildKeys, createKindLabels, heldRows, keyAction, moveWords, movedNote, namesTogether, nothingInView, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { BUSY, TRAY, buildKeys, changeParts, createKindLabels, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, undoRefusalWords } from './build-words.mjs';
+import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
 import { NOTE_WORDS } from './world-words.mjs';
@@ -436,7 +437,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       busy = false; dropPlacing({ outcome: 'placed', thingId: held.thingId });
       try { await refreshRecords(); } catch {}
       if (records.has(held.thingId)) selected = held.thingId;
-      render(); say(placedNote(name), { undoable: true });
+      render(); say(youDid('add_thing', held.thingId, name), { undoable: true });
       if (held.kind.source === 'workspace') void readCreatures(true);
       return;
     } catch (error) {
@@ -639,7 +640,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const to = verdict.to;
       await post(actionOf(move.placedId, 'move'), routeOf(move.placedId) + '/move',
         { base_state_sha256: verdict.base, pose: poseOf(move.placedId, to), saved_entry: savedEntry() });
-      busy = false; dropMove(); render(); say(movedNote(name, moveWords(move.from, to)), { undoable: true });
+      busy = false; dropMove(); render(); say(youDid(isPart(move.placedId) ? 'transform_element' : 'move_thing', move.placedId, name), { undoable: true });
     } catch (error) {
       busy = false;
       if (moving === move) move.verdict = { state: 'refused', words: problem(error) };
@@ -677,13 +678,15 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     try {
       // Against the state the preview read: a change in between is refused as stale, never kept.
       await post(actionOf(placedId, 'remove'), routeOf(placedId) + '/remove', { base_state_sha256: confirming.base, saved_entry: savedEntry() });
-      busy = false; deselect(); say(removedNote(name), { undoable: true });
+      busy = false; deselect(); say(youDid(isPart(placedId) ? 'suppress_element' : 'remove_thing', placedId, name), { undoable: true });
     } catch (error) { busy = false; confirming = null; failure = problem(error); render(); }
     try { await refreshRecords(); } catch {}
   }
 
   /** A made part's name by its id, from the parts read: what an undone part change names. */
   const partNamed = (partId) => parts.get(PART + partId)?.label ?? null;
+  /** A change build mode made, in History's words ("You moved the bench"): the edit it made, by its kind and subject. */
+  const youDid = (kind, id, name) => youChangeWords(changeParts(isPart(id) ? { kind, element_id: id } : { kind, thing_id: id }, [], () => name, partNamed));
 
   /**
    * Does again the last change taken back (Cmd+Shift+Z here and in History). Resolves, once the
@@ -699,7 +702,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = redoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.redo', '/things/redo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = redoneNote(preview.would_change, partNamed, kindLabel), { undoable: true });
+        say(said = youChangeWords(previewParts(preview.would_change, true, partNamed, kindLabel)), { undoable: true });
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;
@@ -723,7 +726,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = undoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.undo', '/things/undo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = undoneNote(preview.would_change, partNamed, kindLabel));
+        say(said = youChangeWords(previewParts(preview.would_change, false, partNamed, kindLabel)));
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;

@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MAX_YAW, TRAY, buildKeys, createKindLabels, changeWords, clockWords, dayWords, heldRows, keyAction, moveWords, namesTogether, movedNote, nothingInView, placedLine, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { BUSY, HISTORY, MAX_YAW, TRAY, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, undoRefusalWords } from './build-words.mjs';
+import { youChangeWords } from './history-words.mjs';
+
+// What build mode's note says: History's sentence for a change build mode made, or for an undo's or a redo's preview.
+const did = (edit, name, partName = () => null) => youChangeWords(changeParts(edit, [], () => name, partName));
+const undone = (change, ...names) => youChangeWords(previewParts(change, false, ...names));
+const redone = (change, ...names) => youChangeWords(previewParts(change, true, ...names));
 
 // A placed thing is called by its kind, never by its id or digest.
 assert.equal(thingName({ kind: { kind: 'lamp_post', version: 1, sha256: 'a'.repeat(64) } }), 'lamp post');
@@ -46,43 +52,34 @@ assert.equal(thingName({ ...made, gone: true }, () => { throw Error('asked'); })
 }
 // The same name in an undo's note and a redo's, as the card says it.
 const placedMade = { ...made, removed: false, transform: { x_mm: 0, z_mm: 0, yaw_microradians: 0 } };
-assert.equal(undoneNote({ undoes: { kind: 'move_thing' }, before: placedMade, after: placedMade }, () => null, label), 'Put the two legged two armed creature back where it was.');
-assert.equal(undoneNote({ undoes: { kind: 'add_thing' }, before: placedMade, after: null }), 'Took away the creature that was placed.');
-assert.equal(redoneNote({ before: placedMade, after: { ...placedMade, removed: true } }, () => null, label), 'Removed the two legged two armed creature again.');
+assert.equal(undone({ undoes: { kind: 'move_thing' }, before: placedMade, after: placedMade }, () => null, label), 'You put the two legged two armed creature back where it was');
+assert.equal(undone({ undoes: { kind: 'add_thing' }, before: placedMade, after: null }), 'You took away the creature you had placed');
+assert.equal(redone({ before: placedMade, after: { ...placedMade, removed: true } }, () => null, label), 'You took out the two legged two armed creature again');
 
 // Where a thing may not stand, the server's own sentence; codes become sentences, never shown as codes.
 assert.equal(refusalWords('thing_landing_blocked', 'That spot is in the water basin.'), 'Not here: that spot is in the water basin.');
 assert.equal(refusalWords('stale_object_base', 'base state 0000 is stale'), 'Someone changed this world a moment ago. Look again and try once more.');
 assert.equal(refusalWords('something_new', 'it_was_refused'), 'That could not be done. Nothing changed.');
 assert.equal(refusalWords('http_404', 'Not Found'), 'That could not be done. Nothing changed.');
-for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), removeTitle('well'), removeLine(), removedNote('well')]) assert.doesNotMatch(words, /_|[0-9a-f]{12}/);
+for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), removeTitle('well'), removeLine(), did({ kind: 'remove_thing', thing_id: 'well:1' }, 'well')]) assert.doesNotMatch(words, /_|[0-9a-f]{12}/);
 // The remove question as the card draws it: the question, then what it does.
 assert.equal(removeTitle('bench'), 'Remove the bench?');
 assert.equal(removeLine(), 'Nobody can use it from the next minute.');
 
-// What an undo did, from its preview.
+// What an undo did, from its preview, as History says it (sheet section 7: the "You" forms, no full stop).
 const well = { kind: { kind: 'well', version: 2 } };
-assert.equal(undoneNote({ undoes: { kind: 'remove_thing' }, before: { ...well, removed: true }, after: well }), 'Brought back the well.');
-assert.equal(undoneNote({ undoes: { kind: 'move_thing' }, before: well, after: well }), 'Put the well back where it was.');
-assert.equal(undoneNote({ undoes: { kind: 'add_thing' }, before: well, after: null }), 'Took away the well that was placed.');
-assert.equal(undoneNote({ undoes: { kind: 'add_object' } }), 'Undid the last change.');
+assert.equal(undone({ undoes: { kind: 'remove_thing' }, before: { ...well, removed: true }, after: well }), 'You brought back the well');
+assert.equal(undone({ undoes: { kind: 'move_thing' }, before: well, after: well }), 'You put the well back where it was');
+assert.equal(undone({ undoes: { kind: 'add_thing' }, before: well, after: null }), 'You took away the well you had placed');
+assert.equal(undone({ undoes: { kind: 'add_object' } }), 'You undid a change');
 assert.equal(undoRefusalWords('invalid_object_state', 'nothing to undo'), 'Nothing left to undo.');
 
-// A move in words: east and south as the region's frame names them, a turn in whole degrees.
-assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: 6500, z: -2000, yaw: 785_398 }), '6.5 m east, 2 m north, turned 45°');
-assert.equal(moveWords({ x: 1000, z: 1000, yaw: 100 }, { x: 1000, z: 4000, yaw: 100 }), '3 m south');
-assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: -500, z: 0, yaw: 0 }), '0.5 m west');
-assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: 3_141_593 }), 'turned round');
-assert.equal(moveWords({ x: 0, z: 0, yaw: 0 }, { x: 20, z: 0, yaw: 0 }), 'where it was');
-assert.equal(movedNote('bench', '6.5 m east'), 'Moved the bench 6.5 m east.');
-// A turn alone is said as a turn; a move with a turn as a move (History and pull requests read the same).
-assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: 1_570_796 })), 'Turned the bench 90°.');
-assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: 3_141_593 })), 'Turned the bench round.');
-assert.equal(movedNote('bench', moveWords({ x: 0, z: 0, yaw: 0 }, { x: -3500, z: 0, yaw: 261_799 })), 'Moved the bench 3.5 m west, turned 15°.');
+// What build mode did, said as History says it, by the edit it made: a turn is a move.
+assert.equal(did({ kind: 'add_thing', thing_id: 'bench:1' }, 'bench'), 'You placed the bench');
+assert.equal(did({ kind: 'move_thing', thing_id: 'bench:1' }, 'bench'), 'You moved the bench');
+assert.equal(did({ kind: 'remove_thing', thing_id: 'bench:1' }, 'bench'), 'You took out the bench');
 // The card's line for a placed thing, which the chosen card outside build mode reads too.
 assert.equal(placedLine(), 'Placed in this world');
-// A part made with the world says so, with the area it stands in (frame 13).
-assert.equal(placedNote('bench'), 'Placed the bench.');
 // A change the server could not take up yet says so, in DESIGN's words (W11), whichever wait it is.
 for (const code of ['kind_work_overran', 'kind_work_busy', 'kind_work_unavailable']) assert.equal(refusalWords(code, 'Ask again shortly.'), BUSY);
 assert.equal(BUSY, 'The world is busy with another change. Try again in a moment.');
@@ -110,14 +107,16 @@ const partLog = [
 ];
 const partName = (id) => ({ 'barn-id': 'barn', 'pond-id': 'pond' })[id] ?? null;
 assert.deepEqual(partLog.map(edit => changeWords(edit, partLog, () => null, partName)), ['Moved the barn', 'Removed the pond', 'Brought back the pond', 'Put the barn back where it was']);
-// An undone change reads the same in the note and in History, the row without the full stop (ruling W2).
-assert.equal(undoneNote({ subject_id: 'part:pond-id', undoes: { kind: 'suppress_element' } }, partName), 'Brought back the pond.');
-assert.equal(undoneNote({ subject_id: 'part:barn-id', undoes: { kind: 'transform_element' } }, partName), 'Put the barn back where it was.');
-assert.equal(undoneNote({ subject_id: 'part:gone', undoes: { kind: 'suppress_element' } }), 'Brought back a part of the world.');
+// A made part's change, and an undone one, read the same in the note and in History's row (ruling W2).
+assert.equal(did({ kind: 'transform_element', element_id: 'part:barn-id' }, 'part', partName), 'You moved the barn');
+assert.equal(did({ kind: 'suppress_element', element_id: 'part:pond-id' }, 'part', partName), 'You took out the pond');
+assert.equal(undone({ subject_id: 'part:pond-id', undoes: { kind: 'suppress_element' } }, partName), 'You brought back the pond');
+assert.equal(undone({ subject_id: 'part:barn-id', undoes: { kind: 'transform_element' } }, partName), 'You put the barn back where it was');
+assert.equal(undone({ subject_id: 'part:gone', undoes: { kind: 'suppress_element' } }), 'You brought back a part of the world');
 const thingLog = (kind) => [{ edit_id: 't1', kind, thing_id: 'well:1' }, { edit_id: 't2', kind: 'undo', undone_edit_id: 't1', thing_id: 'well:1' }];
 for (const kind of ['add_thing', 'move_thing', 'remove_thing']) {
-  const row = changeWords(thingLog(kind)[1], thingLog(kind), () => 'well');
-  assert.equal(`${row}.`, undoneNote({ undoes: { kind }, before: well, after: well }), kind);
+  const row = youChangeWords(changeParts(thingLog(kind)[1], thingLog(kind), () => 'well'));
+  assert.equal(row, undone({ undoes: { kind }, before: well, after: well }), kind);
 }
 assert.equal(changeWords({ edit_id: 'u', kind: 'undo', undone_edit_id: 'missing' }, [], () => null), 'Undid the last change');
 // A building's storeys change is told from a move by its storeys, in the notes and in History's rows,
@@ -126,14 +125,14 @@ assert.equal(changeWords({ edit_id: 'u', kind: 'undo', undone_edit_id: 'missing'
 const tea = (id) => (id === 'tea' ? 'tea house' : null);
 const teaAt = (storeys, transform = null) => ({ element_id: 'part:tea', suppressed: false, transform, ...(storeys === null ? {} : { storeys }) });
 const teaUndo = (before, after) => ({ subject_id: 'part:tea', undoes: { kind: 'transform_element' }, before, after });
-assert.equal(undoneNote(teaUndo(teaAt(4), teaAt(2)), tea), 'Put the tea house back to 2 storeys.');
-assert.equal(undoneNote(teaUndo(teaAt(4), null), tea), 'Put the tea house back to the storeys it was made with.');
-assert.equal(undoneNote(teaUndo(teaAt(4, { x_mm: 1000 }), teaAt(4, { x_mm: 0 })), tea), 'Put the tea house back where it was.');
-assert.equal(redoneNote({ subject_id: 'part:tea', before: teaAt(2), after: teaAt(4) }, tea), 'Raised the tea house to 4 storeys again.');
-assert.equal(redoneNote({ subject_id: 'part:tea', before: teaAt(2), after: teaAt(1) }, tea), 'Lowered the tea house to 1 storey again.');
-assert.equal(redoneNote({ subject_id: 'part:tea', before: null, after: teaAt(4) }, tea), 'Set the tea house to 4 storeys again.');
-assert.equal(redoneNote({ subject_id: 'part:tea', before: teaAt(null, { x_mm: 0 }), after: teaAt(null, { x_mm: 2000 }) }, tea), 'Moved the tea house again.');
-assert.equal(redoneNote({ subject_id: 'part:tea', before: null, after: { ...teaAt(null), suppressed: true } }, tea), 'Removed the tea house again.');
+assert.equal(undone(teaUndo(teaAt(4), teaAt(2)), tea), 'You put the tea house back to 2 storeys');
+assert.equal(undone(teaUndo(teaAt(4), null), tea), 'You put the tea house back to the storeys it was made with');
+assert.equal(undone(teaUndo(teaAt(4, { x_mm: 1000 }), teaAt(4, { x_mm: 0 })), tea), 'You put the tea house back where it was');
+assert.equal(redone({ subject_id: 'part:tea', before: teaAt(2), after: teaAt(4) }, tea), 'You raised the tea house to 4 storeys again');
+assert.equal(redone({ subject_id: 'part:tea', before: teaAt(2), after: teaAt(1) }, tea), 'You lowered the tea house to 1 storey again');
+assert.equal(redone({ subject_id: 'part:tea', before: null, after: teaAt(4) }, tea), 'You set the tea house to 4 storeys again');
+assert.equal(redone({ subject_id: 'part:tea', before: teaAt(null, { x_mm: 0 }), after: teaAt(null, { x_mm: 2000 }) }, tea), 'You moved the tea house again');
+assert.equal(redone({ subject_id: 'part:tea', before: null, after: { ...teaAt(null), suppressed: true } }, tea), 'You took out the tea house again');
 const storeysLog = [
   { edit_id: 's1', kind: 'transform_element', element_id: 'part:tea', storeys: { before: null, after: 4 } },
   { edit_id: 's2', kind: 'transform_element', element_id: 'part:tea', storeys: { before: 4, after: 1 } },
@@ -150,9 +149,9 @@ assert.deepEqual(storeysLog.map(edit => changeWords(edit, storeysLog, () => null
   'Put the tea house back to the storeys it was made with',
   'Moved the tea house',
 ]);
-// Each note is its row and a full stop.
-assert.equal(`${changeWords(storeysLog[2], storeysLog, () => null, tea)}.`, undoneNote(teaUndo(teaAt(1), teaAt(4)), tea));
-assert.equal(`${changeWords(storeysLog[3], storeysLog, () => null, tea)}.`, redoneNote({ subject_id: 'part:tea', before: teaAt(4), after: teaAt(1) }, tea));
+// Each note is History's row for the same change.
+assert.equal(youChangeWords(changeParts(storeysLog[2], storeysLog, () => null, tea)), undone(teaUndo(teaAt(1), teaAt(4)), tea));
+assert.equal(youChangeWords(changeParts(storeysLog[3], storeysLog, () => null, tea)), redone({ subject_id: 'part:tea', before: teaAt(4), after: teaAt(1) }, tea));
 assert.equal(changeWords({ edit_id: 'p4', kind: 'transform_element', element_id: 'part:gone', thing_id: null }, [], () => null), 'Moved a part of the world');
 // Snapping: half metres and 15 degree steps unless free; a yaw stays within one revolution.
 assert.equal(snapped(1249, false), 1000);
@@ -252,10 +251,10 @@ assert.equal(keyAction(busy, key('Escape')), 'held');
 assert.equal(keyAction(busy, key('KeyB')), 'toggle');
 // A redo is said by what it did again, read from the documents.
 const at = (x, removed = false) => ({ kind: { kind: 'well', version: 2 }, removed, transform: { x_mm: x, z_mm: 0, yaw_microradians: 0 } });
-assert.equal(redoneNote({ before: at(0), after: at(0, true) }), 'Removed the well again.');
-assert.equal(redoneNote({ before: null, after: at(0) }), 'Placed the well again.');
-assert.equal(redoneNote({ before: at(0), after: at(2000) }), 'Moved the well again.');
-assert.equal(redoneNote({}), 'Did the change again.');
+assert.equal(redone({ before: at(0), after: at(0, true) }), 'You took out the well again');
+assert.equal(redone({ before: null, after: at(0) }), 'You placed the well again');
+assert.equal(redone({ before: at(0), after: at(2000) }), 'You moved the well again');
+assert.equal(redone({}), 'You did a change again');
 assert.equal(redoRefusalWords('invalid_object_state', ''), 'Nothing left to do again.');
 // The changes list: each edit in words, an undo by what it took back, a redo by what it did again.
 const log = [
@@ -309,7 +308,7 @@ for (const state of [{}, { moving: true, ready: true }, { placing: true, ready: 
     assert.equal(keyAction(flagsOf(state), { code: keyOf[row.key], key: '', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false }), row.action, `${row.word} presses what its key does`);
   }
 }
-for (const words of [...Object.values(TRAY), placedNote('bench')]) assert.doesNotMatch(words, /\u2014|_/u);
+for (const words of [...Object.values(TRAY), did({ kind: 'add_thing', thing_id: 'bench:1' }, 'bench')]) assert.doesNotMatch(words, /\u2014|_/u);
 assert.equal(nothingInView(), 'No placed things in view. Walk closer to one.');
 assert.deepEqual({ ...HISTORY }, { title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
-console.log('Build words checks passed: names by kind, refusals as sentences, undo notes, move words, snapping, redo, the changes list, keys per state.');
+console.log('Build words checks passed: names by kind, refusals as sentences, each change as History says it, snapping, the changes list, keys per state.');
