@@ -133,7 +133,7 @@ describe('a decision, filled', () => {
       decided: 'Teo spoke to Ines', said: 'Teo: “Morning, Ines.”', action: null,
       decider: 'model', answered: { latencyMs: 900, costUsd: '0.0003', costKnown: true }, choicesHeading: "Teo's choices",
       picture: 'blob:m1', portraits: [{ name: 'Teo', url: 'blob:portrait-teo' }, { name: 'Ines', url: 'blob:portrait-ines' }],
-      ground: 'blob:still', earlier: true, later: false, canCompare: false,
+      ground: 'blob:still', earlier: true, later: false, canCompare: false, toldLabel: "What Teo's model was told",
     });
   });
 
@@ -146,6 +146,8 @@ describe('a decision, filled', () => {
     played.request = { ...played.request, provider_config: { kind: 'person', contract: { sha256: 'c'.repeat(64) } } } as never;
     const state = records.decision(showing, { requestId: 'r1', detail: played, failure: null, record: false });
     expect([state.decider, state.model, state.answered, state.decided]).toEqual(['person', null, null, 'Teo spoke to Ines']);
+    // A person playing Teo was shown what the record holds; no model was told it.
+    expect(state.toldLabel).toBe('What the person playing Teo was shown');
   });
 
   it('names a speaker a kind names in its title form, the sentence around them as their tag does', async () => {

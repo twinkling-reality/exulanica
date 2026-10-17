@@ -32,8 +32,13 @@ const capital = words => words.charAt(0).toUpperCase() + words.slice(1);
 const sentence = words => { const text = plain(words); return text ? capital(text).replace(/[.!?]?$/u, end => end || '.') : null; };
 const list = value => Array.isArray(value) ? value : [];
 
-/** "What Teo's model was told". */
-export const toldLabel = who => `What ${possessive(who.within)} model was told`;
+/**
+ * Over what the decider was told: "What Teo's model was told"; on a decision a person playing Teo made, "What the
+ * person playing Teo was shown" (DESIGN, WORDS.md R5b). `decider` is 'person', 'external', 'model' or null.
+ */
+export const toldLabel = (who, decider = null) => (decider === 'person'
+  ? `What the person playing ${who.within} was shown`
+  : `What ${possessive(who.within)} model was told`);
 
 /** "How Teo is", "Near the resident". */
 export const howIsLabel = who => `How ${who.within} is`;

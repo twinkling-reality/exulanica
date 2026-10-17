@@ -146,6 +146,7 @@ export function recordStates(host: RecordHost) {
       // Who decided (T7): a model's request names its provider; a person playing or an outside program, its kind.
       const origin = config?.provider ? 'model' : config?.kind ?? applied?.document?.origin ?? applied?.document?.thing?.decider ?? moment?.decider?.kind ?? null;
       const actor = named.subject(subjectId);
+      const decider = origin === 'model' || origin === 'person' || origin === 'external' ? origin : null;
       return { ...blank,
         // The moment it belongs to, where the moments read has it: "06:52 · Day 1 · Teo met Ines at the bench".
         over: moment ? [worldWhen(at), sentenceCase(momentTitle(moment, named))].filter(Boolean).join(' · ')
@@ -161,7 +162,9 @@ export function recordStates(host: RecordHost) {
           : moment ? sentenceCase(momentTitle(moment, named)) : null,
         said: said ? saidWords(who.title ?? who.start, said.line) : null,
         action: !said && moment ? sentenceCase(momentTitle(moment, named)) : null,
-        decider: origin === 'model' || origin === 'person' || origin === 'external' ? origin : null,
+        decider,
+        // What a person playing them was shown, or what their model was told (DESIGN, WORDS.md R5b).
+        toldLabel: toldLabel(who, decider),
         answered: origin === 'model' && provider ? { latencyMs: provider.latency_ms ?? null, costUsd: provider.cost_usd ?? null, costKnown: provider.cost_known === true } : null,
         choicesHeading: choicesOver(who),
         picture: moment ? host.pictures.momentNow(moment as never) : null,
