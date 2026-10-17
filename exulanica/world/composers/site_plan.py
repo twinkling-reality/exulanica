@@ -22,8 +22,10 @@ world it made as a structural snapshot and a receipt:
   person arrives. The element's streaming key names the receipt's digest, so the snapshot binds it.
 * **Where a person arrives**: on the spine, :data:`ARRIVAL_INSIDE_MM` in from the entry, facing
   into the site; on a volume's top (version 7), on the open top outside the gate, facing the
-  nearest open rim away from the site (:func:`~exulanica.world.site_on_top.arrival_beyond_gate`,
-  :func:`~exulanica.world.site_on_top.open_rim_facing`).
+  nearest open rim away from the site, one with another volume or the land in view first
+  (:func:`~exulanica.world.site_on_top.arrival_beyond_gate`,
+  :func:`~exulanica.world.site_on_top.open_rim_facing`,
+  :func:`~exulanica.world.site_on_top.landmarks_in_view`).
 
 A receipt whose kind document, routine catalogs or grammar no longer read the same, or whose records
 come out otherwise, is refused by name (``generated_world_*``), never generated into something else.
@@ -88,6 +90,7 @@ from exulanica.world.site_on_top import (
     AWAY_FROM_SITE,
     arrival_beyond_gate,
     check_on_rock,
+    landmarks_in_view,
     natural_top,
     on_top,
     open_rim_facing,
@@ -450,10 +453,14 @@ def compose_kind(
         )
         sized = next(r for r in world.records if isinstance(r, SiteExtentRecord))
         check_on_rock(capped, on, sized.width_mm, sized.depth_mm, top.height_at)
-        # A person arrives on the open top outside the gate, the site behind them, facing the rim.
+        # A person arrives on the open top outside the gate, the site behind them, facing the rim
+        # with another volume or the land in view where an open rim has one.
         arrival["position_mm"] = arrival_beyond_gate(capped, on, top, sized.entry_x_mm)
+        seen = landmarks_in_view(
+            stated_landscape, placement, on, top, world_id, arrival["position_mm"]
+        )
         facing = open_rim_facing(
-            capped, on, top, arrival["position_mm"], world.records, AWAY_FROM_SITE
+            capped, on, top, arrival["position_mm"], world.records, AWAY_FROM_SITE, seen
         )
         arrival["facing_mm"] = facing if facing is not None else [0, -1000]
         on_top_up_mm = top.height_at(*arrival["position_mm"])

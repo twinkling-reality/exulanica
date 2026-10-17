@@ -141,25 +141,27 @@ export interface DrawnSiteVolumes {
   destroy(): void;
 }
 
-/** How far from level a volume's face may lean and still be one of its upward faces: about 44 degrees. */
-const UPWARD_NORMAL = Math.round(0.72 * VOLUME_NORMAL_ONE);
+/** How far from level a volume's face may lean and still be one of its upward faces: about 44 degrees, at {@link VOLUME_NORMAL_ONE}. */
+export const VOLUME_UPWARD_NORMAL = Math.round(0.72 * VOLUME_NORMAL_ONE);
 
 /**
- * A chunk's triangles but its upward faces lying wholly where `covered` says something else draws
- * the ground (a site's graded top drawn as land): each triangle is left out only where all three of
- * its corners are covered and face up, so the rock's own top, drawn on its coarser cells, never
- * shows through the land drawn over it, and the rock still meets that land at its edge.
+ * A chunk's triangles whose three corners all pass `test` (a point of the volume's own frame,
+ * millimetres east, north and up, and whether the surface faces up there), or, with `keep`, every
+ * other triangle: the two halves of a chunk where something else draws the volume's top.
  */
-function uncoveredTriangles(chunk: VolumeChunk, covered: (xMm: number, yMm: number) => boolean): Uint32Array {
+export function trianglesWhere(
+  chunk: VolumeChunk,
+  test: (xMm: number, yMm: number, zMm: number, upward: boolean) => boolean,
+  keep = false,
+): Uint32Array {
   const p = chunk.positionsMm, n = chunk.normals, t = chunk.triangles;
-  const under = (v: number): boolean => n[3 * v + 2]! >= UPWARD_NORMAL && covered(p[3 * v]!, p[3 * v + 1]!);
-  const kept: number[] = [];
+  const held = (v: number): boolean => test(p[3 * v]!, p[3 * v + 1]!, p[3 * v + 2]!, n[3 * v + 2]! >= VOLUME_UPWARD_NORMAL);
+  const picked: number[] = [];
   for (let i = 0; i < t.length; i += 3) {
     const a = t[i]!, b = t[i + 1]!, c = t[i + 2]!;
-    if (under(a) && under(b) && under(c)) continue;
-    kept.push(a, b, c);
+    if ((held(a) && held(b) && held(c)) !== keep) picked.push(a, b, c);
   }
-  return Uint32Array.from(kept);
+  return Uint32Array.from(picked);
 }
 
 /**
@@ -167,14 +169,20 @@ function uncoveredTriangles(chunk: VolumeChunk, covered: (xMm: number, yMm: numb
  * frame ({@link landscapePlacementM}): one entity per placed volume at its origin and turn, one mesh
  * per chunk in `material`, each culled by its own bounds. Volumes cast shadows and receive them.
  * What else the landscape draws, the land below a site on a volume's top, goes under the same root.
- * `covered` names, for a volume by its id, the points of its own frame where something else draws
- * its top (a site's graded top drawn as land), whose upward faces are then left out.
+ * `covered` names, for a volume by its id, the points of its own frame (and whether its surface faces
+ * up there) where something else draws its top: a site's graded top drawn as land over its upward
+ * faces, and the faces near that top drawn in the same ground. A triangle is left out only where
+ * all three of its corners are covered, so the rock's own top never shows through the land drawn
+ * over it, and the rock still meets that land at its edge. `under` gives, for a point of a volume's
+ * own frame, the height it is drawn at (its own where nothing is drawn over it), so the rock kept
+ * under that land stays under it.
  */
 export function drawSiteVolumes(
   device: pc.GraphicsDevice,
   volumes: SiteVolumes,
   material: pc.Material,
-  covered?: (volumeId: string, xMm: number, yMm: number) => boolean,
+  covered?: (volumeId: string, xMm: number, yMm: number, zMm: number, upward: boolean) => boolean,
+  under?: (volumeId: string, xMm: number, yMm: number, zMm: number) => number,
 ): DrawnSiteVolumes {
   const root = new pc.Entity('site-volumes');
   if (volumes.drawing.siteFrame !== null) {
@@ -193,9 +201,13 @@ export function drawSiteVolumes(
     placed.setLocalEulerAngles(0, volume.yawMdeg / 1000, 0);
     const own: pc.MeshInstance[] = [];
     for (const chunk of chunks) {
-      const kept = covered === undefined ? chunk.triangles : uncoveredTriangles(chunk, (xMm, yMm) => covered(volume.id, xMm, yMm));
+      const kept = covered === undefined ? chunk.triangles : trianglesWhere(chunk, (xMm, yMm, zMm, upward) => covered(volume.id, xMm, yMm, zMm, upward), true);
       if (kept.length === 0) continue;
       const { positions, normals } = volumeChunkVertices(chunk);
+      if (under !== undefined) {
+        const p = chunk.positionsMm;
+        for (let v = 0; v < p.length / 3; v += 1) positions[3 * v + 1] = under(volume.id, p[3 * v]!, p[3 * v + 1]!, p[3 * v + 2]!) / 1000;
+      }
       const mesh = new pc.Mesh(device);
       mesh.setPositions(positions);
       mesh.setNormals(normals);

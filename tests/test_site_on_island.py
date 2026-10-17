@@ -178,6 +178,45 @@ def test_a_person_arrives_outside_the_gate_facing_an_open_rim_away_from_the_site
     assert rim is not None and rim <= 25_500, rim
 
 
+#: The bay's land with its sea to the south: every point beyond the extent's south edge is sea.
+SEA_SOUTH = {
+    **LANDSCAPE["land"],
+    "features": [
+        {"id": "bay", "kind": "shore", "side": "south", "distance_mm": 0, "beach_mm": 10000,
+         "beach_top_mm": 2000, "sea_depth_mm": 18000, "wander_mm": 0},
+    ],
+}  # fmt: skip
+
+
+def over_the_sea(*others: dict[str, Any]) -> dict[str, Any]:
+    """The island 120 m out over the sea south of the bay, with ``others`` placed beside it."""
+    return {
+        **LANDSCAPE,
+        "land": SEA_SOUTH,
+        "volumes": [{"id": "isle", "volume": ISLAND, "at_mm": [64000, -120000, 60000]}, *others],
+    }
+
+
+def test_a_person_arrives_facing_another_island_over_the_rim_rather_than_open_sea() -> None:
+    found = kind("hamlet")
+    values = found.values(found.presets[0][0])
+
+    def facing(landscape: dict[str, Any]) -> list[int]:
+        made = site_plan.compose_kind(
+            found, values, WORLD, place_id="place:isle", landscape=landscape
+        )
+        return made.receipt["arrival"]["facing_mm"]
+
+    # Alone over the sea, every open rim looks at open sea: the nearest is taken.
+    alone = facing(over_the_sea())
+    # Another island 120 m east at the same height: among the open rims, the one facing it.
+    beside = facing(
+        over_the_sea({"id": "far_isle", "volume": ISLAND, "at_mm": [184000, -120000, 60000]})
+    )
+    assert beside == [1000, 0]
+    assert alone != beside
+
+
 def test_a_site_that_fills_its_top_to_the_rim_stands_its_arrival_in_the_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

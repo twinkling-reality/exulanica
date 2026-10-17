@@ -6,7 +6,7 @@ import {
   type SiteTopRun,
 } from '@exulanica/atlas-core';
 import type { GeneratedTileHost } from '../generated-tile/binding-contract.js';
-import { buildSurfaceMesh } from '../generated-tile/surface-mesh.js';
+import { buildSurfaceMesh, type SurfaceBatch } from '../generated-tile/surface-mesh.js';
 import { landSurfaceMaterial } from './land-slope.js';
 import type { SiteLandSection, SiteLandWall, SiteSlot, SiteTopSection, StructuredSiteDrawing } from './site-drawing.js';
 import type { DrawnSiteSlots } from './site-primitives.js';
@@ -507,9 +507,12 @@ function wallFaces(walls: readonly SiteLandWall[], groundMm: (eastMm: number, no
  * A graded top's mesh in the scene's frame: every point of its lattice, lifted `TOP_LIFT_MM`, with
  * the normals of the whole lattice, and triangles for the cells in `runs`, each split as a near
  * chunk's cells are (and as the height rule splits them), from its south-west corner to its
- * north-east. Its rim is a fringe, not a stair: a cell outside the runs with three corners on rock
- * (corners of a cell in the runs) draws the half of it those three span, so the top's edge runs on
- * the cells' diagonals where the rock's does. None where the runs hold no cell.
+ * north-east. Its rim follows the rock, not the grid: a cell outside the runs draws the part of it
+ * round its corners on rock (corners of a cell in the runs) out to the middles of its edges that
+ * lead off the rock, as marching squares do, so the top's edge runs through the cells' half points
+ * and never takes a square bite; a cell with only two opposite corners on rock draws a corner at
+ * each. A middle stands at the height the rule gives it, its two ends' mean floored. None where
+ * the runs hold no cell.
  */
 function topMesh(top: SiteTop, runs: readonly SiteTopRun[]): {
   readonly positions: number[]; readonly normals: number[]; readonly surfaceMm: number[]; readonly indices: number[]; readonly reachM: number;
@@ -529,6 +532,21 @@ function topMesh(top: SiteTop, runs: readonly SiteTopRun[]): {
   for (const [row, first, last] of runs) {
     for (let i = first; i <= last; i += 1) for (const at of [row * columns + i, row * columns + i + 1, (row + 1) * columns + i, (row + 1) * columns + i + 1]) rock.add(at);
   }
+  // Each edge's middle, made once and shared by the two cells that edge bounds.
+  const lattice = positions.length / 3;
+  const middles = new Map<number, readonly [number, number]>();
+  const middle = (a: number, b: number): number => {
+    const key = Math.min(a, b) * lattice + Math.max(a, b);
+    const known = middles.get(key);
+    if (known !== undefined) return known[0];
+    const at = positions.length / 3;
+    // The height rule's own value there: its two ends' mean, floored, as the server's place stands it.
+    const height = Math.floor((heightMm[a]! + heightMm[b]!) / 2);
+    positions.push((positions[3 * a]! + positions[3 * b]!) / 2, (height + TOP_LIFT_MM) / 1000, (positions[3 * a + 2]! + positions[3 * b + 2]!) / 2);
+    surfaceMm.push((surfaceMm[2 * a]! + surfaceMm[2 * b]!) / 2, (surfaceMm[2 * a + 1]! + surfaceMm[2 * b + 1]!) / 2);
+    middles.set(key, [at, a * lattice + b]);
+    return at;
+  };
   for (let j = 0; j + 1 < rows; j += 1) for (let i = 0; i + 1 < columns; i += 1) {
     const sw = j * columns + i, se = sw + 1, nw = sw + columns, ne = nw + 1;
     all.push(sw, se, ne, sw, ne, nw);
@@ -536,16 +554,38 @@ function topMesh(top: SiteTop, runs: readonly SiteTopRun[]): {
       indices.push(sw, se, ne, sw, ne, nw);
       continue;
     }
-    const on = [sw, se, ne, nw].filter((corner) => rock.has(corner));
-    if (on.length !== 3) continue;
-    // The half the three corners span, turned as the cell's own halves are.
-    if (!rock.has(nw)) indices.push(sw, se, ne);
-    else if (!rock.has(se)) indices.push(sw, ne, nw);
-    else if (!rock.has(ne)) indices.push(sw, se, nw);
-    else indices.push(se, ne, nw);
+    // Round the cell counterclockwise from its south-west corner, as its own halves turn.
+    const corners = [sw, se, ne, nw];
+    const on = corners.map((corner) => rock.has(corner));
+    const count = on.filter(Boolean).length;
+    if (count === 0) continue;
+    if (count === 2 && on[0] === on[2]) {
+      // Two opposite corners: a corner of the cell at each, never a bridge across it.
+      for (let k = 0; k < 4; k += 1) {
+        if (!on[k]) continue;
+        const before = corners[(k + 3) % 4]!, after = corners[(k + 1) % 4]!;
+        indices.push(corners[k]!, middle(corners[k]!, after), middle(before, corners[k]!));
+      }
+      continue;
+    }
+    const outline: number[] = [];
+    for (let k = 0; k < 4; k += 1) {
+      const next = (k + 1) % 4;
+      if (on[k]) outline.push(corners[k]!);
+      if (on[k] !== on[next]) outline.push(middle(corners[k]!, corners[next]!));
+    }
+    for (let k = 1; k + 1 < outline.length; k += 1) indices.push(outline[0]!, outline[k]!, outline[k + 1]!);
   }
   if (indices.length === 0) return null;
-  return { positions, normals: pc.calculateNormals(positions, all), surfaceMm, indices, reachM: reach };
+  const latticeNormals = pc.calculateNormals(positions.slice(0, lattice * 3), all);
+  const normals = [...latticeNormals];
+  for (const [, pair] of [...middles.entries()].sort((one, two) => one[1][0] - two[1][0])) {
+    const a = Math.floor(pair[1] / lattice), b = pair[1] % lattice;
+    const n = [0, 1, 2].map((k) => latticeNormals[3 * a + k]! + latticeNormals[3 * b + k]!);
+    const length = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
+    normals.push(n[0]! / length, n[1]! / length, n[2]! / length);
+  }
+  return { positions, normals, surfaceMm, indices, reachM: reach };
 }
 
 /**
@@ -585,7 +625,10 @@ function plainMaterial(name: string, rgb: Rgb, gloss: number): pc.StandardMateri
  * way, with no backdrop. `datumMm` is how far above the sea the frame the land is drawn in has its
  * level 0, so the surfaces' heights stay above the sea: a floating island's level, for its top and
  * for the landscape's land drawn under a root that stands the island at the page's level 0. With
- * `matte`, every material the land wears is a matte copy, without its shine.
+ * `matte`, every material the land wears is a matte copy, without its shine. `rim` is more of the
+ * top in the page's frame, the volume's own upward faces near it beyond the cells its drawing
+ * draws (surface coordinates east and south, as the top's): drawn with the top, in its ground, so
+ * the top reads as one ground to the rock's edge.
  */
 export function drawSiteLand(
   device: pc.GraphicsDevice,
@@ -593,7 +636,7 @@ export function drawSiteLand(
   groundMaterial: pc.Material,
   groundRgb: Rgb,
   surfaces: LandSurfaces | null = null,
-  options: { readonly leaveOut?: (chunkX: number, chunkY: number) => boolean; readonly datumMm?: number; readonly matte?: boolean } = {},
+  options: { readonly leaveOut?: (chunkX: number, chunkY: number) => boolean; readonly datumMm?: number; readonly matte?: boolean; readonly rim?: SurfaceBatch } = {},
 ): DrawnSiteLand {
   const root = new pc.Entity('site-land');
   const meshes: pc.Mesh[] = [];
@@ -650,12 +693,16 @@ export function drawSiteLand(
   // A volume's top: the cells with rock under them as one mesh, over the volume's own top faces.
   const top = land.top === null ? null : topMesh(land.top, land.section.rockCells);
   if (top !== null) {
-    const mesh = buildSurfaceMesh(device, top, (s, t) => [s / 1000, t / 1000]);
-    meshes.push(mesh);
-    const near = new pc.MeshInstance(mesh, overlaid(groundMaterial));
-    ground.push(near);
-    triangles += top.indices.length / 3;
-    add('site-land:top', [near], true);
+    const drawn: pc.MeshInstance[] = [];
+    for (const batch of options.rim === undefined || options.rim.indices.length === 0 ? [top] : [top, options.rim]) {
+      const mesh = buildSurfaceMesh(device, batch, (s, t) => [s / 1000, t / 1000]);
+      meshes.push(mesh);
+      const near = new pc.MeshInstance(mesh, overlaid(groundMaterial));
+      ground.push(near);
+      drawn.push(near);
+      triangles += batch.indices.length / 3;
+    }
+    add('site-land:top', drawn, true);
   }
   // The backdrop: coloured by vertex, linear, by the land's surfaces over its ground, since it is
   // drawn only and never dressed; a dresser hands it the colour the near land wears instead.

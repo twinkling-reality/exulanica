@@ -21,6 +21,7 @@ import {
   drawSiteVolumes, parseStructuredSiteDrawing, readSiteLand, readSiteVolumes, siteMount, siteVolumeChunks,
   volumeChunkVertices, volumeOriginM, type SiteVolumes, type StructuredSiteDrawing,
 } from '../src/playcanvas/generated-site/index.js';
+import { trianglesWhere } from '../src/playcanvas/generated-site/site-volumes.js';
 import { readSurfaceFinish } from '../src/playcanvas/style-pack/ground-finish.js';
 import { packSiteDresser } from '../src/playcanvas/style-pack/site-dresser.js';
 
@@ -171,15 +172,32 @@ describe('drawing the volumes', () => {
     const faces = volumes.volumes[0]!.chunks.reduce((sum, chunk) => sum + upward(chunk), 0);
     expect(faces).toBeGreaterThan(0);
     // Everything covered: every upward face is left out, and every other face is kept.
-    const all = drawSiteVolumes(app.graphicsDevice, volumes, plain, (id) => id === 'small_island');
+    const all = drawSiteVolumes(app.graphicsDevice, volumes, plain, (id, _x, _y, _z, upward) => upward && id === 'small_island');
     expect(all.triangles).toBe(264 - faces);
     // Another volume covered, or none: nothing is left out.
-    expect(drawSiteVolumes(app.graphicsDevice, volumes, plain, (id) => id === 'elsewhere').triangles).toBe(264);
+    expect(drawSiteVolumes(app.graphicsDevice, volumes, plain, (id, _x, _y, _z, upward) => upward && id === 'elsewhere').triangles).toBe(264);
     // Covered only east of the volume's axis: some upward faces go, fewer than all.
-    const half = drawSiteVolumes(app.graphicsDevice, volumes, plain, (id, xMm) => id === 'small_island' && xMm > 0);
+    const half = drawSiteVolumes(app.graphicsDevice, volumes, plain, (id, xMm, _y, _z, upward) => upward && id === 'small_island' && xMm > 0);
     expect(half.triangles).toBeGreaterThan(264 - faces);
     expect(half.triangles).toBeLessThan(264);
     for (const drawn of [all, half]) drawn.destroy();
+  });
+});
+
+describe("a volume's upward faces, picked", () => {
+  it('splits a chunk into the triangles a test holds at all three corners and every other, between them every triangle once', () => {
+    for (const chunk of volumesOf().volumes[0]!.chunks) {
+      const high = (_x: number, _y: number, zMm: number, upward: boolean): boolean => upward && zMm > 0;
+      const picked = trianglesWhere(chunk, high), kept = trianglesWhere(chunk, high, true);
+      expect(picked.length + kept.length).toBe(chunk.triangles.length);
+      for (let i = 0; i < picked.length; i += 1) {
+        expect(chunk.normals[3 * picked[i]! + 2]!).toBeGreaterThanOrEqual(Math.round(0.72 * 32_767));
+        expect(chunk.positionsMm[3 * picked[i]! + 2]!).toBeGreaterThan(0);
+      }
+      expect(trianglesWhere(chunk, () => false)).toHaveLength(0);
+      expect(trianglesWhere(chunk, () => false, true)).toEqual(chunk.triangles);
+      expect(trianglesWhere(chunk, () => true)).toEqual(chunk.triangles);
+    }
   });
 });
 

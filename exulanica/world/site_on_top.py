@@ -47,11 +47,12 @@ from exulanica.grammar.grammars.site.records import (
     SiteStructureRecord,
     SiteWallRecord,
 )
-from exulanica.grammar.landform import CELL_MM, NearLand
+from exulanica.grammar.landform import CELL_MM, NearLand, WorldFrame, height_at, water_bodies
 from exulanica.grammar.landscape import (
     LandscapeDocument,
     LandscapeRefused,
     Placement,
+    placement_reach,
     placement_seed,
 )
 from exulanica.grammar.volumes import (
@@ -69,13 +70,19 @@ __all__ = [
     "BEARING_STEP_MDEG",
     "EYE_HEIGHT_MM",
     "GATE_CLEAR_MM",
+    "LAND_STEP_MM",
     "RIM_FARTHEST_MM",
     "RIM_NEAREST_MM",
     "ROCK_MARGIN_MM",
     "ROCK_UNDER_MM",
+    "VIEW_FARTHEST_MM",
+    "VIEW_HALF_HEIGHT_PERMILLE",
+    "VIEW_HALF_WIDTH_PERMILLE",
+    "VIEW_NEAREST_MM",
     "TopWorld",
     "arrival_beyond_gate",
     "check_on_rock",
+    "landmarks_in_view",
     "natural_top",
     "on_top",
     "open_rim_facing",
@@ -91,6 +98,14 @@ ROCK_UNDER_MM: Final = 1_000
 RIM_NEAREST_MM: Final = 10_000
 RIM_FARTHEST_MM: Final = 25_000
 EYE_HEIGHT_MM: Final = 1_600
+#: How far each side of its heading and up and down the arrival's view reaches, as tangents in
+#: thousandths (30 and 25 degrees), and the middle distance something in it stands at.
+VIEW_HALF_WIDTH_PERMILLE: Final = 577
+VIEW_HALF_HEIGHT_PERMILLE: Final = 466
+VIEW_NEAREST_MM: Final = 30_000
+VIEW_FARTHEST_MM: Final = 400_000
+#: How often along a heading the land is asked whether it is dry.
+LAND_STEP_MM: Final = 10_000
 #: The bearings tried, from north clockwise, and how far and in what steps each is walked.
 BEARING_STEP_MDEG: Final = 10_000
 _REACH_MM: Final = 64_000
@@ -280,26 +295,95 @@ def open_rim_facing(
     position_mm: Sequence[int],
     records: Sequence[object],
     bearings: range = range(0, _FULL_TURN, BEARING_STEP_MDEG),
+    seen: Callable[[int], int | None] | None = None,
 ) -> list[int] | None:
     """The facing, in thousandths along north and east, toward the nearest open rim from the
     arrival, of ``bearings`` (every one by default): within :data:`RIM_NEAREST_MM` to
     :data:`RIM_FARTHEST_MM` where one is, else the open rim nearest that range, the first bearing
-    among equals; None where no open rim lies within reach."""
+    among equals; None where no open rim lies within reach. With ``seen`` (what lies in view along
+    a bearing, :func:`landmarks_in_view`), an open rim with something in view comes first, the one
+    that holds it nearest the middle of the view among equals."""
     blockers = _blockers(records)
     start = (int(position_mm[0]), int(position_mm[1]))
-    best: tuple[int, int, int] | None = None
+    best: tuple[int, int, int, int, int] | None = None
     for bearing in bearings:
         distance = _rim(field, on, top, start, bearing, blockers)
         if distance is None:
             continue
         outside = max(0, RIM_NEAREST_MM - distance, distance - RIM_FARTHEST_MM)
-        found = (outside, distance, bearing)
+        off = None if seen is None else seen(bearing)
+        found = (0 if off is not None else 1, outside, off or 0, distance, bearing)
         if best is None or found < best:
             best = found
     if best is None:
         return None
-    sine, cosine = sin_cos(best[2])
+    sine, cosine = sin_cos(best[4])
     return [sine * 1000 // TURN_ONE, cosine * 1000 // TURN_ONE]
+
+
+def landmarks_in_view(
+    landscape: LandscapeDocument,
+    placement: Placement,
+    on: OnTop,
+    top: SiteTop,
+    world_id: str,
+    position_mm: Sequence[int],
+) -> Callable[[int], int | None]:
+    """What a person arriving at ``position_mm`` (the site's frame) on ``placement``'s top sees
+    along a bearing (the site's frame, from north clockwise): every other placed volume, and the
+    landscape's dry land (the coast and the land behind it), in the middle distance
+    (:data:`VIEW_NEAREST_MM` to :data:`VIEW_FARTHEST_MM`) and within the view
+    (:data:`VIEW_HALF_WIDTH_PERMILLE` each side, :data:`VIEW_HALF_HEIGHT_PERMILLE` up and down, from
+    eyes :data:`EYE_HEIGHT_MM` over the top). The answer is how far off the view's middle the
+    nearest to it lies, as a tangent in thousandths, or None where nothing is in view."""
+    from exulanica.world.site_land import land_seed
+
+    sine, cosine = sin_cos(placement.yaw_mdeg)
+    east, north = on.at_mm
+    x, y = int(position_mm[0]) + east, int(position_mm[1]) + north
+    world_x, world_y, world_z = placement.at_mm
+    eye = (
+        world_x + (cosine * x - sine * y) // TURN_ONE,
+        world_y + (sine * x + cosine * y) // TURN_ONE,
+        world_z + top.height_at(int(position_mm[0]), int(position_mm[1])) + EYE_HEIGHT_MM,
+    )
+    boxes = [placement_reach(other) for other in landscape.placements if other.id != placement.id]
+    land = landscape.land
+    width, depth = landscape.extent_mm
+    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(world_id, land.sha256))
+    seas = [body.level_mm for body in water_bodies(land, frame) if body.kind == "sea"]
+    # Dry land is above the sea where the land has one; a land with none is dry everywhere.
+    sea = min(seas) if seas else None
+
+    def high_enough(low_z: int, high_z: int, distance: int) -> bool:
+        reach = distance * VIEW_HALF_HEIGHT_PERMILLE // 1000
+        return high_z >= eye[2] - reach and low_z <= eye[2] + reach
+
+    @functools.cache
+    def seen(bearing: int) -> int | None:
+        # The bearing in the landscape's frame: the volume's frame is turned by its yaw.
+        along_x, along_y = sin_cos(bearing - placement.yaw_mdeg)
+        best = None
+        for (low_x, low_y, low_z), (high_x, high_y, high_z) in boxes:
+            dx, dy = (low_x + high_x) // 2 - eye[0], (low_y + high_y) // 2 - eye[1]
+            ahead = (dx * along_x + dy * along_y) // TURN_ONE
+            aside = abs(dx * along_y - dy * along_x) // TURN_ONE
+            if not VIEW_NEAREST_MM <= ahead <= VIEW_FARTHEST_MM:
+                continue
+            off = aside * 1000 // ahead
+            if off <= VIEW_HALF_WIDTH_PERMILLE and high_enough(low_z, high_z, ahead):
+                best = off if best is None else min(best, off)
+        if best == 0:
+            return 0
+        for distance in range(VIEW_NEAREST_MM, VIEW_FARTHEST_MM + 1, LAND_STEP_MM):
+            px = eye[0] + distance * along_x // TURN_ONE
+            py = eye[1] + distance * along_y // TURN_ONE
+            ground = height_at(land, frame, px, py)
+            if (sea is None or ground > sea) and high_enough(ground, ground, distance):
+                return 0
+        return best
+
+    return seen
 
 
 @dataclass(frozen=True)

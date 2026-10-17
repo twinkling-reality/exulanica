@@ -1,5 +1,5 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { LAND_CELL_MM, landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type FurnitureForms, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SiteTop, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { LAND_CELL_MM, VOLUME_NORMAL_ONE, landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type FurnitureForms, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SiteTop, type TerrainOccupancyProof, type SurfaceMaterials, siteTopHeightMm } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
@@ -12,7 +12,8 @@ import { isTerrainSiteDrawing, type SiteDrawing, type SiteTopSection, type Struc
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, slotColour, type DrawnSiteSlots } from './site-primitives.js';
 import { LAND_GROUND_RGB, VOLUME_ROCK_RGB, drapeSiteSlots, drawSiteLand, type SiteLand } from './site-land.js';
-import { drawSiteVolumes, landscapePlacementM, type SiteVolumes } from './site-volumes.js';
+import { VOLUME_UPWARD_NORMAL, drawSiteVolumes, landscapePlacementM, trianglesWhere, type SiteVolumes } from './site-volumes.js';
+import type { SurfaceBatch } from '../generated-tile/surface-mesh.js';
 import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
 import { measureSite } from './site-measurements.js';
@@ -181,6 +182,89 @@ function topCovers(section: SiteTopSection, top: SiteTop): (volumeId: string, xM
   };
 }
 
+/** How near the graded top, above or below, a volume's own upward face is drawn as the top's ground. */
+const TOP_RIM_MM = 500;
+
+/**
+ * Which points of the volume a site's top stands on (its own frame, millimetres east, north and
+ * up) lie within {@link TOP_RIM_MM} of the graded top, inside the top's square.
+ */
+function topNear(section: SiteTopSection, top: SiteTop): (volumeId: string, xMm: number, yMm: number, zMm: number) => boolean {
+  const [east, north] = section.offsetMm, [x0, y0] = top.originMm;
+  const x1 = x0 + (top.columns - 1) * LAND_CELL_MM, y1 = y0 + (top.rows - 1) * LAND_CELL_MM;
+  return (volumeId, xMm, yMm, zMm) => {
+    if (volumeId !== section.placement) return false;
+    const e = xMm - east, n = yMm - north;
+    return e >= x0 && e <= x1 && n >= y0 && n <= y1 && Math.abs(zMm - siteTopHeightMm(top, e, n)) <= TOP_RIM_MM;
+  };
+}
+
+/**
+ * How far under the graded top the volume's rock beneath the cells its drawing draws as land is
+ * drawn at most: the rock's coarser mesh cuts across the top's own cells by a few centimetres, and
+ * no rock rises through the land drawn over it.
+ */
+const TOP_SINK_MM = 50;
+
+/**
+ * The height a point of the volume a site's top stands on is drawn at (its own frame, millimetres):
+ * under a cell its drawing draws as land, never above {@link TOP_SINK_MM} under the graded top;
+ * its own everywhere else.
+ */
+function topUnder(
+  section: SiteTopSection,
+  top: SiteTop,
+  covers: (volumeId: string, xMm: number, yMm: number) => boolean,
+): (volumeId: string, xMm: number, yMm: number, zMm: number) => number {
+  const [east, north] = section.offsetMm;
+  return (volumeId, xMm, yMm, zMm) => (covers(volumeId, xMm, yMm)
+    ? Math.min(zMm, siteTopHeightMm(top, xMm - east, yMm - north) - TOP_SINK_MM) : zMm);
+}
+
+/**
+ * The volume's own faces near its graded top ({@link topNear}), whichever way they face, and not
+ * upward faces wholly under the cells its drawing draws as land, in the page's frame (the site's):
+ * metres east, up and south, and surface coordinates east and south as the top's own, so they are
+ * drawn with the top, in its ground. A corner that does not face up is given the top's own up, so a
+ * step's side reads as the ground it is part of and not as a slope. None where the landscape has no
+ * such faces.
+ */
+function topRim(
+  volumes: SiteVolumes,
+  section: SiteTopSection,
+  near: (volumeId: string, xMm: number, yMm: number, zMm: number) => boolean,
+  covers: (volumeId: string, xMm: number, yMm: number) => boolean,
+): SurfaceBatch | undefined {
+  const own = volumes.volumes.find(({ volume }) => volume.id === section.placement);
+  if (own === undefined) return undefined;
+  const [east, north] = section.offsetMm;
+  const positions: number[] = [], normals: number[] = [], surfaceMm: number[] = [], indices: number[] = [];
+  for (const chunk of own.chunks) {
+    const p = chunk.positionsMm, n = chunk.normals;
+    const picked = trianglesWhere(chunk, (xMm, yMm, zMm) => near(own.volume.id, xMm, yMm, zMm));
+    const index = new Map<number, number>();
+    const upward = (v: number): boolean => n[3 * v + 2]! >= VOLUME_UPWARD_NORMAL;
+    for (let i = 0; i < picked.length; i += 3) {
+      const corners = [picked[i]!, picked[i + 1]!, picked[i + 2]!];
+      if (corners.every((v) => upward(v) && covers(own.volume.id, p[3 * v]!, p[3 * v + 1]!))) continue;
+      for (const v of corners) {
+        let at = index.get(v);
+        if (at === undefined) {
+          at = positions.length / 3;
+          index.set(v, at);
+          const e = p[3 * v]! - east, s = -(p[3 * v + 1]! - north);
+          positions.push(e / 1000, p[3 * v + 2]! / 1000, s / 1000);
+          if (upward(v)) normals.push(n[3 * v]! / VOLUME_NORMAL_ONE, n[3 * v + 2]! / VOLUME_NORMAL_ONE, -n[3 * v + 1]! / VOLUME_NORMAL_ONE);
+          else normals.push(0, 1, 0);
+          surfaceMm.push(e, s);
+        }
+        indices.push(at);
+      }
+    }
+  }
+  return indices.length === 0 ? undefined : { positions, normals, surfaceMm, indices };
+}
+
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
   if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
   const { look, caps } = drawnWithin(options, drawing.extent.enclosure === 'open' ? 'open_site' : 'indoor_site');
@@ -220,10 +304,17 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       // A volume's top is drawn in the frame of the island's level 0: its surfaces' heights are
       // above the sea by the island's altitude, which its landscape's site frame states.
       const datumMm = onTop ? options.landscape?.drawing.siteFrame?.atMm[2] ?? 0 : 0;
+      // On a volume's top the site's graded top is drawn as land over the cells it lists, and the
+      // volume's own upward faces near it beyond them in the same ground, so the top is grass to the
+      // rock's edge; the volume leaves out its upward faces under both.
+      const covers = onTop ? topCovers(land!.section as SiteTopSection, land!.top!) : null;
+      const near = onTop ? topNear(land!.section as SiteTopSection, land!.top!) : null;
+      const rim = covers === null || near === null || options.landscape == null ? undefined
+        : topRim(options.landscape, land!.section as SiteTopSection, near, covers);
       const drawnLand = land === null ? null : drawSiteLand(host.app.graphicsDevice, land,
         landBaseShape?.render?.meshInstances[0]?.material ?? landPlain!,
         landBase === null ? LAND_GROUND_RGB : slotColour(landBase, drawing.extent.enclosure, materials),
-        options.landSurfaces ?? null, { datumMm, matte: onTop });
+        options.landSurfaces ?? null, { datumMm, matte: onTop, ...(rim === undefined ? {} : { rim }) });
       if (drawnLand !== null) {
         host.environmentRoot.addChild(drawnLand.root);
         // The land is the base ground: the slot is kept for what dresses it, and not drawn.
@@ -242,10 +333,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         rockPlain.diffuse = new pc.Color(...VOLUME_ROCK_RGB);
         rockPlain.update();
       }
-      // On a volume's top the site's graded top is drawn as land over the cells it lists, so that
-      // volume's own upward faces under those cells are left out.
       const drawnVolumes = volumes === null ? null : drawSiteVolumes(host.app.graphicsDevice, volumes, rockPlain!,
-        land !== null && land.top !== null ? topCovers(land.section, land.top) : undefined);
+        covers === null || near === null ? undefined : (id, xMm, yMm, zMm, upward) => (upward && covers(id, xMm, yMm)) || near(id, xMm, yMm, zMm),
+        covers === null ? undefined : topUnder(land!.section as SiteTopSection, land!.top!, covers));
       if (drawnVolumes !== null) host.environmentRoot.addChild(drawnVolumes.root);
       // The landscape's own land below a site on a volume's top, under the landscape's root with its
       // volumes, wearing the world's look as any land does (the site's base ground as dressed, its

@@ -417,11 +417,18 @@ datum. In order:
 4. A person arrives on the open top outside the site's gate in its south edge, between the gate
    and the rim: the first of 3, 2.5, 2 and 1.5 m beyond the gate with rock 1 m under the top there
    and a metre either side and beyond, or in the gate's opening where the site fills the top. They
-   face the nearest open rim away from the site: of the bearings 10 degrees apart from east
-   through south to west, the one whose rock ends nearest within 10 to 25 m (else the open rim
-   nearest that range), walked in half-metre steps over nothing taller than eye height (1.6 m: a
-   building, a wall or fixture that tall, or ground rising so far); straight out of the gate where
-   no rim is open. The site and its fence are behind them. Both are stored with the arrival.
+   face an open rim away from the site: of the bearings 10 degrees apart from east through south
+   to west whose rock ends within reach, walked in half-metre steps over nothing taller than eye
+   height (1.6 m: a building, a wall or fixture that tall, or ground rising so far), first one with
+   something in the middle distance in view, then the one whose rock ends nearest within 10 to 25 m
+   (else nearest that range), then the one that holds what is in view nearest the view's middle;
+   straight out of the gate where no rim is open. In view is another placed volume whose box's
+   middle stands 30 to 400 m ahead, within 30 degrees either side of the bearing and with some of
+   it within 25 degrees above or below eyes 1.6 m over the top, or the landscape's dry land (above
+   its sea, where it has one) asked every 10 m along the bearing over that range, within the same
+   25 degrees (`landmarks_in_view`): another island, a stack or the coast, never open sea alone
+   where the rim offers more. The site and its fence are behind them. Both are stored with the
+   arrival, so a world made before keeps its own.
 
 The receipt is version 6's with the land the volume's top land, its digest and the land rules the
 volume rules name for a top land (land rules 3), never the newest; the landscape and its rules
@@ -504,10 +511,16 @@ stands slots, people and things where the server's place stands them (pinned by
 that asks a height, a dry point or its water, with no chunks and no backdrop
 (`readSiteTopLand`, `web/packages/atlas-react/src/playcanvas/generated-site/site-land.ts`); it is
 drawn as one mesh of the cells its drawing lists in `rock_cells`, 3 mm over the island's rock,
-worn in the site's base ground with the land's slope bands, its rim a fringe of half cells where
-three of a cell's corners are on rock, so the edge runs on the cells' diagonals and not in steps.
-Under those cells the island's own upward faces are not drawn, so its coarser rock never shows
-through the land; the island's rock draws the rest of the top to its rim and the rim's face below.
+worn in the site's base ground with the land's slope bands. Its rim follows the rock, not the grid:
+a cell beside the listed ones draws, as marching squares do, the part of it round its corners on
+rock out to the middles of its edges that lead off the rock (a middle at the height rule's value
+there), so the edge runs through the cells' half points and takes no square bites.
+Under those cells the island's own upward faces are not drawn, and its rock there is drawn at least
+5 cm under the graded top, so its coarser mesh never shows through the land; its faces beyond them that lie within 0.5 m of the graded top, above or below,
+inside the top's square, whichever way they face, are drawn with the top in its ground (the same
+mesh's material, surface coordinates and bands, a step's side given the ground's up) and not as
+rock, so the top is one ground to the rock's edge with no seam; the island's rock draws the rim's
+face below and the underside.
 Land cover grows only on chunks, so none grows on a top, and no scenery stands beyond it. `readLandscapeDrawing` reads version 2, and the page holds it to the site's top,
 landscape and placement; its whole landscape (the volumes and the land below, read from
 `landscape/ground` by `readLandscapeGround` and drawn as a site's land is) stands under one root at
@@ -654,8 +667,9 @@ made volumes by digest.
   people; they stand off a site, or carry it on their top;
   spans, landmark flora and far layers are not part of `exulanica.landscape/v1`.
 - A world on a volume's top stands on one volume's top, its people held to the site's rectangle;
-  only kinds whose people all live on the site can stand there. Where the top's drawn cells end
-  short of the rock's own edge, the island's rock shows there in its top look.
+  only kinds whose people all live on the site can stand there. Where the island's own top falls
+  more than 0.5 m from the graded top before the rock's edge, the island's rock shows there in its
+  top look.
   Its landscape drawing realizes the ground below as a site's land is realized, a few seconds more
   than a site on land's.
 - Realized chunks and tops are kept in the kind worker's memory with the landscape's drawing, in a

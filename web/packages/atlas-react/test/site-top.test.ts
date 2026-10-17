@@ -206,7 +206,7 @@ describe("a volume's graded top as a site's land", () => {
     expect(() => readSiteTopLand(parseStructuredSiteDrawing(level), structuredClone(FIXTURE.top), sha256)).toThrow("stands on no volume's top");
   });
 
-  it('draws two triangles for each cell with rock under it and half of each rim cell three of whose corners are on rock, with no backdrop', () => {
+  it('draws two triangles for each cell with rock under it and, round the rim, the part of each cell beside the rock out to its edges\' middles, with no backdrop', () => {
     const { app } = nullApp();
     const land = topLand();
     const drawn = drawSiteLand(app.graphicsDevice, land, new pc.StandardMaterial(), [0.4, 0.5, 0.3]);
@@ -214,40 +214,45 @@ describe("a volume's graded top as a site's land", () => {
     expect(drawn.ground).toHaveLength(1);
     const cells = held();
     expect(cells.size).toBe(1169);
-    // The rim's fringe: cells outside the runs three of whose corners are corners of a held cell.
+    // The rim: cells outside the runs with corners that are corners of a held cell. As marching
+    // squares draw them, each draws one triangle for each such corner (a corner, a half, a cell less
+    // a corner; two opposite corners each their own).
     const { columns, rows } = land.top;
     const rock = new Set<string>();
     for (const cell of cells) {
       const [row, column] = cell.split(',').map(Number) as [number, number];
       for (const [dj, di] of [[0, 0], [0, 1], [1, 0], [1, 1]] as const) rock.add(`${row + dj},${column + di}`);
     }
-    let fringe = 0;
+    let rim = 0, rimCells = 0;
     for (let j = 0; j + 1 < rows; j += 1) for (let i = 0; i + 1 < columns; i += 1) {
       if (cells.has(`${j},${i}`)) continue;
-      if ([[0, 0], [0, 1], [1, 0], [1, 1]].filter(([dj, di]) => rock.has(`${j + dj!},${i + di!}`)).length === 3) fringe += 1;
+      const on = [[0, 0], [0, 1], [1, 0], [1, 1]].filter(([dj, di]) => rock.has(`${j + dj!},${i + di!}`)).length;
+      if (on === 0) continue;
+      rim += on;
+      rimCells += 1;
     }
-    expect(fringe).toBeGreaterThan(10);
-    expect(drawn.triangles).toBe(2 * cells.size + fringe);
+    expect(rimCells).toBeGreaterThan(10);
+    expect(drawn.triangles).toBe(2 * cells.size + rim);
     expect(drawn.draws).toBe(1);
-    // Every triangle lies in a held cell or the fringe, at the top's height there, a few millimetres over it.
+    // Every triangle lies in a held cell or a rim cell, at the top's height there, a few millimetres over it.
     const mesh = drawn.ground[0]!.mesh;
     const positions: number[] = [], indices: number[] = [];
     mesh.getPositions(positions);
     mesh.getIndices(indices);
-    expect(indices.length).toBe(6 * cells.size + 3 * fringe);
+    expect(indices.length).toBe(6 * cells.size + 3 * rim);
     const [x0, y0] = land.top.originMm;
     const found = new Set<string>();
     for (let t = 0; t < indices.length; t += 3) {
       const corners = [0, 1, 2].map((k) => indices[t + k]!);
-      const east = Math.min(...corners.map((v) => positions[3 * v]!)), north = Math.min(...corners.map((v) => -positions[3 * v + 2]!));
-      found.add(`${Math.round((north * 1000 - y0) / 1000)},${Math.round((east * 1000 - x0) / 1000)}`);
+      const east = corners.reduce((sum, v) => sum + positions[3 * v]!, 0) / 3, north = corners.reduce((sum, v) => sum - positions[3 * v + 2]!, 0) / 3;
+      found.add(`${Math.floor((north * 1000 - y0) / 1000)},${Math.floor((east * 1000 - x0) / 1000)}`);
       for (const v of corners) {
         const height = land.groundMm(Math.round(positions[3 * v]! * 1000), Math.round(-positions[3 * v + 2]! * 1000));
         expect(positions[3 * v + 1]! * 1000 - height).toBeCloseTo(3, 2);
       }
     }
     expect([...cells].every((cell) => found.has(cell))).toBe(true);
-    expect(found.size).toBe(cells.size + fringe);
+    expect(found.size).toBe(cells.size + rimCells);
     // Faces up, as the near land's do.
     const normals: number[] = [];
     mesh.getNormals(normals);
@@ -342,9 +347,9 @@ describe("a site on a volume's top, mounted", () => {
     expect(camera.camera!.farClip).toBeGreaterThan(400 * Math.SQRT2);
     const said = JSON.parse(canvas.dataset['siteLand']!) as Record<string, unknown>;
     expect(said).toMatchObject({ top: FIXTURE.top_sha256, draped: 9, draws: 1 });
-    // The held cells' two triangles each and the rim's fringe of half cells.
+    // The held cells' two triangles each and the rim's cells beside the rock, a triangle a corner.
     expect(said['triangles']).toBeGreaterThan(2 * 1169);
-    expect(said['triangles']).toBeLessThan(2 * 1169 + 200);
+    expect(said['triangles']).toBeLessThan(2 * 1169 + 400);
     expect(said['chunks']).toBeUndefined();
     const landscapeSaid = JSON.parse(canvas.dataset['siteLandscape']!) as { volumes: { id: string }[]; ground: { chunks: number } };
     expect(landscapeSaid.volumes.map((one) => one.id)).toEqual(['west_stack', 'east_stack', 'isle']);
@@ -367,6 +372,93 @@ describe("a site on a volume's top, mounted", () => {
     expect(() => siteMount(drawing, { servedBytes: 1 })).toThrow("mounted with the top its drawing names");
     const other = readSiteTopLand(parseStructuredSiteDrawing(served()), structuredClone(FIXTURE.top), sha256);
     expect(() => siteMount(drawing, { servedBytes: 1, land: other })).toThrow("mounted with the top its drawing names");
+  });
+});
+
+describe("the island's own top beyond the drawn cells", () => {
+  /**
+   * The island with one chunk of the server's shape: a cell of the top's square no drawn cell holds,
+   * its two upward faces 0.1 m over the graded top there, the same cell's two faces 3 m under it,
+   * and a step's side facing west from the graded top to 0.3 m under it along the cell's west edge.
+   */
+  const withRim = (): SiteVolumes => {
+    const volumes = volumesOf(0);
+    const top = topLand().top!;
+    const [east, north] = drawing.top!.offsetMm, [x0, y0] = top.originMm;
+    const corners = [[0, 0], [1000, 0], [1000, 1000], [0, 1000]] as const;
+    const positions: number[] = [];
+    for (const lift of [100, -3000]) {
+      for (const [dx, dy] of corners) positions.push(east + x0 + dx, north + y0 + dy, siteTopHeightMm(top, x0 + dx, y0 + dy) + lift);
+    }
+    for (const [dy, drop] of [[0, 0], [1000, 0], [1000, -300], [0, -300]] as const) {
+      positions.push(east + x0, north + y0 + dy, siteTopHeightMm(top, x0, y0 + dy) + drop);
+    }
+    const up = [0, 0, 32_767], west = [-32_767, 0, 0];
+    const chunk = {
+      inputSha256: 'i', volumeSha256: 'v', chunk: [0, 0, 0] as const, cellMm: 1000, sha256: 'c',
+      positionsMm: Int32Array.from(positions), normals: Int16Array.from([...Array.from({ length: 8 }, () => up), ...Array.from({ length: 4 }, () => west)].flat()),
+      vertexLooks: new Uint8Array(12), triangles: Uint32Array.from([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11]),
+    };
+    expect(held().has('0,0')).toBe(false);
+    return { ...volumes, volumes: volumes.volumes.map((one) => (one.volume.id === 'isle' ? { ...one, chunks: [chunk] } : one)) };
+  };
+
+  it("draws the island's upward faces near the graded top with the top, in its ground, and keeps the rest rock", () => {
+    const { app, camera, environmentRoot } = nullApp();
+    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
+    const options = { servedBytes: 1, land: topLand(), look: edgedLook(), landSurfaces: SURFACES, materials: MATERIALS };
+    const plain = siteMount(drawing, { ...options, landscape: volumesOf(0) }).attach({ app, camera, environmentRoot });
+    const plainSaid = JSON.parse(canvas.dataset['siteLand']!) as { draws: number; triangles: number };
+    plain.dispose();
+    const attachment = siteMount(drawing, { ...options, landscape: withRim() }).attach({ app, camera, environmentRoot });
+    const said = JSON.parse(canvas.dataset['siteLand']!) as { draws: number; triangles: number };
+    // The two faces near the top and the step's side are more of the top: a second draw of four triangles.
+    expect(said.draws).toBe(plainSaid.draws + 1);
+    expect(said.triangles).toBe(plainSaid.triangles + 4);
+    const own = environmentRoot.children.find((child) => child.name === 'site-land') as pc.Entity;
+    const drawn = (own.findByName('site-land:top') as pc.Entity).render!.meshInstances;
+    expect(drawn).toHaveLength(2);
+    // In the very ground the top wears, matte and banded as it is.
+    expect(drawn[1]!.material).toBe(drawn[0]!.material);
+    expect((drawn[1]!.material as pc.StandardMaterial).gloss).toBe(0);
+    // Drawn as ground facing up, the step's side as well, so the slope bands read it as the top.
+    const normals: number[] = [];
+    drawn[1]!.mesh.getNormals(normals);
+    expect(normals.filter((_, k) => k % 3 === 1).every((upward) => upward > 0.7)).toBe(true);
+    // The island draws only the faces 3 m under the top.
+    const isle = environmentRoot.findByName('site-volumes:isle') as pc.Entity;
+    expect(isle.render!.meshInstances.map((instance) => instance.mesh.primitive[0]!.count)).toEqual([6]);
+    attachment.dispose();
+  });
+});
+
+describe("the island's rock under the drawn top", () => {
+  it('draws the rock under a drawn cell at least 5 cm under the graded top, where its coarser mesh would rise through the land', () => {
+    const volumes = volumesOf(0);
+    const top = topLand().top!;
+    const [east, north] = drawing.top!.offsetMm, [x0, y0] = top.originMm;
+    const [row, column] = [...held()][0]!.split(',').map(Number) as [number, number];
+    const [e, n] = [x0 + column * 1000, y0 + row * 1000];
+    // A steep face of the rock: two corners 3 cm over the top in a held cell, one 1.2 m under it.
+    const points = [[e, n, 30], [e + 1000, n, 30], [e + 500, n + 500, -1200]] as const;
+    const chunk = {
+      inputSha256: 'i', volumeSha256: 'v', chunk: [0, 0, 0] as const, cellMm: 1000, sha256: 'c',
+      positionsMm: Int32Array.from(points.flatMap(([pe, pn, lift]) => [east + pe, north + pn, siteTopHeightMm(top, pe, pn) + lift])),
+      normals: Int16Array.from([0, -32_767, 0, 0, -32_767, 0, 0, -32_767, 0]), vertexLooks: new Uint8Array(3),
+      triangles: Uint32Array.from([0, 1, 2]),
+    };
+    const landscape = { ...volumes, volumes: volumes.volumes.map((one) => (one.volume.id === 'isle' ? { ...one, chunks: [chunk] } : one)) };
+    const { app, camera, environmentRoot } = nullApp();
+    const attachment = siteMount(drawing, { servedBytes: 1, land: topLand(), look: edgedLook(), landSurfaces: SURFACES, materials: MATERIALS, landscape })
+      .attach({ app, camera, environmentRoot });
+    const isle = environmentRoot.findByName('site-volumes:isle') as pc.Entity;
+    const drawn: number[] = [];
+    isle.render!.meshInstances[0]!.mesh.getPositions(drawn);
+    // Kept as rock, its high corners drawn 5 cm under the top, its low one where it is.
+    expect(drawn[1]! * 1000).toBeCloseTo(siteTopHeightMm(top, e, n) - 50, 1);
+    expect(drawn[4]! * 1000).toBeCloseTo(siteTopHeightMm(top, e + 1000, n) - 50, 1);
+    expect(drawn[7]! * 1000).toBeCloseTo(siteTopHeightMm(top, e + 500, n + 500) - 1200, 1);
+    attachment.dispose();
   });
 });
 
