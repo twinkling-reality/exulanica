@@ -5,7 +5,7 @@ version, written from the parts file and the committed manifests.
     uv run python scripts/style_packs/composed_settings.py --check  # refuse if it differs
 
 ``assets/style-packs/settings/setting-composed.v1.json`` holds, for each committed pack and each
-part of ``setting-parts.v1.json``, the exact setting the server composes
+part of ``setting-parts.v2.json``, the exact setting the server composes
 (``exulanica.world.world_settings.compose_setting``), and one setting of a part from every axis
 together. The page never composes a setting, so this file is what its tests draw: the browser's
 reader applies each to its pack, and each is held to the rule every look's own light is held to, a

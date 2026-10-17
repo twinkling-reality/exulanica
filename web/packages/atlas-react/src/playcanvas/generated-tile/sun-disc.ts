@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import type { Rgb } from './look.js';
+import type { RenderMoon, RenderStars, Rgb } from './look.js';
 import { SUN_DISC_COS } from './sky.js';
 
 /*
@@ -17,21 +17,92 @@ import { SUN_DISC_COS } from './sky.js';
  * built when the sky is first drawn, after the environment installs this. The sky is drawn in world
  * axes (no skybox rotation is set anywhere), which the block relies on.
  *
+ * The same block draws what a look states of the night (`sky.stars`, `sky.moon`). The disc becomes a
+ * moon with darker seas and a limb a little darker than its middle. Stars are points a pixel wide,
+ * one at most in each cell of a grid of `STAR_CELLS` a cube face, placed in the middle half of its
+ * cell so a neighbouring cell never cuts it, behind the clouds by the share of the sky they leave
+ * clear (the drawn sky's alpha, `renderSkyFaces`), and fading out over the lowest 7 degrees. Their
+ * hashes are integer only, so the same seed draws the same stars on every GPU. A look that states
+ * neither skips both branches.
+ *
  * GLSL only: on a WebGPU device nothing is installed and the faces keep their baked disc.
  */
 
-const DECLARATIONS = `
+/** Cells along a cube face's edge for the stars: about 0.7 degrees each, ten pixels at a 70 degree view a thousand high. */
+export const STAR_CELLS = 128;
+
+export const SKY_DECLARATIONS = `
 uniform vec4 exuSunDisc;        // xyz toward the sun, w the cosine of the disc's radius (0: off)
 uniform vec3 exuSunDiscColour;  // linear radiance of the disc
+uniform vec4 exuMoon;           // x how much darker its seas, y the seed, z 1 to draw the disc as a moon (0: off)
+uniform vec4 exuStars;          // x the share of cells with a star, y the brightest one's radiance, z the seed, w 1 to draw (0: off)
+const float EXU_STAR_CELLS = ${STAR_CELLS.toFixed(1)};
+
+uint exuHash(uint v) {
+    v ^= v >> 16u; v *= 0x7feb352du;
+    v ^= v >> 15u; v *= 0x846ca68bu;
+    return v ^ (v >> 16u);
+}
+float exuUnit(uint v) { return float(v >> 8u) / 16777216.0; }
+float exuLattice(ivec2 at, uint seed) { return exuUnit(exuHash(uint(at.x) * 0x8da6b343u ^ exuHash(uint(at.y) * 0xd8163841u ^ seed))); }
+float exuNoise(vec2 p, uint seed) {
+    ivec2 at = ivec2(floor(p));
+    vec2 f = fract(p);
+    vec2 w = f * f * (3.0 - 2.0 * f);
+    float a = exuLattice(at, seed), b = exuLattice(at + ivec2(1, 0), seed);
+    float c = exuLattice(at + ivec2(0, 1), seed), d = exuLattice(at + ivec2(1, 1), seed);
+    return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+}
+// The moon's face toward unit d: its limb a little darker, its seas darker by exuMoon.x.
+float exuMoonFace(vec3 d) {
+    vec3 c = exuSunDisc.xyz;
+    float radius = sqrt(max(2.0 * (1.0 - exuSunDisc.w), 1e-12));
+    vec3 side = normalize(cross(abs(c.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), c));
+    vec2 p = vec2(dot(d, side), dot(d, cross(c, side))) / radius;
+    float limb = 0.72 + 0.28 * sqrt(1.0 - min(dot(p, p), 1.0));
+    uint seed = uint(exuMoon.y);
+    float seas = smoothstep(0.5, 0.64, 0.6 * exuNoise(p * 2.2 + 7.0, seed) + 0.4 * exuNoise(p * 5.0 - 3.0, seed + 1u));
+    return limb * (1.0 - exuMoon.x * seas);
+}
 `;
 
 // Both of the chunk's sampling branches flip x before sampling (`dir.x *= -1.0` for a cubemap),
 // so the world direction is the flip undone.
-const BLOCK = `
+export const SKY_BLOCK = `
+            vec3 exuDir = normalize(dir * vec3(-1.0, 1.0, 1.0));
             if (exuSunDisc.w > 0.0) {
-                float discCos = dot(normalize(dir * vec3(-1.0, 1.0, 1.0)), exuSunDisc.xyz);
+                float discCos = dot(exuDir, exuSunDisc.xyz);
                 float discEdge = max(fwidth(discCos), 1e-7);
-                linear += exuSunDiscColour * smoothstep(exuSunDisc.w - discEdge, exuSunDisc.w + discEdge, discCos);
+                float inDisc = smoothstep(exuSunDisc.w - discEdge, exuSunDisc.w + discEdge, discCos);
+                linear += exuSunDiscColour * (exuMoon.z > 0.0 ? exuMoonFace(exuDir) : 1.0) * inDisc;
+            }
+            if (exuStars.w > 0.0) {
+                // A pixel's angle, taken before any branch a pixel decides for itself.
+                float pixelAngle = max(length(fwidth(exuDir)), 1e-6);
+                #ifdef SKY_CUBEMAP
+                    float clearShare = textureCube(texture_cubeMap, dir).a;
+                #else
+                    float clearShare = 1.0;
+                #endif
+                vec3 a = abs(exuDir);
+                float major;
+                vec2 across;
+                uint face;
+                if (a.x >= a.y && a.x >= a.z) { major = a.x; across = exuDir.yz; face = exuDir.x > 0.0 ? 0u : 1u; }
+                else if (a.y >= a.z) { major = a.y; across = exuDir.xz; face = exuDir.y > 0.0 ? 2u : 3u; }
+                else { major = a.z; across = exuDir.xy; face = exuDir.z > 0.0 ? 4u : 5u; }
+                vec2 grid = (across / major * 0.5 + 0.5) * EXU_STAR_CELLS;
+                vec2 cell = floor(grid);
+                uint h = exuHash(face * 0x9e3779b9u ^ exuHash(uint(cell.x) * 0x85ebca6bu ^ exuHash(uint(cell.y) * 0xc2b2ae35u ^ uint(exuStars.z))));
+                if (exuDir.y > 0.0 && exuUnit(h) < exuStars.x) {
+                    uint h2 = exuHash(h);
+                    uint h3 = exuHash(h2 ^ 0x68e31da4u);
+                    vec2 at = cell + 0.25 + 0.5 * vec2(exuUnit(h2), exuUnit(exuHash(h2)));
+                    float pixels = length(grid - at) / max(pixelAngle * EXU_STAR_CELLS * 0.5 / major, 1e-4);
+                    float brightness = 0.08 + 0.92 * pow(exuUnit(h3), 6.0);
+                    vec3 tint = mix(vec3(1.0, 0.86, 0.72), vec3(0.78, 0.86, 1.0), exuUnit(exuHash(h3)));
+                    linear += exuStars.y * brightness * tint * exp(-pixels * pixels * 1.6) * clearShare * smoothstep(0.0, 0.12, exuDir.y);
+                }
             }
 `;
 
@@ -44,7 +115,7 @@ export function sunDiscSkyChunk(skybox: string): string | null {
   const at = skybox.indexOf(ANCHOR);
   const main = skybox.indexOf(MAIN);
   if (at < 0 || main < 0 || main > at || skybox.indexOf(FLIP) < 0 || skybox.indexOf(FLIP) > at) return null;
-  return skybox.slice(0, main) + DECLARATIONS + skybox.slice(main, at) + BLOCK.trimStart() + '            ' + skybox.slice(at);
+  return skybox.slice(0, main) + SKY_DECLARATIONS + skybox.slice(main, at) + SKY_BLOCK.trimStart() + '            ' + skybox.slice(at);
 }
 
 const installed = new WeakSet<pc.GraphicsDevice>();
@@ -70,4 +141,17 @@ export function setSunDisc(device: pc.GraphicsDevice, toSun: readonly [number, n
   }
   scope.resolve('exuSunDisc').setValue([toSun[0], toSun[1], toSun[2], SUN_DISC_COS]);
   scope.resolve('exuSunDiscColour').setValue([radiance[0], radiance[1], radiance[2]]);
+}
+
+/**
+ * Draw what `sky` states of the night: its stars (their radiance scaled by the sky's own intensity, as
+ * the disc's is) and its disc as a moon; neither for a sky that states none, or for null. A seed is
+ * taken below 2^24, where a float uniform holds it exactly.
+ */
+export function setSkyMarks(device: pc.GraphicsDevice, sky: { readonly intensity: number; readonly stars?: RenderStars; readonly moon?: RenderMoon } | null): void {
+  const scope = device.scope;
+  const stars = sky?.stars;
+  scope.resolve('exuStars').setValue(stars === undefined || sky === null ? [0, 0, 0, 0] : [stars.density, stars.intensity * sky.intensity, stars.seed % 16_777_216, 1]);
+  const moon = sky?.moon;
+  scope.resolve('exuMoon').setValue(moon === undefined ? [0, 0, 0, 0] : [moon.maria, moon.seed % 16_777_216, 1, 0]);
 }

@@ -24,13 +24,14 @@ told apart. What a setting may change in a preset, the rules' figures and the bo
 ``assets/style-packs/settings/setting-cases.v1.json`` holds both to the same verdict on every case:
 the same refusal by reason and path, or the same digest of the setting and of the pack as drawn.
 
-**Named parts.** ``assets/style-packs/settings/setting-parts.v1.json`` lists parts a person or a
-model may choose by name, one an axis (a sky, a ground, a cover), each stated for any pack.
-:func:`compose_setting` turns the chosen parts into the exact setting for one pack: a part's
-swatch the pack does not have is left out, its colour for a family's upward faces becomes one
+**Named parts.** ``assets/style-packs/settings/setting-parts.v2.json`` (:data:`PARTS_FILE`) lists
+parts a person or a model may choose by name, one an axis (a sky, a ground, a cover), each stated
+for any pack. :func:`compose_setting` turns the chosen parts into the exact setting for one pack: a
+part's swatch the pack does not have is left out, its colour for a family's upward faces becomes one
 entry for each surface of that family the pack dresses, and its light is the first of its
-alternatives whose preset the pack states. The setting stores the figures, not the names, so a
-later version of the parts never changes a world.
+alternatives whose preset the pack states. The setting stores the figures, not the names, so a later
+version of the parts never changes a world. An earlier version stays at its own path for the records
+that name it by digest and is not read.
 
 INTEGERS ONLY, as a pack: a setting's identity is the SHA-256 of its canonical bytes.
 """
@@ -71,6 +72,7 @@ from exulanica.world.style_packs import (
 
 __all__ = [
     "CHAIN_MAXIMUM",
+    "PARTS_FILE",
     "PARTS_PROFILE",
     "PROFILE",
     "RULES_PROFILE",
@@ -97,6 +99,8 @@ __all__ = [
 PROFILE: Final = "exulanica.world-setting/v1"
 RULES_PROFILE: Final = "exulanica.world-setting-rules/v1"
 PARTS_PROFILE: Final = "exulanica.world-setting-parts/v1"
+#: The parts file read: version 2 states the stars and the moon's face at night.
+PARTS_FILE: Final = "setting-parts.v2.json"
 #: The profile of the parts as ``GET /world/style-packs`` lists them.
 LISTING_PROFILE: Final = "exulanica.world-setting-part-list/v1"
 #: The most manifests a pack resolves through, itself and its bases, as the browser's
@@ -602,7 +606,7 @@ def load_setting_parts(
 ) -> SettingParts:
     """The parts file, read strictly."""
     rules = setting_rules() if rules is None else rules
-    text = directory.joinpath("setting-parts.v1.json").read_bytes()
+    text = directory.joinpath(PARTS_FILE).read_bytes()
     key = _pattern(_KEY, "a key")
     words = _text(600)
 

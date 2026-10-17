@@ -413,6 +413,23 @@ export interface RenderSky {
   readonly faceTexels: number;
   /** How the sky's colour is computed; absent: the gradient above. */
   readonly model?: RenderSkyModel;
+  /** Stars, drawn by the sky's shader behind its clouds (`sun-disc.ts`); absent: none. */
+  readonly stars?: RenderStars;
+  /** The disc drawn as a moon (`sun-disc.ts`); absent: a plain disc. */
+  readonly moon?: RenderMoon;
+}
+
+/** Stars: the share of the sky's cells that hold one (0 to 1), the brightest one's linear radiance, and the seed that places them. */
+export interface RenderStars {
+  readonly density: number;
+  readonly intensity: number;
+  readonly seed: number;
+}
+
+/** A moon's face: how much darker its seas are than the rest of it (0 to 1), and the seed that places them. */
+export interface RenderMoon {
+  readonly maria: number;
+  readonly seed: number;
 }
 
 /**
@@ -673,6 +690,8 @@ const RENDER_SHAPE: Shape = obj({
         analytic: obj({ kind: { kind: 'literal', value: 'analytic' }, turbidity: num(1, 20), rayleigh: num(0, 4), mie: num(0, 0.1), mieDirection: num(0, 0.95) }),
       },
     }),
+    stars: optional(obj({ density: num(0.001, 1), intensity: num(0.001, 4), seed: num(0, 2_147_483_647, true) })),
+    moon: optional(obj({ maria: num(0, 1), seed: num(0, 2_147_483_647, true) })),
   }),
   fog: {
     kind: 'variant',

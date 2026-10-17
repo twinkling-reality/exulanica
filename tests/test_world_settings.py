@@ -157,10 +157,28 @@ def test_a_setting_may_change_no_part_of_a_looks_finish_or_frame_cost() -> None:
     preset = CASES["packs"]["town"][0]["light"]["presets"]["day"]
     for path in RULES.light_changes:
         assert not any(path == own or path.startswith(f"{own}.") for own in THE_LOOKS_OWN), path
+        *parents, leaf = path.split(".")
         holder: Any = preset
-        for name in path.split("."):
+        for name in parents:
             assert name in holder, f"{path} is no value of a preset"
             holder = holder[name]
+        if leaf in holder:
+            continue
+        # A value the profile added later, which a preset may leave out (the night's stars and
+        # moon): a part states it, and the preset reads with it.
+        stated = [
+            alternative["changes"][path]
+            for part in PARTS.parts.values()
+            for alternative in part["light"]
+            if path in alternative["changes"]
+        ]
+        assert stated, f"{path} is no value of a preset"
+        changed = copy.deepcopy(preset)
+        target = changed
+        for name in parents:
+            target = target[name]
+        target[leaf] = stated[0]
+        assert style_packs._light_preset(changed, "")[parents[0]][leaf] == stated[0]
     assert len(set(RULES.light_changes)) == len(RULES.light_changes)
 
 
@@ -276,13 +294,13 @@ def test_the_parts_file_states_three_axes_and_what_each_part_is_for() -> None:
 
 
 def test_a_parts_file_is_refused_for_an_unknown_axis_and_a_repeated_part(tmp_path: Path) -> None:
-    source = json.loads((STYLE_PACKS / "settings/setting-parts.v1.json").read_text("utf-8"))
+    source = json.loads((STYLE_PACKS / "settings" / ws.PARTS_FILE).read_text("utf-8"))
     (tmp_path / "colour").mkdir()
     settings = tmp_path / "style-packs" / "settings"
     settings.mkdir(parents=True)
 
     def load(document: dict[str, Any]) -> ws.SettingParts:
-        settings.joinpath("setting-parts.v1.json").write_text(json.dumps(document), "utf-8")
+        settings.joinpath(ws.PARTS_FILE).write_text(json.dumps(document), "utf-8")
         return ws.load_setting_parts(settings, RULES)
 
     assert load(source).parts.keys() == PARTS.parts.keys()

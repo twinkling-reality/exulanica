@@ -106,8 +106,28 @@ export interface StylePackSkyPreset {
     readonly seed: number;
   } | null;
   readonly face_texels: number;
-  /** How the sky's colour is computed. Absent in a preset written before it: the gradient above. */
-  readonly model?: StylePackSkyModel;
+  /**
+   * How the sky's colour is computed. Absent in a preset written before it: the gradient above. Null
+   * states the gradient too, as a setting does to draw its own sky over a look whose sky is computed.
+   */
+  readonly model?: StylePackSkyModel | null;
+  /** Stars over the sky, behind its clouds: absent, none. */
+  readonly stars?: StylePackSkyStars;
+  /** The disc drawn as a moon, with darker seas on its face: absent, a plain disc. */
+  readonly moon?: StylePackSkyMoon;
+}
+
+/** Stars as a preset states them: the share of the sky's cells that hold one, the brightest one's radiance, a seed. */
+export interface StylePackSkyStars {
+  readonly density_permille: number;
+  readonly intensity_permille: number;
+  readonly seed: number;
+}
+
+/** The disc as a moon: how much darker its seas are than its face, and the seed that places them. */
+export interface StylePackSkyMoon {
+  readonly maria_permille: number;
+  readonly seed: number;
 }
 
 /** The analytic daylight sky, computed from the preset's one sun. */
@@ -513,8 +533,8 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
         if (![64, 128, 256].includes(n)) fail('range', q, 'must be one of 64, 128, 256');
         return n;
       },
-      // Added within the profile: a preset written before it draws the gradient sky.
-      model: optional((m, q) => {
+      // Added within the profile: a preset written before it draws the gradient sky, as null does.
+      model: optional(nullable((m, q) => {
         const kind = m !== null && typeof m === 'object' && !Array.isArray(m) ? (m as Record<string, unknown>)['kind'] : undefined;
         if (kind === 'analytic') {
           return object(m, q, {
@@ -523,7 +543,12 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
           });
         }
         return fail('range', join(q, 'kind'), 'must be one of analytic');
-      }),
+      })),
+      // Added within the profile: a preset written before them draws no stars, and its disc without a moon's face.
+      stars: optional((t, q) => object(t, q, {
+        density_permille: permille(1, 1000), intensity_permille: permille(1, 4000), seed: integer(0, 2_147_483_647),
+      })),
+      moon: optional((m, q) => object(m, q, { maria_permille: permille(0, 1000), seed: integer(0, 2_147_483_647) })),
     }),
     fog: (v, p) => {
       const kind = v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>)['kind'] : undefined;

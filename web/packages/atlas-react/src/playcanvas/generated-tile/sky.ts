@@ -21,6 +21,11 @@ import { sunDirection, type RenderLook, type RenderSkyModel, type Rgb } from './
 
 const linearDot = (a: readonly number[], b: readonly number[]): number => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
 
+const unit = (d: readonly [number, number, number]): readonly [number, number, number] => {
+  const length = Math.hypot(d[0], d[1], d[2]);
+  return [d[0] / length, d[1] / length, d[2] / length];
+};
+
 /** One round of a 32-bit integer mixer (Wellons's lowbias32 constants). */
 function mix32(value: number): number {
   let h = Math.imul(value ^ (value >>> 16), 0x7feb352d);
@@ -209,8 +214,21 @@ export function cubeTexelWorldDirection(face: number, u: number, v: number): rea
   return [-d[0], d[1], d[2]];
 }
 
-/** The sky's six cubemap faces, `size` texels square, as linear RGBA floats sampled at texel centres. */
+/**
+ * The share of the sky left clear of the look's clouds toward a unit `dir`, 0 to 1: how much of a star
+ * shows there (`sun-disc.ts` reads it from the drawn sky's alpha). Below the horizon no cloud is drawn.
+ */
+export function skyClearShare(look: RenderLook, dir: readonly [number, number, number]): number {
+  return look.sky.clouds === null ? 1 : 1 - cloudAlpha(look.sky.clouds, dir);
+}
+
+/**
+ * The sky's six cubemap faces, `size` texels square, as linear RGBA floats sampled at texel centres.
+ * Alpha is 1, except in the drawn sky (not the image light's) of a look with stars, where it is the
+ * share of the sky its clouds leave clear, so the shader draws the stars behind them.
+ */
 export function renderSkyFaces(look: RenderLook, size: number, forLighting = false, disc = true): Float32Array[] {
+  const clearShare = !forLighting && look.sky.stars !== undefined;
   const faces: Float32Array[] = [];
   for (let face = 0; face < 6; face += 1) {
     const texels = new Float32Array(size * size * 4);
@@ -218,12 +236,13 @@ export function renderSkyFaces(look: RenderLook, size: number, forLighting = fal
       for (let column = 0; column < size; column += 1) {
         const u = ((column + 0.5) / size) * 2 - 1;
         const v = ((row + 0.5) / size) * 2 - 1;
-        const radiance = renderSkyRadiance(look, cubeTexelWorldDirection(face, u, v), forLighting, disc);
+        const direction = cubeTexelWorldDirection(face, u, v);
+        const radiance = renderSkyRadiance(look, direction, forLighting, disc);
         const at = (row * size + column) * 4;
         texels[at] = radiance[0];
         texels[at + 1] = radiance[1];
         texels[at + 2] = radiance[2];
-        texels[at + 3] = 1;
+        texels[at + 3] = clearShare ? skyClearShare(look, unit(direction)) : 1;
       }
     }
     faces.push(texels);

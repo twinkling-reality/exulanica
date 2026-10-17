@@ -65,7 +65,7 @@ export function renderLookOfPreset(
         seed: sky.clouds.seed,
       },
       faceTexels: sky.face_texels,
-      ...(sky.model === undefined ? {} : {
+      ...(sky.model === undefined || sky.model === null ? {} : {
         model: {
           kind: sky.model.kind,
           turbidity: sky.model.turbidity_permille / 1000,
@@ -74,6 +74,10 @@ export function renderLookOfPreset(
           mieDirection: sky.model.mie_direction_permille / 1000,
         },
       }),
+      ...(sky.stars === undefined ? {} : {
+        stars: { density: sky.stars.density_permille / 1000, intensity: sky.stars.intensity_permille / 1000, seed: sky.stars.seed },
+      }),
+      ...(sky.moon === undefined ? {} : { moon: { maria: sky.moon.maria_permille / 1000, seed: sky.moon.seed } }),
     },
     fog: preset.fog.kind === 'linear'
       ? { kind: 'linear', startM: preset.fog.start_mm / 1000, endM: preset.fog.end_mm / 1000, colour: linearRgb(preset.fog.colour) }

@@ -406,8 +406,27 @@ def _light_preset(value: Any, path: str) -> dict[str, Any]:
         "sun_disc_permille": _integer(0, 64_000),
         "clouds": clouds,
         "face_texels": _face_texels,
-        # Added within the profile: a preset written before it draws the gradient sky.
-        "model": _Optional(_sky_model),
+        # Added within the profile: a preset written before it draws the gradient sky, as null
+        # does (a setting states null to draw its own sky over a look whose sky is computed).
+        "model": _Optional(_nullable(_sky_model)),
+        # Added within the profile: a preset written before them draws no stars, and its disc
+        # without a moon's face.
+        "stars": _Optional(
+            lambda v, q: _object(
+                v,
+                q,
+                {
+                    "density_permille": _integer(1, 1000),
+                    "intensity_permille": _integer(1, 4000),
+                    "seed": _integer(0, 2_147_483_647),
+                },
+            )
+        ),
+        "moon": _Optional(
+            lambda v, q: _object(
+                v, q, {"maria_permille": _integer(0, 1000), "seed": _integer(0, 2_147_483_647)}
+            )
+        ),
     }
     post = {
         "bloom": _nullable(

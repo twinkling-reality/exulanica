@@ -1,7 +1,7 @@
 {
  "profile": "exulanica.world-setting-composed/v1",
  "about": "Each named part of a world's setting composed for every look of the library at its current version, and one part of every axis together: what exulanica.world.world_settings.compose_setting returns, written by scripts/style_packs/composed_settings.py and held to it by tests/test_world_settings.py. The page's tests draw these.",
- "parts_version": 1,
+ "parts_version": 2,
  "composed": [
   {
    "pack_id": "exulanica.cozy-town",
@@ -440,7 +440,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -853,7 +863,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -1432,7 +1452,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -1842,7 +1872,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -2418,7 +2458,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -2831,7 +2881,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -3410,7 +3470,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [
@@ -3820,7 +3890,17 @@
       ],
       "sky.intensity_permille": 900,
       "sky.sun_glow_permille": 400,
-      "sky.sun_disc_permille": 20000,
+      "sky.sun_disc_permille": 1800,
+      "sky.model": null,
+      "sky.stars": {
+       "density_permille": 70,
+       "intensity_permille": 1200,
+       "seed": 5
+      },
+      "sky.moon": {
+       "maria_permille": 450,
+       "seed": 3
+      },
       "sky.clouds": {
        "cover_permille": 240,
        "colour": [

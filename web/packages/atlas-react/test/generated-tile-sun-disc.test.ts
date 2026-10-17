@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { StylePackManifest } from '@exulanica/atlas-core';
-import { sunDirection, type RenderLook } from '../src/playcanvas/generated-tile/look.js';
-import { SUN_DISC_COS, cubeTexelWorldDirection, renderSkyFaces, renderSkyRadiance, sunDiscRadiance } from '../src/playcanvas/generated-tile/sky.js';
-import { sunDiscSkyChunk } from '../src/playcanvas/generated-tile/sun-disc.js';
+import { sunDirection, validateRenderLook, type RenderLook } from '../src/playcanvas/generated-tile/look.js';
+import { SUN_DISC_COS, cubeTexelWorldDirection, renderSkyFaces, renderSkyRadiance, skyClearShare, sunDiscRadiance } from '../src/playcanvas/generated-tile/sky.js';
+import { SKY_BLOCK, SKY_DECLARATIONS, setSkyMarks, sunDiscSkyChunk } from '../src/playcanvas/generated-tile/sun-disc.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 /*
@@ -30,9 +30,10 @@ describe('the skybox chunk with the disc', () => {
     // The block sits after the sky is sampled and before its highlight and tone mapping.
     expect(chunk.indexOf('exuSunDisc.w > 0.0')).toBeGreaterThan(chunk.indexOf('dir.x *= -1.0;'));
     expect(chunk.indexOf('exuSunDisc.w > 0.0')).toBeLessThan(chunk.indexOf('greaterThanEqual(linear, vec3(64.0))'));
-    const removed = chunk
-      .replace(/\nuniform vec4 exuSunDisc;[^\n]*\nuniform vec3 exuSunDiscColour;[^\n]*\n/, '')
-      .replace(/if \(exuSunDisc\.w > 0\.0\) \{[\s\S]*?\n {12}\}\n {12}/, '');
+    // The night's two branches are guarded by what a look states, so a day look skips them.
+    expect(chunk.split('if (exuStars.w > 0.0)').length).toBe(2);
+    expect(chunk.split('exuMoon.z > 0.0 ? exuMoonFace(exuDir) : 1.0').length).toBe(2);
+    const removed = chunk.replace(SKY_DECLARATIONS, '').replace(SKY_BLOCK.trimStart() + ' '.repeat(12), '');
     expect(removed).toBe(SKYBOX);
   });
 
@@ -88,5 +89,66 @@ describe('the disc the shader draws', () => {
     const baked = renderSkyRadiance(cloudy, sun);
     const bare = renderSkyRadiance(cloudy, sun, false, false);
     dimmed.forEach((c, i) => expect(c).toBeCloseTo(baked[i]! - bare[i]!, 6));
+  });
+});
+
+describe('the night a look states', () => {
+  const size = 32;
+  const clouds = { cover: 0.6, colour: [0.2, 0.2, 0.25] as const, shade: [0.1, 0.1, 0.12] as const, scale: 1, seed: 9 };
+  const NIGHT = { ...LOOK, sky: { ...LOOK.sky, clouds, stars: { density: 0.07, intensity: 1.2, seed: 5 }, moon: { maria: 0.3, seed: 3 } } } as RenderLook;
+  const DAY = { ...LOOK, sky: { ...LOOK.sky, clouds } } as RenderLook;
+
+  it('leaves a look without stars exactly as it was: every face the same and opaque', () => {
+    const day = renderSkyFaces(DAY, size, false, false);
+    const night = renderSkyFaces(NIGHT, size, false, false);
+    for (let face = 0; face < 6; face += 1) {
+      for (let at = 0; at < size * size * 4; at += 4) {
+        expect(day[face]![at + 3]).toBe(1);
+        // The stars change no colour the faces hold, only what their alpha says.
+        for (let channel = 0; channel < 3; channel += 1) expect(night[face]![at + channel]).toBe(day[face]![at + channel]);
+      }
+    }
+  });
+
+  it('carries the share of the sky its clouds leave clear in the drawn sky, and none in the image light', () => {
+    const faces = renderSkyFaces(NIGHT, size, false, false);
+    const light = renderSkyFaces(NIGHT, size, true, false);
+    let clouded = 0;
+    for (let face = 0; face < 6; face += 1) {
+      for (let row = 0; row < size; row += 1) {
+        for (let column = 0; column < size; column += 1) {
+          const d = cubeTexelWorldDirection(face, ((column + 0.5) / size) * 2 - 1, ((row + 0.5) / size) * 2 - 1);
+          const length = Math.hypot(d[0], d[1], d[2]);
+          const unit = [d[0] / length, d[1] / length, d[2] / length] as const;
+          const alpha = faces[face]![(row * size + column) * 4 + 3]!;
+          expect(alpha).toBeCloseTo(skyClearShare(NIGHT, unit), 6);
+          if (unit[1] < 0) expect(alpha).toBe(1);
+          if (alpha < 0.5) clouded += 1;
+          expect(light[face]![(row * size + column) * 4 + 3]).toBe(1);
+        }
+      }
+    }
+    expect(clouded).toBeGreaterThan(0);
+  });
+
+  it('hands the shader its stars and moon, and nothing for a look that states none', () => {
+    const values = new Map<string, readonly number[]>();
+    const device = { scope: { resolve: (name: string) => ({ setValue: (value: readonly number[]) => values.set(name, value) }) } };
+    setSkyMarks(device as never, { ...NIGHT.sky, intensity: 0.5, stars: { density: 0.07, intensity: 1.2, seed: 16_777_221 } });
+    expect(values.get('exuStars')).toEqual([0.07, 0.6, 5, 1]);
+    expect(values.get('exuMoon')).toEqual([0.3, 3, 1, 0]);
+    setSkyMarks(device as never, DAY.sky);
+    expect(values.get('exuStars')).toEqual([0, 0, 0, 0]);
+    expect(values.get('exuMoon')).toEqual([0, 0, 0, 0]);
+    setSkyMarks(device as never, NIGHT.sky);
+    setSkyMarks(device as never, null);
+    expect(values.get('exuStars')).toEqual([0, 0, 0, 0]);
+    expect(values.get('exuMoon')).toEqual([0, 0, 0, 0]);
+  });
+
+  it('is bounded as a look is', () => {
+    expect(() => validateRenderLook(NIGHT)).not.toThrow();
+    expect(() => validateRenderLook({ ...NIGHT, sky: { ...NIGHT.sky, stars: { density: 0, intensity: 1, seed: 1 } } } as RenderLook)).toThrow();
+    expect(() => validateRenderLook({ ...NIGHT, sky: { ...NIGHT.sky, moon: { maria: 1.5, seed: 1 } } } as RenderLook)).toThrow();
   });
 });
