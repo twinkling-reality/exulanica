@@ -61,6 +61,7 @@ def test_the_state_is_closed_and_holds_no_path_or_credential():
         {**status(), "checkpoints": -1},
         {**status(), "written_at": "yesterday"},
         {**status(), "settle_seconds": 0},
+        {**status(), "publications_per_day": 0},
         {**status(), "project_id": "a project"},
     ):
         with pytest.raises(StatusRefused):
@@ -68,6 +69,9 @@ def test_the_state_is_closed_and_holds_no_path_or_credential():
     # The settle period History states: whole seconds, absent from a status written before it.
     assert status_document(status(settle_seconds=120))["settle_seconds"] == 120
     assert status_document(status())["settle_seconds"] is None
+    # How often a linked project's changes go at most, as History's GitHub question says it.
+    assert status_document(status(publications_per_day=4))["publications_per_day"] == 4
+    assert status_document(status())["publications_per_day"] is None
     # The project's identity, by which a page asks for it on GitHub; absent in an older status.
     assert status_document(status(project_id="project:demo"))["project_id"] == "project:demo"
     assert status_document(status())["project_id"] is None

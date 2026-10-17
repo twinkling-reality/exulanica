@@ -1,0 +1,25 @@
+/* H12's question on History's light page (the R23 build sheet, section 13): a card at the top right (x 1340 to 1800
+   from y 84 at 1920; 80 from the right at 1440), in the page's own ink; refusals in its refusal ink. */
+.wu-hr-keepcard { position: absolute; right: 120px; top: 84px; width: 460px; box-sizing: border-box; padding: 24px 28px 26px; border-radius: 16px; background: rgba(250,252,251,.95); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 18px 48px rgba(18,40,44,.18); color: var(--hr-ink, #121715); }
+.wu-hr-narrow .wu-hr-keepcard { right: 80px; width: 400px; }
+.wu-hr-keep-label { font: 400 13px/1 var(--font-mono); color: var(--hr-quiet, #344750); letter-spacing: .02em; outline: none; }
+.wu-hr-keep-question { margin: 12px 0 18px; font: 300 24px/1.25 var(--font-sans); text-wrap: pretty; }
+.wu-hr-keep-name { margin-top: 12px; font: 500 13px/1.3 var(--font-sans); color: var(--hr-quiet, #344750); }
+.wu-hr-keep-value { margin-top: 4px; min-height: 20px; font: 400 15px/1.35 var(--font-sans); }
+.wu-hr-keep-field { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid rgba(18,23,21,.25); border-radius: 8px; background: rgba(255,255,255,.9); font: 400 15px/1.3 var(--font-sans); color: inherit; }
+.wu-hr-keep-field:focus-visible { outline: 2px solid var(--hr-line, #6496a6); outline-offset: 1px; }
+.wu-hr-keep-count { margin-top: 4px; font: 400 12px/1 var(--font-mono); color: var(--hr-quiet, #344750); text-align: right; }
+.wu-hr-keep-line { margin: 10px 0 0; font: 400 14px/1.45 var(--font-sans); color: var(--hr-quiet, #344750); text-wrap: pretty; }
+.wu-hr-keep-status { margin: 14px 0 0; min-height: 20px; font: 400 14px/1.45 var(--font-sans); color: var(--hr-quiet, #344750); text-wrap: pretty; }
+.wu-hr-keep-status[data-refused="true"] { color: var(--hr-refused, #8f2f25); }
+.wu-hr-keep-make { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.wu-hr-keep-orb { flex: none; width: 72px; height: 72px; border: 0; border-radius: 50%; background: var(--hr-line, #6496a6); color: #fff; font: 500 15px/1 var(--font-sans); cursor: pointer; box-shadow: 0 8px 22px rgba(18,40,44,.22); }
+.wu-hr-keep-orb:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.wu-hr-keep-orb:focus-visible { outline: 2px solid var(--hr-ink, #121715); outline-offset: 3px; }
+.wu-hr-keep-once { font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet, #344750); }
+.wu-hr-cardslot { position: absolute; inset: 0; pointer-events: none; }
+.wu-hr-cardslot > * { pointer-events: auto; }
+.wu-hr-keep-reviewed[hidden] { display: none; }
+/* The story under the open card, or within 24px of it, fades out (H12, 14:07). */
+.wu-history-r23 .wu-hr-track > *, .wu-history-r23 .wu-hr-path circle, .wu-history-r23 .wu-hr-path .bracket { transition: opacity 160ms; }
+.wu-history-r23 .wu-hr-under { opacity: 0; }

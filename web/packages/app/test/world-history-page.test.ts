@@ -21,6 +21,7 @@ interface HistoryHost {
   renderMomentPicture?(moment: Record<string, unknown>, signal: AbortSignal): Promise<Picture | null>;
   portrait?(subjectId: string, signal: AbortSignal): Promise<string | null>;
   openDecision?(decision: { readonly momentId: string; readonly requestId: string | null; readonly tick: number; readonly subject: string | null }): void;
+  readonly write?: ((method: 'POST' | 'DELETE', path: string, body?: unknown) => Promise<{ readonly status: number; readonly body: unknown }>) | null;
   open(url: string): void;
   closed(): void;
 }
@@ -228,6 +229,52 @@ describe('History', () => {
     await (await module()).mountHistory(second).open();
     expect(second.root.querySelector('.wu-hr-kept')?.textContent).toBe('Not kept in a project');
     expect(keys(second.root)).not.toContain('GOpen on GitHub');
+  });
+
+  it('keeps a world in a project with K, asking nothing first, and offers it nowhere it could only fail', async () => {
+    const { read } = reads({ '/world/github-projects': { projects: [], requests: [], publications: [] } });
+    const write = vi.fn(async () => ({ status: 202, body: { request_id: 'k1', version_id: VERSION, refused: null } }));
+    const made = host(read, { write });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    expect(keys(made.root)).toContain('KKeep in a project');
+    expect(history.key(press('KeyK'))).toBe(true);
+    await vi.waitFor(() => expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Starting a project…'));
+    expect(write).toHaveBeenCalledWith('POST', `/world/github-projects?world_id=${encodeURIComponent(WORLD)}`, { version_id: VERSION, readable: false });
+    expect(keys(made.root)).not.toContain('KKeep in a project');
+    history.close();
+    // A read-only copy has no writes: no K.
+    const { read: again } = reads({ '/world/github-projects': { projects: [], requests: [], publications: [] } });
+    const watching = host(again, { write: null });
+    await (await module()).mountHistory(watching).open();
+    expect(keys(watching.root)).toEqual(['←→Earlier, later', 'EnterOpen this moment', 'EscBack']);
+  });
+
+  it("asks H12's question with G where the project is kept on this computer only, its keys alone in the row", async () => {
+    const local = { version_id: VERSION, project_id: 'project:demo', link: null, github: null, publications_per_day: 4 };
+    const { read } = reads({ '/world/github-projects': { projects: [local], requests: [], publications: [] } });
+    const write = vi.fn(async (method: string) => (method === 'POST'
+      ? { status: 202, body: { request_id: 'q1', project_id: 'project:demo', name: null, review: null, refused: null } }
+      : { status: 204, body: null }));
+    const made = host(read, { write });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept in a project on this computer, not on GitHub');
+    expect(keys(made.root)).toContain('GKeep on GitHub');
+    history.key(press('KeyG'));
+    const card = made.root.querySelector('.wu-hr-keepcard') as HTMLElement;
+    expect(card.querySelector('.wu-hr-keep-question')?.textContent).toBe('Keep this world in a new private repository on your GitHub account');
+    expect(keys(made.root)).toEqual(['EnterCreate', 'EscBack']);
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('POST', `/world/github-projects/publications?world_id=${encodeURIComponent(WORLD)}`, { project_id: 'project:demo', name: null }));
+    // Typing a name is the field's own: the page does not take its keys.
+    const field = card.querySelector('.wu-hr-keep-field') as HTMLInputElement;
+    expect(history.key(Object.defineProperty(press('KeyA'), 'target', { value: field }))).toBe(false);
+    // Esc goes back to the story and withdraws the request; the page stays open.
+    history.key(press('Escape'));
+    expect(made.root.querySelector('.wu-hr-keepcard')).toBeNull();
+    expect(history.isOpen).toBe(true);
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('DELETE', `/world/github-projects/requests/q1?world_id=${encodeURIComponent(WORLD)}`));
+    expect(keys(made.root)).toContain('GKeep on GitHub');
   });
 
   it('makes missing pictures and portraits one at a time, and stops making them when it closes', async () => {

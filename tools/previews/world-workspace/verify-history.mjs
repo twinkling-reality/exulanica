@@ -32,6 +32,9 @@ assert.equal(headLine(null).words, 'Not kept in a project');
 assert.equal(headLine(null, { refused: null }).words, 'Starting a project…');
 assert.deepEqual(headLine(null, { refused: { code: 'world_unreadable' } }), { words: 'Not kept: the world could not be read. Try again.', refused: true });
 assert.equal(headLine(undefined).words, '');
+// After Create in H12's question, until the follower links the project; a linked project says where it is.
+assert.deepEqual(headLine({ link: null }, null, true), { words: 'Putting it on GitHub…', refused: false });
+assert.equal(headLine(linked({}), null, true).words, 'Kept on GitHub in terraces-on-the-bay, private · up to date');
 
 // The path (r23) from the moments read as JOURNEY's R1 serves it (society_moments.read_moments) and the other reads.
 const things = { 'bench:1': 'bench', 'market:1': 'market', 'lantern:1': 'lantern', 'pond:part': null };

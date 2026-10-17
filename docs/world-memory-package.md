@@ -966,8 +966,8 @@ directory at a time, and it follows at most 64 folders unless `EXULANICA_PROJECT
 another number. Beside each project it follows it writes `project-status.json` (profile
 `exulanica.world-project-status/v1`, [`project_status.py`](../exulanica/world/project_status.py)),
 never committed and never published: the world and version, the project's identity, its saved checkpoints, whether
-changes wait and how long the world stays unchanged before they are saved (its settle period), its
-link, and what GitHub last said (the repository's visibility, how many saved checkpoints it does
+changes wait and how long the world stays unchanged before they are saved (its settle period), at
+most how many times a day it sends a linked project's changes on its own, its link, and what GitHub last said (the repository's visibility, how many saved checkpoints it does
 not hold yet and when the newest one it holds was saved, the open rolling pull request and a
 pause), read once after each checkpoint of a linked project. The API reads these from the same directory
 (`EXULANICA_PROJECTS_DIRECTORY`) and answers them as `GET /world/github-projects` (`world.write`, so

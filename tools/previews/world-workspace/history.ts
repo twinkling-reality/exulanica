@@ -7,6 +7,8 @@
 // made one at a time where the host can make them, and the making stops when the page closes.
 import { changeParts, thingName } from './build-words.mjs';
 import { LAYOUTS, historyPath, pathLayout, pathView, targetObject } from './history-rows.mjs';
+import { openKeepCard, type KeepCard } from './history-keep.ts';
+import { KEEP_WORDS } from './history-keep-words.mjs';
 import { PATH_WORDS, headLine } from './history-words.mjs';
 import { page } from './world-ui.ts';
 import { storySvg, svgPart } from './world-ui-history.ts';
@@ -19,6 +21,8 @@ const RUNS_READ = 20;
 const ORBS = 3;
 /** Narrower than this, the page takes its 1440 sizes. */
 const NARROW_BELOW = 1700;
+/** While a project is being started or put on GitHub, the projects read is asked again this often. */
+const WATCH_MS = 3000;
 
 type Json = Record<string, any>;
 /** A sentence's parts: plain text, and a model's name the page keeps on one line. */
@@ -67,6 +71,8 @@ export interface HistoryHost {
   openDecision?(decision: { readonly momentId: string; readonly requestId: string | null; readonly tick: number; readonly subject: string | null }): void;
   /** Build mode's undo and redo: not offered here (undo stays in build mode); kept for the host's shape. */
   readonly build?: unknown;
+  /** POST or DELETE through the workspace's credentials (H7's keep, H12's question); absent on a read-only copy. */
+  readonly write?: ((method: 'POST' | 'DELETE', path: string, body?: unknown) => Promise<{ readonly status: number; readonly body: any }>) | null;
   /** Opens a link outside the workspace (the GitHub project). */
   open(url: string): void;
   /** The page closed: give the world its keys and focus back. */
@@ -152,6 +158,17 @@ export function mountHistory(host: HistoryHost): History {
   let called: { subject(id: string): string } = { subject: () => '' };
   /** The page's lasting parts, made once when it opens, so the focus on its title stays through every draw. */
   let lasting: { readonly world: HTMLElement; readonly head: HTMLElement; readonly kept: HTMLElement; readonly layer: HTMLElement } | null = null;
+  /** H12's question, while it is open over the page. */
+  let card: KeepCard | null = null;
+  /** After Create, until the follower links the project: the head says it is being put on GitHub. */
+  let putting = false;
+  /** A server that keeps no projects answers K once; K is not offered again there. */
+  let keepsProjects = true;
+  let watching: ReturnType<typeof setTimeout> | null = null;
+  /** The card just opened: the story under it fades out over a frame rather than vanishing. */
+  let fadeNext = false;
+  /** The card grows when its review answers: what lies under it is measured again then. */
+  let cardSize: ResizeObserver | null = null;
   /** Pictures and portraits made while the page is open, by moment and by subject. */
   const pictures = new Map<string, string | null>();
   const portraits = new Map<string, string | null>();
@@ -287,6 +304,81 @@ export function mountHistory(host: HistoryHost): History {
     }
   }
 
+  /** Reads where the world is kept again while a project is being started or put on GitHub, until it settles. */
+  function watchProjects() {
+    if (watching !== null) clearTimeout(watching);
+    watching = null;
+    const unsettled = (project === null && request && !request.refused) || (putting && project && !project.link);
+    if (!made || !unsettled) return;
+    watching = setTimeout(async () => {
+      watching = null;
+      if (!made) return;
+      try {
+        const projects = await host.read(`/world/github-projects${scope}`);
+        project = (projects.projects ?? []).find((one: Json) => one.version_id === host.versionId) ?? null;
+        request = (projects.requests ?? []).find((one: Json) => one.version_id === host.versionId) ?? null;
+        if (project?.link) putting = false;
+      } catch {
+        // A read that fails is asked again at the next turn.
+      }
+      draw();
+      watchProjects();
+    }, WATCH_MS);
+  }
+
+  /** [K] Keep in a project (H7): asked of the server at once, readable text not kept. */
+  async function keepInProject() {
+    if (!host.write || !offersKeep()) return;
+    const answer = await host.write('POST', `/world/github-projects${scope}`, { version_id: host.versionId, readable: false }).catch(() => null);
+    if (!made) return;
+    if (answer?.status === 202) request = answer.body;
+    else if (answer?.status === 409 && answer.body?.code === 'projects_not_kept') keepsProjects = false;
+    else request = { version_id: host.versionId, refused: { code: 'failed' } };
+    draw();
+    watchProjects();
+  }
+
+  /** K is offered where no project keeps the world and none is being started; G Keep on GitHub where a project is
+   * kept on this computer only. Neither on a read-only copy, nor where it could only fail. */
+  function offersKeep(): boolean {
+    return Boolean(host.write) && keepsProjects && state === 'ready' && project === null && (!request || Boolean(request.refused));
+  }
+
+  function offersGitHub(): boolean {
+    return Boolean(host.write) && state === 'ready' && !putting && Boolean(project && !project.link && project.project_id);
+  }
+
+  function keepOnGitHub() {
+    if (!offersGitHub() || card || !made) return;
+    opened = null;
+    fadeNext = true;
+    const unwatch = () => {
+      cardSize?.disconnect();
+      cardSize = null;
+    };
+    card = openKeepCard({ worldId: host.worldId, read: host.read, write: host.write! }, project as { project_id: string; publications_per_day?: number | null }, {
+      created: () => {
+        unwatch();
+        card = null;
+        putting = true;
+        draw();
+        watchProjects();
+      },
+      closed: () => {
+        unwatch();
+        card = null;
+        draw();
+      },
+    });
+    if (typeof ResizeObserver !== 'undefined') {
+      cardSize = new ResizeObserver(() => {
+        if (card && lasting) fadeUnderCard(lasting.layer);
+      });
+      cardSize.observe(card.element);
+    }
+    draw();
+  }
+
   function githubUrl(): string | null {
     if (!project?.link) return null;
     const pull = project.github?.pull_request;
@@ -360,12 +452,12 @@ export function mountHistory(host: HistoryHost): History {
       const kept = element('p', 'wu-hr-kept');
       head.append(element('div', 'wu-hr-over', PATH_WORDS.history), title, kept);
       const layer = element('div', 'wu-hr-layer');
-      made.content.replaceChildren(world, element('div', 'wu-hr-wash'), head, layer);
+      made.content.replaceChildren(world, element('div', 'wu-hr-wash'), head, layer, element('div', 'wu-hr-cardslot'));
       lasting = { world, head, kept, layer };
     }
     const ground = host.still?.() ?? host.entryPicture ?? null;
     lasting.world.style.backgroundImage = ground ? `url("${ground}")` : '';
-    const kept = headLine(project, request);
+    const kept = headLine(project, request, putting);
     lasting.kept.textContent = kept.words;
     lasting.kept.dataset.refused = String(kept.refused);
     const content = lasting.layer;
@@ -483,7 +575,13 @@ export function mountHistory(host: HistoryHost): History {
 
     const keys = element('div', 'wu-hr-keys');
     const chosenMoment = moments().find((one) => one.id === chosen) ?? null;
-    if (opened) {
+    const slot = made.content.querySelector('.wu-hr-cardslot') as HTMLElement;
+    if (card && card.element.parentElement !== slot) slot.replaceChildren(card.element);
+    if (!card) slot.replaceChildren();
+    if (card) {
+      // While H12's question is open, the row shows its keys alone.
+      for (const one of card.keys()) keys.append(keyButton(one.keys, one.word, () => one.press()));
+    } else if (opened) {
       const moment = moments().find((one) => one.id === opened!.id);
       if (moment) content.append(openedView(moment, layout));
       if ((moment?.lines.length ?? 0) > 1) keys.append(keyButton(['↑', '↓'], PATH_WORDS.chooseLine, () => chooseLine(1)));
@@ -492,11 +590,30 @@ export function mountHistory(host: HistoryHost): History {
     } else {
       if (moments().length >= 2) keys.append(keyButton(['←', '→'], PATH_WORDS.earlierLater, () => move(1)));
       if (chosenMoment) keys.append(keyButton(['Enter'], PATH_WORDS.openMoment, () => openMoment(chosenMoment.id)));
+      // One GitHub key at most (sheet section 11): open it once it is there, keep it there, or keep it at all.
       const url = githubUrl();
       if (url) keys.append(keyButton(['G'], PATH_WORDS.openOnGitHub, () => host.open(url)));
+      else if (offersGitHub()) keys.append(keyButton(['G'], KEEP_WORDS.keepOnGitHub, () => keepOnGitHub()));
+      else if (offersKeep()) keys.append(keyButton(['K'], KEEP_WORDS.keepInProject, () => void keepInProject()));
       keys.append(keyButton(['Esc'], PATH_WORDS.back, () => close()));
     }
     content.append(keys);
+    if (card && fadeNext) requestAnimationFrame(() => fadeUnderCard(content));
+    else if (card) fadeUnderCard(content);
+    fadeNext = false;
+  }
+
+  /** While H12's card is open, every part of the story under it or within 24px of its edges fades out (H12, 14:07),
+   * Now's words included, so nothing peeks past the card. */
+  function fadeUnderCard(content: HTMLElement) {
+    const box = card?.element.getBoundingClientRect();
+    if (!box || box.width === 0) return;
+    const near = { left: box.left - 24, right: box.right + 24, top: box.top - 24, bottom: box.bottom + 24 };
+    for (const part of content.querySelectorAll<Element>('.wu-hr-track > div, .wu-hr-track > button, .wu-hr-path circle, .wu-hr-path .bracket')) {
+      const at = part.getBoundingClientRect();
+      const under = at.right > near.left && at.left < near.right && at.bottom > near.top && at.top < near.bottom;
+      part.classList.toggle('wu-hr-under', under);
+    }
   }
 
   /** The chosen moment opened over the story (sheet section 12): its picture large, and every line said. */
@@ -571,6 +688,13 @@ export function mountHistory(host: HistoryHost): History {
   function remove() {
     making?.abort();
     making = null;
+    card?.close();
+    card = null;
+    cardSize?.disconnect();
+    cardSize = null;
+    putting = false;
+    if (watching !== null) clearTimeout(watching);
+    watching = null;
     made?.close();
     made = null;
     lasting = null;
@@ -614,10 +738,16 @@ export function mountHistory(host: HistoryHost): History {
       const command = event.metaKey || event.ctrlKey;
       const target = event.target as Element | null;
       if (event.code === 'Tab' || ((event.code === 'Enter' || event.code === 'Space') && target?.closest?.('.wu-page button:not(.wu-hr-card)'))) return false;
+      // The repository name field types for itself; its Enter and Esc are its own.
+      if (target?.closest?.('.wu-hr-keepcard input')) return false;
       // A combination the page does not use keeps the browser's own shortcut, as in the world (K8).
       if (command || event.altKey) return false;
       event.preventDefault();
       if (event.repeat && !event.code.startsWith('Arrow')) return true;
+      if (card) {
+        card.key(event);
+        return true;
+      }
       if (opened) {
         if (event.code === 'Escape') closeMoment();
         else if (event.code === 'KeyH') close();
@@ -632,6 +762,8 @@ export function mountHistory(host: HistoryHost): History {
       else if (event.code === 'Enter') {
         if (chosen && moments().some((one) => one.id === chosen)) openMoment(chosen);
       } else if (event.code === 'KeyG' && githubUrl()) host.open(githubUrl() as string);
+      else if (event.code === 'KeyG' && offersGitHub()) keepOnGitHub();
+      else if (event.code === 'KeyK' && offersKeep()) void keepInProject();
       return true;
     },
   };

@@ -97,6 +97,9 @@ class ProjectStatus(_Closed):
     #: How long the world stays unchanged before its changes are saved (the follow's settle
     #: period), in whole seconds; absent in a status written before the follower stated it.
     settle_seconds: Annotated[int, Field(ge=1, le=86_400)] | None = None
+    #: At most how many times a day the follower sends a linked project's changes on its own, as
+    #: History's question to keep it on GitHub says it; absent in a status written before it.
+    publications_per_day: Annotated[int, Field(ge=1, le=1_000)] | None = None
     link: Link | None
     github: GitHub | None
 

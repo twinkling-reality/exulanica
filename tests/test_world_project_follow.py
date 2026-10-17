@@ -24,6 +24,7 @@ from exulanica.world_package.projects.follow import (
     read_follow,
 )
 from exulanica.world_package.projects.history import history_read
+from exulanica.world_package.projects.publish import PUBLICATIONS_PER_DAY
 from exulanica.world_package.projects.repository import Project, published_part
 from exulanica.world_package.projects.watch import Policy
 
@@ -755,6 +756,8 @@ def test_the_follower_writes_where_the_project_is_kept_beside_it_and_never_sends
         assert (held["pending"], held["link"], held["github"]) == (True, None, None)
         # How long the world must stay unchanged, as History says it: the follow's settle period.
         assert held["settle_seconds"] == 120
+        # How often its changes would go once linked: the follower's own bound, its default here.
+        assert held["publications_per_day"] == PUBLICATIONS_PER_DAY
         # Linked by hand: after its next checkpoint the follower reads GitHub once and says
         # what the repository does not hold yet; it sends nothing.
         Project(folder).link("learner/world", "main", "exulanica/world")

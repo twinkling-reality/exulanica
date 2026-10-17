@@ -26,6 +26,7 @@ import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs';
 import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
+import { historyWrite } from './history-host.ts';
 import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
@@ -1143,6 +1144,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     },
     // The world's minute now, as the clock corner reads it, for Now where the moments read did not answer.
     worldNow: () => selection.people?.clock().minute ?? null,
+    write: readOnly ? null : historyWrite(state.credentials, lifetime.signal),
     open: (url) => { window.open(url, '_blank', 'noopener'); },
     closed() {
       otherPage = null;

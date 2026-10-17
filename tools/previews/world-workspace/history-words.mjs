@@ -30,6 +30,7 @@ export const HEAD_WORDS = Object.freeze({
   noProject: 'Not kept in a project',
   localProject: 'Kept in a project on this computer, not on GitHub',
   starting: 'Starting a project…',
+  putting: 'Putting it on GitHub…',
   unreachable: 'GitHub could not be reached. Your changes are kept here and sent when it answers.',
   refusals: Object.freeze({
     nothing_to_keep: 'Nothing to keep in a project yet: change something first.',
@@ -329,10 +330,12 @@ export function creationPathWords(readyWorld, blank = false) {
 
 /**
  * The head's GitHub line (sheet section 2), `{ words, refused }`; empty where the projects were not read.
- * `request` is a request to keep the world in a project, waiting or refused.
+ * `request` is a request to keep the world in a project, waiting or refused; `putting`, after Create in H12's
+ * question until the follower links the project.
  */
-export function headLine(project, request = null) {
+export function headLine(project, request = null, putting = false) {
   if (project === undefined) return { words: '', refused: false };
+  if (putting && project && !project.link) return { words: HEAD_WORDS.putting, refused: false };
   if (!project) {
     if (request && !request.refused) return { words: HEAD_WORDS.starting, refused: false };
     const refusal = request?.refused ? HEAD_WORDS.refusals[request.refused.code] : null;

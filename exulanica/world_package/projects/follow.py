@@ -738,6 +738,10 @@ class Follower:
                 "last_checkpoint_at": _stamp(float(saved[0])) if saved else None,
                 "pending": item.state in _PENDING,
                 "settle_seconds": round(item.watcher.policy.settle_seconds),
+                "publications_per_day": (item.settings.get("limits") or {}).get(
+                    "publications_per_day"
+                )
+                or PUBLICATIONS_PER_DAY,
                 "link": None
                 if link is None
                 else {
