@@ -11,6 +11,8 @@ import { CORNER_WORDS, SCREEN_WORDS } from './world-words.mjs';
  */
 export const SCREEN_TIMING = Object.freeze({
   tipMs: 3_000,
+  /** How long the pill says why a run ended before its people line returns (r09). */
+  runEndedMs: 6_000,
   firstHint: Object.freeze({ leaveAfterMs: 60_000, walkedM: 1.5, lookedRad: 0.35, fadeMs: 400, hintKey: 'exulanica.world-first-hint.v1:' }),
 });
 
@@ -63,10 +65,37 @@ export function clockText(hhmm, day) {
 }
 
 /**
+ * What the clock says: the world's time (`at`, worldTime's answer) where the world keeps one, else
+ * whether it plays ("Playing", "Paused"), as for a society that keeps no time of day.
+ */
+export function clockLabel(at, mode) {
+  if (at) return clockText(at.hhmm, at.day);
+  return mode === 'playing' ? SCREEN_WORDS.playing : SCREEN_WORDS.paused;
+}
+
+/**
  * Whether the first-minute hint leaves now: once the person has both walked and looked, or once it
  * has shown for its time. `shownMs` is how long it has shown; `walkedM` how far the person has moved
  * in plan; `turnedRad` how far the view has turned (yaw and pitch together).
  */
 export function firstHintLeaves({ shownMs, walkedM, turnedRad }, rule = SCREEN_TIMING.firstHint) {
   return shownMs >= rule.leaveAfterMs || (walkedM >= rule.walkedM && turnedRad >= rule.lookedRad);
+}
+
+/**
+ * One frame of the first-minute hint's measure: how far the person has walked and turned, counted
+ * only from their own input. Until they press a moving key (`input.walked`) the place it counts
+ * from follows the camera, and until they look with the mouse (`input.looked`) the view it counts
+ * from does, so the world's own camera moves (its opening glide, its arrival) count as nothing.
+ * `held` is the last answer, or null at first; `at` the pose now. Answers the new `held`.
+ */
+export function firstHintMeasure(held, at, input) {
+  const place = input.walked ? (held?.place ?? { x: at.x, z: at.z }) : { x: at.x, z: at.z };
+  const view = input.looked ? (held?.view ?? { yaw: at.yaw, pitch: at.pitch }) : { yaw: at.yaw, pitch: at.pitch };
+  return {
+    place,
+    view,
+    walked: Math.max(held?.walked ?? 0, Math.hypot(at.x - place.x, at.z - place.z)),
+    turned: Math.max(held?.turned ?? 0, Math.abs(at.yaw - view.yaw) + Math.abs(at.pitch - view.pitch)),
+  };
 }

@@ -1,15 +1,22 @@
-// A world's run while it is open (DESIGN's frame 09): the Running strip at the top centre with its
-// time left, its spending and Stop; the note with why it ended and what it spent; the live dot on
-// the chips of characters whose model decides. It reads the world's running state every 2.5 s only
+// A world's run while it is open (r09, R-RUN-BUILD-SHEET section 2): the world screen's top pill
+// carries it in place of the people line (who decides, the time left, the spending and Stop), and says
+// why it ended for a while once it ends; the live dot on the chips of characters whose model decides. It reads the world's running state every 2.5 s only
 // while a run is open, and once when asked otherwise. The pops over characters who said or chose
 // something come from contextual-world.ts's read while the world plays (T2), on the same cadence. Starting and stopping are
 // entity-execution.mjs's startRun and stopRun; the words are run-words.mjs's.
 import { SocietyControlClient, type SocietyPlaybackControl } from '/src/society-control-api.ts';
 import type { SocietyModels } from '/src/society-models-api.ts';
 import { openRun, startRun, stopRun } from './entity-execution.mjs';
-import { defaultRunLimits, endedNote, stripWords } from './run-words.mjs';
-import { runStrip, type RunStrip } from './world-ui-character.ts';
-import type { Notes } from './world-ui.ts';
+import { defaultRunLimits, endedNote, pillRunLine } from './run-words.mjs';
+
+/** Where a run shows: the world screen's top pill (world-corners.ts `run` and `runEnded`). */
+export interface RunPill {
+  run(state: { readonly line: string; readonly onStop: () => void } | null): void;
+  runEnded(words: string): void;
+}
+
+/** A character as the words call them (character-words.mjs `called`): how a sentence opens and names them within it. */
+export interface CalledAs { readonly start: string; readonly within: string }
 
 /** How often an open run is read, in milliseconds, and what was said while the world plays (T2). */
 export const WATCH_MS = 2500;
@@ -34,9 +41,10 @@ export interface RunWatch {
   dispose(): void;
 }
 
-export function mountRunWatch({ host, notes, entry, credentials, isCurrent, readOnly, onChange }: {
-  readonly host: HTMLElement;
-  readonly notes: Notes;
+export function mountRunWatch({ pill, askers, entry, credentials, isCurrent, readOnly, onChange }: {
+  readonly pill: RunPill;
+  /** The characters whose choice is a model, as the page calls them now, for the pill's "who decides". */
+  readonly askers: () => readonly CalledAs[];
   readonly entry: { readonly worldId: string; readonly authoredVersionId: string };
   readonly credentials: Record<string, unknown>;
   readonly isCurrent: () => boolean;
@@ -45,7 +53,7 @@ export function mountRunWatch({ host, notes, entry, credentials, isCurrent, read
 }): RunWatch {
   const controlClient = new SocietyControlClient({ ...credentials, worldId: entry.worldId } as ConstructorParameters<typeof SocietyControlClient>[0]);
   let control: SocietyPlaybackControl | null = null, live = true, timer = 0, requestId: string | null = null;
-  let strip: RunStrip | null = null, stopping = false;
+  let shown = false, stopping = false;
   const watch: RunWatch = {
     get control() { return control; },
     get run() { return openRun(control); },
@@ -83,21 +91,21 @@ export function mountRunWatch({ host, notes, entry, credentials, isCurrent, read
         return (error as { code?: string }).code ?? 'unknown';
       } finally { stopping = false; }
     },
-    dispose() { live = false; clearTimeout(timer); clearInterval(tick); strip?.remove(); strip = null; },
+    dispose() { live = false; clearTimeout(timer); clearInterval(tick); if (shown) pill.run(null); shown = false; },
   };
-  // The strip's time left counts down between reads.
-  const tick = window.setInterval(() => { if (live && strip) draw(); }, 1000);
+  // The pill's time left counts down between reads.
+  const tick = window.setInterval(() => { if (live && shown) draw(); }, 1000);
   /** The note after a run, once, with the server's sentence for why it ended. */
   function ended(before: ReturnType<typeof openRun>) {
     if (!before || openRun(control)) return;
     const closed = control?.livingSession;
-    if (closed && closed.sessionId === before.sessionId && closed.state === 'closed') notes.show(endedNote(closed), { ms: 8000 });
+    if (closed && closed.sessionId === before.sessionId && closed.state === 'closed') pill.runEnded(endedNote(closed));
   }
   function draw() {
     const run = openRun(control);
-    if (!run) { strip?.remove(); strip = null; return; }
-    if (!strip) { strip = runStrip({ onStop: () => { void watch.stop(); } }); host.append(strip.root); }
-    strip.set(stripWords(run, Date.now()));
+    if (!run) { if (shown) pill.run(null); shown = false; return; }
+    shown = true;
+    pill.run({ line: pillRunLine(run, Date.now(), askers()), onStop: () => { void watch.stop(); } });
   }
   async function read() {
     const before = openRun(control);

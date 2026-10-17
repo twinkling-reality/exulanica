@@ -11,8 +11,9 @@
 import { worldTime } from './world-clock.mjs';
 import { SPEED_SCALE, speedBars } from './opening-steps.mjs';
 import { CORNER_WORDS, NOTE_WORDS, PEOPLE_WORDS, SCREEN_WORDS } from './world-words.mjs';
+import { RUN_WORDS } from './run-words.mjs';
 import { mountPeople } from './world-people.mjs';
-import { SCREEN_TIMING, clockText, firstHintLeaves, keysCardRows, railButtonOf, railEntries } from './world-screen.mjs';
+import { SCREEN_TIMING, clockLabel, firstHintLeaves, firstHintMeasure, keysCardRows, railButtonOf, railEntries } from './world-screen.mjs';
 import { WORLD_UI_TIMING, hintsShown } from './world-ui-layout.mjs';
 import { keyWord, notes as mountNotes, pill, promptColumn, promptRow, tip as railTip, type Notes } from './world-ui.ts';
 import './world-ui-world.css';
@@ -67,6 +68,13 @@ export interface Corners {
   pressed(code: string): void;
   /** Closes the keys card if it is open; true when it was (Esc closes it before anything else). */
   closeKeys(): boolean;
+  /**
+   * A run on (r09): the pill's run line (who decides, time left, spending) with a live dot and Stop, in
+   * the people line's place; null when no run is on.
+   */
+  run(state: { readonly line: string; readonly onStop: () => void } | null): void;
+  /** A run ended: the server's sentence for why, in the people line's place for a while (`screen.runEndedMs`). */
+  runEnded(words: string): void;
   /** A mode's own rows for the keys card (build mode's), or null to give the world's own back. */
   keys(rows: readonly KeysRow[] | null): void;
   /** Whether the world has a clock to play and pause (people live here). */
@@ -84,6 +92,7 @@ export interface Corners {
   dispose(): void;
 }
 
+const RUN_STOP = RUN_WORDS.stop;
 const div = (className: string): HTMLDivElement => { const made = document.createElement('div'); made.className = className; return made; };
 const span = (className: string, text = ''): HTMLSpanElement => { const made = document.createElement('span'); made.className = className; made.textContent = text; return made; };
 const button = (className: string): HTMLButtonElement => { const made = document.createElement('button'); made.type = 'button'; made.className = className; return made; };
@@ -205,16 +214,29 @@ export function mountCorners({
   // ---------- The top pill: the world's name and who lives here ----------
   const topName = span('', title), topRule = span('wu-top-rule'), topPeople = span('wu-top-people');
   topRule.setAttribute('aria-hidden', 'true');
-  const top = pill(topName, topRule, topPeople);
+  // A run on (r09): a live dot, the run line and Stop, in the people line's place.
+  const topRun = span('wu-top-run'), runDot = span('wu-live-dot'), runLine = span('wu-top-people');
+  runDot.setAttribute('aria-hidden', 'true');
+  const runStop = button('wu-run-stop');
+  const stopMark = document.createElement('i');
+  stopMark.setAttribute('aria-hidden', 'true');
+  runStop.append(stopMark, span('', RUN_STOP));
+  let onRunStop: (() => void) | null = null;
+  runStop.addEventListener('click', () => onRunStop?.());
+  topRun.append(runDot, runLine, runStop);
+  topRun.hidden = true;
+  const top = pill(topName, topRule, topPeople, topRun);
   top.classList.add('wu-top', 'wu-screen-in');
   top.setAttribute('role', 'status');
   let shownPeople: string | null = '';
+  let runOn = false, endedWords: string | null = null, endedUntil = -Infinity;
   function drawTop(now: number): void {
-    const line = folk.line(now);
+    topRun.hidden = !runOn;
+    const line = runOn ? null : now < endedUntil ? endedWords : folk.line(now);
     if (line === shownPeople) return;
     shownPeople = line;
     topPeople.textContent = line ?? '';
-    topPeople.hidden = line === null; topRule.hidden = line === null;
+    topPeople.hidden = line === null; topRule.hidden = line === null && !runOn;
   }
 
   // ---------- The clock, and K13's offer in its place ----------
@@ -247,7 +269,18 @@ export function mountCorners({
   firstHint.classList.add('wu-first-hint');
   firstHint.setAttribute('role', 'note');
   firstHint.hidden = hintSeen;
-  let hintStart: number | null = null, hintFrom: CornerPose | null = null, hintWalked = 0, hintTurned = 0, hintLeftAt: number | null = null;
+  let hintStart: number | null = null, hintLeftAt: number | null = null;
+  let hintHeld: ReturnType<typeof firstHintMeasure> | null = null;
+  // The person's own input: a moving key pressed, the mouse looking (a drag, or moving while it is held
+  // to the page). The world's own camera moves before them count as nothing.
+  const hintInput = { walked: false, looked: false };
+  const listening = new AbortController();
+  window.addEventListener('keydown', (event) => {
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) hintInput.walked = true;
+  }, { signal: listening.signal });
+  window.addEventListener('pointermove', (event) => {
+    if (event.buttons !== 0 || document.pointerLockElement !== null) hintInput.looked = true;
+  }, { signal: listening.signal });
 
   const keysButton = button('wu-glass-thin wu-keys-button wu-screen-in');
   keysButton.innerHTML = icon('keys');
@@ -340,12 +373,13 @@ export function mountCorners({
   function readClock(): void {
     const read = people?.clock() ?? null;
     present = read?.society === 'present';
+    // Every present society has its clock: its time of day where it keeps one, else whether it plays.
     const at = present && read ? worldTime(read.minute ?? NaN, read.startMinuteOfDay ?? NaN) : null;
-    clock.hidden = at === null;
+    clock.hidden = !present;
     drawOffer();
-    if (!at || !read) return;
+    if (!present || !read) return;
     playing = read.mode === 'playing';
-    const text = clockText(at.hhmm, at.day);
+    const text = clockLabel(at, read.mode);
     if (text !== shownTime) { time.textContent = text; shownTime = text; }
     if (read.mode !== shownMode) {
       shownMode = read.mode;
@@ -375,16 +409,13 @@ export function mountCorners({
       if (hintLeftAt !== null && now - hintLeftAt >= screen.firstHint.fadeMs) firstHint.hidden = true;
       return;
     }
-    // Flying and a mode's own hints take the bottom while they show; the minute counts on.
-    firstHint.style.visibility = flyingNow || handed !== null ? 'hidden' : '';
+    // Flying, a mode (building) and a mode's own hints take the bottom while they show; the minute counts on.
+    firstHint.style.visibility = flyingNow || handed !== null || modeWordNow !== null ? 'hidden' : '';
     const at = pose();
     if (at === null) return;
     hintStart ??= now;
-    if (hintFrom !== null) {
-      hintWalked = Math.max(hintWalked, Math.hypot(at.x - hintFrom.x, at.z - hintFrom.z));
-      hintTurned = Math.max(hintTurned, Math.abs(at.yaw - hintFrom.yaw) + Math.abs(at.pitch - hintFrom.pitch));
-    } else hintFrom = at;
-    if (!firstHintLeaves({ shownMs: now - hintStart, walkedM: hintWalked, turnedRad: hintTurned }, screen.firstHint)) return;
+    hintHeld = firstHintMeasure(hintHeld, at, hintInput);
+    if (!firstHintLeaves({ shownMs: now - hintStart, walkedM: hintHeld.walked, turnedRad: hintHeld.turned }, screen.firstHint)) return;
     hintLeftAt = now;
     firstHint.dataset.leaving = 'true';
     try { if (worldId !== '') localStorage.setItem(hintKey, '1'); } catch { /* Shown again next time. */ }
@@ -416,6 +447,18 @@ export function mountCorners({
       drawTip();
     },
     closeKeys,
+    run(state) {
+      runOn = state !== null;
+      onRunStop = state?.onStop ?? null;
+      if (state !== null && runLine.textContent !== state.line) runLine.textContent = state.line;
+      shownPeople = '';
+      drawTop(performance.now());
+    },
+    runEnded(words) {
+      endedWords = words; endedUntil = performance.now() + screen.runEndedMs;
+      shownPeople = '';
+      drawTop(performance.now());
+    },
     keys(rows) {
       handedKeys = rows;
       // An open card shows the new rows at once.
@@ -439,6 +482,7 @@ export function mountCorners({
       if (hintsRoot.dataset.faded !== faded) { hintsRoot.dataset.faded = faded; scrim.style.opacity = shown ? '' : '0'; }
     },
     dispose() {
+      listening.abort();
       notes.clear();
       for (const part of [scrim, backRoot, top, clock, offer, reticle, hintsRoot, firstHint, keysCard, keysButton, notes.root]) part.remove();
     },

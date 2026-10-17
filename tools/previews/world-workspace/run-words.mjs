@@ -84,6 +84,26 @@ export function stripWords(run, now) {
     spent: amount(run.used.usd), of: `of ${amount(run.limits.usd)}`, stop: RUN_WORDS.stop });
 }
 
+/**
+ * Who a run asks, as the world screen's pill says it (r09, J28's names): each character whose choice is
+ * a model, as `called` calls them ({ start, within }), the first opening the sentence. "Teo's model is
+ * deciding", "Teo's and Ines's models are deciding", "Teo's, Ines's and the resident's models are
+ * deciding"; past three, how many; with nobody known, that the world runs.
+ */
+export function decidingWords(whos) {
+  const list = whos ?? [];
+  if (list.length === 0) return RUN_WORDS.running;
+  if (list.length > 3) return `${list.length} models are deciding`;
+  const names = list.map((who, at) => possessive(at === 0 ? who.start : who.within));
+  if (names.length === 1) return `${names[0]} model is deciding`;
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)} models are deciding`;
+}
+
+/** The pill's run line (r09): who decides, the time left and the spending, "Teo's model is deciding · 9:13 left · $0.0011 of $0.05". */
+export function pillRunLine(run, now, whos) {
+  return [decidingWords(whos), runningLine(run, now)].join(' · ');
+}
+
 /** The page's line while a run is on: "9:13 left · $0.0011 of $0.05" (the strip and the orb say it runs; DESIGN's J9). */
 export function runningLine(run, now) {
   return [`${timeLeft(run.endsBy, now)} ${RUN_WORDS.left}`, `${amount(run.used.usd)} of ${amount(run.limits.usd)}`].join(' · ');

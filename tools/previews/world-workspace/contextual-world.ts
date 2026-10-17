@@ -493,7 +493,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     ++serial; held = null; picker.drop(); root.dataset.held = '';
     presence.choose(null); presence.group(null);
   }
-  // A run (run-watch.ts): the strip, Stop and the ended note.
+  // A run (run-watch.ts): the pill's run line and Stop, and why it ended (r09).
   const readOnly = import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1';
   const modelName = (model) => subjectReads.models?.models.find(item => item.provider === model?.provider && item.modelId === (model?.model_id ?? model?.modelId))?.name ?? null;
   const eventsPath = (kinds, extra = '') => '/world/versions/' + encodeURIComponent(entry.authoredVersionId) + '/society/events?world_id=' + encodeURIComponent(entry.worldId)
@@ -528,7 +528,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       client: modelsClient, current: () => picker.of(row) !== null && held === row && current() })).verified,
     refusal: (error, row) => modelRefusalWords(error.code ?? 'stale', subjectView(row).who),
     onUsed: (verified) => { subjectReads.models = verified; if (asking) { asking.shown = runWatch.limits(verified); asking.refusal = null; } } });
-  const runWatch = mountRunWatch({ host: root, notes: worldNotes, entry, credentials, isCurrent: current, readOnly,
+  const runWatch = mountRunWatch({ pill: corners, entry, credentials, isCurrent: current, readOnly,
+    askers: () => (subjectReads.models?.choices ?? []).filter(choice => choice.model && !choice.refusal).map(choice => whoOf(choice.subjectId)),
     onChange: () => { if (pageView) drawPage(); },
   });
   void runWatch.refresh();

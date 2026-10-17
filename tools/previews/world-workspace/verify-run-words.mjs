@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RUN, NOT_CONNECTED, PAUSE_FIRST, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, runFor, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides } from './run-words.mjs';
+import { DEFAULT_RUN, NOT_CONNECTED, PAUSE_FIRST, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, runFor, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
 import { called } from './character-words.mjs';
 
 const python = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -62,6 +62,14 @@ assert.equal(timeLeft(open.endsBy, now), '9:13');
 assert.equal(timeLeft(open.endsBy, now + 600_000), '0:00');
 assert.deepEqual({ ...stripWords(open, now) }, { running: 'Running', timeLeft: '9:13', left: 'left', spent: '$0.0011', of: 'of $0.05', stop: 'Stop' });
 assert.equal(runningLine(open, now), '9:13 left · $0.0011 of $0.05');
+// The pill's run line (r09): who decides by J28's names, then the time left and the spending.
+const teo = called({ name: 'Teo' }), ines = called({ name: 'Ines' }), someone = called({ name: null, kind: 'Resident' });
+assert.equal(pillRunLine(open, now, [teo]), "Teo's model is deciding · 9:13 left · $0.0011 of $0.05");
+assert.equal(decidingWords([teo, ines]), "Teo's and Ines's models are deciding");
+assert.equal(decidingWords([teo, ines, someone]), "Teo's, Ines's and the resident's models are deciding");
+assert.equal(decidingWords([someone]), "The resident's model is deciding");
+assert.equal(decidingWords([teo, ines, someone, teo]), '4 models are deciding');
+assert.equal(decidingWords([]), 'Running');
 assert.equal(spentWords({ used: { usd: '0.00120000', unresolved: { count: 1, usd: '0.00060000' } } }), '$0.0012, and up to $0.0006 not known yet');
 assert.equal(endedNote({ closedReasonWords: 'The run played all its minutes.', used: { usd: '0.00420000', unresolved: { count: 0, usd: '0' } } }), 'The run played all its minutes. Spent $0.0042.');
 assert.equal(endedNote({ closedReasonWords: 'The run was stopped.', used: { usd: '0', unresolved: { count: 0, usd: '0' } } }), 'The run was stopped. Spent $0.');
