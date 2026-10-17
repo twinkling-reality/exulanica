@@ -7,7 +7,8 @@
 // the server what removing it would do and Enter does it; while it is being moved, Delete puts it
 // back first. The tray along the bottom holds the things this world may place, as pictures: picking
 // one carries its see-through copy under the pointer, asked of the server as it rests, and a click or
-// Enter places it; "Make a creature" opens the page's own maker. Cmd+Z takes back the world's newest
+// Enter places it; "Make a creature" opens the page's own maker, and the page that makes one holds it at its
+// stand the same way (`hold`). Cmd+Z takes back the world's newest
 // change, and Cmd+Shift+Z does the last change taken back again. Tab and Shift+Tab choose the next or
 // previous placed thing in view, so selecting needs no pointer. History, the page H opens, takes
 // changes back through the same `undo` and `redo` this returns. Every write goes through the app's own
@@ -20,9 +21,9 @@
 // pill, the keys card and the note); what a key does in each state, and every sentence, is
 // build-words.mjs.
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
-import { pickSiteSlot } from '/src/composition/sight.ts';
-import { currentOpenSite } from '/src/composition/site-world.ts';
-import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
+import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
+import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
+import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
 import { BUSY, TRAY, buildKeys, createKindLabels, heldRows, keyAction, moveWords, movedNote, namesTogether, nothingInView, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -59,6 +60,9 @@ const TILE_PICTURE = { width: 112, height: 84, leastWidth: 96, leastHeight: 72 }
 const MAKE_TILE = 'make';
 /** How long build mode waits before mounting the placed things' layer again after a mount left no library, in milliseconds. */
 const LAYER_RETRY_MS = 5000;
+/** How a hold ends: what it held placed, by the new thing's id, or let go unplaced. */
+export type HoldOutcome = { readonly outcome: 'placed'; readonly thingId: string } | { readonly outcome: 'put-back' };
+const PUT_BACK: HoldOutcome = Object.freeze({ outcome: 'put-back' });
 
 export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null, people = null, makeCreature = null }) {
   const lifetime = new AbortController();
@@ -96,7 +100,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /**
    * A new thing being placed from the tray: its tile, its kind as a placed thing names it, its name,
    * the region and id it would be placed under, where it would stand (`to`, as a move's) and the
-   * server's newest answer about it (`verdict`, as a move's).
+   * server's newest answer about it (`verdict`, as a move's); `settle`, for one held by `hold`, is told
+   * how it ended.
    */
   let placing = null;
   let records = new Map(), pointer = null, lastPick = 0, lastNames = 0;
@@ -340,8 +345,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     }
   }
 
-  /** A tile picked: its thing carried under the pointer to be placed, or the creature maker opened. */
-  function pick(tile) {
+  /** A tile picked: its thing carried under the pointer (or stood at the ground point `at`) to be placed, or the creature maker opened. */
+  function pick(tile, at = null) {
     if (!on || busy) return;
     if (tile.make) { putBack(); deselect(); makeCreature?.(); return; }
     if (placing?.tileId === tile.id) { putBack(); return; }
@@ -353,8 +358,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' } };
     const held = placing;
     void kindBox(tile.kind).then(box => { held.box = box; });
-    const at = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
-    const ground = groundAt(at.x, at.y);
+    const pointed = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
+    const ground = at ?? groundAt(pointed.x, pointed.y);
     if (ground !== null) placeTo(ground, false);
     render();
     canvas.focus({ preventScroll: true });
@@ -428,7 +433,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     busy = true; render();
     try {
       await post('things.place', '/things', { base_state_sha256: verdict.base, ...placingBody(held, verdict.to), saved_entry: savedEntry() });
-      busy = false; dropPlacing();
+      busy = false; dropPlacing({ outcome: 'placed', thingId: held.thingId });
       try { await refreshRecords(); } catch {}
       if (records.has(held.thingId)) selected = held.thingId;
       render(); say(placedNote(name), { undoable: true });
@@ -442,11 +447,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     }
     try { await refreshRecords(); } catch {}
   }
-  /** The new thing being placed put back in the tray: its copy goes, nothing was written. */
-  function dropPlacing() {
+  /** The new thing being placed let go (put back in the tray unless `outcome` says it was placed): its copy goes. */
+  function dropPlacing(outcome: HoldOutcome = PUT_BACK) {
     if (placing === null) return;
+    const held = placing;
     placing = null; ++asked; clearTimeout(askTimer);
     void things()?.layer?.setKindGhost?.(null);
+    held.settle?.(outcome);
   }
 
   // ---------- The held group, the corners and the marks ----------
@@ -899,6 +906,26 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     active: () => on,
     undo,
     redo,
+    /**
+     * Holds the made kind `kind` ({ source: 'workspace', sha256 }) at the ground point `at` ({ xMm, zMm }, the
+     * region frame's east and south in millimetres) to be placed, as picking its creatures tile does, switching
+     * build mode on first. Resolves { outcome: 'placed', thingId } once the server keeps it, { outcome: 'put-back' }
+     * when it is let go unplaced (put back, another tile picked, build mode left or closed), or null when nothing
+     * can be held here (no region to place in, or a write under way).
+     */
+    async hold(kind, at): Promise<HoldOutcome | null> {
+      if (kind?.source !== 'workspace' || typeof kind.sha256 !== 'string' || !Number.isFinite(at?.xMm) || !Number.isFinite(at?.zMm)) return null;
+      if (!on) await toggle();
+      // Held from its creatures tab, read again first when it is newer than the tab's list (its name is the list's).
+      trayTab = 'creatures';
+      if (!creatures?.some(made => made.sha256 === kind.sha256)) await readCreatures(true);
+      if (!on || busy || lifetime.signal.aborted) return null;
+      dropMove(); dropPlacing();
+      pick({ id: 'made:' + kind.sha256, kind: { source: 'workspace', sha256: kind.sha256 } }, { xMm: at.xMm, zMm: at.zMm });
+      const held = placing;
+      if (held === null) return null;
+      return new Promise<HoldOutcome>((settle) => { held.settle = settle; });
+    },
     /**
      * The made kinds' labels as build mode reads them (`label(kind)`, and `listen` to be told when one
      * lands), for History's rows to name creatures with the same reads; a page with no build mode
