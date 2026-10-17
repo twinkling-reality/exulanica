@@ -210,6 +210,29 @@ describe('the first view of a dressed town, with what else stands at eye height'
     const toward: [number, number] = [(0 - view.eastMm) / reach, (-12_000 - view.southMm) / reach];
     expect(openDistance([view.eastMm, view.southMm], toward, [trunk], reach)).toBe(reach);
   });
+
+  it('never stands on a placed thing to see it, nor nearer than the rule keeps a thing from the feet', () => {
+    // A well placed on the footway 6 m east of the arrival, on a spot the view would try, with a post
+    // just this side of it: every nearer spot along the footway sees the post, not the well. A spot
+    // on the well itself sees nothing of it, and would face nowhere.
+    const well: [number, number][] = [[6_000, 0]];
+    const footwayOnly = (_east: number, south: number) => south === 0;
+    const view = arrivalView({
+      eastMm: 0, southMm: 0, facing: [0, -1], targets: well, parked: [], ground: footwayOnly, blockers: [post(5_000, 0)],
+    });
+    expect(view.moved).toBe(true);
+    expect(Number.isFinite(view.yaw)).toBe(true);
+    expect(view).toMatchObject({ eastMm: 7_500, southMm: 0 });
+    // Under a rule that keeps a seat or a door from counting nearer than 6 m, a thing is not seen
+    // from nearer either: the view stands back along the footway until the well is 6 m off or more
+    // (with nothing kept clear dead ahead, so that rule alone decides).
+    const kept = arrivalView({
+      eastMm: 0, southMm: 0, facing: [0, -1], targets: well, parked: [], ground: footwayOnly, blockers: [post(5_000, 0)],
+      open: { ...LIVELY, life: { ...LIFE, leastMm: 6_000, centreFloorMm: 0 } },
+    });
+    expect(Math.hypot(kept.eastMm - 6_000, kept.southMm)).toBeGreaterThanOrEqual(6_000);
+    expect(Number.isFinite(kept.yaw)).toBe(true);
+  });
 });
 
 /*

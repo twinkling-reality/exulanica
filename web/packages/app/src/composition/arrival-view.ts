@@ -491,9 +491,12 @@ export function arrivalView(input: {
    * line: the view is the way the entry says, past parked cars alone.
    */
   const sees = (east: number, south: number): boolean => {
+    const reach = Math.hypot(aim[0] - east, aim[1] - south);
+    // A spot on the placed things, or nearer them than the rule lets a seat or a door count as life in
+    // view, has them at its feet: it is no view of them, and on them it would face nowhere.
+    if (input.targets.length > 0 && (reach === 0 || reach < (input.open?.life?.leastMm ?? 0))) return false;
     const rings = input.targets.length === 0 ? [] : input.blockers ?? [];
     if (rings.length === 0) return true;
-    const reach = Math.hypot(aim[0] - east, aim[1] - south);
     if (reach === 0) return true;
     const toward: [number, number] = [(aim[0] - east) / reach, (aim[1] - south) / reach];
     if (openDistance([east, south], toward, rings, reach) < reach) return false;
