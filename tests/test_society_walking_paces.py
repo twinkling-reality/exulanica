@@ -272,6 +272,7 @@ def test_the_one_function_writes_a_first_input_s_lists_and_nothing_into_a_later_
         "input_seq": 1,
         "modules": list(current_modules()),
         MOVEMENT_MODULES_FIELD: [SWIMMING, WALKING_V2],
+        "identity": {"catalog": "society-legacy-identity", "version": 2},
     }
     later: dict[str, Any] = {"input_seq": 2}
     record_modules(later)
@@ -288,6 +289,7 @@ def _recording(document: dict[str, Any], modules: object) -> dict[str, Any]:
     """``document`` recording ``modules`` as its movement modules, or none for None, resealed."""
     changed = copy.deepcopy(document)
     changed.pop(MOVEMENT_MODULES_FIELD, None)
+    changed.pop("identity", None)
     if modules is not None:
         changed[MOVEMENT_MODULES_FIELD] = modules
     return _resealed(changed)

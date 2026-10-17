@@ -269,6 +269,8 @@ def test_a_stored_society_of_the_first_version_replays_as_it_ran():
     # The input as it was stored: the same composition, recording the modules it recorded then and
     # the villager's first version, which its people were.
     stored = {**compose((GATE, SPIRIT, KNIGHT)), "population_kind": dict(FIRST_VILLAGER)}
+    # Nor did it record the identity naming its people: they bear the first version's names.
+    stored.pop("identity")
     document = _first_version(stored, history["modules"])
     assert PURPOSEFUL in document["modules"]
     assert document["document_sha256"] == history["input_sha256"]

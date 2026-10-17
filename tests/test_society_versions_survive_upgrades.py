@@ -264,6 +264,9 @@ RELEASED_CATALOGS = {
     "society-legacy-identity.v1.json": (
         "5f8c5a040fe346e7fe61b22f20e3210507f4828d6fc1c93690cb909d09aee455"
     ),
+    "society-legacy-identity.v2.json": (
+        "f36de442fd6135af42f681439e3e94bb13db9e84da99a670e98c21345a1d68cb"
+    ),
     "society-need.v1.json": "fde86f793eac317b3899ba384a204e57683773b48ac588c527173511ffccd563",
     "society-policy.v1.json": "789243cd93f0b83274870919df34427fb3b75dc3e8df926cac59d40c2476bb3f",
     "society-purposeful-activity.v1.json": (

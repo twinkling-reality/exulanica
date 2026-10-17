@@ -92,6 +92,8 @@ from exulanica.world.society_thing_inputs import (
     MOVEMENT_MODULES_FIELD,
     arrival_points,
     check_character,
+    check_kept_identity,
+    keep_first_records,
     placed_beings,
     placed_objects,
 )
@@ -1168,12 +1170,7 @@ def initial_things_society(
         )
     state["next_ordinal"] = len(state["inhabitants"])
     state["refused_placements"] = []
-    if "modules" in document:
-        # The modules its first input records, which its minutes run for its whole life.
-        state["modules"] = list(document["modules"])
-    if MOVEMENT_MODULES_FIELD in document:
-        # And the movement modules that move its people, kept the same way.
-        state[MOVEMENT_MODULES_FIELD] = list(document[MOVEMENT_MODULES_FIELD])
+    keep_first_records(state, document, seed)
     if "people" in document:
         _house_the_population(state, seed, document["people"])
     from exulanica.world.society_resident_day import initialize
@@ -2050,6 +2047,7 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             check_recorded(state[MOVEMENT_MODULES_FIELD], THINGS_PROFILE)
         except MovementError as exc:
             raise ValueError(f"a society of things' movement modules: {exc}") from exc
+    check_kept_identity(state)
     people = state["inhabitants"]
     # The run forms it keeps are exactly those of the made kinds somebody or something here is of.
     validate_kinds(

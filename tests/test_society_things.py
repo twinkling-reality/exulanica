@@ -41,6 +41,7 @@ from exulanica.world.society_decision_contract import (
     person_role,
     situation,
 )
+from exulanica.world.society_identity import IDENTITY_FIELD, name_people
 from exulanica.world.society_planner import (
     advance_purposeful_society,
     initial_purposeful_society,
@@ -87,6 +88,8 @@ def test_genesis_is_the_purposeful_people_as_villagers_then_each_placed_being():
     document = compose((GATE, WELL, SWORD, KNIGHT))
     state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
     purposeful = initial_purposeful_society(SOCIETY, SEED, document, population=POPULATION)
+    # Its people named as the society of things names them, by the identity its input records.
+    name_people(purposeful["inhabitants"], SEED, document[IDENTITY_FIELD])
     assert state["profile"] == THINGS_PROFILE
     villagers = [p for p in state["inhabitants"] if p["came_by"] == "populated"]
     assert [(p["id"], p["display_name"], p["position_mm"]) for p in villagers] == [
@@ -132,6 +135,8 @@ def test_a_minute_with_nothing_to_reconcile_and_no_crossing_is_the_planner_s_min
     document = compose((GATE, WELL))
     things = _genesis(GATE, WELL)
     purposeful = initial_purposeful_society(SOCIETY, SEED, document, population=POPULATION)
+    # Its people named as the society of things names them, by the identity its input records.
+    name_people(purposeful["inhabitants"], SEED, document[IDENTITY_FIELD])
     for _ in range(12):
         things, thing_events, bound = _minute(things, document)
         purposeful, events = advance_purposeful_society(purposeful, SEED, [document])

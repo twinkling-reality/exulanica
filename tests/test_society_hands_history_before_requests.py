@@ -62,6 +62,7 @@ def recorded(document: dict[str, Any]) -> dict[str, Any]:
         "population_kind": dict(FIRST_VILLAGER),
     }
     document.pop("movement_modules", None)
+    document.pop("identity", None)
     document.pop("document_sha256")
     document["document_sha256"] = input_sha256(document)
     return document

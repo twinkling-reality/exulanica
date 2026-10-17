@@ -34,6 +34,7 @@ from exulanica.world.society_catalogs import (
     purposeful_routine,
 )
 from exulanica.world.society_engines import society_engine
+from exulanica.world.society_identity import IDENTITY_FIELD
 from exulanica.world.society_input_policy import (
     ARRIVAL_INPUTS,
     AUTHORED_GROUND_INPUT,
@@ -300,12 +301,11 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         fields.add("arrival")
     if document.get("profile") in THING_INPUTS:
         fields.update(("things", "population_kind"))
-        # The modules a society runs: recorded by its first input alone, absent before they were.
-        if "modules" in document:
-            fields.add("modules")
-        # The movement modules that move its people: the same, and absent before they were.
-        if MOVEMENT_MODULES_FIELD in document:
-            fields.add(MOVEMENT_MODULES_FIELD)
+        # What its first input alone records, each absent before it was: the modules it runs, the
+        # movement modules that move its people and the identity catalog version naming them.
+        for recorded in ("modules", MOVEMENT_MODULES_FIELD, IDENTITY_FIELD):
+            if recorded in document:
+                fields.add(recorded)
         # What a town's people are made from: recorded by its first input alone, where it is.
         if "people" in document:
             fields.add("people")

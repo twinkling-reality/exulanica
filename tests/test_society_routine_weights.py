@@ -213,6 +213,7 @@ def test_nearest_with_activity_targets_remains_refused_and_no_targets_waits():
     document["input_seq"] += 1
     document.pop("modules", None)
     document.pop("movement_modules", None)
+    document.pop("identity", None)
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     planned, events = advance_purposeful_society(state, SEED, [prior, document])

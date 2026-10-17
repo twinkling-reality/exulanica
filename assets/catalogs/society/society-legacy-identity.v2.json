@@ -1,0 +1,1127 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-legacy-identity",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "first_ari",
+      "kind": "first_name",
+      "text": "Ari",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_bela",
+      "kind": "first_name",
+      "text": "Bela",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_cleo",
+      "kind": "first_name",
+      "text": "Cleo",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_dara",
+      "kind": "first_name",
+      "text": "Dara",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_emi",
+      "kind": "first_name",
+      "text": "Emi",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_faye",
+      "kind": "first_name",
+      "text": "Faye",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_ivo",
+      "kind": "first_name",
+      "text": "Ivo",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_juno",
+      "kind": "first_name",
+      "text": "Juno",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_ada",
+      "kind": "first_name",
+      "text": "Ada",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_bram",
+      "kind": "first_name",
+      "text": "Bram",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_cyra",
+      "kind": "first_name",
+      "text": "Cyra",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_dev",
+      "kind": "first_name",
+      "text": "Dev",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_esme",
+      "kind": "first_name",
+      "text": "Esme",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_finn",
+      "kind": "first_name",
+      "text": "Finn",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_gia",
+      "kind": "first_name",
+      "text": "Gia",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_hugo",
+      "kind": "first_name",
+      "text": "Hugo",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_ines",
+      "kind": "first_name",
+      "text": "Ines",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_jonah",
+      "kind": "first_name",
+      "text": "Jonah",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_kai",
+      "kind": "first_name",
+      "text": "Kai",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_lena",
+      "kind": "first_name",
+      "text": "Lena",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_milo",
+      "kind": "first_name",
+      "text": "Milo",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_nia",
+      "kind": "first_name",
+      "text": "Nia",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_otto",
+      "kind": "first_name",
+      "text": "Otto",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_pia",
+      "kind": "first_name",
+      "text": "Pia",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_quinn",
+      "kind": "first_name",
+      "text": "Quinn",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_rosa",
+      "kind": "first_name",
+      "text": "Rosa",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_sami",
+      "kind": "first_name",
+      "text": "Sami",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_tova",
+      "kind": "first_name",
+      "text": "Tova",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_uma",
+      "kind": "first_name",
+      "text": "Uma",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_vik",
+      "kind": "first_name",
+      "text": "Vik",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_willa",
+      "kind": "first_name",
+      "text": "Willa",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_yara",
+      "kind": "first_name",
+      "text": "Yara",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_zeno",
+      "kind": "first_name",
+      "text": "Zeno",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_amal",
+      "kind": "first_name",
+      "text": "Amal",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_bodhi",
+      "kind": "first_name",
+      "text": "Bodhi",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_calla",
+      "kind": "first_name",
+      "text": "Calla",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_davi",
+      "kind": "first_name",
+      "text": "Davi",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_elio",
+      "kind": "first_name",
+      "text": "Elio",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_freya",
+      "kind": "first_name",
+      "text": "Freya",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_noor",
+      "kind": "first_name",
+      "text": "Noor",
+      "milli": 0,
+      "reason": "Authored: a first name for the invented people of a society of things whose first input records this version. A person's name is a first and a last name drawn without repeats by the society's seed from every pair this version holds, invented for synthetic people and not anyone's, and it carries no number.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_ash",
+      "kind": "last_name",
+      "text": "Ash",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_bell",
+      "kind": "last_name",
+      "text": "Bell",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_cove",
+      "kind": "last_name",
+      "text": "Cove",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_dawn",
+      "kind": "last_name",
+      "text": "Dawn",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_elm",
+      "kind": "last_name",
+      "text": "Elm",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_ford",
+      "kind": "last_name",
+      "text": "Ford",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_grove",
+      "kind": "last_name",
+      "text": "Grove",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_hayes",
+      "kind": "last_name",
+      "text": "Hayes",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_ames",
+      "kind": "last_name",
+      "text": "Ames",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_brook",
+      "kind": "last_name",
+      "text": "Brook",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_carver",
+      "kind": "last_name",
+      "text": "Carver",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_dale",
+      "kind": "last_name",
+      "text": "Dale",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_ember",
+      "kind": "last_name",
+      "text": "Ember",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_field",
+      "kind": "last_name",
+      "text": "Field",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_gale",
+      "kind": "last_name",
+      "text": "Gale",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_holt",
+      "kind": "last_name",
+      "text": "Holt",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_ivers",
+      "kind": "last_name",
+      "text": "Ivers",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_joss",
+      "kind": "last_name",
+      "text": "Joss",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_kerr",
+      "kind": "last_name",
+      "text": "Kerr",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_lane",
+      "kind": "last_name",
+      "text": "Lane",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_moss",
+      "kind": "last_name",
+      "text": "Moss",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_north",
+      "kind": "last_name",
+      "text": "North",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_oak",
+      "kind": "last_name",
+      "text": "Oak",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_penn",
+      "kind": "last_name",
+      "text": "Penn",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_quill",
+      "kind": "last_name",
+      "text": "Quill",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_reed",
+      "kind": "last_name",
+      "text": "Reed",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_stone",
+      "kind": "last_name",
+      "text": "Stone",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_thorne",
+      "kind": "last_name",
+      "text": "Thorne",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_vale",
+      "kind": "last_name",
+      "text": "Vale",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_wells",
+      "kind": "last_name",
+      "text": "Wells",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_birch",
+      "kind": "last_name",
+      "text": "Birch",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_cliff",
+      "kind": "last_name",
+      "text": "Cliff",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_hollis",
+      "kind": "last_name",
+      "text": "Hollis",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_marsh",
+      "kind": "last_name",
+      "text": "Marsh",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_rowan",
+      "kind": "last_name",
+      "text": "Rowan",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_sorrel",
+      "kind": "last_name",
+      "text": "Sorrel",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_tarn",
+      "kind": "last_name",
+      "text": "Tarn",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_wynn",
+      "kind": "last_name",
+      "text": "Wynn",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_lowe",
+      "kind": "last_name",
+      "text": "Lowe",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_pryor",
+      "kind": "last_name",
+      "text": "Pryor",
+      "milli": 0,
+      "reason": "Authored: a last name for the invented people of a society of things whose first input records this version, drawn with a first name as one pair without repeats by the society's seed; invented for synthetic people and not anyone's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    }
+  ]
+}

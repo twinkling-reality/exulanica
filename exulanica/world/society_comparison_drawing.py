@@ -109,6 +109,7 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_engines",
     "exulanica.world.society_follow",
     "exulanica.world.society_hands",
+    "exulanica.world.society_identity",
     "exulanica.world.society_input_policy",
     "exulanica.world.society_kinds",
     "exulanica.world.society_legacy",

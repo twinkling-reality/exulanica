@@ -195,6 +195,7 @@ def test_an_input_with_no_frame_and_its_society_are_the_bytes_they_were(things: 
     # pins, the first walking and the first villager.
     document["modules"] = list(RECORDED_MODULES)
     del document["movement_modules"]
+    document.pop("identity", None)
     document["population_kind"] = dict(FIRST_VILLAGER)
     document = _resealed(document)
     assert "people" not in document

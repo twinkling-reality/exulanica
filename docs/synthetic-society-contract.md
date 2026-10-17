@@ -2142,8 +2142,8 @@ another being where a person playing one chooses to (below); a person may play o
 ([decision roles](decision-roles-contract.md#a-person-playing-a-being)).
 Each of them names its kind by key, version and digest (a being of a kind its workspace keeps,
 by that kind's digest alone: below), and how it came: `populated` (the
-people its ground's population brings, the purposeful genesis's own people with the same names and
-draws, of the kind the ground's catalog entry names, `population_kind`), `placed` (a being the
+people its ground's population brings, the purposeful genesis's own people with the same draws,
+named as below, of the kind the ground's catalog entry names, `population_kind`), `placed` (a being the
 world's author placed in the version) or `crossed` (a visitor from an outside program). At genesis
 the author's beings are seated first, each at the open node nearest where it was placed, and only
 then does anybody of the population whose starting node one took step to the open node nearest it,
@@ -2154,6 +2154,17 @@ hear it and to everyone near, and, asked the minute after a line was said to it,
 society whose first input recorded the first villager keeps it, and its villagers say nothing. A
 society no model decides for lives the same either way
 (`tests/test_villagers_say_lines.py`).
+
+**Its people's names.** A society of things made since the identity catalog's second version
+records it in its first input (`identity`: the catalog `society-legacy-identity` at version 2) and
+its state keeps it from genesis. Each of its population is then named by a first and a last name
+from that version's forty of each, the pair drawn by the society's seed without repeats, with no
+number ([`society_identity.py`](../exulanica/world/society_identity.py)): no two of its first 1,600
+people share a name, and the same society names the same person the same way on any machine. A
+later input records none, and its absence is no difference. A society whose first input records no
+identity, as every one made before, keeps the first version's names, a number after each, so its
+genesis and replay are as they were. A being the author placed or that came in keeps its kind's
+name, numbered from the second present (`tests/test_society_identity_names.py`).
 
 **Its input carries the things its author placed.** It reads
 `exulanica.society-input/authored-ground-v5` (migration 0151): the fourth profile's projection, at

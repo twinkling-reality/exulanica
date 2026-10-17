@@ -34,6 +34,7 @@ def _stored_input():
     document = compose((GATE, KNIGHT))
     document.pop("modules", None)
     document.pop("movement_modules", None)
+    document.pop("identity", None)
     document["population_kind"] = dict(FIRST_VILLAGER)
     document.pop("document_sha256")
     document["document_sha256"] = input_sha256(document)

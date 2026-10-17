@@ -91,6 +91,7 @@ def _before(document: dict[str, Any]) -> dict[str, Any]:
     the villager's first version."""
     earlier = copy.deepcopy(document)
     earlier["modules"] = list(BEFORE)
+    earlier.pop("identity", None)
     earlier["population_kind"] = dict(FIRST_VILLAGER)
     earlier["movement_modules"] = list(BEFORE_MOVEMENT)
     earlier["document_sha256"] = input_sha256(earlier)

@@ -39,6 +39,7 @@ from exulanica.world.society_decision_contract import (
     person_role,
 )
 from exulanica.world.society_decisions import receipt_for, seal, validate_decision_receipt
+from exulanica.world.society_planner import input_sha256
 from exulanica.world.society_things import THINGS_PROFILE, initial_things_society
 
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
@@ -63,9 +64,14 @@ def _things_terms():
     return person_role().terms(THINGS_PROFILE)
 
 
-def _asked():
-    """A knight standing beside a villager, asked under the society of things' terms."""
+def _asked(*, named_by_identity: bool = True):
+    """A knight standing beside a villager, asked under the society of things' terms; with
+    ``named_by_identity`` false, in a society made before its people were named by the identity
+    catalog's second version, as a prompt recorded then was."""
     document = compose((GATE, KNIGHT))
+    if not named_by_identity:
+        document.pop("identity")
+        document["document_sha256"] = input_sha256(document)
     state = initial_things_society(SOCIETY, SEED, document, population=6)
     knight = next(p for p in state["inhabitants"] if p["came_by"] == "placed")
     villager = next(p for p in state["inhabitants"] if p["came_by"] == "populated")
@@ -239,7 +245,7 @@ def test_the_fifth_prompt_is_kept_as_bytes(tmp_path):
     prior = REGISTRY_DIRECTORY / "decision-roles.v8.json"
     (tmp_path / prior.name).write_bytes(prior.read_bytes())
     with registry_in_use(tmp_path, ADAPTER_PACKAGE):
-        state, document, knight, contract, options = _asked()
+        state, document, knight, contract, options = _asked(named_by_identity=False)
         request = _request(state, document, knight["id"], options, contract, model="example/model")
         role = person_role()
         found = {

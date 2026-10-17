@@ -211,12 +211,13 @@ UNRECORDED_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 1}
 AFFORDANCE_CATALOG: Final = "society-affordance"
 #: The digest of each published version, which the loader refuses a file to differ from: the codes
 #: in it are recorded in stored societies, and a replay must produce them unchanged.
-#: The names, roles, weather and resources the first three engine profiles give a new society:
-#: a published version is frozen by its digest, because every stored genesis of those profiles
-#: hashes its values, and each version names the profiles it serves.
+#: The names, roles, weather and resources a new society's people are given, each version frozen
+#: by its digest (stored geneses hash its values): v1 serves profiles v1 to v3 by name, v2 a society
+#: of things whose first input records it (:mod:`exulanica.world.society_identity`).
 LEGACY_IDENTITY_CATALOG: Final = "society-legacy-identity"
 LEGACY_IDENTITY_DIGESTS: Final = {
-    1: "5f8c5a040fe346e7fe61b22f20e3210507f4828d6fc1c93690cb909d09aee455"
+    1: "5f8c5a040fe346e7fe61b22f20e3210507f4828d6fc1c93690cb909d09aee455",
+    2: "f36de442fd6135af42f681439e3e94bb13db9e84da99a670e98c21345a1d68cb",
 }
 LEGACY_IDENTITY_KINDS: Final = ("profile", "role", "first_name", "last_name", "weather", "resource")
 AFFORDANCE_DIGESTS: Final = {1: "ca280468cc1051bd5f4dfadc72625c9b14be9a9fdeec840b72696349a2d0986b"}
@@ -696,16 +697,19 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         )
         for version in (1, 2)
     },
-    (LEGACY_IDENTITY_CATALOG, 1): CatalogSchema(
-        LEGACY_IDENTITY_CATALOG,
-        1,
-        (
-            ("kind", _choice(LEGACY_IDENTITY_KINDS)),
-            ("text", text_field),
-            ("milli", integer_field(0, 10**6)),
-            ("reason", text_field),
-        ),
-    ),
+    **{
+        (LEGACY_IDENTITY_CATALOG, version): CatalogSchema(
+            LEGACY_IDENTITY_CATALOG,
+            version,
+            (
+                ("kind", _choice(LEGACY_IDENTITY_KINDS)),
+                ("text", text_field),
+                ("milli", integer_field(0, 10**6)),
+                ("reason", text_field),
+            ),
+        )
+        for version in LEGACY_IDENTITY_DIGESTS
+    },
     (AFFORDANCE_CATALOG, 1): CatalogSchema(
         AFFORDANCE_CATALOG,
         1,
@@ -1485,25 +1489,20 @@ def legacy_identity(profile: str, directory: Path = ROUTINE_DIRECTORY) -> Legacy
                 f"{LEGACY_IDENTITY_CATALOG} v{version} is published and stored societies hash its "
                 "values: a change is a new version, never an edit to this one"
             )
-        entries = _values(catalog)
-
-        def of(
-            kind: str, entries: dict[str, dict[str, FieldValue]] = entries
-        ) -> list[tuple[str, dict[str, FieldValue]]]:
-            return [(key, v) for key, v in entries.items() if v["kind"] == kind]
-
-        if profile not in {str(v["text"]) for _, v in of("profile")}:
+        entries = _values(catalog).items()
+        of = {k: [(n, v) for n, v in entries if v["kind"] == k] for k in LEGACY_IDENTITY_KINDS}
+        if profile not in {str(v["text"]) for _, v in of["profile"]}:
             continue
-        (weather,) = (v for _, v in of("weather"))
+        (weather,) = (v for _, v in of["weather"])
         return LegacyIdentity(
-            roles=tuple(str(v["text"]) for _, v in of("role")),
-            first_names=tuple(str(v["text"]) for _, v in of("first_name")),
-            last_names=tuple(str(v["text"]) for _, v in of("last_name")),
+            roles=tuple(str(v["text"]) for _, v in of["role"]),
+            first_names=tuple(str(v["text"]) for _, v in of["first_name"]),
+            last_names=tuple(str(v["text"]) for _, v in of["last_name"]),
             weather=MappingProxyType(
                 {"kind": str(weather["text"]), "temperature_c_milli": int(weather["milli"])}  # type: ignore[arg-type]
             ),
             resources=MappingProxyType(
-                {key: int(v["milli"]) for key, v in of("resource")}  # type: ignore[arg-type]
+                {key: int(v["milli"]) for key, v in of["resource"]}  # type: ignore[arg-type]
             ),
         )
     raise CatalogError(f"no {LEGACY_IDENTITY_CATALOG} version serves the profile {profile!r}")

@@ -88,7 +88,7 @@ def test_someone_heading_to_a_premises_keeps_going_when_the_first_named_input_ar
     target and route; only the name is new."""
     named = _compose(*_scene_things())
     old = _without_names(named)
-    first_only = ("modules", "movement_modules")
+    first_only = ("modules", "movement_modules", "identity")
     later = {k: v for k, v in copy.deepcopy(named).items() if k not in first_only}
     later["input_seq"] = 2
     later = _sealed(later)

@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Any, Final
 
 from exulanica.things.lines import LineRefused, check_line
@@ -62,7 +63,9 @@ __all__ = [
     "THINGS_BOUND",
     "arrival_points",
     "check_character",
+    "check_kept_identity",
     "input_things",
+    "keep_first_records",
     "placed_beings",
     "placed_objects",
     "record_modules",
@@ -216,17 +219,44 @@ def things_engine() -> str:
 
 def record_modules(document: dict[str, Any], *, day: bool = False) -> None:
     """Write into a things input what a society's first input alone records, and nothing into a
-    later one: the ability modules its minutes run, each built module at its newest version, and
-    the movement modules that move its people, the newest of each kind of movement. The society
+    later one: the ability modules its minutes run, each built module at its newest version, the
+    movement modules that move its people, the newest of each kind of movement, and the identity
+    catalog version that names its people (:mod:`exulanica.world.society_identity`). The society
     runs exactly these for its whole life, whatever a later table adds. Every composer of a things
     input calls this before it seals the document."""
     if document["input_seq"] != 1:
         return
     from exulanica.abilities.registry import current_modules
     from exulanica.movement.registry import current_engine_modules
+    from exulanica.world.society_identity import IDENTITY_FIELD, identity_record
 
     document["modules"] = list(current_modules(day=day))
     document[MOVEMENT_MODULES_FIELD] = list(current_engine_modules(things_engine()))
+    document[IDENTITY_FIELD] = identity_record()
+
+
+def keep_first_records(state: dict[str, Any], document: Mapping[str, Any], seed: str) -> None:
+    """Keep in a society of things' genesis state what its first input alone records, for its whole
+    life: the modules its minutes run, the movement modules that move its people, and the identity
+    catalog version naming them, by which its invented people are named
+    (:func:`~exulanica.world.society_identity.name_people`). What an input records none of, as one
+    made before it was, the state keeps none of."""
+    from exulanica.world.society_identity import IDENTITY_FIELD, name_people
+
+    for recorded in ("modules", MOVEMENT_MODULES_FIELD, IDENTITY_FIELD):
+        if recorded in document:
+            state[recorded] = deepcopy(document[recorded])
+    if IDENTITY_FIELD in state:
+        name_people(state["inhabitants"], seed, state[IDENTITY_FIELD])
+
+
+def check_kept_identity(state: Mapping[str, Any]) -> None:
+    """A society of things' state holds the identity its first input recorded, where it holds one,
+    to its shape."""
+    from exulanica.world.society_identity import IDENTITY_FIELD, check_identity
+
+    if IDENTITY_FIELD in state:
+        check_identity(state[IDENTITY_FIELD])
 
 
 def validate_input_things(document: Mapping[str, Any]) -> None:
@@ -348,9 +378,14 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
         raise ValueError("placed things must be unique and sorted")
     validate_kinds(document, made)
     validate_things_gone(document, set(names))
+    from exulanica.world.society_identity import IDENTITY_FIELD, check_identity
     from exulanica.world.society_water import validate_water
 
     validate_water(document)
+    if IDENTITY_FIELD in document:
+        if document["input_seq"] != 1:
+            raise ValueError("only a society's first input records the identity naming its people")
+        check_identity(document[IDENTITY_FIELD])
 
 
 def input_things(document: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
