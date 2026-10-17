@@ -183,7 +183,7 @@ function overviewPose(binding: any, beginning: typeof MOMENT_FRAMING.beginning):
 }
 
 /** Camera motion in the preview's own renderer, held to the saved world it was asked for. */
-export function mountScenePreview({ state, renderer }): void {
+export function mountScenePreview({ state, renderer }: { readonly state: { readonly activeWorldEntry?: SavedWorldEntry | null }; readonly renderer: any }): void {
   if (momentKey !== null && window.parent !== window) { void drawMoment(renderer, momentKey); return; }
   if (!live || window.parent === window) return;
   const entry = state.activeWorldEntry, binding = renderer.atlas?.binding;

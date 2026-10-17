@@ -96,7 +96,7 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       if (key === shown) return;
       shown = key;
       const body = card.body;
-      body.replaceChildren(cardWords({ label: content.label, title: content.title, lines: content.lines }));
+      body.replaceChildren(cardWords(content));
       if (content.chip) body.append(chip(content.chip, { live: content.live === true }));
       if (content.prompts.length) body.append(rule(), promptColumn(content.prompts.map(prompt)));
       body.setAttribute('aria-label', content.title);

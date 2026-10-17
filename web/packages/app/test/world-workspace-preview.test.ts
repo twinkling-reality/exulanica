@@ -3,8 +3,9 @@
 // and the code it inserts to still compile where it lands: a renamed variable or a lost `async`
 // would otherwise break the preview with no test noticing. Each patched file is type-checked alone
 // against the same file unpatched, and only what the edit introduces counts. The preview's own
-// checks (verify-*.mjs) run here too, unchanged.
-import { readFileSync } from 'node:fs';
+// TypeScript modules, which this app's build leaves out, are type-checked here, and its own checks
+// (verify-*.mjs) run here too, unchanged.
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -62,6 +63,60 @@ function introduced(file: string, before: string, after: string): string[] {
   });
 }
 
+const APP = fileURLToPath(new URL('web/packages/app/', REPOSITORY));
+/** The two hosts written in an untyped style: checked for names, arity and known properties, not for strictness. */
+const LOOSE = new Set(['contextual-world.ts', 'build-mode.ts']);
+const LOOSER = {
+  strict: false, noImplicitAny: false, useUnknownInCatchVariables: false, exactOptionalPropertyTypes: false,
+  noUnusedLocals: false, noUnusedParameters: false,
+};
+const CONTROL = `${here}/type-check-control.ts`;
+/** A preview module that is wrong twice: a typed import misused and an untyped parameter, beside an untyped words import. */
+const CONTROL_TEXT = [
+  "import { cardWords } from './world-ui.ts';",
+  "import { buildKeys } from './build-words.mjs';",
+  "export const words: number = cardWords({ title: 'A bench' });",
+  'export const keys = (state) => [buildKeys(), state];',
+].join('\n');
+
+/**
+ * What TypeScript says about the preview's modules `names` (and the control's, with `control`), read as one program
+ * under this app's compiler options (`looser` relaxes them): imports resolve as Vite serves them (`/src/*` is this
+ * app's sources, a package name resolves as it does from them) and each plain JavaScript words module (.mjs) is
+ * untyped, its bindings `any`. Only what it says of those modules and the preview's declarations counts, with any
+ * diagnostic of no file. One `file:line TScode message` string per diagnostic.
+ */
+function previewTypeErrors(names: readonly string[], { looser = false, control = false } = {}): string[] {
+  const base = ts.readConfigFile(fileURLToPath(new URL('web/tsconfig.base.json', REPOSITORY)), ts.sys.readFile).config.compilerOptions;
+  const { options, errors } = ts.convertCompilerOptionsFromJson({
+    ...base, composite: false, declaration: false, declarationMap: false, sourceMap: false, noEmit: true,
+    module: 'ESNext', moduleResolution: 'Bundler', lib: ['ES2022', 'DOM', 'DOM.Iterable'], types: [],
+    allowImportingTsExtensions: true, baseUrl: APP, paths: { '/src/*': [`${APP}src/*`] },
+    ...(looser ? LOOSER : {}),
+  }, APP);
+  expect(errors).toEqual([]);
+  const host = ts.createCompilerHost(options);
+  const fromApp = `${APP}src/main.ts`;
+  host.resolveModuleNameLiterals = (literals, containing, redirected, settings) => literals.map(({ text }) =>
+    ts.resolveModuleName(text, /^[./]/u.test(text) ? containing : fromApp, settings, host, undefined, redirected));
+  const read = host.getSourceFile.bind(host);
+  host.getSourceFile = (path, language, ...rest) =>
+    path === CONTROL ? ts.createSourceFile(path, CONTROL_TEXT, language, true) : read(path, language, ...rest);
+  const checked = new Set([`${here}/preview-env.d.ts`, ...names.map((name) => `${here}/${name}`), ...(control ? [CONTROL] : [])]);
+  const program = ts.createProgram([`${APP}src/vite-env.d.ts`, ...checked], options, host);
+  const untypedWords = (one: ts.Diagnostic): boolean => one.code === 7016
+    && /module '\.\.?\/[^']*\.mjs'/u.test(ts.flattenDiagnosticMessageText(one.messageText, ' '));
+  return ts.getPreEmitDiagnostics(program)
+    .filter((one) => !one.file || (checked.has(one.file.fileName) && !untypedWords(one)))
+    .map((one) => {
+      const message = `TS${one.code} ${ts.flattenDiagnosticMessageText(one.messageText, ' ')}`;
+      if (!one.file) return message;
+      const at = one.file.getLineAndCharacterOfPosition(one.start ?? 0).line + 1;
+      return `${one.file.fileName.slice(here.length + 1)}:${at} ${message}`;
+    });
+}
+const previewModules = (): string[] => readdirSync(here).filter((name) => name.endsWith('.ts') && !name.endsWith('.d.ts')).sort();
+
 describe('the world workspace preview\'s edits to this app', () => {
   it('finds each seam exactly once in the sources', async () => {
     const { SEAMS, occurrences } = await seams();
@@ -96,6 +151,23 @@ describe('the world workspace preview\'s edits to this app', () => {
     const doubled = `${source(main)}\nvoid environmentSelection.begin();\n`;
     expect(occurrences(doubled, 'void environmentSelection.begin();')).toBe(2);
     expect(() => patchSource(main, doubled, here)).toThrow(/"begin\(\) await" occurs 2 times/u);
+  }, 60_000);
+});
+
+describe('the world workspace preview\'s modules', () => {
+  it('notices a misused import and an untyped parameter in a preview module: a positive control', () => {
+    const found = previewTypeErrors([], { control: true });
+    expect(found.map((one) => one.replace(/ TS(\d+) .*/u, ' TS$1'))).toEqual([
+      'type-check-control.ts:3 TS2322', 'type-check-control.ts:4 TS7006',
+    ]);
+    expect(found[0]).toMatch(/'DocumentFragment' is not assignable to type 'number'/u);
+  }, 60_000);
+
+  it('type-check under this app\'s compiler options, the two untyped-style hosts under looser ones', () => {
+    const modules = previewModules();
+    expect(modules).toEqual(expect.arrayContaining([...LOOSE]));
+    expect(previewTypeErrors(modules.filter((name) => !LOOSE.has(name)))).toEqual([]);
+    expect(previewTypeErrors([...LOOSE], { looser: true })).toEqual([]);
   }, 60_000);
 });
 

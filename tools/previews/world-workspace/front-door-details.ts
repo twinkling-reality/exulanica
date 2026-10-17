@@ -2,6 +2,7 @@ import { canonicalJson } from '../../../web/packages/atlas-core/src/style-pack.t
 import { say } from '/src/ui/copy.ts';
 import { icon } from '/src/ui/system/icon.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
+import type { ListedStylePack } from '/src/world-look.ts';
 
 // Details: the chosen world's saved facts, read only. Changing a world happens inside it.
 
@@ -42,10 +43,10 @@ export function showWorldDetails(entry: SavedWorldEntry): void {
     const appearance = section('Appearance');
     if (styles.status === 'fulfilled' && packs.status === 'fulfilled') {
       const versions = Array.isArray(styles.value) ? styles.value : styles.value.versions;
-      const version = versions?.find((v) => v.version_id === entry.styleVersionId);
+      const version = versions?.find((v: { readonly version_id: string }) => v.version_id === entry.styleVersionId);
       const listed = Array.isArray(packs.value) ? packs.value : packs.value.packs;
       const bound = version?.style_pack;
-      let chosen = bound ? listed?.find((p) => p.pack_id === bound.pack_id && (p.manifest_sha256 === bound.manifest_sha256 || p.earlier_versions?.some(v => v.manifest_sha256 === bound.manifest_sha256))) : listed?.find(p => p.default === true);
+      let chosen = bound ? listed?.find((p: ListedStylePack) => p.pack_id === bound.pack_id && (p.manifest_sha256 === bound.manifest_sha256 || p.earlier_versions?.some(v => v.manifest_sha256 === bound.manifest_sha256))) : listed?.find((p: ListedStylePack) => p.default === true);
       if (bound?.source === 'workspace') {
         try {
           const held = await read('/workspace-style-packs/' + encodeURIComponent(bound.manifest_sha256));

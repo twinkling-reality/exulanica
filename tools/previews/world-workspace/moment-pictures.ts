@@ -62,7 +62,7 @@ function drawInPreview(entry: SavedWorldEntry, held: PreviewAsk, size: readonly 
     const receive = (event: MessageEvent): void => {
       if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
       const data = event.data as { type?: unknown; key?: unknown; picture?: unknown } | null;
-      if (data?.type !== MOMENT_PICTURE_MESSAGE || data.key !== key) return;
+      if (!data || data.type !== MOMENT_PICTURE_MESSAGE || data.key !== key) return;
       finish(data.picture instanceof Blob ? data.picture : null);
     };
     const aborted = (): void => finish(null);

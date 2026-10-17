@@ -142,12 +142,13 @@ export function mountCorners({
   rail.setAttribute('role', 'toolbar');
   rail.setAttribute('aria-label', SCREEN_WORDS.rail);
   rail.setAttribute('aria-orientation', 'vertical');
+  type RailEntry = 'divider' | { readonly id: string; readonly key: string; readonly shortcut: string; readonly word: string; readonly lit: boolean };
   const railTips = new Map<string, HTMLButtonElement>();
   let flyingNow = false, tipShown: { id: string; until: number } | null = null, hovered: string | null = null;
   const tipRoot = div('');
   function drawRail(): void {
     railTips.clear();
-    const parts = railEntries({ build: onBuild !== null, history: onHistory !== null, flying: flyingNow }).map((entry) => {
+    const parts = railEntries({ build: onBuild !== null, history: onHistory !== null, flying: flyingNow }).map((entry: RailEntry) => {
       if (entry === 'divider') return div('wu-rail-divider');
       const made = button('wu-rail-button');
       made.innerHTML = icon(entry.id);
@@ -177,7 +178,7 @@ export function mountCorners({
     const id = hovered ?? (tipShown && now < tipShown.until ? tipShown.id : null);
     const target = id === null ? null : railTips.get(id) ?? null;
     if (target === null) { tipRoot.replaceChildren(); return; }
-    const entry = railEntries({ build: onBuild !== null, history: onHistory !== null, flying: flyingNow }).find((one) => one !== 'divider' && one.id === id);
+    const entry = railEntries({ build: onBuild !== null, history: onHistory !== null, flying: flyingNow }).find((one: RailEntry) => one !== 'divider' && one.id === id);
     if (!entry || entry === 'divider') { tipRoot.replaceChildren(); return; }
     const made = railTip(entry.word, entry.key);
     made.setAttribute('aria-hidden', 'true');

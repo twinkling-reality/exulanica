@@ -25,7 +25,7 @@ import { currentOpenSite } from '/src/composition/site-world.ts';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { BUSY, TRAY, buildKeys, createKindLabels, heldRows, keyAction, moveWords, movedNote, namesTogether, nothingInView, placedNote, redoRefusalWords, redoneNote, refusalWords, removeLine, removeTitle, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
-import { heldGroup, namesNear, tray } from './world-ui-build.ts';
+import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
 import { NOTE_WORDS } from './world-words.mjs';
 
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
@@ -112,7 +112,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const isPart = (id) => typeof id === 'string' && id.startsWith(PART);
   const partOf = (id) => parts.get(id) ?? null;
   const exists = (id) => (isPart(id) ? parts.has(id) : records.has(id));
-  const siteDrawing = () => currentOpenSite()?.drawing() ?? null;
+  // A site's made parts are its structured drawing's slots; a terrain drawing has none.
+  const siteDrawing = () => { const drawing = currentOpenSite()?.drawing() ?? null; return drawing !== null && 'slots' in drawing ? drawing : null; };
   const slotOf = (id) => siteDrawing()?.slots?.find(slot => slot.identity === id.slice(PART.length)) ?? null;
   /** The region a made world is drawn in, where new things are placed; null in a world drawn otherwise, which offers no tray. */
   const placingRegion = () => entry.generatedSite?.regionId ?? entry.generatedGround?.regionId ?? null;
@@ -120,7 +121,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
   /** The tray's open tab, the made creatures as GET /things/kinds lists them (null until read), and whether the server could be read. */
-  let trayTab = 'things', creatures = null, creaturesRead = null, offline = false;
+  let trayTab: TrayTab = 'things', creatures = null, creaturesRead = null, offline = false;
   /**
    * The placed things' layer, which the tray reads the library through and draws its pictures and
    * copies with: the page mounts it once something is placed, and build mode mounts it itself in a
@@ -206,7 +207,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const ids = inView();
     const at = selected === null ? -1 : ids.indexOf(selected);
     // Past the last thing in view, Tab moves into the tray: its open tab, then its tiles.
-    const tab = trayView.root.hidden ? null : trayView.root.querySelector('[role="tab"][aria-selected="true"]');
+    const tab = trayView.root.hidden ? null : trayView.root.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
     if (step > 0 && tab && (ids.length === 0 || at === ids.length - 1)) { tab.focus(); return; }
     if (!ids.length) { say(nothingInView()); return; }
     select(ids[at === -1 ? (step > 0 ? 0 : ids.length - 1) : (at + step + ids.length) % ids.length]);

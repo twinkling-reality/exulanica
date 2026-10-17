@@ -46,6 +46,10 @@ export const GROUND_RING = Object.freeze({
   depthBiasShare: 0.002,
 });
 
+type Widened<T> = T extends number ? number : T extends readonly number[] ? { readonly [I in keyof T]: number } : T;
+/** A ring's look: GROUND_RING's fields, each any value of its kind, so a caller's look need not be the default's. */
+export type GroundRingLook = { readonly [K in keyof typeof GROUND_RING]: Widened<(typeof GROUND_RING)[K]> };
+
 /** The layer the ring is drawn on after tone mapping: after every layer of the scene's own. */
 export const RING_LAYER = 'exulanica-world-marks';
 
@@ -141,7 +145,7 @@ interface ShaderDesc {
 }
 
 /** The ring's widths for the shader, in framebuffer pixels at `pixelRatio` framebuffer pixels a CSS pixel. */
-function widths(look: typeof GROUND_RING, pixelRatio: number): Float32Array {
+function widths(look: GroundRingLook, pixelRatio: number): Float32Array {
   return new Float32Array([look.linePx * pixelRatio, look.glowPx * pixelRatio, look.glowBlurPx * pixelRatio, look.glowAlpha]);
 }
 
@@ -149,7 +153,7 @@ function widths(look: typeof GROUND_RING, pixelRatio: number): Float32Array {
  * The ring's material: transparent, writing no depth, both sides. In the scene it is depth-tested;
  * after tone mapping, where no depth buffer of the scene's is bound, it tests the scene's depth itself.
  */
-export function groundRingMaterial(look: typeof GROUND_RING = GROUND_RING, pixelRatio = 1, afterToneMapping = false): pc.ShaderMaterial {
+export function groundRingMaterial(look: GroundRingLook = GROUND_RING, pixelRatio = 1, afterToneMapping = false): pc.ShaderMaterial {
   const material = new pc.ShaderMaterial({
     uniqueName: afterToneMapping ? 'exulanica-ground-ring-after-tone-mapping' : 'exulanica-ground-ring',
     attributes: { aPosition: pc.SEMANTIC_POSITION },
@@ -207,7 +211,7 @@ export function createGroundRing(
     readonly parent?: pc.Entity;
     readonly camera?: pc.CameraComponent;
     readonly invalidate?: () => void;
-    readonly look?: typeof GROUND_RING;
+    readonly look?: GroundRingLook;
   } = {},
 ): GroundRing {
   const entity = new pc.Entity('ground-ring');

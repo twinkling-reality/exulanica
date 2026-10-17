@@ -178,7 +178,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
   const build = writable
     ? mountBuildMode({
-      b, root, state, entry, read, send, binding, canvas, guidance, worlds, corners, inspecting: () => pageShown() || held !== null,
+      b, root, state, entry, read, send, binding, canvas, corners, inspecting: () => pageShown() || held !== null,
       groundRing: createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, ...THING_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } }),
       // Who is drawn and where, for the names over people near what is held; read as the people arrive.
       people: {
@@ -246,7 +246,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (subjectReads.options.has(requestId)) return subjectReads.options.get(requestId);
     subjectReads.options.set(requestId, null);
     modelsClient.readDecision(entry.authoredVersionId, requestId).then(data => {
-      const options = data?.request?.context?.options;
+      const options = (data?.request?.context as { readonly options?: unknown } | undefined)?.options;
       if (Array.isArray(options)) subjectReads.options.set(requestId, options.length);
       if (pageView) drawPage();
     }, () => { setTimeout(() => subjectReads.options.delete(requestId), OPTIONS_RETRY_MS); });
@@ -729,7 +729,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       drawPage();
     } catch { if (showing === pageView && showing.did === null) { showing.did = []; drawPage(); } }
   }
-  function pageAct(action, index) {
+  function pageAct(action, index?) {
     if (!pageView) return;
     const choosing = pageView.choosing, editing = pageView.editing;
     const compare = pageView.compare;
@@ -779,7 +779,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     try {
       const outcome = await writeThingCharacter(state.credentials, entry.worldId, entry.authoredVersionId, showing.placedId, showing.personality.revision, personalityBody(editing.name, editing.about));
       if (showing !== pageView) return;
-      if (outcome.written) {
+      if (outcome.written === true) {
         showing.personality = { ...showing.personality, revision: outcome.revision, character: outcome.character };
         showing.editing = null;
         if (showing.personality.shown) worldNotes.show(savedNote(subjectView(showing.row).who));
@@ -1212,7 +1212,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         // Compare's result (12b): the arrows step the moments, Enter uses the asked model, Esc goes back.
         if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) comparisonAct('back'); }
         else if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') { event.preventDefault(); comparisonAct(event.code === 'ArrowLeft' ? 'earlier' : 'later'); }
-        else if (event.code === 'Enter' && event.target?.closest?.('.wu-page button')) return;
+        else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
         else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); comparisonAct('use'); }
         else if (event.code === 'Tab') return;
         else event.preventDefault();
@@ -1229,7 +1229,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
           const last = (compareModels(pageView.row)?.length ?? 1) - 1;
           pageAct('compareChoose', Math.max(0, Math.min(last, compare.focus + (event.code === 'ArrowUp' ? -1 : 1))));
         }
-        else if (event.code === 'Enter' && event.target?.closest?.('.wu-page button')) return;
+        else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
         else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('compareStart'); }
         else if (event.code === 'Tab') return;
         else event.preventDefault();
@@ -1251,7 +1251,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         // Ask: the arrows choose a question, Enter asks it, Esc goes back to the rows.
         if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) pageAct('back'); }
         else if (event.code === 'ArrowUp' || event.code === 'ArrowDown') { event.preventDefault(); if (!ask.busy) { ask.focus = Math.max(0, Math.min(ASK_ASPECTS.length - 1, ask.focus + (event.code === 'ArrowUp' ? -1 : 1))); drawPage(); } }
-        else if (event.code === 'Enter' && event.target?.closest?.('.wu-page button')) return;
+        else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
         else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('question'); }
         else if (event.code === 'Tab') return;
         else event.preventDefault();
@@ -1282,7 +1282,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         pageAct('choose', Math.max(0, Math.min(last, choosing.focus + (event.code === 'ArrowUp' ? -1 : 1))));
       }
       else if (choosing && event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('use'); }
-      else if (event.code === 'Enter' && event.target?.closest?.('.wu-page button')) return;
+      else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
       else if (event.code === 'Enter' && !choosing && !event.repeat) { event.preventDefault(); pageAct('inspect'); }
       else if (event.code === 'Tab') return;
       else event.preventDefault();
@@ -1294,7 +1294,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (listed) { event.stopImmediatePropagation(); return; }
     if (asking) {
       // The question before a run keeps its answers together: Enter runs, Esc puts it away, P pauses first.
-      if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); if (!event.target?.closest?.('.cw-beside button')) questionAct('run'); else return; }
+      if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); if (!(event.target as Element | null)?.closest?.('.cw-beside button')) questionAct('run'); else return; }
       else if (event.code === 'Escape' && !event.repeat) { event.preventDefault(); questionAct('back'); }
       else if (event.code === 'KeyP' && asking.refusal === 'society_not_paused' && !event.repeat) { event.preventDefault(); questionAct('pause'); }
       else if (event.code === 'KeyM' && groupActions.has('model') && !event.repeat) { event.preventDefault(); act('model'); }
@@ -1308,14 +1308,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const being = held?.scene.type === 'being';
     if (held && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) release(); event.stopImmediatePropagation(); return; }
-      if (event.code === 'Enter' && event.target?.closest?.('.cw-beside button,.wu-prompt,.wu-scene button')) return;
+      if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt,.wu-scene button')) return;
       if (event.code === 'Enter' && root.dataset.scene === 'talking') { event.preventDefault(); if (!event.repeat) openSpeakerPage(); event.stopImmediatePropagation(); return; }
       if (event.code === 'Enter' && being) { event.preventDefault(); if (!event.repeat) act('details'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyR' && being) { event.preventDefault(); if (!event.repeat) act(runWatch.run ? 'stop' : 'run'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyM' && being && groupActions.has('model')) { event.preventDefault(); if (!event.repeat) act('model'); event.stopImmediatePropagation(); return; }
     }
-    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn() }, Boolean(event.target?.closest?.('.cw-beside button,.wu-prompt')));
+    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn() }, Boolean((event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
     if (fate === 'inspect') void choose();
