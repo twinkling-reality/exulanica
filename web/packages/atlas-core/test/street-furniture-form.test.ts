@@ -104,6 +104,21 @@ describe('street furniture forms drawn', () => {
     }
   });
 
+  it('stands a sign\'s plate on its pole: the pole ends at the plate\'s foot, and every vertex a form makes is drawn', () => {
+    const parts = partsOf('sign_post');
+    const plate = parts[1]!;
+    const pole = furnitureFormSurfaces(forms, 'sign_post', parts)!.find((surface) => surface.role === parts[0]!.surfaceRole)!;
+    const top = Math.max(...pole.indices.map((index) => pole.positions[index * 3 + 2]!));
+    // The plate's foot is 2200 mm up the 2800 mm pole, 786 thousandths: the pole's top sits under a millimetre inside it.
+    expect(top).toBeGreaterThanOrEqual(plate.offsetZMm);
+    expect(top).toBeLessThan(plate.offsetZMm + 1);
+    for (const key of CLASSES) {
+      for (const surface of furnitureFormSurfaces(forms, key, partsOf(key))!) {
+        expect(new Set(surface.indices).size, `${key} ${surface.role}`).toBe(surface.positions.length / 3);
+      }
+    }
+  });
+
   it('draws each part as a closed solid facing outward, in the role its part states', () => {
     for (const key of CLASSES) {
       const form = forms.byClass.get(key)!;

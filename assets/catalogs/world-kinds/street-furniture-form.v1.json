@@ -205,12 +205,16 @@
        760
       ],
       [
-       990,
+       786,
        760
       ],
       [
+       786,
+       0
+      ],
+      [
        1000,
-       450
+       0
       ]
      ]
     },
@@ -223,7 +227,7 @@
      "inset_mm": 5
     }
    ],
-   "reason": "Authored: a round pole on a flanged foot with a capped top, carrying a name plate framed by a raised rim. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "reason": "Authored: a round pole on a flanged foot, carrying a name plate framed by a raised rim. The pole ends at the plate's foot (786 thousandths of its height is the plate's 2200 mm of 2800), so the plate stands on it and nothing of the pole shows through or above the plate. Each figure is a chosen default, picked by eye; none is measured from a source.",
    "licence": {
     "spdx": "Apache-2.0",
     "verdict": "SHIP",

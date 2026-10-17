@@ -382,7 +382,8 @@ function lathe(out: Builder, part: FurniturePart, segments: number, profile: rea
   for (let at = 1; at < profile.length; at += 1) {
     const [h0, r0] = profile[at - 1]!;
     const [h1, r1] = profile[at]!;
-    if (h0 === h1 && r0 === r1) continue;
+    // A band of no radius draws nothing, so a body that ends below its part's top runs to it at radius 0.
+    if ((h0 === h1 && r0 === r1) || (r0 === 0 && r1 === 0)) continue;
     const lower = ring(height(h0), r0 / 1000);
     const upper = ring(height(h1), r1 / 1000);
     const first = out.positions.length / 3;
@@ -395,7 +396,7 @@ function lathe(out: Builder, part: FurniturePart, segments: number, profile: rea
     for (let k = 0; k < segments; k += 1) {
       const a = first + k * 2;
       // Counter-clockwise from outside: up the seam, then across.
-      if (r1 > 0 || r0 > 0) out.indices.push(a, a + 2, a + 3, a, a + 3, a + 1);
+      out.indices.push(a, a + 2, a + 3, a, a + 3, a + 1);
     }
   }
   const disc = (permille: number, scale: number, up: boolean): void => {
