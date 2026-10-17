@@ -137,7 +137,7 @@ def read_settings(raw: object) -> tuple[LandscapeSetting, ...]:
 def landscape_settings() -> tuple[LandscapeSetting, ...]:
     """Every setting the product ships, read once."""
     return read_settings(
-        read_json(SETTINGS_DIRECTORY / f"landscape-setting.v{SETTINGS_VERSION}.json")
+        read_json(SETTINGS_DIRECTORY.joinpath(f"landscape-setting.v{SETTINGS_VERSION}.json"))
     )
 
 
