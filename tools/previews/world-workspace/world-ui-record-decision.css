@@ -1,0 +1,64 @@
+/* A decision as r10 (DESIGN's R-DAY-DECISION build sheet, section 2; design-2026-10-14/frames/r10-decision.html) on the
+   record pages' light page (world-ui-record.css): the head, what the model was told, the flow's lines, the ring's words,
+   the choices, the moment's card and the stored record. Places come from decision-flow.mjs; sizes and colours are the
+   sheet's, the same at 1440 but for the title. */
+/* The head never runs into what the model was told: the over line and the small print keep to one line, the title to
+   two, each cut with an ellipsis; its width (inline, from decision-flow.mjs) keeps it clear of the card. */
+.wu-record-decision .wu-rd-head { position: absolute; }
+.wu-record-decision .wu-rd-head .wu-hr-over { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wu-record-decision .wu-rd-title { margin: 14px 0 0; font: 200 56px/1.05 var(--font-sans); letter-spacing: -.02em; color: var(--hr-ink); text-wrap: balance;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-overflow: ellipsis; }
+.wu-record-decision.wu-hr-narrow .wu-rd-title { font-size: 48px; }
+.wu-record-decision .wu-rd-title:focus { outline: none; }
+.wu-record-decision .wu-rd-by { margin: 16px 0 0; font: 400 15px/1.4 var(--font-sans); color: var(--hr-quiet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wu-record-decision .wu-rd-label { margin: 0; font: 400 13px/1 var(--font-mono); color: var(--hr-quiet); letter-spacing: .02em; white-space: nowrap; }
+
+/* What the model was told: its label, then each section's name and words; past its place it scrolls. */
+.wu-record-decision .wu-rd-told { position: absolute; overflow: auto; scrollbar-width: thin; }
+.wu-record-decision .wu-rd-told > .wu-rd-label { margin-bottom: 20px; }
+.wu-record-decision .wu-rd-section { margin-top: 18px; }
+.wu-record-decision .wu-rd-name { margin: 0; font: 500 13px/1.3 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-decision .wu-rd-words { margin: 4px 0 0; font: 400 16px/1.45 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
+.wu-record-decision .wu-rd-block { display: block; }
+.wu-record-decision .wu-rd-quote { font-style: italic; font-weight: 300; }
+.wu-record-decision .wu-rd-note { margin: 0; font: 400 16px/1.45 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-decision .wu-rd-note[data-refused="true"] { color: var(--hr-refused); }
+
+/* The flow's lines: the bracket and its line in, the ring, the choices' curves (the taken one lit), their dots. */
+.wu-record-decision .wu-rd-flow { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.wu-rd-flow .in { stroke: var(--hr-quiet); stroke-width: 1; fill: none; opacity: .45; }
+.wu-rd-flow .lit { stroke: var(--hr-line); stroke-width: 2; fill: none; }
+.wu-rd-flow .dim { stroke: var(--hr-line); stroke-width: 1.2; fill: none; stroke-dasharray: 4 6; opacity: .5; }
+.wu-rd-flow .node { fill: var(--hr-ground); stroke: var(--hr-line); stroke-width: 2; }
+.wu-rd-flow .core { fill: var(--hr-line); }
+.wu-rd-flow .end { fill: var(--hr-ground); stroke: var(--hr-line); stroke-width: 1.4; opacity: .7; }
+.wu-rd-flow .end.lit { fill: var(--hr-line); stroke: none; opacity: 1; }
+.wu-record-decision .wu-rd-caption { position: absolute; transform: translateX(-50%); text-align: center; font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); white-space: nowrap; }
+.wu-record-decision .wu-rd-caption > span { display: block; }
+
+/* The choices: a number and the words as offered, the taken one in the ink with History's tag. */
+.wu-record-decision .wu-rd-over { position: absolute; display: flex; align-items: center; gap: 12px; height: 13px; }
+.wu-record-decision .wu-rd-rows { margin: 0; padding: 0; list-style: none; }
+.wu-record-decision .wu-rd-choice { position: absolute; display: flex; align-items: center; gap: 12px; height: 24px; white-space: nowrap; transform: translateY(-50%); }
+.wu-record-decision .wu-rd-number { flex: none; width: 12px; font: 400 12px/1 var(--font-mono); color: var(--hr-quiet); }
+.wu-record-decision .wu-rd-choice-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 400 17px/1.4 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-decision .wu-rd-choice[data-taken="true"] .wu-rd-choice-words { font-weight: 500; color: var(--hr-ink); }
+.wu-record-decision .wu-rd-choice .wu-hr-tag { flex: none; margin-left: 0; vertical-align: baseline; }
+.wu-record-decision .wu-rd-more { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; line-height: 0; cursor: pointer; }
+.wu-record-decision .wu-rd-more:focus-visible { outline: 2px solid var(--hr-line); outline-offset: 3px; border-radius: 6px; }
+.wu-record-decision .wu-rd-down { position: absolute; }
+
+/* The moment's card: History's picture with its rim lit and its portraits, What happened under it. */
+.wu-record-decision .wu-rd-moment { position: absolute; }
+.wu-record-decision .wu-rd-moment .wu-hr-pic { box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 20px 48px rgba(18,40,44,.22); }
+.wu-record-decision .wu-rd-moment .wu-hr-pic::after { opacity: 1; }
+.wu-record-decision.wu-hr-narrow .wu-rd-moment .wu-hr-orbs { bottom: -21px; }
+.wu-record-decision .wu-rd-text { padding: 40px 6px 0 18px; }
+.wu-record-decision .wu-rd-text.wu-rd-bare { padding-top: 18px; }
+.wu-record-decision .wu-rd-said { margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.wu-record-decision .wu-rd-action { margin-top: 10px; font: 400 21px/1.3 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wu-record-decision .wu-rd-verdict { margin: 8px 0 0; font: 400 15px/1.4 var(--font-sans); color: var(--hr-quiet); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* [J]: the stored record as it is, in place of the flow. */
+.wu-record-decision .wu-rd-record { position: absolute; margin: 0; overflow: auto; font: 400 14px/1.5 var(--font-mono); color: var(--hr-quiet); white-space: pre-wrap; overflow-wrap: anywhere; }
+.wu-record-decision .wu-rd-record:focus { outline: none; }

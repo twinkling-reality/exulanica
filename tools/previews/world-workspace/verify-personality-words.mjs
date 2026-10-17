@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PERSONALITY_LIMITS, PERSONALITY_REFUSALS, PERSONALITY_WORDS, counter, length, notRead, personalityBody, personalityRecordLines, personalityRefusalWords, readsEach, savedNote } from './personality-words.mjs';
+import { PERSONALITY_LIMITS, PERSONALITY_REFUSALS, PERSONALITY_WORDS, counter, length, notRead, personalityBody, personalityRecordLines, personalityRefusalWords, readsEach, savedNote, writtenWords } from './personality-words.mjs';
 import { called } from './character-words.mjs';
 
 const repository = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -37,6 +37,13 @@ const teo = called({ name: 'Teo' }), resident = called({ name: null, kind: 'resi
 assert.equal(readsEach(teo), "Teo's model reads this each time it decides.");
 assert.equal(notRead(resident), "This world's people were added before personalities could be written, so the resident's model does not read this.");
 assert.equal(savedNote(teo), "Saved. Teo's model reads it from the next minute.");
+
+// Teo's day (r06) and its fields (r11): the personality as written in curly quotes, the line where none is written,
+// and the counts over the fields ("3 of 40", "89 of 300").
+assert.equal(writtenWords(' A retired fisherman who walks the quay. '), '\u201cA retired fisherman who walks the quay.\u201d');
+assert.equal(PERSONALITY_WORDS.noneWritten, 'No personality written yet.');
+assert.equal(counter('Teo', PERSONALITY_LIMITS.name), '3 of 40');
+assert.equal(counter('A retired fisherman who walks the quay every morning and talks to anyone who will listen.', PERSONALITY_LIMITS.about), '89 of 300');
 assert.deepEqual(personalityRecordLines({ name: 'Puddle', about: 'A worried yellow duck.' }), ['Puddle', 'A worried yellow duck.']);
 assert.equal(personalityRecordLines({ name: null, about: null }), null);
 assert.equal(personalityRecordLines(null), null);
@@ -45,4 +52,4 @@ assert.equal(personalityRecordLines(null), null);
 assert.deepEqual(personalityBody(' Puddle ', ''), { name: 'Puddle', about: null });
 assert.equal(personalityBody(' ', ''), null);
 
-console.log('Personality words checks passed: the module\'s limits, every refusal code, the sentences that name the character, and the record\'s lines.');
+console.log('Personality words checks passed: the module\'s limits, every refusal code, the sentences that name the character, the record\'s lines and Teo\'s day\'s.');

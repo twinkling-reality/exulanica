@@ -27,7 +27,7 @@ import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePla
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { historyWrite } from './history-host.ts';
-import { personalityBody, personalityRefusalWords, savedNote } from './personality-words.mjs';
+import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { areaBanner, mountUiScale } from './world-ui.ts';
@@ -784,7 +784,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (outcome.written === true) {
         showing.personality = { ...showing.personality, revision: outcome.revision, character: outcome.character };
         showing.editing = null;
-        if (showing.personality.shown) worldNotes.show(savedNote(subjectView(showing.row).who));
       } else {
         editing.refusal = personalityRefusalWords(outcome.code);
         if (outcome.code === 'character_changed') void readPersonality(showing);
@@ -903,7 +902,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       over: overLabel({ at: askedAt(request.base_tick, start), who, said: Boolean(spoken), to: spoken?.document?.thing?.to ? personName(spoken.document.thing.to) : null }),
       title: decisionTitle({ line: spoken ? spoken.document.thing.line : null, chose: proposal?.label ?? null }) || showing.did[decision.rowIndex]?.what || '',
       model: config ? modelName({ provider: config.provider, model_id: config.model_id }) ?? config.model_id ?? null : null,
-      done: result.done, verdict: result.verdict, told: toldSections(context, who),
+      done: result.done, verdict: result.verdict, told: toldSections(context, who), personality: context?.character ? { name: context.character.name ?? null, about: context.character.about ?? null } : null,
       choicesLabel: choicesLabel(who, choices.length), choices,
       record: decision.record ? JSON.stringify({ request, decision: receipt }, null, 2) : null };
   }

@@ -15,7 +15,12 @@ export const PERSONALITY_WORDS = Object.freeze({
   record: 'Personality, as you wrote it',
   writtenByYou: 'Written by you',
   none: 'No personality yet.',
+  /** Teo's day (r06) where its owner has written none; [N] Personality writes one. */
+  noneWritten: 'No personality written yet.',
 });
+
+/** The personality on Teo's day (r06): as the person wrote it, in curly quotes. */
+export const writtenWords = about => `“${(about || '').trim()}”`;
 
 /** Under the fields, where the society reads personalities. */
 export const readsEach = who => `${possessive(who.start)} model reads this each time it decides.`;

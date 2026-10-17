@@ -1,0 +1,412 @@
+// @vitest-environment happy-dom
+// Teo's day as r06 with r11's fields (tools/previews/world-workspace/character-page.ts): who the character is at the
+// left, What Teo did as a path of moment cards at the right, newest first, the chosen card with "[Enter] See the
+// decision"; N's two light fields in place with their counts, Save and Cancel, and the saved note for four seconds;
+// the keys each only where they work; the 1440 sizes. The page only draws and says what was asked through `act`.
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+type State = Record<string, unknown>;
+interface CharacterPage { draw(state: State): void; hide(hidden: boolean): void; close(): void }
+// A joined path: the test runner still finds the file, and the type checker leaves the preview
+// module (outside this package) out of the program.
+const module = async (): Promise<{ openCharacterPage(host: HTMLElement, act: (action: string, value?: unknown) => void): CharacterPage }> =>
+  import('../../../../tools/previews/world-workspace/' + 'character-page.ts') as Promise<{ openCharacterPage(host: HTMLElement, act: (action: string, value?: unknown) => void): CharacterPage }>;
+
+const ABOUT = 'A retired fisherman who walks the quay every morning and talks to anyone who will listen.';
+const teo = { title: 'Teo', start: 'Teo', within: 'Teo', named: true };
+const resident = { title: 'Resident', start: 'The resident', within: 'the resident', named: false };
+const NEMOTRON = 'Nemotron 3 Nano 30B';
+
+/** What Teo did as r06 draws it: the newest first, a line heard second, the chosen meeting third. */
+function rows() {
+  return [
+    { time: '07:10 · Day 1', what: 'Said to Marco: “Sardines, mostly. Come down early tomorrow.”', sub: `${NEMOTRON} · 7 choices`, decision: true,
+      title: 'Teo spoke to Marco', said: '“Sardines, mostly. Come down early tomorrow.”', picture: '/pictures/spoke.png', model: NEMOTRON, choices: 7 },
+    { time: '07:09 · Day 1', what: 'Heard Marco: “Did they bring in anything good?”', sub: '', decision: false, heard: true,
+      title: 'Marco asked Teo', said: 'Marco: “Did they bring in anything good?”', picture: null, model: null, decider: 'person' },
+    { time: '06:52 · Day 1', what: 'Said to Ines: “Morning, Ines. The boats are out early.”', sub: `${NEMOTRON} · 9 choices`, decision: true,
+      title: 'Teo met Ines at the bench', said: '“Morning, Ines. The boats are out early.”', picture: '/pictures/met.png', model: NEMOTRON, choices: 9 },
+    { time: '06:31 · Day 1', what: 'Went to the lower pools', sub: `${NEMOTRON} · 6 choices`, decision: true, title: 'Teo went to the lower pools', model: NEMOTRON, choices: 6 },
+    { time: '06:00 · Day 1', what: 'Left home', sub: 'Routine', decision: false, title: 'Teo left home', model: null },
+  ];
+}
+
+/** Teo with a model and a personality, nothing open over the day. */
+function teoState(extra: State = {}): State {
+  return {
+    who: teo, sub: 'Resident · Terraces on the bay', assignable: true,
+    model: { name: NEMOTRON, price: { input: '0.06', output: '0.24' } }, connected: true, runLine: null,
+    run: { open: false, big: '10 minutes · at most $0.05', small: "Teo's model decides. Everyone else keeps their routine.", busy: false, refusal: null },
+    did: rows(), didFocus: 2, canAsk: true, ask: null, lastRun: 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042',
+    personality: { character: { name: 'Teo', about: ABOUT }, shown: true }, editing: null, choosing: null, canCompare: true, compare: null,
+    portrait: '/portraits/teo.png', doing: 'Waiting by the bench', decides: `${NEMOTRON} decides for Teo`,
+    ...extra,
+  };
+}
+
+/** A resident the society made, on its routine, whose owner has written no personality. */
+function residentState(extra: State = {}): State {
+  return {
+    who: resident, sub: 'Terraces on the bay', assignable: false, model: null, connected: true, runLine: 'The resident follows a routine.',
+    run: { open: false, big: '10 minutes · at most $0.05', small: '', busy: false, refusal: null },
+    did: [], didFocus: null, canAsk: false, ask: null, lastRun: null,
+    personality: { character: null, shown: true }, editing: null, choosing: null, canCompare: false, compare: null,
+    decides: 'The resident follows a routine',
+    ...extra,
+  };
+}
+
+async function open(width = 1920, height = 1080) {
+  const root = document.createElement('div');
+  // The page lays itself out for the window it is in: r06's own 1920 by 1080, or 1440 by 900.
+  Object.defineProperty(root, 'clientWidth', { value: width });
+  Object.defineProperty(root, 'clientHeight', { value: height });
+  document.body.append(root);
+  const act = vi.fn();
+  const page = (await module()).openCharacterPage(root, act);
+  return { root, act, page };
+}
+
+const all = (root: ParentNode, selector: string) => [...root.querySelectorAll(selector)].map((node) => node.textContent);
+const one = (root: ParentNode, selector: string) => root.querySelector(selector)?.textContent ?? null;
+const keys = (root: HTMLElement) => all(root, '.wu-hr-keys .wu-hr-key');
+const keyNamed = (root: HTMLElement, word: string) => [...root.querySelectorAll<HTMLElement>('.wu-hr-keys .wu-hr-key')].find((node) => node.querySelector('.wu-hr-key-word')?.textContent === word)!;
+const items = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.wu-day-item')];
+
+afterEach(() => {
+  vi.useRealTimers();
+  document.body.replaceChildren();
+});
+
+describe("Teo's day", () => {
+  it('shows who Teo is at the left: portrait, kind and world, name, what Teo is doing, the personality and who decides', async () => {
+    const { root, page } = await open();
+    page.draw(teoState());
+    const dialog = root.querySelector('[role="dialog"]') as HTMLElement;
+    expect(dialog.classList.contains('wu-record')).toBe(true);
+    expect(dialog.classList.contains('wu-record-day')).toBe(true);
+    expect(dialog.getAttribute('aria-label')).toBe('Teo');
+    // It opens with the focus on the name, so a reader announces whose day it is (L18).
+    expect(document.activeElement?.textContent).toBe('Teo');
+    const who = root.querySelector('.wu-day-who') as HTMLElement;
+    expect([who.style.left, who.style.top, who.style.width]).toEqual(['120px', '84px', '600px']);
+    expect(who.querySelector('.wu-day-face img')?.getAttribute('src')).toBe('/portraits/teo.png');
+    expect((who.querySelector('.wu-day-face') as HTMLElement).style.width).toBe('112px');
+    expect(one(who, '.wu-hr-over')).toBe('Resident · Terraces on the bay');
+    expect(one(who, '.wu-day-name')).toBe('Teo');
+    expect(one(who, '.wu-day-doing')).toBe('Waiting by the bench');
+    expect(one(who, '.wu-day-persona')).toBe(`“${ABOUT}”`);
+    expect(one(who, '.wu-day-by')).toBe('Written by you');
+    // Who decides with History's Current tag; the price, the last run and what [R] would start in the small print.
+    expect(one(who, '.wu-day-decides')).toBe(`${NEMOTRON} decides for TeoCurrent`);
+    expect(one(who, '.wu-day-decides .wu-hr-tag')).toBe('Current');
+    expect(all(who, '.wu-day-small .wu-day-line')).toEqual([
+      '$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042',
+      '10 minutes · at most $0.05', "Teo's model decides. Everyone else keeps their routine.",
+    ]);
+  });
+
+  it('shows what Run would start, its length and most it may spend, before R starts it', async () => {
+    const { root, act, page } = await open();
+    const run = { open: false, big: '10 minutes · at most $0.05', small: "Teo's model decides. Everyone else keeps their routine.", busy: false, refusal: null };
+    page.draw(teoState({ lastRun: null, run }));
+    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', '10 minutes · at most $0.05', "Teo's model decides. Everyone else keeps their routine."]);
+    // The figures wrap only between their parts (J9).
+    expect(all(root, '.wu-day-small .wu-nowrap')).toEqual(['10 minutes', 'at most $0.05']);
+    keyNamed(root, 'Run').click();
+    expect(act).toHaveBeenLastCalledWith('run');
+    // While it starts, and when a refusal asks to press Run again, the limits it names stay on screen.
+    page.draw(teoState({ lastRun: null, run: { ...run, busy: true, refusal: 'That run already started with other limits. Press Run again.' } }));
+    expect(all(root, '.wu-day-small .wu-day-line')).toContain('10 minutes · at most $0.05');
+    expect(one(root, '.wu-day-who .wu-day-refused')).toBe('That run already started with other limits. Press Run again.');
+    // Once it is on, the running line stands in its place; where no run is offered, there are no limits to show.
+    page.draw(teoState({ lastRun: null, run: { ...run, open: true, big: '9:13 left · $0.0011 of $0.05' }, running: "Teo's model is deciding · 9:13 left" }));
+    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', "Teo's model is deciding · 9:13 left"]);
+    page.draw(teoState({ lastRun: null, run, connected: false }));
+    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens']);
+    expect(keys(root)).not.toContain('RRun');
+  });
+
+  it('keeps a long line to two lines on its card, the whole line still in its text', async () => {
+    const { root, page } = await open(1440, 900);
+    const line = `Said to Marco: “${'The boats were out before the light and came back heavy, so come down early. '.repeat(3).trim()}”`;
+    expect(line.length).toBeGreaterThan(200);
+    page.draw(teoState({ did: [{ time: '07:10 · Day 1', what: line, sub: `${NEMOTRON} · 7 choices`, decision: true }, ...rows().slice(1)], didFocus: 0 }));
+    expect(one(root, '.wu-day-item .wu-day-title')).toBe(line);
+    // The stylesheet clamps a card's title and its line said to two lines with an ellipsis (the test runner loads
+    // stylesheets empty, so the rule is read from the file).
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../tools/previews/world-workspace/world-ui-record-day.css'), 'utf8');
+    const rule = css.match(/\.wu-record-day \.wu-day-title, \.wu-record-day \.wu-day-said \{([^}]*)\}/)?.[1] ?? '';
+    expect(rule).toMatch(/-webkit-line-clamp: 2;/);
+    expect(rule).toMatch(/line-clamp: 2;/);
+    expect(rule).toMatch(/display: -webkit-box;/);
+    expect(rule).toMatch(/overflow: hidden;/);
+    expect(rule).toMatch(/text-overflow: ellipsis;/);
+  });
+
+  it('shows the name as written where a personality holds only a name', async () => {
+    const { root, page } = await open();
+    page.draw(teoState({ personality: { character: { name: 'Puddle', about: null }, shown: true } }));
+    expect(one(root, '.wu-day-persona')).toBe('“Puddle”');
+    expect(one(root, '.wu-day-by')).toBe('Written by you');
+    expect(root.querySelector('.wu-day-none')).toBeNull();
+    page.draw(teoState({ personality: { character: { name: ' ', about: '' }, shown: true } }));
+    expect(one(root, '.wu-day-none')).toBe('No personality written yet.');
+  });
+
+  it('draws What Teo did newest first on the path at x 880, the chosen card filled and offering its decision', async () => {
+    const { root, act, page } = await open();
+    page.draw(teoState());
+    expect(one(root, '.wu-day-over')).toBe('What Teo did');
+    const cards = items(root);
+    expect(cards.map((card) => card.querySelector('.wu-day-title')?.textContent)).toEqual([
+      'Teo spoke to Marco', 'Marco asked Teo', 'Teo met Ines at the bench', 'Teo went to the lower pools', 'Teo left home',
+    ]);
+    // 160px apart from 150, at x 920, each a 208 by 118 picture with its words beside it.
+    expect(cards.map((card) => [card.style.left, card.style.top])).toEqual([['920px', '150px'], ['920px', '310px'], ['920px', '470px'], ['920px', '630px'], ['920px', '790px']]);
+    expect(cards.map((card) => (card.querySelector('.wu-hr-pic') as HTMLElement).style.width)).toEqual(['208px', '208px', '208px', '208px', '208px']);
+    const picture = cards[0]!.querySelector('.wu-hr-pic') as HTMLElement;
+    expect([picture.style.width, picture.style.height]).toEqual(['208px', '118px']);
+    expect(all(root, '.wu-day-item .wu-hr-time')).toEqual(['07:10 · Day 1', '07:09 · Day 1', '06:52 · Day 1', '06:31 · Day 1', '06:00 · Day 1']);
+    // The line said in curly quotes, a line said to Teo with its speaker first; the who line under it.
+    expect(all(root, '.wu-day-item .wu-hr-said')).toEqual(['“Sardines, mostly. Come down early tomorrow.”', 'Marco: “Did they bring in anything good?”', '“Morning, Ines. The boats are out early.”']);
+    expect(all(root, '.wu-day-decided')).toEqual([`By ${NEMOTRON} · 7 choices`, 'By a person playing', `By ${NEMOTRON} · 9 choices`, `By ${NEMOTRON} · 6 choices`, 'Routine']);
+    // A model's name never breaks.
+    expect(all(root, '.wu-day-item .wu-hr-model')).toEqual([NEMOTRON, NEMOTRON, NEMOTRON]);
+    // A picture where one exists, the quiet tile where none does (no words in it).
+    expect(cards.map((card) => card.querySelector('.wu-hr-pic img')?.getAttribute('src') ?? null)).toEqual(['/pictures/spoke.png', null, '/pictures/met.png', null, null]);
+    expect(all(root, '.wu-hr-pic')).toEqual(['', '', '', '', '']);
+    // The chosen card rises; only it says "[Enter] See the decision".
+    expect(cards.map((card) => card.getAttribute('aria-current'))).toEqual([null, null, 'true', null, null]);
+    expect(all(root, '.wu-day-see')).toEqual(['EnterSee the decision']);
+    expect(cards[2]!.querySelector('.wu-day-see')).not.toBeNull();
+    // The path from the newest card's top to the oldest dot, a hollow dot per card, the chosen one filled.
+    expect(root.querySelector('.wu-day-path .line')?.getAttribute('d')).toBe('M 880 150 L 880 811');
+    const dots = [...root.querySelectorAll('.wu-day-path .dot')];
+    expect(dots.map((dot) => [dot.getAttribute('cx'), dot.getAttribute('cy')])).toEqual([['880', '171'], ['880', '331'], ['880', '491'], ['880', '651'], ['880', '811']]);
+    expect(dots.map((dot) => (dot as SVGElement).dataset['chosen'])).toEqual(['false', 'false', 'true', 'false', 'false']);
+    // Pressing a card chooses it; a line heard is never chosen; See the decision opens that card's decision.
+    cards[0]!.click();
+    expect(act).toHaveBeenLastCalledWith('row', 0);
+    act.mockClear();
+    cards[1]!.click();
+    expect(act).not.toHaveBeenCalled();
+    (root.querySelector('.wu-day-see') as HTMLElement).click();
+    expect(act.mock.calls).toEqual([['inspect', 2]]);
+  });
+
+  it('draws today\'s rows by their own words and the quiet tile until the moment titles and pictures exist', async () => {
+    const { root, page } = await open();
+    const today = rows().map(({ time, what, sub, decision, heard }) => ({ time, what, sub, decision, ...(heard ? { heard } : {}) }));
+    const plain = teoState({ did: today });
+    for (const field of ['portrait', 'doing', 'decides']) delete plain[field];
+    page.draw(plain);
+    expect(all(root, '.wu-day-title')).toEqual(today.map((row) => row.what));
+    expect(all(root, '.wu-day-decided')).toEqual([`${NEMOTRON} · 7 choices`, `${NEMOTRON} · 9 choices`, `${NEMOTRON} · 6 choices`, 'Routine']);
+    expect(root.querySelector('.wu-day-item .wu-hr-said')).toBeNull();
+    expect(root.querySelector('.wu-day-item img')).toBeNull();
+    // No portrait yet: the first letter on the quiet orb; who decides is the model's own name with its tag.
+    expect(one(root, '.wu-day-face')).toBe('T');
+    expect(root.querySelector('.wu-day-doing')).toBeNull();
+    expect(one(root, '.wu-day-decides')).toBe(`${NEMOTRON}Current`);
+  });
+
+  it('shows a routine character with no personality written: the line, [N] Personality, and nothing it cannot do', async () => {
+    const { root, page } = await open();
+    page.draw(residentState());
+    expect(root.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Resident');
+    expect(one(root, '.wu-day-face')).toBe('R');
+    expect(root.querySelector('.wu-day-face img')).toBeNull();
+    expect(one(root, '.wu-day-name')).toBe('Resident');
+    expect(one(root, '.wu-day-none')).toBe('No personality written yet.');
+    expect(root.querySelector('.wu-day-persona')).toBeNull();
+    expect(root.querySelector('.wu-day-by')).toBeNull();
+    expect(one(root, '.wu-day-decides')).toBe('The resident follows a routine');
+    expect(root.querySelector('.wu-day-decides .wu-hr-tag')).toBeNull();
+    expect(root.querySelector('.wu-day-small')).toBeNull();
+    expect(one(root, '.wu-day-note')).toBe('The resident has not done anything yet.');
+    expect(root.querySelector('.wu-day-path .line')).toBeNull();
+    expect(keys(root)).toEqual(['NPersonality', 'EscBack']);
+    // While the rows are read, it says so; without the host's words for who decides, the Run section's line.
+    const plain = residentState({ did: null });
+    delete plain['decides'];
+    page.draw(plain);
+    expect(one(root, '.wu-day-note')).toBe("Reading the resident's record…");
+    expect(one(root, '.wu-day-decides')).toBe('The resident follows a routine.');
+    // A character no one placed has no personality and no [N].
+    page.draw(residentState({ personality: null }));
+    expect(root.querySelector('.wu-day-none')).toBeNull();
+    expect(keys(root)).toEqual(['EscBack']);
+  });
+});
+
+describe("Teo's personality", () => {
+  it('turns the left column into the two light fields in place, the day dimmed, with Save and Cancel', async () => {
+    const { root, act, page } = await open();
+    page.draw(teoState());
+    page.draw(teoState({ editing: { session: 's1', refusal: null, busy: false } }));
+    const dialog = root.querySelector('[role="dialog"]') as HTMLElement;
+    expect(dialog.hasAttribute('data-editing')).toBe(true);
+    const editor = root.querySelector('.wu-day-editor') as HTMLElement;
+    expect(one(editor, '.wu-hr-over')).toBe('Resident · Terraces on the bay');
+    expect(editor.querySelector('.wu-day-name')).toBeNull();
+    expect(all(editor, '.wu-day-label')).toEqual(['Name3 of 40', 'Personality89 of 300']);
+    const name = editor.querySelector('input.wu-day-name-field') as HTMLInputElement;
+    const about = editor.querySelector('textarea.wu-day-about-field') as HTMLTextAreaElement;
+    expect([name.value, about.value]).toEqual(['Teo', ABOUT]);
+    expect(one(editor, '.wu-day-reads')).toBe("Teo's model reads this each time it decides.");
+    // The day at the right stays where it was, dimmed, and answers nothing.
+    expect(root.querySelector('.wu-day-did')?.hasAttribute('data-dim')).toBe(true);
+    expect(items(root)).toHaveLength(5);
+    expect(root.querySelector('.wu-day-see')).toBeNull();
+    expect(keys(root)).toEqual(['EnterSave', 'EscCancel']);
+    await Promise.resolve();
+    expect(document.activeElement).toBe(about);
+    // Typing keeps its place through every draw; the count follows, and past the limit it turns.
+    about.value = 'A worried yellow duck.';
+    about.dispatchEvent(new Event('input'));
+    expect(act).toHaveBeenLastCalledWith('draft', { name: 'Teo', about: 'A worried yellow duck.' });
+    expect(all(editor, '.wu-day-count')).toEqual(['3 of 40', '22 of 300']);
+    name.value = 'x'.repeat(41);
+    name.dispatchEvent(new Event('input'));
+    expect(editor.querySelector('.wu-day-count')?.classList.contains('wu-over')).toBe(true);
+    page.draw(teoState({ editing: { session: 's1', refusal: 'Too long: a name has at most 40 characters, a personality at most 300.', busy: false } }));
+    expect(root.querySelector('textarea.wu-day-about-field')).toBe(about);
+    expect(about.value).toBe('A worried yellow duck.');
+    expect(one(root, '.wu-day-editor .wu-day-refused')).toBe('Too long: a name has at most 40 characters, a personality at most 300.');
+    page.draw(teoState({ editing: { session: 's1', refusal: null, busy: true } }));
+    expect(keyNamed(root, 'Save').hasAttribute('disabled')).toBe(true);
+    expect((root.querySelector('.wu-day-editor .wu-day-refused') as HTMLElement).hidden).toBe(true);
+    page.draw(teoState({ editing: { session: 's1', refusal: null, busy: false } }));
+    act.mockClear();
+    keyNamed(root, 'Save').click();
+    keyNamed(root, 'Cancel').click();
+    expect(act.mock.calls).toEqual([['save'], ['back']]);
+  });
+
+  it('says it was saved in the who column for four seconds, and nothing after a cancel or a refusal', async () => {
+    vi.useFakeTimers();
+    const { root, page } = await open();
+    const saved = { character: { name: 'Teo', about: 'A worried yellow duck.' }, shown: true };
+    page.draw(teoState({ editing: { session: 's1', refusal: null, busy: false } }));
+    page.draw(teoState({ editing: { session: 's1', refusal: null, busy: true } }));
+    page.draw(teoState({ personality: saved }));
+    expect(root.querySelector('.wu-day-editor')).toBeNull();
+    expect(one(root, '.wu-day-persona')).toBe('“A worried yellow duck.”');
+    expect(one(root, '.wu-day-who .wu-day-saved')).toBe("Saved. Teo's model reads it from the next minute.");
+    expect(root.querySelector('.wu-day-saved')?.getAttribute('role')).toBe('status');
+    vi.advanceTimersByTime(3900);
+    expect(root.querySelector('.wu-day-saved')).not.toBeNull();
+    vi.advanceTimersByTime(200);
+    expect(root.querySelector('.wu-day-saved')).toBeNull();
+    // Cancel: the fields close over the same personality.
+    page.draw(teoState({ personality: saved, editing: { session: 's2', refusal: null, busy: false } }));
+    page.draw(teoState({ personality: saved }));
+    expect(root.querySelector('.wu-day-saved')).toBeNull();
+    // A refusal keeps the fields open; nothing was saved.
+    page.draw(teoState({ personality: saved, editing: { session: 's3', refusal: null, busy: true } }));
+    page.draw(teoState({ personality: saved, editing: { session: 's3', refusal: 'Nothing changed.', busy: false } }));
+    page.draw(teoState({ personality: saved }));
+    expect(root.querySelector('.wu-day-saved')).toBeNull();
+  });
+
+  it("says where this world's people do not read a personality, and no saved note there", async () => {
+    const { root, page } = await open();
+    const unread = { character: { name: 'Teo', about: ABOUT }, shown: false };
+    page.draw(teoState({ personality: unread, editing: { session: 's1', refusal: null, busy: true } }));
+    expect(one(root, '.wu-day-reads')).toBe("This world's people were added before personalities could be written, so Teo's model does not read this.");
+    page.draw(teoState({ personality: { ...unread, character: { name: 'Teo', about: 'Changed.' } } }));
+    expect(root.querySelector('.wu-day-saved')).toBeNull();
+  });
+});
+
+describe("Teo's day keys", () => {
+  it('offers each key only where it works and says what each asked', async () => {
+    const { root, act, page } = await open();
+    page.draw(teoState());
+    expect(keys(root)).toEqual(['↑↓Earlier, later', 'MModel', 'NPersonality', 'RRun', 'CCompare', 'QAsk', 'EscBack']);
+    expect(keyNamed(root, 'Back').getAttribute('aria-keyshortcuts')).toBe('Escape');
+    for (const word of ['Model', 'Personality', 'Run', 'Compare', 'Ask', 'Back']) keyNamed(root, word).click();
+    expect(act.mock.calls).toEqual([['model'], ['personality'], ['run'], ['compare'], ['ask'], ['back']]);
+    // The arrows' key steps earlier, over a line heard, and from the oldest back to the newest.
+    act.mockClear();
+    keyNamed(root, 'Earlier, later').click();
+    expect(act).toHaveBeenLastCalledWith('row', 3);
+    page.draw(teoState({ didFocus: 3 }));
+    keyNamed(root, 'Earlier, later').click();
+    expect(act).toHaveBeenLastCalledWith('row', 4);
+    page.draw(teoState({ didFocus: 4 }));
+    keyNamed(root, 'Earlier, later').click();
+    expect(act).toHaveBeenLastCalledWith('row', 0);
+    // While a run is on: R stops, and the running line stands in for the last run; while it is asked, R waits.
+    page.draw(teoState({ run: { open: true, big: '9:13 left · $0.0011 of $0.05', small: '', busy: false, refusal: null }, running: "Teo's model is deciding · 9:13 left" }));
+    expect(keys(root)).toContain('RStop');
+    expect(one(root, '.wu-day-small')).toBe("$0.06 in · $0.24 out per million tokensTeo's model is deciding · 9:13 left");
+    act.mockClear();
+    keyNamed(root, 'Stop').click();
+    expect(act).toHaveBeenLastCalledWith('stop');
+    page.draw(teoState({ run: { open: true, big: '9:13 left · $0.0011 of $0.05', small: '', busy: true, refusal: 'A run is already on. Stop it first.' } }));
+    expect(keyNamed(root, 'Stop').hasAttribute('disabled')).toBe(true);
+    expect(one(root, '.wu-day-small')).toBe('$0.06 in · $0.24 out per million tokens9:13 left · $0.0011 of $0.05');
+    expect(one(root, '.wu-day-who .wu-day-refused')).toBe('A run is already on. Stop it first.');
+    // No model connected: no R; no choice to move between: no arrows; nothing to compare, nothing to ask, no model to choose.
+    page.draw(teoState({ connected: false, did: rows().slice(0, 2), didFocus: 0, canCompare: false, canAsk: false, assignable: false }));
+    expect(keys(root)).toEqual(['NPersonality', 'EscBack']);
+    // A person playing Teo: no Current tag beside who decides.
+    page.draw(teoState({ decider: 'person', decides: 'A person is playing Teo' }));
+    expect(one(root, '.wu-day-decides')).toBe('A person is playing Teo');
+  });
+
+  it("keeps choosing a model, Compare's question and Ask in the right column with their own keys", async () => {
+    const { root, act, page } = await open();
+    const choices = [
+      { model: { provider: 'nebius', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' } }, current: true },
+      { model: null, current: false },
+    ];
+    page.draw(teoState({ choosing: { choices, focus: 0, refusal: null, busy: false } }));
+    expect(root.querySelector('.wu-day-did')).toBeNull();
+    expect(all(root, '.wu-day-side .wu-model-name')).toEqual([`${NEMOTRON}Current`, 'Routine']);
+    expect(keys(root)).toEqual(['↑↓Choose', 'EnterUse this model', 'EscBack']);
+    (root.querySelectorAll('.wu-model-row')[1] as HTMLElement).click();
+    expect(act).toHaveBeenLastCalledWith('choose', 1);
+    keyNamed(root, 'Use this model').click();
+    expect(act).toHaveBeenLastCalledWith('use');
+    page.draw(teoState({ compare: { nothing: null, big: 'Ask another model', explain: 'The same moments.', choices: [choices[0]], focus: 0, figure: 'Asking 5 of 24 · $0.0008 of $0.01', asking: true, note: null, canStart: false } }));
+    expect(keys(root)).toEqual(['EscStop']);
+    page.draw(teoState({ ask: { questions: ['What is Teo doing?', 'Why?'], focus: 0, busy: false, asked: null, answer: null, failure: null } }));
+    expect(all(root, '.wu-ask-row')).toEqual(['What is Teo doing?', 'Why?']);
+    expect(keys(root)).toEqual(['↑↓Choose', 'EnterAsk', 'EscBack']);
+    // Back on the day, the chosen card is where it was.
+    page.draw(teoState());
+    expect(items(root)[2]!.getAttribute('aria-current')).toBe('true');
+  });
+});
+
+describe("Teo's day at 1440 by 900", () => {
+  it("takes History's 1440 rules: margins 80, the title 60, pictures 0.86, and keeps the chosen card in view", async () => {
+    const { root, page } = await open(1440, 900);
+    page.draw(teoState({ didFocus: 0 }));
+    const dialog = root.querySelector('[role="dialog"]') as HTMLElement;
+    // The narrow class carries the stylesheet's 1440 sizes (the name at 60, the keys 64 in and 32 up).
+    expect(dialog.classList.contains('wu-hr-narrow')).toBe(true);
+    const who = root.querySelector('.wu-day-who') as HTMLElement;
+    expect([who.style.left, who.style.top, who.style.width]).toEqual(['80px', '84px', '480px']);
+    expect((root.querySelector('.wu-day-face') as HTMLElement).style.width).toBe('96px');
+    const cards = items(root);
+    expect(cards.map((card) => [card.style.left, card.style.top])).toEqual([['680px', '150px'], ['680px', '288px'], ['680px', '426px'], ['680px', '564px']]);
+    const picture = cards[0]!.querySelector('.wu-hr-pic') as HTMLElement;
+    expect([picture.style.width, picture.style.height]).toEqual(['179px', '101px']);
+    // The oldest card is out of view: the path runs on to the band over the page's foot.
+    expect(root.querySelector('.wu-day-path .line')?.getAttribute('d')).toBe('M 640 150 L 640 780');
+    // Choosing the oldest slides the view; the path then starts under "What Teo did".
+    page.draw(teoState({ didFocus: 4 }));
+    expect(all(root, '.wu-day-title')).toEqual(['Marco asked Teo', 'Teo met Ines at the bench', 'Teo went to the lower pools', 'Teo left home']);
+    expect(root.querySelector('.wu-day-path .line')?.getAttribute('d')).toBe('M 640 116 L 640 582');
+    // A choice inside the view moves nothing.
+    page.draw(teoState({ didFocus: 2 }));
+    expect(all(root, '.wu-day-title')[0]).toBe('Marco asked Teo');
+  });
+});

@@ -1,0 +1,38 @@
+/* Compare as r12 (DESIGN's R-DAY-DECISION build sheet section 4 and "1440 x 900"; frames/r12-compare.html): the page's
+   own type, colours and fixed sizes over world-ui-record.css's ground, tokens, small text styles and keys. Where each
+   part sits comes from compare-line.mjs and is set on the part by compare-page.ts; the 1440 sizes follow .wu-hr-narrow. */
+.wu-record-compare .wu-rc-head, .wu-record-compare .wu-rc-answer, .wu-record-compare .wu-rc-moment,
+.wu-record-compare .wu-rc-time, .wu-record-compare .wu-rc-branch { position: absolute; }
+
+/* The head (History's) and the answer in words. */
+.wu-record-compare .wu-rc-title { margin: 14px 0 0; font: 200 56px/1.05 var(--font-sans); letter-spacing: -.02em; color: var(--hr-ink); }
+.wu-record-compare.wu-hr-narrow .wu-rc-title { font-size: 48px; }
+.wu-record-compare .wu-rc-sub { margin: 16px 0 0; font: 400 17px/1.45 var(--font-sans); color: var(--hr-quiet); text-wrap: pretty; }
+.wu-record-compare .wu-rc-sentence, .wu-record-compare .wu-rc-asking { margin: 0; font: 300 26px/1.35 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
+.wu-record-compare .wu-rc-rerun { margin: 8px 0 0; font: 400 15px/1.45 var(--font-sans); color: var(--hr-quiet); text-wrap: pretty; }
+
+/* History's line: a hollow dot each, the picked one filled, a moment not asked faint; a different answer's dashed
+   branch, the model's name over the answer. */
+.wu-record-compare .wu-rc-line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.wu-record-compare .wu-rc-line .line { fill: none; stroke: var(--hr-line); stroke-width: 1.5; opacity: .75; }
+.wu-record-compare .wu-rc-line .branch { fill: none; stroke: var(--hr-line); stroke-width: 1.3; stroke-dasharray: 5 6; opacity: .65; }
+.wu-record-compare .wu-rc-line .dot { fill: var(--hr-ground); stroke: var(--hr-line); stroke-width: 1.6; }
+.wu-record-compare .wu-rc-line .dot[data-picked="true"] { fill: var(--hr-line); }
+.wu-record-compare .wu-rc-line .dot[data-asked="false"] { opacity: .4; }
+.wu-record-compare .wu-rc-time { transform: translateX(-50%); font: 400 12px/1 var(--font-mono); color: var(--hr-quiet); white-space: nowrap; }
+.wu-record-compare .wu-rc-branch { font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-compare .wu-rc-branch[data-side="left"] { text-align: right; }
+.wu-record-compare .wu-rc-branch-name { display: block; margin-bottom: 3px; font: 400 12px/1.3 var(--font-mono); opacity: .8; }
+.wu-record-compare .wu-rc-branch-words { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* The picked moment opened: each answer's 2px rule (the recorded one in the line's colour), the model's name with its
+   tag at the right, and the answer, words said in italic (world-ui-record.css's .wu-hr-said). */
+.wu-record-compare .wu-rc-row { margin-top: 18px; padding-left: 16px; border-left: 2px solid color-mix(in srgb, var(--hr-line) 35%, transparent); }
+.wu-record-compare .wu-rc-row[data-recorded="true"] { border-left-color: var(--hr-line); }
+.wu-record-compare .wu-rc-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font: 500 15px/1.3 var(--font-sans); color: var(--hr-ink); }
+.wu-record-compare .wu-rc-row-tag { font: 400 13px/1.3 var(--font-sans); color: var(--hr-quiet); white-space: nowrap; }
+.wu-record-compare .wu-rc-row-words { margin-top: 4px; font: 400 18px/1.4 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
+.wu-record-compare .wu-rc-row[data-tag=""] .wu-rc-row-words { color: var(--hr-quiet); }
+/* Words said run inline within their answer, at its size, whatever another page's .wu-hr-said rule does (History's sets
+   it as a clamped block with a margin): the page never depends on History's stylesheet. */
+.wu-record-compare .wu-rc-row-words .wu-hr-said { display: inline; margin: 0; overflow: visible; -webkit-line-clamp: none; -webkit-box-orient: initial; font-style: italic; font-weight: 300; font-size: inherit; line-height: inherit; color: inherit; }

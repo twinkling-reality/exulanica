@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DECISION_WORDS, askedAt, choiceRows, choicesLabel, decisionTitle, needLine, overLabel, resultLines, toldLabel, toldSections } from './decision-words.mjs';
+import {
+  DECISION_FLOW_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, decisionTitle,
+  needLine, overLabel, resultLines, toldLabel, toldSections,
+} from './decision-words.mjs';
 import { called } from './character-words.mjs';
 
 const repository = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -30,6 +33,26 @@ assert.equal(resultLines({ verdict: { kind: 'applied' }, costUsd: '0' }).done, '
 // A time under a tenth of a second (DESIGN's W5).
 assert.equal(resultLines({ verdict: { kind: 'applied' }, doneAt: '06:53', latencyMs: 13 }).done, 'Done at 06:53 · answered in under 0.1 s');
 assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done, 'Done · answered in 0.1 s');
+
+// The record page's words (r10): the column's label, the ring's count, the card's label and the head's small print,
+// who decided first (T7's words where no model did), then the answer's time and cost as resultLines says them.
+assert.equal(choicesOver(teo), "Teo's choices");
+assert.equal(choicesOver(resident), "The resident's choices");
+assert.equal(choseOneOf(9), 'chose 1 of 9');
+assert.equal(DECISION_FLOW_WORDS.whatHappened, 'What happened');
+assert.equal(DECISION_WORDS.chosen, 'Chosen');
+assert.equal(toldLabel(teo), "What Teo's model was told");
+assert.deepEqual([answeredIn(912), answeredIn(13), answeredIn(100), answeredIn(null)], ['answered in 0.9 s', 'answered in under 0.1 s', 'answered in 0.1 s', null]);
+assert.deepEqual([costWords('0.00030000'), costWords('0.0014006', false), costWords('0'), costWords(null), costWords('nonsense')], ['cost $0.0003', 'cost at most $0.0014', 'cost $0', null, null]);
+const partsText = parts => parts.map(part => typeof part === 'string' ? part : part.model).join('');
+assert.deepEqual(decidedByParts({ model: 'Nemotron 3 Nano 30B', ...record }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }, ' · answered in 0.9 s · cost $0.0003']);
+assert.deepEqual(decidedByParts({ decider: 'model', model: ' Nemotron 3 Nano 30B ' }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }]);
+assert.deepEqual(decidedByParts({ decider: 'person' }), ['Decided by a person playing']);
+assert.equal(partsText(decidedByParts({ decider: 'external', latencyMs: 1300 })), 'Decided by an outside program · answered in 1.3 s');
+assert.equal(partsText(decidedByParts({ decider: 'person', model: 'Nemotron 3 Nano 30B' })), 'Decided by a person playing');
+assert.deepEqual(decidedByParts({ latencyMs: 1300, costUsd: '0.0014006', costKnown: false }), ['Answered in 1.3 s · cost at most $0.0014']);
+assert.deepEqual(decidedByParts({}), []);
+assert.deepEqual(decidedByParts(), []);
 
 // A need, words first (ruling J14): needed now only above the level people see to it at.
 assert.equal(needLine('rest', 417, 500), 'Rest: not needed yet (417 of 1000).');
@@ -87,7 +110,8 @@ assert.deepEqual(toldSections({}, teo), []);
 
 // Plain words: no em dash, no code, no "it" for a character (the personality is "it": as you wrote it;
 // a spot's own words, in brackets, are the server's and name a place).
-const said = [...Object.values(DECISION_WORDS), ...toldSections(garden, teo).flatMap(section => [section.label, ...section.lines])];
+const said = [...Object.values(DECISION_WORDS), ...Object.values(DECISION_FLOW_WORDS), choicesOver(teo), choicesOver(resident), choseOneOf(9),
+  ...toldSections(garden, teo).flatMap(section => [section.label, ...section.lines])];
 for (const words of said) {
   assert.doesNotMatch(words, /\u2014|_/, words);
   assert.doesNotMatch(words.replace('as you wrote it', '').replace(/\([^)]*\)/gu, ''), /\b(it|he|she)\b/i, words);

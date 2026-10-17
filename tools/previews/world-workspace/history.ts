@@ -5,6 +5,8 @@
 // Now. Enter opens the chosen moment on the same page. It reads the server alone (GET through the workspace's reader);
 // the path and the views come from history-rows.mjs and every word from history-words.mjs. Pictures and portraits are
 // made one at a time where the host can make them, and the making stops when the page closes.
+// The record pages' shared parts load first: History's own stylesheet refines them and must come after.
+import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import { changeParts, thingName } from './build-words.mjs';
 import { LAYOUTS, historyPath, pathLayout, pathView, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
@@ -17,16 +19,12 @@ import { storySvg, svgPart } from './world-ui-history.ts';
 const GENERATED = 'world:generated:';
 /** The newest runs whose own read is fetched for their bracket. */
 const RUNS_READ = 20;
-/** At most this many portraits on a card; more become "+n". */
-const ORBS = 3;
 /** Narrower than this, the page takes its 1440 sizes. */
 const NARROW_BELOW = 1700;
 /** While a project is being started or put on GitHub, the projects read is asked again this often. */
 const WATCH_MS = 3000;
 
 type Json = Record<string, any>;
-/** A sentence's parts: plain text, and a model's name the page keeps on one line. */
-type Parts = readonly (string | { readonly model: string })[];
 export interface Picture { readonly sha256: string; readonly width: number; readonly height: number }
 
 /** The characters History's path names: society subjects (moments, models) and placed beings (personalities). */
@@ -87,39 +85,6 @@ export interface History {
   /** A key while the page is open; true when the page took it. */
   key(event: KeyboardEvent): boolean;
   readonly isOpen: boolean;
-}
-
-function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', words = ''): HTMLElementTagNameMap[K] {
-  const made = document.createElement(tag);
-  if (className) made.className = className;
-  if (words) made.textContent = words;
-  return made;
-}
-
-/** A sentence from its parts, each model's name in a span that never breaks. */
-function sentence(tag: 'div' | 'span' | 'p', className: string, parts: Parts | string): HTMLElement {
-  const made = element(tag, className);
-  for (const part of typeof parts === 'string' ? [parts] : parts) {
-    made.append(typeof part === 'string' ? document.createTextNode(part) : element('span', 'wu-hr-model', part.model));
-  }
-  return made;
-}
-
-function px(node: HTMLElement, left: number, top: number, width?: number, height?: number) {
-  node.style.left = `${left}px`;
-  node.style.top = `${top}px`;
-  if (width !== undefined) node.style.width = `${width}px`;
-  if (height !== undefined) node.style.height = `${height}px`;
-}
-
-/** A key the page answers, drawn as r23 draws it: its caps, then its word; pressing it does what the key does. */
-function keyButton(keys: readonly string[], word: string, onPress: () => void): HTMLButtonElement {
-  const button = element('button', 'wu-hr-key');
-  button.type = 'button';
-  for (const key of keys) button.append(element('kbd', 'wu-hr-cap', key));
-  button.append(element('span', 'wu-hr-key-word', word));
-  button.addEventListener('click', onPress);
-  return button;
 }
 
 export function mountHistory(host: HistoryHost): History {
@@ -385,43 +350,9 @@ export function mountHistory(host: HistoryHost): History {
     return pull ? `https://github.com/${project.link.repository}/pull/${pull.number}` : `https://github.com/${project.link.repository}`;
   }
 
-  /** A picture, or the quiet tile while it does not exist (no spinner, no words); it fades in when it arrives. */
-  function pictureBox(url: string | null, width: number, height: number): HTMLDivElement {
-    const box = element('div', 'wu-hr-pic');
-    box.style.width = `${width}px`;
-    box.style.height = `${height}px`;
-    if (url) {
-      const image = element('img');
-      image.alt = '';
-      image.addEventListener('load', () => image.setAttribute('data-loaded', 'true'));
-      image.src = url;
-      box.append(image);
-    }
-    return box;
-  }
-
+  /** The people's round portraits: a made portrait, or the first letter of the name as the tag says it. */
   function orbs(subjects: readonly string[], size: number): HTMLDivElement {
-    const row = element('div', 'wu-hr-orbs');
-    for (const subject of subjects.slice(0, ORBS)) {
-      const orb = element('span', 'wu-hr-orb');
-      orb.style.width = orb.style.height = `${size}px`;
-      const url = portraits.get(subject);
-      if (url) {
-        const image = element('img');
-        image.alt = '';
-        image.src = url;
-        orb.append(image);
-      } else {
-        orb.textContent = called.subject(subject).replace(/^the /, '').charAt(0).toUpperCase();
-      }
-      row.append(orb);
-    }
-    if (subjects.length > ORBS) {
-      const more = element('span', 'wu-hr-orb more', `+${subjects.length - ORBS}`);
-      more.style.width = more.style.height = `${size}px`;
-      row.append(more);
-    }
-    return row;
+    return recordOrbs(subjects, size, (id) => portraits.get(id), (id) => called.subject(id));
   }
 
   /** A card's words: time, title, the creation's quote or the first lines said, who decided, a same answer. */
@@ -717,7 +648,7 @@ export function mountHistory(host: HistoryHost): History {
     async open() {
       if (made) return;
       made = page({ form: 'full' });
-      made.root.classList.add('wu-history-r23');
+      made.root.classList.add('wu-record', 'wu-history-r23');
       made.root.setAttribute('aria-label', PATH_WORDS.history);
       // A made creature's label that lands while the page is open re-words the path.
       unlisten = host.kindLabels.listen(() => {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { COMPARE_WORDS, again, answerTag, askLine, asking, atMoment, cannotAskAgain, atMost, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
+import { COMPARE_WORDS, again, answerTag, askLine, asking, atMoment, cannotAskAgain, atMost, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultSub, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { called } from './character-words.mjs';
 
 const teo = called({ name: 'Teo' }), resident = called({ kind: 'resident' });
@@ -30,6 +30,10 @@ assert.equal(resultTitle(teo, 1, true), "Teo's decision, asked again");
 assert.equal(COMPARE_WORDS.sameMoments(teo), "The same moments, exactly as Teo's model was told them. Nothing in the world changed.");
 assert.equal(spentAsking(0.003), 'Spent $0.003 asking again');
 assert.equal(spentAsking('0.00300000'), 'Spent $0.003 asking again');
+// r12: the small sentence carries what asking again spent.
+assert.equal(resultSub(COMPARE_WORDS.sameMoments(teo), spentAsking(0.003)), "The same moments, exactly as Teo's model was told them. Nothing in the world changed. Spent $0.003 asking again.");
+assert.equal(resultSub(COMPARE_WORDS.sameMoment(teo), ''), "The same moment, exactly as Teo's model was told it. Nothing in the world changed.");
+assert.equal(resultSub('Asked.', 'Spent $0.003 asking again.'), 'Asked. Spent $0.003 asking again.');
 assert.equal(atMoment('06:43', 2, 12), 'At 06:43 · 3 of 12');
 assert.equal(atMoment(null, 0, 5), '1 of 5');
 // One moment: its clock alone, or nothing (C3).
@@ -100,4 +104,4 @@ for (const line of [...whatEachChose({ recordedName: NANO, otherName: QWEN, othe
   assert.doesNotMatch(line, /\b(better|worse|best|wins?)\b/i, line);
   assert.doesNotMatch(line, /\u2014|_/, line);
 }
-console.log('Compare words checks passed: the frames’ lines, the moments asked, the counts and the band.');
+console.log('Compare words checks passed: the frames’ lines, the moments asked, the counts, the band and r12’s small sentence.');

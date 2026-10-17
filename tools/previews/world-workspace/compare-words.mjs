@@ -1,4 +1,4 @@
-// The words of Compare (DESIGN's frames 12a and 12b, rulings C1 and C2, WORDS.md): a character's
+// The words of Compare (DESIGN's frames 12a, 12b and r12, rulings C1 and C2, WORDS.md): a character's
 // recorded decisions asked again, exactly as they were asked (D1), of a second model and once more of
 // the model that made them. Nothing they choose is applied. The count and the most it can cost are
 // the server's offer (GET .../people/{id}/asks-again), never a number here. verify-compare-words.mjs
@@ -64,6 +64,12 @@ export function resultTitle(who, count, single = false) {
 
 /** "Spent $0.0030 asking again". */
 export const spentAsking = usd => `Spent ${amount(usd)} asking again`;
+
+/**
+ * The result's small sentence (r12): how the moments were asked, then what asking again spent: "The same moments,
+ * exactly as Teo's model was told them. Nothing in the world changed. Spent $0.003 asking again."
+ */
+export const resultSub = (sub, spent) => [sub, spent ? `${spent.replace(/\.$/u, '')}.` : ''].filter(Boolean).join(' ');
 
 /** "At 06:43 · 3 of 12" (where the society keeps no clock, "3 of 12"); one moment, "At 06:43" or nothing (C3). */
 export const atMoment = (hhmm, index, count) =>

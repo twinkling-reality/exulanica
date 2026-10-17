@@ -1,4 +1,4 @@
-// The words of one decision (DESIGN's frame 10, WORDS.md): when it was asked and what came of it,
+// The words of one decision (DESIGN's frame 10 and its redraw r10, WORDS.md): when it was asked and what came of it,
 // what the character's model was told, in sections, and the choices it had. Read from the recorded
 // request's context (exulanica.society-decision-context/v2) as the server stored it; a field a
 // context does not carry leaves its line or section out. The stored text itself is the Full record.
@@ -64,12 +64,52 @@ export function decisionTitle({ line = null, chose = null }) {
  * $0.0003". `verdict` is the choice account's { kind, words }; a part not recorded is left out.
  */
 export function resultLines({ verdict, doneAt = null, latencyMs = null, costUsd = null, costKnown = true }) {
-  const parts = [];
-  // Under a tenth of a second has no figure of its own at one decimal (DESIGN's W5).
-  if (Number.isFinite(latencyMs)) parts.push(latencyMs < 100 ? 'answered in under 0.1 s' : `answered in ${(latencyMs / 1000).toFixed(1)} s`);
-  if (costUsd !== null && costUsd !== undefined && amount(costUsd)) parts.push(`${costKnown ? 'cost' : 'cost at most'} ${amount(costUsd)}`);
+  const parts = [answeredIn(latencyMs), costWords(costUsd, costKnown)].filter(Boolean);
   if (verdict?.kind === 'applied') return { done: [doneAt ? `Done at ${doneAt}` : 'Done', ...parts].join(' · '), verdict: null };
   return { done: parts.length ? capital(parts.join(' · ')) : null, verdict: plain(verdict?.words) };
+}
+
+/**
+ * How long the answer took: "answered in 0.9 s"; under a tenth of a second has no figure of its own at one decimal,
+ * "answered in under 0.1 s" (DESIGN's W5). Null where no time is recorded.
+ */
+export function answeredIn(latencyMs) {
+  if (!Number.isFinite(latencyMs)) return null;
+  return latencyMs < 100 ? 'answered in under 0.1 s' : `answered in ${(latencyMs / 1000).toFixed(1)} s`;
+}
+
+/** What the answer cost: "cost $0.0003", or "cost at most $0.0014" where only its bound is known; null where unrecorded. */
+export function costWords(costUsd, costKnown = true) {
+  if (costUsd === null || costUsd === undefined || !amount(costUsd)) return null;
+  return `${costKnown ? 'cost' : 'cost at most'} ${amount(costUsd)}`;
+}
+
+/** The record page's own words (DESIGN's r10): the moment card's label and who decided, T7's words where no model did. */
+export const DECISION_FLOW_WORDS = Object.freeze({
+  whatHappened: 'What happened',
+  decidedBy: 'Decided by ',
+  decidedByPerson: 'Decided by a person playing',
+  decidedByProgram: 'Decided by an outside program',
+});
+
+/** Over the column of choices (r10): "Teo's choices", "The resident's choices". */
+export const choicesOver = who => `${possessive(who.start)} choices`;
+
+/** Under the decision's ring, after who decided (r10): "chose 1 of 9". */
+export const choseOneOf = count => `chose 1 of ${count}`;
+
+/**
+ * The head's small print (r10) as parts, a model's name its own part ({ model }) so the page keeps it on one line:
+ * "Decided by Nemotron 3 Nano 30B · answered in 0.9 s · cost $0.0003", "Decided by a person playing", "Decided by an
+ * outside program" (`decider` 'person' or 'external', T7). A part not recorded is left out; with no one named, the
+ * line opens on its first part, capitalised.
+ */
+export function decidedByParts({ decider = null, model = null, latencyMs = null, costUsd = null, costKnown = true } = {}) {
+  const who = decider === 'person' ? DECISION_FLOW_WORDS.decidedByPerson : decider === 'external' ? DECISION_FLOW_WORDS.decidedByProgram : null;
+  const named = who ? [who] : plain(model) ? [DECISION_FLOW_WORDS.decidedBy, { model: plain(model) }] : [];
+  const rest = [answeredIn(latencyMs), costWords(costUsd, costKnown)].filter(Boolean);
+  if (!named.length) return rest.length ? [capital(rest.join(' · '))] : [];
+  return rest.length ? [...named, ` · ${rest.join(' · ')}`] : named;
 }
 
 /**

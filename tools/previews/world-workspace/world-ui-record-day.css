@@ -1,0 +1,77 @@
+/* Teo's day (r06) with its personality fields (r11): the page's own type and parts over world-ui-record.css's shared
+   ones (DESIGN's R-DAY-DECISION build sheet sections 1 and 3, and "1440 x 900"). The record's tokens and classes
+   (.wu-hr-over, -tag, -time, -said, -who, -pic, -key, -keys) carry what they already draw; places the layout computes
+   (left, top, width, height, the path) are set by character-page.ts from day-rows.mjs. world-ui.ts's dark-page parts
+   drawn in the right column (choosing a model, Compare's question, Ask) take the light page's ink here. */
+.wu-record-day { --ink: var(--hr-ink); --ink-2: var(--hr-quiet); --ink-3: rgba(52,71,80,.80); --ink-4: rgba(52,71,80,.45); --wash: var(--hr-line); --live: var(--hr-line); --refused-ink: var(--hr-refused); --text-shadow: none; text-shadow: none; }
+/* Without a still, the live world shows through at the record's .26: the ground laid over it at .74. */
+.wu-record-day[data-live] { background: transparent; }
+.wu-record-day[data-live] .wu-hr-world { background: var(--hr-ground); opacity: .74; }
+.wu-record-day .wu-day-layer { position: absolute; inset: 0; }
+
+/* Who the character is. */
+.wu-record-day .wu-day-who { position: absolute; }
+.wu-record-day .wu-day-face { box-shadow: 0 0 0 3px var(--hr-ground), 0 10px 28px rgba(18,40,44,.22); font: 300 45px/1 var(--font-sans); }
+.wu-record-day.wu-hr-narrow .wu-day-face { font-size: 38px; }
+.wu-record-day .wu-day-who > .wu-hr-over { margin-top: 32px; }
+.wu-record-day .wu-day-name { margin: 14px 0 0; font: 200 72px/1 var(--font-sans); letter-spacing: -.025em; color: var(--hr-ink); overflow-wrap: anywhere; }
+.wu-record-day.wu-hr-narrow .wu-day-name { font-size: 60px; }
+.wu-record-day .wu-day-name:focus { outline: none; }
+.wu-record-day .wu-day-doing { margin: 12px 0 0; font: 400 20px/1.3 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-day .wu-day-persona { margin: 32px 0 0; font: italic 300 22px/1.45 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
+.wu-record-day .wu-day-none { margin: 32px 0 0; font: 300 22px/1.45 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-day .wu-day-by { margin: 10px 0 0; font: 400 13px/1.3 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-day .wu-day-saved { margin: 10px 0 0; font: 400 14px/1.4 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-day .wu-day-decides { margin: 32px 0 0; font: 400 18px/1.4 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
+.wu-record-day .wu-day-small { margin: 6px 0 0; font: 400 13px/1.5 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-day .wu-day-small .wu-nowrap { white-space: nowrap; }
+.wu-record-day .wu-day-refused { margin: 8px 0 0; font: 400 13px/1.5 var(--font-sans); color: var(--hr-refused); }
+
+/* What Teo did: the label, the path and the cards, each placed by the layout; dimmed to .32 while the fields are open. */
+.wu-record-day .wu-day-did { position: absolute; inset: 0; pointer-events: none; transition: opacity 160ms; }
+.wu-record-day .wu-day-did > * { position: absolute; pointer-events: auto; }
+.wu-record-day .wu-day-did[data-dim] { opacity: .32; }
+.wu-record-day .wu-day-did[data-dim] > * { pointer-events: none; }
+.wu-record-day .wu-day-path { overflow: visible; pointer-events: none; }
+.wu-record-day .wu-day-path .line { stroke: var(--hr-line); stroke-width: 1.5; fill: none; opacity: .75; }
+.wu-record-day .wu-day-path .dot { fill: var(--hr-ground); stroke: var(--hr-line); stroke-width: 1.6; }
+.wu-record-day .wu-day-path .dot[data-chosen="true"] { fill: var(--hr-line); }
+.wu-record-day .wu-day-note { margin: 0; font: 400 15px/1.45 var(--font-sans); color: var(--hr-quiet); }
+/* A card: its picture (sized by the layout) and its words 28px beside it. */
+.wu-record-day .wu-day-item { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 28px; align-items: start; color: var(--hr-ink); }
+.wu-record-day .wu-day-item:not([data-heard]) { cursor: pointer; }
+.wu-record-day .wu-day-item .wu-hr-pic { border-radius: 12px; box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 10px 28px rgba(18,40,44,.14); }
+.wu-record-day .wu-day-item[aria-current="true"] .wu-hr-pic { transform: translateY(-3px); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 16px 40px rgba(18,40,44,.22); }
+.wu-record-day .wu-day-item[aria-current="true"] .wu-hr-pic::after { opacity: 1; }
+.wu-record-day .wu-day-words { min-width: 0; }
+.wu-record-day .wu-day-title { margin-top: 8px; font: 400 21px/1.3 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
+.wu-record-day .wu-day-said { margin-top: 6px; }
+/* A long line (a row's own words hold a whole line said, up to 200 characters) keeps to two lines and ends in an
+   ellipsis, so a card never reaches the next one (138px apart at 1440); the whole line stays in the text. */
+.wu-record-day .wu-day-title, .wu-record-day .wu-day-said { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
+.wu-record-day .wu-day-who-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 8px; }
+.wu-record-day .wu-day-see { color: var(--hr-ink); }
+
+/* Keys: History's row; a key that cannot act now dims, the arrows while choosing are said, not pressed. */
+.wu-record-day .wu-hr-key:disabled { opacity: .45; cursor: default; }
+.wu-record-day .wu-day-hint { cursor: default; }
+
+/* The personality's fields in place (r11). */
+.wu-record-day .wu-day-field-wrap { display: block; }
+.wu-record-day .wu-day-label { display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; font: 500 13px/1.3 var(--font-sans); color: var(--hr-quiet); }
+.wu-record-day .wu-day-count { font: 400 12px/1.3 var(--font-mono); }
+.wu-record-day .wu-day-count.wu-over { color: var(--hr-refused); }
+.wu-record-day .wu-day-field { display: block; width: 100%; margin: 8px 0 0; padding: 14px 18px; border: 0; border-radius: 12px; resize: none; outline: none; color: var(--hr-ink);
+  background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1px rgba(18,23,21,.22), 0 6px 18px rgba(18,40,44,.08); }
+.wu-record-day .wu-day-field:focus { box-shadow: inset 0 0 0 1.5px var(--hr-line), 0 0 0 4px rgba(100,150,166,.16), 0 6px 18px rgba(18,40,44,.08); }
+.wu-record-day .wu-day-name-field { padding: 10px 18px; font: 200 40px/1.1 var(--font-sans); letter-spacing: -.02em; }
+.wu-record-day .wu-day-about-field { min-height: 120px; font: 300 20px/1.5 var(--font-sans); }
+.wu-record-day .wu-day-reads { margin: 12px 0 0; font: 400 14px/1.4 var(--font-sans); color: var(--hr-quiet); }
+
+/* Choosing a model, Compare's question and Ask in the right column, on the light page. */
+.wu-record-day .wu-day-side { position: absolute; }
+.wu-record-day .wu-model-row + .wu-model-row::after { background: rgba(18,23,21,.10); }
+.wu-record-day .wu-model-row[aria-selected="true"] { background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1.5px var(--hr-line); }
+.wu-record-day .wu-model-row[data-current="true"] .wu-model-name::before { box-shadow: none; }
+.wu-record-day .wu-orb { color: #fff; }
+.wu-record-day .wu-hairline { background: linear-gradient(90deg, rgba(18,23,21,.22), rgba(18,23,21,.04)); }
