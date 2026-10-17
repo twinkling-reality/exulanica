@@ -1069,9 +1069,18 @@ class WorkerComposer:
         from exulanica.world.kinds.samples import SiteRefused
         from exulanica.world.support_surfaces import SupportRefused
 
+        land, landscape, land_key = self._land, self._landscape, self._land_key
+        if land is None and landscape is None and self._support is None:
+            # A shipped kind that starts on a setting is made on its landscape.
+            from exulanica.canonical import sha256_of_canonical
+            from exulanica.world.kinds.library import starter_landscape
+
+            landscape = starter_landscape(kind)
+            if landscape is not None:
+                land_key = f":landscape:{sha256_of_canonical(landscape).hex()}"
         outcome = self._worker.run(
             f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
-            f"{json.dumps(dict(values), sort_keys=True)}" + self._support_key + self._land_key,
+            f"{json.dumps(dict(values), sort_keys=True)}" + self._support_key + land_key,
             self._seconds,
             compose_job,
             self.workspace,
@@ -1079,11 +1088,7 @@ class WorkerComposer:
             dict(values),
             world_id,
             self._support,
-            *(
-                ()
-                if self._land is None and self._landscape is None
-                else (self._land, self._landscape)
-            ),
+            *(() if land is None and landscape is None else (land, landscape)),
             workspace=self.workspace,
         )
         if outcome.status != "done" or outcome.value is None:

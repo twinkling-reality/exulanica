@@ -469,7 +469,9 @@ longer read is left out of the library and refused 409 `kind_unreadable` when a 
 asked for; its row stays kept. The kinds the product
 ships are files under `assets/catalogs/world-kinds/library`, read by
 [`library.py`](../exulanica/world/kinds/library.py); a test holds every shipped kind to both
-stages.
+stages. A shipped kind may start on a setting ([landscape contract](landscape-contract.md#settings)):
+a world of it made with no land, landscape or support of its own stands on that setting's
+landscape, the shipped document only, never a workspace's kind of the same key.
 
 | Route | Permission | Behaviour |
 | --- | --- | --- |
@@ -788,8 +790,9 @@ town's receipt or digest depends on the adapter.
 - A drafted kind is kept once it passes, without a separate accept, and takes one of the
   workspace's kind versions. Its creator or workspace owner can erase an unused version through
   the erasure routes below; a retained world receipt prevents erasure.
-- The library ships the town's adapter and no site-grammar kind. The three kinds under
-  `tests/fixtures/world-kinds` are hand-written test fixtures.
+- The library ships the town's adapter and one site-grammar kind, the island hamlet ("Hamlet on a
+  sky island", `island_hamlet.v1.json`), which starts on the settings catalog's sky island over the
+  bay. The kinds under `tests/fixtures/world-kinds` are hand-written test fixtures.
 - Only the ground storey of a structure is walked inside. A structure stands at most six storeys,
   or as many as bounds version 3 states for a kind that names it; every storey above the ground is
   drawn, not walked, and a taller structure adds no slot to the drawing and no place to the walk.

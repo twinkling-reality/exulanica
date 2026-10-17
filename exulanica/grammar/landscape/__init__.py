@@ -14,6 +14,8 @@ layers. The land and volume documents inside never change for it.
   meet.
 * :mod:`.surfaces`: its walkable surfaces (the ground and each placed volume's tops), the joins a
   person steps between them, and what is reached from the arrival or only by flight.
+* :mod:`.settings`: named landscapes a world of a kind can stand in, and the shipped kinds that
+  start on each (``assets/catalogs/landscape-settings``).
 
 Nothing here opens a database, a store or evidence, and nothing reads a landscape yet.
 """
@@ -46,6 +48,12 @@ from exulanica.grammar.landscape.rules import (
     check_landscape_rules,
     landscape_rules,
 )
+from exulanica.grammar.landscape.settings import (
+    LandscapeSetting,
+    landscape_settings,
+    read_settings,
+    starting_setting,
+)
 from exulanica.grammar.landscape.spacing import check_volumes_apart, placement_reach
 from exulanica.grammar.landscape.surfaces import (
     SURFACES_PROFILE,
@@ -65,6 +73,7 @@ __all__ = [
     "LandscapeCatalog",
     "LandscapeDocument",
     "LandscapeRefused",
+    "LandscapeSetting",
     "LandscapeSite",
     "LandscapeSurfaces",
     "PlacedVolume",
@@ -76,11 +85,14 @@ __all__ = [
     "compose_volumes",
     "landscape_catalog",
     "landscape_rules",
+    "landscape_settings",
     "landscape_surfaces",
     "load_landscape_catalog",
     "placement_reach",
     "placement_seed",
     "read_landscape_document",
+    "read_settings",
+    "starting_setting",
     "volume_bodies",
     "volumes_section",
 ]

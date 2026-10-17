@@ -1,0 +1,748 @@
+{
+ "schema_version": 1,
+ "catalog_id": "landscape-setting",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "island_over_the_bay",
+   "label": "Sky island over the bay",
+   "landscape": {
+    "profile": "exulanica.landscape/v1",
+    "extent_mm": [
+     128000,
+     200000
+    ],
+    "land": {
+     "profile": "exulanica.landform/v1",
+     "ground_mm": 7000,
+     "features": [
+      {
+       "id": "climb",
+       "kind": "tilt",
+       "side": "north",
+       "grade_permille": 40,
+       "reach_mm": 260000
+      },
+      {
+       "id": "hill",
+       "kind": "rise",
+       "side": "north",
+       "distance_mm": 20000,
+       "width_mm": 340000,
+       "depth_mm": 220000,
+       "height_mm": 44000,
+       "roughness_permille": 220
+      },
+      {
+       "id": "west_head",
+       "kind": "rise",
+       "side": "west",
+       "distance_mm": 60000,
+       "offset_mm": -40000,
+       "width_mm": 200000,
+       "depth_mm": 110000,
+       "height_mm": 26000,
+       "roughness_permille": 320
+      },
+      {
+       "id": "east_head",
+       "kind": "rise",
+       "side": "east",
+       "distance_mm": 70000,
+       "offset_mm": -30000,
+       "width_mm": 220000,
+       "depth_mm": 120000,
+       "height_mm": 34000,
+       "roughness_permille": 320
+      },
+      {
+       "id": "texture",
+       "kind": "undulation",
+       "amplitude_mm": 600,
+       "wavelength_mm": 30000
+      },
+      {
+       "id": "far_north",
+       "kind": "range",
+       "side": "north",
+       "distance_mm": 1800000,
+       "band_mm": 800000,
+       "height_mm": 420000,
+       "ruggedness_permille": 700
+      },
+      {
+       "id": "far_west",
+       "kind": "range",
+       "side": "north_west",
+       "distance_mm": 1200000,
+       "band_mm": 600000,
+       "height_mm": 260000,
+       "ruggedness_permille": 650,
+       "wavelength_mm": 600000
+      },
+      {
+       "id": "bay",
+       "kind": "shore",
+       "side": "south",
+       "distance_mm": 6000,
+       "beach_mm": 10000,
+       "beach_top_mm": 2000,
+       "sea_depth_mm": 18000,
+       "wander_mm": 8000
+      },
+      {
+       "id": "steps",
+       "kind": "terraces",
+       "side": "north",
+       "distance_mm": 0,
+       "depth_mm": 150000,
+       "width_mm": 260000,
+       "tier_height_mm": 5000
+      },
+      {
+       "id": "falls",
+       "kind": "cascade",
+       "side": "south",
+       "offset_mm": -105000,
+       "from_mm": -240000,
+       "to_mm": 30000,
+       "step_mm": 2500,
+       "width_mm": 6000
+      }
+     ]
+    },
+    "finest_cell_mm": 2000,
+    "volumes": [
+     {
+      "id": "arch_stack",
+      "volume": {
+       "profile": "exulanica.volume/v1",
+       "id": "arch_stack",
+       "erosion": {
+        "amplitude_mm": 2500,
+        "wavelength_mm": 14000,
+        "octaves": 3,
+        "ridged": "yes"
+       },
+       "parts": [
+        {
+         "id": "trunk",
+         "shape": "column",
+         "at_mm": [
+          0,
+          0,
+          -8000
+         ],
+         "height_mm": 52000,
+         "base_radius_mm": 11000,
+         "top_radius_mm": 15000,
+         "round_mm": 2000
+        },
+        {
+         "id": "shoulder",
+         "shape": "sphere",
+         "at_mm": [
+          6000,
+          -3000,
+          30000
+         ],
+         "radius_mm": 9000,
+         "blend_mm": 4000
+        },
+        {
+         "id": "sea_arch",
+         "shape": "arch",
+         "at_mm": [
+          0,
+          0,
+          -3000
+         ],
+         "width_mm": 9000,
+         "spring_mm": 6000,
+         "depth_mm": 40000,
+         "blend_mm": 1500,
+         "yaw_mdeg": 0
+        },
+        {
+         "id": "top",
+         "shape": "cap",
+         "height_mm": 41000,
+         "blend_mm": 800
+        }
+       ],
+       "walk": "none",
+       "strata": {
+        "amplitude_mm": 1000,
+        "period_mm": 4500,
+        "spread_mm": 2500,
+        "relief_permille": 600,
+        "offset_permille": 700,
+        "tilt_mdeg": 3000,
+        "toward_mdeg": 120000
+       },
+       "top_look": "grass"
+      },
+      "at_mm": [
+       140000,
+       -70000,
+       0
+      ],
+      "yaw_mdeg": 30300
+     },
+     {
+      "id": "far_stack",
+      "volume": {
+       "profile": "exulanica.volume/v1",
+       "id": "arch_stack",
+       "erosion": {
+        "amplitude_mm": 2500,
+        "wavelength_mm": 14000,
+        "octaves": 3,
+        "ridged": "yes"
+       },
+       "parts": [
+        {
+         "id": "trunk",
+         "shape": "column",
+         "at_mm": [
+          0,
+          0,
+          -8000
+         ],
+         "height_mm": 52000,
+         "base_radius_mm": 11000,
+         "top_radius_mm": 15000,
+         "round_mm": 2000
+        },
+        {
+         "id": "shoulder",
+         "shape": "sphere",
+         "at_mm": [
+          6000,
+          -3000,
+          30000
+         ],
+         "radius_mm": 9000,
+         "blend_mm": 4000
+        },
+        {
+         "id": "sea_arch",
+         "shape": "arch",
+         "at_mm": [
+          0,
+          0,
+          -3000
+         ],
+         "width_mm": 9000,
+         "spring_mm": 6000,
+         "depth_mm": 40000,
+         "blend_mm": 1500,
+         "yaw_mdeg": 0
+        },
+        {
+         "id": "top",
+         "shape": "cap",
+         "height_mm": 41000,
+         "blend_mm": 800
+        }
+       ],
+       "walk": "none",
+       "strata": {
+        "amplitude_mm": 1000,
+        "period_mm": 4500,
+        "spread_mm": 2500,
+        "relief_permille": 600,
+        "offset_permille": 700,
+        "tilt_mdeg": 3000,
+        "toward_mdeg": 120000
+       },
+       "top_look": "grass"
+      },
+      "at_mm": [
+       -15000,
+       -100000,
+       -6000
+      ],
+      "yaw_mdeg": 140000
+     },
+     {
+      "id": "isle",
+      "volume": {
+       "erosion": {
+        "amplitude_mm": 1500,
+        "octaves": 3,
+        "ridged": "yes",
+        "wavelength_mm": 9000
+       },
+       "id": "isle",
+       "look": "rock",
+       "parts": [
+        {
+         "at_mm": [
+          0,
+          0,
+          -9000
+         ],
+         "base_radius_mm": 16400,
+         "blend_mm": 0,
+         "height_mm": 18532,
+         "id": "slab",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 1285,
+         "shape": "column",
+         "tilt_mdeg": 0,
+         "top_radius_mm": 23812,
+         "toward_mdeg": 0,
+         "yaw_mdeg": 0
+        },
+        {
+         "at_mm": [
+          -1905,
+          2073,
+          -32285
+         ],
+         "base_radius_mm": 5379,
+         "blend_mm": 1917,
+         "height_mm": 27748,
+         "id": "keel",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 1075,
+         "shape": "column",
+         "tilt_mdeg": 5826,
+         "top_radius_mm": 13448,
+         "toward_mdeg": 137403,
+         "yaw_mdeg": 0
+        },
+        {
+         "at_mm": [
+          -4271,
+          -6906,
+          -14987
+         ],
+         "base_radius_mm": 2043,
+         "blend_mm": 1107,
+         "height_mm": 7750,
+         "id": "root_1",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 1021,
+         "shape": "column",
+         "tilt_mdeg": 14077,
+         "top_radius_mm": 5084,
+         "toward_mdeg": 211732,
+         "yaw_mdeg": 0
+        },
+        {
+         "at_mm": [
+          537,
+          6863,
+          -13708
+         ],
+         "base_radius_mm": 2043,
+         "blend_mm": 1360,
+         "height_mm": 7500,
+         "id": "root_2",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 1021,
+         "shape": "column",
+         "tilt_mdeg": 17874,
+         "top_radius_mm": 5904,
+         "toward_mdeg": 4473,
+         "yaw_mdeg": 0
+        },
+        {
+         "at_mm": [
+          9281,
+          1665,
+          -12424
+         ],
+         "blend_mm": 1049,
+         "id": "lump_1",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 738,
+         "shape": "box",
+         "size_mm": [
+          8528,
+          6396,
+          5904
+         ],
+         "tilt_mdeg": 28651,
+         "toward_mdeg": 104591,
+         "yaw_mdeg": 262565
+        },
+        {
+         "at_mm": [
+          -9960,
+          -1392,
+          -11697
+         ],
+         "blend_mm": 901,
+         "id": "lump_2",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 674,
+         "shape": "box",
+         "size_mm": [
+          7708,
+          5395,
+          5740
+         ],
+         "tilt_mdeg": 22160,
+         "toward_mdeg": 248155,
+         "yaw_mdeg": 51727
+        },
+        {
+         "at_mm": [
+          -1444,
+          1799,
+          -33713
+         ],
+         "blend_mm": 2645,
+         "id": "keel_toe",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 792,
+         "shape": "box",
+         "size_mm": [
+          6347,
+          6029,
+          2856
+         ],
+         "tilt_mdeg": 3767,
+         "toward_mdeg": 279869,
+         "yaw_mdeg": 249784
+        },
+        {
+         "at_mm": [
+          -2273,
+          -4806,
+          -25897
+         ],
+         "base_radius_mm": 2180,
+         "blend_mm": 338,
+         "height_mm": 8762,
+         "id": "finger_1",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 726,
+         "shape": "column",
+         "tilt_mdeg": 3165,
+         "top_radius_mm": 2725,
+         "toward_mdeg": 193817,
+         "yaw_mdeg": 0
+        },
+        {
+         "at_mm": [
+          -490,
+          6301,
+          -23361
+         ],
+         "base_radius_mm": 2180,
+         "blend_mm": 361,
+         "height_mm": 8630,
+         "id": "finger_2",
+         "look": "volume",
+         "op": "add",
+         "round_mm": 726,
+         "shape": "column",
+         "tilt_mdeg": 8277,
+         "top_radius_mm": 2958,
+         "toward_mdeg": 2166,
+         "yaw_mdeg": 0
+        }
+       ],
+       "profile": "exulanica.volume/v1",
+       "strata": {
+        "amplitude_mm": 800,
+        "offset_permille": 600,
+        "period_mm": 3200,
+        "relief_permille": 600,
+        "spread_mm": 900,
+        "tilt_mdeg": 4000,
+        "toward_mdeg": 70000
+       },
+       "top_land": {
+        "blend_mm": 1125,
+        "land": {
+         "features": [
+          {
+           "depth_mm": 36000,
+           "distance_mm": 0,
+           "height_mm": 1500,
+           "id": "rise",
+           "kind": "rise",
+           "offset_mm": 0,
+           "roughness_permille": 120,
+           "side": "centre",
+           "width_mm": 36000
+          }
+         ],
+         "ground_mm": 0,
+         "profile": "exulanica.landform/v1"
+        },
+        "side_mm": 44000
+       },
+       "top_look": "grass",
+       "walk": "tops"
+      },
+      "at_mm": [
+       57600,
+       -95000,
+       95000
+      ],
+      "yaw_mdeg": 60000
+     },
+     {
+      "id": "east_island",
+      "volume": {
+       "profile": "exulanica.volume/v1",
+       "id": "small_island",
+       "top_look": "grass",
+       "erosion": {
+        "amplitude_mm": 1500,
+        "wavelength_mm": 8000,
+        "octaves": 4,
+        "ridged": "yes"
+       },
+       "strata": {
+        "amplitude_mm": 700,
+        "period_mm": 2800,
+        "spread_mm": 800,
+        "relief_permille": 600,
+        "offset_permille": 500,
+        "tilt_mdeg": 5000,
+        "toward_mdeg": 200000
+       },
+       "parts": [
+        {
+         "id": "slab",
+         "shape": "column",
+         "at_mm": [
+          0,
+          0,
+          -4000
+         ],
+         "height_mm": 6500,
+         "base_radius_mm": 9000,
+         "top_radius_mm": 12000,
+         "round_mm": 1000
+        },
+        {
+         "id": "lobe",
+         "shape": "sphere",
+         "at_mm": [
+          5000,
+          2000,
+          0
+         ],
+         "radius_mm": 5500,
+         "blend_mm": 1500
+        },
+        {
+         "id": "keel",
+         "shape": "column",
+         "at_mm": [
+          1000,
+          0,
+          -19000
+         ],
+         "height_mm": 16000,
+         "base_radius_mm": 2500,
+         "top_radius_mm": 8500,
+         "round_mm": 800,
+         "tilt_mdeg": 5000,
+         "toward_mdeg": 120000,
+         "blend_mm": 1500
+        },
+        {
+         "id": "root",
+         "shape": "column",
+         "at_mm": [
+          -2000,
+          1500,
+          -16000
+         ],
+         "height_mm": 8000,
+         "base_radius_mm": 1500,
+         "top_radius_mm": 3500,
+         "round_mm": 600,
+         "tilt_mdeg": 15000,
+         "toward_mdeg": 290000,
+         "blend_mm": 1200
+        },
+        {
+         "id": "block",
+         "shape": "box",
+         "at_mm": [
+          2000,
+          -3000,
+          -13000
+         ],
+         "size_mm": [
+          6000,
+          5000,
+          6000
+         ],
+         "round_mm": 600,
+         "yaw_mdeg": 40000,
+         "tilt_mdeg": 18000,
+         "toward_mdeg": 180000,
+         "blend_mm": 900
+        },
+        {
+         "id": "top",
+         "shape": "cap",
+         "height_mm": 2500,
+         "blend_mm": 800
+        }
+       ]
+      },
+      "at_mm": [
+       108800,
+       -60000,
+       70000
+      ],
+      "yaw_mdeg": 200000
+     },
+     {
+      "id": "west_island",
+      "volume": {
+       "profile": "exulanica.volume/v1",
+       "id": "small_island",
+       "top_look": "grass",
+       "erosion": {
+        "amplitude_mm": 1500,
+        "wavelength_mm": 8000,
+        "octaves": 4,
+        "ridged": "yes"
+       },
+       "strata": {
+        "amplitude_mm": 700,
+        "period_mm": 2800,
+        "spread_mm": 800,
+        "relief_permille": 600,
+        "offset_permille": 500,
+        "tilt_mdeg": 5000,
+        "toward_mdeg": 200000
+       },
+       "parts": [
+        {
+         "id": "slab",
+         "shape": "column",
+         "at_mm": [
+          0,
+          0,
+          -4000
+         ],
+         "height_mm": 6500,
+         "base_radius_mm": 9000,
+         "top_radius_mm": 12000,
+         "round_mm": 1000
+        },
+        {
+         "id": "lobe",
+         "shape": "sphere",
+         "at_mm": [
+          5000,
+          2000,
+          0
+         ],
+         "radius_mm": 5500,
+         "blend_mm": 1500
+        },
+        {
+         "id": "keel",
+         "shape": "column",
+         "at_mm": [
+          1000,
+          0,
+          -19000
+         ],
+         "height_mm": 16000,
+         "base_radius_mm": 2500,
+         "top_radius_mm": 8500,
+         "round_mm": 800,
+         "tilt_mdeg": 5000,
+         "toward_mdeg": 120000,
+         "blend_mm": 1500
+        },
+        {
+         "id": "root",
+         "shape": "column",
+         "at_mm": [
+          -2000,
+          1500,
+          -16000
+         ],
+         "height_mm": 8000,
+         "base_radius_mm": 1500,
+         "top_radius_mm": 3500,
+         "round_mm": 600,
+         "tilt_mdeg": 15000,
+         "toward_mdeg": 290000,
+         "blend_mm": 1200
+        },
+        {
+         "id": "block",
+         "shape": "box",
+         "at_mm": [
+          2000,
+          -3000,
+          -13000
+         ],
+         "size_mm": [
+          6000,
+          5000,
+          6000
+         ],
+         "round_mm": 600,
+         "yaw_mdeg": 40000,
+         "tilt_mdeg": 18000,
+         "toward_mdeg": 180000,
+         "blend_mm": 900
+        },
+        {
+         "id": "top",
+         "shape": "cap",
+         "height_mm": 2500,
+         "blend_mm": 800
+        }
+       ]
+      },
+      "at_mm": [
+       12800,
+       -45000,
+       120000
+      ],
+      "yaw_mdeg": 300000
+     }
+    ],
+    "site": {
+     "on": "isle",
+     "at_mm": [
+      -11000,
+      -11000
+     ]
+    }
+   },
+   "starters": [
+    {
+     "kind": "island_hamlet",
+     "version": 1
+    }
+   ],
+   "reason": "Authored: a sky island 40 m across with a gentle hill for its top, 95 m over a bay with two sea stacks and two smaller islands, the coast and its hills to the north; a site up to 22 m square stands on its top, its corner 11 m west and south of the island's middle. The first view from its top looks along the coast.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landscapes; see the entry reasons"
+   }
+  }
+ ]
+}

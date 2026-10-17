@@ -14,6 +14,11 @@ Each file is named ``<kind>.v<version>.json`` and is either
   look roles every kind uses, so the interface, the Companion and the style packs read one
   vocabulary. Making a town from the adapter is making it from its preset, through the same gate and
   composer, so no town's receipt or digest depends on the adapter.
+
+A shipped kind may start on a setting (``assets/catalogs/landscape-settings``): its worlds are made
+on that setting's landscape wherever their making names no land, landscape or support of its own
+(:func:`starter_landscape`). Only the shipped document itself starts there; a workspace's kind of
+the same key and version is its own kind and starts on open ground.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ __all__ = [
     "LIBRARY_DIRECTORY",
     "TownAdapter",
     "shipped_kinds",
+    "starter_landscape",
     "town_adapter",
 ]
 
@@ -118,3 +124,18 @@ def town_adapter() -> TownAdapter:
     if town is None:
         raise CatalogError("the world kind library holds no town adapter")
     return town
+
+
+def starter_landscape(kind: KindDocument) -> dict[str, Any] | None:
+    """The landscape a world of ``kind`` is made on when its making names none: the setting the
+    settings catalog starts it on, for a shipped kind's own document only (its digest the shipped
+    one's); None for every other kind, a workspace's of the same key included."""
+    from exulanica.grammar.landscape import starting_setting
+
+    shipped = next(
+        (k for k in shipped_kinds() if (k.kind, k.version) == (kind.kind, kind.version)), None
+    )
+    if shipped is None or shipped.sha256 != kind.sha256:
+        return None
+    setting = starting_setting(kind.kind, kind.version)
+    return None if setting is None else setting.landscape()

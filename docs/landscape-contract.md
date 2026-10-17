@@ -34,6 +34,7 @@ belongs to the [world kinds contract](world-kinds-contract.md).
 - [A site on a landscape](#a-site-on-a-landscape)
 - [Grading a site on a volume's top](#grading-a-site-on-a-volumes-top)
 - [A site on a volume's top](#a-site-on-a-volumes-top)
+- [Settings](#settings)
 - [Readers in the browser](#readers-in-the-browser)
 - [Sky islands](#sky-islands)
 - [Refusals](#refusals)
@@ -453,6 +454,25 @@ frame over its extent and one ring of chunks, realized under the seed a world's 
 land chunks, a backdrop and the water on it, the ground or sea the volume floats over. Its chunks
 and backdrop are served by digest (`GET /world/versions/{version_id}/landscape/ground?sha256=`). The
 application draws such a world as [readers in the browser](#readers-in-the-browser) says.
+
+## Settings
+
+The settings catalog (`assets/catalogs/landscape-settings/landscape-setting.v1.json`, read by
+`exulanica/grammar/landscape/settings.py`) names landscapes a world of a kind can stand in. Each entry
+states a `key`, a `label`, a whole `exulanica.landscape/v1` document read and held as every landscape
+is, the shipped kinds whose worlds start on it (`starters`, each a kind's key and version), and a
+reason and a licence. Keys are unique and a kind starts on one setting at most; a catalog that breaks
+a rule is refused where it broke it. Version 1 holds `island_over_the_bay`: a sky island 40 m across
+with a gentle hill for its top, 95 m over a bay with two sea stacks and two smaller islands, its
+site's corner 11 m west and south of the island's middle, so a site up to 22 m square stands on its
+top. Its one starter is the shipped kind `island_hamlet`, "Hamlet on a sky island".
+
+A world of a starter made with no land, landscape or support of its own, as Create a world's card for
+it makes one, is composed on its setting's landscape exactly as any world on a volume's top is
+([a site on a volume's top](#a-site-on-a-volumes-top)); its receipt keeps that landscape, so a later
+settings version never moves a world already made. Only the shipped document itself starts there: a
+workspace's kind of the same key and version is its own kind
+([world kinds contract](world-kinds-contract.md)). Settings are not offered to choose between.
 
 ## Readers in the browser
 

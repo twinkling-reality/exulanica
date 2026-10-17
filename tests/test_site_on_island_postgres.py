@@ -2,7 +2,8 @@
 receipt check every site world meets, drawn as ``exulanica.site-drawing/v6``, its graded top served
 by the digest its drawing names and no land chunk or backdrop, its landscape drawn round it as
 ``exulanica.landscape-drawing/v2`` with the ground below served by digest, and refused by name for a
-kind whose people come from homes off the site."""
+kind whose people come from homes off the site; and the shipped island hamlet made from its card,
+with no landscape in the making, on its setting's island."""
 
 from __future__ import annotations
 
@@ -97,3 +98,26 @@ def test_a_kind_whose_people_come_from_off_the_site_is_refused_on_a_top(made):
         "landscape_site_offsite_homes",
         "landscape.site",
     )
+
+
+def test_the_shipped_island_hamlet_is_made_on_its_island_as_its_card_makes_it(made):
+    api = made
+    listed = {kind["kind"]: kind for kind in api.get("/worlds/kinds").json()["kinds"]}
+    card = listed["island_hamlet"]
+    assert (card["label"], card["source"]) == ("Hamlet on a sky island", "shipped")
+    # As Create a world's card makes it: its first preset, its label for the title, no landscape.
+    response = api.post(
+        "/worlds/kinds/island_hamlet/worlds",
+        {"version": card["version"], "preset": card["presets"][0]["key"], "title": card["label"]},
+    )
+    assert response.status_code == 201, response.text
+    entry = response.json()
+    with api.database.session(api.repository.workspace_id) as connection:
+        _, receipt = generation_receipt(
+            connection,
+            api.repository.workspace_id,
+            entry["world_id"],
+            uuid.UUID(entry["source_snapshot_id"]),
+        )
+    assert receipt["composer"] == {"key": "site-plan", "version": 7}
+    assert receipt["landscape"]["site"]["on"] == "isle"
