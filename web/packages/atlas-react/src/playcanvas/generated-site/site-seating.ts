@@ -9,7 +9,7 @@ export function seatGeometry(positions: readonly number[], normals: readonly num
 }
 const EMPTY: SeatGeometry = seatGeometry([], []);
 
-/** Actual primitive triangles in the site root's frame, after dressing and texture mesh replacement. */
+/** Actual primitive triangles in the site root's frame, after dressing and texture mesh replacement, with a slatted seat's top. */
 function primitiveTriangles(drawn: DrawnSiteSlots, identity: string): SeatGeometry {
   const entity = drawn.entities.get(identity);
   if (entity === undefined || !entity.enabled) return EMPTY;
@@ -32,6 +32,16 @@ function primitiveTriangles(drawn: DrawnSiteSlots, identity: string): SeatGeomet
       transform.transformVector(point, point).normalize();
       normals.push(point.x, point.y, point.z);
     }
+  }
+  // A seat drawn as slats rests a body across its gaps, at the slats' own top (`DrawnSiteSlots.seatTops`).
+  const tops = drawn.seatTops?.get(identity) ?? [];
+  for (let at = 0; at + 2 < tops.length; at += 3) {
+    point.set(tops[at]!, tops[at + 1]!, tops[at + 2]!);
+    transform.transformPoint(point, point);
+    positions.push(point.x, point.y, point.z);
+    point.set(0, 1, 0);
+    transform.transformVector(point, point).normalize();
+    normals.push(point.x, point.y, point.z);
   }
   return seatGeometry(positions, normals);
 }

@@ -1,0 +1,197 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  furnitureFormEnvelopes, furnitureFormSurfaces, readStreetFurnitureForms, slotFurnitureParts, slotFurnitureSeatTops,
+  slotFurnitureSurfaces,
+  type FurnitureForm, type FurnitureForms, type FurniturePart, type FurnitureSurface,
+} from '../src/street-furniture-form.js';
+
+const TEXT = readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v1.json', 'utf8');
+const forms = readStreetFurnitureForms(TEXT);
+
+/** The parts a record of each class carries: the grammar's own catalog, field for field. */
+const GRAMMAR = JSON.parse(readFileSync('../assets/catalogs/street-furniture.v2.json', 'utf8')) as {
+  readonly entries: readonly { readonly key: string; readonly parts: readonly Record<string, unknown>[] }[];
+};
+function partsOf(key: string): FurniturePart[] {
+  const entry = GRAMMAR.entries.find((one) => one.key === key)!;
+  return entry.parts.map((part) => ({
+    shape: part['shape'] as FurniturePart['shape'], surfaceRole: part['surface_role'] as string,
+    offsetXMm: part['offset_x_mm'] as number, offsetYMm: part['offset_y_mm'] as number, offsetZMm: part['offset_z_mm'] as number,
+    sizeXMm: part['size_x_mm'] as number, sizeYMm: part['size_y_mm'] as number, sizeZMm: part['size_z_mm'] as number,
+  }));
+}
+
+/** The signed volume a surface's triangles enclose, cubic millimetres: positive when they face outward. */
+function volume(surfaces: readonly FurnitureSurface[]): number {
+  let total = 0;
+  for (const surface of surfaces) {
+    const p = (i: number): [number, number, number] => [surface.positions[i * 3]!, surface.positions[i * 3 + 1]!, surface.positions[i * 3 + 2]!];
+    for (let t = 0; t < surface.indices.length; t += 3) {
+      const [a, b, c] = [p(surface.indices[t]!), p(surface.indices[t + 1]!), p(surface.indices[t + 2]!)];
+      total += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+    }
+  }
+  return total;
+}
+
+/** A form of one class with only one of its draws, to hold that draw to its own envelope. */
+function onlyDraw(form: FurnitureForm, at: number): FurnitureForms {
+  return { version: 1, byClass: new Map([[form.key, { ...form, draws: [form.draws[at]!] }]]), bySlotLeaf: new Map() };
+}
+
+const CLASSES = ['bench', 'litter_bin', 'cycle_stand', 'sign_post'];
+
+describe('street furniture form catalog', () => {
+  it('reads the shipped catalog: a form for each furniture class the grammar places along a kerb', () => {
+    expect([...forms.byClass.keys()].sort()).toEqual([...CLASSES].sort());
+    for (const key of CLASSES) {
+      expect(forms.byClass.get(key)!.parts).toEqual(partsOf(key).map((part) => part.shape));
+    }
+  });
+
+  it('refuses a catalog that is not one, and a form that leaves a part undrawn or draws one twice', () => {
+    const document = JSON.parse(TEXT) as { catalog_id: string; entries: Record<string, unknown>[] };
+    const edited = (change: (copy: typeof document) => void): string => {
+      const copy = JSON.parse(TEXT) as typeof document;
+      change(copy);
+      return JSON.stringify(copy);
+    };
+    expect(() => readStreetFurnitureForms(edited((copy) => { copy.catalog_id = 'roof-form'; }))).toThrow(/is not the street furniture form catalog/);
+    expect(() => readStreetFurnitureForms(edited((copy) => { copy.entries.push(copy.entries[0]!); }))).toThrow(/bench is stated twice/);
+    expect(() => readStreetFurnitureForms(edited((copy) => { (copy.entries[0]!['draws'] as unknown[]).pop(); }))).toThrow(/leaves a part undrawn/);
+    expect(() => readStreetFurnitureForms(edited((copy) => {
+      ((copy.entries[0]!['draws'] as Record<string, unknown>[])[3]!)['parts'] = [2];
+    }))).toThrow(/draws a part twice/);
+    expect(() => readStreetFurnitureForms(edited((copy) => { copy.entries[0]!['reason'] = ' '; }))).toThrow(/bench gives no reason/);
+  });
+
+  it('refuses a form for a shape it cannot draw and a figure out of its range', () => {
+    const one = (draw: Record<string, unknown>, parts: string[] = ['box']): string => JSON.stringify({
+      catalog_id: 'street-furniture-form', catalog_version: 1, entries: [{ key: 'thing', parts, draws: [draw], reason: 'a test' }],
+    });
+    expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 16, profile_permille: [[0, 1000], [1000, 1000]] }))).toThrow(/turns a box/);
+    expect(() => readStreetFurnitureForms(one({ form: 'slats', parts: [0], count: 3, gap_mm: 10 }, ['prism']))).toThrow(/draws a prism as slats/);
+    expect(() => readStreetFurnitureForms(one({ form: 'slats', parts: [0], count: 13, gap_mm: 10 }))).toThrow(/count must be a whole number from 1 to 12/);
+    expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 12, profile_permille: [[0, 1000], [1000, 1000]] }, ['prism']))).toThrow(/must be 8, 16, 32 or 64/);
+    expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 16, profile_permille: [[0, 1000], [900, 1000]] }, ['prism']))).toThrow(/must run from height 0 to 1000/);
+    expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 16, profile_permille: [[0, 1000], [600, 1000], [500, 900], [1000, 1000]] }, ['prism']))).toThrow(/must not go down/);
+    expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 16, profile_permille: [[0, 1001], [1000, 1000]] }, ['prism']))).toThrow(/from 0 to 1000/);
+    expect(() => readStreetFurnitureForms(one({ form: 'tube', parts: [0], through: [[1, 'top'], [0, 'top']], radius_permille: 500, bend_mm: 100, segments: 8 }, ['box', 'box']))).toThrow(/does not draw/);
+    expect(() => readStreetFurnitureForms(one({ form: 'cone', parts: [0] }))).toThrow(/must be solid, slats, frame, lathe, tube or plate/);
+  });
+});
+
+describe('street furniture forms drawn', () => {
+  it('keeps every vertex of every draw inside the box of the parts it draws', () => {
+    for (const key of CLASSES) {
+      const form = forms.byClass.get(key)!;
+      const parts = partsOf(key);
+      const envelopes = furnitureFormEnvelopes(form, parts);
+      form.draws.forEach((_, at) => {
+        const surfaces = furnitureFormSurfaces(onlyDraw(form, at), key, parts)!;
+        expect(surfaces.length).toBeGreaterThan(0);
+        const { min, max } = envelopes[at]!;
+        for (const surface of surfaces) {
+          for (let i = 0; i < surface.positions.length; i += 3) {
+            for (let axis = 0; axis < 3; axis += 1) {
+              expect(surface.positions[i + axis]!).toBeGreaterThanOrEqual(min[axis]! - 1e-6);
+              expect(surface.positions[i + axis]!).toBeLessThanOrEqual(max[axis]! + 1e-6);
+            }
+          }
+        }
+      });
+    }
+  });
+
+  it('draws each part as a closed solid facing outward, in the role its part states', () => {
+    for (const key of CLASSES) {
+      const form = forms.byClass.get(key)!;
+      const parts = partsOf(key);
+      form.draws.forEach((draw, at) => {
+        const surfaces = furnitureFormSurfaces(onlyDraw(form, at), key, parts)!;
+        expect(surfaces.map((surface) => surface.role)).toEqual([parts[draw.parts[0]!]!.surfaceRole]);
+        const enclosed = volume(surfaces);
+        const envelope = furnitureFormEnvelopes(form, parts)[at]!;
+        const box = (envelope.max[0] - envelope.min[0]) * (envelope.max[1] - envelope.min[1]) * (envelope.max[2] - envelope.min[2]);
+        expect(enclosed, `${key} draw ${at}`).toBeGreaterThan(0);
+        expect(enclosed, `${key} draw ${at}`).toBeLessThanOrEqual(box * 1.000001);
+      });
+    }
+  });
+
+  it('lays slats with their gaps and frames with their bars, as stated', () => {
+    const bench = partsOf('bench');
+    const seat = furnitureFormSurfaces(onlyDraw(forms.byClass.get('bench')!, 0), 'bench', bench)!;
+    // Four slats across the 450 mm seat with three 20 mm gaps: each (450 - 60) / 4 wide, 1800 long, 60 thick.
+    expect(volume(seat)).toBeCloseTo(4 * ((450 - 3 * 20) / 4) * 1800 * 60, 0);
+    const leg = furnitureFormSurfaces(onlyDraw(forms.byClass.get('bench')!, 2), 'bench', bench)!;
+    // Two uprights 50 by 80 by 420, a top rail and a foot rail 350 by 80 by 50 between them.
+    expect(volume(leg)).toBeCloseTo(2 * 50 * 80 * 420 + 2 * 350 * 80 * 50, 0);
+  });
+
+  it('draws the same triangles from the same record, and draws a record its form does not fit as baked', () => {
+    for (const key of CLASSES) {
+      expect(furnitureFormSurfaces(forms, key, partsOf(key))).toEqual(furnitureFormSurfaces(forms, key, partsOf(key)));
+    }
+    expect(furnitureFormSurfaces(forms, 'street_lamp', partsOf('street_lamp'))).toBeNull();
+    expect(furnitureFormSurfaces(forms, 'bench', partsOf('bench').slice(0, 3))).toBeNull();
+    expect(furnitureFormSurfaces(forms, 'bench', partsOf('litter_bin'))).toBeNull();
+    // A seat too small for four slats and their three 20 mm gaps across either short side is drawn as
+    // baked, never as slats of no width.
+    const narrow = partsOf('bench').map((part, at) => (at === 0 ? { ...part, sizeYMm: 30, sizeZMm: 30 } : part));
+    expect(furnitureFormSurfaces(forms, 'bench', narrow)).toBeNull();
+  });
+});
+
+describe('a made place\'s fixture slot drawn by its leaf\'s form', () => {
+  // A bench slot of Terraces on the bay: 2 m along its front, 500 mm deep, as tall as its seat.
+  const BOX = [2000, 500, 450] as const;
+
+  it('draws a bench slot inside its own box, as closed solids facing outward, and anything else as its box', () => {
+    const form = forms.bySlotLeaf.get('bench')!;
+    expect(form.parts).toEqual(['box', 'box', 'box']);
+    const surfaces = slotFurnitureSurfaces(forms, 'bench', BOX)!;
+    expect(surfaces.map((surface) => surface.role).sort()).toEqual(['object_primary', 'object_secondary']);
+    for (const surface of surfaces) {
+      for (let at = 0; at < surface.positions.length; at += 3) {
+        expect(Math.abs(surface.positions[at]!)).toBeLessThanOrEqual(BOX[0] / 2 + 1e-6);
+        expect(Math.abs(surface.positions[at + 1]!)).toBeLessThanOrEqual(BOX[1] / 2 + 1e-6);
+        expect(surface.positions[at + 2]!).toBeGreaterThanOrEqual(-1e-6);
+        expect(surface.positions[at + 2]!).toBeLessThanOrEqual(BOX[2] + 1e-6);
+      }
+    }
+    expect(volume(surfaces)).toBeGreaterThan(0);
+    // Its seat: four slats across 500 mm with three 20 mm gaps, 2 m long, 60 mm thick (133 thousandths of 450).
+    const seat = slotFurnitureParts(form, BOX)[0]!;
+    expect([seat.sizeXMm, seat.sizeYMm, seat.sizeZMm, seat.offsetZMm]).toEqual([2000, 500, 59.85, 390.15]);
+    expect(slotFurnitureSurfaces(forms, 'rail', BOX)).toBeNull();
+    // A slot too shallow for the slats and their gaps is drawn as its box.
+    expect(slotFurnitureSurfaces(forms, 'bench', [2000, 40, 30])).toBeNull();
+    expect(slotFurnitureSeatTops(forms, 'bench', [2000, 40, 30])).toBeNull();
+  });
+
+  it('gives where a body rests on a slatted seat: its whole top across the gaps, at the slats\' top, facing up', () => {
+    const tops = slotFurnitureSeatTops(forms, 'bench', BOX)!;
+    // One level slatted seat, two triangles, its slats' 2 m by 500 mm footprint at the box's top.
+    expect(tops).toHaveLength(18);
+    const corners = new Set<string>();
+    for (let at = 0; at < tops.length; at += 3) {
+      expect(tops[at + 2]).toBeCloseTo(BOX[2], 9);
+      corners.add(`${tops[at]},${tops[at + 1]}`);
+    }
+    expect([...corners].sort()).toEqual(['-1000,-250', '-1000,250', '1000,-250', '1000,250']);
+    for (let at = 0; at < tops.length; at += 9) {
+      const [ax, ay, , bx, by, , cx, cy] = tops.slice(at, at + 9) as number[];
+      expect((bx! - ax!) * (cy! - ay!) - (by! - ay!) * (cx! - ax!)).toBeGreaterThan(0);
+    }
+    expect(slotFurnitureSeatTops(forms, 'rail', BOX)).toBeNull();
+  });
+
+  it('refuses a slot part stated past its slot\'s box', () => {
+    const document = JSON.parse(TEXT) as { slot_entries: { parts_permille: { offset_permille: number[]; size_permille: number[] }[] }[] };
+    document.slot_entries[0]!.parts_permille[1]!.offset_permille = [-490, 0, 0];
+    expect(() => readStreetFurnitureForms(JSON.stringify(document))).toThrow(/bench.parts_permille\[1\] reaches past its slot's box/);
+  });
+});
+

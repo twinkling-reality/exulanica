@@ -722,6 +722,13 @@ export {
 } from './world-setting.js';
 export type { RidgeRuns, RoofForm, RoofForms } from './roof-form.js';
 export { ROOF_FORM_CATALOG_ID, readRoofForms } from './roof-form.js';
+export type {
+  FurnitureDraw, FurnitureForm, FurnitureForms, FurniturePart, FurnitureSurface, PartPoint, SlotFurnitureForm, SlotPartPermille,
+} from './street-furniture-form.js';
+export {
+  STREET_FURNITURE_FORM_CATALOG_ID, furnitureFormEnvelopes, furnitureFormSurfaces, readStreetFurnitureForms, slotFurnitureParts,
+  slotFurnitureSeatTops, slotFurnitureSurfaces,
+} from './street-furniture-form.js';
 export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
 export type { BorderNeighbour, GroundBorder, GroundBorders, GroundPlane, PlaneBorder } from './ground-border.js';
 export { BORDER_NEIGHBOURS_MOST, GROUND_BORDER_CATALOG_ID, borderReachMm, planBorders, readGroundBorders } from './ground-border.js';

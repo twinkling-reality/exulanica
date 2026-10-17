@@ -277,11 +277,13 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   }
   const containerSha256 = hex(await digest.digest('SHA-256', source.tile));
   const manifest = parseTextureSetManifest(source.textureManifest);
+  const { STREET_FURNITURE_FORMS: furnitureForms } = await import('../street-furniture-forms.js');
   const tile = await loadGeneratedTile({
     name,
     bytes: source.tile,
     manifest,
     fetchSet: (entry) => source.textureSet(entry.contentSha256),
+    furnitureForms,
   });
   // The title stays the preview's own: the visual gate harness holds the shell to it.
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, name);
@@ -409,12 +411,14 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   }
 
   const library = await sources.committedTextureLibrary();
+  const { STREET_FURNITURE_FORMS: furnitureForms } = await import('../street-furniture-forms.js');
   const tile = await route.loadGeneratedTile({
     name: bakedTileId,
     bytes: fetched.bytes,
     manifest: parseTextureSetManifest(library.textureManifest),
     fetchSet: (entry) => library.textureSet(entry.contentSha256),
     ...(world === null ? {} : { neighbours: world.neighbours }),
+    furnitureForms,
   });
   const opening = openTile(tile, request.pose, route.tileToRenderer);
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, bakedTileId);

@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import { materialOfLeaf, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, slotFurnitureSeatTops, slotFurnitureSurfaces, type FurnitureForms, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type { StructuredSiteDrawing, SiteSlot } from './site-drawing.js';
 import { shapeRoofs } from './site-roofs.js';
 
@@ -13,6 +13,11 @@ import { shapeRoofs } from './site-roofs.js';
  * slot's quarter turns counterclockwise seen from above: a slot facing north turns 0, west 1, south
  * 2 and east 3. The site's x east, y north and z up are the renderer's x, -z and y, so a quarter
  * turn is 90 degrees about the renderer's up axis.
+ *
+ * A fixture whose leaf has a slot form in the street furniture form catalog (`street-furniture-form.ts`
+ * in atlas-core, passed in) is drawn as that form inside its box instead of as the box: a bench as
+ * slats on two frames. It is still the slot's one shape, in the slot's colour, and a pack that
+ * dresses the slot replaces it as it replaces a box.
  *
  * The colour is the fallback a pack replaces: the material the slot's leaf names in the surface
  * material catalog (`assets/catalogs/world-kinds/surface-material.v2.json`, passed in), so sand,
@@ -96,6 +101,12 @@ export interface DrawnSiteSlots {
    * material instance, and puts back what it changed when its disposer runs.
    */
   readonly entities: ReadonlyMap<string, pc.Entity>;
+  /**
+   * Where a body rests on a fixture drawn by its form, by the slot's identity: its level slats' tops
+   * across their gaps, triangles in its shape's frame, metres (`slotFurnitureSeatTops`). Seating reads
+   * them with the drawn triangles, so a person sits across slats rather than between them.
+   */
+  readonly seatTops?: ReadonlyMap<string, readonly number[]>;
   /** Slots drawn as an entity; a `none` slot draws nothing and is not counted. */
   readonly drawn: number;
   readonly triangles: number;
@@ -105,9 +116,16 @@ export interface DrawnSiteSlots {
 /**
  * Draw every slot of a site under a new root, at the site's origin in the renderer's frame, each in its
  * leaf's material where `catalog` names one, and each roof in its material's form where `roofForms`
- * shapes it (`shapeRoofs`); the wall pieces a tent stands in place of are not drawn.
+ * shapes it (`shapeRoofs`); the wall pieces a tent stands in place of are not drawn. A fixture whose
+ * leaf `furnitureForms` has a slot form for is drawn as that form.
  */
-export function drawSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSiteDrawing, catalog: SurfaceMaterials | null = null, roofForms: RoofForms | null = null): DrawnSiteSlots {
+export function drawSiteSlots(
+  device: pc.GraphicsDevice,
+  drawing: StructuredSiteDrawing,
+  catalog: SurfaceMaterials | null = null,
+  roofForms: RoofForms | null = null,
+  furnitureForms: FurnitureForms | null = null,
+): DrawnSiteSlots {
   const root = new pc.Entity(`generated-site:${drawing.worldId}`);
   const materials = new Map<string, pc.StandardMaterial>();
   const material = (rgb: Rgb): pc.StandardMaterial => {
@@ -126,6 +144,7 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSite
   };
   let gable: pc.Mesh | null = null;
   const entities = new Map<string, pc.Entity>();
+  const seatTops = new Map<string, readonly number[]>();
   let drawn = 0;
   let triangles = 0;
   // Roofs their material's form shapes, and the wall pieces a tent's canvas stands in place of.
@@ -165,10 +184,39 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSite
       shape.setLocalScale(width, 1, depth);
       triangles += 2;
     } else if (slot.primitive === 'box') {
-      shape.addComponent('render', { type: 'box', material: colour, castShadows: true });
-      shape.setLocalPosition(0, height / 2, 0);
-      shape.setLocalScale(width, height, depth);
-      triangles += 12;
+      const made = furnitureForms === null || slot.family !== 'fixture' ? null : slotFurnitureSurfaces(furnitureForms, slot.leaf, slot.boxMm);
+      if (made === null) {
+        shape.addComponent('render', { type: 'box', material: colour, castShadows: true });
+        shape.setLocalPosition(0, height / 2, 0);
+        shape.setLocalScale(width, height, depth);
+        triangles += 12;
+      } else {
+        // The form's frame is the slot's own, millimetres from its base centre: x along its width, y toward
+        // its front, z up; the renderer's are x, up and the front's negative.
+        const positions: number[] = [];
+        const indices: number[] = [];
+        for (const surface of made) {
+          const first = positions.length / 3;
+          for (let at = 0; at < surface.positions.length; at += 3) {
+            positions.push(surface.positions[at]! / MILLIMETRES, surface.positions[at + 2]! / MILLIMETRES, -surface.positions[at + 1]! / MILLIMETRES);
+          }
+          for (const index of surface.indices) indices.push(first + index);
+        }
+        const mesh = new pc.Mesh(device);
+        mesh.setPositions(positions);
+        mesh.setNormals(pc.calculateNormals(positions, indices));
+        mesh.setIndices(indices);
+        mesh.update();
+        shaped.push(mesh);
+        shape.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, colour)], castShadows: true });
+        triangles += indices.length / 3;
+        const tops = slotFurnitureSeatTops(furnitureForms!, slot.leaf, slot.boxMm) ?? [];
+        if (tops.length > 0) {
+          const local: number[] = [];
+          for (let at = 0; at < tops.length; at += 3) local.push(tops[at]! / MILLIMETRES, tops[at + 2]! / MILLIMETRES, -tops[at + 1]! / MILLIMETRES);
+          seatTops.set(slot.identity, Object.freeze(local));
+        }
+      }
     } else {
       gable ??= gableMesh(device);
       const instance = new pc.MeshInstance(gable, colour);
@@ -185,6 +233,7 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSite
   return {
     root,
     entities,
+    seatTops,
     drawn,
     triangles,
     destroy(): void {

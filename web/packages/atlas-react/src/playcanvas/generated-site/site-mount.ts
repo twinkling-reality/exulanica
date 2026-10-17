@@ -1,5 +1,5 @@
 import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
-import { LAND_CELL_MM, landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SiteTop, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { LAND_CELL_MM, landBandAt, landNoiseShift, materialOfLeaf, renderCapsFor, unknownSurfaceLeaf, type FurnitureForms, type LandSurfaces, type LandWater, type RenderBudget, type RenderCaps, type RenderForm, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SiteTop, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
@@ -81,6 +81,8 @@ export interface SiteMountOptions {
   readonly materials?: SurfaceMaterials;
   /** The roof form catalog a roof is shaped by, through its material; none draws every roof as served. */
   readonly roofForms?: RoofForms;
+  /** The street furniture forms a fixture slot is drawn by, through its leaf; none draws every fixture as its box. */
+  readonly furnitureForms?: FurnitureForms;
   /**
    * The scenery catalog: what stands on the ground beyond the place, by its base ground's material
    * (`site-scenery.ts`). It needs `materials` to name that material; none, or no `materials`, draws
@@ -200,7 +202,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const environment = applyTileEnvironment(host.app, host.camera, look, caps);
       const materials = options.materials ?? null;
-      const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials, options.roofForms ?? null);
+      const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials, options.roofForms ?? null, options.furnitureForms ?? null);
       host.environmentRoot.addChild(slots.root);
       const base = drawing.extent.enclosure === 'open' ? baseGroundSlot(drawing) : null;
       // On land: the slots that follow it laid on it, and the land itself in place of the base

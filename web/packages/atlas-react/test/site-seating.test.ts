@@ -2,7 +2,7 @@
 import * as pc from 'playcanvas';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { readStylePackManifest, resolveStylePack, type LookFamily } from '@exulanica/atlas-core';
+import { readStreetFurnitureForms, readStylePackManifest, resolveStylePack, type LookFamily } from '@exulanica/atlas-core';
 import { fetchPackPieces, uploadPackPieces } from '../src/playcanvas/style-pack/pieces.js';
 import { dressSlots } from '../src/playcanvas/style-pack/dresser.js';
 import { describe, expect, it } from 'vitest';
@@ -69,6 +69,26 @@ describe('declared fixture contact', () => {
     expect(fixtureSeatDrawing(drawnSiteSeats(drawing,drawn)[0]!,[5000,-6000]).kind).toBe('miss');
     // A module's actual missing corner wins over the primitive hidden below it.
     expect(fixtureSeatDrawing(drawnSiteSeats(drawing,drawn,new Map([['bench',seatGeometry([],[])]]))[0]!,[5000,-6000]).kind).toBe('miss');
+    drawn.destroy(); app.destroy();
+  });
+  it.each([0,1,2,3])('seats a person across a slatted bench\'s gaps, at its slats\' top, after quarter-turn %s', yaw => {
+    const forms = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v1.json','utf8'));
+    const app = new pc.Application(document.createElement('canvas'),{graphicsDevice:new pc.NullGraphicsDevice(document.createElement('canvas'))});
+    const drawing = parseStructuredSiteDrawing({profile:'exulanica.site-drawing/v1',world_id:'world-a',receipt_sha256:'a'.repeat(64),kind:{kind:'test_yard',version:1,label:'Yard'},extent:{widthMm:10000,depthMm:12000,enclosure:'open'},arrival:{positionMm:[4000,4000,0],facingMm:[0,1]},slots:[{identity:'bench',part:'bench',label:'Bench',lookRole:'fixture.bench',positionMm:[5000,6000,0],yawQuarterTurns:yaw,boxMm:[2000,500,450],front:'+y',fit:'contain',primitive:'box'}],walk:{floorMm:[0,0,10000,12000],blockersMm:[],keepOutMm:[]},seats:[{identity:'bench',seatHeightMm:225}]});
+    const drawn=drawSiteSlots(app.graphicsDevice,drawing,null,null,forms);
+    app.root.addChild(drawn.root); drawn.root.setPosition(100,30,-200);
+    // Positive control: four slats across its 500 mm depth leave a 20 mm gap on its centre line, so what is
+    // drawn alone holds no seat there.
+    expect(fixtureSeatDrawing(drawnSiteSeats(drawing,{...drawn,seatTops:new Map()})[0]!,[5000,-6000]).kind).toBe('miss');
+    const seat = drawnSiteSeats(drawing,drawn)[0]!;
+    // On the centre line, and on the slat beside it, a person sits at the slats' top.
+    for (const point of [[5000,-6000],[5000 + (yaw % 2 === 1 ? 60 : 0),-6000 - (yaw % 2 === 0 ? 60 : 0)]] as const) {
+      expect(fixtureSeatDrawing(seat,point)).toMatchObject({kind:'place',drawing:{seat:{position:[point[0] / 1000,expect.closeTo(.45,5),point[1] / 1000]}}});
+    }
+    // Past the bench's end nothing is drawn and nothing is closed.
+    expect(fixtureSeatDrawing(seat,[6100,-6000]).kind).toBe('miss');
+    drawn.entities.get('bench')!.enabled=false;
+    expect(fixtureSeatDrawing(drawnSiteSeats(drawing,drawn)[0]!,[5000,-6000]).kind).toBe('miss');
     drawn.destroy(); app.destroy();
   });
 });

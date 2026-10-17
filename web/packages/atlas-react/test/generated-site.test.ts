@@ -8,7 +8,7 @@
  * roof. It is a test fixture, not a site a kind generated.
  */
 import { readFileSync } from 'node:fs';
-import { isNavigationPositionClear, atlasVec3, readRoofForms, readSurfaceMaterials } from '@exulanica/atlas-core';
+import { isNavigationPositionClear, atlasVec3, readRoofForms, readStreetFurnitureForms, readSurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
@@ -166,6 +166,7 @@ describe('walking a site', () => {
 // Relative to web/, where the suite runs: the catalog a deployment ships.
 const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const ROOF_FORMS = readRoofForms(readFileSync('../assets/catalogs/world-kinds/roof-form.v1.json', 'utf8'));
+const FURNITURE_FORMS = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v1.json', 'utf8'));
 const bytes = (rgb: readonly number[]): number[] => rgb.map((channel) => Math.round(channel * 255));
 /** The default light of the committed cozy town pack, which states a ground beyond the world: a lawn, 0.6 m down. */
 const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy-town/manifest.json', 'utf8')) as {
@@ -210,6 +211,40 @@ describe('drawing a site', () => {
     const ground = drawn.root.findByName('ground:shape') as pc.Entity;
     expect(xyz(ground.getLocalScale())).toEqual([10, 1, 12]);
     drawn.destroy();
+  });
+
+  it('draws a fixture whose leaf has a slot form as that form inside its box, and every other slot as before', () => {
+    const { app } = nullApp();
+    const plain = drawSiteSlots(app.graphicsDevice, drawing, MATERIALS);
+    const formed = drawSiteSlots(app.graphicsDevice, drawing, MATERIALS, null, FURNITURE_FORMS);
+    expect(formed.drawn).toBe(plain.drawn);
+    const shapeOf = (drawn: typeof plain): pc.Entity => drawn.root.findByName('bench:shape') as pc.Entity;
+    expect(shapeOf(plain).render!.type).toBe('box');
+    const mesh = shapeOf(formed).render!.meshInstances[0]!.mesh;
+    const positions: number[] = [];
+    mesh.getPositions(positions);
+    const indices: number[] = [];
+    mesh.getIndices(indices);
+    // A bench of slats on two frames, not a box, in the slot's 1.8 by 0.5 by 0.45 m: the renderer's x along
+    // its width, y up, z its depth, turned with the slot's entity, which is unchanged.
+    expect(indices.length / 3).toBeGreaterThan(12);
+    expect(formed.triangles - plain.triangles).toBe(indices.length / 3 - 12);
+    for (let at = 0; at < positions.length; at += 3) {
+      expect(Math.abs(positions[at]!)).toBeLessThanOrEqual(0.9 + 1e-9);
+      expect(positions[at + 1]!).toBeGreaterThanOrEqual(-1e-9);
+      expect(positions[at + 1]!).toBeLessThanOrEqual(0.45 + 1e-9);
+      expect(Math.abs(positions[at + 2]!)).toBeLessThanOrEqual(0.25 + 1e-9);
+    }
+    expect(shapeOf(formed).getLocalScale().x).toBe(1);
+    const turn = (drawn: typeof plain): number[] => {
+      const q = (drawn.root.findByName('bench') as pc.Entity).getLocalRotation();
+      return [q.x, q.y, q.z, q.w];
+    };
+    expect(turn(formed)).toEqual(turn(plain));
+    // Every other slot is drawn as without the forms.
+    expect((formed.root.findByName('shed:wall:0:shape') as pc.Entity).render!.type).toBe('box');
+    plain.destroy();
+    formed.destroy();
   });
 
   it('colours a slot by the material its leaf names in the catalog, and anything else by its family', () => {

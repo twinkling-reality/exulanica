@@ -296,7 +296,7 @@ async function siteInLook(
   land: SiteLand | null = null,
   landscape: SiteVolumes | null = null,
 ): Promise<SiteWorld> {
-  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }] = await Promise.all([
+  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }, { STREET_FURNITURE_FORMS: furnitureForms }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('../world-look.js'),
     import('../surface-materials.js'),
@@ -307,6 +307,7 @@ async function siteInLook(
     import('../ground-borders.js'),
     import('../render-budget.js'),
     import('../surface-finish.js'),
+    import('../street-furniture-forms.js'),
   ]);
   const preparedDressing = drawing.profile === 'exulanica.site-drawing/v4' ? await import('./terrain-dressing.js').then(module => module.loadTerrainDressing(access, drawing.dressing)) : undefined;
   const dressingReadiness = createDressingReadiness();
@@ -327,7 +328,7 @@ async function siteInLook(
   };
   /** The mount in a resolved choice's pack, or in the tile look for none. Throws when the pack cannot be read. */
   const mounted = async (choice: WorldLookChoice): Promise<GeneratedSiteMount> => {
-    if (choice.packId === null) return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
+    if (choice.packId === null) return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, furnitureForms, scenery, interior, renderBudget });
     const [library, { packSiteDresser, packTextureSetId, preparePackTexture }, { prepareTextureSet }, { parseTextureSetManifest, resolveSurfaceLookRole }] = await Promise.all([
       import('../texture-library.js').then((module) => module.committedTextureLibrary()),
       import('@exulanica/atlas-react/style-pack'),
@@ -346,7 +347,7 @@ async function siteInLook(
       ...[...packTextures].map(async key => [packTextureSetId(key), await preparePackTexture(prepared.pack, key, prepared.packFile)] as const),
     ]));
     const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders, finish, ...(landSurfaces === null ? {} : { landSurfaces }) });
-    return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior, renderBudget });
+    return siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, furnitureForms, scenery, interior, renderBudget });
   };
   let choice = worldLook.worldLookChoice(search, bound);
   let mount: GeneratedSiteMount;
@@ -356,7 +357,7 @@ async function siteInLook(
     mount = await mounted(choice);
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
-    mount = siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, scenery, interior, renderBudget });
+    mount = siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, furnitureForms, scenery, interior, renderBudget });
   }
   return {
     mount: leasedMount(mount, terrainLease),

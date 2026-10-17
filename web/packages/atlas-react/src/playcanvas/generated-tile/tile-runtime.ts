@@ -1,6 +1,6 @@
 import { rayTriangle } from '../mesh-picking.js';
 import * as pc from 'playcanvas';
-import { renderCapsFor, type RenderBudget, type RenderCaps, type TextureSetDigest, type TextureSetManifest, type TextureSetManifestEntry } from '@exulanica/atlas-core';
+import { renderCapsFor, type FurnitureForms, type RenderBudget, type RenderCaps, type TextureSetDigest, type TextureSetManifest, type TextureSetManifestEntry } from '@exulanica/atlas-core';
 import {
   IDENTITY_NOT_STATED,
   MATERIAL_NONE_EXISTS,
@@ -30,6 +30,7 @@ import { obstructionRings, type ObstructionRings } from './obstruction-rings.js'
 import { composedObstructionRings, type StatingTile } from './walk-world.js';
 import { TILE_LOOK_V1, type TileLook } from './look.js';
 import { buildSurfaceMesh } from './surface-mesh.js';
+import { madeStreetFurniture, type MadeFurnitureSurface } from './street-furniture-drawing.js';
 import {
   TileTextureUploads,
   castsShadow,
@@ -156,6 +157,13 @@ export interface GeneratedTileSources {
    * of the `town_tiles` form, in this look and in any it is relit in. None draws the look as chosen.
    */
   readonly renderBudget?: RenderBudget;
+  /**
+   * The street furniture forms (`street-furniture-form.ts` in atlas-core): a bench, a bin, a cycle
+   * stand or a sign post whose class has a form is drawn as that form, inside its own parts, in place
+   * of its baked parts. None draws every record as baked. Only the drawing changes: the container,
+   * its picking, its walk and its counts are the bake's.
+   */
+  readonly furnitureForms?: FurnitureForms;
   /** The page's `crypto.subtle` by default; null refuses every tile. */
   readonly digest?: TextureSetDigest | null;
   /**
@@ -416,6 +424,10 @@ export interface TileSurfaceBatch {
  * computed per surface, over that surface's own triangles, so a kerb's vertical face never bends the
  * normals of its horizontal top. Positions are the payload's metres from the projection origin,
  * rotated into the renderer frame as (x, z, -y).
+ *
+ * A range `made` holds (street furniture its form draws, `street-furniture-drawing.ts`) is drawn by
+ * those surfaces instead of its baked ones, each in the batch, placement and orientation of the
+ * record's own surface of its role.
  */
 export function batchTileSurfaces(
   render: Pick<DecodedProjection, 'position' | 'index'>,
@@ -423,21 +435,51 @@ export function batchTileSurfaces(
   ranges: readonly GeneratedTileRange[],
   placements: ReadonlyMap<GeneratedTileSurface, SurfacePlacement>,
   look: TileLook,
+  made: ReadonlyMap<GeneratedTileRange, readonly MadeFurnitureSurface[]> | null = null,
 ): TileSurfaceBatch[] {
   const batches = new Map<string, { -readonly [K in keyof TileSurfaceBatch]: TileSurfaceBatch[K] }>();
+  const batchOf = (key: string): { -readonly [K in keyof TileSurfaceBatch]: TileSurfaceBatch[K] } => {
+    let batch = batches.get(key);
+    if (batch === undefined) {
+      batch = { key, positions: [], normals: [], uvs: [], indices: [], triangles: 0 };
+      batches.set(key, batch);
+    }
+    return batch;
+  };
+  const placementOf = (range: DrawnTileRange, surface: GeneratedTileSurface): SurfacePlacement | undefined => {
+    const placement = placements.get(surface);
+    if (surface.state === 'textured' && placement === undefined) {
+      throw new Error(`The ${surface.role} surface of record ${range.record} is textured and has no placement`);
+    }
+    return placement;
+  };
   for (const range of ranges) {
     if (range.state !== 'drawn') continue;
+    const instead = made?.get(range);
+    if (instead !== undefined) {
+      for (const one of instead) {
+        const own = range.surfaces.find((surface) => surface.role === one.role);
+        const placement = own === undefined ? undefined : placementOf(range, own);
+        const batch = batchOf(placement === undefined ? '' : placement.entry.setId);
+        const first = batch.positions.length / 3;
+        const local: number[] = [];
+        for (let at = 0; at < one.positions.length; at += 3) local.push(one.positions[at]!, one.positions[at + 2]!, -one.positions[at + 1]!);
+        for (let at = 0; at < one.st.length; at += 2) {
+          batch.uvs.push(...(placement === undefined
+            ? unavailableUv(one.st[at]!, one.st[at + 1]!, look, own?.orientation ?? 'vertical')
+            : surfaceUv(one.st[at]!, one.st[at + 1]!, placement.reference, placement.entry)));
+        }
+        batch.positions.push(...local);
+        batch.normals.push(...pc.calculateNormals(local, [...one.indices]));
+        for (const index of one.indices) batch.indices.push(first + index);
+        batch.triangles += one.indices.length / 3;
+      }
+      continue;
+    }
     for (const surface of range.surfaces) {
-      const placement = placements.get(surface);
-      if (surface.state === 'textured' && placement === undefined) {
-        throw new Error(`The ${surface.role} surface of record ${range.record} is textured and has no placement`);
-      }
+      const placement = placementOf(range, surface);
       const key = placement === undefined ? '' : placement.entry.setId;
-      let batch = batches.get(key);
-      if (batch === undefined) {
-        batch = { key, positions: [], normals: [], uvs: [], indices: [], triangles: 0 };
-        batches.set(key, batch);
-      }
+      const batch = batchOf(key);
       const place = (s: number, t: number): readonly [number, number] =>
         placement === undefined
           ? unavailableUv(s, t, look, surface.orientation)
@@ -701,13 +743,13 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
       return best;
     },
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      return attachTile(host, tile, planned, prepared, caps);
+      return attachTile(host, tile, planned, prepared, caps, sources.furnitureForms ?? null);
     },
     inLook(next: TileLook): LoadedGeneratedTile {
       const relit: LoadedGeneratedTile = {
         ...tile,
         look: next,
-        attach: (host: GeneratedTileHost): GeneratedTileAttachment => attachTile(host, relit, planned, prepared, caps),
+        attach: (host: GeneratedTileHost): GeneratedTileAttachment => attachTile(host, relit, planned, prepared, caps, sources.furnitureForms ?? null),
       };
       return relit;
     },
@@ -738,6 +780,7 @@ function attachTile(
   tiles: readonly DrawnTile[],
   prepared: ReadonlyMap<string, PreparedTextureSet>,
   caps: RenderCaps | null,
+  forms: FurnitureForms | null,
 ): GeneratedTileAttachment {
   const device = host.app.graphicsDevice;
   const look = tile.look;
@@ -757,7 +800,8 @@ function attachTile(
 
     // One draw per texture set, and one for every unavailable surface, per tile. Sets are shared
     // across the world, so two tiles drawing one set upload it once and draw it twice.
-    const batches = batchTileSurfaces(one.render, one.surfaceMm, one.ranges, one.placements, look);
+    const made = forms === null ? null : madeStreetFurniture(one.header.records, one.ranges, one.render.header.origin_mm, forms);
+    const batches = batchTileSurfaces(one.render, one.surfaceMm, one.ranges, one.placements, look, made);
     for (const batch of batches) {
       let material: pc.Material = uploads.unavailableMaterial;
       let shadows = true;

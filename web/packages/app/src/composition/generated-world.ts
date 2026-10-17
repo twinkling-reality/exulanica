@@ -357,7 +357,9 @@ export async function loadGeneratedWorld(
   const read = streetFurnitureOfTown(route, containers);
   const furniture = town === null ? read : furnitureOnLand(read);
   rememberTownFurniture(entry.entryId, furniture);
-  const [worldLook, { RENDER_BUDGET: renderBudget }] = await Promise.all([import('../world-look.js'), import('../render-budget.js')]);
+  const [worldLook, { RENDER_BUDGET: renderBudget }, { STREET_FURNITURE_FORMS: furnitureForms }] = await Promise.all([
+    import('../world-look.js'), import('../render-budget.js'), import('../street-furniture-forms.js'),
+  ]);
   type Prepared = import('../world-look.js').PreparedWorldLook;
   type Choice = import('../world-look.js').WorldLookChoice;
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
@@ -405,6 +407,7 @@ export async function loadGeneratedWorld(
     ...(neighbours.length === 0 ? {} : { neighbours }),
     ...(prepared === null ? {} : { look: edged(prepared.look) }),
     renderBudget,
+    furnitureForms,
   });
   const drawn = dressedIn(plain, prepared);
   const loaded = drawn.tile;
