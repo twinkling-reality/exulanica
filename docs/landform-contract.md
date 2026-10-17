@@ -376,8 +376,10 @@ The page draws a town on land with its land round it
 ([`town-land.ts`](../web/packages/app/src/composition/town-land.ts)). It reads the land section,
 held to its entity tag, its world and the digest the entry names, and every chunk and the backdrop
 by the digests the section names, and draws the near chunks no tile covers (chunk (x, y) lies under
-tile (x, y)), the backdrop and the water, in place of the look's flat plane beyond the tiles. Land
-that cannot be read is not stood in for: the world does not open. The town's people stand on the
+tile (x, y)), the backdrop and the water, in place of the look's flat plane beyond the tiles. The
+tiles' own ground, where no street, footway or lot stands, wears what the near land wears, so the
+town's unbuilt land meets its land as one ground; its tree pits, drawn in the same texture set as
+its terrain, wear it too. Land that cannot be read is not stood in for: the world does not open. The town's people stand on the
 ground its tiles walk, and on the land where they walk none. A person walks the town's tiles; the
 land round them is seen, not walked.
 

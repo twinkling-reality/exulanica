@@ -25,7 +25,7 @@
  */
 
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
-import type { SiteLand } from '@exulanica/atlas-react/generated-site';
+import type { DrawnSiteLand, SiteLand } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
 import type { GeneratedTile, SavedWorldEntry } from '../world-entry-api.js';
 
@@ -33,10 +33,16 @@ import type { GeneratedTile, SavedWorldEntry } from '../world-entry-api.js';
 export const TOWN_LAND_PROFILE = 'exulanica.town-land/v1';
 
 /** A town on land's land, read and held, and how to draw it round the town's tiles. */
+/** What the land round a town wears: one material for every near chunk, with its surfaces over it. */
+type LandGround = DrawnSiteLand['ground'][number]['material'];
+
 export interface TownLand {
   readonly land: SiteLand;
-  /** Draw the land under the host's environment root, leaving out the chunks `covered` names. */
-  draw(host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean): { dispose(): void };
+  /**
+   * Draw the land under the host's environment root, leaving out the chunks `covered` names: with
+   * the material its near land wears, or null where it drew none.
+   */
+  draw(host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean): { readonly ground?: LandGround | null; dispose(): void };
 }
 
 /** A navigation world's walked surface, as far as a person's height is read from it. */
@@ -86,7 +92,10 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
   const land = readLandSection(named, new Map(chunks), backdrop, sha256Hex, bytes);
   return Object.freeze({
     land,
-    draw: (host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean) => attachLandRound(host, land, covered, LAND_SURFACES),
+    draw: (host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean) => {
+      const round = attachLandRound(host, land, covered, LAND_SURFACES);
+      return { ground: round.drawn.ground[0]?.material ?? null, dispose: () => round.dispose() };
+    },
   });
 }
 
@@ -97,7 +106,11 @@ export function withoutEdge<Look extends object>(look: Look): Look {
 
 /**
  * The town's tiles with its land drawn round them whenever they are attached: every chunk no tile
- * covers, the backdrop and the water, taken away again with them.
+ * covers, the backdrop and the water, taken away again with them. The tiles' own ground, where no
+ * street, footway or lot stands, wears what the land round them wears, so the town's unbuilt land
+ * meets its land in one ground rather than in a tile of bare soil (the texture set a town's terrain
+ * is dressed in, which its tree pits share and so wear too); the tiles' own material comes back
+ * before either is taken away.
  */
 export function withTownLand(tile: LoadedGeneratedTile, town: TownLand, tiles: readonly Pick<GeneratedTile, 'tileX' | 'tileY'>[]): LoadedGeneratedTile {
   const under = new Set(tiles.map((one) => `${one.tileX},${one.tileY}`));
@@ -106,17 +119,48 @@ export function withTownLand(tile: LoadedGeneratedTile, town: TownLand, tiles: r
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const attachment = tile.attach(host);
       const drawn = town.draw(host, (chunkX, chunkY) => under.has(`${chunkX},${chunkY}`));
+      const restore = wearLandGround(host, terrainSets(tile), drawn.ground ?? null);
       return {
         metrics: attachment.metrics,
         get animating() {
           return attachment.animating ?? false;
         },
         dispose() {
+          restore();
           drawn.dispose();
           attachment.dispose();
         },
       };
     },
+  };
+}
+
+/** The texture sets a tile's ground is drawn in: those of its terrain surfaces. */
+function terrainSets(tile: LoadedGeneratedTile): ReadonlySet<string> {
+  const sets = new Set<string>();
+  for (const range of tile.ranges ?? []) {
+    if (range.state !== 'drawn') continue;
+    for (const surface of range.surfaces) {
+      if (surface.role === 'terrain' && surface.textureSetId !== null) sets.add(surface.textureSetId);
+    }
+  }
+  return sets;
+}
+
+/** Have every tile batch drawn in one of `sets` wear `ground`; what puts their own material back. */
+function wearLandGround(host: GeneratedTileHost, sets: ReadonlySet<string>, ground: LandGround | null): () => void {
+  if (ground === null || sets.size === 0) return () => {};
+  const kept: { instance: { material: LandGround }; material: LandGround }[] = [];
+  for (const set of sets) {
+    for (const entity of host.environmentRoot.find((node) => node.name === `generated-tile:${set}`)) {
+      for (const instance of (entity as typeof host.environmentRoot).render?.meshInstances ?? []) {
+        kept.push({ instance, material: instance.material });
+        instance.material = ground;
+      }
+    }
+  }
+  return () => {
+    for (const { instance, material } of kept) instance.material = material;
   };
 }
 

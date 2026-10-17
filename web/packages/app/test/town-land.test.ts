@@ -46,7 +46,7 @@ vi.mock('@exulanica/atlas-react/generated-site', async (importOriginal) => ({
   attachLandRound: (_host: unknown, _land: unknown, covered: (x: number, y: number) => boolean) => {
     const call = { covered, disposed: false };
     drawnRound.calls.push(call);
-    return { dispose: () => { call.disposed = true; } };
+    return { drawn: { ground: [] }, dispose: () => { call.disposed = true; } };
   },
 }));
 vi.mock('@exulanica/atlas-core', async (importOriginal) => ({
@@ -165,6 +165,36 @@ describe("a town on its land's land, drawn", () => {
     expect([covered!(0, 0), covered!(1, 0), covered!(-1, 0), covered!(0, 1)]).toEqual([true, true, false, false]);
     drawn.dispose();
     expect(order).toEqual(['tiles drawn', 'land drawn', 'land taken away', 'tiles taken away']);
+  });
+
+  it("dresses the town's own unbuilt ground in what its land wears, and gives the tiles theirs back first", () => {
+    const order: string[] = [];
+    const soil = { name: 'tree pit soil' }, paving = { name: 'footway paving' }, land = { name: 'the land round the town' };
+    // Two tiles' batches drawn in the terrain's texture set, one in the footway's.
+    const batch = (name: string, material: object) => ({ name, render: { meshInstances: [{ material }] } });
+    const batches = [batch('generated-tile:soil', soil), batch('generated-tile:soil', soil), batch('generated-tile:paving', paving)];
+    const host = { environmentRoot: { find: (test: (node: { name: string }) => boolean) => batches.filter(test) } } as unknown as GeneratedTileHost;
+    const surface = (role: string, textureSetId: string) => ({ role, textureSetId });
+    const ranges = [
+      { state: 'drawn', surfaces: [surface('terrain', 'soil'), surface('terrain', 'soil')] },
+      { state: 'drawn', surfaces: [surface('footway', 'paving'), surface('tree_pit', 'soil')] },
+      { state: 'halo' },
+    ];
+    const tile = { ranges, attach: () => ({ metrics: {}, dispose: () => order.push('tiles taken away') }) } as unknown as LoadedGeneratedTile;
+    const worn = (): object[] => batches.map((one) => one.render.meshInstances[0]!.material);
+    const town = { land: {}, draw: () => ({
+      ground: land,
+      dispose: () => order.push(`land taken away, the tiles wearing ${worn().map((m) => (m as { name: string }).name).join(', ')}`),
+    }) } as unknown as TownLand;
+    const drawn = withTownLand(tile, town, [{ tileX: 0, tileY: 0 }]).attach(host);
+    expect(worn()).toEqual([land, land, paving]);
+    drawn.dispose();
+    expect(worn()).toEqual([soil, soil, paving]);
+    expect(order).toEqual(['land taken away, the tiles wearing tree pit soil, tree pit soil, footway paving', 'tiles taken away']);
+    // Where the land round the town drew no near chunk, the tiles wear their own.
+    const bare = { land: {}, draw: () => ({ ground: null, dispose: () => {} }) } as unknown as TownLand;
+    withTownLand(tile, bare, [{ tileX: 0, tileY: 0 }]).attach(host);
+    expect(worn()).toEqual([soil, soil, paving]);
   });
 
   it("stands its street furniture at each piece's own height, its people's region being at the land's datum", () => {
