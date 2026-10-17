@@ -159,7 +159,7 @@ export function openComparePage(host: HTMLElement, act: (action: string) => void
         svg.append(shape('circle', { cx: xs[index]!, cy: layout.lineY, r: picked ? PICKED_DOT : DOT, class: 'dot', 'data-index': index, 'data-picked': String(picked), 'data-asked': String(point.asked) }));
       });
       onLine.push(svg);
-      const shownTimes = times ?? timeIndexes(xs).flatMap(index => points[index]!.time ? [{ index, text: points[index]!.time! }] : []);
+      const shownTimes = times ?? timeIndexes(xs).flatMap((index: number) => points[index]!.time ? [{ index, text: points[index]!.time! }] : []);
       for (const time of shownTimes) {
         if (time.index >= count) continue;
         const label = element('div', 'wu-rc-time', time.text);

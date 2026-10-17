@@ -218,7 +218,7 @@ export function recordStates(host: RecordHost) {
       const words = (requestId: string, answer: Json) => (answer.asked || answer.recorded
         ? choseWords({ chose: answer.chose, line: answer.line, to: answer.line ? saidTo(requestId, answer.chose) : null }) ?? '' : COMPARE_WORDS.notAsked);
       const step = Math.max(1, Math.ceil(moments.length / 4));
-      const times = moments.flatMap((item, index) => ((index % step === 0 || index === moments.length - 1) && at(item) ? [{ index, text: at(item)!.hhmm }] : []));
+      const times = moments.flatMap((item: Json, index: number) => ((index % step === 0 || index === moments.length - 1) && at(item) ? [{ index, text: at(item)!.hhmm }] : []));
       return {
         over: resultOver({ who, count: moments.length, from: first?.hhmm ?? null, to: last?.hhmm ?? null, day: first?.day ?? null }),
         title: resultTitle(who, moments.length, single),
@@ -242,7 +242,7 @@ export function recordStates(host: RecordHost) {
         focus,
         use: !asking && host.assignable() && !comparison.busy ? useFor(otherName, who) : null,
         // Every moment on the line, oldest first, each different answer under its branch; a single moment draws none.
-        ...(single ? {} : { line: moments.map((item) => ({ time: at(item)?.hhmm ?? null, asked: item.other.asked, different: item.other.asked && item.other.same === false ? words(item.requestId, item.other) : null })) }),
+        ...(single ? {} : { line: moments.map((item: Json) => ({ time: at(item)?.hhmm ?? null, asked: item.other.asked, different: item.other.asked && item.other.same === false ? words(item.requestId, item.other) : null })) }),
         // While the asks run, how far they are in the answer's place, with [Esc] Stop alone (C2).
         asking: asking ? askingWords(asking.done, asking.total, asking.spent, comparison.most) : null,
         ground: comparison.ground ?? host.pictures.still(),

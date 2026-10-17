@@ -21,7 +21,7 @@ export function historyWrite(access: Access, signal: AbortSignal) {
     const response = await fetch(`${access.baseUrl}${path}`, {
       method, credentials: 'same-origin', signal,
       headers: { ...accessHeaders(access, method), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     return { status: response.status, body: await response.json().catch(() => null) };
   };

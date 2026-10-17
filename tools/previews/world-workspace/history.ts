@@ -6,7 +6,7 @@
 // the path and the views come from history-rows.mjs and every word from history-words.mjs. Pictures and portraits are
 // made one at a time where the host can make them, and the making stops when the page closes.
 // The record pages' shared parts load first: History's own stylesheet refines them and must come after.
-import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
+import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence } from './world-ui-record.ts';
 import { changeParts, thingName } from './build-words.mjs';
 import { LAYOUTS, historyPath, pathLayout, pathView, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
