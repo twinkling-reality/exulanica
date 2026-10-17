@@ -26,7 +26,8 @@ import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs';
 import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
-import { historyWrite } from './history-host.ts';
+import { historyHooks, historyWrite, recordPictures } from './history-host.ts';
+import { recordStates } from './record-host.ts';
 import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
@@ -41,14 +42,12 @@ import { BESIDE, OFFLINE_AFTER_FAILED_READS } from './world-ui-layout.mjs';
 import { worldKey, wakesHints } from './world-keys.mjs';
 import { CORNER_WORDS, NOTE_WORDS, availableHints } from './world-words.mjs';
 import { openDecisionPage } from './decision-page.ts';
-import { DECISION_WORDS, askedAt, choiceRows, choicesLabel, decisionTitle, overLabel, resultLines, toldLabel, toldSections } from './decision-words.mjs';
+import { DECISION_WORDS } from './decision-words.mjs';
 import { ASK_ASPECTS, askEntityCompanion, askWords } from './entity-companion.mjs';
-import { choiceAccount, parseDecisionEvents } from '/src/decision-record.ts';
 import { CompanionAskClient } from '/src/companion-ask-api.ts';
 import { drawSimulated } from '/src/companion-simulated.ts';
 import { DecisionAsksClient } from '/src/society-decision-asks-api.ts';
 import { openComparePage } from './compare-page.ts';
-import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import './blank-world.css';
 import './contextual-world.css';
 
@@ -256,6 +255,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   /** A character's row by its society id. */
   const beingRow = (id) => rows.find(item => item.scene?.type === 'being' && item.scene.id === id) ?? null;
   const personName = (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? selection.societyNames?.()?.people.get(id) ?? null;
+  /** A person inside History's sentences (J20): as their tag and card call them, else "the" and their kind. */
+  const calledAs = (id) => { const row = beingRow(id); return row ? subjectView(row).who : called({ name: null, kind: characterFacts(subjectReads.society, id)?.kind ?? null }); };
+  const calledWithin = (id) => calledAs(id).within;
   /** A person as the tag and card call them (J20), by society id: from their offer, else their society name, else "the" and their kind. */
   function whoOf(id) {
     const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null;
@@ -679,7 +681,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
-      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId), heard: row.heard === true })) : null,
+      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
@@ -687,7 +689,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       editing: pageView.editing ? { session: pageView.editing.session, refusal: pageView.editing.refusal, busy: pageView.editing.busy } : null,
       choosing: pageView.choosing ? { choices, focus: pageView.choosing.focus, refusal: pageView.choosing.refusal, busy: pageView.choosing.busy } : null,
       canCompare: comparable(pageView) && (pageView.did ?? []).some(modelAnswered),
-      compare: pageView.compare ? compareState(view.who) : null,
+      compare: pageView.compare ? records.compare(pageView, view.who) : null, ...records.day(pageView, view, Boolean(subjectReads.models)),
     };
   }
   function drawPage() {
@@ -714,6 +716,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       const facts = characterFacts(subjectReads.society, showing.row.scene.id);
       if (showing !== pageView) return;
       showing.events = events;
+      void records.readMoments(showing).then(() => { if (showing === pageView) drawPage(); });
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
         options: (requestId) => decisionOptions(requestId), who: whoOf,
         wordGoal: (document) => {
@@ -736,8 +739,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const choosing = pageView.choosing, editing = pageView.editing;
     const compare = pageView.compare;
     if (action === 'back') {
-      if (compare?.asking) { compare.asking.stop = true; drawPage(); }
-      else if (compare) { pageView.compare = null; drawPage(); }
+      if (compare) { pageView.compare = null; drawPage(); }
       else if (editing) { pageView.editing = null; drawPage(); } else if (choosing) { pageView.choosing = null; drawPage(); } else if (pageView.ask) { pageView.ask = null; drawPage(); } else closePage();
     }
     else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: 0, offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
@@ -845,6 +847,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const decision = { page, rowIndex: index, requestId: showing.did[index].requestId, detail: null, failure: null, record: false };
     showing.decision = decision;
     showing.page.hide(true);
+    if (!pictures.still()) void pictures.takeStill().then(drawPage);
     drawPage();
     try {
       const detail = await modelsClient.readDecision(entry.authoredVersionId, decision.requestId);
@@ -858,6 +861,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     showing.decision.page.close(); showing.decision = null;
     showing.page.hide(false); drawPage();
   }
+  const pictures = recordPictures({ entry, credentials: state.credentials, source: b, changed: () => drawPage() });
+  lifetime.signal.addEventListener('abort', () => pictures.dispose(), { once: true });
+  const records = recordStates({ versionPath: '/world/versions/' + encodeURIComponent(entry.authoredVersionId), scope: '?world_id=' + encodeURIComponent(entry.worldId), read, pictures,
+    subjectView, modelOf, nameOf: calledWithin, personName: (id) => personName(id), modelName: (model) => modelName(model), latest: (requestId) => subjectReads.models?.latest.find(item => item.requestId === requestId) ?? null,
+    compareModels, modelKey: (model) => modelKey(model), comparedDecisions: (compare, offer) => comparedDecisions(compare, offer), boundOf: (decisions) => boundOf(decisions),
+    label: (kind) => kindLabels.label(kind), run: () => runWatch.run ?? null, assignable: () => pageState().assignable });
   /** The rows a decision stands behind, newest first, as indexes into What Teo did. */
   const decisionRows = (showing) => (showing.did ?? []).flatMap((row, at) => row.requestId ? [at] : []);
   function decisionAct(action) {
@@ -878,33 +887,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     }
   }
   function decisionState() {
-    const showing = pageView, decision = showing.decision, view = subjectView(showing.row), who = view.who;
-    const order = decisionRows(showing), here = order.indexOf(decision.rowIndex);
-    const blank = { over: '', title: '', model: null, done: null, verdict: null, toldLabel: toldLabel(who), told: decision.failure ? [] : null,
-      choicesLabel: '', choices: [], earlier: here >= 0 && here < order.length - 1, later: here > 0, record: null, failure: decision.failure,
-      canCompare: comparable(showing) && modelAnswered(showing.did?.[decision.rowIndex]) };
-    const detail = decision.detail;
-    if (!detail) return blank;
-    const request = detail.request, receipt = detail.decision, context = request.context ?? null;
-    const events = parseDecisionEvents({ events: showing.events ?? [] }).events;
-    const latest = subjectReads.models?.latest.find(item => item.requestId === decision.requestId) ?? null;
-    // The choice account's verdict; a record it cannot read says nothing of what came of it.
-    let verdict = null;
-    try { verdict = choiceAccount(detail, latest, events).verdict; } catch { verdict = null; }
-    const consumed = events.find(event => event.kind === 'decision_applied' && event.requestId === decision.requestId)?.tick ?? latest?.consumedTick ?? null;
-    const start = view.facts?.startMinute ?? null;
-    const spoken = (showing.events ?? []).find(event => event.event_kind === 'said' && event.document?.thing?.request_id === decision.requestId);
-    const proposal = receipt?.proposal ?? null, provider = receipt?.provider ?? null, config = request.provider_config ?? null;
-    const choices = choiceRows(context, proposal?.label ?? null);
-    const result = resultLines({ verdict, doneAt: consumed === null ? null : worldTime(consumed, start)?.hhmm ?? null,
-      latencyMs: provider?.latency_ms ?? null, costUsd: provider?.cost_usd ?? null, costKnown: provider?.cost_known === true });
-    return { ...blank,
-      over: overLabel({ at: askedAt(request.base_tick, start), who, said: Boolean(spoken), to: spoken?.document?.thing?.to ? personName(spoken.document.thing.to) : null }),
-      title: decisionTitle({ line: spoken ? spoken.document.thing.line : null, chose: proposal?.label ?? null }) || showing.did[decision.rowIndex]?.what || '',
-      model: config ? modelName({ provider: config.provider, model_id: config.model_id }) ?? config.model_id ?? null : null,
-      done: result.done, verdict: result.verdict, told: toldSections(context, who), personality: context?.character ? { name: context.character.name ?? null, about: context.character.about ?? null } : null,
-      choicesLabel: choicesLabel(who, choices.length), choices,
-      record: decision.record ? JSON.stringify({ request, decision: receipt }, null, 2) : null };
+    const showing = pageView, decision = showing.decision, order = decisionRows(showing), here = order.indexOf(decision.rowIndex);
+    return records.decision(showing, decision, { earlier: here >= 0 && here < order.length - 1, later: here > 0, canCompare: comparable(showing) && modelAnswered(showing.did?.[decision.rowIndex]) });
   }
   // Compare (frames 12a and 12b, rulings C1 and C2): a character's recorded decisions asked again,
   // exactly as asked, of a chosen model and once more of the model that answered each. The count and
@@ -933,35 +917,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   /** The offer's decisions this comparison asks: every one offered, or the one moment a decision named. */
   const comparedDecisions = (compare, offer) => (offer?.decisions ?? []).filter(decision => decision.askUsd !== null && (compare.single === null || decision.requestId === compare.single));
   const boundOf = (decisions) => decisions.reduce((sum, decision) => sum + Number(decision.askUsd.chosen) + Number(decision.askUsd.again ?? 0), 0);
-  function compareState(who) {
-    const compare = pageView.compare;
-    const models = compareModels(pageView.row);
-    const model = models?.[compare.focus] ?? null;
-    const held = model ? compare.offers.get(modelKey(model)) : null;
-    const offer = held?.offer ?? null;
-    const decisions = comparedDecisions(compare, offer);
-    const recorded = decisions.at(-1)?.model ?? null;
-    const recordedName = recorded ? modelName({ provider: recorded.provider, model_id: recorded.modelId }) ?? recorded.modelId : modelOf(pageView.row).model?.name ?? '';
-    const most = boundOf(decisions);
-    const note = offer?.refusal ? modelRefusalWords(offer.refusal, who) : held?.failed ? CHARACTER_WORDS.askFailed : null;
-    // Nothing to ask of any model (C4): none offered, or every one refused; the line stands alone.
-    const single = compare.single !== null;
-    const offered = (offer?.decisions ?? []).filter(decision => !single || decision.requestId === compare.single);
-    const nothing = !offer || offer.refusal || decisions.length ? null
-      : offered.length || single ? cannotAskAgain(who, single) : nothingToAsk(who);
-    return {
-      nothing,
-      big: offer && decisions.length ? askLine(who, decisions.length, compare.single !== null) : '',
-      explain: offer && decisions.length ? explanation(who, recordedName) : '',
-      choices: models ? models.map(item => ({ model: item, current: false })) : null,
-      focus: compare.focus,
-      figure: compare.asking ? askingWords(compare.asking.done, compare.asking.total, compare.asking.spent, most) : offer && decisions.length ? atMost(most) : null,
-      asking: Boolean(compare.asking),
-      note,
-      canStart: Boolean(offer && decisions.length && !offer.refusal && !compare.asking),
-    };
-  }
-  /** Ask each offered decision of the chosen model and once more of its own, one at a time, then show what came back. */
+  /** Ask each offered decision of the chosen model and once more of its own, one at a time, on Compare's page. */
   async function compareAsk(showing) {
     const compare = showing.compare, model = compareModels(showing.row)?.[compare.focus];
     const offer = model ? compare.offers.get(modelKey(model))?.offer : null;
@@ -972,42 +928,43 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       { decision, which: 'other', model: chosen, bound: decision.askUsd.chosen, key: crypto.randomUUID() },
       ...(decision.askUsd.again !== null && decision.model ? [{ decision, which: 'again', model: decision.model, bound: decision.askUsd.again, key: crypto.randomUUID() }] : []),
     ]);
-    compare.asking = { done: 0, total: steps.length, spent: 0, stop: false };
-    compare.answers = new Map();
-    drawPage();
+    const asking = { done: 0, total: steps.length, spent: 0, stop: false };
+    const comparison = openComparison(showing, { decisions, other: model, single: compare.single !== null, asking });
     for (const step of steps) {
-      if (compare.asking.stop || showing !== pageView) break;
+      // Stop sends nothing more; an ask already sent is answered and counted (C2).
+      if (asking.stop || showing !== pageView || showing.comparison !== comparison) break;
       try {
         const answer = await decisionAsks.ask(entry.authoredVersionId, step.decision.requestId, step.model, step.bound, step.key);
-        const pair = compare.answers.get(step.decision.requestId) ?? {};
+        const pair = comparison.answers.get(step.decision.requestId) ?? {};
         pair[step.which] = answer;
-        compare.answers.set(step.decision.requestId, pair);
-        compare.asking.spent += Number(answer.costUsd) || 0;
+        comparison.answers.set(step.decision.requestId, pair);
+        asking.spent += Number(answer.costUsd) || 0;
       } catch { break; /* A refused ask ends the asking; what came back is shown (C2). */ }
-      compare.asking.done += 1;
+      asking.done += 1;
       if (showing === pageView) drawPage();
     }
-    if (showing !== pageView) return;
-    openComparison(showing, { decisions, answers: compare.answers, other: model, single: compare.single !== null });
+    comparison.asking = null;
+    if (showing === pageView) drawPage();
   }
-  function openComparison(showing, { decisions, answers, other, single }) {
+  function openComparison(showing, { decisions, other, single, asking }) {
     showing.compare = null;
-    const moments = compareMoments(decisions, answers);
     const page = openComparePage(root, action => comparisonAct(action));
     // The recorded model by the name the models read gives it: the newest moment's.
     const recorded = decisions.at(-1)?.model ?? null;
     const recordedName = recorded ? modelName({ provider: recorded.provider, model_id: recorded.modelId }) ?? recorded.modelId : modelOf(showing.row).model?.name ?? '';
     // The recorded model's own asks were all refused (each decision's again refusal): it could not be asked again (C3).
     const againRefused = decisions.every(decision => decision.askUsd?.again === null);
-    showing.comparison = { page, moments, other, single: single || moments.length === 1, againRefused, recordedName, focus: Math.max(0, moments.length - 1), details: new Map(), busy: false };
+    showing.comparison = { page, decisions, answers: new Map(), other, single: single || decisions.length === 1, againRefused, recordedName, focus: Math.max(0, decisions.length - 1), details: new Map(), busy: false, asking, most: boundOf(decisions) };
     showing.page.hide(true);
+    if (!pictures.still()) void pictures.takeStill().then(drawPage);
     // Who a line was said to is in the decision's own options: read once a moment.
-    for (const moment of moments) {
-      modelsClient.readDecision(entry.authoredVersionId, moment.requestId).then(detail => {
-        if (showing.comparison) { showing.comparison.details.set(moment.requestId, detail); if (showing === pageView) drawPage(); }
+    for (const decision of decisions) {
+      modelsClient.readDecision(entry.authoredVersionId, decision.requestId).then(detail => {
+        if (showing.comparison) { showing.comparison.details.set(decision.requestId, detail); if (showing === pageView) drawPage(); }
       }, () => {});
     }
     drawPage();
+    return showing.comparison;
   }
   function closeComparison() {
     const showing = pageView;
@@ -1015,54 +972,15 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     showing.comparison.page.close(); showing.comparison = null;
     showing.page.hide(false); drawPage();
   }
-  /** Who an option said a line to, by the option the decision offered under that label. */
-  function saidTo(detail, chose) {
-    const option = (detail?.request?.context?.options ?? []).find(item => item.label === chose);
-    return option?.addressee_id ? personName(option.addressee_id) : null;
-  }
-  function comparisonState() {
-    const showing = pageView, comparison = showing.comparison, view = subjectView(showing.row), who = view.who;
-    const { moments, other, single, focus } = comparison;
-    const start = view.facts?.startMinute ?? null;
-    const at = moment => moment ? worldTime(moment.tick, start) : null;
-    const first = at(moments[0]), last = at(moments.at(-1));
-    const recordedName = comparison.recordedName;
-    const otherName = other.name;
-    const moment = moments[focus] ?? null;
-    const detail = moment ? comparison.details.get(moment.requestId) : null;
-    const words = answer => answer.asked || answer.recorded ? choseWords({ chose: answer.chose, line: answer.line, to: answer.line ? saidTo(detail, answer.chose) : null }) ?? '' : COMPARE_WORDS.notAsked;
-    const step = Math.max(1, Math.ceil(moments.length / 4));
-    const times = moments.flatMap((item, index) => (index % step === 0 || index === moments.length - 1) && at(item) ? [{ index, text: at(item).hhmm }] : []);
-    return {
-      over: resultOver({ who, count: moments.length, from: first?.hhmm ?? null, to: last?.hhmm ?? null, day: first?.day ?? null }),
-      title: resultTitle(who, moments.length, single),
-      sub: single ? COMPARE_WORDS.sameMoment(who) : COMPARE_WORDS.sameMoments(who),
-      spent: spentAsking(spentOf(moments)),
-      moment: moment ? {
-        label: atMoment(at(moment)?.hhmm ?? null, focus, moments.length),
-        rows: [
-          { model: recordedName, again: false, what: words({ ...moment.recorded, recorded: true }), tag: answerTag({ recorded: true }) },
-          { model: otherName, again: false, what: words(moment.other), tag: answerTag(moment.other) },
-          { model: againName(recordedName), again: true, what: words(moment.again), tag: answerTag(moment.again) },
-        ],
-      } : null,
-      eachChose: single ? [] : whatEachChose({ recordedName, otherName, other: sameCounts(moments, 'other'), again: sameCounts(moments, 'again'), count: moments.length, againRefused: comparison.againRefused }),
-      lanes: single ? [] : [
-        { name: recordedName, faint: false, marks: laneMarks(moments, 'recorded') },
-        { name: otherName, faint: false, marks: laneMarks(moments, 'other') },
-        { name: againName(recordedName), faint: true, marks: laneMarks(moments, 'again') },
-      ],
-      times: single ? [] : times,
-      focus,
-      use: pageState().assignable && !comparison.busy ? useFor(otherName, who) : null,
-    };
-  }
+  const comparisonState = () => records.comparison(pageView);
   function comparisonAct(action) {
     const comparison = pageView?.comparison;
     if (!comparison) return;
-    if (action === 'back') closeComparison();
+    // While the asks run, [Esc] Stop alone: nothing more is sent, and the page then shows what came back.
+    if (comparison.asking) { if (action === 'back' || action === 'stop') { comparison.asking.stop = true; drawPage(); } }
+    else if (action === 'back') closeComparison();
     else if ((action === 'earlier' || action === 'later') && !comparison.single) {
-      comparison.focus = Math.max(0, Math.min(comparison.moments.length - 1, comparison.focus + (action === 'earlier' ? -1 : 1)));
+      comparison.focus = Math.max(0, Math.min(comparison.decisions.length - 1, comparison.focus + (action === 'earlier' ? -1 : 1)));
       drawPage();
     }
     else if (action === 'use' && !comparison.busy && pageState().assignable) void useCompared(pageView);
@@ -1105,12 +1023,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function closePage() {
     if (!pageView) return;
     const { page, before, decision, comparison } = pageView;
-    pageView = null; page.close(); decision?.page.close(); comparison?.page.close();
+    pageView = null; page.close(); decision?.page.close(); comparison?.page.close(); pictures.release();
     b.controls.setView(before.pose, before.hold); b.invalidate();
     canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
     guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
   }
 
+  const kindLabels = build?.kindLabels ?? createKindLabels(read, kindDocumentLabel);
   // History (H, from the world and from build mode): every change of this world version over the
   // dimmed world, read from the server alone. Undo and redo there are build mode's own.
   const history = mountHistory({
@@ -1123,19 +1042,17 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // One name per character (J20): as the tag and card call it, from its inventory offer: its name,
       // else "the" and its kind's label. Only the characters History's rows name are read; a
       // personality is kept by its placed being.
-      const beings = new Map(rows.filter(row => row.scene?.type === 'being').map(row => [row.scene.id, row]));
       const placedBeings = new Map(rows.filter(row => row.scene?.type === 'being' && row.reference?.source === 'authored-thing').map(row => [row.reference.id, row]));
-      const needed = new Set([...subjects.map(id => beings.get(id)), ...placed.map(id => placedBeings.get(id))].filter(Boolean));
+      const needed = new Set([...subjects.map(beingRow), ...placed.map(id => placedBeings.get(id))].filter(Boolean));
       await Promise.all([...needed].map(row => entityOffer(row).catch(() => null)));
-      const unlisted = (id) => called({ name: null, kind: characterFacts(subjectReads.society, id)?.kind ?? null }).within;
       return {
-        subject: (id) => (beings.has(id) ? subjectView(beings.get(id)).who.within : unlisted(id)),
+        subject: calledWithin, speaker: (id) => calledAs(id).title,
         placed: (placedId) => (placedBeings.has(placedId) ? subjectView(placedBeings.get(placedId)).who.within : called({ name: null, kind: null }).within),
       };
     },
     build: build ? { undo: () => build.undo(), redo: () => build.redo() } : null,
     // Made creatures by their labels (J20): build mode's reader where it is mounted, else History's own.
-    kindLabels: build?.kindLabels ?? createKindLabels(read, kindDocumentLabel),
+    kindLabels,
     worldClock(tick) {
       // The society's own first minute, as characterFacts reads it; with no society there is no clock (K5).
       const state = subjectReads.society?.state;
@@ -1143,10 +1060,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     },
     // The world's minute now, as the clock corner reads it, for Now where the moments read did not answer.
     worldNow: () => selection.people?.clock().minute ?? null,
-    write: readOnly ? null : historyWrite(state.credentials, lifetime.signal),
+    write: readOnly ? null : historyWrite(state.credentials, lifetime.signal), ...historyHooks(pictures),
+    openDecision: (asked) => void openHistoryDecision(asked),
     open: (url) => { window.open(url, '_blank', 'noopener'); },
     closed() {
-      otherPage = null;
+      otherPage = null; historyDecision?.page.close(); historyDecision = null; pictures.release();
       canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
       guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
     },
@@ -1158,7 +1076,33 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     presence.setCovered(true); notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     guidance.hidden = true; worlds.hidden = true;
-    void history.open();
+    // The still behind History is taken before the page covers the world.
+    void pictures.takeStill().finally(() => history.open());
+  }
+  // A decision from History ([Enter] See the decision): the r10 page over History, by its request.
+  let historyDecision = null;
+  async function openHistoryDecision({ requestId, subject }) {
+    const row = subject ? beingRow(subject) : null;
+    if (!requestId || !row) return;
+    const showing = { row, events: [], moments: null, things: null, did: null };
+    historyDecision?.page.close();
+    historyDecision = { page: openDecisionPage(root, historyDecisionAct), showing, decision: { requestId, detail: null, failure: null, record: false } };
+    drawHistoryDecision();
+    const [detail] = await Promise.all([modelsClient.readDecision(entry.authoredVersionId, requestId).catch(() => null), records.readMoments(showing)]);
+    // Its people named as History names them: their offers read first.
+    const people = (showing.moments ?? []).filter(moment => moment.request_id === requestId || moment.said?.some(line => line.request_id === requestId)).flatMap(moment => moment.subjects ?? []);
+    await Promise.all([...new Set(people.map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
+    if (historyDecision?.showing !== showing) return;
+    if (detail) historyDecision.decision.detail = detail; else historyDecision.decision.failure = DECISION_WORDS.unread;
+    drawHistoryDecision();
+  }
+  const drawHistoryDecision = () => historyDecision?.page.draw(records.decision(historyDecision.showing, historyDecision.decision));
+  function historyDecisionAct(action) {
+    const decision = historyDecision?.decision;
+    if (!decision) return;
+    if (action === 'record' && decision.detail) { decision.record = !decision.record; drawHistoryDecision(); }
+    else if (action === 'back' && decision.record) { decision.record = false; drawHistoryDecision(); }
+    else if (action === 'back') { historyDecision.page.close(); historyDecision = null; }
   }
 
   // Drag-to-look keeps the ordinary cursor and also works where pointer lock is unavailable.
@@ -1203,6 +1147,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!pageShown() && !asking && build?.key(event)) { event.stopImmediatePropagation(); return; }
     // History takes its keys; what it leaves (Tab, Enter on a focused button) keeps the browser's own
     // default, and no key reaches the old shell's listeners while it is open (K8).
+    if (otherPage && historyDecision) {
+      // A decision over History: Esc back (from the record to the decision, then to History), J the record.
+      if (event.code === 'Escape' && !event.repeat) historyDecisionAct('back');
+      else if (event.code === 'KeyJ' && !event.repeat) historyDecisionAct('record');
+      if (event.code !== 'Tab' && !(historyDecision?.decision.record && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(event.code))) event.preventDefault();
+      event.stopImmediatePropagation(); return;
+    }
     if (otherPage) { otherPage.key(event); event.stopImmediatePropagation(); return; }
     if ((pageShown() || asking) && (event.metaKey || event.ctrlKey || event.altKey)) { event.stopImmediatePropagation(); return; }
     if (pageShown()) {

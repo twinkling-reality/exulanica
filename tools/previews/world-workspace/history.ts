@@ -43,7 +43,7 @@ export interface HistoryHost {
   /** GET through the workspace's reader; throws where the server does not answer 200. */
   read(path: string): Promise<any>;
   /** What these characters are called inside a sentence, as the tag and card call them (J20). */
-  names(named: Named): Promise<{ subject(id: string): string; placed(id: string): string }>;
+  names(named: Named): Promise<{ subject(id: string): string; placed(id: string): string; speaker?(id: string): string }>;
   /** The labels of the kinds a workspace made (J20): `label(kind)`, and `listen` for each that lands. */
   readonly kindLabels: { label(kind: unknown): string | null; listen(listener: () => void): () => void };
   /** The world's clock for a tick: its time and day ("06:52", day 1), where the clock is read. */
@@ -58,8 +58,9 @@ export interface HistoryHost {
   readonly entryPicture?: string | null;
   /** How the world began, where no entry picture was kept: one first-view render, kept (MOTION's renderer). */
   beginningPicture?(signal: AbortSignal): Promise<string | null>;
-  /** The address of a kept picture (a moment's). */
-  picture?(picture: Picture): string;
+  /** The address of a kept picture (a moment's), read once while the page is open; null where it cannot be read. The
+   * host keeps the addresses it makes until the page closes, so the page forgets them then. */
+  pictureAddress?(picture: Picture, signal: AbortSignal): Promise<string | null>;
   /** Makes a moment's missing picture once (MOTION's renderer); null where it cannot be made. */
   renderMomentPicture?(moment: Json, signal: AbortSignal): Promise<Picture | null>;
   /** A character's round portrait, made once from its look, as an image address; null where it cannot be made. */
@@ -120,7 +121,7 @@ export function mountHistory(host: HistoryHost): History {
   let unlisten: (() => void) | null = null;
   let making: AbortController | null = null;
   /** What the characters are called, from the last read. */
-  let called: { subject(id: string): string } = { subject: () => '' };
+  let called: { subject(id: string): string; speaker?(id: string): string } = { subject: () => '' };
   /** The page's lasting parts, made once when it opens, so the focus on its title stays through every draw. */
   let lasting: { readonly world: HTMLElement; readonly head: HTMLElement; readonly kept: HTMLElement; readonly layer: HTMLElement } | null = null;
   /** H12's question, while it is open over the page. */
@@ -186,6 +187,8 @@ export function mountHistory(host: HistoryHost): History {
     called = named;
     const names = {
       subject: (id: string) => named.subject(id),
+      // Who said a line, in J20's title form where a kind names them ("Canopy strider").
+      speaker: (id: string) => named.speaker?.(id) ?? named.subject(id),
       placed: (id: string) => named.placed(id),
       thing: (id: string) => thingOf(id),
       place: (place: Json) => thingOf(place?.thing_id),
@@ -233,10 +236,13 @@ export function mountHistory(host: HistoryHost): History {
     }
     for (const moment of order) {
       if (controller.signal.aborted) return;
-      if (!moment.picture && host.renderMomentPicture && !pictures.has(moment.id)) {
-        const result = await host.renderMomentPicture(moment, controller.signal).catch(() => null);
+      // A kept picture is read at its address; a missing one is made once, then read.
+      if (!pictures.has(moment.id) && host.pictureAddress && (moment.picture || host.renderMomentPicture)) {
+        const kept = moment.picture ?? (await host.renderMomentPicture?.(moment, controller.signal).catch(() => null)) ?? null;
         if (controller.signal.aborted) return;
-        pictures.set(moment.id, result && host.picture ? host.picture(result) : null);
+        const address = kept ? await host.pictureAddress(kept as Picture, controller.signal).catch(() => null) : null;
+        if (controller.signal.aborted) return;
+        pictures.set(moment.id, address);
         draw();
       }
       for (const subject of moment.subjects.slice(0, ORBS)) {
@@ -249,9 +255,8 @@ export function mountHistory(host: HistoryHost): History {
   }
 
   function pictureOf(item: Json): string | null {
-    // How the world began carries the entry picture's address; a moment, a kept picture or one made here.
+    // How the world began carries the entry picture's address; a moment, its kept picture's or one made here.
     if (typeof item.picture === 'string') return item.picture;
-    if (item.picture && host.picture) return host.picture(item.picture as Picture);
     return pictures.get(item.id) ?? null;
   }
 
@@ -565,7 +570,7 @@ export function mountHistory(host: HistoryHost): History {
     moment.lines.forEach((one: Json, index: number) => {
       const said = element('div', 'wu-hr-line');
       if (index === opened?.line) said.setAttribute('aria-current', 'true');
-      said.append(element('div', 'wu-hr-speaker', called.subject(one.subject)), element('div', 'wu-hr-line-said', one.quote));
+      said.append(element('div', 'wu-hr-speaker', (called.speaker ?? called.subject)(one.subject)), element('div', 'wu-hr-line-said', one.quote));
       if (one.by) said.append(sentence('div', 'wu-hr-who', one.by));
       lines.append(said);
     });
@@ -619,6 +624,9 @@ export function mountHistory(host: HistoryHost): History {
   function remove() {
     making?.abort();
     making = null;
+    // The host takes back the addresses it made for this page as it closes; the next open reads them again.
+    pictures.clear();
+    portraits.clear();
     card?.close();
     card = null;
     cardSize?.disconnect();

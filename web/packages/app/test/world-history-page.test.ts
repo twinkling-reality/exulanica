@@ -3,6 +3,7 @@
 // It only reads (GET through the workspace's reader, every read scoped to the world); a project it could not read is
 // never called unkept; Enter opens a moment on the same page and Esc goes back to the story; the pictures it makes
 // stop when it closes; Esc from the story gives the world its keys back.
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface Picture { readonly sha256: string; readonly width: number; readonly height: number }
@@ -17,7 +18,7 @@ interface HistoryHost {
   worldClock?(tick: number): { readonly hhmm: string; readonly day: number } | null;
   worldNow?(): number | null;
   readonly entryPicture?: string | null;
-  picture?(picture: Picture): string;
+  pictureAddress?(picture: Picture, signal: AbortSignal): Promise<string | null>;
   renderMomentPicture?(moment: Record<string, unknown>, signal: AbortSignal): Promise<Picture | null>;
   portrait?(subjectId: string, signal: AbortSignal): Promise<string | null>;
   openDecision?(decision: { readonly momentId: string; readonly requestId: string | null; readonly tick: number; readonly subject: string | null }): void;
@@ -110,7 +111,7 @@ function host(read: HistoryHost['read'], extra: Partial<HistoryHost> = {}, label
     root, worldId: WORLD, versionId: VERSION, title: 'Terraces on the bay', read, kindLabels: labels,
     names: vi.fn(async () => ({ subject: (id: string) => NAMES[id] ?? 'the resident', placed: () => 'the resident' })),
     worldClock: (tick: number) => ({ hhmm: `${String(Math.floor(tick / 60) % 24).padStart(2, '0')}:${String(tick % 60).padStart(2, '0')}`, day: 1 }),
-    picture: (picture: Picture) => `/world/pictures/${picture.sha256}?world_id=${encodeURIComponent(WORLD)}`,
+    pictureAddress: async (picture: Picture) => `/world/pictures/${picture.sha256}?world_id=${encodeURIComponent(WORLD)}`,
     open: vi.fn(), closed: vi.fn(), openDecision: vi.fn(),
     ...extra,
   };
@@ -152,7 +153,7 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-run')?.textContent).toBe("Teo's model was deciding · 06:00 to 07:15 · spent $0.0042");
     expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
     // A kept picture is read at its address; a missing one is the quiet tile, no words in it.
-    expect(exchange.querySelector('.wu-hr-pic img')?.getAttribute('src')).toBe(`/world/pictures/${'f'.repeat(64)}?world_id=${encodeURIComponent(WORLD)}`);
+    await vi.waitFor(() => expect(made.root.querySelector('.wu-hr-card[aria-current="true"] .wu-hr-pic img')?.getAttribute('src')).toBe(`/world/pictures/${'f'.repeat(64)}?world_id=${encodeURIComponent(WORLD)}`));
     expect(made.root.querySelector('.wu-hr-card:not(.first):not([aria-current]) .wu-hr-pic img')).toBeNull();
     expect(keys(made.root)).toEqual(['←→Earlier, later', 'EnterOpen this moment', 'GOpen on GitHub', 'EscBack']);
     history.key(press('KeyG'));
@@ -300,6 +301,60 @@ describe('History', () => {
     await Promise.resolve();
     expect(made.root.querySelector('[role="dialog"]')).toBeNull();
     expect(made.closed).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws no ring around the title it focuses itself; a ring is only for focus Tab moves', async () => {
+    const { read } = reads();
+    const made = host(read);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    const title = made.root.querySelector('.wu-hr-title') as HTMLElement;
+    expect([document.activeElement === title, title.tabIndex, title.closest('.wu-record') !== null]).toEqual([true, -1, true]);
+    // The test runner loads stylesheets empty, so the rule is read from the file, as the web tests run from web/.
+    const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-record.css`, 'utf8');
+    expect(css).toMatch(/\.wu-record \[tabindex="-1"\]:focus \{ outline: none; \}/);
+    history.close();
+  });
+
+  it('names a range within one day once and keeps each date whole, so it wraps only at "to"', async () => {
+    const { personSpan } = await import('../../../../tools/previews/world-workspace/' + 'history-words.mjs') as { personSpan(from: string, to: string, now: Date): string };
+    const now = new Date(2026, 9, 16, 12, 0);
+    const whole = (words: string) => words.replace(/ /g, '\u00a0');
+    expect(personSpan(new Date(2026, 9, 11, 18, 59).toISOString(), new Date(2026, 9, 11, 20, 45).toISOString(), now)).toBe(`${whole('11 Oct · 18:59')} to 20:45`);
+    expect(personSpan(new Date(2026, 9, 11, 23, 50).toISOString(), new Date(2026, 9, 12, 0, 10).toISOString(), now)).toBe(`${whole('11 Oct · 23:50')} to ${whole('12 Oct · 00:10')}`);
+    expect(personSpan(new Date(2026, 9, 11, 18, 59).toISOString(), new Date(2026, 9, 11, 18, 59).toISOString(), now)).toBe(whole('11 Oct · 18:59'));
+  });
+
+  it('names a speaker a kind names in its title form, as their tag does', async () => {
+    const { read } = reads({ [`/world/versions/${VERSION}/history/moments`]: { ...moments(), moments: [
+      { moment_id: 'm7', tick: 420, at: at(20), session_id: 's1', kind: 'spoke', subjects: ['strider', 'teo'], place: null, target: null, with: null,
+        said: [{ tick: 420, by: 'strider', to: ['teo'], line: 'Rest in my shade.', decider: person }], decider: person, scene: {}, picture: null, branches: [] },
+    ] } });
+    const made = host(read, { names: vi.fn(async () => ({ subject: (id: string) => NAMES[id] ?? 'the canopy strider', placed: () => 'the resident', speaker: (id: string) => NAMES[id] ?? 'Canopy strider' })) });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    expect(made.root.querySelector('.wu-hr-card[aria-current="true"]')?.textContent).toContain('Canopy strider: \u201cRest in my shade.\u201d');
+    history.close();
+  });
+
+  it('reads kept pictures again after it closes, since the host takes their addresses back as it closes', async () => {
+    const { read } = reads();
+    let made = 0;
+    const pictureAddress = vi.fn(async (picture: Picture) => `blob:picture-${picture.sha256.slice(0, 4)}-${(made += 1)}`);
+    const opened = host(read, { pictureAddress });
+    const history = (await module()).mountHistory(opened);
+    await history.open();
+    const shown = () => opened.root.querySelector('.wu-hr-card[aria-current="true"] .wu-hr-pic img')?.getAttribute('src');
+    await vi.waitFor(() => expect(shown()).toBe('blob:picture-ffff-1'));
+    // Each picture is read once while the page is open, whatever is drawn again.
+    history.key(press('ArrowLeft'));
+    history.key(press('ArrowRight'));
+    expect(pictureAddress).toHaveBeenCalledTimes(1);
+    history.close();
+    await history.open();
+    await vi.waitFor(() => expect(shown()).toBe('blob:picture-ffff-2'));
+    expect(pictureAddress).toHaveBeenCalledTimes(2);
+    history.close();
   });
 
   it("names a made creature by its label as build mode does, re-wording when the label lands", async () => {

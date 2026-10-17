@@ -306,6 +306,19 @@ describe('A decision (r10)', () => {
     expect((wide.root.querySelector('.wu-rd-head') as HTMLElement).style.maxWidth).toBe('1220px');
   });
 
+  it('never cuts the chosen choice: its words wrap with Chosen after the last line, the others stay on one line', async () => {
+    const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-record-decision.css`, 'utf8');
+    // Every rule for exactly this selector, joined (the chosen row's words have two).
+    const rule = (selector: string) => [...css.matchAll(new RegExp(`(?:^|\\n)${selector.replace(/[.[\]"]/g, (c) => `\\${c}`)} \\{([^}]*)\\}`, 'g'))].map((found) => found[1]).join(' ');
+    expect(rule('.wu-record-decision .wu-rd-choice[data-taken="true"]')).toMatch(/white-space: normal;/);
+    expect(rule('.wu-record-decision .wu-rd-choice[data-taken="true"] .wu-rd-choice-words')).toMatch(/overflow: visible;[^]*text-overflow: clip;/);
+    expect(rule('.wu-record-decision .wu-rd-choice-words')).toMatch(/text-overflow: ellipsis;/);
+    const long = 'Say something to the eight legged finned creature, 8 m away';
+    const { root } = await open(teo({ choices: [{ number: 1, words: long, chosen: true }, { number: 2, words: 'Wait a minute', chosen: false }] }));
+    const taken = root.querySelector('.wu-rd-choice[data-taken="true"]') as HTMLElement;
+    expect([taken.querySelector('.wu-rd-choice-words')?.textContent, taken.lastElementChild?.textContent]).toEqual([long, 'Chosen']);
+  });
+
   it("sizes what was told and the stored record from the window's height", async () => {
     // In its own 1080: what was told stops 60px above the foot, the record 24px above the key row's caps.
     const tall = await open(teo());

@@ -44,6 +44,12 @@
 .wu-record-decision .wu-rd-choice-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 400 17px/1.4 var(--font-sans); color: var(--hr-quiet); }
 .wu-record-decision .wu-rd-choice[data-taken="true"] .wu-rd-choice-words { font-weight: 500; color: var(--hr-ink); }
 .wu-record-decision .wu-rd-choice .wu-hr-tag { flex: none; margin-left: 0; vertical-align: baseline; }
+/* The chosen one is never cut: its words wrap (two lines at most for any offered choice) with Chosen after the
+   last line, the number hanging at the first. */
+.wu-record-decision .wu-rd-choice[data-taken="true"] { display: block; box-sizing: border-box; width: max-content; height: auto; padding-left: 24px; white-space: normal; line-height: 1.3; }
+.wu-record-decision .wu-rd-choice[data-taken="true"] .wu-rd-number { display: inline-block; margin: 0 12px 0 -24px; }
+.wu-record-decision .wu-rd-choice[data-taken="true"] .wu-rd-choice-words { display: inline; overflow: visible; text-overflow: clip; line-height: 1.3; }
+.wu-record-decision .wu-rd-choice[data-taken="true"] .wu-hr-tag { display: inline-block; margin-left: 12px; white-space: nowrap; }
 .wu-record-decision .wu-rd-more { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; line-height: 0; cursor: pointer; }
 .wu-record-decision .wu-rd-more:focus-visible { outline: 2px solid var(--hr-line); outline-offset: 3px; border-radius: 6px; }
 .wu-record-decision .wu-rd-down { position: absolute; }

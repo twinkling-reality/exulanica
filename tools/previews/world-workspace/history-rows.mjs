@@ -22,6 +22,7 @@ import {
   runSpanWords,
   saidWords,
   sameChoiceParts,
+  personSpan,
   spanWhen,
   worldWhen,
   youChangeWords,
@@ -123,7 +124,7 @@ function momentItem(moment, names, clock) {
   const actor = first ? names.subject(first) : '';
   const lines = (moment.said ?? []).map((line) => ({
     tick: line.tick, subject: line.by, request: line.request_id ?? null,
-    words: saidWords(names.subject(line.by), line.line),
+    words: saidWords((names.speaker ?? names.subject)(line.by), line.line),
     quote: `\u201c${line.line}\u201d`,
     by: byParts(line.decider),
   }));
@@ -146,6 +147,8 @@ function momentItem(moment, names, clock) {
     subjects: moment.subjects ?? [],
     session: moment.session_id ?? null,
     picture: moment.picture ?? null,
+    // What its picture is drawn from where none is kept (MOTION's renderMomentPicture).
+    scene: moment.scene ?? null,
     decided: moment.decider?.kind ?? 'routine',
   };
 }
@@ -187,9 +190,9 @@ export function historyPath(reads, names, partsOf, clock, now = Date.now()) {
       if (previous?.kind === 'change' && previous.merging) {
         previous.count += 1;
         previous.words = changesWords(previous.count);
-        previous.when = spanWhen(personWhen(previous.first, now), personWhen(entry.at, now));
+        previous.when = personSpan(previous.first, entry.at, now);
       } else {
-        items.push({ id: `change:${entry.at}:${items.length}`, kind: 'change', merging: true, count: 1, first: entry.at, at: entry.at, when: personWhen(entry.at, now), words: entry.words });
+        items.push({ id: `change:${entry.at}:${items.length}`, kind: 'change', merging: true, count: 1, first: entry.at, at: entry.at, when: personSpan(entry.at, entry.at, now), words: entry.words });
       }
       continue;
     }

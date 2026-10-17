@@ -111,6 +111,19 @@ export function worldWhen(clock) {
   return clock.day ? `${clock.hhmm} · Day ${clock.day}` : clock.hhmm;
 }
 
+/** A date and time kept whole on one line: its spaces never break. */
+const whole = (words) => words.replace(/ /g, '\u00a0');
+
+/**
+ * When a run of changes happened, in the person's own time: "11 Oct · 18:59 to 20:45" within one day (the day
+ * named once), each date and time kept whole, so the words wrap only at "to"; one change, its time alone.
+ */
+export function personSpan(from, to, now) {
+  const start = personWhen(from, now);
+  const end = dayHeading(to, now) === dayHeading(from, now) ? clockAt(to) : personWhen(to, now);
+  return start === end || from === to ? whole(start) : `${whole(start)} to ${whole(end)}`;
+}
+
 export function spanWhen(from, to) {
   return from === to ? from : `${from} to ${to}`;
 }
