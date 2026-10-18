@@ -7,7 +7,9 @@ import {
   PAINTED_FRAME_ROUTE,
   PAINTED_LAB_MARKER,
   PAINTED_SPLAT_ROUTE,
+  layoutUndrawn,
   paintedLabAsked,
+  paintedLayout,
   paintedPush,
   readPaintedFrame,
 } from '../src/dev/painted-splat.js';
@@ -33,6 +35,39 @@ describe('painted lab: how far the layout is pushed back', () => {
       '?push=0.125', '?push=0.6&push=0.7', '?push=metres', '?push=0x1']) {
       expect(paintedPush(refused), refused).toBeNull();
     }
+  });
+});
+
+describe('painted lab: the layout under the splat', () => {
+  it('is held undrawn unless the page asks for exactly layout=depth', () => {
+    expect(paintedLayout('?painted=1')).toBe('undrawn');
+    expect(paintedLayout('?painted=1&layout=depth')).toBe('depth');
+    for (const other of ['?layout=', '?layout=undrawn', '?layout=Depth', '?layout=depth&layout=depth', '?layout=depth%20']) {
+      expect(paintedLayout(other), other).toBe('undrawn');
+    }
+  });
+
+  it('hides only opaque surfaces for each frame and gives every one back', () => {
+    const handlers = new Map<string, () => void>();
+    const app = {
+      on: (name: string, handler: () => void) => { handlers.set(name, handler); },
+      off: (name: string, handler: () => void) => { if (handlers.get(name) === handler) handlers.delete(name); },
+    };
+    const surface = (transparent: boolean, depthWrite: boolean, visible = true) => ({ visible, material: { transparent, depthWrite } });
+    const wall = surface(false, true), water = surface(true, false), glass = surface(true, true), decal = surface(false, false);
+    const hidden = surface(false, true, false);
+    const render = { meshInstances: [wall, water, glass, decal, hidden, { visible: true, material: null }] };
+    const root = { findComponents: (name: string) => (name === 'render' ? [render] : []) };
+    const held = layoutUndrawn([root] as never, app as never);
+    handlers.get('prerender')!();
+    expect([wall.visible, water.visible, glass.visible, decal.visible, hidden.visible]).toEqual([false, true, true, true, false]);
+    expect(held.instances).toBe(1);
+    handlers.get('postrender')!();
+    expect([wall.visible, hidden.visible]).toEqual([true, false]);
+    handlers.get('prerender')!();
+    held.dispose();
+    expect(wall.visible).toBe(true);
+    expect(handlers.size).toBe(0);
   });
 });
 

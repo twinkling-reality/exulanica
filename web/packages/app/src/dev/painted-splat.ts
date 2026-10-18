@@ -2,13 +2,18 @@
  * DEVELOPMENT ONLY: the painted world's lab page.
  *
  * On a development build, the plain word `?painted=1` draws a gaussian splat over a site world at
- * the frame its layout is drawn in, and makes the layout depth-only (`layoutDepthOnly`): still there
- * for the walk, for picking (a CPU ray test that needs the layout's entities enabled) and for hiding
- * people behind walls, but drawn only into depth so the splat is what is seen. Water and glass,
- * which are drawn blended, stay as they are; the sky is the scene's skybox, drawn first while the
- * lab is open so it shows where the splat leaves a hole. A splat lies a little behind the surfaces
- * it was trained on, so the depth-only layout is pushed back from the eye (`SPLAT_OCCLUSION`'s
- * `pushMetres`); `push=<metres>` beside the word tries another distance, from 0 to 10 m.
+ * the frame its layout is drawn in. The layout's opaque surfaces are held undrawn while each frame
+ * renders and given back after it, so the walk and picking (a CPU ray test between frames) find
+ * them as before while the splat is what is seen: a splat trained to the layout's depth paints its
+ * own ground and walls, and people and things test against the depth they write themselves. Water
+ * and glass, which are drawn blended, stay as they are.
+ *
+ * `layout=depth` beside the word makes the layout depth-only instead (`layoutDepthOnly`), for a
+ * splat not held to the layout: still there for hiding people behind walls the splat paints thinly,
+ * drawn only into depth, with the scene's skybox drawn first so it shows where the splat leaves a
+ * hole. A splat lies a little behind the surfaces it was trained on, so the depth-only layout is
+ * pushed back from the eye (`SPLAT_OCCLUSION`'s `pushMetres`); `push=<metres>` tries another
+ * distance, from 0 to 10 m.
  *
  * The splat is the one the development server was started with (`EXULANICA_PAINTED_SPLAT`, served
  * at `PAINTED_SPLAT_ROUTE` by `vite.config.ts`); the page never names a path or a URL. A SOG goes
@@ -46,6 +51,12 @@ export function paintedLabAsked(search: string, development: boolean): boolean {
   if (!development) return false;
   const values = new URLSearchParams(search).getAll('painted');
   return values.length === 1 && values[0] === '1';
+}
+
+/** How the layout lies under the splat: held undrawn, unless the page asks for exactly `layout=depth`. */
+export function paintedLayout(search: string): 'undrawn' | 'depth' {
+  const values = new URLSearchParams(search).getAll('layout');
+  return values.length === 1 && values[0] === 'depth' ? 'depth' : 'undrawn';
 }
 
 /**
@@ -113,7 +124,9 @@ export interface PaintedLabState {
   readonly label: string | null;
   readonly frame: readonly number[];
   readonly pointCount: number | null;
-  /** How far the depth-only layout is pushed back from the eye, in metres. */
+  /** How the layout lies under the splat: held undrawn, or depth-only (`layout=depth`). */
+  readonly layout: 'undrawn' | 'depth';
+  /** How far a depth-only layout is pushed back from the eye, in metres. */
   readonly pushMetres: number;
   readonly reason: string | null;
 }
@@ -121,8 +134,47 @@ export interface PaintedLabState {
 export interface PaintedLab {
   readonly state: () => PaintedLabState;
   readonly splat: () => Entity | null;
+  /** The layout's instances drawn depth-only, or held undrawn in the last frame. */
   readonly depthOnly: () => number;
+  readonly undrawn: () => number;
   dispose(): void;
+}
+
+/** What a render component holds that the undrawn hold reads; the lab names no engine type. */
+interface LayoutDrawing {
+  readonly meshInstances: readonly { visible: boolean; readonly material: { readonly transparent: boolean; readonly depthWrite: boolean } | null }[];
+}
+
+/**
+ * Holds the opaque surfaces under `roots` undrawn while each frame renders (from the app's prerender
+ * to its postrender) and gives them back after it. They are found again every frame, because the
+ * world's streaming adds pieces and turns render components back on as the camera moves.
+ */
+export function layoutUndrawn(roots: readonly Entity[], app: Pick<App, 'on' | 'off'>): { readonly instances: number; dispose(): void } {
+  let held: LayoutDrawing['meshInstances'][number][] = [];
+  const hide = (): void => {
+    held = [];
+    for (const render of roots.flatMap((root) => root.findComponents('render') as unknown as LayoutDrawing[])) {
+      for (const instance of render.meshInstances) {
+        const material = instance.material;
+        if (material === null || material.transparent || !material.depthWrite || !instance.visible) continue;
+        instance.visible = false;
+        held.push(instance);
+      }
+    }
+  };
+  const show = (): void => { for (const instance of held) instance.visible = true; };
+  app.on('prerender', hide);
+  app.on('postrender', show);
+  return {
+    get instances() { return held.length; },
+    dispose() {
+      app.off('prerender', hide);
+      app.off('postrender', show);
+      show();
+      held = [];
+    },
+  };
 }
 
 /** The splat's asset: a validated SOG from its bytes, or a `.ply` stand-in by its file name. */
@@ -161,22 +213,30 @@ async function paintedFrame(): Promise<readonly number[]> {
 
 /**
  * Opens the lab over a site just attached: `siteRoots` are the entities its drawing added under the
- * environment root, the layout made depth-only; people, things and the splat are never among them.
+ * environment root, the layout the splat lies over; people, things and the splat are never among them.
  * Returns null, doing nothing, unless the page asked for the lab on a development build.
  */
 export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<object>, search: string): PaintedLab | null {
   if (!paintedLabAsked(search, import.meta.env.DEV)) return null;
   const look = { ...SPLAT_OCCLUSION, pushMetres: paintedPush(search) ?? SPLAT_OCCLUSION.pushMetres };
+  const layout = paintedLayout(search);
   let state: PaintedLabState = {
     phase: 'loading', format: null, standIn: false, label: null, frame: IDENTITY, pointCount: null,
-    pushMetres: look.pushMetres, reason: null,
+    layout, pushMetres: look.pushMetres, reason: null,
   };
   let splat: Entity | null = null;
   let asset: Asset | null = null;
   let disposed = false;
-  const depthOnly = layoutDepthOnly([...siteRoots] as Entity[], { app: host.app, look });
+  const roots = [...siteRoots] as Entity[];
+  const depthOnly = layout === 'depth' ? layoutDepthOnly(roots, { app: host.app, look }) : null;
+  const undrawn = layout === 'undrawn' ? layoutUndrawn(roots, host.app) : null;
   // Pieces and dressing can arrive after the drawing: what the site adds is taken in as it comes.
-  const refreshing = setInterval(() => depthOnly.refresh(), 1_000);
+  const refreshing = setInterval(() => depthOnly?.refresh(), 1_000);
+  const giveBack = (): void => {
+    clearInterval(refreshing);
+    depthOnly?.dispose();
+    undrawn?.dispose();
+  };
   void (async () => {
     try {
       const frame = await paintedFrame();
@@ -192,26 +252,23 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
       splat = entity;
       state = {
         ...state, phase: 'drawn', format: made.format, standIn: made.format === 'ply', frame, pointCount: made.pointCount,
-        label: made.format === 'ply' ? 'A layout-shaped stand-in splat, not paint.' : 'A SOG held to the trained scene checks.',
+        label: made.format === 'ply' ? 'A layout-shaped stand-in splat, not paint.' : 'Invented appearance: a SOG held to the trained scene checks.',
       };
     } catch (error) {
       state = { ...state, phase: disposed ? 'disposed' : 'failed', reason: error instanceof Error ? error.message : String(error) };
       console.warn(error);
       // Without its splat the lab would leave nothing to see: the layout is given back as drawn.
-      if (!disposed) {
-        clearInterval(refreshing);
-        depthOnly.dispose();
-      }
+      if (!disposed) giveBack();
     }
   })();
   const lab: PaintedLab = {
     state: () => state,
     splat: () => splat,
-    depthOnly: () => depthOnly.instances,
+    depthOnly: () => depthOnly?.instances ?? 0,
+    undrawn: () => undrawn?.instances ?? 0,
     dispose() {
       disposed = true;
-      clearInterval(refreshing);
-      depthOnly.dispose();
+      giveBack();
       splat?.destroy();
       splat = null;
       if (asset !== null) { asset.unload(); host.app.assets.remove(asset); asset = null; }
