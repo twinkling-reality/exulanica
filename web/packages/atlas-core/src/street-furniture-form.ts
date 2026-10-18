@@ -5,7 +5,7 @@
  * geometry: boxes and prisms in the furniture's own frame, `+x` its facing, `+y` to its left, `+z` up,
  * each offset placing a part's bottom centre (`exulanica.grammar.grammars.city.common.FormPart`). The
  * parts are what a person sits on, walks round and sees past, and the bake draws them as they are. The
- * street furniture form catalog (`assets/catalogs/world-kinds/street-furniture-form.v1.json`) states,
+ * street furniture form catalog (`assets/catalogs/world-kinds/street-furniture-form.v2.json`) states,
  * by the record's furniture class, how its parts are drawn instead: a seat as slats, a leg as a frame,
  * a bin as a turned body, a stand's posts and rail as one bent tube, a plate with a rim. Every form
  * stays inside the boxes of the parts it draws (a tube inside its parts' common box), so nothing
@@ -18,7 +18,8 @@
  * A made place's fixture is a slot, a box with no parts (`site-drawing.ts`). The catalog's slot entries
  * state, by the slot's leaf, the parts a form draws in thousandths of the slot's width, depth and height
  * (centred on its base, in the slot's own frame: `+x` along its width, `+y` toward its front, `+z` up),
- * so a site's bench is drawn by the same forms inside its own box.
+ * so a site's bench is drawn by the same forms inside its own box, and a boundary run whose leaf has an
+ * entry (a timber fence) as posts and rails inside its own box.
  *
  * Pure: no DOM, no Node, no renderer. The catalog's text is passed in. Millimetres in the furniture's
  * own frame; `s` and `t` are the surface coordinates a texture is placed by, in millimetres, as the
@@ -58,7 +59,15 @@ export type FurnitureDraw =
       readonly radiusPermille: number; readonly bendMm: number; readonly segments: number;
     }
   /** A thin box as a panel framed by a rim of full thickness, the panel set in on both faces. */
-  | { readonly form: 'plate'; readonly parts: readonly number[]; readonly rimMm: number; readonly insetMm: number };
+  | { readonly form: 'plate'; readonly parts: readonly number[]; readonly rimMm: number; readonly insetMm: number }
+  /**
+   * A box as a post-and-rail fence along its longer level side: square posts as deep as the box at both ends and
+   * evenly between, at most `spacingMm` apart, and rails between the end posts at heights in thousandths of the box's.
+   */
+  | {
+      readonly form: 'rails'; readonly parts: readonly number[]; readonly postMm: number; readonly spacingMm: number;
+      readonly railMm: number; readonly railDepthMm: number; readonly railsPermille: readonly number[];
+    };
 
 export interface FurnitureForm {
   /** The furniture class it draws (`street-furniture.v2.json`'s key). */
@@ -177,11 +186,21 @@ function readDraw(raw: Record<string, unknown>, where: string, shapes: readonly 
         bendMm: whole(raw['bend_mm'], `${where}.bend_mm`, 0, 2000), segments,
       };
     }
+    case 'rails': {
+      one('a fence of posts and rails', 'box');
+      const heights = raw['rails_permille'];
+      if (!Array.isArray(heights) || heights.length === 0 || heights.length > 6) return refuse(`${where}.rails_permille`, 'must state 1 to 6 rail heights');
+      return {
+        form: 'rails', parts, postMm: whole(raw['post_mm'], `${where}.post_mm`, 20, 500), spacingMm: whole(raw['spacing_mm'], `${where}.spacing_mm`, 500, 10000),
+        railMm: whole(raw['rail_mm'], `${where}.rail_mm`, 10, 500), railDepthMm: whole(raw['rail_depth_mm'], `${where}.rail_depth_mm`, 10, 500),
+        railsPermille: heights.map((one, at) => whole(one, `${where}.rails_permille[${at}]`, 0, 1000)),
+      };
+    }
     case 'plate':
       one('a plate', 'box');
       return { form: 'plate', parts, rimMm: whole(raw['rim_mm'], `${where}.rim_mm`, 1, 500), insetMm: whole(raw['inset_mm'], `${where}.inset_mm`, 0, 100) };
     default:
-      return refuse(`${where}.form`, 'must be solid, slats, frame, lathe, tube or plate');
+      return refuse(`${where}.form`, 'must be solid, slats, frame, lathe, tube, plate or rails');
   }
 }
 
@@ -531,6 +550,42 @@ function plate(out: Builder, part: FurniturePart, rimMm: number, insetMm: number
   return true;
 }
 
+function rails(out: Builder, part: FurniturePart, draw: Extract<FurnitureDraw, { form: 'rails' }>): boolean {
+  const { min, max } = boxOf(part);
+  // Along the longer level side; the other level side is the fence's depth.
+  const run = part.sizeXMm >= part.sizeYMm ? 0 : 1;
+  const across = 1 - run;
+  const length = max[run]! - min[run]!;
+  const depth = max[across]! - min[across]!;
+  const half = draw.railMm / 2;
+  const heights = draw.railsPermille.map((permille) => min[2] + (part.sizeZMm * permille) / 1000);
+  if (draw.postMm * 2 >= length || draw.railDepthMm > depth || heights.some((z) => z - half < min[2] || z + half > max[2])) return false;
+  // Posts at both ends and evenly between, so no gap between two is wider than the spacing.
+  const gaps = Math.max(1, Math.ceil((length - draw.postMm) / draw.spacingMm));
+  const step = (length - draw.postMm) / gaps;
+  for (let at = 0; at <= gaps; at += 1) {
+    const lo = [...min] as [number, number, number];
+    const hi = [...max] as [number, number, number];
+    lo[run] = min[run]! + at * step;
+    hi[run] = lo[run] + draw.postMm;
+    out.box(lo, hi);
+  }
+  // Each rail runs from the first post's inner face to the last's, through the posts between, centred in depth.
+  const middle = (min[across]! + max[across]!) / 2;
+  for (const z of heights) {
+    const lo = [...min] as [number, number, number];
+    const hi = [...max] as [number, number, number];
+    lo[run] = min[run]! + draw.postMm;
+    hi[run] = max[run]! - draw.postMm;
+    lo[across] = middle - draw.railDepthMm / 2;
+    hi[across] = middle + draw.railDepthMm / 2;
+    lo[2] = z - half;
+    hi[2] = z + half;
+    out.box(lo, hi);
+  }
+  return true;
+}
+
 function norm(v: Vec3): Vec3 { const l = Math.hypot(...v) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
 function dot(a: Vec3, b: Vec3): number { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 function scaled(v: Vec3, k: number): Vec3 { return [v[0] * k, v[1] * k, v[2] * k]; }
@@ -611,6 +666,7 @@ function drawForm(form: FurnitureForm, parts: readonly FurniturePart[]): Furnitu
       : draw.form === 'frame' ? frame(out, part, draw.barMm, draw.top, draw.foot)
       : draw.form === 'lathe' ? lathe(out, part, draw.segments, draw.profilePermille)
       : draw.form === 'tube' ? tube(out, parts, draw.through, draw.radiusPermille, draw.bendMm, draw.segments)
+      : draw.form === 'rails' ? rails(out, part, draw)
       : plate(out, part, draw.rimMm, draw.insetMm);
     if (!made) return null;
   }

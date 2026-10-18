@@ -184,7 +184,9 @@ export function drawSiteSlots(
       shape.setLocalScale(width, 1, depth);
       triangles += 2;
     } else if (slot.primitive === 'box') {
-      const made = furnitureForms === null || slot.family !== 'fixture' ? null : slotFurnitureSurfaces(furnitureForms, slot.leaf, slot.boxMm);
+      // A fixture or a boundary run whose leaf the furniture forms state (a bench, a timber fence) is drawn by its form.
+      const formed = slot.family === 'fixture' || slot.family === 'boundary';
+      const made = furnitureForms === null || !formed ? null : slotFurnitureSurfaces(furnitureForms, slot.leaf, slot.boxMm);
       if (made === null) {
         shape.addComponent('render', { type: 'box', material: colour, castShadows: true });
         shape.setLocalPosition(0, height / 2, 0);

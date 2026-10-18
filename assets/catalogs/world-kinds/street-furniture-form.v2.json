@@ -1,0 +1,368 @@
+{
+ "schema_version": 1,
+ "catalog_id": "street-furniture-form",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "bench",
+   "parts": [
+    "box",
+    "box",
+    "box",
+    "box"
+   ],
+   "draws": [
+    {
+     "form": "slats",
+     "parts": [
+      0
+     ],
+     "count": 4,
+     "gap_mm": 20
+    },
+    {
+     "form": "slats",
+     "parts": [
+      1
+     ],
+     "count": 3,
+     "gap_mm": 40
+    },
+    {
+     "form": "frame",
+     "parts": [
+      2
+     ],
+     "bar_mm": 50,
+     "top": true,
+     "foot": true
+    },
+    {
+     "form": "frame",
+     "parts": [
+      3
+     ],
+     "bar_mm": 50,
+     "top": true,
+     "foot": true
+    }
+   ],
+   "reason": "Authored: a slatted bench. The seat and the back are timber slats laid along the bench with gaps between them, and each end stands on a frame of two uprights joined at the top under the seat and at the foot. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "litter_bin",
+   "parts": [
+    "prism",
+    "prism"
+   ],
+   "draws": [
+    {
+     "form": "lathe",
+     "parts": [
+      0
+     ],
+     "segments": 32,
+     "profile_permille": [
+      [
+       0,
+       860
+      ],
+      [
+       30,
+       900
+      ],
+      [
+       880,
+       1000
+      ],
+      [
+       900,
+       960
+      ],
+      [
+       960,
+       960
+      ],
+      [
+       1000,
+       1000
+      ]
+     ]
+    },
+    {
+     "form": "lathe",
+     "parts": [
+      1
+     ],
+     "segments": 32,
+     "profile_permille": [
+      [
+       0,
+       1000
+      ],
+      [
+       450,
+       1000
+      ],
+      [
+       750,
+       820
+      ],
+      [
+       1000,
+       380
+      ]
+     ]
+    }
+   ],
+   "reason": "Authored: a round bin, narrower at its foot, with a rolled band near its rim, under a domed lid. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "cycle_stand",
+   "parts": [
+    "box",
+    "box",
+    "box"
+   ],
+   "draws": [
+    {
+     "form": "tube",
+     "parts": [
+      0,
+      1,
+      2
+     ],
+     "through": [
+      [
+       0,
+       "bottom"
+      ],
+      [
+       0,
+       "top"
+      ],
+      [
+       1,
+       "top"
+      ],
+      [
+       1,
+       "bottom"
+      ]
+     ],
+     "radius_permille": 1000,
+     "bend_mm": 180,
+     "segments": 12
+    }
+   ],
+   "reason": "Authored: a hoop stand, one tube bent into an arch: up one post, across the top and down the other, with round bends. Its two posts and its rail are the one tube. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sign_post",
+   "parts": [
+    "prism",
+    "box"
+   ],
+   "draws": [
+    {
+     "form": "lathe",
+     "parts": [
+      0
+     ],
+     "segments": 16,
+     "profile_permille": [
+      [
+       0,
+       1000
+      ],
+      [
+       25,
+       1000
+      ],
+      [
+       32,
+       760
+      ],
+      [
+       786,
+       760
+      ],
+      [
+       786,
+       0
+      ],
+      [
+       1000,
+       0
+      ]
+     ]
+    },
+    {
+     "form": "plate",
+     "parts": [
+      1
+     ],
+     "rim_mm": 22,
+     "inset_mm": 5
+    }
+   ],
+   "reason": "Authored: a round pole on a flanged foot, carrying a name plate framed by a raised rim. The pole ends at the plate's foot (786 thousandths of its height is the plate's 2200 mm of 2800), so the plate stands on it and nothing of the pole shows through or above the plate. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ],
+ "slot_entries": [
+  {
+   "key": "bench",
+   "parts_permille": [
+    {
+     "shape": "box",
+     "surface_role": "object_primary",
+     "offset_permille": [
+      0,
+      0,
+      867
+     ],
+     "size_permille": [
+      1000,
+      1000,
+      133
+     ]
+    },
+    {
+     "shape": "box",
+     "surface_role": "object_secondary",
+     "offset_permille": [
+      -400,
+      0,
+      0
+     ],
+     "size_permille": [
+      40,
+      900,
+      867
+     ]
+    },
+    {
+     "shape": "box",
+     "surface_role": "object_secondary",
+     "offset_permille": [
+      400,
+      0,
+      0
+     ],
+     "size_permille": [
+      40,
+      900,
+      867
+     ]
+    }
+   ],
+   "draws": [
+    {
+     "form": "slats",
+     "parts": [
+      0
+     ],
+     "count": 4,
+     "gap_mm": 20
+    },
+    {
+     "form": "frame",
+     "parts": [
+      1
+     ],
+     "bar_mm": 50,
+     "top": true,
+     "foot": true
+    },
+    {
+     "form": "frame",
+     "parts": [
+      2
+     ],
+     "bar_mm": 50,
+     "top": true,
+     "foot": true
+    }
+   ],
+   "reason": "Authored: a site's bench slot is a box as long and deep as the bench and as tall as its seat, so the bench drawn in it has no back: timber slats laid along it on two end frames, each frame two uprights joined at the top under the seat and at the foot. Parts are stated in thousandths of the slot's width, depth and height, centred on its base. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "fence_wood",
+   "parts_permille": [
+    {
+     "shape": "box",
+     "surface_role": "object_primary",
+     "offset_permille": [
+      0,
+      0,
+      0
+     ],
+     "size_permille": [
+      1000,
+      1000,
+      1000
+     ]
+    }
+   ],
+   "draws": [
+    {
+     "form": "rails",
+     "parts": [
+      0
+     ],
+     "post_mm": 100,
+     "spacing_mm": 2000,
+     "rail_mm": 90,
+     "rail_depth_mm": 40,
+     "rails_permille": [
+      420,
+      830
+     ]
+    }
+   ],
+   "reason": "Authored: a boundary run whose look is a timber fence (boundary.fence_wood, \"a timber post and rail fence\" in the island hamlet) is a box as long as the run, as thick as the fence and as tall as it, so the fence drawn in it is square posts as deep as the run at both ends and about every 2 m between, evenly spaced, and two rails between the end posts, narrower than the posts and centred in them, at 420 and 830 thousandths of its height. The run stays one box for the walk and picking; only its drawing changes. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}

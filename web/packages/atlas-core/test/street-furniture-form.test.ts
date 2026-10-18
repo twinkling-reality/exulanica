@@ -8,6 +8,8 @@ import {
 
 const TEXT = readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v1.json', 'utf8');
 const forms = readStreetFurnitureForms(TEXT);
+/** The catalog the page bundles: v1's forms and a timber fence for a boundary run. */
+const FORMS2 = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v2.json', 'utf8'));
 
 /** The parts a record of each class carries: the grammar's own catalog, field for field. */
 const GRAMMAR = JSON.parse(readFileSync('../assets/catalogs/street-furniture.v2.json', 'utf8')) as {
@@ -97,7 +99,7 @@ describe('street furniture form catalog', () => {
     expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 16, profile_permille: [[0, 1000], [600, 1000], [500, 900], [1000, 1000]] }, ['prism']))).toThrow(/must not go down/);
     expect(() => readStreetFurnitureForms(one({ form: 'lathe', parts: [0], segments: 16, profile_permille: [[0, 1001], [1000, 1000]] }, ['prism']))).toThrow(/from 0 to 1000/);
     expect(() => readStreetFurnitureForms(one({ form: 'tube', parts: [0], through: [[1, 'top'], [0, 'top']], radius_permille: 500, bend_mm: 100, segments: 8 }, ['box', 'box']))).toThrow(/does not draw/);
-    expect(() => readStreetFurnitureForms(one({ form: 'cone', parts: [0] }))).toThrow(/must be solid, slats, frame, lathe, tube or plate/);
+    expect(() => readStreetFurnitureForms(one({ form: 'cone', parts: [0] }))).toThrow(/must be solid, slats, frame, lathe, tube, plate or rails/);
   });
 });
 
@@ -142,8 +144,8 @@ describe('street furniture forms drawn', () => {
     // The page makes normals from the triangles: a vertex whose only triangle has no area gets none (NaN), and the
     // tile's surface batch then refuses to draw at all. The sign's pole once closed its top with such slivers.
     const drawn: [string, FurnitureSurface[]][] = [
-      ...CLASSES.map((key): [string, FurnitureSurface[]] => [key, furnitureFormSurfaces(forms, key, partsOf(key))!]),
-      ...[...forms.bySlotLeaf.keys()].map((leaf): [string, FurnitureSurface[]] => [`slot ${leaf}`, slotFurnitureSurfaces(forms, leaf, [2000, 500, 450])!]),
+      ...CLASSES.map((key): [string, FurnitureSurface[]] => [key, furnitureFormSurfaces(FORMS2, key, partsOf(key))!]),
+      ...[...FORMS2.bySlotLeaf.keys()].map((leaf): [string, FurnitureSurface[]] => [`slot ${leaf}`, slotFurnitureSurfaces(FORMS2, leaf, [2000, 500, 450])!]),
     ];
     for (const [what, surfaces] of drawn) {
       for (const surface of surfaces) {
@@ -199,6 +201,48 @@ describe('street furniture forms drawn', () => {
     // baked, never as slats of no width.
     const narrow = partsOf('bench').map((part, at) => (at === 0 ? { ...part, sizeYMm: 30, sizeZMm: 30 } : part));
     expect(furnitureFormSurfaces(forms, 'bench', narrow)).toBeNull();
+  });
+});
+
+describe('a boundary run drawn as a timber fence (catalog v2)', () => {
+  it('reads v2 as v1 with a timber fence for a boundary run, and v1 still reads as made', () => {
+    expect([forms.version, FORMS2.version]).toEqual([1, 2]);
+    expect([...FORMS2.byClass]).toEqual([...forms.byClass]);
+    expect(FORMS2.bySlotLeaf.get('bench')).toEqual(forms.bySlotLeaf.get('bench'));
+    expect([...forms.bySlotLeaf.keys()]).toEqual(['bench']);
+    expect([...FORMS2.bySlotLeaf.keys()]).toEqual(['bench', 'fence_wood']);
+  });
+
+  it('stands posts at both ends and at most 2 m apart, rails between the end posts, all inside the run\'s box', () => {
+    const triangles = (box: readonly [number, number, number]): number | null => {
+      const surfaces = slotFurnitureSurfaces(FORMS2, 'fence_wood', box);
+      return surfaces === null ? null : surfaces.reduce((sum, surface) => sum + surface.indices.length / 3, 0);
+    };
+    // Twelve triangles a box: 2 posts and 2 rails for a run up to 2.1 m, a third post past it; a 9.5 m run 6 posts.
+    expect(triangles([2100, 100, 1200])).toBe((2 + 2) * 12);
+    expect(triangles([2101, 100, 1200])).toBe((3 + 2) * 12);
+    expect(triangles([9500, 100, 1200])).toBe((6 + 2) * 12);
+    const run = slotFurnitureSurfaces(FORMS2, 'fence_wood', [9500, 100, 1200])!;
+    expect(run.map((surface) => surface.role)).toEqual(['object_primary']);
+    expect(unpairedEdges(run)).toEqual([]);
+    expect(volume(run)).toBeGreaterThan(0);
+    const xs: number[] = [];
+    for (let at = 0; at < run[0]!.positions.length; at += 3) {
+      const [x, y, z] = [run[0]!.positions[at]!, run[0]!.positions[at + 1]!, run[0]!.positions[at + 2]!];
+      expect(Math.abs(x)).toBeLessThanOrEqual(4750 + 1e-6);
+      expect(Math.abs(y)).toBeLessThanOrEqual(50 + 1e-6);
+      expect(z).toBeGreaterThanOrEqual(0);
+      expect(z).toBeLessThanOrEqual(1200 + 1e-6);
+      if (Math.abs(y) === 50) xs.push(x);
+    }
+    // The posts are the only boxes as deep as the run: their faces' x, sorted, step at most 2 m between posts.
+    const faces = [...new Set(xs.map((x) => x.toFixed(3)))].map(Number).sort((a, b) => a - b);
+    expect(faces[0]).toBe(-4750);
+    expect(faces.at(-1)).toBe(4750);
+    for (let at = 2; at < faces.length; at += 2) expect(faces[at]! - faces[at - 2]!).toBeLessThanOrEqual(2000);
+    // A run too short for two posts, or too shallow for its rails, is drawn as its box.
+    expect(slotFurnitureSurfaces(FORMS2, 'fence_wood', [150, 100, 1200])).toBeNull();
+    expect(slotFurnitureSurfaces(FORMS2, 'fence_wood', [9500, 30, 1200])).toBeNull();
   });
 });
 

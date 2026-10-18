@@ -263,7 +263,8 @@ export interface DrapedSlots {
  * Lay every slot a site on land marks `drape` on the land: a plane becomes a mesh over its
  * rectangle that bends where the land bends, and a box's corners rise and fall with the land under
  * them, each point as far above the land as the slot's base stands above the land under its base's
- * centre. The slot's entity and its material are kept; only its shape's mesh and its shape's own
+ * centre. A box drawn by a form (a bench, a timber fence: `drawSiteSlots`) keeps its form, each of its
+ * own vertices lifted so. The slot's entity and its material are kept; only its shape's mesh and its shape's own
  * placing change, and `undrape` puts both back.
  */
 export function drapeSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSiteDrawing, drawn: DrawnSiteSlots, land: SiteLand): DrapedSlots {
@@ -295,6 +296,20 @@ export function drapeSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSit
         const sw = j * w + i, se = sw + 1, nw = sw + w, ne = nw + 1;
         indices.push(sw, se, ne, sw, ne, nw);
       }
+    } else if (shape.render!.type === 'asset') {
+      // A box drawn by a form: its own vertices (in the slot's frame, the shape unplaced), each carried
+      // into the site's frame, lifted by the land under it and carried back; its surface along and up.
+      const own: number[] = [], ownIndices: number[] = [];
+      instance.mesh.getPositions(own);
+      instance.mesh.getIndices(ownIndices);
+      for (let at = 0; at < own.length; at += 3) {
+        toRoot.transformPoint(point.set(own[at]!, own[at + 1]!, own[at + 2]!), point);
+        const lift = land.groundMm(point.x * 1000, -point.z * 1000) - land.groundMm(cx, cy);
+        toLocal.transformPoint(point.set(point.x, point.y + lift / 1000, point.z), point);
+        positions.push(point.x, point.y, point.z);
+        surfaceMm.push(own[at]! * 1000 + width / 2, own[at + 1]! * 1000);
+      }
+      indices.push(...ownIndices);
     } else {
       // A box from its base up, its corners carried into the site's frame, lifted by the land
       // under each and carried back.

@@ -19,6 +19,7 @@ import {
   siteNavigationWorld,
   siteStart,
   slotColour,
+  drapeSiteSlots,
   drawSiteSlots,
   type StructuredSiteDrawing,
 } from '../src/playcanvas/generated-site/index.js';
@@ -166,7 +167,7 @@ describe('walking a site', () => {
 // Relative to web/, where the suite runs: the catalog a deployment ships.
 const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const ROOF_FORMS = readRoofForms(readFileSync('../assets/catalogs/world-kinds/roof-form.v1.json', 'utf8'));
-const FURNITURE_FORMS = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v1.json', 'utf8'));
+const FURNITURE_FORMS = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v2.json', 'utf8'));
 const bytes = (rgb: readonly number[]): number[] => rgb.map((channel) => Math.round(channel * 255));
 /** The default light of the committed cozy town pack, which states a ground beyond the world: a lawn, 0.6 m down. */
 const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy-town/manifest.json', 'utf8')) as {
@@ -243,6 +244,50 @@ describe('drawing a site', () => {
     expect(turn(formed)).toEqual(turn(plain));
     // Every other slot is drawn as without the forms.
     expect((formed.root.findByName('shed:wall:0:shape') as pc.Entity).render!.type).toBe('box');
+    plain.destroy();
+    formed.destroy();
+  });
+
+  it('draws a timber fence run as posts and rails inside its box, and a stone wall run as its box', () => {
+    const { app } = nullApp();
+    const document = served();
+    // The yard's north side: a 9.5 m fence run 100 mm thick and 1.2 m tall, and a stone wall run beside it.
+    (document['slots'] as unknown[]).push(
+      slot('fence:0', 'boundary.fence_wood', 'box', [4750, 11_950, 0], 0, [9500, 100, 1200]),
+      slot('wall:0', 'boundary.wall_stone', 'box', [9750, 11_950, 0], 0, [500, 100, 1200]),
+    );
+    const fenced = parseStructuredSiteDrawing(document);
+    const plain = drawSiteSlots(app.graphicsDevice, fenced, MATERIALS);
+    const formed = drawSiteSlots(app.graphicsDevice, fenced, MATERIALS, null, FURNITURE_FORMS);
+    expect((plain.root.findByName('fence:0:shape') as pc.Entity).render!.type).toBe('box');
+    expect((formed.root.findByName('wall:0:shape') as pc.Entity).render!.type).toBe('box');
+    const mesh = (formed.root.findByName('fence:0:shape') as pc.Entity).render!.meshInstances[0]!.mesh;
+    const positions: number[] = [];
+    mesh.getPositions(positions);
+    const indices: number[] = [];
+    mesh.getIndices(indices);
+    // Six posts (both ends and every 1.88 m between) and two rails, each a closed box of twelve triangles.
+    expect(indices.length / 3).toBe((6 + 2) * 12);
+    // Within its box, metres in the renderer's frame (the mesh holds 32-bit floats).
+    for (let at = 0; at < positions.length; at += 3) {
+      expect(Math.abs(positions[at]!)).toBeLessThanOrEqual(4.75 + 1e-6);
+      expect(positions[at + 1]!).toBeGreaterThanOrEqual(-1e-6);
+      expect(positions[at + 1]!).toBeLessThanOrEqual(1.2 + 1e-6);
+      expect(Math.abs(positions[at + 2]!)).toBeLessThanOrEqual(0.05 + 1e-6);
+    }
+    // Draped on land rising 0.1 m a metre eastward, the fence keeps its posts and rails, each vertex lifted by the
+    // land under it: its west end 0.475 m down, its east end 0.475 m up, as the run's centre stands on the land.
+    const onLand = { ...fenced, slots: fenced.slots.map((one) => (one.identity === 'fence:0' ? { ...one, drape: true as const } : one)) };
+    const draped = drapeSiteSlots(app.graphicsDevice, onLand, formed, { groundMm: (x: number) => x / 10 } as unknown as Parameters<typeof drapeSiteSlots>[3]);
+    expect(draped.draped).toBe(1);
+    const laid: number[] = [];
+    (formed.root.findByName('fence:0:shape') as pc.Entity).render!.meshInstances[0]!.mesh.getPositions(laid);
+    expect(laid.length).toBe(positions.length);
+    const ys = (end: number): number[] => laid.filter((_, at) => at % 3 === 1 && Math.abs(laid[at - 1]! - end) < 1e-6);
+    expect(Math.min(...ys(-4.75))).toBeCloseTo(-0.475, 5);
+    expect(Math.max(...ys(4.75))).toBeCloseTo(1.2 + 0.475, 5);
+    draped.undrape();
+    draped.destroy();
     plain.destroy();
     formed.destroy();
   });
