@@ -272,7 +272,7 @@ describe('who a person is and what they are doing, in words', () => {
       action: { kind: 'visit', status: 'completed', target_id: 't-gone', remaining_ticks: 0, reason: 'reviewed_duration_elapsed' },
     });
     // A place the person's objects no longer name is said to be gone, never guessed at.
-    expect(done.doing).toBe('Just finished visiting a place that is no longer there.');
+    expect(`${done.doing} ${done.why}`).toBe('Standing, deciding where to go. Because they finished visiting a place that is no longer there.');
   });
 
   it('says a reason code it has no words for is in the record, rather than guessing or printing the code', () => {

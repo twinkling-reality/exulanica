@@ -1,6 +1,6 @@
 /**
  * Who a simulated person is and what they are doing, in words, read from the one data file the
- * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v5.json`.
+ * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v6.json`.
  *
  * The choice of sentence for a state is code here and in `exulanica/selection/inhabitant_words.py`,
  * and both run the same cases (`tests/fixtures/society-inhabitant-words/cases.json`), so the
@@ -8,7 +8,7 @@
  * sentence here says what anybody talked about.
  */
 
-import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v5.json?raw';
+import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v6.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 import { societyEngine } from './society-engines.js';
@@ -257,6 +257,14 @@ export function inhabitantWordsFrom(
   // way, which would hide why they set out (a model's choice, say).
   const acting = action.status === 'blocked'
     || (under !== undefined && under.setting !== 'object' && action.reason !== under.underWayReason);
+  // A finished activity is said in the because line, while the doing line says what they do now (J36):
+  // a doing the catalog gives a `why_` phrase says why in it. A reason with a line of its own (`why_<doing>_<reason>`:
+  // a talk the other person left did not finish) says it where the other person is named, and by the reason's own
+  // line where not.
+  const own = TABLES.phrase[`why_${chosen}_${action.reason}`];
+  const named = goal?.partner_id ? partner(goal.partner_id) : null;
+  const finished = own === undefined ? TABLES.phrase[`why_${chosen}`] : named ? own : undefined;
+  if (finished !== undefined) return { who, what, doing, why: fill(finished, { place: where(action.target_id), partner: met }) };
   const code = !acting && goal !== null ? goal.reason : action.reason;
   const reason = code !== 'chosen_by_their_model' ? reasonWords(code)
     : playedByPerson ? words('phrase', 'chosen_by_their_player')

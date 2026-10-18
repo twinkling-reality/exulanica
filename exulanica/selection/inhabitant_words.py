@@ -1,7 +1,7 @@
 """Who a simulated person is and what they are doing, in the words the inspector uses.
 
 The words are one data file,
-``assets/catalogs/society-words/society-inhabitant-words.v5.json``, which the browser's inspector
+``assets/catalogs/society-words/society-inhabitant-words.v6.json``, which the browser's inspector
 reads too (``web/packages/app/src/society-inhabitant-words.ts``). The choice of sentence for a
 state is code on both sides, and both are held to one set of cases,
 ``tests/fixtures/society-inhabitant-words/cases.json``, which ``tests/test_inhabitant_words.py`` and
@@ -45,7 +45,7 @@ CATALOG_PATH: Final = (
     / "assets"
     / "catalogs"
     / "society-words"
-    / "society-inhabitant-words.v5.json"
+    / "society-inhabitant-words.v6.json"
 )
 
 ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
@@ -396,4 +396,14 @@ def inhabitant_words(
         and action.get("reason") != under.under_way_reason
     )
     code = goal["reason"] if not acting and goal is not None else action.get("reason", "")
+    # A finished activity is said in the because line, while the doing line says what they do now
+    # (J36): a doing the catalog gives a ``why_`` phrase says why in it. A reason with a line of its
+    # own (``why_<doing>_<reason>``: a talk the other person left did not finish) says it where the
+    # other person is named, and by the reason's own line where not.
+    own = phrase.get(f"why_{chosen}_{action.get('reason')}")
+    named = partner(partner_id) if partner_id else None
+    finished = phrase.get(f"why_{chosen}") if own is None else own if named else None
+    if finished is not None:
+        why = finished.format(place=where(action.get("target_id")), partner=met)
+        return InhabitantWords(who, what, doing, why)
     return InhabitantWords(who, what, doing, phrase["because"].format(reason=words.reason(code)))

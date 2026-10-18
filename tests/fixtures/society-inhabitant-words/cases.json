@@ -381,8 +381,8 @@
       "expected": {
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Just finished resting at Bench 2.",
-        "why": "Because they need a rest, and it is the nearest place to rest they have not just used."
+        "doing": "Standing, deciding where to go.",
+        "why": "Because they finished resting at Bench 2."
       }
     },
     {
@@ -406,8 +406,8 @@
       "expected": {
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Just finished visiting Pillar.",
-        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
+        "doing": "Standing, deciding where to go.",
+        "why": "Because they finished visiting Pillar."
       }
     },
     {
@@ -481,8 +481,8 @@
       "expected": {
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Just finished standing a while.",
-        "why": "Because they have been at it as long as they meant to."
+        "doing": "Standing, deciding where to go.",
+        "why": "Because they had stood there as long as they meant to."
       }
     },
     {
@@ -611,7 +611,33 @@
       "expected": {
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
-        "doing": "Just finished talking with Bela Ash 2.",
+        "doing": "Standing, deciding where to go.",
+        "why": "Because Bela Ash 2 left while they were talking."
+      }
+    },
+    {
+      "case": "finished talking, the other left, not named",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "talk",
+          "status": "completed",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "partner_left"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-gone"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing, deciding where to go.",
         "why": "Because the person they were talking with left."
       }
     },

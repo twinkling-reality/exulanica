@@ -82,10 +82,10 @@ describe('what the inspector says of each new behaviour', () => {
       .toBe('Talking with Bo, 3 more minutes. Because they met someone and stopped to talk.');
     expect(words([person('a', 'Ada', talk('b', {
       action: { kind: 'talk', status: 'completed', target_id: null, remaining_ticks: 0, reason: 'reviewed_duration_elapsed' },
-    })), person('b', 'Bo', talk('a'))])).toBe('Just finished talking with Bo. Because they have been at it as long as they meant to.');
+    })), person('b', 'Bo', talk('a'))])).toBe('Standing, deciding where to go. Because they finished talking with Bo.');
     expect(words([person('a', 'Ada', talk('b', {
       action: { kind: 'talk', status: 'completed', target_id: null, remaining_ticks: 3, reason: 'partner_left' },
-    })), person('b', 'Bo')])).toBe('Just finished talking with Bo. Because the person they were talking with left.');
+    })), person('b', 'Bo')])).toBe('Standing, deciding where to go. Because Bo left while they were talking.');
     // Without the people to name them from, the other person is somebody nearby, never guessed.
     const snapshot = read([person('a', 'Ada', talk('b')), person('b', 'Bo', talk('a'))]);
     expect(inhabitantWords(snapshot.state.inhabitants[0]!, []).doing).toBe('Talking with someone nearby, 3 more minutes.');
@@ -100,7 +100,7 @@ describe('what the inspector says of each new behaviour', () => {
     expect(standing({ kind: 'stand', status: 'active', target_id: null, remaining_ticks: 1, reason: 'standing_a_while' }))
       .toBe('Standing a while, one more minute. Because they chose to stop and stand a while.');
     expect(standing({ kind: 'stand', status: 'completed', target_id: null, remaining_ticks: 0, reason: 'reviewed_duration_elapsed' }))
-      .toBe('Just finished standing a while. Because they have been at it as long as they meant to.');
+      .toBe('Standing, deciding where to go. Because they had stood there as long as they meant to.');
   });
 
   it('says why a rested person sits or looks around', () => {

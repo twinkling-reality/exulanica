@@ -24,7 +24,7 @@ const CASES = JSON.parse(
   readonly cases: readonly Case[];
 };
 const CATALOG = JSON.parse(
-  readFileSync(new URL('../../../../assets/catalogs/society-words/society-inhabitant-words.v5.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../../assets/catalogs/society-words/society-inhabitant-words.v6.json', import.meta.url), 'utf8'),
 ) as { readonly entries: readonly { readonly kind: string; readonly code: string; readonly words: string }[] };
 
 describe('a simulated person in words, as the server says them', () => {

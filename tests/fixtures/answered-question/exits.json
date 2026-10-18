@@ -297,7 +297,7 @@
         "citations": [
           "TOKEN00001"
         ],
-        "text": "[inhabitant A]: Just finished talking with [inhabitant B].",
+        "text": "[inhabitant A]: Standing, deciding where to go.",
         "type": "simulation",
         "value_refs": []
       },
@@ -306,7 +306,7 @@
           "TOKEN00001",
           "TOKEN00002"
         ],
-        "text": "Because they have been at it as long as they meant to.",
+        "text": "Because they finished talking with [inhabitant B].",
         "type": "simulation",
         "value_refs": []
       },
@@ -349,7 +349,7 @@
         [
           "synthetic_inhabitant",
           40,
-          "[inhabitant A]: Just finished talking with [inhabitant B]. Because they have been at it as long as they meant to."
+          "[inhabitant A]: Standing, deciding where to go. Because they finished talking with [inhabitant B]."
         ],
         [
           "simulation_event",
