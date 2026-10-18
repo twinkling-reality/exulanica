@@ -18,6 +18,7 @@ import json
 import math
 import pathlib
 import re
+import threading
 import uuid
 from collections import OrderedDict
 from types import MappingProxyType
@@ -524,6 +525,27 @@ def test_a_generated_world_s_tile_is_baked_off_the_request_and_served_only_to_it
         assert refused.json()["code"] == "unknown_reference"
 
 
+def test_a_tile_s_two_bakes_run_at_once(made, tmp_path, monkeypatch):
+    """A tile's two bakes are the same work on the same document, a child process each, so they
+    run side by side: here each waits for the other to begin, which only two at once get past."""
+    api = made
+    store = tile_store(tmp_path / "data")
+    api.client.app.state.services = dataclasses.replace(api.client.app.state.services, tiles=store)
+    baker = _baker(api, store, tmp_path, monkeypatch)
+    stub = GeneratedTileBaker._bake
+    both = threading.Barrier(2, timeout=10)
+
+    def wait_for_the_other(self, document, container):
+        both.wait()
+        return stub(self, document, container)
+
+    monkeypatch.setattr(GeneratedTileBaker, "_bake", wait_for_the_other)
+    _town(api, "Side by side")
+    count = len(world_recipe("small_town").tiles)
+    outcomes = baker.drain([api.repository.workspace_id])
+    assert [(o.status, o.detail) for o in outcomes] == [("baked", "stored then identical")] * count
+
+
 def test_a_world_is_never_left_being_built_when_a_bake_fails_or_is_stranded(
     made, tmp_path, monkeypatch
 ):
@@ -942,7 +964,8 @@ def test_a_tile_whose_determinism_check_was_refused_waits_and_is_not_drawn(
     def second_bake_disagrees(self, document, container):
         statement = stub(self, document, container)
         bakes.append(container.name)
-        if len(bakes) == 2:
+        # The two bakes run at once, so the second is the one its container names, the first time.
+        if container.name.endswith(".second.owd") and bakes.count(container.name) == 1:
             data = container.read_bytes() + b"!"
             container.write_bytes(data)
             statement = {**statement, "container_sha256": hashlib.sha256(data).hexdigest()}

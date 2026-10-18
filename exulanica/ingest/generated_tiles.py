@@ -8,9 +8,9 @@ drains them one workspace at a time:
    records through its receipt (:func:`~exulanica.world.generated_worlds.town_records`), the one
    interface a generated world's records are read by, and the tile documents they make.
 2. It **bakes** the tile with the tessellator's Node build (``web/packages/loom-tess``) twice, in
-   a child process each, under a wall-clock timeout, as the offline bake does. The child is given
-   only the environment :func:`child_environment` allows, so no database URL, credential or key
-   this worker holds reaches Node or a web dependency.
+   a child process each, both at once, under a wall-clock timeout, as the offline bake does. The
+   child is given only the environment :func:`child_environment` allows, so no database URL,
+   credential or key this worker holds reaches Node or a web dependency.
 3. It **publishes** each bake through the publisher connection, as ``exulanica_tiles``, which may
    execute ``record_baked_tile_bake`` and nothing else (migration 0138); that function runs with
    its owner's rights and accepts only a bake of the stage the installation runs (0144). The first
@@ -49,6 +49,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -567,8 +568,9 @@ class GeneratedTileBaker:
         provenance: Mapping[str, Any],
         publish: Callable[[Mapping[str, Any], bytes], str],
     ) -> tuple[uuid.UUID, list[str]]:
-        """Bake ``document`` twice and publish each bake with ``publish(fields, container)``; the
-        receipt carries ``provenance`` beside the stage and the bake's statement."""
+        """Bake ``document`` twice, both at once, and publish each bake in turn with
+        ``publish(fields, container)``; the receipt carries ``provenance`` beside the stage and the
+        bake's statement."""
         spec = STAGES["baked_tile"]
         tile = document.tile
         key = baked_tile_id(spec, tile)
@@ -577,9 +579,17 @@ class GeneratedTileBaker:
         with tempfile.TemporaryDirectory() as work:
             document_path = Path(work) / f"tile-{tile.tile_x}-{tile.tile_y}.json"
             document_path.write_bytes(data)
-            for bake in ("first", "second"):
-                container_path = Path(work) / f"tile-{tile.tile_x}-{tile.tile_y}.{bake}.owd"
-                statement = self._bake(document_path, container_path)
+            containers = [
+                Path(work) / f"tile-{tile.tile_x}-{tile.tile_y}.{bake}.owd"
+                for bake in ("first", "second")
+            ]
+            # The same work on the same document, a child process each: side by side they take
+            # the time of one. The first is still published first.
+            with ThreadPoolExecutor(max_workers=len(containers)) as bakes:
+                statements = list(
+                    bakes.map(lambda path: self._bake(document_path, path), containers)
+                )
+            for container_path, statement in zip(containers, statements, strict=True):
                 container = container_path.read_bytes()
                 if hashlib.sha256(container).hexdigest() != statement["container_sha256"]:
                     raise RuntimeError("the bake's statement and its bytes disagree")
