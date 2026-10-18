@@ -387,11 +387,26 @@ function lathe(out: Builder, part: FurniturePart, segments: number, profile: rea
     const lower = ring(height(h0), r0 / 1000);
     const upper = ring(height(h1), r1 / 1000);
     const first = out.positions.length / 3;
+    const sAt = (k: number): number => (2 * Math.PI * k * Math.max(rx, ry)) / segments;
+    if (r0 === 0 || r1 === 0) {
+      // A ring of no radius is one point, so the band is a fan: one triangle a segment, each with its own tip.
+      // A quad's second triangle would have two corners on that point and no area, and a vertex whose only
+      // triangle has no area gets no normal, which keeps a tile from drawing at all.
+      const rim = r1 === 0 ? lower : upper;
+      const tip = (r1 === 0 ? upper : lower)[0]!;
+      for (let k = 0; k <= segments; k += 1) out.vertex(rim[k % segments]!, sAt(k), -rim[k % segments]![2]);
+      for (let k = 0; k < segments; k += 1) out.vertex(tip, sAt(r1 === 0 ? k + 1 : k), -tip[2]);
+      for (let k = 0; k < segments; k += 1) {
+        const [a, b, t] = [first + k, first + k + 1, first + segments + 1 + k];
+        // Counter-clockwise from outside, as the quads below: up the seam, then across.
+        if (r1 === 0) out.indices.push(a, b, t); else out.indices.push(t, b, a);
+      }
+      continue;
+    }
     for (let k = 0; k <= segments; k += 1) {
       const i = k % segments;
-      const s = (2 * Math.PI * k * Math.max(rx, ry)) / segments;
-      out.vertex(lower[i]!, s, -lower[i]![2]);
-      out.vertex(upper[i]!, s, -upper[i]![2]);
+      out.vertex(lower[i]!, sAt(k), -lower[i]![2]);
+      out.vertex(upper[i]!, sAt(k), -upper[i]![2]);
     }
     for (let k = 0; k < segments; k += 1) {
       const a = first + k * 2;
