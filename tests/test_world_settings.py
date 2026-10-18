@@ -273,6 +273,147 @@ def test_dusk_is_the_looks_own_evening_and_figures_for_a_look_that_states_none()
     ws.apply_setting(day_only, ws.read_setting(composed, RULES), _case_context(), RULES)
 
 
+#: A computed sky as a look states one, for the parts' figures over it.
+ANALYTIC = {
+    "kind": "analytic",
+    "turbidity_permille": 2200,
+    "rayleigh_permille": 1000,
+    "mie_micro": 3500,
+    "mie_direction_permille": 780,
+}
+
+
+def _computed(pack: ws.ResolvedPack) -> ws.ResolvedPack:
+    """``pack`` with its default preset's sky computed from its sun."""
+    presets = copy.deepcopy(dict(pack.light["presets"]))
+    presets[pack.light["default_preset"]]["sky"]["model"] = dict(ANALYTIC)
+    return ws.ResolvedPack(
+        light={**pack.light, "presets": presets},
+        edge=pack.edge,
+        swatches=pack.swatches,
+        surfaces=pack.surfaces,
+    )
+
+
+def _part_light(key: str) -> dict[str, Any]:
+    return next(part for (axis, name), part in PARTS.parts.items() if name == key)["light"][0]
+
+
+def test_a_computed_sky_takes_a_parts_own_figures_for_it_and_a_gradient_none() -> None:
+    town = _case_pack("town")
+    computed = _computed(town)
+    noon = _part_light("clear_noon")
+    # A computed sky at a noon sun is several times a gradient's brightness: the part dims it there.
+    assert noon["for_sky_model"]["analytic"] == {
+        "sky.intensity_permille": 250,
+        "environment.intensity_permille": 450,
+    }
+    assert noon["changes"]["sky.intensity_permille"] == 1000
+    over_gradient = ws.compose_setting({"sky": "clear_noon"}, town, _case_context(), PARTS)
+    assert over_gradient["light"]["changes"] == noon["changes"]
+    over_computed = ws.compose_setting({"sky": "clear_noon"}, computed, _case_context(), PARTS)
+    assert over_computed["light"]["changes"] == {
+        **noon["changes"],
+        **noon["for_sky_model"]["analytic"],
+    }
+    applied = ws.apply_setting(
+        computed, ws.read_setting(over_computed, RULES), _case_context(), RULES
+    )
+    assert applied.preset["sky"]["model"] == ANALYTIC
+    assert applied.preset["sky"]["intensity_permille"] == 250
+    # Under full cloud the part draws its own gradient over a computed sky, as the night does on
+    # any look, and over a gradient it states nothing of the sky's model.
+    for key in ("overcast", "thick_fog"):
+        plain = ws.compose_setting({"sky": key}, town, _case_context(), PARTS)
+        assert "sky.model" not in plain["light"]["changes"]
+        composed = ws.compose_setting({"sky": key}, computed, _case_context(), PARTS)
+        assert composed["light"]["changes"] == {**plain["light"]["changes"], "sky.model": None}
+        drawn = ws.apply_setting(computed, ws.read_setting(composed, RULES), _case_context(), RULES)
+        assert drawn.preset["sky"]["model"] is None
+
+
+def test_a_sky_a_part_turns_to_the_gradient_takes_none_of_its_computed_figures(
+    tmp_path: Path,
+) -> None:
+    source = json.loads((STYLE_PACKS / "settings" / ws.PARTS_FILE).read_text("utf-8"))
+    night = next(part for part in source["parts"] if part["key"] == "night")
+    night["light"][0]["for_sky_model"] = {"analytic": {"exposure_permille": 500}}
+    (tmp_path / "settings").mkdir()
+    (tmp_path / "settings" / ws.PARTS_FILE).write_text(json.dumps(source), "utf-8")
+    parts = ws.load_setting_parts(tmp_path / "settings", RULES)
+    composed = ws.compose_setting(
+        {"sky": "night"}, _computed(_case_pack("town")), _case_context(), parts
+    )
+    assert (
+        composed["light"]["changes"]["exposure_permille"]
+        == night["light"][0]["changes"]["exposure_permille"]
+    )
+
+
+def test_the_earlier_parts_file_still_reads_and_composes_as_it_did(tmp_path: Path) -> None:
+    """Version 2, unread by the host, stays as it was: under this reader it reads, and its noon over
+    a computed sky is its own figures, with none for that sky."""
+    earlier = (STYLE_PACKS / "settings" / "setting-parts.v2.json").read_text("utf-8")
+    assert '"version": 2' in earlier and "for_sky_model" not in earlier
+    (tmp_path / "settings").mkdir()
+    (tmp_path / "settings" / ws.PARTS_FILE).write_text(earlier, "utf-8")
+    parts = ws.load_setting_parts(tmp_path / "settings", RULES)
+    assert parts.version == 2 and parts.parts.keys() == PARTS.parts.keys()
+    composed = ws.compose_setting(
+        {"sky": "clear_noon"}, _computed(_case_pack("town")), _case_context(), parts
+    )
+    assert composed["light"]["changes"]["sky.intensity_permille"] == 1000
+
+
+def test_a_parts_figures_for_a_computed_sky_name_a_model_and_values_a_setting_may_change(
+    tmp_path: Path,
+) -> None:
+    source = json.loads((STYLE_PACKS / "settings" / ws.PARTS_FILE).read_text("utf-8"))
+    at = next(index for index, part in enumerate(source["parts"]) if part["key"] == "clear_noon")
+    (tmp_path / "settings").mkdir()
+
+    def load(document: dict[str, Any]) -> ws.SettingParts:
+        (tmp_path / "settings" / ws.PARTS_FILE).write_text(json.dumps(document), "utf-8")
+        return ws.load_setting_parts(tmp_path / "settings", RULES)
+
+    unknown = copy.deepcopy(source)
+    unknown["parts"][at]["light"][0]["for_sky_model"] = {"gradient": {"exposure_permille": 900}}
+    with pytest.raises(style_packs.StylePackRefused) as refused:
+        load(unknown)
+    assert (refused.value.reason, refused.value.path) == (
+        "reference",
+        f"parts[{at}].light[0].for_sky_model.gradient",
+    )
+    finish = copy.deepcopy(source)
+    finish["parts"][at]["light"][0]["for_sky_model"]["analytic"]["tone_mapping"] = "linear"
+    with pytest.raises(style_packs.StylePackRefused) as refused:
+        load(finish)
+    assert (refused.value.reason, refused.value.path) == (
+        "reference",
+        f"parts[{at}].light[0].for_sky_model.analytic.tone_mapping",
+    )
+
+
+def test_the_parts_name_the_sky_models_the_look_reader_reads() -> None:
+    """The kinds a part may state figures for are the look reader's own: it reads a preset whose
+    sky is computed by each, and refuses one of another kind."""
+    town = CASES["packs"]["town"][0]
+
+    def read(kind: str) -> dict[str, Any]:
+        manifest = copy.deepcopy(town)
+        manifest["light"]["presets"]["day"]["sky"]["model"] = {**ANALYTIC, "kind": kind}
+        return style_packs.read_manifest(manifest, _case_context())
+
+    for kind in ws.SKY_MODEL_KINDS:
+        assert read(kind)["light"]["presets"]["day"]["sky"]["model"]["kind"] == kind
+    with pytest.raises(style_packs.StylePackRefused) as refused:
+        read("gradient")
+    assert (refused.value.reason, refused.value.path) == (
+        "range",
+        "light.presets.day.sky.model.kind",
+    )
+
+
 def test_a_part_that_is_not_listed_is_refused_by_name() -> None:
     with pytest.raises(ws.SettingRefused) as refused:
         ws.compose_setting({"sky": "aurora"}, _case_pack("town"), _case_context(), PARTS)

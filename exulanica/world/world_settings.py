@@ -24,14 +24,17 @@ told apart. What a setting may change in a preset, the rules' figures and the bo
 ``assets/style-packs/settings/setting-cases.v1.json`` holds both to the same verdict on every case:
 the same refusal by reason and path, or the same digest of the setting and of the pack as drawn.
 
-**Named parts.** ``assets/style-packs/settings/setting-parts.v2.json`` (:data:`PARTS_FILE`) lists
+**Named parts.** ``assets/style-packs/settings/setting-parts.v3.json`` (:data:`PARTS_FILE`) lists
 parts a person or a model may choose by name, one an axis (a sky, a ground, a cover), each stated
 for any pack. :func:`compose_setting` turns the chosen parts into the exact setting for one pack: a
 part's swatch the pack does not have is left out, its colour for a family's upward faces becomes one
 entry for each surface of that family the pack dresses, and its light is the first of its
-alternatives whose preset the pack states. The setting stores the figures, not the names, so a later
-version of the parts never changes a world. An earlier version stays at its own path for the records
-that name it by digest and is not read.
+alternatives whose preset the pack states. An alternative may state what it changes over a sky the
+pack computes from its sun (``for_sky_model``, by the model's kind): such a sky grows brighter as
+its sun climbs, which a gradient's colours do not, so the same figures cannot serve both. The
+setting stores the figures, not the names, so a later version of the parts never changes a world.
+Earlier versions stay at their paths and are not read, version 1 for the record that names it by
+digest.
 
 INTEGERS ONLY, as a pack: a setting's identity is the SHA-256 of its canonical bytes.
 """
@@ -99,8 +102,10 @@ __all__ = [
 PROFILE: Final = "exulanica.world-setting/v1"
 RULES_PROFILE: Final = "exulanica.world-setting-rules/v1"
 PARTS_PROFILE: Final = "exulanica.world-setting-parts/v1"
-#: The parts file read: version 2 states the stars and the moon's face at night.
-PARTS_FILE: Final = "setting-parts.v2.json"
+#: The parts file read: version 3 states what a part's light changes over a computed sky.
+PARTS_FILE: Final = "setting-parts.v3.json"
+#: The kinds of computed sky a look's preset may state (``sky.model``), as its reader reads them.
+SKY_MODEL_KINDS: Final = ("analytic",)
 #: The profile of the parts as ``GET /world/style-packs`` lists them.
 LISTING_PROFILE: Final = "exulanica.world-setting-part-list/v1"
 #: The most manifests a pack resolves through, itself and its bases, as the browser's
@@ -617,13 +622,20 @@ def load_setting_parts(
     def anything(item: Any, _path: str) -> Any:
         return item
 
+    def model_kind(name: str, path: str) -> None:
+        if name not in SKY_MODEL_KINDS:
+            raise StylePackRefused("reference", path, "names no sky model a look may state")
+
+    changes = _record(change_key, anything, len(rules.light_changes))
+
     def alternative(value: Any, path: str) -> dict[str, Any]:
         return _object(
             value,
             path,
             {
                 "from": _nullable(key),
-                "changes": _record(change_key, anything, len(rules.light_changes)),
+                "changes": changes,
+                "for_sky_model": _Optional(_record(model_kind, changes, len(SKY_MODEL_KINDS))),
             },
         )
 
@@ -704,7 +716,9 @@ def compose_setting(
     one's. A part's swatch the pack does not state is left out; its colour for a family's upward
     faces becomes one entry for each surface of that family the pack or an earlier part dresses;
     its light is the first alternative whose preset the pack states (None names the pack's
-    default), and a second part's light adds its changes to the first's. A part that is not
+    default), with what the alternative changes over a sky computed by the preset's model when the
+    sky is still computed after its changes, and a second part's light adds its changes to the
+    first's. A part that is not
     listed is refused by name. The result is unchecked: :func:`apply_setting` checks it."""
     for axis, key in chosen.items():
         if (axis, key) not in parts.parts:
@@ -731,7 +745,15 @@ def compose_setting(
                 continue
             if setting["light"] is None:
                 setting["light"] = {"from": source, "changes": {}}
-            setting["light"]["changes"].update(copy.deepcopy(alternative["changes"]))
+            changes = setting["light"]["changes"]
+            changes.update(copy.deepcopy(alternative["changes"]))
+            # The sky as the setting draws it so far: the preset's own model unless a change
+            # restated it, a null model being the gradient.
+            sky = pack.light["presets"][setting["light"]["from"]]["sky"]
+            model = changes["sky.model"] if "sky.model" in changes else sky.get("model")
+            over = alternative.get("for_sky_model", {})
+            if model is not None and model["kind"] in over:
+                changes.update(copy.deepcopy(over[model["kind"]]))
             break
         for role, colour in part["surfaces"].items():
             setting["surfaces"][role] = dict(colour)

@@ -16,7 +16,7 @@ import { parseSettingOffer, parseWorldDraft, type OfferedSetting, type WorldDraf
 import { WorldEntryClient } from '../src/world-entry-api.js';
 
 const REPOSITORY = new FileUrl('../../../../', import.meta.url);
-const PARTS = JSON.parse(readFileSync(new FileUrl('assets/style-packs/settings/setting-parts.v2.json', REPOSITORY), 'utf8')) as {
+const PARTS = JSON.parse(readFileSync(new FileUrl('assets/style-packs/settings/setting-parts.v3.json', REPOSITORY), 'utf8')) as {
   version: number; axes: { key: string; title: string }[]; parts: { axis: string; key: string; title: string; description: string }[];
 };
 const SETTINGS = {

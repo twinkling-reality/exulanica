@@ -72,7 +72,7 @@ function shadeBlueOverRed(pack: ResolvedStylePack): number {
 
 describe('the named parts of a setting, composed for every committed look', () => {
   it('cover every look and every part, alone and one of each axis together', () => {
-    const listed = (read('style-packs/settings/setting-parts.v2.json') as { parts: unknown[] }).parts.length;
+    const listed = (read('style-packs/settings/setting-parts.v3.json') as { parts: unknown[] }).parts.length;
     const looks = new Set(COMPOSED.map((row) => row.pack_id));
     expect(looks.size).toBeGreaterThanOrEqual(3);
     expect(COMPOSED.length).toBe(looks.size * (listed + 1));

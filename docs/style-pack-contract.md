@@ -931,10 +931,10 @@ as drawn (`tests/test_world_settings.py`, `web/packages/atlas-core/test/world-se
 Every look the library holds stands in light its own setting rule accepts, in every version it
 still serves.
 
-**Named parts.** `setting-parts.v2.json` lists parts a person or a model chooses by name, one an
-axis, each stated for any pack (version 2 gives the night its stars, the moon's face, a moon dim enough for its face to show and
-its own gradient sky on any look; version 1 stays at its path for the record that names it by
-digest, and is not read):
+**Named parts.** `setting-parts.v3.json` lists parts a person or a model chooses by name, one an
+axis, each stated for any pack (the night has its stars, the moon's face, a moon dim enough for its face to show and
+its own gradient sky on any look; earlier versions stay at their paths and are not read, version 1
+for the record that names it by digest):
 
 | Axis | Parts |
 | --- | --- |
@@ -946,7 +946,12 @@ The host composes the chosen parts into the exact setting for one pack (`compose
 axes' order, a later part's colour for a role replacing an earlier one's: a part's swatch the pack
 does not state is left out, its colour for a family's upward faces becomes one entry for each
 surface of that family the pack dresses, and its light is the first of its alternatives whose
-preset the pack states, so dusk is a pack's own evening preset where it has one. The setting stores
+preset the pack states, so dusk is a pack's own evening preset where it has one. Over a sky the
+pack computes from its sun (`sky.model`), an alternative also takes its figures for that model's
+kind (`for_sky_model`) when the sky is still computed after its changes: such a sky grows brighter
+as its sun climbs, which a gradient's colours do not, so clear noon states its own dimmer sky and
+image light there, and overcast and thick fog draw their own gradient under their full cloud, as
+the night does on any look. The setting stores
 the figures and the parts' keys, so a later version of the parts file never changes a world. Each
 part, composed for every look of the library, is drawn by the browser's reader and held to the bound
 every look's own light is held to, a surface in shade lit at most twice as blue as red

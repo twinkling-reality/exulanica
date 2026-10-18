@@ -93,7 +93,7 @@ def test_the_list_names_every_committed_pack_with_its_licence_and_attribution(cl
 def test_the_list_states_the_named_parts_a_worlds_setting_is_chosen_from(client) -> None:
     """Read from the committed parts file: the axes in its order and each part's words, and none
     of a part's figures, which the host keeps and composes."""
-    stated = json.loads((PACKS.parent / "settings" / "setting-parts.v2.json").read_text("utf-8"))
+    stated = json.loads((PACKS.parent / "settings" / "setting-parts.v3.json").read_text("utf-8"))
     listed = _get(client, "/world/style-packs").json()["settings"]
     assert listed["profile"] == "exulanica.world-setting-part-list/v1"
     assert listed["version"] == stated["version"]

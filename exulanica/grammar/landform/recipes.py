@@ -5,7 +5,7 @@ recipe with a whole land document (``exulanica.landform/v1``), read by the landf
 catalog is read; the words a made world's card says it is set with, its preposition included
 (``title``: "on a coast, ...", "in a valley ..."); the whole words that
 name it in a person's sentence (``words``); the setting ground parts that bring it
-(``for_ground``, keys of ``assets/style-packs/settings/setting-parts.v2.json``); whether it is
+(``for_ground``, keys of ``assets/style-packs/settings/setting-parts.v3.json``); whether it is
 the land a place stands on when nothing names another (``default``, exactly one); a reason and a
 licence. Entries are in the order a sentence that names two is read in: the first wins.
 
