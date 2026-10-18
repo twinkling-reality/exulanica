@@ -180,7 +180,7 @@ describe('society directed-action control', () => {
       subject,
       { kind: 'perform', targetId: 'district:marker:visit', affordance: 'visit' },
     );
-    expect(control.status.textContent).toMatch(/Simulation action request recorded/);
+    expect(control.status.textContent).toMatch(/Request recorded/);
     expect(control.status.textContent).toMatch(/not personal evidence/);
   });
 
@@ -213,6 +213,25 @@ describe('society directed-action control', () => {
 });
 
 describe('society directed-action control refresh', () => {
+  it('says its line before asking of whoever is chosen now, by name', () => {
+    let selected: string | null = subject;
+    const snapshot = v2Snapshot();
+    const nameOf = (id: string | null) => snapshot.state.inhabitants.find((person) => person.id === id)?.display_name ?? 'this person';
+    const control = buildSocietyDirectedAction({
+      client: { requestAction: vi.fn() },
+      getSnapshot: () => snapshot,
+      getSubjectId: () => selected,
+      targetId: 'district:marker:visit',
+      affordance: 'visit',
+      idleText: () => `Asks ${nameOf(selected)} to go there next. Nothing they do is a memory.`,
+    });
+    control.reflect();
+    expect(control.status.textContent).toBe('Asks Sim 0 to go there next. Nothing they do is a memory.');
+    selected = 'person-1';
+    control.reflect();
+    expect(control.status.textContent).toBe('Asks Sim 1 to go there next. Nothing they do is a memory.');
+  });
+
   it('re-gates when the held society or inhabitant changes, keeping a result only while it applies', async () => {
     let snapshot: ReturnType<typeof v2Snapshot> | null = v2Snapshot();
     let selected: string | null = subject;
@@ -226,7 +245,7 @@ describe('society directed-action control refresh', () => {
     });
     await control.issue();
     const recorded = control.status.textContent;
-    expect(recorded).toMatch(/Simulation action request recorded/);
+    expect(recorded).toMatch(/Request recorded/);
 
     // A newer state of the same society, same inhabitant: the record stays shown.
     snapshot = v2Snapshot();

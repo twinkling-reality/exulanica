@@ -710,11 +710,11 @@ and so on). The names do not change when words do; drivers select with `ACTION(i
 
 | Thing | Say | Not |
 | --- | --- | --- |
-| a simulated person | person, people ("simulated" once where it matters) | inhabitant, resident, subject |
+| a simulated person | person, people ("invented for this world" once where it matters) | simulated, inhabitant, resident, subject |
 | the people of a world | people here | society, population |
 | a placed thing | object | asset, instance, affordance |
 | a change to a world | change | edit, authored edit, event |
-| a simulated minute | minute | tick, step |
+| a simulated minute | the world's clock time ("06:08"), else minute ("minute 8") | simulated minute, tick, step |
 | the assistant | Companion | assistant, agent |
 | a photograph | photo | capture, source |
 | appearance editing | Design | Customize |

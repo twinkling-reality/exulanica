@@ -40,7 +40,7 @@ describe('Options', () => {
       worldStyleParameters: expect.objectContaining({ vitality: 0.4 }),
     }));
     expect(view.root.textContent).toContain('Previewing · not saved');
-    expect(view.root.textContent).toContain('Sources and simulated decisions stay labelled');
+    expect(view.root.textContent).toContain('Sources and the decisions made in a world stay labelled');
     expect(view.root.querySelector('.world-style-field-help summary')?.textContent).toBe('What this changes');
     expect(view.root.querySelector('[aria-label="Surface finish"]')).not.toBeNull();
     [...view.root.querySelectorAll('button')]

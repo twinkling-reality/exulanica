@@ -241,7 +241,7 @@ describe('the start controls', () => {
     form.showPlan({ ...planned, plan: { ...planned.plan!, runs: 5 } });
     expect(form.root.querySelector('.comparison-start-button')).toBe(start);
     expect(form.root.querySelector('.comparison-start-bound')).toBe(bound);
-    expect(form.root.querySelector('.comparison-start-plan')!.textContent).toMatch(/^5 runs of one simulated hour/);
+    expect(form.root.querySelector('.comparison-start-plan')!.textContent).toMatch(/^5 runs of one hour of this world/);
   });
 
   it('says why nothing can be started, in words, where the server refuses', () => {

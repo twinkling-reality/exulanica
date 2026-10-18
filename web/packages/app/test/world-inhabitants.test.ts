@@ -42,7 +42,7 @@ describe('where each object stands for inhabitants', () => {
     expect(rows[1]!.words).toBe('Inhabitants cannot get close enough to use this: it is outside the area they walk in.');
     // Inside the square yet unreachable: the server says so, and the words claim no more.
     expect(rows[2]!.words).toBe('Inhabitants cannot get close enough to use this.');
-    expect(rows[3]!.words).toBe('Inhabitants notice this after the next simulated minute.');
+    expect(rows[3]!.words).toBe('Inhabitants notice this after the next minute.');
   });
 
   it('says how many use a destination at once, and why an object nobody uses is unused', () => {
@@ -97,8 +97,8 @@ describe('the inhabitants panel', () => {
     panel.render({ society: view({}), objects: [], walked: 0, advanceBlocked: null });
     expect(panel.root.dataset['state']).toBe('absent');
     expect(panel.root.querySelector('.world-inhabitants-summary')?.textContent).toBe('Nobody lives here yet.');
-    expect(panel.root.textContent).toMatch(/simulated people/);
-    expect(panel.root.textContent).toMatch(/never a memory/);
+    expect(panel.root.textContent).toMatch(/people invented for this world/);
+    expect(panel.root.textContent).toMatch(/Nothing they do is a memory/);
     expect(panel.bringIn.hidden).toBe(false);
     expect(panel.advance.hidden).toBe(true);
     panel.bringIn.click();
@@ -170,7 +170,7 @@ describe('the inhabitants panel', () => {
     panel.advance.click();
     expect(onAdvance).toHaveBeenCalledTimes(1);
     panel.render({ society: view({ status: 'ready', snapshot, eventsAvailable: true }), objects, walked: 0,
-      advanceBlocked: 'Pause the simulation to advance one minute by hand.' });
+      advanceBlocked: 'Pause this world to advance one minute by hand.' });
     expect(panel.advance.disabled).toBe(true);
   });
 });

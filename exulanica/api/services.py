@@ -1059,7 +1059,7 @@ class Services(ServiceRefusals, WorkerFactories):
             notes.append(
                 "no society runtime is configured, so no world holds inhabitants here and "
                 "creating a society answers 424. Nothing already saved is affected: a society "
-                "is a simulation started on top of a world, never part of the world itself."
+                "is started on top of a world, never part of the world itself."
             )
         elif not self.society_control_enabled:
             notes.append(
@@ -1067,7 +1067,7 @@ class Services(ServiceRefusals, WorkerFactories):
                 "else does: no world holds a society until its owner asks for one. "
                 f"{SOCIETY_CONTROL_WORKER_ENV} is off and {SOCIETY_CONTROL_WORKSPACES_ENV} names "
                 "no workspace, so a society advances only when somebody advances it, one "
-                "simulated minute at a time."
+                "minute at a time."
             )
         elif self.playback_player == "process":
             notes.append(
@@ -1078,8 +1078,8 @@ class Services(ServiceRefusals, WorkerFactories):
         elif self.playback_player == "none":
             notes.append(
                 f"{PLAYBACK_WORKER_ENV} is off: nothing plays the societies of the workspaces "
-                "this host lists, so each advances only when somebody advances it, one simulated "
-                "minute at a time."
+                "this host lists, so each advances only when somebody advances it, one minute "
+                "at a time."
             )
         if self.runs_derivative_worker:
             notes.append(

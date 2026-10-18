@@ -60,19 +60,19 @@ REAP_SECONDS: Final = 30.0
 #: words a person reads beside the playback control.
 HOST_PLAYBACK_REFUSALS = {
     "no_playback_worker": (
-        "This server does not advance worlds on their own. Advance one simulated minute at a time."
+        "This server does not advance worlds on their own. Advance one minute at a time."
     ),
     "playback_worker_stopped": (
         "This server's playback has stopped, so this world does not advance on its own until "
-        "the server is restarted. Advance one simulated minute at a time."
+        "the server is restarted. Advance one minute at a time."
     ),
     "workspace_not_played": (
-        "This server advances other worlds on their own, not this one. Advance one simulated "
-        "minute at a time."
+        "This server advances other worlds on their own, not this one. Advance one minute at "
+        "a time."
     ),
     "guest_towns_full": (
         "Many visitors' worlds are playing on this server right now, so yours waits until one of "
-        "them stops. Advance one simulated minute at a time meanwhile."
+        "them stops. Advance one minute at a time meanwhile."
     ),
 }
 

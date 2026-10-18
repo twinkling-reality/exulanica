@@ -178,7 +178,7 @@ describe('watching a saved world live', () => {
     server.tick = 9;
     await vi.advanceTimersByTimeAsync(2_000);
     expect(line('.world-inhabitants-moved')).toBe(
-      'Someone moved without walking: this page missed 3 simulated minutes, so they are shown where they are now.');
+      'Someone moved without walking: this page missed 3 minutes, so they are shown where they are now.');
     mounted.dispose();
   });
 
@@ -188,7 +188,7 @@ describe('watching a saved world live', () => {
     const play = [...panel().querySelectorAll('button')].find((button) => !button.hidden && button.textContent === 'Pause')!;
     expect(play).toBeDefined();
     expect([...panel().querySelectorAll('button')].find((button) => button.textContent === 'Next minute')!.hidden).toBe(true);
-    const about = [...mounted.root.querySelectorAll('details')].find((node) => node.querySelector('summary')?.textContent === 'Living world simulation')!;
+    const about = [...mounted.root.querySelectorAll('details')].find((node) => node.querySelector('summary')?.textContent === 'Living world')!;
     expect(about.textContent).toContain('Play, pause and pace are in People nearby');
     expect([...about.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Refresh persisted society']);
     play.click();
@@ -238,12 +238,12 @@ describe('watching a saved world live', () => {
     await mounted.begin();
     place([object('plate', 'Marker plate', 3000, 5000), object('bench', 'Bench', 1000, 2000)]);
     await mounted.afterAuthoredEdit('version');
-    expect(line('.world-inhabitants-notice')).toBe('They notice Bench at simulated minute 6, the next one.');
+    expect(line('.world-inhabitants-notice')).toBe('They notice Bench at minute 6.');
     // The next minute consumes the input the edit queued.
     server.tick = 6;
     server.inputSeq = 2;
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(line('.world-inhabitants-notice')).toBe('They noticed Bench at simulated minute 6.');
+    expect(line('.world-inhabitants-notice')).toBe('They noticed Bench at minute 6.');
     mounted.dispose();
   });
 });

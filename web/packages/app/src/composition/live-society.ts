@@ -129,7 +129,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
         error instanceof ApiError && error.status === 424 ? 'Society dependencies are unavailable. Reconnect after access is restored.' :
         `Society unavailable. ${error instanceof Error ? error.message : 'The request failed.'}` });
   };
-  const accept = async (raw: SocietySnapshot, message = 'Persisted simulation. Each advance consumes one simulated minute.') => {
+  const accept = async (raw: SocietySnapshot, message = 'Saved. Each advance is one minute of this world.') => {
     if (!alive()) return;
     const snapshot = checked(raw);
     publish({ snapshot, events: emptyEvents, eventsAvailable: false });
@@ -233,7 +233,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
     }),
     refresh,
     sendAway: () => changePresence('away', 'Everyone has left. What they did here is still in this world\'s history.'),
-    bringBack: () => changePresence('here', 'They are back. Each advance is one simulated minute.'),
+    bringBack: () => changePresence('here', 'They are back. Each advance is one minute of this world.'),
     advance: () => run(async () => {
       const snapshot = view.snapshot;
       if (!snapshot || !view.eventsAvailable) {
@@ -253,7 +253,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
       // A completed object edit can arrive while a step is in flight. Re-read after it, never
       // discard the edit notification or submit authored JSON as authoritative society input.
       if (pending) await pending;
-      await run(() => read('Authored change saved. Advance to consume queued inputs. Restoring an object retains earlier simulation events.'));
+      await run(() => read('Authored change saved. Advance to consume queued inputs. Restoring an object keeps what has happened in this world.'));
     },
     inspect: subjectId => {
       const inhabitant = view.snapshot?.state.inhabitants.find(person => person.id === subjectId) ?? null;

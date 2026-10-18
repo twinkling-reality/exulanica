@@ -666,7 +666,7 @@ export function buildSocietyComparisonView(handlers: {
       const eyebrow = [
         groupSize === null ? 'Everybody here' : `The same ${groupSize === 1 ? 'person' : `${groupSize} people`}`,
         'the same start',
-        result.seeds.length === 1 ? 'one simulated hour' : `one simulated hour on each of ${result.seeds.length} seeds`,
+        result.seeds.length === 1 ? 'one hour of this world' : `one hour of this world on each of ${result.seeds.length} seeds`,
       ].join(' · ');
       replace(summary, [
         el('section', { class: 'comparison-verdict', 'data-verdict': result.verdict.code }, [
@@ -738,7 +738,7 @@ export function buildSocietyComparisonView(handlers: {
         (side, id, minute) => { clock = minute; playing = false; pick(side, id); });
       const scrubber = el('input', {
         type: 'range', min: 0, max: last, step: 'any', value: 0,
-        class: 'comparison-scrubber', 'aria-label': 'Simulated minute',
+        class: 'comparison-scrubber', 'aria-label': 'Minute of this world',
       });
       const minuteLabel = el('output', { class: 'comparison-minute' });
       const play = el('button', { type: 'button', class: 'comparison-play', text: 'Play' });
@@ -781,7 +781,7 @@ export function buildSocietyComparisonView(handlers: {
         inspector.show({
           subject: person.id,
           title: name,
-          description: 'A simulated person in this recorded run: invented for this world, and nothing they do is a memory.',
+          description: 'A person in this recorded run, invented for this world: nothing they do is a memory.',
           activity: `${doing.slice(0, 1).toUpperCase()}${doing.slice(1)}. ${decidedWords(run!, arm, person.id, minute.tick)}`,
           details: [
             [livingNeeds === null ? 'Tiredness' : 'Needs', livingNeeds ?? `${person.needMilli} of 1000; they prefer to rest from ${run!.threshold}`],

@@ -557,7 +557,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     const button = (label: string) => buttons.find((held) => held.textContent === label)!;
     expect(button('Preview undo latest edit').disabled).toBe(false);
     button('Preview undo latest edit').click();
-    expect(mounted.root.textContent).toContain('This does not erase simulation history.');
+    expect(mounted.root.textContent).toContain('This does not erase what has happened in this world.');
 
     button('Bring into my world').click();
     const role = mounted.root.querySelector<HTMLSelectElement>('select[aria-label="Authored role"]')!;
@@ -836,7 +836,7 @@ describe('persisted living world controls',()=>{
     expect(mount.root.textContent).toContain('Recorded target removal.');
     expect(mount.root.textContent).toContain('Referenced events unavailable in the latest event window: outside-window');
     expect(mount.root.textContent).toContain(`Sequence 1 · ${'b'.repeat(64)}`);
-    expect(mount.root.textContent).toContain('Simulation clockUnavailable');
+    expect(mount.root.textContent).toContain('ClockUnavailable');
     expect(mount.root.textContent).toContain('Routine catalogsUnavailable');
     mount.dispose();
   });
@@ -853,9 +853,9 @@ describe('persisted living world controls',()=>{
     expect(mount.root.textContent).toContain('society-activity v1, society-capacity v1, society-need v1, society-policy v1, society-use-class v1');
     expect(mount.root.textContent).toContain('5ed1a63d6589763693bec365d41f46b00de3a6ee8b9c25fa0cd35e2381f10931');
     expect(mount.root.textContent).toContain('Sequence 1 · f5396475c3196031391c8dd1cfb0772071c2710c490ed48202393896807b7aa6');
-    expect(mount.root.textContent).toContain('Simulation tick1');
+    expect(mount.root.textContent).toContain('Minute1');
     expect(mount.root.textContent).toContain('Day 0 · 08:01');
-    expect(mount.root.textContent).toContain('60 simulated seconds per tick');
+    expect(mount.root.textContent).toContain('60 seconds');
     expect(mount.root.textContent).toContain('Latest bounded persisted event window');
     expect(mount.root.textContent).toContain('be802169-d4f0-5e83-a02d-a49d8138c14e');
     expect(mount.root.textContent).toContain('does not verify replay or send them to Companion');
@@ -864,7 +864,7 @@ describe('persisted living world controls',()=>{
   it('refreshes only the exact version after an authored object change, without advancing',async()=>{
     const {mount,client}=liveMount();await mount.begin();await mount.afterAuthoredEdit('other');expect(client.read).not.toHaveBeenCalled();
     await mount.afterAuthoredEdit('version');expect(client.read).toHaveBeenCalledTimes(1);expect(client.advance).not.toHaveBeenCalled();
-    expect(mount.root.textContent).toContain('Restoring an object retains earlier simulation events');mount.dispose();
+    expect(mount.root.textContent).toContain('Restoring an object keeps what has happened in this world');mount.dispose();
   });
   it('refreshes society after an internally confirmed authored restore',async()=>{
     const {mount,client,button,environment}=liveMount();await mount.begin();
@@ -918,7 +918,7 @@ describe('destination directed-action control in the inspector',()=>{
     perform().click();
     await vi.waitFor(()=>expect(client.requestAction).toHaveBeenCalledTimes(1));
     await vi.waitFor(()=>expect(mount.root.querySelector('.society-directed-action-status')?.textContent)
-      .toMatch(/Simulation action request recorded/));
+      .toMatch(/Request recorded/));
 
     client.read.mockResolvedValueOnce(liveSnapshot(1,'person-0'));
     button('Refresh persisted society').click();

@@ -324,7 +324,7 @@ _UNLABELLED_CONTENT: Final[Mapping[str, str]] = {
     "admitted_environment_feature": "a feature derived from an admitted source",
     "authored_environment_instance": "an authored addition",
     "synthetic_inhabitant": "an unnamed inhabitant",
-    "simulation_event": "an unlabelled simulation event",
+    "simulation_event": "an unlabelled event in this world",
 }
 
 
@@ -369,9 +369,9 @@ def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
                 "This modifies a version, not its source record."
             )
         elif item.result_kind == "synthetic_inhabitant":
-            text = f"Simulated inhabitant: {label}. This is not a real resident."
+            text = f"A person invented for this world: {label}. This is not a real resident."
         elif item.result_kind == "simulation_event":
-            text = f"Persisted simulation event: {label}. This is not a real-world visit."
+            text = f"An event in this world: {label}. This is not a real-world visit."
         else:
             # A kind this ladder does not name. Deliberately neutral rather than guessing at a
             # class: it says the content was authorized and nothing about what it is.
@@ -380,8 +380,8 @@ def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
     clauses.append(
         AnswerClause(
             text=(
-                "Only memory captures can support a personal visit. Imported, authored, "
-                "and simulated records cannot."
+                "Only memory captures can support a personal visit. Imported and authored "
+                "records, and what happens in a world, cannot."
             ),
             type=ClauseType.META,
         )
@@ -801,9 +801,9 @@ _SOCIETY_LEFT_OUT_WHY: Final[Mapping[SocietyLeftOut, str]] = {
 def _societies_left_out(left_out: Sequence[LeftOutSociety]) -> str:
     """The note that says which societies at the question's place were left out, and why."""
     who = (
-        "The people simulated at this place"
+        "The people at this place"
         if len(left_out) == 1
-        else "The people of more than one society simulated at this place"
+        else "The people of more than one society at this place"
     )
     why = "; ".join(dict.fromkeys(_SOCIETY_LEFT_OUT_WHY[society.reason] for society in left_out))
     return f"{who} could not be read for this answer, so it leaves them out: {why}."

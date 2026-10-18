@@ -257,7 +257,7 @@ function spoken(pieces: readonly DrawnPiece[]): (Node | string)[] {
         'data-simulated': piece.subject,
         'data-subject-id': piece.id ?? undefined,
         'data-unresolved': piece.drawn ? undefined : 'not_shown',
-        title: piece.subject === 'inhabitant' ? 'Simulated person, invented for this world' : undefined,
+        title: piece.subject === 'inhabitant' ? 'Person invented for this world' : undefined,
         text: piece.text,
       });
     }

@@ -190,7 +190,7 @@ function heading(definition?: ExperimentDefinition): HTMLElement {
   return el('header', { class: 'experiment-view-head' }, [
     el('p', { class: 'experiment-view-kicker', text: 'Controlled society experiment' }),
     el('h2', { class: 'experiment-view-title', text: intervention }),
-    el('p', { class: 'experiment-view-note', text: 'A compact read of one exact development attempt. No simulation is run from this view.' }),
+    el('p', { class: 'experiment-view-note', text: 'A compact read of one exact development attempt. Nothing in a world is run from this view.' }),
   ]);
 }
 
@@ -204,7 +204,7 @@ function validView(definition: ExperimentDefinition, attempt: Extract<Experiment
       el('li', {}, [el('strong', { text: `${metric.metric}: ` }), metric.reason]))),
   ];
   return [heading(definition), statusPanel('Server-recorded pair validation',
-    'The server recorded this pair as valid, and this reader verified its canonical result digest and bindings. This is not an independent arithmetic proof, scientific significance, or a prediction of real people. Compact results do not contain enough evidence to replay the simulation.'),
+    'The server recorded this pair as valid, and this reader verified its canonical result digest and bindings. This is not an independent arithmetic proof, scientific significance, or a prediction of real people. Compact results do not contain enough evidence to replay the run.'),
   ledger(result), safetyLedger(result.baseline, result.treatment), ...unsupported,
   bindings(definition, attempt)];
 }

@@ -228,12 +228,20 @@ export function recordingState(recording: LivingSocietyRecording, index: number)
         goal: person.goal,
         needs: person.needs,
         explanation: {
-          summary: summary ?? 'Simulated inhabitant awaiting its first choice.',
+          summary: summary ?? 'A person invented for this world, waiting for their first choice.',
           event_ids: person.explanation_event_ids,
         },
       };
     }),
   };
+}
+
+/**
+ * A moment of a world, said after "at": its clock time where the world keeps a clock ("06:08"), else its
+ * minute ("minute 8"). `startMinuteOfDay` is the world's clock at minute 0, or null for a world without one.
+ */
+export function momentWords(minute: number, startMinuteOfDay: number | null = null): string {
+  return startMinuteOfDay === null ? `minute ${minute}` : clockText(startMinuteOfDay + minute);
 }
 
 export function clockText(minuteOfDay: number): string {

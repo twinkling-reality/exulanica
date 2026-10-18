@@ -239,7 +239,7 @@ describe('what the sheet says of a budget before the yes', () => {
       + 'Until then they keep their own routine. The choice is kept.',
     );
     const typical = mindChoiceWords(step!.mind!, { ...step!.cost!, usdTypical: '0.00014500', typicalIsEstimate: true }, false);
-    expect(typical).toContain('Typically about $0.0001 a simulated minute, an estimate from a measurement that was cut short.');
+    expect(typical).toContain('Typically about $0.0001 a minute of this world, an estimate from a measurement that was cut short.');
   });
 });
 

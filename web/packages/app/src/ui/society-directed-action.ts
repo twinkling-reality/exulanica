@@ -60,12 +60,12 @@ export function describeSocietyActionRecord(record: SocietyActionRecord): string
       ? `perform ${intent.affordance} at ${String(record.request.target?.['target_id'] ?? intent.target_id)}`
       : `go_to ${String(record.request.target?.['target_id'] ?? intent.target_id)}`;
   if (record.status === 'pending') {
-    return `Simulation action request recorded (${record.status}): ${action}. `
+    return `Request recorded (${record.status}): ${action}. `
       + `Request ${record.request.requestId}. Digest ${record.request.documentSha256}. `
       + 'This is a synthetic society record, not personal evidence. Advance the society to consume it.';
   }
   const disposition = record.consumption?.disposition ?? 'unknown';
-  return `Simulation action request ${record.status} (${disposition}): ${action}. `
+  return `Request ${record.status} (${disposition}): ${action}. `
     + `Request ${record.request.requestId}. Digest ${record.request.documentSha256}. `
     + 'This is a synthetic society record, not personal evidence.';
 }
@@ -148,7 +148,8 @@ export function buildSocietyDirectedAction(options: {
   /** How a returned record is said. The full simulation record when omitted. */
   readonly describeRecord?: (record: SocietyActionRecord) => string;
   /** What the status says while the control is available and nothing has been asked yet. */
-  readonly idleText?: string;
+  /** What it says before anything is asked; a function to say it of whoever is chosen now. */
+  readonly idleText?: string | (() => string);
   /**
    * Why the world's capability descriptor refuses directed actions now, in words, or null when it
    * does not. Read on every reflect; a refusal disables the control and is said in its status.
@@ -162,7 +163,7 @@ export function buildSocietyDirectedAction(options: {
     role: 'status',
     'aria-live': 'polite',
     class: 'society-directed-action-status',
-    text: 'Simulation directed actions stay separate from personal evidence.',
+    text: 'Requests to the people of a world stay separate from personal evidence.',
   });
   const root = el('div', { class: 'society-directed-action' }, [button, status]);
   let busy = false;
@@ -181,9 +182,9 @@ export function buildSocietyDirectedAction(options: {
     if (!gate.ok) status.textContent = gate.reason;
     else {
       status.textContent = outcome?.text
-        ?? options.idleText
+        ?? (typeof options.idleText === 'function' ? options.idleText() : options.idleText)
         ?? 'Issues one typed perform request to the society action API. '
-          + 'The returned record is a synthetic simulation event, not personal evidence.';
+          + 'The returned record is an event in this world, not personal evidence.';
     }
   };
 
@@ -199,7 +200,7 @@ export function buildSocietyDirectedAction(options: {
     const heldFor = held();
     busy = true;
     reflect();
-    status.textContent = 'Recording simulation directed action…';
+    status.textContent = 'Recording the request…';
     try {
       const record = await options.client.requestAction(snapshot, subjectId, {
         kind: 'perform',

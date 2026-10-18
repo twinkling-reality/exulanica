@@ -25,7 +25,7 @@ import {
 import { nycOpenDataAdmissionId } from '../config.js';
 import type { Credentials } from '../config.js';
 import {
-  clockText,
+  clockText, momentWords,
   parseLivingSocietyRecording,
   recordingState,
   type LivingSocietyRecording,
@@ -545,9 +545,9 @@ export function mountEnvironmentSelection(
   refreshSociety.addEventListener('click', () => void (async () => {
     await refreshDistrict(); await refreshPlayback(true);
   })());
-  const liveHelp = el('p', { text: 'Play, pause, change speed, or advance one simulated minute. Authored edits affect the next step. Restoring objects retains earlier simulation history.' });
+  const liveHelp = el('p', { text: 'Play, pause, change speed, or advance one minute. Authored edits affect the next step. Restoring objects keeps what has happened in this world.' });
   const liveControls = el('details', { hidden: deps.env.preview }, [
-    el('summary', { text: 'Living world simulation' }),
+    el('summary', { text: 'Living world' }),
     liveStatus,
     playbackStatus,
     liveHelp,
@@ -836,7 +836,7 @@ export function mountEnvironmentSelection(
     selected.textContent = names[subject.kind] ?? subject.kind;
     inspector.show({ subject: subject.subject_id, title: names[subject.kind] ?? subject.kind,
       description: subject.uncertainty,
-      activity: destination ? `Inhabitants may ${destination.affordance} here for ${destination.duration_ticks} simulated minute${destination.duration_ticks === 1 ? '' : 's'}.` : 'No inhabitant action is declared for this subject.',
+      activity: destination ? `Inhabitants may ${destination.affordance} here for ${destination.duration_ticks} minute${destination.duration_ticks === 1 ? '' : 's'}.` : 'No inhabitant action is declared for this subject.',
       details: [
         ['Plane / origin', subject.epistemic_status], ['Producer', doc.producer],
         ['Source references', subject.source_refs.map(r => `${r.dataset_id} · ${r.feature_id} · ${r.sha256}`).join('; ') || 'No direct source claim; district dependencies still apply.'],
@@ -1063,10 +1063,10 @@ export function mountEnvironmentSelection(
         ...(words !== null ? [
           // The engine's own sentence about what the being is doing: never a model's reasoning, and labelled so.
           ['Recorded by the engine', inhabitant.explanation?.summary ?? 'Unavailable'],
-          ...(societyModels?.personDetails(id) ?? []),
+          ...(societyModels?.personDetails(id, liveSociety?.view.snapshot?.state.start_minute_of_day ?? null) ?? []),
           ...(resting ? [['Drawn as', restDrawn] as const] : []),
         ] as const : []),
-        ['Plane / origin', 'Simulation · synthetic'],
+        ['Plane / origin', 'This world · invented'],
         ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
         ['Current activity', purposeful && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
         ['Goal / destination', purposeful && goal ? (goal.target_id === null ? (goal.kind === 'make_room' ? 'Making room at a busy place' : `${goal.kind}: ${goal.reason}`) : `${goal.kind} · ${goal.target_id}: ${goal.reason}`) : 'Unavailable'],
@@ -1074,14 +1074,14 @@ export function mountEnvironmentSelection(
         ['Event references', purposeful ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
         ['Producer', state.profile ?? 'Static preview fixture'],
         ['Authored branch', state.branch_id ?? society?.versionId ?? 'Unavailable'],
-        ['Simulation tick', String(state.tick)],
-        ['Simulation clock', 'Unavailable'],
-        ['Tick duration', 'Unavailable'],
+        ['Minute', String(state.tick)],
+        ['Clock', 'Unavailable'],
+        ['Minute length', 'Unavailable'],
         ['Routine catalogs', 'Unavailable'],
         ['Routine digest', 'Unavailable'],
         ['Input binding', inputBinding],
-        ['Permitted use', 'Inspect simulation state; not historical evidence'],
-        ['Shared position', `${crowd()?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
+        ['Permitted use', 'Inspect this world\'s state; not historical evidence'],
+        ['Shared position', `${crowd()?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where this world placed them.`],
         ...characterDisplayDetails(nativeCharacter, representation?.representationId, NEAR_CHARACTER_BUDGET),
         ['Unavailable dependencies', purposeful ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
       ],
@@ -1175,7 +1175,7 @@ export function mountEnvironmentSelection(
     });
     if (changed === undefined) return;
     const label = placeRows(objects, snapshot.places).find((row) => row.object.objectId === changed.objectId)?.label ?? changed.title;
-    noticing = { label, minute: snapshot.currentTick + 1, noticed: false, afterInputSeq: snapshot.places.inputSeq };
+    noticing = { label, minute: snapshot.currentTick + 1, startMinuteOfDay: snapshot.state.start_minute_of_day ?? null, noticed: false, afterInputSeq: snapshot.places.inputSeq };
   }
 
   /**
@@ -1197,12 +1197,12 @@ export function mountEnvironmentSelection(
     const verb = filled(objectActivity(affordance).verbAtPlace, { place });
     return (record: SocietyActionRecord): string => {
       if (record.status === 'pending') {
-        return `Asked to ${verb}. They set off at the next simulated minute. This is simulation, not a memory.`;
+        return `Asked to ${verb}. They set off the next minute. Nothing they do is a memory.`;
       }
       const disposition = record.consumption?.disposition ?? 'unknown';
       return disposition === 'applied'
-        ? `Taken up at simulated minute ${record.consumption?.tick}: they are on their way to ${verb}.`
-        : `Not taken up at simulated minute ${record.consumption?.tick}: they ${dispositionWords(disposition)}.`;
+        ? `Taken up at ${momentWords(record.consumption?.tick ?? 0, liveSociety?.view.snapshot?.state.start_minute_of_day ?? null)}: they are on their way to ${verb}.`
+        : `Not taken up at ${momentWords(record.consumption?.tick ?? 0, liveSociety?.view.snapshot?.state.start_minute_of_day ?? null)}: they ${dispositionWords(disposition)}.`;
     };
   }
 
@@ -1228,7 +1228,7 @@ export function mountEnvironmentSelection(
           targetId, affordance,
           label: filled(objectActivity(affordance).directLabel, { place: row.label }),
           describeRecord: plainRecord(row.label, affordance),
-          idleText: 'Asks this simulated person to go there next. It is recorded as simulation, never as something that happened.',
+          idleText: () => `Asks ${society?.state.inhabitants.find((person) => person.id === selectedInhabitant)?.display_name ?? 'this person'} to go there next. Nothing they do is a memory.`,
           serverGate: () => peopleGate('direct'),
         });
         control.root.classList.add('world-inhabitants-action');
@@ -1290,7 +1290,7 @@ export function mountEnvironmentSelection(
         ? `${activityLabel(goal.activity)} at ${where(goal.destination_id)}, because ${goal.because}.`
         : inhabitant.explanation?.summary ?? 'Awaiting its first choice.',
       details: [
-        ['Plane / origin', 'Simulation · synthetic'],
+        ['Plane / origin', 'This world · invented'],
         ['Shown as', shown],
         ['Role', inhabitant.role ? inhabitant.role : `Unavailable (${(inhabitant.role_reason ?? 'no premises').replaceAll('_', ' ')})`],
         ['Current activity', action ? `${activityLabel(action.kind)} · ${action.status}: ${action.reason.replaceAll('_', ' ')}` : 'Unavailable'],
@@ -1301,16 +1301,16 @@ export function mountEnvironmentSelection(
         ['Event references', inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references'],
         ['Producer', `${state.profile} · ${deps.env.preview ? 'recorded by the real engine' : 'persisted'}`],
         ['Authored branch', state.branch_id ?? society?.versionId ?? 'Unavailable'],
-        ['Simulation tick', String(state.tick)],
-        ['Simulation clock', simulationClock],
-        ['Tick duration', state.tick_seconds === undefined
-          ? 'Unavailable' : `${state.tick_seconds} simulated seconds per tick`],
+        ['Minute', String(state.tick)],
+        ['Clock', simulationClock],
+        ['Minute length', state.tick_seconds === undefined
+          ? 'Unavailable' : `${state.tick_seconds} seconds`],
         ['Routine catalogs', routineVersions],
         ['Routine digest', state.routine?.sha256 ?? 'Unavailable'],
         ['Input binding', inputBinding],
         ['Inspection scope', 'These bindings identify the displayed state. This view does not verify replay or send them to Companion.'],
-        ['Population', recording ? `${recording.population.size} of ${recording.population.capacity} places this district can hold. ${recording.population.reason}` : `${state.inhabitants.length} inhabitants`],
-        ['Permitted use', 'Inspect simulation state; not historical evidence'],
+        ['Who lives here', recording ? `${recording.population.size} of ${recording.population.capacity} places this district can hold. ${recording.population.reason}` : `${state.inhabitants.length} people`],
+        ['Permitted use', 'Inspect this world\'s state; not historical evidence'],
         ['Shared position', `${runtime?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position`],
         ...characterDisplayDetails(nativeCharacter, representation?.representationId),
         ['Unavailable dependencies', recording
@@ -1361,14 +1361,14 @@ export function mountEnvironmentSelection(
       // The catalog's living words are phrases ("walking home to eat"); the line is a sentence.
       activity: sentenceCase(`${words.doing}${goal?.destination_id ? ` at ${where(goal.destination_id)}` : ''}. ${words.why}`),
       details: [
-        ['Origin', 'Simulated person; not a memory'],
+        ['Origin', 'Invented for this world; not a memory'],
         ['Shown as', shown],
         ['Role', inhabitant.role ?? 'Resident'],
         ['Destination', goal ? where(goal.destination_id) : 'No destination chosen'],
         ['Needs tracked', needs || 'None available'],
         ['Recent events', live?.events.length ? `${live.events.length} recorded events available` : 'No recent events available'],
-        ['Simulation clock', simulationClock],
-        ['Population', `${state.inhabitants.length} simulated residents`],
+        ['Clock', simulationClock],
+        ['Who lives here', `${state.inhabitants.length} people`],
       ],
     });
   }
@@ -1436,7 +1436,7 @@ export function mountEnvironmentSelection(
       recordingStatus.textContent = 'Living society unavailable: this district publishes no interpretation to walk on.';
       return;
     }
-    recordingStatus.textContent = 'Recording the living society with the simulation engine.';
+    recordingStatus.textContent = 'Recording the people here.';
     try {
       const response = await fetch(SOCIETY_RECORDING_URL, { signal: districtAbort.signal });
       const body = await response.json() as unknown;
@@ -1626,7 +1626,7 @@ export function mountEnvironmentSelection(
       previewText.textContent = 'Proposed operation: remove_selected_authored_instance · '
         + `instance ${value.instanceId}.`;
     } else {
-      previewText.textContent = 'Restore the state before the latest authored edit. This does not erase simulation history.';
+      previewText.textContent = 'Restore the state before the latest authored edit. This does not erase what has happened in this world.';
     }
     previewText.textContent += value.promptVersion === 'deterministic-environment-preview-1'
       ? ' Deterministic preview; no model ran.'
@@ -1779,7 +1779,7 @@ export function mountEnvironmentSelection(
         clearProposal('Applied. No edit is waiting for review.');
         deps.showStatus(
           operation === 'undo_latest_version_edit'
-            ? 'Latest authored edit restored. Simulation history is retained.'
+            ? 'Latest authored edit restored. What has happened in this world is kept.'
             : operation === 'remove_selected_authored_instance'
               ? 'Environment placement removed. Undo latest edit remains available.'
               : 'NYC Open Data feature placed in the authored version.',
@@ -1836,7 +1836,7 @@ export function mountEnvironmentSelection(
     const control = societyControl;
     if (controlBusy) return 'Advancing…';
     if (control === null) return 'Playback controls are not connected.';
-    if (control.mode === 'playing') return 'Pause the simulation to advance one minute by hand.';
+    if (control.mode === 'playing') return 'Pause this world to advance one minute by hand.';
     if (!liveSociety?.view.eventsAvailable) return 'Reconnect to this world\'s inhabitants first.';
     return null;
   }

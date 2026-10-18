@@ -220,8 +220,7 @@ class SocietyLineChoice(BaseModel):
 
 
 _NOT_A_MEMORY: Final = (
-    "These are simulated people, invented for this world: what they do is recorded by its "
-    "simulation, and none of it is a memory or a real visit."
+    "These are people invented for this world: nothing they do is a memory or a real visit."
 )
 
 
@@ -230,8 +229,7 @@ _NOT_A_MEMORY: Final = (
 _REFUSALS: Final[Mapping[SocietyRefusal, tuple[Abstention, str]]] = {
     SocietyRefusal.NO_SOCIETY_HERE: (
         Abstention.NOT_CAPTURED,
-        "There are no simulated people in view to ask about. Open a world with people in it, "
-        "and ask again.",
+        "There are no people in view to ask about. Open a world with people in it, and ask again.",
     ),
     SocietyRefusal.NOBODY_HERE: (
         Abstention.NOT_CAPTURED,
@@ -239,7 +237,7 @@ _REFUSALS: Final[Mapping[SocietyRefusal, tuple[Abstention, str]]] = {
     ),
     SocietyRefusal.PROFILE_HAS_NO_WORDS: (
         Abstention.NOT_CAPTURED,
-        "The people here are simulated in a way I have no words for, so I cannot say what they "
+        "The people here live by rules I have no words for, so I cannot say what they "
         "are doing. The inspector shows what is recorded about each of them.",
     ),
     SocietyRefusal.UNAVAILABLE: (
@@ -248,7 +246,7 @@ _REFUSALS: Final[Mapping[SocietyRefusal, tuple[Abstention, str]]] = {
     ),
     SocietyRefusal.SELECT_A_PERSON: (
         Abstention.AMBIGUOUS,
-        "I cannot tell which simulated person you mean. Select the person you mean in the world, "
+        "I cannot tell which person you mean. Select the person you mean in the world, "
         "and ask again.",
     ),
     SocietyRefusal.SYNTHETIC_NAME_COLLISION: (
@@ -266,12 +264,12 @@ _REFUSALS: Final[Mapping[SocietyRefusal, tuple[Abstention, str]]] = {
     ),
     SocietyRefusal.TALK_HAS_NO_CONTENT: (
         Abstention.NOT_IN_MODALITY,
-        "The simulation records that people talked and with whom, and never what they said, so "
+        "This world records that people talked and with whom, and never what they said, so "
         "there is nothing to tell about what was said.",
     ),
     SocietyRefusal.NOT_SIMULATED: (
         Abstention.NOT_CAPTURED,
-        "The simulation records where these people go, what they do there and why, and nothing "
+        "This world records where these people go, what they do there and why, and nothing "
         "else about them: they have no life outside this world to ask about.",
     ),
 }
@@ -357,16 +355,16 @@ class _Builder:
                 named = f"The model {model} " if model else "A model "
                 if document.get("disposition") == _APPLIED:
                     line = (
-                        f"At simulated minute {minute.text}, {named}chose for {label}; "
+                        f"At minute {minute.text}, {named}chose for {label}; "
                         f"they were {said.doing}."
                     )
                 else:
                     line = (
-                        f"At simulated minute {minute.text}, {named}proposed a choice for "
+                        f"At minute {minute.text}, {named}proposed a choice for "
                         f"{label}, but it was not applied."
                     )
             else:
-                line = f"At simulated minute {minute.text}, {label} was {said.doing}. {said.why}"
+                line = f"At minute {minute.text}, {label} was {said.doing}. {said.why}"
             item = SocietyEvidenceItem(
                 token=_token(self.taken),
                 result_kind="simulation_event",
@@ -457,7 +455,7 @@ class _Builder:
         key = f"minute_{tick}"
         if key not in self.values:
             self.values[key] = ValueReference(
-                key=key, text=str(tick), label="a simulated minute an event was recorded in"
+                key=key, text=str(tick), label="a minute an event was recorded in"
             )
         return self.values[key]
 
@@ -539,7 +537,7 @@ def _person_answer(
             item = builder.state(subject, f"{label}: {said.doing}")
             return [
                 AnswerClause(
-                    text=f"Nothing about {label} is in the latest recorded simulated minutes.",
+                    text=f"Nothing about {label} is in the latest recorded minutes.",
                     type=ClauseType.META,
                 ),
                 _cited(f"{label}: {said.doing}", item),
@@ -558,15 +556,15 @@ def _world_answer(builder: _Builder, aspect: SocietyAspect) -> list[AnswerClause
         return None
     listed = list(scene.people)[: MAX_CLAUSES - 2]
     everybody = builder.count(
-        "people_count", len(scene.people), "how many simulated people are in this world"
+        "people_count", len(scene.people), "how many people live in this world"
     )
     shown = builder.count("people_shown", len(listed), "how many of them this answer names")
     clauses = [
         AnswerClause(
             text=(
-                f"{everybody.text} simulated people are in this world; here are {shown.text}."
+                f"{everybody.text} people live in this world; here are {shown.text}."
                 if len(listed) < len(scene.people)
-                else f"{everybody.text} simulated people are in this world."
+                else f"{everybody.text} people live in this world."
             ),
             type=ClauseType.META,
             value_refs=[everybody.key, shown.key],
@@ -602,7 +600,7 @@ def _span(
             else f"These lines are from its minute {first.text}."
         )
     return AnswerClause(
-        text=f"The simulation counts minutes, not times of day. {said}",
+        text=f"This world counts minutes here, not times of day. {said}",
         type=ClauseType.META,
         value_refs=sorted({first.key, last.key}),
     )
@@ -660,7 +658,7 @@ def answer_about_society(
                 answer=Answer(
                     clauses=[
                         AnswerClause(
-                            text="Nothing has been recorded in this world's simulation yet.",
+                            text="Nothing has been recorded in this world yet.",
                             type=ClauseType.META,
                         ),
                         _closing(),

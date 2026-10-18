@@ -25,7 +25,7 @@ def test_every_reason_has_its_words():
 def test_one_society_is_named_by_its_place_with_why():
     note = question_module._societies_left_out([_left(SocietyLeftOut.INPUT_UNAVAILABLE)])
     assert note == (
-        "The people simulated at this place could not be read for this answer, so it leaves them "
+        "The people at this place could not be read for this answer, so it leaves them "
         "out: something they are made from is not available now."
     )
 
@@ -38,7 +38,7 @@ def test_several_societies_are_said_as_several_and_each_reason_once():
             _left(SocietyLeftOut.INPUTS_DO_NOT_CHECK, 3),
         ]
     )
-    assert note.startswith("The people of more than one society simulated at this place")
+    assert note.startswith("The people of more than one society at this place")
     assert note.count(question_module._SOCIETY_LEFT_OUT_WHY[SocietyLeftOut.READ_RACED]) == 1
     assert question_module._SOCIETY_LEFT_OUT_WHY[SocietyLeftOut.INPUTS_DO_NOT_CHECK] in note
 

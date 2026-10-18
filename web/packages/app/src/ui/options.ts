@@ -600,7 +600,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
       el('div', { class: 'world-style-assurance' }, [
         el('strong', { text: 'Preserved' }),
         el('span', {
-          text: 'Sources and simulated decisions stay labelled. Navigation and contrast remain readable.',
+          text: 'Sources and the decisions made in a world stay labelled. Navigation and contrast remain readable.',
         }),
       ]),
       proposalReview,

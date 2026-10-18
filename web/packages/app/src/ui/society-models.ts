@@ -18,6 +18,7 @@ import type {
   SocietyModels,
 } from '../society-models-api.js';
 import { DECISION_WORDS } from '../society-inhabitant-words.js';
+import { momentWords } from '../society-preview-presentation.js';
 import { el, replace, setText } from './dom.js';
 import { HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS } from './words/model-refusals.js';
 import './society-models.css';
@@ -43,7 +44,7 @@ function hostReason(refusal: string | null): string | null {
 export function hostWords(refusal: string | null): string {
   const why = hostReason(refusal);
   return why === null
-    ? 'This server asks the models you choose before each simulated minute.'
+    ? 'This server asks the models you choose before each minute of this world.'
     : `${sentence(why)}, so everyone here follows their own routine for now.`;
 }
 
@@ -145,23 +146,23 @@ export function recordedWords(
 }
 
 /** A person's latest decision and what came of it, in words, or null before their first. */
-export function decisionWordsFor(view: SocietyModels, subjectId: string): string | null {
+export function decisionWordsFor(view: SocietyModels, subjectId: string, startMinuteOfDay: number | null = null): string | null {
   const decision = view.latest.find((held) => held.subjectId === subjectId);
-  return decision === undefined ? null : latestDecisionWords(decision);
+  return decision === undefined ? null : latestDecisionWords(decision, startMinuteOfDay);
 }
 
-export function latestDecisionWords(decision: PersonDecision): string {
+export function latestDecisionWords(decision: PersonDecision, startMinuteOfDay: number | null = null): string {
   const { name } = decision;
   // The routine decided in the decision's own minute when the model was not followed, however
   // late its receipt was closed, but only once a minute has taken it up: until then no minute has
   // run without it, and an answer that never came is nobody's decision. A followed decision is
   // told by the minute that took it up.
-  const minute = `At simulated minute ${decision.status !== 'accepted' || decision.consumedTick === null
+  const minute = `At ${momentWords(decision.status !== 'accepted' || decision.consumedTick === null
     ? decision.baseTick + 1
-    : decision.consumedTick}`;
+    : decision.consumedTick, startMinuteOfDay)}`;
   if (decision.status !== 'accepted') {
     if (decision.consumedTick === null) {
-      return `Asked at simulated minute ${decision.baseTick}, ${name} was not followed because ${decisionWords(decision.reason)}. `
+      return `Asked at ${momentWords(decision.baseTick, startMinuteOfDay)}, ${name} was not followed because ${decisionWords(decision.reason)}. `
         + 'Nothing was applied from it; no minute has taken it up yet.';
     }
     return `${minute}, their routine decided: ${name} was not followed because ${decisionWords(decision.reason)}.`;

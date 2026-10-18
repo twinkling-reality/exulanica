@@ -127,7 +127,7 @@ const UNLABELLED: Readonly<Record<string, string>> = {
   admitted_environment_feature: 'A feature derived from an admitted source',
   authored_environment_instance: 'An authored addition',
   synthetic_inhabitant: 'An unnamed inhabitant',
-  simulation_event: 'An unlabelled simulation event',
+  simulation_event: 'An unlabelled event in this world',
 };
 
 const KIND: Readonly<Record<string, string>> = {
@@ -135,22 +135,22 @@ const KIND: Readonly<Record<string, string>> = {
   admitted_environment_source: 'Admitted source record',
   admitted_environment_feature: 'Feature from an admitted source',
   authored_environment_instance: 'Authored addition to a world',
-  synthetic_inhabitant: 'Simulated inhabitant',
-  simulation_event: 'Simulated event',
+  synthetic_inhabitant: 'Person invented for this world',
+  simulation_event: 'Event in this world',
 };
 
 const ORIGIN: Readonly<Record<string, string>> = {
   personal: 'Your own photographs',
   imported: 'An admitted outside source',
   authored: 'Made in a world, not observed',
-  simulated: 'The world simulation, not observed',
+  simulated: 'In this world, not observed',
 };
 
 const RELATION: Readonly<Record<string, string>> = {
   captured_at: 'Taken at this place',
   admitted_for: 'Admitted for this place',
   derived_from: 'Made from this place’s source records',
-  simulated_at: 'Simulated at this place',
+  simulated_at: 'In this world, at this place',
 };
 
 const AVAILABILITY: Readonly<Record<string, string>> = {

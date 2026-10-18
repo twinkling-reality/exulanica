@@ -290,7 +290,7 @@ def test_a_selected_person_s_why_is_answered_from_the_society_with_simulation_ci
     text = " ".join(clause["text"] for clause in body["answer"]["clauses"])
     assert "[inhabitant A]" in text and text.startswith("[inhabitant A]: ")
     assert not {part for part in _parts(_names(snapshot)) if part in text}
-    assert "none of it is a memory or a real visit" in text
+    assert "nothing they do is a memory or a real visit" in text
 
 
 def test_a_society_this_world_does_not_hold_is_answered_as_none_alike_in_every_case(world):

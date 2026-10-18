@@ -149,22 +149,24 @@ describe('reading who decides', () => {
     expect(choiceWords(view, 'ada')).toBe('Nemotron 3 Nano 30B, which you chose.');
     expect(choiceWords(view, 'grace')).toBe('Their own routine.');
     expect(latestDecisionWords(view.latest[0]!))
-      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.');
+      .toBe('At minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.');
+    expect(latestDecisionWords(view.latest[0]!, 6 * 60))
+      .toBe('At 06:07, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.');
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'rejected', dispositionReason: 'place_taken_this_minute' }))
-      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but someone else took that place first, so their routine decided.');
+      .toBe('At minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but someone else took that place first, so their routine decided.');
     expect(latestDecisionWords({ ...view.latest[0]!, status: 'unavailable', reason: 'model_timed_out', disposition: 'unavailable', chose: null }))
-      .toBe('At simulated minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because their model did not answer in time.');
+      .toBe('At minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because their model did not answer in time.');
     // A request closed after its minute is told by the minute the routine decided, not the later
     // minute that took up its receipt.
     expect(latestDecisionWords({ ...view.latest[0]!, baseTick: 6, consumedTick: 9, status: 'unavailable',
       reason: 'unanswered_in_its_minute', disposition: 'unavailable', dispositionReason: null, chose: null }))
-      .toBe('At simulated minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because this server '
+      .toBe('At minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because this server '
         + 'stopped before it heard the answer.');
     // A person's own request, or another decision, came first: neither is their routine.
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'person_asked_directly' }))
-      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but you asked them yourself, and that came first.');
+      .toBe('At minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but you asked them yourself, and that came first.');
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'subject_already_decided' }))
-      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but something else already decided for them this minute, and that came first.');
+      .toBe('At minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but something else already decided for them this minute, and that came first.');
     // Every decision not acted on is counted once, under why.
     expect(summaryWords(view.byModel[0]!)).toBe(
       'Nemotron 3 Nano 30B: 5 decisions, 3 acted on, 2 not acted on (1 because their model did not answer in time; '
@@ -280,7 +282,7 @@ describe('the mounted section', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(mounted.personDetails('ada')).toEqual([
       ['Decided by', 'Nemotron 3 Nano 30B, which you chose.'],
-      ['Latest decision', 'At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.'],
+      ['Latest decision', 'At minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.'],
     ]);
     const box = mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     box.checked = true;

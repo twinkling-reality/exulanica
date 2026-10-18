@@ -77,7 +77,7 @@ describe('authenticated society composition', () => {
     const advancing = live.advance(); await Promise.resolve(); const edited = live.afterAuthoredEdit();
     held.resolve(snapshot(1)); await advancing; await edited;
     expect(client.read).toHaveBeenCalledTimes(1); expect(client.advance).toHaveBeenCalledTimes(1);
-    expect(live.view.message).toContain('retains earlier simulation events');
+    expect(live.view.message).toContain('keeps what has happened in this world');
   });
   it('reopening reads retained state, without issuing a progression action', async () => {
     const { live, client, options } = setup(); await live.connect(); await live.advance(); live.dispose();

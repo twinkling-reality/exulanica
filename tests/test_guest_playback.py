@@ -404,7 +404,7 @@ def test_a_waiting_town_is_told_so_and_one_not_watched_is_told_it_is_not_played(
         stop.set()
         thread.join()
     sentence = HOST_PLAYBACK_REFUSALS["guest_towns_full"]
-    assert "waits" in sentence and "Advance one simulated minute" in sentence
+    assert "waits" in sentence and "Advance one minute" in sentence
 
 
 def test_the_playback_digest_names_the_guests_figures_and_nothing_else_moves_it():

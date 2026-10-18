@@ -22,6 +22,7 @@ import {
 } from '../society-control-api.js';
 import { societyEngine } from '../society-engines.js';
 import { inhabitantWordsFrom, optionalPhrase, phrase, type BridgeLabel, type InhabitantWords } from '../society-inhabitant-words.js';
+import { momentWords } from '../society-preview-presentation.js';
 import { say } from './copy.js';
 import { el, replace, setText } from './dom.js';
 import './world-inhabitants.css';
@@ -125,7 +126,7 @@ export function placeRows(objects: readonly InhabitedObject[], places: SocietyPl
         : 'Inhabitants cannot get close enough to use this.';
     } else {
       status = { kind: 'not-noticed' };
-      words = 'Inhabitants notice this after the next simulated minute.';
+      words = 'Inhabitants notice this after the next minute.';
     }
     return { object, label, status, words };
   });
@@ -136,7 +137,7 @@ export const PRESENCE_WORDS: Readonly<Record<string, string>> = {
   nobody_to_send_away: 'Nobody is here to send away.',
   already_here: 'They are already here.',
   a_request_is_waiting: 'Someone was just asked to go somewhere, or a model\'s decision for someone waits for '
-    + 'the next simulated minute. Use Next minute first, then ask again.',
+    + 'the next minute. Use Next minute first, then ask again.',
   nowhere_to_arrive: 'They cannot come back yet: there is nowhere in this world they could reach. Put something '
     + `they can rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`,
   stale_society_state: 'This world changed while you were deciding. Look again, then ask again.',
@@ -274,7 +275,7 @@ export function playbackWords(control: SocietyPlaybackControl | null, unheld: 'u
   return {
     offerPlay: !playing, offerPause: playing,
     status: playing
-      ? `Playing: one simulated minute ${everyWords(host.intervalMs)}.`
+      ? `Playing: one minute of this world ${everyWords(host.intervalMs)}.`
       : 'Paused. Press Play to watch them live.',
     why: null,
   };
@@ -295,7 +296,7 @@ export interface MovedWithoutWalking {
  * record type makes a reason without words, or words for no reason, a type error.
  */
 const MOVED_WORDS: Readonly<Record<MovedReason, (unread: number) => string>> = {
-  'minutes-not-read': (unread) => `this page missed ${unread === 1 ? 'a simulated minute' : `${unread} simulated minutes`}, so they are shown where they are now.`,
+  'minutes-not-read': (unread) => `this page missed ${unread === 1 ? 'a minute' : `${unread} minutes`}, so they are shown where they are now.`,
   'path-starts-elsewhere': () => 'they started this minute somewhere new.',
   'too-far-behind': () => 'this page fell behind them, so they are shown further along their way.',
   'no-recorded-path': () => 'this world does not record how they got there.',
@@ -316,15 +317,17 @@ export function movedWords(moved: readonly MovedWithoutWalking[]): string | null
 /** An object placed or moved while people were here, and whether they have noticed it yet. */
 export interface Noticing {
   readonly label: string;
-  /** The simulated minute that notices it: the one after the minute the edit was made in. */
+  /** The minute that notices it: the one after the minute the edit was made in. */
   readonly minute: number;
+  /** The world's clock at minute 0, for the clock time it is noticed at; null or absent for a world without one. */
+  readonly startMinuteOfDay?: number | null;
   readonly noticed: boolean;
 }
 
 export function noticeWords(noticing: Noticing): string {
   return noticing.noticed
-    ? `They noticed ${noticing.label} at simulated minute ${noticing.minute}.`
-    : `They notice ${noticing.label} at simulated minute ${noticing.minute}, the next one.`;
+    ? `They noticed ${noticing.label} at ${momentWords(noticing.minute, noticing.startMinuteOfDay ?? null)}.`
+    : `They notice ${noticing.label} at ${momentWords(noticing.minute, noticing.startMinuteOfDay ?? null)}.`;
 }
 
 type Inhabitant = OwnedSocietyState['inhabitants'][number];
@@ -442,8 +445,8 @@ export function buildWorldInhabitants(handlers: {
   const summary = el('p', { class: 'world-inhabitants-summary', role: 'status', 'aria-live': 'polite' });
   const about = el('p', {
     class: 'world-help',
-    text: 'These are simulated people: invented for this world, not anyone you know. What they do '
-      + 'is simulation, never a memory.',
+    text: 'These are people invented for this world: not anyone you know. Nothing they do '
+      + 'is a memory.',
   });
   const need = el('p', {
     class: 'world-help',

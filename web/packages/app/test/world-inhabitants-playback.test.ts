@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LiveSocietyView } from '../src/composition/live-society.js';
 import { parseSociety } from '../src/society-api.js';
+import { momentWords } from '../src/society-preview-presentation.js';
 import { parseSocietyControl, type SocietyPlaybackControl } from '../src/society-control-api.js';
 import {
   HOST_PLAYBACK_WORDS,
@@ -126,7 +127,7 @@ describe('Play, Pause and pace beside the people', () => {
       playback: { control: control('playing', running), busy: false } });
     expect(built.play.textContent).toBe('Pause');
     expect(shown(built.advance)).toBe(false);
-    expect(text('.world-inhabitants-playback')).toBe('Playing: one simulated minute every 4 seconds.');
+    expect(text('.world-inhabitants-playback')).toBe('Playing: one minute of this world every 4 seconds.');
     built.play.click();
     expect(handlers.onPause).toHaveBeenCalledTimes(1);
     expect(handlers.onPlay).not.toHaveBeenCalled();
@@ -200,8 +201,8 @@ describe('lines about what the person sees', () => {
       moved: [{ inhabitantId: 'a', reason: 'minutes-not-read', unreadTicks: 2 }, { inhabitantId: 'b', reason: 'minutes-not-read', unreadTicks: 2 }],
       noticing: { label: 'Bench', minute: 8, noticed: false } });
     expect(text('.world-inhabitants-moved')).toBe(
-      '2 people moved without walking: this page missed 2 simulated minutes, so they are shown where they are now.');
-    expect(text('.world-inhabitants-notice')).toBe('They notice Bench at simulated minute 8, the next one.');
+      '2 people moved without walking: this page missed 2 minutes, so they are shown where they are now.');
+    expect(text('.world-inhabitants-notice')).toBe('They notice Bench at minute 8.');
     built.render({ society: view(), objects, walked: 0, advanceBlocked: null, moved: [] });
     expect(text('.world-inhabitants-moved')).toBeNull();
     expect(text('.world-inhabitants-notice')).toBeNull();
@@ -219,7 +220,11 @@ describe('lines about what the person sees', () => {
       { inhabitantId: 'a', reason: 'too-far-behind', unreadTicks: 0 },
       { inhabitantId: 'b', reason: 'not-newer', unreadTicks: 0 },
     ])).toMatch(/Others moved for other reasons\.$/);
-    expect(noticeWords({ label: 'Bench', minute: 8, noticed: true })).toBe('They noticed Bench at simulated minute 8.');
+    expect(noticeWords({ label: 'Bench', minute: 8, noticed: true })).toBe('They noticed Bench at minute 8.');
+    // A world that keeps a clock says the moment by it, the minute's own time (J35).
+    expect(noticeWords({ label: 'Bench', minute: 8, startMinuteOfDay: 360, noticed: false })).toBe('They notice Bench at 06:08.');
+    expect(momentWords(8)).toBe('minute 8');
+    expect(momentWords(30, 1430)).toBe('00:20');
     expect(everyWords(60_000)).toBe('every minute');
     expect(everyWords(120_000)).toBe('every 2 minutes');
     expect(everyWords(1_000)).toBe('every second');

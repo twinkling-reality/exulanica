@@ -91,7 +91,7 @@ describe('what the sheet says of a mind before the yes', () => {
     });
     expect(mindChoiceWords(step!.mind!, step!.cost, false)).toBe(
       'This is for 2 beings (1 left out because someone is playing them). Choosing asks no model. '
-      + 'While the world plays, at most $0.0062 a simulated minute (at most $0.0031 each time a being is asked, at most once a minute). '
+      + 'While the world plays, at most $0.0062 a minute of this world (at most $0.0031 each time a being is asked, at most once a minute). '
       + 'An answer a model does not finish is still billed. '
       + 'No typical figure is measured for this model here yet. '
       + 'This world stops asking models at $0.25 or 600 decisions in any hour of real time, whatever is chosen.',
@@ -125,7 +125,7 @@ describe('what the sheet says of a mind before the yes', () => {
     });
     sheet.showPlan(shown, shown.steps.map((step) => plannedStepView(step, (spec) => spec.label, () => null, () => null)), 'give every villager Nano');
     const line = sheet.root.querySelector('.companion-plan-estimate[data-kind="mind"]');
-    expect(line?.textContent).toContain('at most $0.0062 a simulated minute');
+    expect(line?.textContent).toContain('at most $0.0062 a minute of this world');
     expect(sheet.root.querySelector('.companion-plan-spends')?.getAttribute('data-spends')).toBe('true');
     expect(sheet.root.querySelector('.companion-plan-step-detail')?.textContent).toBe('Nano decides for every villager');
   });
@@ -161,7 +161,7 @@ describe('two minds chosen in one sentence', () => {
     expect(lines.length).toBe(2);
     expect(lines[0]).toContain('This is for 1 being.');
     expect(lines[1]).toContain('This is for 2 beings (1 left out because someone is playing them).');
-    expect(lines[1]).toContain('at most $0.0062 a simulated minute');
+    expect(lines[1]).toContain('at most $0.0062 a minute of this world');
   });
 
   it('has words for a later step that grew and for a question in the middle of a plan', () => {

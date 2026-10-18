@@ -54,7 +54,7 @@ def test_content_answer_keeps_source_memory_authored_and_simulated_truth_separat
     assert "modifies a version, not its source record" in text
     assert "not a real resident" in text
     assert "not a real-world visit" in text
-    assert text.endswith("Imported, authored, and simulated records cannot.")
+    assert text.endswith("Imported and authored records, and what happens in a world, cannot.")
 
 
 def test_content_answer_is_bounded_and_does_not_invent_real_residents():

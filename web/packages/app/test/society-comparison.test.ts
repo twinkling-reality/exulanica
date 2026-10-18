@@ -160,7 +160,7 @@ describe('the Compare view', () => {
     expect(shown.root.querySelector('.comparison-inspector-side')!.textContent).toMatch(/^Left: /);
     dot(1).dispatchEvent(new MouseEvent('click'));
     expect(shown.root.querySelector('.comparison-inspector-side')!.textContent).toMatch(/^Right: /);
-    expect(inspector.textContent).toContain('simulated person');
+    expect(inspector.textContent).toContain('invented for this world');
   });
 
   it('says why a side has no hour to show, by its run\'s failure code', () => {
@@ -361,7 +361,7 @@ describe('what the Compare view leads with', () => {
     expect(numbers.open).toBe(false);
     expect(numbers.querySelector('table.comparison-arms')).not.toBeNull();
     expect(numbers.querySelector('table.comparison-seeds')).not.toBeNull();
-    expect(summary.querySelector('.comparison-eyebrow')!.textContent).toMatch(/ · the same start · one simulated hour/);
+    expect(summary.querySelector('.comparison-eyebrow')!.textContent).toMatch(/ · the same start · one hour of this world/);
   });
 
   it('says on each side what its group did, with the view from above folded under it', () => {

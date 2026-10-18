@@ -249,8 +249,8 @@ export function mindChoiceWords(facts: MindFacts, cost: MindCost | null, routine
     : ` This world stops asking models at ${atMostDollarsWords(cost.usdPerWorldHour)}`
       + `${cost.decisionsPerWorldHour === null ? '' : ` or ${cost.decisionsPerWorldHour} decisions`} in any hour of real time, whatever is chosen.`;
   const typical = cost.usdTypical === null ? ' No typical figure is measured for this model here yet.'
-    : ` Typically about ${smallDollarsWords(cost.usdTypical)} a simulated minute${cost.typicalIsEstimate ? ', an estimate from a measurement that was cut short' : ', as measured in a world like this one'}.`;
-  return `${who} Choosing asks no model. While the world plays, at most ${atMostDollarsWords(cost.usdAtMost)} a simulated minute `
+    : ` Typically about ${smallDollarsWords(cost.usdTypical)} a minute of this world${cost.typicalIsEstimate ? ', an estimate from a measurement that was cut short' : ', as measured in a world like this one'}.`;
+  return `${who} Choosing asks no model. While the world plays, at most ${atMostDollarsWords(cost.usdAtMost)} a minute of this world `
     + `(at most ${atMostDollarsWords(cost.usdPerAnswerAtMost)} each time a being is asked, at most once a minute). `
     + `${MIND_UNFINISHED_BILLED}${typical}${ceiling}`;
 }

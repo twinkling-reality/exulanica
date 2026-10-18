@@ -87,7 +87,7 @@ describe('mounted society experiment comparison', () => {
     expect(mounted.root.textContent).toContain('Treatment − baseline');
     expect(mounted.root.textContent).toContain('Server-recorded pair validation');
     expect(mounted.root.textContent).toContain('not an independent arithmetic proof, scientific significance, or a prediction of real people');
-    expect(mounted.root.textContent).toContain('do not contain enough evidence to replay the simulation');
+    expect(mounted.root.textContent).toContain('do not contain enough evidence to replay the run');
     expect(mounted.root.textContent).toContain('Synthetic agents do not predict real-human outcomes.');
     const exact = mounted.root.querySelector('details')!;
     expect(exact.open).toBe(false);

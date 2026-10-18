@@ -548,7 +548,7 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     icon: 'people', group: 'people', placement: ['rail', 'palette'],
   },
   {
-    id: 'people.bring-in', label: 'Bring people in', hint: 'Bring simulated people into this world',
+    id: 'people.bring-in', label: 'Bring people in', hint: 'Bring people into this world',
     icon: 'add', group: 'people', placement: ['palette', 'panel:people'], operation: SOCIETY,
     refusals: {
       no_reachable_targets: {

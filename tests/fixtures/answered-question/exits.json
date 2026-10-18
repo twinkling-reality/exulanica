@@ -55,7 +55,7 @@
       },
       {
         "citations": [],
-        "text": "Only memory captures can support a personal visit. Imported, authored, and simulated records cannot.",
+        "text": "Only memory captures can support a personal visit. Imported and authored records, and what happens in a world, cannot.",
         "type": "meta",
         "value_refs": []
       }
@@ -115,7 +115,7 @@
     "answer": [
       {
         "citations": [],
-        "text": "The people simulated at this place could not be read for this answer, so it leaves them out: what they are made from changed while it was read, so asking again reads them.",
+        "text": "The people at this place could not be read for this answer, so it leaves them out: what they are made from changed while it was read, so asking again reads them.",
         "type": "meta",
         "value_refs": []
       },
@@ -127,7 +127,7 @@
       },
       {
         "citations": [],
-        "text": "Only memory captures can support a personal visit. Imported, authored, and simulated records cannot.",
+        "text": "Only memory captures can support a personal visit. Imported and authored records, and what happens in a world, cannot.",
         "type": "meta",
         "value_refs": []
       }
@@ -312,7 +312,7 @@
       },
       {
         "citations": [],
-        "text": "These are simulated people, invented for this world: what they do is recorded by its simulation, and none of it is a memory or a real visit.",
+        "text": "These are people invented for this world: nothing they do is a memory or a real visit.",
         "type": "meta",
         "value_refs": []
       }
@@ -364,7 +364,7 @@
     "answer": [
       {
         "citations": [],
-        "text": "There are no simulated people in view to ask about. Open a world with people in it, and ask again.",
+        "text": "There are no people in view to ask about. Open a world with people in it, and ask again.",
         "type": "meta",
         "value_refs": []
       }

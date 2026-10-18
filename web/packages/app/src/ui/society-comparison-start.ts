@@ -373,7 +373,7 @@ export function buildComparisonStartForm(handlers: {
         ? planRefusalWords(answer.planRefusal)
         : figures === null
           ? 'Choose what to compare.'
-          : `${figures.runs} runs of one simulated hour. It could cost at most ${dollars(figures.mostUsd)}, if every person were asked every minute and every answer were as long as allowed. `
+          : `${figures.runs} runs of one hour of this world. It could cost at most ${dollars(figures.mostUsd)}, if every person were asked every minute and every answer were as long as allowed. `
             + (figures.typicalUsd === null
               ? 'No recorded comparison measured what one like it typically costs.'
               : figures.typicalMatches
@@ -427,7 +427,7 @@ export function buildComparisonStartForm(handlers: {
     update(plan);
     replace(root, [
       title,
-      el('p', { class: 'comparison-start-role', text: `The models decide for ${SUBJECT_WORDS[role.subject] ?? role.subject}, one simulated hour on each seed, beside their own routine and waiting.` }),
+      el('p', { class: 'comparison-start-role', text: `The models decide for ${SUBJECT_WORDS[role.subject] ?? role.subject}, one hour of this world on each seed, beside their own routine and waiting.` }),
       el('div', { class: 'comparison-start-fields' }, [
         el('label', {}, [el('span', { text: 'Who' }), groupSelect]),
         namedField,

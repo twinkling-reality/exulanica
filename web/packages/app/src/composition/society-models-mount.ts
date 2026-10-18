@@ -77,7 +77,7 @@ export interface MountedSocietyModels {
    */
   refresh(tick: number | null, people: readonly ChoosablePerson[], force?: boolean): Promise<void>;
   /** A person's lines for the inspector: who decides for them, and their latest decision. */
-  personDetails(subjectId: string): readonly (readonly [string, string])[];
+  personDetails(subjectId: string, startMinuteOfDay?: number | null): readonly (readonly [string, string])[];
   /**
    * Show who decides for these subjects of one role, chosen as a person chooses them: people
    * ticked, or the one traffic light selected. Returns how many it chose.
@@ -324,11 +324,11 @@ export function mountSocietyModels(options: {
       if (view === null || !view.takesModelChoices) return new Map();
       return new Map((view.outside ?? []).map((entry) => [entry.subjectId, entry]));
     },
-    personDetails(subjectId) {
+    personDetails(subjectId, startMinuteOfDay = null) {
       if (view === null || !view.takesModelChoices) return [];
       return [
         ['Decided by', choiceWords(view, subjectId, minds?.why ?? null)],
-        ['Latest decision', decisionWordsFor(view, subjectId) ?? 'None yet.'],
+        ['Latest decision', decisionWordsFor(view, subjectId, startMinuteOfDay) ?? 'None yet.'],
       ];
     },
     dispose() {

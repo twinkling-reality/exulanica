@@ -176,7 +176,7 @@ def test_why_a_selected_person_is_there_is_the_inspector_s_words_cited_to_the_ex
     assert all(item.truth_class == "simulation" for item in packet.items)
     assert not any(item.personal_visit_evidence for item in packet.items)
     # It closes saying what these people are.
-    assert "none of it is a memory or a real visit" in said.answer.clauses[-1].text
+    assert "nothing they do is a memory or a real visit" in said.answer.clauses[-1].text
 
 
 @pytest.mark.parametrize("aspect", [SocietyAspect.WHO, SocietyAspect.DOING, SocietyAspect.RECENT])
@@ -636,11 +636,9 @@ def test_a_composed_answer_is_the_chosen_lines_each_in_its_own_words_in_the_list
     assert [clause.text for clause in clauses[2:-1]] == [item.line for item in chosen]
     assert [clause.citations for clause in clauses[2:-1]] == [[item.token] for item in chosen]
     assert all(clause.type is ClauseType.SIMULATION for clause in clauses[2:-1])
-    assert clauses[0].text.startswith("The simulation counts minutes, not times of day.")
+    assert clauses[0].text.startswith("This world counts minutes here, not times of day.")
     assert "These lines are from its minute" in clauses[0].text
-    assert clauses[1].text == (
-        "This world records who talked with whom, and never what they said."
-    )
+    assert clauses[1].text == ("This world records who talked with whom, and never what they said.")
     # Every sentence is a line's own words or code's: no text of the model's anywhere.
     lines = {item.line for item in said.packet.items}
     assert all(c.type is ClauseType.META or c.text in lines for c in clauses)
