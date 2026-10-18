@@ -14,8 +14,9 @@
 .wu-tray { position: absolute; left: 50%; bottom: var(--edge-inset); transform: translateX(-50%); box-sizing: border-box; max-width: calc(100% - 2 * var(--edge-inset));
   padding: calc(12 * var(--u)); border-radius: calc(18 * var(--u)); pointer-events: auto; }
 .wu-tray-tabs { display: flex; gap: calc(16 * var(--u)); margin: 0 calc(4 * var(--u)) calc(12 * var(--u)); }
-.wu-tray-tab { margin: 0; padding: 0; border: 0; background: none; color: var(--ink-2); font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-sans); cursor: pointer; }
-.wu-tray-tab[aria-selected="true"] { color: var(--ink); font-weight: 500; }
+/* Under the world's root and inside the tray, so the world screen's button reset (contextual-world.css) never outranks the open tab's mark. */
+#contextual-world .wu-tray .wu-tray-tabs .wu-tray-tab { margin: 0; padding: 0; border: 0; background: none; color: var(--ink-2); font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-sans); cursor: pointer; }
+#contextual-world .wu-tray .wu-tray-tabs .wu-tray-tab[aria-selected="true"] { color: var(--ink); font-weight: 500; }
 .wu-tray-tab:focus-visible, .wu-tile:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: calc(4 * var(--u)); }
 /* Held at a tile's height while the tiles are read, so the tray does not jump when they arrive. */
 .wu-tray-tiles { display: flex; gap: calc(8 * var(--u)); min-height: calc(var(--tile-height) + 8 * var(--u) + max(12px, calc(13 * var(--u))) * 1.2);

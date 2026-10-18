@@ -34,6 +34,8 @@ import { NOTE_WORDS } from './world-words.mjs';
 const ASK_AFTER_MS = 180;
 /** How much wider than the footprint's half diagonal the ring at a thing's foot is, so it encloses the outline's corners. */
 const RING_MARGIN = 1.18;
+/** How far below the eye a point grabbed on a thing is carried at most, in metres, so the pointer's ray still comes down to it. */
+const GRAB_BELOW_EYE_M = 0.25;
 /**
  * The chosen thing's ground ring, quieter than a character's (DESIGN's ruling L22): the outline is
  * the primary mark, so the ring is a thinner white line with no glow and no fill. Spread over the
@@ -224,16 +226,20 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    * hides it, and a part is met by its box in the drawing the world shows now.
    */
   function placedAt(x, y) {
+    return pickedAt(x, y)?.id ?? null;
+  }
+  /** What `placedAt` meets, with how far along the pointer's ray (metres) and the ray itself, or null. */
+  function pickedAt(x, y) {
     if (!b.__workspacePick) return null;
     const ray = pointerRay(b, x, y); if (!ray) return null;
     const hit = b.__workspacePick(ray.origin, ray.direction);
     if (hit?.inhabitantId) return null;
     const thingId = hit?.thing?.pick?.placedId ?? null;
-    const thing = thingId !== null && records.has(thingId) ? { id: thingId, distance: hit.thing.distance } : null;
+    const thing = thingId !== null && records.has(thingId) ? { id: thingId, distance: hit.thing.distance, ray } : null;
     const drawing = parts.size ? siteDrawing() : null;
     const part = drawing ? pickSiteSlot(drawing, ray.origin, ray.direction, (id) => parts.has(PART + id)) : null;
-    if (part !== null && (thing === null || part.distance < thing.distance)) return PART + part.identity;
-    return thing?.id ?? null;
+    if (part !== null && (thing === null || part.distance < thing.distance)) return { id: PART + part.identity, distance: part.distance, ray };
+    return thing;
   }
 
   /**
@@ -356,7 +362,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     dropMove(); dropPlacing();
     selected = null; confirming = null; failure = ''; removeRefused = false;
     const name = tile.kind.source === 'workspace' ? thingName({ kind: tile.kind }, () => creatures?.find(made => made.sha256 === tile.kind.sha256)?.label ?? null) : thingName({ kind: tile.kind });
-    placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' } };
+    placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' }, letGo: false };
     const held = placing;
     void kindBox(tile.kind).then(box => { held.box = box; });
     const pointed = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
@@ -397,6 +403,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (placing.to && placing.to.x === to.x && placing.to.z === to.z && placing.to.yaw === to.yaw) return;
     placing.to = to;
     placing.verdict = { state: 'checking', words: '' };
+    // Turned or stood elsewhere after a click let it go: that click is taken back.
+    placing.letGo = false;
     showKindCopy(placing, false);
     clearTimeout(askTimer);
     askTimer = window.setTimeout(() => { void askPlace(); }, ASK_AFTER_MS);
@@ -418,6 +426,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     }
     showKindCopy(held, held.verdict.state === 'refused');
     render();
+    // Let go here while it was asked about: placed now that the server says it may stand here, else carried on.
+    if (held.letGo) { held.letGo = false; if (held.verdict.state === 'ready') void placeNew(); }
   }
   const placingBody = (held, to) => ({
     thing_id: held.thingId, kind: held.kind, region_id: held.regionId,
@@ -429,7 +439,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
   /** Place the new thing where the server said it may stand: the placing's own base and pose. */
   async function placeNew() {
-    if (placing === null || busy || placing.verdict.state !== 'ready') return;
+    if (placing === null || busy) return;
+    // Still asked about where it stands: let go there, and placed when the answer says it may stand (askPlace).
+    if (placing.verdict.state === 'checking') { if (placing.to !== null) placing.letGo = true; return; }
+    if (placing.verdict.state !== 'ready') return;
     const held = placing, verdict = held.verdict, name = held.name;
     busy = true; render();
     try {
@@ -552,10 +565,25 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** What is held put back: a moved thing where it stood, a new one in the tray. */
   function putBack() { dropMove(); dropPlacing(); render(); canvas.focus({ preventScroll: true }); }
 
-  /** The ground point under a screen point (region frame, millimetres), or null off the ground. */
-  function groundAt(x, y) {
+  /**
+   * The ground point under a screen point (region frame, millimetres), or null off the ground; with `lift`, the point
+   * of the ground under where the pointer's ray passes that many metres above it, where a thing grabbed that high is
+   * carried.
+   */
+  function groundAt(x, y, lift = 0) {
     const ray = pointerRay(b, x, y); if (!ray) return null;
-    return b.authoredSociety?.groundPoint(ray.origin, ray.direction) ?? null;
+    const origin = lift > 0 ? [ray.origin[0], ray.origin[1] - lift, ray.origin[2]] : ray.origin;
+    return b.authoredSociety?.groundPoint(origin, ray.direction) ?? null;
+  }
+  /**
+   * How high above its foot (`footMm`, the region's up) a press met a thing, in metres, from the pick's distance along
+   * the pointer's ray; never above the eye less GRAB_BELOW_EYE_M, and 0 where the region or the distance is unknown.
+   */
+  function grabHeight(met, footMm) {
+    const rootY = b.authoredSociety?.root?.getPosition?.().y;
+    if (!Number.isFinite(rootY) || !Number.isFinite(met?.distance) || !Number.isFinite(footMm)) return 0;
+    const eye = b.camera.getPosition().y, foot = rootY + footMm / 1000;
+    return Math.max(0, Math.min(eye + met.ray.direction[1] * met.distance - foot, eye - foot - GRAB_BELOW_EYE_M));
   }
 
   /** Start a move of the selected thing from where it stands, or keep the one under way. */
@@ -565,13 +593,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       // A part stands where the parts read says, turned as it says; on the ground it is moved over.
       const part = partOf(selected); if (!part) return null;
       const from = { x: part.centre_mm[0], y: slotOf(selected)?.positionMm[2] ?? 0, z: -part.centre_mm[1], yaw: QUARTER_TURNS[turnsNow(selected) % 4] };
-      moving = { placedId: selected, from, to: { ...from }, grip: null, verdict: { state: 'checking', words: '' } };
+      moving = { placedId: selected, from, to: { ...from }, grip: null, verdict: { state: 'checking', words: '' }, letGo: false };
       return moving;
     }
     const record = records.get(selected); if (!record) return null;
     const t = record.transform;
     const from = { x: t.x_mm, y: t.y_mm, z: t.z_mm, yaw: t.yaw_microradians };
-    moving = { placedId: selected, from, to: { ...from }, grip: null, verdict: { state: 'checking', words: '' } };
+    moving = { placedId: selected, from, to: { ...from }, grip: null, verdict: { state: 'checking', words: '' }, letGo: false };
     return moving;
   }
 
@@ -580,6 +608,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (moving === null) return;
     moving.to = to;
     moving.verdict = { state: 'checking', words: '' };
+    // Carried or turned again after a click let it go: that click is taken back.
+    moving.letGo = false;
     showCopy(moving, to, false);
     clearTimeout(askTimer);
     askTimer = window.setTimeout(() => { void askMove(); }, ASK_AFTER_MS);
@@ -603,6 +633,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     }
     showCopy(move, to, move.verdict.state === 'refused');
     render();
+    // Let go here while it was asked about: kept now that the server says it may stand here, else carried on.
+    if (move.letGo) { move.letGo = false; if (move.verdict.state === 'ready') void keepMove(); }
   }
 
   /** The see-through copy where a move would put what it carries: a thing's own, a made part's box. */
@@ -632,7 +664,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
 
   async function keepMove() {
-    if (moving === null || busy || moving.verdict.state !== 'ready') return;
+    if (moving === null || busy) return;
+    // Still asked about where it would stand: let go there, and kept when the answer says it may stand (askMove).
+    if (moving.verdict.state === 'checking') { moving.letGo = true; return; }
+    if (moving.verdict.state !== 'ready') return;
     const move = moving, verdict = move.verdict, name = nameOf(move.placedId);
     busy = true; render();
     try {
@@ -937,7 +972,9 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     kindLabels,
     /** Act on a key; true when build mode took it. */
     key(event) {
-      const action = keyAction(flags(), event);
+      // While the server is asked about where the held thing stands, Enter lets it go there, as a click does.
+      const now = flags(), asking = (placing ?? moving)?.verdict.state === 'checking';
+      const action = keyAction(asking ? { ...now, ready: true } : now, event);
       if (action === null) return false;
       event.preventDefault();
       act(action, event.altKey);
@@ -949,13 +986,19 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
      */
     pointerDown(event) {
       if (!on || busy || event.button !== 0 || selected === null || confirming !== null || placing !== null) return false;
-      if (placedAt(event.clientX, event.clientY) !== selected) return false;
-      const ground = groundAt(event.clientX, event.clientY);
-      const move = ground === null ? null : beginMove();
+      const met = pickedAt(event.clientX, event.clientY);
+      if (met?.id !== selected) return false;
+      const flat = groundAt(event.clientX, event.clientY);
+      const move = flat === null ? null : beginMove();
       if (move === null) return false;
+      // Carried by the point the press met, at its height above the thing's foot, so that point stays under the
+      // pointer: the ground behind a tall thing lies metres beyond it.
+      const raised = grabHeight(met, move.to.y);
+      const high = raised > 0 ? groundAt(event.clientX, event.clientY, raised) : null;
+      const lift = high === null ? 0 : raised, ground = high ?? flat;
       move.grip = { east: move.to.x - ground.xMm, south: move.to.z - ground.zMm };
       const carry = (at, free) => {
-        const where = groundAt(at.clientX, at.clientY);
+        const where = groundAt(at.clientX, at.clientY, lift);
         if (where === null || moving !== move) return;
         moveTo({ ...move.to, x: snapped(where.xMm + move.grip.east, free), z: snapped(where.zMm + move.grip.south, free) });
       };
@@ -972,7 +1015,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (!on || busy) return false;
       if (reading !== null) { void reading.then(() => { if (on) this.click(x, y); }); return true; }
       // While something is held, a click places it where the server said it may stand, as Enter does.
-      if (placing !== null || moving !== null) { if ((placing ?? moving).verdict.state === 'ready') act('place', false); return true; }
+      // While it is asked about, the click lets it go there and the answer places it (placeNew, keepMove).
+      if (placing !== null || moving !== null) { if ((placing ?? moving).verdict.state !== 'refused') act('place', false); return true; }
       const placedId = placedAt(x, y);
       if (placedId === null) { if (selected !== null) deselect(); return true; }
       if (placedId !== selected) select(placedId);
@@ -984,8 +1028,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         lastPick = now;
         hovered = pointer && !inspecting() && moving?.grip == null && placing === null ? placedAt(pointer.x, pointer.y) : null;
         canvas.style.cursor = moving?.grip != null ? 'grabbing' : placing !== null ? 'crosshair' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : '';
-        // A new thing's copy follows the pointer over the ground.
-        if (placing !== null && pointer && !inspecting()) { const ground = groundAt(pointer.x, pointer.y); if (ground !== null) placeTo(ground, pointer.free); }
+        // A new thing's copy follows the pointer over the ground, until a click lets it go.
+        if (placing !== null && !placing.letGo && pointer && !inspecting()) { const ground = groundAt(pointer.x, pointer.y); if (ground !== null) placeTo(ground, pointer.free); }
       }
       const layer = things()?.layer;
       // The name of what the pointer is on, above it; the held group names what is chosen instead.
