@@ -77,6 +77,8 @@ assert.deepEqual(did.map(row => [row.time, row.what, row.sub]), [
   ['06:00', 'Leaving home', 'Routine'],
 ]);
 assert.equal(didRows({ events, subjectId: 't', wordGoal: () => null, modelName: () => null, limit: 1 }).length, 1);
+// Every row carries its time (R5e): where the society keeps no clock, the minute in J35's form.
+assert.deepEqual(didRows({ events, subjectId: 't', wordGoal: () => 'Leaving home', modelName: () => null }).map(row => row.time), ['Minute 52', 'Minute 44', 'Minute 0']);
 // T6: a line said to Teo, or to everyone near while Teo heard it, is a heard row with no sub-line and
 // no decision; a line overheard, said to someone else, or not heard at all, is none; Teo's own line
 // names whom it was said to.

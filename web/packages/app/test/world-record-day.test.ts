@@ -24,13 +24,13 @@ const NEMOTRON = 'Nemotron 3 Nano 30B';
 function rows() {
   return [
     { time: '07:10 · Day 1', what: 'Said to Marco: “Sardines, mostly. Come down early tomorrow.”', sub: `${NEMOTRON} · 7 choices`, decision: true,
-      title: 'Teo spoke to Marco', said: '“Sardines, mostly. Come down early tomorrow.”', picture: '/pictures/spoke.png', model: NEMOTRON, choices: 7 },
+      moment: true, title: 'Teo spoke to Marco', said: '“Sardines, mostly. Come down early tomorrow.”', picture: '/pictures/spoke.png', model: NEMOTRON, choices: 7 },
     { time: '07:09 · Day 1', what: 'Heard Marco: “Did they bring in anything good?”', sub: '', decision: false, heard: true,
       title: 'Marco asked Teo', said: 'Marco: “Did they bring in anything good?”', picture: null, model: null, decider: 'person' },
     { time: '06:52 · Day 1', what: 'Said to Ines: “Morning, Ines. The boats are out early.”', sub: `${NEMOTRON} · 9 choices`, decision: true,
-      title: 'Teo met Ines at the bench', said: '“Morning, Ines. The boats are out early.”', picture: '/pictures/met.png', model: NEMOTRON, choices: 9 },
-    { time: '06:31 · Day 1', what: 'Went to the lower pools', sub: `${NEMOTRON} · 6 choices`, decision: true, title: 'Teo went to the lower pools', model: NEMOTRON, choices: 6 },
-    { time: '06:00 · Day 1', what: 'Left home', sub: 'Routine', decision: false, title: 'Teo left home', model: null },
+      moment: true, title: 'Teo met Ines at the bench', said: '“Morning, Ines. The boats are out early.”', picture: '/pictures/met.png', model: NEMOTRON, choices: 9 },
+    { time: '06:31 · Day 1', what: 'Went to the lower pools', sub: `${NEMOTRON} · 6 choices`, decision: true, moment: true, title: 'Teo went to the lower pools', model: NEMOTRON, choices: 6 },
+    { time: '06:00 · Day 1', what: 'Left home', sub: 'Routine', decision: false, moment: true, title: 'Teo left home', model: null },
   ];
 }
 
@@ -165,9 +165,11 @@ describe("Teo's day", () => {
     expect(cards.map((card) => card.querySelector('.wu-day-title')?.textContent)).toEqual([
       'Teo spoke to Marco', 'Marco asked Teo', 'Teo met Ines at the bench', 'Teo went to the lower pools', 'Teo left home',
     ]);
-    // 160px apart from 150, at x 920, each a 208 by 118 picture with its words beside it.
+    // 160px apart from 150, at x 920, each a 208 by 118 picture with its words beside it; a line heard is no moment of
+    // Teo's, so it draws no tile and its words keep the same column (R5e).
     expect(cards.map((card) => [card.style.left, card.style.top])).toEqual([['920px', '150px'], ['920px', '310px'], ['920px', '470px'], ['920px', '630px'], ['920px', '790px']]);
-    expect(cards.map((card) => (card.querySelector('.wu-hr-pic') as HTMLElement).style.width)).toEqual(['208px', '208px', '208px', '208px', '208px']);
+    expect(cards.map((card) => (card.firstElementChild as HTMLElement).style.width)).toEqual(['208px', '208px', '208px', '208px', '208px']);
+    expect(cards.map((card) => (card.firstElementChild as HTMLElement).className)).toEqual(['wu-hr-pic', 'wu-day-untiled', 'wu-hr-pic', 'wu-hr-pic', 'wu-hr-pic']);
     const picture = cards[0]!.querySelector('.wu-hr-pic') as HTMLElement;
     expect([picture.style.width, picture.style.height]).toEqual(['208px', '118px']);
     expect(all(root, '.wu-day-item .wu-hr-time')).toEqual(['07:10 · Day 1', '07:09 · Day 1', '06:52 · Day 1', '06:31 · Day 1', '06:00 · Day 1']);
@@ -176,9 +178,9 @@ describe("Teo's day", () => {
     expect(all(root, '.wu-day-decided')).toEqual([`By ${NEMOTRON} · 7 choices`, 'By a person playing', `By ${NEMOTRON} · 9 choices`, `By ${NEMOTRON} · 6 choices`, 'Routine']);
     // A model's name never breaks.
     expect(all(root, '.wu-day-item .wu-hr-model')).toEqual([NEMOTRON, NEMOTRON, NEMOTRON]);
-    // A picture where one exists, the quiet tile where none does (no words in it).
+    // A picture where one exists, the quiet tile where a moment's is still to come (no words in it).
     expect(cards.map((card) => card.querySelector('.wu-hr-pic img')?.getAttribute('src') ?? null)).toEqual(['/pictures/spoke.png', null, '/pictures/met.png', null, null]);
-    expect(all(root, '.wu-hr-pic')).toEqual(['', '', '', '', '']);
+    expect(all(root, '.wu-hr-pic')).toEqual(['', '', '', '']);
     // The chosen card rises; only it says "[Enter] See the decision".
     expect(cards.map((card) => card.getAttribute('aria-current'))).toEqual([null, null, 'true', null, null]);
     expect(all(root, '.wu-day-see')).toEqual(['EnterSee the decision']);
@@ -198,7 +200,7 @@ describe("Teo's day", () => {
     expect(act.mock.calls).toEqual([['inspect', 2]]);
   });
 
-  it('draws today\'s rows by their own words and the quiet tile until the moment titles and pictures exist', async () => {
+  it('draws rows that made no moment by their own words with no picture tile, their words in the pictured column (R5e)', async () => {
     const { root, page } = await open();
     const today = rows().map(({ time, what, sub, decision, heard }) => ({ time, what, sub, decision, ...(heard ? { heard } : {}) }));
     const plain = teoState({ did: today });
@@ -208,6 +210,8 @@ describe("Teo's day", () => {
     expect(all(root, '.wu-day-decided')).toEqual([`${NEMOTRON} · 7 choices`, `${NEMOTRON} · 9 choices`, `${NEMOTRON} · 6 choices`, 'Routine']);
     expect(root.querySelector('.wu-day-item .wu-hr-said')).toBeNull();
     expect(root.querySelector('.wu-day-item img')).toBeNull();
+    expect(root.querySelector('.wu-day-item .wu-hr-pic')).toBeNull();
+    expect([...root.querySelectorAll<HTMLElement>('.wu-day-item > .wu-day-untiled')].map((spacer) => spacer.style.width)).toEqual(['208px', '208px', '208px', '208px', '208px']);
     // No portrait yet: the first letter on the quiet orb; who decides is the model's own name with its tag.
     expect(one(root, '.wu-day-face')).toBe('T');
     expect(root.querySelector('.wu-day-doing')).toBeNull();

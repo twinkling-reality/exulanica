@@ -32,7 +32,9 @@ export interface DidRow {
   readonly title?: string | null;
   /** The line said, as drawn: in curly quotes, a line said to the character with its speaker first (T6's heard). */
   readonly said?: string | null;
-  /** The moment's picture, as an image address (R2); absent or null, the quiet tile. */
+  /** Whether the row is a moment of the moments read: only such a row draws a picture tile (R5e). */
+  readonly moment?: boolean;
+  /** The moment's picture, as an image address (R2); absent or null on a moment, the quiet tile until it comes. */
   readonly picture?: string | null;
   /** The served name of the model that decided, or null where none did; absent, the who line is `sub` as worded. */
   readonly model?: string | null;
@@ -438,7 +440,10 @@ function drawDay(state: CharacterPageState, layout: Layout, view: View | null, w
       whoLine.append(see);
     }
     if (whoLine.childNodes.length) words.append(whoLine);
-    item.append(pictureBox(row.picture ?? null, layout.picture.width, layout.picture.height), words);
+    // A choice that made no moment has no picture to come, so no tile: its words keep the pictured rows' column (R5e).
+    const tile = row.moment ? pictureBox(row.picture ?? null, layout.picture.width, layout.picture.height) : element('div', 'wu-day-untiled');
+    if (!row.moment) tile.style.width = `${layout.picture.width}px`;
+    item.append(tile, words);
     day.append(item);
   }
   return day;

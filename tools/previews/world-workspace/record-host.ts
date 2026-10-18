@@ -95,13 +95,14 @@ export function recordStates(host: RecordHost) {
   return {
     readMoments,
 
-    /** A row of What Teo did, filled from its moment: the title in the moment words, the line said, its picture. */
+    /** A row of What Teo did, filled from its moment: the title in the moment words, the line said, its picture; a row
+     * with no moment is left as worded, and draws no picture tile (R5e). */
     dayRow(showing: Json, row: Json): Json {
       const subjectId = showing.row.scene.id;
       const moment = row.heard ? null : ownMoment(showing.moments, row.requestId, subjectId);
       if (!moment) return {};
       const said = lineOf(showing, row.requestId, subjectId, moment);
-      return { title: sentenceCase(momentTitle(moment, names(showing))), said: said ? quoted(said.line) : null, picture: host.pictures.momentNow(moment as never) };
+      return { moment: true, title: sentenceCase(momentTitle(moment, names(showing))), said: said ? quoted(said.line) : null, picture: host.pictures.momentNow(moment as never) };
     },
 
     /** The day page's who column beyond what the page reads itself: portrait, what they are doing, who decides. */

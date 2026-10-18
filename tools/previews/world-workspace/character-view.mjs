@@ -184,7 +184,8 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
   for (const event of mine) {
     if (rows.length >= limit) break;
     const document = event.document || {};
-    const time = worldTime(event.tick, startMinute)?.hhmm ?? '';
+    // Every row carries its time (R5e): the world's clock time, else the society's minute (J35's "Minute 8").
+    const time = worldTime(event.tick, startMinute)?.hhmm ?? (Number.isSafeInteger(event.tick) ? `Minute ${event.tick}` : '');
     if (event.subject_id !== subjectId) {
       rows.push({ time, what: heardRow(who(event.subject_id), document.thing.line), sub: '', requestId: null, model: null, heard: true });
     } else if (event.event_kind === 'said' && typeof document.thing?.line === 'string') {

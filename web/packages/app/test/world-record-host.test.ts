@@ -104,7 +104,7 @@ describe("a record page's moments", () => {
     const showing = teoPage();
     await records.readMoments(showing);
     expect(made.host.read).toHaveBeenCalledWith(`/world/versions/v1/history/moments?world_id=w1&limit=200&recipe=${encodeURIComponent(await recipe())}`);
-    expect(records.dayRow(showing, { requestId: 'r1' })).toEqual({ title: 'Teo met Ines', said: '“Morning, Ines.”', picture: 'blob:m1' });
+    expect(records.dayRow(showing, { requestId: 'r1' })).toEqual({ moment: true, title: 'Teo met Ines', said: '“Morning, Ines.”', picture: 'blob:m1' });
     // Marco's moment never titles or pictures a row of Teo's, whatever request the row names.
     expect(records.dayRow(showing, { requestId: 'r9' })).toEqual({});
     expect(records.dayRow(showing, { requestId: null, heard: true })).toEqual({});
