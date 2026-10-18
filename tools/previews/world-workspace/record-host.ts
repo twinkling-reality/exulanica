@@ -9,7 +9,7 @@ import { CHARACTER_WORDS, decidesPrint, modelRefusalWords, quoted } from './char
 import { deciderOf } from './character-group.mjs';
 import { thingName } from './build-words.mjs';
 import { momentTitle, targetObject } from './history-rows.mjs';
-import { momentWords, saidWords, worldWhen } from './history-words.mjs';
+import { didWords, momentWords, saidWords, worldWhen } from './history-words.mjs';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { timeLeft } from './run-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -68,7 +68,13 @@ export function recordStates(host: RecordHost) {
       host.read(`${host.versionPath}/history/moments${host.scope}&limit=${MOMENTS_READ}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`).catch(() => null),
       showing.things ? null : host.read(`${host.versionPath}${host.scope}`).catch(() => null),
     ]);
-    if (moments) showing.moments = moments.moments ?? [];
+    if (moments) {
+      showing.moments = moments.moments ?? [];
+      // Where the read stopped short of the oldest moment, a choice older than its oldest moment is not known to have
+      // made none (R5e): it never folds.
+      const ticks = showing.moments.map((moment: Json) => moment.tick).filter(Number.isSafeInteger);
+      showing.momentsFrom = moments.more && ticks.length ? Math.min(...ticks) : moments.more ? Number.POSITIVE_INFINITY : null;
+    }
     if (version) showing.things = new Map((version.things ?? []).map((thing: Json) => [thing.thing_id, thing]));
   }
 
@@ -95,12 +101,27 @@ export function recordStates(host: RecordHost) {
   return {
     readMoments,
 
-    /** A row of What Teo did, filled from its moment: the title in the moment words, the line said, its picture; a row
-     * with no moment is left as worded, and draws no picture tile (R5e). */
+    /** Whether a row of What Teo did may fold with the same choice beside it (R5e): its decision made no moment of
+     * Teo's own in the moments read, and is not older than what that read covers. Nothing folds before it answers. */
+    foldable(showing: Json, row: Json): boolean {
+      if (!Array.isArray(showing.moments) || !Number.isSafeInteger(row.tick)) return false;
+      if (showing.momentsFrom !== null && showing.momentsFrom !== undefined && row.tick < showing.momentsFrom) return false;
+      return ownMoment(showing.moments, row.requestId, showing.row.scene.id) === null;
+    },
+
+    /** A row of What Teo did, filled from its moment: the title in the moment words, the line said, its picture. A
+     * choice with no moment says what Teo did in the past ("Waited", R5e), else keeps its words, and draws no
+     * picture tile. */
     dayRow(showing: Json, row: Json): Json {
       const subjectId = showing.row.scene.id;
       const moment = row.heard ? null : ownMoment(showing.moments, row.requestId, subjectId);
-      if (!moment) return {};
+      if (!moment) {
+        const did = row.heard ? null : row.did;
+        // didWords reads the target's name as a place for a going and as a thing in hand for the hands' kinds.
+        const named = did?.target ? names(showing).target(did.target) : null;
+        const title = did?.kind ? didWords({ kind: did.kind, to: named, thing: named, activity: did.target?.activity ?? null, withName: did.with ? host.nameOf(did.with) : null }) : null;
+        return title ? { title } : {};
+      }
       const said = lineOf(showing, row.requestId, subjectId, moment);
       return { moment: true, title: sentenceCase(momentTitle(moment, names(showing))), said: said ? quoted(said.line) : null, picture: host.pictures.momentNow(moment as never) };
     },

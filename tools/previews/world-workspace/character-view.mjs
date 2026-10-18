@@ -4,6 +4,7 @@
 // holds it.
 import { CHARACTER_WORDS, called, chosenLine, deciderWords, readingRecord, rowSub } from './character-words.mjs';
 import { PAUSE_FIRST, RUN_WORDS, atMost, runFor, runRefusalWords, whoDecides } from './run-words.mjs';
+import { plural } from './history-words.mjs';
 import { heardRow, saidRow } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
@@ -171,9 +172,12 @@ export function runQuestion({ who, model, limits, refusal = null, busy = false }
  * character heard it, is a `heard` row ("Heard Ines: “…”") with no sub-line and no decision; a line
  * overheard, said to someone else, is none. `wordGoal(document)` says a goal in the catalog's words;
  * `modelName` names a model by its provider and id; `options(requestId)` is a decision's number of
- * choices once read; `who(id)` calls a person as the tag and card do (J20).
+ * choices once read; `who(id)` calls a person as the tag and card do (J20). A choice's row keeps what was
+ * done (`did`, which the events read joins onto the event, R5e), the offered words (`chose`) and its minute
+ * (`tick`); the same choice
+ * made several times in a row folds into one row where `foldable(row)` says each made no moment (foldRows).
  */
-export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7 }) {
+export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7, foldable = () => false }) {
   const heard = event => event.subject_id !== subjectId && event.event_kind === 'said' && typeof event.document?.thing?.line === 'string'
     && Array.isArray(event.document.thing.heard_by) && event.document.thing.heard_by.includes(subjectId) && (event.document.thing.to === subjectId || !event.document.thing.to);
   const mine = events.map((event, index) => ({ event, index })).filter(({ event }) => event.subject_id === subjectId || heard(event))
@@ -182,7 +186,6 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
   const said = new Set(mine.filter(event => event.event_kind === 'said').map(event => event.document?.thing?.request_id).filter(Boolean));
   const rows = [];
   for (const event of mine) {
-    if (rows.length >= limit) break;
     const document = event.document || {};
     // Every row carries its time (R5e): the world's clock time, else the society's minute (J35's "Minute 8").
     const time = worldTime(event.tick, startMinute)?.hhmm ?? (Number.isSafeInteger(event.tick) ? `Minute ${event.tick}` : '');
@@ -191,16 +194,57 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
     } else if (event.event_kind === 'said' && typeof document.thing?.line === 'string') {
       const model = document.thing.model ? modelName(document.thing.model) : null;
       const to = typeof document.thing.to === 'string' ? who(document.thing.to) : null;
-      rows.push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model });
+      rows.push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model,
+        decider: document.thing.decider ?? null });
     } else if (event.event_kind === 'decision_applied' && !said.has(document.request_id)) {
       const what = typeof document.chose === 'string' && document.chose ? document.chose.charAt(0).toUpperCase() + document.chose.slice(1) : wordGoal(document);
       if (!what) continue;
       const model = document.model ? modelName(document.model) : null;
-      rows.push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model });
+      rows.push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model,
+        decider: document.origin ?? null, did: event.did ?? null, chose: typeof document.chose === 'string' ? document.chose : null, tick: event.tick });
     } else if (event.event_kind === 'goal_selected' && document.reason !== 'chosen_by_their_model') {
       const what = wordGoal(document);
       if (what) rows.push({ time, what, sub: rowSub(null), requestId: null, model: null });
     }
   }
-  return rows;
+  return foldRows(rows, foldable).slice(0, limit);
+}
+
+/**
+ * The same choice, by what was done (its kind, where and with whom), else, where the read says no kind (an option the
+ * moment rules do not map, or none joined), by the offered words.
+ */
+function sameChoice(a, b) {
+  if (a.did?.kind && b.did?.kind) {
+    return a.did.kind === b.did.kind && (a.did.target?.target_id ?? null) === (b.did.target?.target_id ?? null)
+      && (a.did.target?.activity ?? null) === (b.did.target?.activity ?? null) && (a.did.with ?? null) === (b.did.with ?? null);
+  }
+  return !a.did?.kind && !b.did?.kind && a.chose !== null && a.chose === b.chose;
+}
+
+/** A span of rows' times: "06:10 to 06:33", "Minute 4 to minute 27" (the second end in the sentence's case). */
+export function timeRange(from, to) {
+  return from === to ? from : `${from} to ${to.replace(/^Minute /, 'minute ')}`;
+}
+
+/**
+ * Folds the same choice made several times in a row into one row (R5e item 3): consecutive rows, newest first, each
+ * a model's or a decider's choice (a row with `chose`) that made no moment of its own (`foldable(row)`), choosing the
+ * same thing with the same model. The row keeps the newest decision, which [Enter] opens, spans its oldest to its
+ * newest time, counts its `decisions`, and says so in its who line ("Nemotron 3 Nano 30B · 23 decisions").
+ */
+export function foldRows(rows, foldable) {
+  const folded = [];
+  const fits = (row) => Boolean(row.requestId) && !row.heard && 'chose' in row && foldable(row);
+  for (const row of rows) {
+    const last = folded[folded.length - 1];
+    if (last && fits(row) && fits(last.newest) && sameChoice(last.newest, row) && (last.newest.model ?? null) === (row.model ?? null)) {
+      last.decisions += 1;
+      last.row = { ...last.newest, time: timeRange(row.time, last.newest.time), decisions: last.decisions,
+        sub: `${last.newest.model ? rowSub({ model: last.newest.model }) : last.newest.sub} · ${plural(last.decisions, 'decision')}` };
+      continue;
+    }
+    folded.push({ newest: row, row, decisions: 1 });
+  }
+  return folded.map((one) => one.row);
 }

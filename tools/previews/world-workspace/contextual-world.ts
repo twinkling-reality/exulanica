@@ -12,7 +12,7 @@ import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, questionGroup } from './character-group.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ringRadii, subjectWho, tagWords } from './character-view.mjs';
-import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, rowSub, runSectionLine } from './character-words.mjs';
+import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { WATCH_MS, mountRunWatch } from './run-watch.ts';
@@ -681,7 +681,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
-      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.model ? rowSub({ model: row.model, options: decisionOptions(row.requestId) }) : row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...records.dayRow(pageView, row) })) : null,
+      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null }), ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
@@ -704,21 +704,21 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!showing) return;
     try {
       // The events read serves the whole society, newest first, a page at a time: read back until
-      // the character's newest rows are found or DID_PAGES pages are read.
+      // the character's newest rows are found (counted as they fold, R5e) or DID_PAGES pages are read.
       const events = [];
       let before = '';
       for (let pageNumber = 0; pageNumber < DID_PAGES; pageNumber += 1) {
         const page = await read(eventsPath(['goal_selected', 'decision_applied', 'said'], '&limit=256' + (before ? '&before=' + encodeURIComponent(before) : '')));
         events.push(...page.events);
-        if (!page.next || events.filter(event => event.subject_id === showing.row.scene.id).length >= 7 || showing !== pageView) break;
+        if (!page.next || didRows({ events, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null, foldable: () => true }).length >= 7 || showing !== pageView) break;
         before = page.next;
       }
       const facts = characterFacts(subjectReads.society, showing.row.scene.id);
-      if (showing !== pageView) return;
       showing.events = events;
-      void records.readMoments(showing).then(() => { if (showing === pageView) drawPage(); });
+      await records.readMoments(showing);
+      if (showing !== pageView) return;
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
-        options: (requestId) => decisionOptions(requestId), who: whoOf,
+        options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row),
         wordGoal: (document) => {
           if (!facts) return null;
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };

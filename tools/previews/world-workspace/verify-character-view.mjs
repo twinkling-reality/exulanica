@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords } from './character-view.mjs';
+import { chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -79,6 +79,41 @@ assert.deepEqual(did.map(row => [row.time, row.what, row.sub]), [
 assert.equal(didRows({ events, subjectId: 't', wordGoal: () => null, modelName: () => null, limit: 1 }).length, 1);
 // Every row carries its time (R5e): where the society keeps no clock, the minute in J35's form.
 assert.deepEqual(didRows({ events, subjectId: 't', wordGoal: () => 'Leaving home', modelName: () => null }).map(row => row.time), ['Minute 52', 'Minute 44', 'Minute 0']);
+// The same choice made several times in a row, each with no moment of its own, is one row (R5e item 3): its time
+// the span, its who line the count, its decision the newest (which [Enter] opens). A choice with a moment, or one the
+// moments read cannot place (foldable false), keeps its own row; another choice or row between ends the run.
+const nano = { provider: 'p', model_id: 'nano' };
+const choice = (tick, id, chose, did) => ({ subject_id: 't', tick, event_kind: 'decision_applied', did, document: { request_id: id, chose, model: nano } });
+const waited = { kind: 'waited', target: null, with: null };
+const bench = { kind: 'went', target: { target_id: 'authored:v:bench:1:sit', activity: 'rest' }, with: null };
+const day = [
+  ...[33, 32, 31, 30, 29].map((tick) => choice(tick, `w${tick}`, 'wait here a minute', waited)),
+  choice(28, 'b28', 'rest at the bench (4 m away)', bench), choice(27, 'b27', 'rest at the bench (3 m away)', bench),
+  choice(26, 'w26', 'wait here a minute', waited), choice(12, 's12', 'talk with Ines', { kind: 'talked', target: null, with: 'i' }),
+];
+const rowsOf = (foldable, more = {}) => didRows({ events: day, subjectId: 't', wordGoal: () => null, modelName: () => 'Nemotron 3 Nano 30B', options: () => 8, foldable, ...more });
+assert.deepEqual(rowsOf((row) => row.requestId !== 's12').map(row => [row.time, row.sub, row.requestId, row.decisions ?? 1]), [
+  ['Minute 29 to minute 33', 'Nemotron 3 Nano 30B · 5 decisions', 'w33', 5],
+  ['Minute 27 to minute 28', 'Nemotron 3 Nano 30B · 2 decisions', 'b28', 2],
+  ['Minute 26', 'Nemotron 3 Nano 30B · 8 choices', 'w26', 1],
+  ['Minute 12', 'Nemotron 3 Nano 30B · 8 choices', 's12', 1],
+]);
+// The offered words differ (4 m, 3 m away) but what was done is the same, so the two rests fold; nothing folds where
+// no row may, and the limit counts the folded rows.
+assert.equal(rowsOf(() => false).length, 7);
+// Each row keeps who decided, so the page words its who line itself ("By a person playing", R5e part 2 as built).
+assert.deepEqual(didRows({ events: [choice(5, 'p5', 'wait here a minute', waited)].map((event) => ({ ...event, document: { ...event.document, model: null, origin: 'person' } })), subjectId: 't', wordGoal: () => null, modelName: () => null })
+  .map((row) => [row.model, row.decider]), [[null, 'person']]);
+assert.equal(rowsOf(() => true, { limit: 2 }).map(row => row.requestId).join(), 'w33,b28');
+// A wait whose decision made a moment stops the run there.
+assert.deepEqual(rowsOf((row) => row.requestId !== 'w31').map(row => row.decisions ?? 1).slice(0, 3), [2, 1, 2]);
+// Where the read says no kind (none joined, or an option the moment rules do not map), the offered words decide:
+// the waits fold, the rests 4 m and 3 m away do not.
+const unjoined = didRows({ events: day.map(({ did, ...event }) => event), subjectId: 't', wordGoal: () => null, modelName: () => 'N', foldable: () => true });
+assert.deepEqual(unjoined.map((row) => row.decisions ?? 1), [5, 1, 1, 1, 1]);
+const unmapped = didRows({ events: day.map((event) => ({ ...event, did: { kind: null, target: null, with: null } })), subjectId: 't', wordGoal: () => null, modelName: () => 'N', foldable: () => true });
+assert.deepEqual(unmapped.map((row) => row.decisions ?? 1), [5, 1, 1, 1, 1]);
+assert.deepEqual([timeRange('06:10', '06:33'), timeRange('Minute 4', 'Minute 27'), timeRange('06:10', '06:10')], ['06:10 to 06:33', 'Minute 4 to minute 27', '06:10']);
 // T6: a line said to Teo, or to everyone near while Teo heard it, is a heard row with no sub-line and
 // no decision; a line overheard, said to someone else, or not heard at all, is none; Teo's own line
 // names whom it was said to.

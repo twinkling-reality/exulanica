@@ -40,6 +40,8 @@ export interface DidRow {
   readonly model?: string | null;
   /** How many choices that model was offered (the decision's count); null where it is not known. */
   readonly choices?: number | null;
+  /** On a row the same choice folded into (R5e), how many decisions it stands for; the newest is the one opened. */
+  readonly decisions?: number | null;
   /** Who decided where no model did (T7): a person playing, or an outside program. */
   readonly decider?: 'person' | 'external' | null;
 }
@@ -371,6 +373,8 @@ function decidedBy(row: DidRow): Parts | string | null {
   if (row.model === undefined) return row.sub || null;
   if (!row.model) return CHARACTER_WORDS.routine;
   const by: Parts = byParts({ kind: 'model', model: { name: row.model } });
+  // A folded row counts its decisions ("· 23 decisions", R5e), else the one decision's choices.
+  if (Number.isSafeInteger(row.decisions) && (row.decisions ?? 0) > 1) return [...by, ` · ${plural(row.decisions, 'decision')}`];
   return Number.isSafeInteger(row.choices) && (row.choices ?? 0) > 0 ? [...by, ` · ${plural(row.choices, 'choice')}`] : by;
 }
 

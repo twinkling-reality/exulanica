@@ -218,6 +218,17 @@ describe("Teo's day", () => {
     expect(one(root, '.wu-day-decides')).toBe(`${NEMOTRON}Current`);
   });
 
+  it('draws the same choice folded into one row: its span of minutes and its decisions counted (R5e)', async () => {
+    const { root, page } = await open();
+    page.draw(teoState({ did: [
+      { time: 'Minute 10 to minute 33', what: 'Waited', sub: '', decision: true, model: NEMOTRON, choices: 8, decisions: 23 },
+      { time: 'Minute 9', what: 'Waited', sub: '', decision: true, model: NEMOTRON, choices: 8, decisions: 1 },
+    ], didFocus: 0 }));
+    expect(all(root, '.wu-day-item .wu-hr-time')).toEqual(['Minute 10 to minute 33', 'Minute 9']);
+    // The folded row counts its decisions; a single decision keeps its choices.
+    expect(all(root, '.wu-day-decided')).toEqual([`By ${NEMOTRON} · 23 decisions`, `By ${NEMOTRON} · 8 choices`]);
+  });
+
   it('shows a routine character with no personality written: the line, [N] Personality, and nothing it cannot do', async () => {
     const { root, page } = await open();
     page.draw(residentState());

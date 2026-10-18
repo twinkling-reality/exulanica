@@ -111,6 +111,39 @@ describe("a record page's moments", () => {
     expect(made.pictures.momentNow.mock.calls.map(([moment]) => moment.moment_id)).toEqual(['m1']);
   });
 
+  it('says what Teo did at a choice that made no moment, in the past, else keeps the choice as offered (R5e)', async () => {
+    const { recordStates } = await recordHost();
+    const bench = { thing_id: 'bench:1', kind: { kind: 'bench' } };
+    const records = recordStates(host({ read: vi.fn(async (path: string) => (path.includes('/history/moments') ? { moments: MOMENTS } : { things: [bench] })) }).host);
+    const showing = teoPage();
+    await records.readMoments(showing);
+    const use = 'authored:3c4d5e6f-0000-4000-8000-000000000002:bench:1:sit';
+    expect(records.dayRow(showing, { requestId: 'w1', did: { kind: 'waited', target: null, with: null } })).toEqual({ title: 'Waited' });
+    expect(records.dayRow(showing, { requestId: 'w2', did: { kind: 'went', target: { target_id: use, activity: 'rest' }, with: null } })).toEqual({ title: 'Went to rest at the bench' });
+    expect(records.dayRow(showing, { requestId: 'w3', did: { kind: 'talked', target: null, with: 'ines' } })).toEqual({ title: 'Talked with Ines' });
+    // A kind the moment rules do not map, no did at all, or a line heard: the row keeps its own words.
+    expect([records.dayRow(showing, { requestId: 'w4', did: { kind: null, target: null, with: null } }), records.dayRow(showing, { requestId: 'w5', did: null }),
+      records.dayRow(showing, { requestId: null, heard: true, did: { kind: 'waited', target: null, with: null } })]).toEqual([{}, {}, {}]);
+    // A choice that made Teo's own moment is titled by the moment, whatever it did.
+    expect(records.dayRow(showing, { requestId: 'r1', did: { kind: 'waited', target: null, with: null } }).title).toBe('Teo met Ines');
+  });
+
+  it('lets a row fold only where its decision made no moment of Teo\'s and the moments read covers its minute (R5e)', async () => {
+    const { recordStates } = await recordHost();
+    const records = recordStates(host().host);
+    const showing = teoPage();
+    // Nothing folds before the moments read answers.
+    expect(records.foldable(showing, { requestId: 'w1', tick: 400 })).toBe(false);
+    await records.readMoments(showing);
+    // The read is whole: a wait with no moment folds; Teo's meeting does not; Marco's moment is not Teo's.
+    expect([records.foldable(showing, { requestId: 'w1', tick: 400 }), records.foldable(showing, { requestId: 'r1', tick: 412 }), records.foldable(showing, { requestId: 'r9', tick: 429 })]).toEqual([true, false, true]);
+    // A read that stopped short (more to come) covers its oldest moment's minute on: an older choice never folds.
+    const short = recordStates(host({ read: vi.fn(async (path: string) => (path.includes('/history/moments') ? { moments: MOMENTS, more: true } : { things: [] })) }).host);
+    const cut = teoPage();
+    await short.readMoments(cut);
+    expect([short.foldable(cut, { requestId: 'w1', tick: 391 }), short.foldable(cut, { requestId: 'w2', tick: 390 }), short.foldable(cut, { requestId: 'w3', tick: null })]).toEqual([true, false, false]);
+  });
+
   it("says who decides for Teo, what Teo is doing, Teo's portrait, and Teo's model deciding while a run is on", async () => {
     const { recordStates } = await recordHost();
     const records = recordStates(host().host);
