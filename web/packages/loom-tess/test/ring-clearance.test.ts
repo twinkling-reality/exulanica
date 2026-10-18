@@ -218,6 +218,21 @@ describe('the ring clearance rule', () => {
     }
   });
 
+  it('clears a ring moved anywhere by the same pieces moved, at radii in any order', () => {
+    // A corner's hull reads only the steps out from the corner, so the rule finds each radius's
+    // hull once and moves it to every corner. A ring with a reflex corner keeps its corner hulls as
+    // pieces of their own, so this sees them; a radius met again comes after others.
+    const shape: Plan[] = [[0, 0], [14, 0], [14, 6], [7, 6], [9, 13], [0, 11]];
+    const moves: Plan[] = [[0, 0], [123_457, -98_765], [-3, 5]];
+    for (const radius of [340, 2, 17, 2]) {
+      const home = ringClearance(shape, radius, 'case');
+      for (const [dx, dy] of moves) {
+        const moved = shape.map(([x, y]): Plan => [x + dx, y + dy]);
+        expect(ringClearance(moved, radius, 'case')).toEqual(home.map((piece) => piece.map(([x, y]) => [x + dx, y + dy])));
+      }
+    }
+  });
+
   it('refuses a radius that is not positive, and a ring the grammar refuses', () => {
     const square: Plan[] = [[0, 0], [10, 0], [10, 10], [0, 10]];
     expect(() => ringClearance(square, 0, 'case')).toThrow(GeometryError);

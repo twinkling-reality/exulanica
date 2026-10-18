@@ -172,13 +172,31 @@ function chordsClear(walk: readonly Plan[], centre: Plan, distance: number, wher
   });
 }
 
+/**
+ * Each radius's corner hull round the origin, found once. A hull's steps, its walk and the check of
+ * its chords read only the steps out from the corner, never where the corner is, so the hull round
+ * any corner is this one moved there, exactly, in integers. Found again at every corner of every
+ * ring, it would cost most of a tile's bake.
+ */
+const hullsRoundOrigin = new Map<number, ClearancePiece>();
+
 /** A convex integer walk round `centre` that holds every point within `radius` of it. */
 function cornerHull(centre: Plan, radius: number, where: string): ClearancePiece {
+  let round = hullsRoundOrigin.get(radius);
+  if (round === undefined) {
+    round = hullRoundOrigin(radius, where);
+    hullsRoundOrigin.set(radius, round);
+  }
+  return round.map((step) => plus(centre, step, where));
+}
+
+/** The corner hull of `radius` round the origin: the steps out, bisected until every chord clears. */
+function hullRoundOrigin(radius: number, where: string): ClearancePiece {
   const out = add(radius, CORNER_MARGIN_MM, where);
   for (let steps = 0; steps <= MOST_BISECTIONS; steps += 1) {
-    const walk = convexWalk(stepsRound(out, steps, where).map((step) => plus(centre, step, where)), where);
+    const walk = convexWalk(stepsRound(out, steps, where), where);
     if (walk.length < 3) continue;
-    if (chordsClear(walk, centre, radius, where)) return walk;
+    if (chordsClear(walk, [0, 0], radius, where)) return walk;
   }
   throw new GeometryError(`${where} could not hold a disk of ${String(radius)} in an integer walk`);
 }

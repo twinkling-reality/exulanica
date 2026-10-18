@@ -311,6 +311,13 @@ export function uncoveredRegions(
   const findGroup = (key: string): string => {
     let root = key;
     while (group.get(root) !== root) root = group.get(root)!;
+    // Every vertex passed on the way points straight at the root from now on, so a long chain is
+    // walked once, not once a lookup. No group's root changes, nor the order groups are labelled in.
+    for (let at = key; at !== root; ) {
+      const next = group.get(at)!;
+      group.set(at, root);
+      at = next;
+    }
     return root;
   };
   for (const key of points.keys()) group.set(key, key);
