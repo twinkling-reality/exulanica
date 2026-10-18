@@ -269,6 +269,36 @@ describe('History', () => {
     }
   });
 
+  it("draws a run's bracket over the part of it in view at 1440, with no leg where the window's edge cuts it (H16)", async () => {
+    // The run goes on: two more moments after Marco asked Teo, so at 1440 the story does not fit and a view cuts it.
+    const longer = moments();
+    for (const [id, minutes] of [['m3', 20], ['m4', 10]] as const) {
+      longer.moments.push({ ...longer.moments[0]!, moment_id: id, tick: 432, at: at(minutes), kind: 'left', subjects: ['ines'], place: null, said: [], branches: [] } as never);
+    }
+    const { read } = reads({ [`/world/versions/${VERSION}/history/moments`]: longer });
+    const narrow = document.createElement('div');
+    Object.defineProperty(narrow, 'clientWidth', { value: 1440 });
+    Object.defineProperty(narrow, 'clientHeight', { value: 900 });
+    document.body.append(narrow);
+    const made = host(read, { root: narrow });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    const bracket = () => [...made.root.querySelectorAll('.wu-hr-path .bracket')].map((path) => path.getAttribute('d'));
+    const words = () => made.root.querySelector<HTMLElement>('.wu-hr-run');
+    const slide = () => made.root.querySelector<HTMLElement>('.wu-hr-track')!.style.transform;
+    // The newest end: the run began before the view, so its bracket starts at the window's left edge with no leg, and
+    // its words stand whole at the page's margin (80 at 1440) above it.
+    expect(slide()).toBe('translateX(-796px)');
+    expect(bracket()).toEqual(['M 796 254 L 1856 254 L 1856 262']);
+    expect([words()?.textContent, Number.parseFloat(words()!.style.left) - 796]).toEqual(["Teo's and Ines's models were deciding · 06:00 to 07:15 · spent $0.0042", 80]);
+    // Back at the start: the run goes on past the right edge, so the bracket runs to it with no leg there; its words
+    // over its first dot.
+    for (let step = 0; step < 4; step += 1) history.key(press('ArrowLeft'));
+    expect(slide()).toBe('translateX(0px)');
+    expect(bracket()).toEqual(['M 516 262 L 516 254 L 1440 254']);
+    expect(words()?.style.left).toBe('516px');
+  });
+
   it('shows the creation and Now alone with nothing yet, and no arrows with nothing to move to', async () => {
     const { read } = reads({
       [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [], edits: [] },

@@ -8,7 +8,7 @@
 // The record pages' shared parts load first: History's own stylesheet refines them and must come after.
 import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence } from './world-ui-record.ts';
 import { changeParts, thingName } from './build-words.mjs';
-import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, targetObject } from './history-rows.mjs';
+import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
 import { KEEP_WORDS } from './history-keep-words.mjs';
 import { PATH_WORDS, headLine } from './history-words.mjs';
@@ -419,14 +419,23 @@ export function mountHistory(host: HistoryHost): History {
     if (state === 'ready') svg.append(svgPart('path', { d: `M ${local(view.from)} ${layout.lineY} L ${local(view.to)} ${layout.lineY}` }, 'line'));
     track.append(svg);
 
+    // Each run's bracket over the part of it in view, cut at the window's edge with no leg there (H16); its words are
+    // measured where they stand so words at the margin that would meet another run's are left out.
+    const runWords = new Map<string, HTMLElement>();
     for (const span of path?.spans ?? []) {
-      if (!view.drawn.has(span.first) || !view.drawn.has(span.last)) continue;
-      const from = placed.x.get(span.first)!;
-      const right = placed.x.get(span.last)! + layout.card;
-      svg.append(svgPart('path', { d: `M ${from} ${layout.bracketY + 8} L ${from} ${layout.bracketY} L ${right} ${layout.bracketY} L ${right} ${layout.bracketY + 8}` }, 'bracket'));
       const words = element('div', 'wu-hr-run', span.words);
-      px(words, from, layout.bracketY - 22);
       track.append(words);
+      runWords.set(span.id, words);
+    }
+    const brackets = state === 'ready' ? runBrackets(path?.spans ?? [], items, placed, view, layout, width, (id: string) => runWords.get(id)?.offsetWidth ?? 0) : [];
+    for (const bracket of brackets) {
+      const y = layout.bracketY, [left, right] = bracket.legs;
+      const d = `M ${bracket.from} ${left ? y + 8 : y}${left ? ` L ${bracket.from} ${y}` : ''} L ${bracket.to} ${y}${right ? ` L ${bracket.to} ${y + 8}` : ''}`;
+      svg.append(svgPart('path', { d }, 'bracket'));
+      if (bracket.words !== null) px(runWords.get(bracket.id)!, bracket.words, y - 22);
+    }
+    for (const [id, words] of runWords) {
+      if (!brackets.some((bracket: Json) => bracket.id === id && bracket.words !== null)) words.remove();
     }
 
     for (const item of items) {

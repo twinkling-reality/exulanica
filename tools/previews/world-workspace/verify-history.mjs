@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { changeParts, changeWords } from './build-words.mjs';
-import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, targetObject } from './history-rows.mjs';
+import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import {
   HEAD_WORDS, PATH_WORDS, branchWords, byParts, creationWhen, dayHeading, headLine, momentWords, money, partsText,
   personWhen, runSpanWords, youChangeWords, youModelParts, youPersonalityWords,
@@ -164,6 +164,37 @@ assert.equal(pathView(long.items, longPlaced, wide, 1920, 'moment:l0', back.offs
 // A routine's moment has no who line.
 assert.equal(long.items[1].by, null);
 
+// A run's bracket partly in view (H16): a line over the part in view, cut at the window's edge with no leg there; its
+// words above its left end where that end is in view, else at the margin, and left out there where they would meet
+// another run's words (16px clear). Two runs over six model-made moments, 420 apart from 540.
+const twoRuns = historyPath({
+  creation: { at: iso(16, 6, 0), readyWorld: 'Terraces on the bay', picture: null },
+  runs: [{ session_id: 'ra', start_tick: 400, end_tick: 404, spent: '0.0010', closed: { reason: 'session_minutes', words: '' } },
+    { session_id: 'rb', start_tick: 404, end_tick: 406, spent: '0.0020', closed: { reason: 'session_minutes', words: '' } }],
+  moments: Array.from({ length: 6 }, (_, index) => ({
+    moment_id: `r${index}`, tick: 400 + index, at: iso(16, 7, index), session_id: index < 4 ? 'ra' : 'rb', kind: 'left', subjects: ['teo'],
+    place: null, target: null, with: null, said: [], decider: model('Qwen3 235B'), scene: {}, picture: null, branches: [],
+  })),
+}, names, partsOf, clock, now);
+const runsPlaced = pathLayout(twoRuns.items, wide);
+const bracketsOf = (view, widthOf = () => 500) => runBrackets(twoRuns.spans, twoRuns.items, runsPlaced, view, wide, 1920, widthOf);
+// The newest end: r0 and r1 out of view to the left. The first run is cut at the window's left edge (1260 in the
+// track's places), its words at the margin (120 on the page); the second is whole, its words over its first dot.
+const runsNewest = pathView(twoRuns.items, runsPlaced, wide, 1920, 'moment:r5');
+assert.equal(runsNewest.offset, -1260);
+assert.deepEqual(bracketsOf(runsNewest), [
+  { id: 'run:ra', from: 1260, to: 2100, legs: [false, true], words: 1380 },
+  { id: 'run:rb', from: 2220, to: 2940, legs: [true, true], words: 2220 },
+]);
+assert.equal(bracketsOf(runsNewest)[0].words + runsNewest.offset, wide.margin);
+// Words at the margin that would come within 16px of the next run's words are left out; the other run's stay.
+assert.deepEqual(bracketsOf(runsNewest, (id) => (id === 'run:ra' ? 825 : 500)).map((one) => one.words), [null, 2220]);
+assert.deepEqual(bracketsOf(runsNewest, (id) => (id === 'run:ra' ? 824 : 500)).map((one) => one.words), [1380, 2220]);
+// Back at the start: the first run is cut at the window's right edge, its left leg and words at its first dot; the
+// second run has no moment in view and draws nothing.
+const runsStart = pathView(twoRuns.items, runsPlaced, wide, 1920, 'moment:r0', runsNewest.offset);
+assert.deepEqual(bracketsOf(runsStart), [{ id: 'run:ra', from: 540, to: 1920, legs: [true, false], words: 540 }]);
+
 // Nothing yet: the creation alone, and Now still at its place on the right.
 const empty = historyPath({ creation: { at: iso(16, 9, 12), readyWorld: 'Terraces on the bay', picture: null } }, names, partsOf, clock, now);
 assert.deepEqual(empty.items.map((item) => [item.words, item.quote]), [['Started from Terraces on the bay', null]]);
@@ -288,4 +319,4 @@ assert.equal(runSpanWords({ names: ['Teo'], from: '06:00', to: '07:15', spent: '
 assert.equal(runSpanWords({ names: ['Teo', 'Ines', 'Marco'], from: '06:00', to: '07:15', spent: '0' }), "3 characters' models were deciding · 06:00 to 07:15");
 assert.equal(runSpanWords({ names: ['Teo', 'Ines'], from: null, to: null, worldMinutes: 75, spent: '0.0042' }), "Teo's and Ines's models were deciding · 75 minutes of world time · spent $0.0042");
 
-console.log('History checks passed: money and days, the GitHub line, the path from the moments read in r23\'s words and places, whole-item views, Now at its place, exchanges, same answers and branches, the "You" forms, a grouped dot\'s changes and their window, runs on and ended.');
+console.log('History checks passed: money and days, the GitHub line, the path from the moments read in r23\'s words and places, whole-item views, Now at its place, exchanges, same answers and branches, the "You" forms, a grouped dot\'s changes and their window, runs on and ended, a run\'s bracket partly in view.');

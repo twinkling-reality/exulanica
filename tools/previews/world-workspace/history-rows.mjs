@@ -354,6 +354,34 @@ export function pathView(items, placed, layout, width, chosen = null, previous =
   return { offset, drawn, now, from, to: now ?? width };
 }
 
+/** A run's words left at the page's margin keep at least this far from another run's words, or are left out (H16). */
+const RUN_WORDS_CLEAR = 16;
+
+/**
+ * Where each run's bracket is drawn in a view (sheet section 8, amended by H16): a line, as the story line is, over the
+ * part of the run in view, from its first moment's dot to its last moment's card edge, or to the window's edge where
+ * the run goes on past it, with no leg at a cut end. Its words stand above its left end where that end is in view;
+ * where the run began before the view, at the page's margin, and left out there if they would meet another run's
+ * words. A run with no moment in view draws nothing. `wordsWidth(id)` is a run's words' drawn width. Places are the
+ * track's own (before the view's slide); `words` is the words' left edge, or null.
+ */
+export function runBrackets(spans, items, placed, view, layout, width, wordsWidth) {
+  const made = [];
+  for (const span of spans) {
+    if (!items.some((item) => item.kind === 'moment' && item.session === span.session && view.drawn.has(item.id))) continue;
+    const startsIn = view.drawn.has(span.first), endsIn = view.drawn.has(span.last);
+    const from = startsIn ? placed.x.get(span.first) : -view.offset;
+    const to = endsIn ? placed.x.get(span.last) + layout.card : width - view.offset;
+    made.push({ id: span.id, from, to, legs: [startsIn, endsIn], words: startsIn ? from : layout.margin - view.offset });
+  }
+  const meets = (one, other) => other.words !== null && other.words < one.words + wordsWidth(one.id) + RUN_WORDS_CLEAR
+    && one.words < other.words + wordsWidth(other.id) + RUN_WORDS_CLEAR;
+  for (const one of made) {
+    if (!one.legs[0] && made.some((other) => other !== one && meets(one, other))) one.words = null;
+  }
+  return made;
+}
+
 /**
  * The opened changes' window (H15, sheet section 7): a list longer than the column moves a row at a time. `rows` are
  * each row's [top, bottom] in the list, `height` what the column has room for; `first` the row asked to stand at its
