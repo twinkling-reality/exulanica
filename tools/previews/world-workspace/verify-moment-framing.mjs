@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framedWhole, framingInSight, framingPose, lensOf, momentSociety, overviewDistance, reframe, standsInBand } from './moment-framing.mjs';
 
-assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v4');
+assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v5');
+// R23's band: from its foot to its top.
+assert.ok(MOMENT_FRAMING.tallest_least > 0 && MOMENT_FRAMING.tallest_least < MOMENT_FRAMING.tallest_share);
 // A near subject is waited for until drawn in full (its far form has no face), within the draw's bound.
 assert.ok(Number.isInteger(MOMENT_FRAMING.wait_ms.near) && MOMENT_FRAMING.wait_ms.near > 0);
 // The widest pair framed together is the widest the lens takes whole, with room each side, at the most distance.
@@ -223,7 +225,7 @@ const unmargined = framingPose(staggered, { ...R, third: 0, foot_margin: 0 }, { 
 assert.ok(Math.max(...staggered.map((one) => shareAt(unmargined, one))) <= R.tallest_share + 1e-9);
 // The chosen pose says how it framed, and the same framing is made again from where they stand later.
 const chosen = framingInSight(staggered, () => true);
-assert.deepEqual(chosen.frame, { subjects: 2, side: R.sight.sides_degrees[0], raise: 0, third: R.third });
+assert.deepEqual(chosen.frame, { subjects: 2, side: R.sight.sides_degrees[0], raise: 0, third: R.third, back: 0 });
 assert.equal(JSON.stringify(chosen).includes('frame'), false, 'the pose serialises as the camera alone');
 const moved = [{ ...staggered[0], x: 0.2 }, { ...staggered[1], height: 1.9 }];
 assert.deepEqual(reframe(chosen, moved), framingPose(moved, R, { side: R.sight.sides_degrees[0] }));
@@ -245,6 +247,33 @@ const plain = framingInSight([speaker[0], { x: 40, y: 0, z: 0 }], () => true);
 const least = framingInSight([speaker[0], { x: 40, y: 0, z: 0 }], () => true, R, undefined, [blocking]);
 assert.ok(least !== null && faceAngle(speaker[0], least) <= R.sight.face_limit_deg);
 assert.ok(tallness(least, blocking) < tallness(plain, blocking), `the bystander ${tallness(least, blocking)} against ${tallness(plain, blocking)}`);
+// In a group, the one who acted or spoke stands most prominent ("Ines Carver spoke up": a hearer nearer the
+// camera stood larger than her). A hearer smaller than the band's top but larger than the speaker is out of it.
+const shareOf = (pose, one) => one.height / (2 * Math.hypot(one.x - pose.x, one.z - pose.z) * Math.tan(lensOf(R).vertical));
+const speakerInes = { x: 0, y: 0, z: 0, height: 1.6, heading: Math.PI };
+// A pair framed wide (the speaker below the band's top) with a hearer inside the band but larger than the speaker:
+// another side, where the speaker stands largest.
+const partner = { x: 3, y: 0, z: 0, height: 1.6, heading: Math.PI };
+const hearer = { x: 0.6, y: 0, z: 0.5, height: 1.6 };
+const plainFront = framingPose([speakerInes, partner], R, { side: R.sight.sides_degrees[0] });
+assert.ok(shareOf(plainFront, speakerInes) < R.tallest_share && shareOf(plainFront, hearer) > shareOf(plainFront, speakerInes), 'the case');
+assert.equal(standsInBand(plainFront, hearer), true, 'in the band alone');
+assert.equal(standsInBand(plainFront, hearer, R, speakerInes), false, 'larger than the speaker');
+const grouped = framingInSight([speakerInes, partner], () => true, R, undefined, [hearer]);
+assert.ok(standsInBand(grouped, hearer, R, speakerInes), 'the speaker most prominent');
+// Stepping back is bounded: with a hearer no side or distance can shrink below the speaker, the speaker never
+// falls below the band's foot, and the framing is never null.
+// One side only, so stepping back is the one way to shrink the hearer.
+const oneSide = { ...R, sight: { ...R.sight, sides_degrees: [0] } };
+const tallHearer = { x: 0, y: 0, z: 1.2, height: 2.4 };
+const bounded = framingInSight([speakerInes, { x: 40, y: 0, z: 0 }], () => true, oneSide, undefined, [tallHearer]);
+assert.ok(bounded !== null && shareOf(bounded, speakerInes) >= R.tallest_least - 1e-9, `the speaker ${bounded && shareOf(bounded, speakerInes)}`);
+assert.ok(bounded.frame.back > 0, 'it stepped back for the hearer');
+// With no step given, no step back, and the search still ends.
+assert.equal(framingInSight([speakerInes, { x: 40, y: 0, z: 0 }], () => true, { ...oneSide, sight: { ...oneSide.sight, back_step_m: 0 } }, undefined, [tallHearer]).frame.back, 0);
+// Reframing keeps the chosen step back.
+assert.equal(typeof grouped.frame.back, 'number');
+assert.deepEqual(reframe(bounded, [speakerInes, { x: 40, y: 0, z: 0 }], oneSide), framingPose([speakerInes], oneSide.third === bounded.frame.third ? oneSide : { ...oneSide, third: bounded.frame.third }, { side: bounded.frame.side, raise: bounded.frame.raise, back: bounded.frame.back }));
 // Just inside pair_most_m the two are framed together, as before.
 const close = [{ x: 0, y: 0, z: 0 }, { x: R.pair_most_m - 0.01, y: 0, z: 0 }];
 assert.deepEqual(framingInSight(close, () => true), framingPose(close, R, { side: 0 }));
