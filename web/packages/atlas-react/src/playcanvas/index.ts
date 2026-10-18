@@ -56,6 +56,8 @@ export {
 } from './scene-splats.js';
 export type { LayoutDepthOnly, SplatOcclusionLook } from './splat-occlusion.js';
 export { SPLAT_OCCLUSION, layoutDepthOnly } from './splat-occlusion.js';
+export type { SplatDisplay, SplatDisplayLook } from './splat-display.js';
+export { SPLAT_DISPLAY, SPLAT_DISPLAY_LAYER, splatsAfterToneMapping } from './splat-display.js';
 export {
   opmPointInScene,
   scenePointMapFootprint,

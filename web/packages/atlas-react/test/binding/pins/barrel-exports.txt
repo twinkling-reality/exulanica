@@ -36,6 +36,8 @@ PeopleCatalogNotServed
 PhysicalResidencyRuntime
 RepresentationRuntime
 SCALE_MILLI_UNIT
+SPLAT_DISPLAY
+SPLAT_DISPLAY_LAYER
 SPLAT_OCCLUSION
 SceneObjectRuntime
 StaticMeshPicker
@@ -116,6 +118,7 @@ scenePointMapViewpoint
 sha256Hex
 sourceMediaForIsland
 sourcePanelEnvelopeOf
+splatsAfterToneMapping
 trainedSceneFootprint
 validateCharacterCatalog
 validateDesignedLooks
