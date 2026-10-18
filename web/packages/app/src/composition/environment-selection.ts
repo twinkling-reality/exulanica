@@ -2766,7 +2766,7 @@ export function mountEnvironmentSelection(
         invalidate: () => atlas.invalidate(),
         reducedMotion: () => deps.env.systemReducedMotion.matches,
         walkEnded: (id) => atlas.authoredSociety?.walkEnded(id) ?? true,
-        society: () => atlas.authoredSociety ?? null,
+        society: () => atlas.authoredSociety ?? null, sight: () => deps.state.worldSight,
         leaving: (id) => atlas.authoredSociety?.isLeaving(id) ?? false,
       });
       if ((phase as string) === 'disposed') { things.destroy(); things = null; return; }

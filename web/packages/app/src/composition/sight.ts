@@ -242,3 +242,41 @@ export function planSight(rings: readonly SightBlocker[], marginMm: number): Sig
     },
   };
 }
+
+/** How a person standing still is turned when nothing says which way they face (`openFacing`). */
+export interface StandingFacingRule {
+  /**
+   * How far the eye must run ahead before something of the plan stands in it: a wall nearer reads as
+   * standing nose to it (a town's footway line can lie 0.4 m off a shopfront), and a footway with
+   * its kerb is about this wide, so a way across it to the street is open.
+   */
+  readonly openMm: number;
+  /** How many ways, evenly apart, are tried: eight is along and across a street and the slants between. */
+  readonly ways: number;
+}
+
+export const STANDING_FACING_DEFAULTS: StandingFacingRule = Object.freeze({ openMm: 3_000, ways: 8 });
+
+/**
+ * The way a person standing at a world point faces when nothing says (the crowd has not seen them
+ * walk and nobody placed them facing a way): of the rule's ways, evenly apart and starting from the
+ * one `key` draws so that neighbours face differently, the first whose sight line runs at least the
+ * rule's distance before the plan stands in it; where none does, the most open, the first of equals.
+ * A crowd facing: radians, 0 north, forward (-sin, -cos) along x east and z south, in metres.
+ */
+export function openFacing(
+  sight: Sight, at: { readonly x: number; readonly z: number }, key: string, rule: StandingFacingRule = STANDING_FACING_DEFAULTS,
+): number {
+  // FNV-1a over the key: the same person starts from the same way on every load.
+  let drawn = 0x811c9dc5;
+  for (let i = 0; i < key.length; i += 1) drawn = Math.imul(drawn ^ key.charCodeAt(i), 0x01000193) >>> 0;
+  let most = 0, mostOpen = -1;
+  for (let step = 0; step < rule.ways; step += 1) {
+    const turn = (((drawn + step) % rule.ways) * 2 * Math.PI) / rule.ways;
+    const facing = Math.atan2(Math.sin(turn), Math.cos(turn));
+    const open = sight.reach([at.x, 0, at.z], [-Math.sin(facing), 0, -Math.cos(facing)]) * 1000;
+    if (open >= rule.openMm) return facing;
+    if (open > mostOpen) [most, mostOpen] = [facing, open];
+  }
+  return most;
+}

@@ -133,6 +133,11 @@ export interface ThingCrowdFiguresOptions {
   readonly lookOf?: (person: SocietyInhabitantSnapshot) => Named | null;
   /** A placed thing's authored yaw by its placed id, or null for one not placed (`facingOfYaw`). */
   readonly placedYawOf?: (placedId: string) => number | null;
+  /**
+   * The facing someone nobody placed stands at until they first walk (a resident the crowd has not
+   * seen walk), or null where nothing says: they then face as the crowd does.
+   */
+  readonly standingFacingAt?: (person: SocietyInhabitantSnapshot) => number | null;
 }
 
 /**
@@ -182,11 +187,12 @@ export class ThingCrowdFigures implements CrowdFigures {
 
   /**
    * A placed being stands at its placed yaw until it first walks, as the layer draws it before a
-   * society holds it: one rule for both (`facingOfYaw`). Anyone else, or a placement not read, null.
+   * society holds it: one rule for both (`facingOfYaw`); a placement not read, null. Anyone nobody
+   * placed stands as `standingFacingAt` says.
    */
   standingFacingOf(person: SocietyInhabitantSnapshot): number | null {
     const placedId = person.placed_id ?? null;
-    if (placedId === null) return null;
+    if (placedId === null) return this.options.standingFacingAt?.(person) ?? null;
     const yaw = this.options.placedYawOf?.(placedId) ?? null;
     return yaw === null ? null : facingOfYaw(yaw);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { holdSight, planSight, siteSightRings, type Sight } from '../src/composition/sight.js';
+import { holdSight, openFacing, planSight, siteSightRings, type Sight } from '../src/composition/sight.js';
 import type { SightBlocker } from '../src/composition/arrival-view.js';
 
 /*
@@ -127,5 +127,43 @@ describe('what hides a being, from a plan of what stands at eye height', () => {
     const open = planSight([], MARGIN_MM);
     expect(open.sees(eye, { x: 0, z: 40 })).toBe(true);
     expect(open.reach([0, 1.6, 0], [0, 0, 1])).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe('which way someone standing faces where nothing says', () => {
+  // A crowd facing looks along (-sin, -cos), x east and z south.
+  const reachAhead = (plan: Sight, at: { x: number; z: number }, facing: number) =>
+    plan.reach([at.x, 1.6, at.z], [-Math.sin(facing), 0, -Math.cos(facing)]);
+
+  it('never faces a wall close ahead, faces the same way on every load, and neighbours differ', () => {
+    // 40 cm south of the house's far wall, so north (a crowd's facing 0) is into it, as a town's
+    // footway line lies before a shopfront.
+    const at = { x: 0, z: 30.4 };
+    expect(reachAhead(sight, at, 0)).toBeCloseTo(0.4, 9);
+    const ways = new Set<number>();
+    for (let n = 0; n < 40; n += 1) {
+      const facing = openFacing(sight, at, `resident-${n}`);
+      expect(reachAhead(sight, at, facing)).toBeGreaterThanOrEqual(3);
+      expect(openFacing(sight, at, `resident-${n}`)).toBe(facing);
+      ways.add(Math.round(facing * 1000));
+    }
+    // Along the wall either way, away from it, and the slants away from it: never one heading for all.
+    expect(ways.size).toBeGreaterThan(2);
+  });
+
+  it('faces the most open way where every way is closer than the rule', () => {
+    // A booth 4 m east to west and 2 m north to south around the one standing in it.
+    const booth = planSight([[[-2000, -1000], [2000, -1000], [2000, 1000], [-2000, 1000]]], MARGIN_MM);
+    for (const key of ['a', 'b', 'c', 'd', 'e']) {
+      expect(reachAhead(booth, { x: 0, z: 0 }, openFacing(booth, { x: 0, z: 0 }, key))).toBeCloseTo(2, 9);
+    }
+  });
+
+  it('turns by the rule it is handed: its distance and how many ways', () => {
+    const booth = planSight([[[-2000, -1000], [2000, -1000], [2000, 1000], [-2000, 1000]]], MARGIN_MM);
+    // Four ways a quarter turn apart, any open a metre: each is, so the one each key draws stands.
+    const facings = ['a', 'b', 'c', 'd', 'e', 'f'].map((key) => openFacing(booth, { x: 0, z: 0 }, key, { openMm: 1000, ways: 4 }));
+    for (const facing of facings) expect(Math.abs(Math.sin(2 * facing))).toBeLessThan(1e-9);
+    expect(new Set(facings.map((facing) => Math.round(facing * 1000))).size).toBeGreaterThan(1);
   });
 });
