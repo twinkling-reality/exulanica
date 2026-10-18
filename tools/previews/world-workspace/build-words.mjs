@@ -268,6 +268,10 @@ export const HISTORY = Object.freeze({ title: 'History', today: 'Today', empty: 
  * Every key build mode has, as the keys card at the bottom right lists them (ruling W10): each the caps
  * drawn, its word and the shortcut a reader is told.
  */
+/** Undo's and Redo's keys, as the keys card and the note after a change draw them: one cap for the chord (K11, W12.3). */
+export const UNDO_KEY = Object.freeze({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z' });
+export const REDO_KEY = Object.freeze({ keys: ['⇧⌘Z'], word: 'Redo', shortcut: 'Shift+Meta+Z' });
+
 export function buildKeys() {
   return [
     { keys: 'mouse', word: 'Move' },
@@ -275,7 +279,8 @@ export function buildKeys() {
     { keys: ['Alt'], word: 'Free', shortcut: 'Alt' },
     { keys: ['Del'], word: 'Remove', shortcut: 'Delete' },
     { keys: ['Tab'], word: 'Next', shortcut: 'Tab' },
-    { keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z' },
+    UNDO_KEY,
+    REDO_KEY,
     { keys: ['B'], word: 'Done', shortcut: 'B' },
     { keys: ['H'], word: 'History', shortcut: 'H' },
     { keys: ['Esc'], word: 'Back', shortcut: 'Escape' },

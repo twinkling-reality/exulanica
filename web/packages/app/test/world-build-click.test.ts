@@ -21,6 +21,7 @@ interface BuildMode {
   key(event: KeyboardEvent): boolean;
   click(x: number, y: number): boolean;
   pointerDown(event: MouseEvent): boolean;
+  frame(now: number): void;
   dispose(): void;
 }
 interface Write { readonly actionId: string; readonly path: string; readonly body: Record<string, unknown> }
@@ -56,11 +57,25 @@ function groundPoint(origin: Vec, direction: Vec): { xMm: number; zMm: number } 
 let mounted: BuildMode | null = null;
 afterEach(() => { mounted?.dispose(); mounted = null; rays.clear(); document.body.replaceChildren(); });
 
+/** How the eye looks: along `forward`, with `right` and `up` across the picture, a pinhole 500 px to a metre at 1 m. */
+interface View { readonly forward: Vec; readonly right: Vec; readonly up: Vec }
+const LEVEL: View = { forward: [0, 0, -1], right: [1, 0, 0], up: [0, 1, 0] };
+/** Looking down ahead, so a 4 m post 2 m away has its top behind the camera and its foot in view. */
+const DOWN: View = { forward: [0, -0.8, -0.6], right: [1, 0, 0], up: [0, 0.6, -0.8] };
+const dot = (a: Vec, b: readonly number[]): number => a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!;
+/** A post 4 m tall standing 2 m ahead: the chosen thing's figure, its box from its foot. */
+const post = {
+  pickVolume: { kind: 'box', min: [-0.15, 0, -0.15], max: [0.15, 4, 0.15] },
+  root: { enabled: true, getWorldTransform: () => ({ transformPoint: (p: Point, out: Point) => out.set(p.x, p.y, p.z - 2) }), getLocalScale: () => ({ x: 1, y: 1, z: 1 }) },
+  markAnchor: (out: Point) => out.set(0, 4.25, -2),
+};
+
 /**
  * Build mode in a made world with one bench placed 4 m ahead, its back met by `picked`; the server answers every
- * preview only when the test calls `answer` (ready, or a refusal), and keeps every write.
+ * preview only when the test calls `answer` (ready, or a refusal), and keeps every write and every note. With `view`
+ * the eye looks that way and the chosen thing is drawn as `post`.
  */
-async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null) {
+async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null) {
   const writes: Write[] = [], waiting: Array<(body: unknown) => void> = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -76,13 +91,21 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
     if (write.actionId.endsWith('.preview')) return new Promise((resolve) => { waiting.push((body) => resolve({ body })); });
     return Promise.resolve({ body: {} });
   };
-  const notes = { show: () => {}, clear: () => {}, place: () => {} };
+  const shown: Array<{ readonly words: string; readonly prompt: string }> = [];
+  const notes = { show: (words: string, options: { prompt?: Element } = {}) => { shown.push({ words, prompt: options.prompt?.textContent ?? '' }); }, clear: () => {}, place: () => {} };
   const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes };
-  const camera = { getPosition: () => new Point(...EYE), camera: { worldToScreen: (_: unknown, out = new Point()) => out.set(0, 0, -1) } };
+  const project = (p: Point, out = new Point()): Point => {
+    if (view === null) return out.set(0, 0, -1);
+    const relative = [p.x - EYE[0], p.y - EYE[1], p.z - EYE[2]], depth = dot(view.forward, relative);
+    return out.set(500 + 500 * dot(view.right, relative) / depth, 300 - 500 * dot(view.up, relative) / depth, depth);
+  };
+  const forward = view === null ? undefined : new Point(...view.forward);
+  const camera = { getPosition: () => new Point(...EYE), forward, camera: { worldToScreen: project } };
+  const layer = { figureOf: (id: string) => (view !== null && id === 'bench:1' ? post : null), drawn: [{ placedId: 'bench:1' }], setGhost: () => {}, setBoxGhost: () => {}, setKindGhost: async () => false };
   const authoredSociety = { root: { getPosition: () => new Point(0, 0, 0) }, groundPoint };
   const pick = (_: unknown, direction: unknown) => picked !== null && direction === picked.direction
     ? { thing: { pick: { placedId: 'bench:1' }, distance: picked.distance } } : null;
-  const b = { camera, regionRoots: new Map(), authoredSociety, __workspaceThings: () => null, __workspacePick: pick };
+  const b = { camera, regionRoots: new Map(), authoredSociety, __workspaceThings: () => (view === null ? null : { layer }), __workspacePick: pick };
   const { mountBuildMode } = await build();
   mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false });
   /** The oldest preview still waiting is answered. */
@@ -91,9 +114,9 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
     waiting.shift()!(body);
     await settled();
   };
-  return { mode: mounted, writes, answer, previews: () => writes.filter((write) => write.actionId.endsWith('.preview')).length };
+  return { mode: mounted, writes, answer, shown, previews: () => writes.filter((write) => write.actionId.endsWith('.preview')).length };
 }
-const press = (mode: BuildMode, code: string): boolean => mode.key(new KeyboardEvent('keydown', { code, bubbles: true }));
+const press = (mode: BuildMode, code: string, more: KeyboardEventInit = {}): boolean => mode.key(new KeyboardEvent('keydown', { code, bubbles: true, ...more }));
 const settled = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0); });
 const placed = (writes: readonly Write[]): Write[] => writes.filter((write) => write.actionId === 'things.place');
 const REFUSED = { availability: 'unavailable', blocked_reason: 'thing_overlaps', blocked_detail: '' };
@@ -198,5 +221,62 @@ describe('the tray marks its open tab in the world', () => {
       expect([open, other]).toEqual(['500', '400']);
       document.head.querySelectorAll('style').forEach((style) => style.remove());
     }
+  });
+});
+
+describe('undo and redo in build mode', () => {
+  const bench = (more: Record<string, unknown> = {}) => ({ thing_id: 'bench:1', kind: BENCH, region_id: 'region:generated', transform: { x_mm: 0, y_mm: 0, z_mm: -4000, yaw_microradians: 0 }, ...more });
+
+  it('carries Undo on the note after a change and Redo on the note after an undo (W12.3)', async () => {
+    const { mode, writes, answer, shown } = await mount();
+    void mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 2000, zMm: -6000 });
+    await answer();
+    expect(press(mode, 'Enter')).toBe(true);
+    await vi.waitFor(() => expect(shown.at(-1)?.prompt).toContain('Undo'));
+    expect(shown.at(-1)!.prompt).toContain('⌘Z');
+    expect(press(mode, 'KeyZ', { metaKey: true })).toBe(true);
+    await answer({ availability: 'ready', would_change: { subject_id: placed(writes)[0]!.body.thing_id, before: bench(), after: bench({ removed: true }), undoes: { kind: 'add_thing' } } });
+    await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.undo')).toBe(true));
+    await vi.waitFor(() => expect(shown.at(-1)?.prompt).toContain('Redo'));
+    expect(shown.at(-1)!.prompt).toContain('⇧⌘Z');
+  });
+
+  it('chooses a thing a redo places again, and not one a redo moves (W12.8)', async () => {
+    for (const [change, chosen] of [[{ before: null, after: bench() }, true], [{ before: bench(), after: bench({ transform: { x_mm: 500, y_mm: 0, z_mm: -4000, yaw_microradians: 0 } }) }, false]] as const) {
+      const { mode, writes, answer } = await mount();
+      expect(press(mode, 'KeyB')).toBe(true);
+      await settled();
+      expect(press(mode, 'KeyZ', { metaKey: true, shiftKey: true })).toBe(true);
+      await answer({ availability: 'ready', would_change: { subject_id: 'bench:1', ...change } });
+      await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.redo')).toBe(true));
+      await settled();
+      const held = document.querySelector<HTMLElement>('.wu-held');
+      expect(Boolean(held && !held.hidden && held.textContent?.includes('Bench'))).toBe(chosen);
+      mounted?.dispose(); mounted = null; document.body.replaceChildren();
+    }
+  });
+});
+
+describe('a chosen thing\'s marks up close (W12.5)', () => {
+  const choose = async (view: View): Promise<SVGElement | null> => {
+    const met = towards(0, 1, -2);
+    rays.set('500,300', met.ray);
+    const { mode } = await mount({ direction: met.ray.direction, distance: met.distance }, view);
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    mode.frame(1000);
+    return document.querySelector<SVGElement>('svg.wu-outline[data-form="chosen"]');
+  };
+
+  it('outlines a chosen post seen level, top and foot in view: a positive control', async () => {
+    const outline = await choose(LEVEL);
+    expect(outline?.style.display).toBe('');
+  });
+
+  it('still outlines it from its footprint when its top is behind the camera', async () => {
+    const outline = await choose(DOWN);
+    expect(outline?.style.display).toBe('');
+    expect(outline?.querySelector('path')?.getAttribute('d')).toBeTruthy();
   });
 });

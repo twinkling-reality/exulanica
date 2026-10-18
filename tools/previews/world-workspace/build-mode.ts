@@ -24,7 +24,7 @@ import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/ind
 import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
-import { BUSY, TRAY, buildKeys, changeParts, createKindLabels, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, undoRefusalWords } from './build-words.mjs';
+import { BUSY, REDO_KEY, TRAY, UNDO_KEY, buildKeys, changeParts, createKindLabels, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -36,6 +36,8 @@ const ASK_AFTER_MS = 180;
 const RING_MARGIN = 1.18;
 /** How far below the eye a point grabbed on a thing is carried at most, in metres, so the pointer's ray still comes down to it. */
 const GRAB_BELOW_EYE_M = 0.25;
+/** How far ahead of the eye a chosen thing's footprint is cut where it reaches behind the camera, in metres. */
+const MARK_NEAR_M = 0.05;
 /**
  * The chosen thing's ground ring, quieter than a character's (DESIGN's ruling L22): the outline is
  * the primary mark, so the ring is a thinner white line with no glow and no fill. Spread over the
@@ -160,10 +162,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     busy, removeRefused, focused: focused(),
   });
 
-  /** The note above the tray; a change it reports can be taken back from it. */
-  function say(words, { undoable = false } = {}) {
+  /** The note above the tray; a change it reports can be taken back from it, and an undo done again (W12.3). */
+  function say(words, { undoable = false, redoable = false } = {}) {
     if (!words) { corners.notes.clear(); return; }
-    corners.notes.show(words, undoable ? { prompt: keyWord({ keys: ['⌘Z'], word: 'Undo', shortcut: 'Meta+Z', small: true, onPress: () => { void undo(); } }) } : {});
+    const prompt = undoable ? keyWord({ ...UNDO_KEY, small: true, onPress: () => { void undo(); } })
+      : redoable ? keyWord({ ...REDO_KEY, small: true, onPress: () => { void redo(); } }) : null;
+    corners.notes.show(words, prompt ? { prompt } : {});
   }
   function problem(error) {
     const detail = typeof error?.code === 'string' && typeof error.message === 'string' && error.message.startsWith(error.code + ': ') ? error.message.slice(error.code.length + 2) : '';
@@ -730,7 +734,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   async function redo() {
     if (busy) return null;
     busy = true; render();
-    let said;
+    let said, again = null;
     try {
       const stateBase = base();
       const preview = (await post('things.redo.preview', '/things/redo/preview', { base_state_sha256: stateBase })).body;
@@ -738,12 +742,22 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       else {
         await post('things.redo', '/things/redo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
         say(said = youChangeWords(previewParts(preview.would_change, true, partNamed, kindLabel)), { undoable: true });
+        again = placedAgain(preview.would_change);
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;
     try { await refreshRecords(); } catch {}
-    if (selected !== null && !exists(selected)) deselect(); else render();
+    // A thing the redo placed again is chosen, as after a place (W12.8).
+    if (on && again !== null && records.has(again)) select(again);
+    else if (selected !== null && !exists(selected)) deselect(); else render();
     return said;
+  }
+
+  /** The placed thing a redo's change puts back into the world, or null: absent or removed before it, standing after. */
+  function placedAgain(change) {
+    const subject = change?.subject_id;
+    if (typeof subject !== 'string' || subject.startsWith('part:') || !change.after || change.after.removed) return null;
+    return change.before == null || change.before.removed ? subject : null;
   }
 
   /**
@@ -761,7 +775,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = undoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.undo', '/things/undo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = youChangeWords(previewParts(preview.would_change, false, partNamed, kindLabel)));
+        say(said = youChangeWords(previewParts(preview.would_change, false, partNamed, kindLabel)), { redoable: true });
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;
@@ -791,8 +805,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   /**
    * A drawn thing's pick volume on the screen, standing where it stands or at `to` (its copy):
-   * its footprint's four ground corners in order and the box around all eight corners; null when
-   * any of them is behind the camera.
+   * its footprint's ground corners in order and the box around what of its eight corners is ahead;
+   * null when none of its footprint is ahead of the camera (shapeOnScreen).
    */
   function onScreen(figure, to) {
     const volume = figure.pickVolume; if (!volume) return null;
@@ -802,22 +816,41 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const frame = to === null ? figure.root.getWorldTransform() : figure.root.parent.getWorldTransform();
     const size = figure.root.getLocalScale();
     const yaw = to === null ? 0 : to.yaw / 1e6, cos = Math.cos(yaw), sin = Math.sin(yaw);
-    const ground = [];
-    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
-    for (const [x, z] of [[box.x0, box.z0], [box.x1, box.z0], [box.x1, box.z1], [box.x0, box.z1]]) {
-      for (const y of [0, box.top]) {
-        if (to === null) point.set(x, y, z);
-        else {
-          // Where the copy stands: turned about its own up axis, then moved, in its parent's frame.
-          const across = x * size.x, along = z * size.z;
-          point.set(to.x / 1000 + cos * across + sin * along, to.y / 1000 + y * size.y, to.z / 1000 - sin * across + cos * along);
-        }
-        frame.transformPoint(point, point);
-        const at = b.camera.camera.worldToScreen(point, seen);
-        if (at.z <= 0) return null;
-        if (y === 0) ground.push({ x: at.x, y: at.y });
-        left = Math.min(left, at.x); right = Math.max(right, at.x); top = Math.min(top, at.y); bottom = Math.max(bottom, at.y);
+    const world = (x, y, z) => {
+      if (to === null) point.set(x, y, z);
+      else {
+        // Where the copy stands: turned about its own up axis, then moved, in its parent's frame.
+        const across = x * size.x, along = z * size.z;
+        point.set(to.x / 1000 + cos * across + sin * along, to.y / 1000 + y * size.y, to.z / 1000 - sin * across + cos * along);
       }
+      frame.transformPoint(point, point);
+      return { x: point.x, y: point.y, z: point.z };
+    };
+    const corners = [[box.x0, box.z0], [box.x1, box.z0], [box.x1, box.z1], [box.x0, box.z1]];
+    return shapeOnScreen(corners.map(([x, z]) => world(x, 0, z)), corners.map(([x, z]) => world(x, box.top, z)));
+  }
+
+  /**
+   * A footprint and its top on the screen, from their world corners in order (metres): the footprint cut where it
+   * reaches behind the camera, so the part in view is marked and the screen's edge clips the rest (DESIGN's W12.5),
+   * and the box around what of it is ahead; null when none of the footprint is ahead of the camera.
+   */
+  function shapeOnScreen(feet, tops) {
+    const eye = b.camera.getPosition(), ahead = b.camera.forward;
+    const depth = (c) => (c.x - eye.x) * ahead.x + (c.y - eye.y) * ahead.y + (c.z - eye.z) * ahead.z - MARK_NEAR_M;
+    const kept = [];
+    feet.forEach((a, index) => {
+      const c = feet[(index + 1) % feet.length], da = depth(a), dc = depth(c);
+      if (da > 0) kept.push(a);
+      if ((da > 0) !== (dc > 0)) { const t = da / (da - dc); kept.push({ x: a.x + (c.x - a.x) * t, y: a.y + (c.y - a.y) * t, z: a.z + (c.z - a.z) * t }); }
+    });
+    if (kept.length < 3) return null;
+    const screen = (c) => { const at = b.camera.camera.worldToScreen(point.set(c.x, c.y, c.z), seen); return at.z > 0 ? { x: at.x, y: at.y } : null; };
+    const ground = kept.map(screen);
+    if (ground.some((at) => at === null)) return null;
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (const at of [...ground, ...tops.filter((c) => depth(c) > 0).map(screen).filter((at) => at !== null)]) {
+      left = Math.min(left, at.x); right = Math.max(right, at.x); top = Math.min(top, at.y); bottom = Math.max(bottom, at.y);
     }
     return { ground, bounds: { left, right, top, bottom, headY: top, waistY: (top + bottom) / 2 } };
   }
@@ -825,8 +858,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /**
    * A made part on the screen, standing where the parts read says or at `to` (its copy): its
    * footprint's ground corners in order and the box around it with its height, from the region's
-   * frame through the region root; null when the world or part is not drawn or a corner is behind
-   * the camera.
+   * frame through the region root; null when the world or part is not drawn or none of its footprint
+   * is ahead of the camera (shapeOnScreen).
    */
   function partOnScreen(id, to) {
     const part = partOf(id), site = regionRoot();
@@ -838,18 +871,9 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (to !== null && Math.abs(quarterOf(to.yaw) - turnsNow(id)) % 2 === 1) [width, depth] = [depth, width];
     const east = to === null ? part.centre_mm[0] : to.x, north = to === null ? part.centre_mm[1] : -to.z;
     const frame = site.getWorldTransform();
-    const ground = [];
-    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
-    for (const [x, n] of [[east - width / 2, north - depth / 2], [east + width / 2, north - depth / 2], [east + width / 2, north + depth / 2], [east - width / 2, north + depth / 2]]) {
-      for (const y of [floor, floor + height]) {
-        frame.transformPoint(point.set(x / 1000, y / 1000, -n / 1000), point);
-        const at = b.camera.camera.worldToScreen(point, seen);
-        if (at.z <= 0) return null;
-        if (y === floor) ground.push({ x: at.x, y: at.y });
-        left = Math.min(left, at.x); right = Math.max(right, at.x); top = Math.min(top, at.y); bottom = Math.max(bottom, at.y);
-      }
-    }
-    return { ground, bounds: { left, right, top, bottom, headY: top, waistY: (top + bottom) / 2 } };
+    const world = (x, y, n) => { frame.transformPoint(point.set(x / 1000, y / 1000, -n / 1000), point); return { x: point.x, y: point.y, z: point.z }; };
+    const corners = [[east - width / 2, north - depth / 2], [east + width / 2, north - depth / 2], [east + width / 2, north + depth / 2], [east - width / 2, north + depth / 2]];
+    return shapeOnScreen(corners.map(([x, n]) => world(x, floor, n)), corners.map(([x, n]) => world(x, floor + height, n)));
   }
 
   /**

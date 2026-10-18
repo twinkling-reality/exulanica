@@ -283,11 +283,12 @@ assert.equal(dayWords(new Date(2026, 9, 13, 22, 40).toISOString(), new Date(2026
 assert.equal(dayWords('not a time', Date.now()), '');
 // Build mode's keys and rows, in the design's words and order (WORDS.md, ruling W10).
 const said = (list) => list.map(({ keys, word }) => [Array.isArray(keys) ? keys.join(' ') : keys, word]);
-// The keys card lists every key build mode has (ruling W10).
+// The keys card lists every key build mode has (ruling W10), Redo under Undo with one cap for its chord (W12.3).
 assert.deepEqual(said(buildKeys()), [
-  ['mouse', 'Move'], ['[ ]', 'Turn'], ['Alt', 'Free'], ['Del', 'Remove'], ['Tab', 'Next'], ['⌘Z', 'Undo'],
+  ['mouse', 'Move'], ['[ ]', 'Turn'], ['Alt', 'Free'], ['Del', 'Remove'], ['Tab', 'Next'], ['⌘Z', 'Undo'], ['⇧⌘Z', 'Redo'],
   ['B', 'Done'], ['H', 'History'], ['Esc', 'Back'],
 ]);
+assert.equal(buildKeys().find(({ word }) => word === 'Redo').shortcut, 'Shift+Meta+Z');
 // The held group's rows in each state (ruling W10), each pressing what its key does.
 const rows = (state) => heldRows(state).map(({ key, word }) => [key, word]);
 assert.deepEqual(rows({}), [['mouse-click', 'Move'], ['[ ]', 'Turn'], ['Del', 'Remove']]);
