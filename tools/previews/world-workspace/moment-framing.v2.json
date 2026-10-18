@@ -1,0 +1,89 @@
+{
+  "profile": "exulanica.moment-framing/v1",
+  "recipe": "moment-framing/v2",
+  "size_px": [
+    600,
+    340
+  ],
+  "fov_deg": 40,
+  "eye_height_m": 1.5,
+  "look_at_height_m": 1.0,
+  "subject_height_m": 1.75,
+  "tallest_share": 0.6,
+  "distance_m": {
+    "least": 3,
+    "most": 5,
+    "room_m": 1.2
+  },
+  "pair_most_m": 4.0,
+  "third": 1,
+  "side_degrees": 25,
+  "sight": {
+    "points_m": [
+      0.25,
+      0.9,
+      1.55
+    ],
+    "ground_ahead_m": [
+      1.5
+    ],
+    "sides_degrees": [
+      0,
+      25,
+      -25,
+      50,
+      -50,
+      75,
+      -75,
+      105,
+      -105,
+      130,
+      -130,
+      155,
+      -155,
+      180
+    ],
+    "raise_m": [
+      0
+    ],
+    "own_m": 0.45,
+    "foreground": {
+      "grid": [
+        16,
+        9
+      ],
+      "share": 0.1,
+      "nearer_m": 1.0,
+      "above_ground_m": 0.3
+    },
+    "face_limit_deg": 100
+  },
+  "walk_hint_m": 0.05,
+  "wait_ms": {
+    "people": 20000,
+    "frame": 15000,
+    "retry": 500
+  },
+  "beginning": {
+    "fov_deg": 50,
+    "pitch_deg": 35,
+    "surround": 1.15,
+    "margin": 0.0833,
+    "most_m": 1500
+  },
+  "portrait": {
+    "recipe": "portrait/v1",
+    "stage_px": 1024,
+    "zoom": 1.7,
+    "crop": {
+      "side": 0.2,
+      "above_head": 0.1,
+      "top": 0.08,
+      "left": 0.4,
+      "ground_tolerance": 24
+    },
+    "size_px": 156,
+    "wait_ms": 20000,
+    "background": "#dfe6e5"
+  }
+}

@@ -27,8 +27,14 @@ export function historyWrite(access: Access, signal: AbortSignal) {
   };
 }
 
-/** The world's canvas as the pictures read it: a frame source, asked to draw. */
-export type StillSource = PictureSource & { invalidate?(): void };
+/**
+ * The world's canvas as the pictures read it: a frame source, asked to draw, and a saved world's
+ * society, which says who it draws as one of its people (AuthoredRegionSociety.drawnAsPerson).
+ */
+export type StillSource = PictureSource & {
+  invalidate?(): void;
+  readonly authoredSociety?: { drawnAsPerson?(id: string): boolean | null } | null;
+};
 
 export interface RecordPictures {
   /** Takes a still of the world as it is drawn now, in place of the last one; its address, or the last where none. */
@@ -122,8 +128,14 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     const own = lifetime.signal;
     const making = serial(async () => {
       if (own.aborted) return null;
-      const catalog = people();
-      // Before the people are served there is no look to draw; asked again by the next draw that wants it.
+      // A face from the people catalog only for one the world draws as one of its people: one drawn by a
+      // look of its own (a creature, a knight) keeps the quiet circle until portraits draw that look. A
+      // world with no saved society (a generated town) draws everyone so.
+      const society = source.authoredSociety;
+      const person = society ? society.drawnAsPerson?.(subjectId) ?? null : true;
+      if (person === false) return null;
+      const catalog = person === null ? null : people();
+      // Before that is known, or before the people are served, there is no look to draw; asked again by the next draw.
       if (catalog === null) {
         portraits.delete(subjectId);
         return null;

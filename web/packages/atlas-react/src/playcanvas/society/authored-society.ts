@@ -121,6 +121,9 @@ export class AuthoredRegionSociety {
   private readonly fromWorld = new pc.Mat4();
   private readonly local = new pc.Vec3();
   private nearbySignature = '';
+  /** The latest snapshot and the things' figures, which say who is drawn as one of the world's people. */
+  private state: OwnedSocietyState | null = null;
+  private figures: CrowdFigures | null = null;
 
   /**
    * The land's height under a point of this society's frame (east, south, metres), for a site on
@@ -147,6 +150,7 @@ export class AuthoredRegionSociety {
     options?: CrowdTiming,
     layout: SeatingLayout | null = null,
   ): number {
+    this.state = state;
     return this.crowd.set(state, observer === undefined ? undefined : this.localGround(observer), options, layout).drawn;
   }
 
@@ -192,7 +196,21 @@ export class AuthoredRegionSociety {
    * people with null (`SocietyCrowd.setFigures`).
    */
   setFigures(figures: CrowdFigures | null): void {
+    this.figures = figures;
     this.crowd.setFigures(figures);
+  }
+
+  /**
+   * Whether an inhabitant of the latest snapshot is drawn as one of the world's people, from the
+   * people catalog: one with no thing kind, or whose figure the things' figures leave to the catalog
+   * (`CrowdFigures.figureFor` null). False for one drawn by a look of its own (a creature, a knight);
+   * null while that is not known: not in the snapshot, or a kind named before the figures are given.
+   */
+  drawnAsPerson(id: string): boolean | null {
+    const person = this.state?.inhabitants.find((one) => one.id === id);
+    if (person === undefined) return null;
+    if (person.kind === undefined) return true;
+    return this.figures === null ? null : this.figures.figureFor(person) === null;
   }
 
   /** Whether a person's drawn walk for the latest state has ended (`SocietyCrowd.walkEnded`). */
@@ -271,6 +289,7 @@ export class AuthoredRegionSociety {
 
   /** Release the population without inventing an authoritative snapshot. */
   clearSociety(): void {
+    this.state = null;
     this.crowd.clear();
   }
 

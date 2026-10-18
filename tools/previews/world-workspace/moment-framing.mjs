@@ -1,8 +1,9 @@
-// A History moment's picture, as data in and data out (moment-framing.v1.json): the society read a
+// A History moment's picture, as data in and data out (moment-framing.v2.json): the society read a
 // page is served rewritten to the moment's recorded people, and the camera that frames who it is
 // about. Pure, so verify-moment-framing.mjs checks it in Node; the scene preview's moment mode
 // (front-door-preview.ts) draws by it, and moment-pictures.ts names the recipe it kept a picture by.
-import framing from './moment-framing.v1.json' with { type: 'json' };
+// moment-framing.v1.json stays beside it: the recipe the pictures kept under its name were drawn by.
+import framing from './moment-framing.v2.json' with { type: 'json' };
 
 /** The framing recipe; each figure a world could want different is a field of the file. */
 export const MOMENT_FRAMING = Object.freeze(framing);
@@ -166,21 +167,66 @@ export function faceAngle(anchor, pose) {
 }
 
 /**
- * The framing that sees the moment's subjects: the recipe's sides and raised heights (`sight`), each
- * judged by `seen(camera, point)` at every subject's feet, waist and head (`points_m` above where
- * they stand) and at the ground `ground_ahead_m` short of their middle toward the camera, and by
- * `covered(pose)`, the share of the frame something nearer than them covers (foregroundShare), at
- * most the recipe's `foreground.share`. A side from which any subject's face does not show (more
- * than `face_limit_deg` round from it, faceAngle) is never chosen. Of the rest, those that pass every
- * test, and of those the one that shows the faces best (the smallest worst face angle; the first of
- * equals); where none passes every test, the one that passes the most, then the faces. `seen` is the
- * scene's answer: whether nothing stands between the camera and the point. Null without a subject,
- * or where no side shows every face: the page keeps its quiet tile.
- * @param {(pose: { x: number, y: number, z: number, yaw: number, pitch: number }) => number} [covered]
+ * The framing that sees the moment's subjects. The first two standing farther apart than the
+ * recipe's `pair_most_m` (more than its lens fits at its framing) are not framed together: the first,
+ * who acted or spoke, is framed alone, in front of the way they face, and never so that the frame's
+ * edge cuts the other (framedWhole): on the recipe's third, else the other third, else another side
+ * within the face limit. Otherwise the recipe's sides and
+ * raised heights (`sight`), each judged by the faces it shows: a subject's face shows from a side no
+ * more than `face_limit_deg` round from it (faceAngle; a subject with no heading shows from every side),
+ * and a side that shows none of them is never chosen. Of the rest, those that show the most faces;
+ * of those, the ones that pass the most of the sight tests: `seen(camera, point)` at every subject's
+ * feet, waist and head (`points_m` above where they stand) and at the ground `ground_ahead_m` short of
+ * their middle toward the camera, and `covered(pose, subjects)`, the share of the frame something nearer
+ * than the framed subjects covers (foregroundShare), at most the recipe's `foreground.share`; of those,
+ * the one whose worst shown face is turned least (the first of equals). Where no side shows a face of
+ * the pair, the first is framed alone. `seen` is the scene's answer: whether nothing stands between the
+ * camera and the point. Null only without a subject: the page keeps its quiet tile.
+ * @param {(pose: { x: number, y: number, z: number, yaw: number, pitch: number }, subjects: readonly object[]) => number} [covered]
  */
-export function framingInSight(anchors, seen, recipe = MOMENT_FRAMING, covered = (_pose) => 0) {
+export function framingInSight(anchors, seen, recipe = MOMENT_FRAMING, covered = (_pose, _subjects) => 0) {
   const drawn = (anchors ?? []).filter((one) => one && [one.x, one.y, one.z].every(finite));
   if (drawn.length === 0) return null;
+  const apart = drawn.length > 1 && Math.hypot(drawn[1].x - drawn[0].x, drawn[1].z - drawn[0].z) > (recipe.pair_most_m ?? Infinity);
+  const framed = apart ? null : bestSide(drawn, seen, recipe, covered, []);
+  return framed ?? bestSide(drawn.slice(0, 1), seen, recipe, covered, drawn.slice(1));
+}
+
+/**
+ * Whether `other` (an anchor; its `outline`, points of the box it is drawn by, else its feet and its
+ * head at its `height` or the recipe's `subject_height_m`) is wholly in the frame a camera at `pose`
+ * sees through the recipe's lens, or wholly out of it: never cut by the frame's edge.
+ */
+export function framedWhole(pose, other, recipe = MOMENT_FRAMING) {
+  const lens = lensOf(recipe);
+  const cy = Math.cos(pose.yaw), sy = Math.sin(pose.yaw), cp = Math.cos(pose.pitch), sp = Math.sin(pose.pitch);
+  const forward = [-sy * cp, sp, -cy * cp], right = [cy, 0, -sy], up = [sy * sp, cp, cy * sp];
+  const tall = finite(other.height) && other.height > 0 ? other.height : recipe.subject_height_m;
+  const points = Array.isArray(other.outline) && other.outline.length > 0 ? other.outline
+    : [{ x: other.x, y: other.y, z: other.z }, { x: other.x, y: other.y + tall, z: other.z }];
+  const inside = points.filter((point) => {
+    const v = [point.x - pose.x, point.y - pose.y, point.z - pose.z];
+    const depth = v[0] * forward[0] + v[1] * forward[1] + v[2] * forward[2];
+    if (depth <= 0) return false;
+    const across = (v[0] * right[0] + v[2] * right[2]) / (depth * Math.tan(lens.horizontal));
+    const high = (v[0] * up[0] + v[1] * up[1] + v[2] * up[2]) / (depth * Math.tan(lens.vertical));
+    return Math.abs(across) <= 1 && Math.abs(high) <= 1;
+  }).length;
+  return inside === 0 || inside === points.length;
+}
+
+/**
+ * The side framingInSight chooses for these subjects, or null where no side shows any of their faces.
+ * With `others` (the subjects not framed), on the recipe's third or the other one, and only where every
+ * other is wholly in or out of the frame (framedWhole); where none is, as though there were no others.
+ */
+function bestSide(drawn, seen, recipe, covered, others) {
+  const thirds = others.length > 0 ? [...new Set([recipe.third ?? 0, -(recipe.third ?? 0)])] : [recipe.third ?? 0];
+  return chooseSide(drawn, seen, recipe, covered, thirds, (pose) => others.every((other) => framedWhole(pose, other, recipe)))
+    ?? (others.length > 0 ? chooseSide(drawn, seen, recipe, covered, [recipe.third ?? 0], () => true) : null);
+}
+
+function chooseSide(drawn, seen, recipe, covered, thirds, allowed) {
   const subjects = drawn.flatMap((one) => recipe.sight.points_m.map((height) => ({ x: one.x, y: one.y + height, z: one.z })));
   const centre = drawn.reduce((sum, one) => ({ x: sum.x + one.x / drawn.length, y: sum.y + one.y / drawn.length, z: sum.z + one.z / drawn.length }), { x: 0, y: 0, z: 0 });
   // The ground in front of them, toward this camera, a little above it so the ground itself is no wall.
@@ -192,15 +238,21 @@ export function framingInSight(anchors, seen, recipe = MOMENT_FRAMING, covered =
   let best = null;
   for (const raise of recipe.sight.raise_m) {
     for (const side of recipe.sight.sides_degrees) {
-      const pose = framingPose(drawn, recipe, { side, raise });
-      const faces = drawn.map((one) => faceAngle(one, pose)).filter((angle) => angle !== null);
-      const worst = faces.length > 0 ? Math.max(...faces) : 0;
-      if (worst > limit) continue;
-      const points = [...subjects, ...ahead(pose)];
-      // Something near the camera over more than the recipe's share of the frame counts as one more unseen point.
-      const clear = covered(pose) <= recipe.sight.foreground.share;
-      const passed = points.filter((point) => seen(pose, point)).length + (clear ? 1 : 0);
-      if (best === null || passed > best.passed || (passed === best.passed && worst < best.worst)) best = { pose, passed, worst };
+      for (const third of thirds) {
+        const pose = framingPose(drawn, third === recipe.third ? recipe : { ...recipe, third }, { side, raise });
+        if (!allowed(pose)) continue;
+        const angles = drawn.map((one) => faceAngle(one, pose));
+        const turned = angles.filter((angle) => angle !== null && angle <= limit);
+        const shown = turned.length + angles.filter((angle) => angle === null).length;
+        if (shown === 0) continue;
+        const worst = turned.length > 0 ? Math.max(...turned) : 0;
+        const points = [...subjects, ...ahead(pose)];
+        // Something near the camera over more than the recipe's share of the frame counts as one more unseen point.
+        const clear = covered(pose, drawn) <= recipe.sight.foreground.share;
+        const passed = points.filter((point) => seen(pose, point)).length + (clear ? 1 : 0);
+        const better = best === null || shown > best.shown || (shown === best.shown && (passed > best.passed || (passed === best.passed && worst < best.worst)));
+        if (better) best = { pose, shown, passed, worst };
+      }
     }
   }
   return best?.pose ?? null;

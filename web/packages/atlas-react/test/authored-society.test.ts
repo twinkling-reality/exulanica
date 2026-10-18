@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { islandId } from '@exulanica/atlas-core';
 import { AtlasBinding } from '../src/playcanvas/atlas-binding.js';
+import type { CrowdFigures } from '../src/playcanvas/society/crowd.js';
 import type { OwnedSocietyState } from '../src/playcanvas/society/types.js';
 import { serveFixturePeople } from './served-people.js';
 
@@ -138,6 +139,40 @@ describe('a saved world draws its inhabitants over its authored region', () => {
     expect(frames.length).toBe(3);
     // A resident missing from a call is released by NativeCharacterRuntime.syncFrames.
     for (const call of frames) expect([...call].sort()).toEqual([...near].sort());
+  });
+
+  it('says who it draws as one of the world\'s people, and who by a look of its own', async () => {
+    const atlas = await binding('saved');
+    const crowd = atlas.authoredSociety!;
+    const kind = (name: string) => ({ kind: name, version: 1, sha256: name[0]!.repeat(64) });
+    const at = (id: string, x: number, of?: ReturnType<typeof kind> | { source: 'workspace'; sha256: string }) =>
+      ({ id, synthetic: true as const, position_mm: [x, 0] as const, motion_path_mm: [[x, 0]] as const, ...(of ? { kind: of } : {}) });
+    const state: OwnedSocietyState = {
+      profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'branch', tick: 1,
+      inhabitants: [at('teo', 1000, kind('villager')), at('knight', 2000, kind('knight')), at('strider', 3000, { source: 'workspace', sha256: 'f'.repeat(64) }), at('old', 4000)],
+    };
+    // The things' figures leave a villager's look to the people catalog and draw every other kind by its own.
+    const figures: CrowdFigures = {
+      figureFor: (person) => (person.kind && 'kind' in person.kind && person.kind.kind === 'villager' ? null : {
+        key: person.id,
+        factory: (_device, parent, identity) => {
+          const root = new pc.Entity(`thing:${identity.inhabitantId}`);
+          parent.addChild(root);
+          return {
+            root, subject: { kind: 'synthetic-inhabitant', ...identity }, standingHeight: 1.8, facing: 0,
+            pose: (pose) => root.setLocalPosition(...pose.position), setVisible: (visible) => { root.enabled = visible; }, destroy: () => root.destroy(),
+          };
+        },
+      }),
+    };
+    expect(crowd.drawnAsPerson('teo')).toBeNull();
+    crowd.setSociety(state, [0, 0]);
+    // A kind named before the figures are given: not known yet; a person with no kind is one of the people.
+    expect(['teo', 'strider', 'old'].map((id) => crowd.drawnAsPerson(id))).toEqual([null, null, true]);
+    crowd.setFigures(figures);
+    expect(['teo', 'knight', 'strider', 'old', 'nobody'].map((id) => crowd.drawnAsPerson(id))).toEqual([true, false, false, true, null]);
+    crowd.clearSociety();
+    expect(crowd.drawnAsPerson('teo')).toBeNull();
   });
 
   it('is released with the binding', async () => {

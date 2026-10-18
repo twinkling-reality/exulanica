@@ -1,4 +1,4 @@
-// A History moment's picture (moment-framing.v1.json): drawn once, by the first page that shows the
+// A History moment's picture (moment-framing.v2.json): drawn once, by the first page that shows the
 // moment without one, and kept by the server under the moment and the framing recipe, so every
 // later view on any computer reads the same picture. The moment is drawn in its own hidden scene
 // preview of the saved world, never in the world this page shows: a moment may belong to another

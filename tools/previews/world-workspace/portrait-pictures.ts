@@ -1,4 +1,4 @@
-// A portrait of a look (moment-framing.v1.json's portrait recipe): the look drawn alone on the
+// A portrait of a look (moment-framing.v2.json's portrait recipe): the look drawn alone on the
 // character stage, its head and shoulders cut from the frame and kept by the server under the look's
 // digest and the recipe, in the world, so History, cards and the character page show the same one.
 // A resident's look is the one the world draws: drawn from the people catalog it serves, by the

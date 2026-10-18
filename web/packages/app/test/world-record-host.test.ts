@@ -7,6 +7,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const reads = vi.hoisted(() => [] as string[]);
+// Whether the people catalog is served, and whose portraits were drawn from it.
+const people = vi.hoisted(() => ({ served: false, drawn: [] as string[] }));
 vi.mock('../src/decision-record.ts', () => ({ choiceAccount: () => ({ verdict: null }), parseDecisionEvents: () => ({ events: [] }) }));
 vi.mock('../src/config.ts', () => ({ accessHeaders: () => ({}) }));
 vi.mock('../src/composition/world-pictures.ts', () => ({
@@ -20,12 +22,16 @@ vi.mock('../src/world-pictures-api.ts', () => ({
     async portraits() { return new Map(); }
   },
 }));
-vi.mock('../../atlas-react/src/playcanvas/index.ts', () => ({ inhabitantCatalog: () => { throw new Error('the people are not served yet'); } }));
+vi.mock('../../atlas-react/src/playcanvas/index.ts', () => ({ inhabitantCatalog: () => { if (people.served) return {}; throw new Error('the people are not served yet'); } }));
 vi.mock('../../../../tools/previews/world-workspace/moment-pictures.ts', () => ({
   renderBeginningPicture: async () => null,
   renderMomentPicture: async () => ({ sha256: 'b'.repeat(64), width: 600, height: 340 }),
 }));
-vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () => ({ lookDigest: () => 'd', lookOfSubject: () => ({}), renderPortrait: async () => null }));
+vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () => ({
+  lookDigest: () => 'd',
+  lookOfSubject: (id: string) => ({ id }),
+  renderPortrait: async ({ look }: { look: { id: string } }) => { people.drawn.push(look.id); return { sha256: 'c'.repeat(64), width: 156, height: 156 }; },
+}));
 
 type Json = Record<string, any>;
 // Joined paths: the test runner still finds the files, and the type checker leaves the preview modules out.
@@ -262,5 +268,31 @@ describe("a world's pictures", () => {
     pictures.release();
     expect(revoked).toEqual(['blob:made-1', 'blob:made-2', 'blob:made-3']);
     expect(pictures.still()).toBeNull();
+  });
+
+  it("draws a face only for one the world draws as one of its people: a creature keeps the quiet circle", async () => {
+    urls();
+    people.served = true;
+    people.drawn.length = 0;
+    // The saved world's society: Teo from the people catalog, the canopy strider by its own look, a newcomer not yet known.
+    const asked: string[] = [];
+    const drawnAsPerson = (id: string) => { asked.push(id); return id === 'teo' ? true : id === 'strider' ? false : null; };
+    const pictures = await (await historyHost()).recordPictures({
+      entry: { worldId: 'w1', entryId: 'e1', authoredVersionId: 'v1' }, credentials: { baseUrl: 'http://api.test' },
+      source: { ...source, authoredSociety: { drawnAsPerson } },
+    });
+    expect(await pictures.portrait('strider')).toBeNull();
+    expect(await pictures.portrait('teo')).toBe('blob:made-1');
+    expect(await pictures.portrait('newcomer')).toBeNull();
+    expect(people.drawn).toEqual(['teo']);
+    // The strider's answer is kept; the newcomer is asked again by the next draw.
+    expect(await pictures.portrait('strider')).toBeNull();
+    expect(await pictures.portrait('newcomer')).toBeNull();
+    expect(asked).toEqual(['strider', 'teo', 'newcomer', 'newcomer']);
+    // A generated town has no saved society: everyone is one of its people.
+    const town = await open();
+    expect(await town.portrait('marco')).toBe('blob:made-2');
+    expect(people.drawn).toEqual(['teo', 'marco']);
+    people.served = false;
   });
 });

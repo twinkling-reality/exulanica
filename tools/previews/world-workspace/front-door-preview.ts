@@ -143,14 +143,28 @@ async function drawMoment(renderer: any, key: string): Promise<void> {
   // was last re-centred: the camera's own pose and position say by how much.
   const eye = binding.camera.getPosition(), held = binding.controls.state;
   const offset = { x: held.x - eye.x, y: held.y - eye.y, z: held.z - eye.z };
-  // Each subject as drawn: how tall, and which way it faces (the crowd's heading, which follows the
-  // recorded path and a seat or partner), so the camera stands where every face shows.
+  // Each subject as drawn: how tall, which way it faces (the crowd's heading, which follows the
+  // recorded path and a seat or partner), so the camera stands where every face shows, and the
+  // outline of the box it is drawn by (its points nearest far points all round), so a subject not
+  // framed is never cut by the frame's edge.
+  const outlineOf = (id: string) => {
+    const points: { x: number; y: number; z: number }[] = [];
+    const ground = drawn[subjects.indexOf(id)];
+    for (let turn = 0; ground && turn < 16 && society.nearestPointOf; turn += 1) {
+      for (const rise of [-1000, 1000]) {
+        const from = { x: ground.x + Math.cos((turn * Math.PI) / 8) * 1000, y: ground.y + rise, z: ground.z + Math.sin((turn * Math.PI) / 8) * 1000 };
+        const out = { x: 0, y: 0, z: 0, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; } };
+        if (society.nearestPointOf(id, from, out)) points.push({ x: out.x, y: out.y, z: out.z });
+      }
+    }
+    return points;
+  };
   const feet = drawn.map((one, at) => (one === null ? null : {
-    ...one, height: society.heightOf?.(subjects[at]!) ?? NaN, heading: society.headingOf?.(subjects[at]!) ?? NaN,
-  })).filter((one): one is { x: number; y: number; z: number; height: number; heading: number } => one !== null);
+    ...one, height: society.heightOf?.(subjects[at]!) ?? NaN, heading: society.headingOf?.(subjects[at]!) ?? NaN, outline: outlineOf(subjects[at]!),
+  })).filter((one): one is { x: number; y: number; z: number; height: number; heading: number; outline: { x: number; y: number; z: number }[] } => one !== null);
   const hit = sceneHit(binding.app);
   const sighted = framingInSight(feet, sceneSight(hit, MOMENT_FRAMING.sight.own_m), MOMENT_FRAMING,
-    (pose: { x: number; y: number; z: number; yaw: number; pitch: number }) => foregroundShare(pose, feet, hit));
+    (pose: { x: number; y: number; z: number; yaw: number; pitch: number }, framed: readonly object[]) => foregroundShare(pose, framed, hit));
   if (sighted === null) return answer(null);
   useLens(binding, MOMENT_FRAMING.fov_deg);
   binding.controls.setView({ ...sighted, x: sighted.x + offset.x, y: sighted.y + offset.y, z: sighted.z + offset.z }, 'altitude');

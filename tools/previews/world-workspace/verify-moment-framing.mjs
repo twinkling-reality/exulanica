@@ -1,9 +1,11 @@
 // Checks moment-framing.mjs in Node: the society read rewritten to a moment's people, and the camera
 // that frames them, from the recipe file. Run: node verify-moment-framing.mjs
 import assert from 'node:assert/strict';
-import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framingInSight, framingPose, lensOf, momentSociety, overviewDistance } from './moment-framing.mjs';
+import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framedWhole, framingInSight, framingPose, lensOf, momentSociety, overviewDistance } from './moment-framing.mjs';
 
-assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v1');
+assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v2');
+// The widest pair framed together is the widest the lens takes whole, with room each side, at the most distance.
+assert.ok((MOMENT_FRAMING.pair_most_m + 2 * MOMENT_FRAMING.distance_m.room_m) / (2 * Math.tan(lensOf().horizontal)) <= MOMENT_FRAMING.distance_m.most);
 // R23: a moment's picture at the card's 2x (600 x 340); a portrait at 3x of its 52 px orb, on the tile's ground.
 assert.deepEqual(MOMENT_FRAMING.size_px, [600, 340]);
 assert.equal(MOMENT_FRAMING.portrait.size_px, 156);
@@ -127,10 +129,64 @@ const fromNorth = framingInSight(north, () => true);
 assert.ok(fromNorth.z < 0 && face(fromNorth, north) < 30, 'not their backs');
 // Their faces show only from where the feet are hidden: still where the faces show.
 assert.ok(framingInSight(north, (camera, point) => !(camera.z < 0 && point.y < 0.5)).z < 0);
-// Back to back with a narrow limit: no side shows both faces, so no picture.
+// Back to back with a narrow limit: no side shows both faces, so the side that shows the most, one face
+// turned no further than the limit.
 const backToBack = [{ x: 0, y: 0, z: 0, heading: Math.PI / 2 }, { x: 2, y: 0, z: 0, heading: -Math.PI / 2 }];
 const narrow = { ...MOMENT_FRAMING, sight: { ...MOMENT_FRAMING.sight, face_limit_deg: 60 } };
-assert.equal(framingInSight(backToBack, () => true, narrow), null);
+const one = framingInSight(backToBack, () => true, narrow);
+assert.ok(one !== null && Math.min(...backToBack.map((person) => faceAngle(person, one))) <= 60, 'one face shows');
+// The faces shown come before the sight tests: a side that sees both whole but shows one face loses
+// to one that shows both with their feet hidden.
+const squareHidden = (camera, point) => !(Math.abs(camera.x - 1) < 0.01 && point.y < 0.5);
+assert.deepEqual(framingInSight(talking, squareHidden), framingPose(talking, R, { side: 0 }), 'both faces, feet hidden');
+// Farther apart than pair_most_m (Canopy shore's knight and strider, 40 m): the first, who spoke,
+// alone, from in front of the way they face, filling R23's 55 to 65 percent of the frame's height; never
+// from behind, whatever the other's face does.
+const lens2 = lensOf(R);
+const shore = [{ x: 38.319, y: 0, z: -16, heading: Math.PI / 2 }, { x: 20, y: 0, z: -52, heading: 0 }];
+const lone = framingInSight(shore, () => true);
+assert.deepEqual(lone, framingPose(shore.slice(0, 1), R, { side: R.sight.sides_degrees[0] }));
+assert.ok(faceAngle(shore[0], lone) <= 30, `the speaker faces the camera, ${faceAngle(shore[0], lone)}`);
+const loneShare = R.subject_height_m / (2 * Math.hypot(lone.x - shore[0].x, lone.z - shore[0].z) * Math.tan(lens2.vertical));
+assert.ok(loneShare >= 0.55 && loneShare <= 0.65, `the speaker fills ${loneShare} of the frame`);
+// A wall on the speaker's front hides them from straight on: another side that shows their face, never their back.
+const fronted = framingInSight(shore, (camera, point) => !(camera.x < 37 && Math.abs(camera.z + 16) < 1));
+assert.ok(faceAngle(shore[0], fronted) <= R.sight.face_limit_deg && fronted.x < shore[0].x, 'still in front');
+// The other, framed alone or not, is never cut by the frame's edge. Points along a line 20 m before the
+// lone speaker's camera, from 16 to 10 m left of its middle, straddle the left edge on the left third.
+const speaker = [{ x: 0, y: 0, z: 0, heading: Math.PI }];
+const leftThird = framingPose(speaker, R, { side: R.sight.sides_degrees[0] });
+const at = (pose, depth, left) => {
+  const forward = [-Math.sin(pose.yaw), -Math.cos(pose.yaw)], right = [Math.cos(pose.yaw), -Math.sin(pose.yaw)];
+  return { x: pose.x + forward[0] * depth - right[0] * left, y: 1, z: pose.z + forward[1] * depth - right[1] * left };
+};
+const straddling = { x: 0, y: 0, z: 0, outline: [16, 14, 12, 10].map((left) => at(leftThird, 20, left)) };
+straddling.x = straddling.outline[0].x; straddling.z = straddling.outline[0].z;
+assert.equal(framedWhole(leftThird, straddling), false, 'cut by the left edge');
+assert.equal(framedWhole(leftThird, { ...straddling, outline: straddling.outline.slice(2) }), true, 'wholly in');
+assert.equal(framedWhole(leftThird, { x: 0, y: 0, z: 50, height: 2 }), true, 'behind the camera: wholly out');
+// Far apart, the other cut on the left third: the speaker on the right third, the other whole.
+const withOther = [speaker[0], { ...straddling, heading: 0 }];
+const rightThird = framingInSight(withOther, () => true);
+assert.deepEqual(rightThird, framingPose(speaker, { ...R, third: -R.third }, { side: R.sight.sides_degrees[0] }));
+assert.ok(framedWhole(rightThird, straddling));
+// Cut on both thirds square on: another side within the face limit, the other whole, the face still shown.
+const wide = { ...straddling, outline: [...straddling.outline, ...[-16, -14, -12, -10, 0].map((left) => at(leftThird, 20, left))] };
+const turnedAway = framingInSight([speaker[0], wide], () => true);
+assert.ok(framedWhole(turnedAway, wide) && faceAngle(speaker[0], turnedAway) <= R.sight.face_limit_deg, 'turned, whole');
+assert.ok(Math.abs(turnedAway.yaw - leftThird.yaw) > 1e-6);
+// Just inside pair_most_m the two are framed together, as before.
+const close = [{ x: 0, y: 0, z: 0 }, { x: R.pair_most_m - 0.01, y: 0, z: 0 }];
+assert.deepEqual(framingInSight(close, () => true), framingPose(close, R, { side: 0 }));
+// Close together, but no side the recipe tries shows a face of either (only square on, from behind
+// them): the first alone, from in front.
+const behindOnly = { ...R, sight: { ...R.sight, sides_degrees: [0] } };
+const backs = [{ ...pair[0], heading: 0 }, { ...pair[1], heading: 0 }];
+const fallback = framingInSight(backs, () => true, behindOnly);
+assert.deepEqual(fallback, framingPose(backs.slice(0, 1), behindOnly, { side: 0 }));
+assert.ok(fallback.z < 0 && faceAngle(backs[0], fallback) < 30, 'in front of the first');
+// Seen from nowhere at all: a framing still, the one that sees the most.
+assert.notEqual(framingInSight(shore, () => false), null);
 assert.equal(faceAngle({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }), null, 'no heading, no face to judge');
 
 // The overview stands back until the site and what is round it fit the frame with its margin.
