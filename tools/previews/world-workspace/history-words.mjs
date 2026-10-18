@@ -232,6 +232,52 @@ export function branchWords({ kind, to, activity, thing, withName, line }, actor
   }
 }
 
+/**
+ * What a person did at a choice of their day (R5e), said in the past with no full stop like a row's title: the
+ * chosen option as the events read serves it (`did`, a branch's kind, or `went_to_spot` for a walk to a spot the
+ * person playing chose), "Went to the market", "Went to rest at the bench", "Waited", "Talked with Ines" (WORDS.md
+ * "R5e item 4's words"). Fields as branchWords takes them, with no actor: a row is the person's own. Null for a kind
+ * it has no words for, so the row keeps the choice as offered.
+ */
+export function didWords({ kind, to = null, activity = null, thing = null, withName = null } = {}) {
+  switch (kind) {
+    case 'went':
+      if (activity === 'rest') return `Went to rest${to ? ` at ${labelWords(to)}` : ''}`;
+      return to ? `Went to ${labelWords(to)}` : 'Moved on';
+    case 'went_to_spot':
+      return 'Went to the chosen spot';
+    case 'talked':
+    case 'met':
+      return withName ? `Talked with ${withName}` : 'Talked with someone';
+    case 'spoke':
+      return withName ? `Spoke to ${withName}` : 'Spoke';
+    case 'spoke_to_all':
+      return 'Spoke up';
+    case 'followed':
+      return withName ? `Followed ${withName}` : 'Followed someone';
+    case 'stopped_following':
+      return withName ? `Stopped following ${withName}` : 'Stopped following';
+    case 'picked_up':
+      return thing ? `Picked up ${labelWords(thing)}` : 'Picked something up';
+    case 'put_down':
+      return thing ? `Put down ${labelWords(thing)}` : 'Put something down';
+    case 'gave':
+      return withName ? `Gave ${withName} ${thing ? labelWords(thing) : 'something'}` : 'Gave something away';
+    case 'took':
+      return `Took ${thing ? labelWords(thing) : 'something'}${withName ? ` from ${withName}` : ''}`;
+    case 'left':
+      return 'Went away';
+    case 'waited':
+      return 'Waited';
+    case 'stood':
+      return 'Stood a while';
+    case 'carried_on':
+      return 'Carried on as before';
+    default:
+      return null;
+  }
+}
+
 /** The branch's head: "Asked again with Qwen3 235B". */
 export function askedAgainParts(modelName) {
   return ['Asked again with ', modelPart(modelName)];

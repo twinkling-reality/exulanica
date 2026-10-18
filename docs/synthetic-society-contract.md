@@ -1103,7 +1103,10 @@ first instead, in minute, then the order the minute gave its events, then id, an
 without a window. So a page that joins late, scrubs or replays a stretch shows each minute's lines
 in the order they were said, from the stored events alone, asking no model. A window that ends
 before it begins, `before` with a window, `after` without one, a cursor outside the window or a
-malformed kind is refused `invalid_events_window`. How long a line stays readable is presentation
+malformed kind is refused `invalid_events_window`. Each `decision_applied` event also carries `did`,
+what its chosen option did in a History branch's shape (`kind`, `target`, `with`), read from the
+decision's receipt and never stored, so a person's day says what was done rather than the choice as
+offered; it is null where the receipt holds no proposal. How long a line stays readable is presentation
 (`assets/catalogs/thing-presentation/decider-marks.v2.json`), not part of the record.
 
 A read of the society, its events or its playback, and a step, load and validate only the inputs

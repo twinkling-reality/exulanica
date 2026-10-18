@@ -31,6 +31,7 @@ from typing import Any, Final, Protocol
 from psycopg.types.json import Jsonb
 
 from exulanica.world.society import SocietyEvent, society_state_sha256
+from exulanica.world.society_decision_contract import POINT_KIND
 
 __all__ = [
     "MOMENTS_PROFILE",
@@ -38,16 +39,21 @@ __all__ = [
     "Moment",
     "MomentRules",
     "backfill",
+    "chosen_dids",
     "form_moments",
     "load_rules",
     "merge_moments",
     "moment_id_of",
+    "option_did",
     "read_moments",
     "record_moments",
 ]
 
 RULES_PROFILE: Final = "exulanica.society-moment-rules/v1"
 MOMENTS_PROFILE: Final = "exulanica.world-history-moments/v1"
+#: What a walk to a spot the person playing chose did (the contract's point option): a going that
+#: names no place, and that the moment rules give no branch kind of its own.
+WENT_TO_SPOT: Final = "went_to_spot"
 _RULES_PATH: Final = Path(__file__).with_name("society-moment-rules.v1.json")
 #: The namespace a moment's id is derived in, from its version, its rule and the event it is
 #: anchored on, so the minute's hook and a later back-fill name the same moment the same way.
@@ -602,6 +608,48 @@ def _recorded_at(
     return {uuid.UUID(str(one["event_id"])): one["recorded_at"].isoformat() for one in rows}
 
 
+def option_did(option: Mapping[str, Any], rules: MomentRules) -> dict[str, Any]:
+    """What a decision's option does, in a branch's shape: its branch kind (a walk to a chosen
+    spot :data:`WENT_TO_SPOT`, None for another kind the rules give none), the target it goes to or
+    takes in hand, and who it is with or said to."""
+    addressee = option.get("addressee_id") or option.get("partner_id")
+    kind = str(option.get("kind"))
+    return {
+        "kind": rules.branch_kinds.get(kind) or (WENT_TO_SPOT if kind == POINT_KIND else None),
+        "target": {"target_id": option.get("target_id"), "activity": option.get("activity")}
+        if option.get("target_id") is not None
+        else None,
+        "with": None if addressee is None else str(addressee),
+    }
+
+
+def chosen_dids(
+    connection: Any,
+    workspace_id: uuid.UUID,
+    society_id: uuid.UUID,
+    requests: Iterable[uuid.UUID],
+    rules: MomentRules | None = None,
+) -> dict[uuid.UUID, dict[str, Any]]:
+    """What each applied decision's chosen option did (:func:`option_did`), from its receipt, so a
+    person's day says what was done rather than the choice as offered; a decision whose receipt
+    holds no proposal is absent."""
+    rules = load_rules() if rules is None else rules
+    asked = sorted(set(requests), key=str)
+    if not asked:
+        return {}
+    rows = connection.execute(
+        "select request_id, document->'proposal'->'option' as option "
+        "from world_society_decision where workspace_id=%s and society_id=%s "
+        "and request_id = any(%s)",
+        (workspace_id, society_id, asked),
+    ).fetchall()
+    return {
+        uuid.UUID(str(row["request_id"])): option_did(row["option"], rules)
+        for row in rows
+        if isinstance(row["option"], Mapping)
+    }
+
+
 def _branches(
     connection: Any,
     workspace_id: uuid.UUID,
@@ -635,7 +683,7 @@ def _branches(
         if not isinstance(option, Mapping):
             continue
         request = uuid.UUID(str(one["request_id"]))
-        addressee = option.get("addressee_id") or option.get("partner_id")
+        did = option_did(option, rules)
         line = proposal.get("line") if isinstance(proposal, Mapping) else None
         found.setdefault(request, []).append(
             {
@@ -647,11 +695,9 @@ def _branches(
                     "name": name(str(one["model_id"])),
                 },
                 "same_choice": option.get("label") == originals.get(request),
+                # Another model's answer of a kind the rules give no branch kind carries on.
+                **did,
                 "kind": rules.branch_kinds.get(str(option.get("kind")), "carried_on"),
-                "target": {"target_id": option.get("target_id"), "activity": option.get("activity")}
-                if option.get("target_id") is not None
-                else None,
-                "with": None if addressee is None else str(addressee),
                 "said": None if not line else {"line": str(line)},
                 "scene": None,
                 "picture": None,

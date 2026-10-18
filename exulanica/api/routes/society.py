@@ -37,6 +37,8 @@ from exulanica.world.society_engines import (
     ENGINES,
 )
 from exulanica.world.society_erasure import SocietyErasureRefused, erase_society
+from exulanica.world.society_living_decisions import DECISION_EVENT_KIND
+from exulanica.world.society_moments import chosen_dids
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import (
     EVENT_KINDS_READ_MAXIMUM,
@@ -352,10 +354,13 @@ def society_events(
     time (``after`` reads on), so a page can show what was said in the minutes it draws, in order;
     ``kinds`` keeps those kinds alone (``said`` for lines). A window that ends before it begins,
     ``before`` with a window, ``after`` without one or a malformed kind is refused
-    ``invalid_events_window``."""
+    ``invalid_events_window``. Each ``decision_applied`` event also carries ``did``, what its
+    chosen option did in a History branch's shape (kind, target, with), read from its receipt
+    and not stored, or null where the receipt holds no proposal."""
 
     def page() -> dict[str, Any]:
-        events, following = _repository(connection, session, request, world_id).events_page(
+        repository = _repository(connection, session, request, world_id)
+        events, following = repository.events_page(
             version_id,
             limit=limit,
             before=before,
@@ -364,7 +369,23 @@ def society_events(
             from_tick=from_tick,
             to_tick=to_tick,
         )
-        return {"events": served_events(events), "next": following}
+        served = served_events(events)
+        applied = [event for event in served if event.get("event_kind") == DECISION_EVENT_KIND]
+        asked = [event["document"].get("request_id") for event in applied]
+        row = repository._row(version_id) if applied else None
+        dids = (
+            {}
+            if row is None
+            else chosen_dids(
+                connection,
+                session.workspace_id,
+                row["society_id"],
+                [uuid.UUID(str(one)) for one in asked if one],
+            )
+        )
+        for event, one in zip(applied, asked, strict=True):
+            event["did"] = dids.get(uuid.UUID(str(one))) if one else None
+        return {"events": served, "next": following}
 
     return _call(page, invalid_status=409)
 

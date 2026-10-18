@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { changeParts, changeWords } from './build-words.mjs';
 import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import {
-  HEAD_WORDS, PATH_WORDS, branchWords, byParts, creationWhen, dayHeading, headLine, momentWords, money, partsText,
+  HEAD_WORDS, PATH_WORDS, branchWords, didWords, byParts, creationWhen, dayHeading, headLine, momentWords, money, partsText,
   personWhen, runSpanWords, youChangeWords, youModelParts, youPersonalityWords,
 } from './history-words.mjs';
 
@@ -280,6 +280,22 @@ assert.deepEqual([
 ]);
 assert.ok([would('went'), would('left'), would('talked', { withName: 'Ines' })].every((words) => !words.endsWith('.')));
 assert.deepEqual([byParts({ kind: 'external' }), byParts({ kind: 'routine' }), byParts(null)], [[PATH_WORDS.outsideProgram], null, null]);
+// What a person did at a choice of their day (R5e), in the past with no full stop; null for a kind with no words.
+const did = (kind, extra = {}) => didWords({ kind, ...extra });
+assert.deepEqual([
+  did('went', { to: 'market' }), did('went', { to: 'bench', activity: 'rest' }), did('went'), did('went_to_spot'), did('stood'), did('waited'),
+  did('talked', { withName: 'Ines' }), did('talked'), did('spoke', { withName: 'Ines' }), did('spoke_to_all'),
+  did('followed', { withName: 'Ines' }), did('stopped_following', { withName: 'Ines' }), did('picked_up', { thing: 'lantern' }),
+  did('put_down', { thing: 'lantern' }), did('gave', { withName: 'Ines', thing: 'lantern' }), did('took', { withName: 'Ines', thing: 'lantern' }),
+  did('left'), did('carried_on'),
+], [
+  'Went to the market', 'Went to rest at the bench', 'Moved on', 'Went to the chosen spot', 'Stood a while', 'Waited',
+  'Talked with Ines', 'Talked with someone', 'Spoke to Ines', 'Spoke up',
+  'Followed Ines', 'Stopped following Ines', 'Picked up the lantern',
+  'Put down the lantern', 'Gave Ines the lantern', 'Took the lantern from Ines',
+  'Went away', 'Carried on as before',
+]);
+assert.deepEqual([did(null), did('point'), didWords()], [null, null, null]);
 
 // The person's own changes, History's "You" form of each of build mode's sentence kinds (never a cut string).
 const you = (edit, edits = [edit]) => youChangeWords(partsOf(edit, edits));
