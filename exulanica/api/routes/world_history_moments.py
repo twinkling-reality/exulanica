@@ -40,9 +40,10 @@ _PICTURE_BYTES: Final = ("GET", "/world/pictures/{sha256}")
 
 def _reads_pictures(held: frozenset[Permission]) -> bool:
     """Whether a grant holding ``held`` may read a kept picture's bytes; no if that route's rule is
-    ever anything but a requirement, so a change there names no picture until this is read again."""
+    ever anything but a plain requirement (a kind that asks more, as an invitation or a browser
+    owner does, is not read here), so a change there names no picture until this is read again."""
     rule = rule_for(*_PICTURE_BYTES)
-    return isinstance(rule, Requires) and rule.permissions <= held
+    return type(rule) is Requires and rule.permissions <= held
 
 
 @router.get("/versions/{version_id}/history/moments")

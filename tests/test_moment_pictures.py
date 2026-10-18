@@ -1,7 +1,8 @@
 """A History picture's rules without a database (exulanica/world/moment_pictures.py, 0223).
 
 A portrait is a square JPEG or WebP walked whole, from 128 to 512 pixels a side and at most 128 KiB;
-a recipe is a name and a version; a kept picture serves its digest and size. The routes, the store
+a recipe is a name and a version; a kept picture serves its digest and size; the moments read names
+a kept picture only to a grant the picture route's plain requirement admits. The routes, the store
 and erasure are ``test_moment_pictures_postgres.py``.
 """
 
@@ -10,6 +11,8 @@ from __future__ import annotations
 import hashlib
 
 import pytest
+from exulanica.api.permissions import BrowserRequires, Granted, Permission, Requires
+from exulanica.api.routes import world_history_moments
 from exulanica.world.moment_pictures import (
     PORTRAIT_MAX_BYTES,
     RECIPE_PATTERN,
@@ -18,6 +21,24 @@ from exulanica.world.moment_pictures import (
 from exulanica.world.saved_entry_pictures import PictureRefused
 
 from style_pack_upload_support import jpeg
+
+
+def test_the_moments_read_names_a_picture_only_under_the_picture_route_s_plain_requirement(
+    monkeypatch,
+):
+    write, read = frozenset({Permission.WORLD_WRITE}), frozenset({Permission.WORLD_READ})
+    # The control: the picture route's own rule today admits a grant holding world.write alone.
+    assert world_history_moments._reads_pictures(write)
+    assert not world_history_moments._reads_pictures(read)
+    for rule, told in (
+        (Requires(frozenset({Permission.WORLD_WRITE})), True),
+        # A kind that asks more than the permissions is not read here: it names no picture.
+        (Granted(frozenset({Permission.WORLD_WRITE})), False),
+        (BrowserRequires(frozenset({Permission.WORLD_WRITE}), owner_only=True), False),
+    ):
+        monkeypatch.setattr(world_history_moments, "rule_for", lambda *_route, rule=rule: rule)
+        assert world_history_moments._reads_pictures(write) is told, rule
+        assert not world_history_moments._reads_pictures(read)
 
 
 def test_a_portrait_is_a_square_picture_walked_whole():
