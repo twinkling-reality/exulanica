@@ -47,11 +47,19 @@
 .wu-history-r23 .wu-hr-ghost .wu-hr-text { padding: 14px 0 0; }
 .wu-history-r23 .wu-hr-ghost .wu-hr-words { margin-top: 0; font-size: 17px; color: var(--hr-quiet); display: block; }
 .wu-history-r23 .wu-hr-ghost .wu-hr-said { font: 400 16px/1.4 var(--font-sans); color: var(--hr-quiet); display: block; }
+/* A card or branch that would reach the band over the key row keeps each of its words to one line (H15). */
+.wu-history-r23 .wu-hr-clamped .wu-hr-words, .wu-history-r23 .wu-hr-clamped .wu-hr-said { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* The person's changes, the day marks, the runs, Now and the notes. */
 .wu-history-r23 .wu-hr-change { position: absolute; width: 150px; font: 400 14px/1.35 var(--font-sans); color: var(--hr-quiet); }
 .wu-history-r23 .wu-hr-change .wu-hr-time { font-size: 12px; margin-bottom: 6px; }
 .wu-history-r23 .wu-hr-change-words { text-wrap: pretty; }
+/* A grouped changes dot is a stop (H15): chosen, a 2px ring at r 9 and its words dark; the dot or its words open it. */
+.wu-history-r23 .wu-hr-path .ring { fill: none; stroke: var(--hr-line); stroke-width: 2; }
+.wu-history-r23 .wu-hr-path .hit { fill: transparent; pointer-events: all; cursor: pointer; }
+.wu-history-r23 button.wu-hr-change { display: block; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.wu-history-r23 .wu-hr-change[aria-current="true"] .wu-hr-change-words { color: var(--hr-ink); }
+.wu-history-r23 .wu-hr-change:focus-visible { outline: 2px solid var(--hr-line); outline-offset: 6px; border-radius: 8px; }
 .wu-history-r23 .wu-hr-day { position: absolute; font: 400 12px/1 var(--font-mono); color: var(--hr-quiet); transform: translateX(-50%); }
 .wu-history-r23 .wu-hr-run { position: absolute; font: 400 13px/1 var(--font-sans); color: var(--hr-quiet); white-space: nowrap; }
 .wu-history-r23 .wu-hr-now { position: absolute; font: 400 21px/1.2 var(--font-sans); color: var(--hr-ink); white-space: nowrap; }
@@ -76,4 +84,14 @@
 .wu-history-r23 .wu-hr-asked-head { font: 400 13px/1 var(--font-mono); color: var(--hr-quiet); }
 .wu-history-r23 .wu-hr-answer { margin-top: 8px; font: 400 15px/1.4 var(--font-sans); color: var(--hr-quiet); text-wrap: pretty; }
 .wu-history-r23 .wu-hr-small { margin-top: 32px; font: 400 13px/1.4 var(--font-sans); color: var(--hr-quiet); }
+
+/* A grouped dot's changes opened over the story (H15, sheet section 7): the time, the title, then each change; a
+   list past the column moves a row at a time, its foot faded while more lies past it. */
+.wu-history-r23 .wu-hr-changes { position: absolute; inset: 0; }
+.wu-history-r23 .wu-hr-changes .wu-hr-column { display: flex; flex-direction: column; }
+.wu-history-r23 .wu-hr-rows { position: relative; flex: 1 1 auto; min-height: 0; margin-top: 32px; overflow: hidden; }
+.wu-history-r23 .wu-hr-rows.more { -webkit-mask-image: linear-gradient(#000 calc(100% - 48px), transparent); mask-image: linear-gradient(#000 calc(100% - 48px), transparent); }
+.wu-history-r23 .wu-hr-row + .wu-hr-row { margin-top: 20px; }
+.wu-history-r23 .wu-hr-row .wu-hr-time { font-size: 12px; }
+.wu-history-r23 .wu-hr-row-words { margin-top: 6px; font: 400 18px/1.4 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
 .wu-history-r23 .wu-hr-ended { margin-top: 4px; }

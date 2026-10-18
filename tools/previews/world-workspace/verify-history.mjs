@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { changeParts, changeWords } from './build-words.mjs';
-import { LAYOUTS, historyPath, pathLayout, pathView, targetObject } from './history-rows.mjs';
+import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, targetObject } from './history-rows.mjs';
 import {
   HEAD_WORDS, PATH_WORDS, branchWords, byParts, creationWhen, dayHeading, headLine, momentWords, money, partsText,
   personWhen, runSpanWords, youChangeWords, youModelParts, youPersonalityWords,
@@ -83,7 +83,9 @@ assert.deepEqual(path.items.map((item) => [item.kind, item.when, text(item.words
   ['moment', '06:55 · Day 1', 'Ines and Teo went to the market'],
   ['moment', '07:09 · Day 1', 'Marco asked Teo'],
 ]);
-const [creation, , met, went, asked] = path.items;
+const [creation, single, met, went, asked] = path.items;
+// A single change's words are the whole of it: it keeps no list and opens nothing (H15).
+assert.equal('changes' in single, false);
 assert.equal(creation.quote, 'Glass terraces with pools above the sea, and a grand hotel at the top');
 assert.deepEqual([met.shown, met.more, text(met.by), met.subjects], [['Teo: “Morning, Ines. The boats are out early.”'], null, 'By Nemotron 3 Nano 30B', ['teo', 'ines']]);
 // A model's name is a part the page keeps on one line.
@@ -189,6 +191,30 @@ assert.deepEqual(busy.items.map((item) => [item.kind, item.when ?? null, text(it
   ['moment', '00:05 · Day 2', 'Marco left'],
 ]);
 assert.equal(busy.items[3].by, null);
+// A grouped dot keeps every change it stands for, oldest first, each its own time and You sentence, for the list it
+// opens (H15); its count is the list's length.
+assert.deepEqual(busy.items[0].changes.map((row) => [row.when, text(row.words)]), [
+  ['08:30', 'You moved the bench'],
+  ['08:35', "You changed Teo's model to Qwen3 235B"],
+  ['08:41', 'You moved the lantern'],
+]);
+
+// The opened list's window (H15): a list that fits never moves and offers no arrows; a longer one moves a row at a
+// time, held where its last row ends at the foot, never past it and never before its first row.
+const rowsOf = (count, tall = 50, gap = 20) => Array.from({ length: count }, (_, index) => [index * (tall + gap), index * (tall + gap) + tall]);
+// Its height ends on a whole row (DESIGN, "H15 as built"): 300 has room for four rows of 50 with 20 between (260), never
+// a fifth row's time alone.
+assert.deepEqual(rowsWindow(rowsOf(3), 600, 0), { first: 0, scroll: 0, height: 190, earlier: false, later: false });
+assert.deepEqual(rowsWindow(rowsOf(3), 600, 2), { first: 0, scroll: 0, height: 190, earlier: false, later: false });
+assert.deepEqual(rowsWindow(rowsOf(10), 300, 0), { first: 0, scroll: 0, height: 260, earlier: false, later: true });
+assert.deepEqual(rowsWindow(rowsOf(10), 300, 1), { first: 1, scroll: 70, height: 260, earlier: true, later: true });
+// Rows 6 to 9 end at 680 from row 6's top 420: the last row stands at the foot from row 6, so row 6 is the furthest.
+assert.deepEqual(rowsWindow(rowsOf(10), 300, 9), { first: 6, scroll: 420, height: 260, earlier: true, later: false });
+assert.deepEqual(rowsWindow(rowsOf(10), 300, -3), { first: 0, scroll: 0, height: 260, earlier: false, later: true });
+assert.deepEqual(rowsWindow(rowsOf(10, 50, 20), 329, 0).height, 260);
+assert.deepEqual(rowsWindow(rowsOf(10, 50, 20), 330, 0).height, 330);
+// Not yet laid out (no height): nothing moves, no height is set and no arrows are offered.
+assert.deepEqual(rowsWindow(rowsOf(10), 0, 4), { first: 0, scroll: 0, height: null, earlier: false, later: false });
 assert.deepEqual(busy.spans.map((span) => span.words), ["Ari's model is deciding · 23:50 to now · 1:52 left"]);
 
 // Every moment kind's title (JOURNEY's catalog, the sheet's section 9): no pronoun for a character, never a topic.
@@ -262,4 +288,4 @@ assert.equal(runSpanWords({ names: ['Teo'], from: '06:00', to: '07:15', spent: '
 assert.equal(runSpanWords({ names: ['Teo', 'Ines', 'Marco'], from: '06:00', to: '07:15', spent: '0' }), "3 characters' models were deciding · 06:00 to 07:15");
 assert.equal(runSpanWords({ names: ['Teo', 'Ines'], from: null, to: null, worldMinutes: 75, spent: '0.0042' }), "Teo's and Ines's models were deciding · 75 minutes of world time · spent $0.0042");
 
-console.log('History checks passed: money and days, the GitHub line, the path from the moments read in r23\'s words and places, whole-item views, Now at its place, exchanges, same answers and branches, the "You" forms, runs on and ended.');
+console.log('History checks passed: money and days, the GitHub line, the path from the moments read in r23\'s words and places, whole-item views, Now at its place, exchanges, same answers and branches, the "You" forms, a grouped dot\'s changes and their window, runs on and ended.');

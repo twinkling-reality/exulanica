@@ -236,7 +236,7 @@ describe('Compare as r12', () => {
     document.body.replaceChildren();
     const small = (await opened(finished(), 1280)).root;
     expect([small.querySelector<HTMLElement>('.wu-rc-moment')!.style.left, small.querySelector<HTMLElement>('.wu-rc-moment')!.style.width]).toEqual(['780px', '420px']);
-    expect(small.querySelector('svg.wu-rc-line path.line')!.getAttribute('d')).toBe('M 80 470 L 700 470');
+    expect(small.querySelector('svg.wu-rc-line path.line')!.getAttribute('d')).toBe('M 80 438 L 700 438');
     expect(Number.parseFloat(small.querySelector<HTMLElement>('.wu-rc-head')!.style.width) + 80).toBeLessThanOrEqual(1280 - 80);
   });
 
@@ -261,7 +261,7 @@ describe('Compare as r12', () => {
     const { root, page } = await opened(finished(), 1440);
     expect(root.classList.contains('wu-hr-narrow')).toBe(true);
     expect(root.querySelector<HTMLElement>('.wu-rc-head')!.style.left).toBe('80px');
-    expect(root.querySelector('svg.wu-rc-line path.line')!.getAttribute('d')).toBe('M 80 470 L 860 470');
+    expect(root.querySelector('svg.wu-rc-line path.line')!.getAttribute('d')).toBe('M 80 438 L 860 438');
     expect(root.querySelector<HTMLElement>('.wu-rc-moment')!.style.left).toBe('940px');
     // The window widens: the page takes its 1920 sizes again.
     widen(1920);

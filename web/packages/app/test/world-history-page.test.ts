@@ -197,6 +197,71 @@ describe('History', () => {
     expect(chosen(made.root)).toBe('Marco asked Teo');
   });
 
+  it('stops the arrows on a grouped changes dot and opens every change on the same page, oldest first (H15)', async () => {
+    const { read } = reads({
+      [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [{ thing_id: 'bench:1', kind: { kind: 'bench' } }, { thing_id: 'market:1', kind: { kind: 'market' } }],
+        edits: [
+          { edit_id: 'e1', kind: 'move_thing', thing_id: 'bench:1', recorded_at: at(50) },
+          { edit_id: 'e2', kind: 'remove_thing', thing_id: 'market:1', recorded_at: at(48) },
+          { edit_id: 'e3', kind: 'undo', undone_edit_id: 'e1', recorded_at: at(46) },
+        ] },
+    });
+    const made = host(read);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    const group = () => made.root.querySelector('.wu-hr-change') as HTMLElement;
+    // From the newest moment, back past the first moment to the grouped dot, the first stop; no moment is chosen there.
+    history.key(press('ArrowLeft'));
+    history.key(press('ArrowLeft'));
+    history.key(press('ArrowLeft'));
+    expect(group().getAttribute('aria-current')).toBe('true');
+    expect(made.root.querySelectorAll('.wu-hr-path .ring')).toHaveLength(1);
+    expect(chosen(made.root)).toBeUndefined();
+    expect(group().querySelector('.wu-hr-change-words')?.textContent).toBe('You made 3 changes');
+    expect(keys(made.root)).toEqual(['←→Earlier, later', 'EnterOpen these changes', 'GOpen on GitHub', 'EscBack']);
+    history.key(press('Enter'));
+    expect(made.root.querySelector('.wu-history-r23')?.classList.contains('wu-hr-opened')).toBe(true);
+    const list = made.root.querySelector('.wu-hr-changes') as HTMLElement;
+    expect(list.querySelector('.wu-hr-moment-title')?.textContent).toBe('You made 3 changes');
+    expect(list.querySelector('.wu-hr-column > .wu-hr-time')?.textContent).toContain(' to ');
+    // Each change its own time and You sentence; an undo says what it did, never that a change was undone.
+    expect(all(list, '.wu-hr-row-words')).toEqual(['You moved the bench', 'You took out the market', 'You put the bench back where it was']);
+    expect(all(list, '.wu-hr-row > .wu-hr-time').every((time) => /\d\d:\d\d$/.test(time ?? ''))).toBe(true);
+    // Nothing runs past the column here, so no arrows; Esc goes back to the story with the same dot chosen.
+    expect(keys(made.root)).toEqual(['EscBack to the story']);
+    history.key(press('Escape'));
+    expect(made.root.querySelector('.wu-hr-changes')).toBeNull();
+    expect(history.isOpen).toBe(true);
+    expect(group().getAttribute('aria-current')).toBe('true');
+    // A click on the dot's words opens it as Enter does.
+    history.key(press('ArrowRight'));
+    expect(group().hasAttribute('aria-current')).toBe(false);
+    group().click();
+    expect(all(made.root, '.wu-hr-changes .wu-hr-row-words')).toHaveLength(3);
+  });
+
+  it("keeps to one line the words of a branch that would reach the band over the key row's caps (H15)", async () => {
+    // Laid out as a short page would lay it out: the branch's box ends at 1000, within 85 of the page's 1080 foot;
+    // the cards end well above it.
+    const tall = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('wu-hr-ghost') ? 200 : this.classList.contains('wu-hr-card') ? 300 : 0;
+    });
+    const top = vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('wu-hr-ghost') ? 800 : this.classList.contains('wu-hr-card') ? 390 : 0;
+    });
+    try {
+      const { read } = reads();
+      const made = host(read);
+      await (await module()).mountHistory(made).open();
+      expect(made.root.querySelectorAll('.wu-hr-ghost')).toHaveLength(1);
+      expect(made.root.querySelector('.wu-hr-ghost')?.classList.contains('wu-hr-clamped')).toBe(true);
+      expect(made.root.querySelectorAll('.wu-hr-card.wu-hr-clamped')).toHaveLength(0);
+    } finally {
+      tall.mockRestore();
+      top.mockRestore();
+    }
+  });
+
   it('shows the creation and Now alone with nothing yet, and no arrows with nothing to move to', async () => {
     const { read } = reads({
       [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [], edits: [] },

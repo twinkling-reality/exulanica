@@ -181,18 +181,21 @@ export function historyPath(reads, names, partsOf, clock, now = Date.now()) {
   for (const change of changes(reads, names, partsOf)) timed.push({ kind: 'change-one', ...change });
   timed.sort((a, b) => a.at - b.at || (a.kind === 'creation' ? -1 : b.kind === 'creation' ? 1 : 0));
 
-  // The person's changes between the same two moments become one dot, so labels never overlap.
+  // The person's changes between the same two moments become one dot, so labels never overlap; a grouped dot keeps
+  // each change, oldest first, for the list it opens (H15). A single change's words are the whole of it.
   const items = [];
   let lastDay = null;
   for (const entry of timed) {
     if (entry.kind === 'change-one') {
       const previous = items[items.length - 1];
+      const row = { when: personSpan(entry.at, entry.at, now), words: entry.words };
       if (previous?.kind === 'change' && previous.merging) {
         previous.count += 1;
         previous.words = changesWords(previous.count);
         previous.when = personSpan(previous.first, entry.at, now);
+        previous.changes.push(row);
       } else {
-        items.push({ id: `change:${entry.at}:${items.length}`, kind: 'change', merging: true, count: 1, first: entry.at, at: entry.at, when: personSpan(entry.at, entry.at, now), words: entry.words });
+        items.push({ id: `change:${entry.at}:${items.length}`, kind: 'change', merging: true, count: 1, first: entry.at, at: entry.at, when: row.when, words: entry.words, changes: [row] });
       }
       continue;
     }
@@ -203,6 +206,7 @@ export function historyPath(reads, names, partsOf, clock, now = Date.now()) {
     items.push(entry);
   }
   for (const item of items) {
+    if (item.kind === 'change' && item.count < 2) delete item.changes;
     delete item.merging;
     delete item.count;
     delete item.first;
@@ -233,17 +237,24 @@ export function historyPath(reads, names, partsOf, clock, now = Date.now()) {
   return { items, spans, now: { when: worldWhen(clock(reads.nowTick)) } };
 }
 
-/** The page's sizes at 1920 by 1080 and at 1440 by 900 (sheet sections 3 to 12 and "1440 x 900"). */
+/**
+ * The page's sizes at 1920 by 1080 and at 1440 by 900 (sheet sections 3 to 12 and "1440 x 900"). `band`, from the
+ * page's bottom: the key row's caps and the 24px of it nothing on the story line enters (H15). At 1440 the story line
+ * stands 32px higher than r23 drew it (H15), so a branch under it clears that band; the bracket stays.
+ */
 export const LAYOUTS = Object.freeze({
   wide: Object.freeze({
-    margin: 120, lineY: 560, gap: 420, card: 300, picture: 170, orb: 52, bracketY: 344, nowFromRight: 120,
+    band: 85, margin: 120, lineY: 560, gap: 420, card: 300, picture: 170, orb: 52, bracketY: 344, nowFromRight: 120,
     branchY: 750, branchCard: 260, branchPicture: 146, branchWords: 260, branchMeet: 67, branchUnder: 16,
     opened: Object.freeze({ left: 120, top: 260, width: 960, height: 540, orb: 64, column: 1130, columnRight: 1800 }),
+    // A grouped dot's changes, opened (H15): `foot` from the page's bottom, 40 above the key row (40 up, caps 21 tall).
+    changes: Object.freeze({ left: 120, top: 260, width: 680, foot: 101 }),
   }),
   narrow: Object.freeze({
-    margin: 80, lineY: 470, gap: 360, card: 260, picture: 148, orb: 46, bracketY: 254, nowFromRight: 120,
-    branchY: 640, branchCard: 220, branchPicture: 124, branchWords: 300, branchMeet: 57, branchUnder: 16,
+    band: 77, margin: 80, lineY: 438, gap: 360, card: 260, picture: 148, orb: 46, bracketY: 254, nowFromRight: 120,
+    branchY: 608, branchCard: 220, branchPicture: 124, branchWords: 300, branchMeet: 57, branchUnder: 16,
     opened: Object.freeze({ left: 80, top: 240, width: 720, height: 405, orb: 56, column: 850, columnRight: 1360 }),
+    changes: Object.freeze({ left: 80, top: 240, width: 600, foot: 93 }),
   }),
 });
 
@@ -341,4 +352,22 @@ export function pathView(items, placed, layout, width, chosen = null, previous =
   const start = order.find((item) => item.kind === 'creation' || item.kind === 'moment');
   const from = hiddenBefore ? 0 : start ? placed.x.get(start.id) + offset : layout.margin;
   return { offset, drawn, now, from, to: now ?? width };
+}
+
+/**
+ * The opened changes' window (H15, sheet section 7): a list longer than the column moves a row at a time. `rows` are
+ * each row's [top, bottom] in the list, `height` what the column has room for; `first` the row asked to stand at its
+ * top, held where the last row ends at the foot and never past it. Answers that row, how far the list is moved, the
+ * height it shows (ending on a whole row, never a time without its sentence; null before it is laid out), and
+ * whether rows lie before it or past its foot (where [↑] [↓] Earlier, later and the foot's fade are shown).
+ */
+export function rowsWindow(rows, height, first = 0) {
+  if (!rows.length || !(height > 0)) return { first: 0, scroll: 0, height: null, earlier: false, later: false };
+  const start = rows[0][0], end = rows[rows.length - 1][1];
+  let most = 0;
+  while (most < rows.length - 1 && end - rows[most][0] > height) most += 1;
+  const at = Math.min(most, Math.max(0, first));
+  let last = at;
+  while (last < rows.length - 1 && rows[last + 1][1] - rows[at][0] <= height) last += 1;
+  return { first: at, scroll: rows[at][0] - start, height: rows[last][1] - rows[at][0], earlier: at > 0, later: last < rows.length - 1 };
 }

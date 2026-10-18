@@ -15,6 +15,8 @@ export const PATH_WORDS = Object.freeze({
   outsideProgram: 'By an outside program',
   earlierLater: 'Earlier, later',
   openMoment: 'Open this moment',
+  // A grouped changes dot, chosen (H15).
+  openChanges: 'Open these changes',
   back: 'Back',
   openOnGitHub: 'Open on GitHub',
   chooseLine: 'Choose a line',

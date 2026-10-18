@@ -2,13 +2,13 @@
 // page over the world faded behind it, read left to right: how the world began, each moment the characters made (its
 // picture, the people's portraits, what happened, the lines said, who decided, another model's answer: the same as one
 // small line, a different one as a faded branch), the person's own changes as small dots, the runs as brackets, and
-// Now. Enter opens the chosen moment on the same page. It reads the server alone (GET through the workspace's reader);
+// Now. Enter opens the chosen moment, or a grouped changes dot's list, on the same page. It reads the server alone (GET through the workspace's reader);
 // the path and the views come from history-rows.mjs and every word from history-words.mjs. Pictures and portraits are
 // made one at a time where the host can make them, and the making stops when the page closes.
 // The record pages' shared parts load first: History's own stylesheet refines them and must come after.
 import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence } from './world-ui-record.ts';
 import { changeParts, thingName } from './build-words.mjs';
-import { LAYOUTS, historyPath, pathLayout, pathView, targetObject } from './history-rows.mjs';
+import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
 import { KEEP_WORDS } from './history-keep-words.mjs';
 import { PATH_WORDS, headLine } from './history-words.mjs';
@@ -113,8 +113,8 @@ export function mountHistory(host: HistoryHost): History {
   let momentsFailed = false;
   let state: 'loading' | 'ready' | 'offline' = 'loading';
   let chosen: string | null = null;
-  /** The moment opened over the story, and which of its lines is chosen. */
-  let opened: { readonly id: string; line: number } | null = null;
+  /** The moment or grouped changes opened over the story: a moment's chosen line, a list's row at its top (H15). */
+  let opened: { readonly id: string; line: number; first: number } | null = null;
   /** How far the line has slid, kept between draws so a choice in view moves nothing. */
   let offset: number | null = null;
   let held: { readonly compose: () => ReturnType<typeof historyPath> } | null = null;
@@ -264,8 +264,13 @@ export function mountHistory(host: HistoryHost): History {
     return (path?.items ?? []).filter((item: Json) => item.kind === 'moment');
   }
 
+  /** Where [←] [→] stop: each moment and each grouped changes dot (H15); a single change is passed over. */
+  function stops(): Json[] {
+    return (path?.items ?? []).filter((item: Json) => item.kind === 'moment' || (item.kind === 'change' && item.changes));
+  }
+
   function move(by: number) {
-    const list = moments();
+    const list = stops();
     const index = list.findIndex((item) => item.id === chosen);
     const next = list[Math.min(list.length - 1, Math.max(0, (index < 0 ? list.length - 1 : index) + by))];
     if (next && next.id !== chosen) {
@@ -428,7 +433,21 @@ export function mountHistory(host: HistoryHost): History {
       const x = placed.x.get(item.id)!;
       if (item.kind === 'change') {
         svg.append(svgPart('circle', { cx: x, cy: layout.lineY, r: 4 }, 'dot small'));
-        const words = element('div', 'wu-hr-change');
+        // A grouped dot is a stop: chosen it gains a ring and dark words, and it opens on a click (H15).
+        const group = Boolean(item.changes);
+        const words = element(group ? 'button' : 'div', 'wu-hr-change');
+        if (group) {
+          const open = () => openMoment(item.id);
+          if (item.id === chosen) {
+            svg.append(svgPart('circle', { cx: x, cy: layout.lineY, r: 9 }, 'ring'));
+            words.setAttribute('aria-current', 'true');
+          }
+          const hit = svgPart('circle', { cx: x, cy: layout.lineY, r: 12 }, 'hit');
+          hit.addEventListener('click', open);
+          svg.append(hit);
+          (words as HTMLButtonElement).type = 'button';
+          words.addEventListener('click', open);
+        }
         if (item.when) words.append(element('div', 'wu-hr-time', item.when));
         words.append(sentence('div', 'wu-hr-change-words', item.words));
         track.append(words);
@@ -484,6 +503,13 @@ export function mountHistory(host: HistoryHost): History {
       }
     }
 
+    // Nothing on the story line enters the 24px over the key row's caps (H15): a card or a branch that would reach
+    // that band keeps its words to one line.
+    const band = (host.root.clientHeight || window.innerHeight) - layout.band;
+    for (const part of track.querySelectorAll<HTMLElement>('.wu-hr-card, .wu-hr-ghost')) {
+      if (part.offsetHeight > 0 && part.offsetTop + part.offsetHeight > band) part.classList.add('wu-hr-clamped');
+    }
+
     if (state === 'ready' && view.now !== null) {
       svg.append(svgPart('circle', { cx: local(view.now), cy: layout.lineY, r: 9 }, 'now'), svgPart('circle', { cx: local(view.now), cy: layout.lineY, r: 3.5 }, 'now-dot'));
       const nowLabel = element('div', 'wu-hr-now', PATH_WORDS.now);
@@ -510,7 +536,7 @@ export function mountHistory(host: HistoryHost): History {
     }
 
     const keys = element('div', 'wu-hr-keys');
-    const chosenMoment = moments().find((one) => one.id === chosen) ?? null;
+    const choice = stops().find((one) => one.id === chosen) ?? null;
     const slot = made.content.querySelector('.wu-hr-cardslot') as HTMLElement;
     if (card && card.element.parentElement !== slot) slot.replaceChildren(card.element);
     if (!card) slot.replaceChildren();
@@ -519,13 +545,32 @@ export function mountHistory(host: HistoryHost): History {
       for (const one of card.keys()) keys.append(keyButton(one.keys, one.word, () => one.press()));
     } else if (opened) {
       const moment = moments().find((one) => one.id === opened!.id);
-      if (moment) content.append(openedView(moment, layout));
-      if ((moment?.lines.length ?? 0) > 1) keys.append(keyButton(['↑', '↓'], PATH_WORDS.chooseLine, () => chooseLine(1)));
-      if (host.openDecision) keys.append(keyButton(['Enter'], PATH_WORDS.seeDecision, () => seeDecision()));
+      const changes = moment ? null : openedChanges();
+      if (moment) {
+        content.append(openedView(moment, layout));
+        if (moment.lines.length > 1) keys.append(keyButton(['↑', '↓'], PATH_WORDS.chooseLine, () => chooseLine(1)));
+        if (host.openDecision) keys.append(keyButton(['Enter'], PATH_WORDS.seeDecision, () => seeDecision()));
+      } else if (changes) {
+        const list = changesView(changes, layout);
+        content.append(list.view);
+        // Measured where it stands: a list longer than the column moves a row at a time, its foot faded while more
+        // lies past it, and [↑] [↓] offered only while there is somewhere to move.
+        const rows = [...list.rows.children].map((row) => [(row as HTMLElement).offsetTop, (row as HTMLElement).offsetTop + (row as HTMLElement).offsetHeight]);
+        const shown = rowsWindow(rows, list.rows.clientHeight, opened.first);
+        opened.first = shown.first;
+        if (shown.height !== null) {
+          // The list shows whole rows only: its foot is the last whole row's, and the fade lies over that row.
+          list.rows.style.flex = '0 0 auto';
+          list.rows.style.height = `${shown.height}px`;
+        }
+        list.rows.scrollTop = shown.scroll;
+        list.rows.classList.toggle('more', shown.later);
+        if (shown.earlier || shown.later) keys.append(keyButton(['↑', '↓'], PATH_WORDS.earlierLater, () => moveRows(1)));
+      }
       keys.append(keyButton(['Esc'], PATH_WORDS.backToStory, () => closeMoment()));
     } else {
-      if (moments().length >= 2) keys.append(keyButton(['←', '→'], PATH_WORDS.earlierLater, () => move(1)));
-      if (chosenMoment) keys.append(keyButton(['Enter'], PATH_WORDS.openMoment, () => openMoment(chosenMoment.id)));
+      if (stops().length >= 2) keys.append(keyButton(['←', '→'], PATH_WORDS.earlierLater, () => move(1)));
+      if (choice) keys.append(keyButton(['Enter'], choice.kind === 'moment' ? PATH_WORDS.openMoment : PATH_WORDS.openChanges, () => openMoment(choice.id)));
       // One GitHub key at most (sheet section 11): open it once it is there, keep it there, or keep it at all.
       const url = githubUrl();
       if (url) keys.append(keyButton(['G'], PATH_WORDS.openOnGitHub, () => host.open(url)));
@@ -592,9 +637,44 @@ export function mountHistory(host: HistoryHost): History {
     return view;
   }
 
+  /** A grouped changes dot opened over the story (H15, sheet section 7): the time, the title and every change, oldest
+   * first, its time over its You sentence. No picture: edits have none, so nothing stands in for one. */
+  function changesView(item: Json, layout: (typeof LAYOUTS)['wide']): { readonly view: HTMLElement; readonly rows: HTMLElement } {
+    const sizes = layout.changes;
+    const view = element('div', 'wu-hr-changes');
+    view.setAttribute('role', 'group');
+    view.setAttribute('aria-label', item.words);
+    const column = element('div', 'wu-hr-column');
+    px(column, sizes.left, sizes.top, sizes.width);
+    column.style.bottom = `${sizes.foot}px`;
+    if (item.when) column.append(element('div', 'wu-hr-time', item.when));
+    column.append(element('div', 'wu-hr-moment-title', item.words));
+    const rows = element('div', 'wu-hr-rows');
+    for (const change of item.changes) {
+      const row = element('div', 'wu-hr-row');
+      row.append(element('div', 'wu-hr-time', change.when), sentence('div', 'wu-hr-row-words', change.words));
+      rows.append(row);
+    }
+    column.append(rows);
+    view.append(column);
+    return { view, rows };
+  }
+
+  function openedChanges(): Json | null {
+    return opened ? stops().find((one) => one.id === opened!.id && one.kind === 'change') ?? null : null;
+  }
+
+  /** Opens the chosen moment, or a grouped changes dot's list, on the same page. */
   function openMoment(id: string) {
     chosen = id;
-    opened = { id, line: 0 };
+    opened = { id, line: 0, first: 0 };
+    draw();
+  }
+
+  /** Moves an opened list of changes a row at a time; draw holds it where its last row ends at the foot. */
+  function moveRows(by: number) {
+    if (!opened || !openedChanges()) return;
+    opened.first = Math.max(0, opened.first + by);
     draw();
   }
 
@@ -690,8 +770,11 @@ export function mountHistory(host: HistoryHost): History {
       if (opened) {
         if (event.code === 'Escape') closeMoment();
         else if (event.code === 'KeyH') close();
-        else if (event.code === 'ArrowUp') chooseLine(-1);
-        else if (event.code === 'ArrowDown') chooseLine(1);
+        else if (event.code === 'ArrowUp' || event.code === 'ArrowDown') {
+          const by = event.code === 'ArrowUp' ? -1 : 1;
+          if (openedChanges()) moveRows(by);
+          else chooseLine(by);
+        }
         else if (event.code === 'Enter') seeDecision();
         return true;
       }
@@ -699,7 +782,7 @@ export function mountHistory(host: HistoryHost): History {
       else if (event.code === 'ArrowLeft') move(-1);
       else if (event.code === 'ArrowRight') move(1);
       else if (event.code === 'Enter') {
-        if (chosen && moments().some((one) => one.id === chosen)) openMoment(chosen);
+        if (chosen && stops().some((one) => one.id === chosen)) openMoment(chosen);
       } else if (event.code === 'KeyG' && githubUrl()) host.open(githubUrl() as string);
       else if (event.code === 'KeyG' && offersGitHub()) keepOnGitHub();
       else if (event.code === 'KeyK' && offersKeep()) void keepInProject();
