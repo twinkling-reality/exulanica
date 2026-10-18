@@ -1,9 +1,10 @@
-// A History moment's picture, as data in and data out (moment-framing.v2.json): the society read a
+// A History moment's picture, as data in and data out (moment-framing.v3.json): the society read a
 // page is served rewritten to the moment's recorded people, and the camera that frames who it is
 // about. Pure, so verify-moment-framing.mjs checks it in Node; the scene preview's moment mode
 // (front-door-preview.ts) draws by it, and moment-pictures.ts names the recipe it kept a picture by.
-// moment-framing.v1.json stays beside it: the recipe the pictures kept under its name were drawn by.
-import framing from './moment-framing.v2.json' with { type: 'json' };
+// moment-framing.v1.json and v2.json stay beside it: the recipes the pictures kept under their names were
+// drawn by (v3 frames as v2 does and waits for the near subjects to be drawn in full, `wait_ms.near`).
+import framing from './moment-framing.v3.json' with { type: 'json' };
 
 /** The framing recipe; each figure a world could want different is a field of the file. */
 export const MOMENT_FRAMING = Object.freeze(framing);
@@ -68,12 +69,15 @@ export function lensOf(recipe = MOMENT_FRAMING, fovDeg = recipe.fov_deg) {
  * x east, y up, z south; an anchor may carry `height`, as drawn, and `heading`, the way it faces:
  * radians about +Y with -Z forward, the crowd's convention). Beside the line between
  * the first two subjects, or in front of a lone one that has a heading, `side` degrees round from square on (the recipe's
- * `side_degrees` unless given). Back far enough that the tallest subject (its drawn height, else
- * `subject_height_m`) fills `tallest_share` of the frame's height through the recipe's lens, and the
- * group with `room_m` beside it fits the frame's width, held between the least and most distance. At
- * eye height raised by `raise` metres, looking at `look_at_height_m` above their feet, turned so the
- * group's centre sits on a third of the frame (`third`: 1 the left third, -1 the right, 0 the
- * middle). Facing -z is yaw 0, as the controls turn. Null without a subject.
+ * `side_degrees` unless given). Back far enough that no subject (its drawn height, else
+ * `subject_height_m`) stands taller than `tallest_share` of the frame's height through the recipe's
+ * lens, measured where each stands (one nearer the camera than the group's middle stands taller),
+ * and the group with `room_m` beside it fits the frame's width, held between the least and most
+ * distance; then further back, still within the most, until every subject's feet stand at least
+ * `foot_margin` of the frame's height above its foot. At eye height raised by `raise` metres,
+ * looking at `look_at_height_m` above their feet, turned so the group's centre sits on a third of the
+ * frame (`third`: 1 the left third, -1 the right, 0 the middle). Facing -z is yaw 0, as the controls
+ * turn. Null without a subject.
  */
 export function framingPose(anchors, recipe = MOMENT_FRAMING, { side = recipe.side_degrees, raise = 0 } = {}) {
   const drawn = (anchors ?? []).filter((one) => one && [one.x, one.y, one.z].every(finite));
@@ -82,12 +86,6 @@ export function framingPose(anchors, recipe = MOMENT_FRAMING, { side = recipe.si
   const spread = Math.max(0, ...drawn.map((one) => Math.hypot(one.x - centre.x, one.z - centre.z))) * 2;
   const lens = lensOf(recipe);
   const d = recipe.distance_m;
-  // The tallest as drawn where the anchors say (`height`, metres), else the recipe's figure.
-  const heights = drawn.map((one) => one.height).filter((height) => finite(height) && height > 0);
-  const tallest = heights.length > 0 ? Math.max(...heights) : recipe.subject_height_m;
-  const byHeight = tallest / (recipe.tallest_share * 2 * Math.tan(lens.vertical));
-  const byWidth = (spread + 2 * d.room_m) / (2 * Math.tan(lens.horizontal));
-  const distance = Math.min(d.most, Math.max(d.least, byHeight, byWidth));
   // Square on to the line between the first two subjects; one subject alone is seen from in front, the
   // way it faces, or from the south where it has no heading.
   let across = { x: 0, z: 1 };
@@ -99,13 +97,50 @@ export function framingPose(anchors, recipe = MOMENT_FRAMING, { side = recipe.si
   }
   const turn = (side * Math.PI) / 180;
   const view = { x: across.x * Math.cos(turn) - across.z * Math.sin(turn), z: across.x * Math.sin(turn) + across.z * Math.cos(turn) };
-  const camera = { x: centre.x + view.x * distance, y: centre.y + recipe.eye_height_m + raise, z: centre.z + view.z * distance };
-  const target = { x: centre.x, y: centre.y + recipe.look_at_height_m, z: centre.z };
-  // Turning right (a smaller yaw) by a third of the half width puts the group on the left third.
+  // Each subject as drawn where the anchors say (`height`, metres), else the recipe's figure, at its own
+  // distance: one standing `along` metres nearer the camera than the middle is that much nearer.
+  const heightOf = (one) => (finite(one.height) && one.height > 0 ? one.height : recipe.subject_height_m);
+  const byHeight = Math.max(...drawn.map((one) => heightOf(one) / (recipe.tallest_share * 2 * Math.tan(lens.vertical))
+    + (one.x - centre.x) * view.x + (one.z - centre.z) * view.z));
+  const byWidth = (spread + 2 * d.room_m) / (2 * Math.tan(lens.horizontal));
   const thirdTurn = Math.atan(Math.tan(lens.horizontal) / 3) * Math.sign(recipe.third ?? 0);
-  const yaw = Math.atan2(-(target.x - camera.x), -(target.z - camera.z)) - thirdTurn;
-  const pitch = Math.atan2(target.y - camera.y, Math.hypot(target.x - camera.x, target.z - camera.z));
-  return { x: camera.x, y: camera.y, z: camera.z, yaw, pitch };
+  const poseAt = (distance) => {
+    const camera = { x: centre.x + view.x * distance, y: centre.y + recipe.eye_height_m + raise, z: centre.z + view.z * distance };
+    const target = { x: centre.x, y: centre.y + recipe.look_at_height_m, z: centre.z };
+    // Turning right (a smaller yaw) by a third of the half width puts the group on the left third.
+    const yaw = Math.atan2(-(target.x - camera.x), -(target.z - camera.z)) - thirdTurn;
+    const pitch = Math.atan2(target.y - camera.y, Math.hypot(target.x - camera.x, target.z - camera.z));
+    return { x: camera.x, y: camera.y, z: camera.z, yaw, pitch };
+  };
+  // How high in the frame a point stands: 1 at its top, -1 at its foot (null behind the camera).
+  const heightInFrame = (pose, point) => {
+    const cy = Math.cos(pose.yaw), sy = Math.sin(pose.yaw), cp = Math.cos(pose.pitch), sp = Math.sin(pose.pitch);
+    const v = [point.x - pose.x, point.y - pose.y, point.z - pose.z];
+    const depth = -sy * cp * v[0] + sp * v[1] - cy * cp * v[2];
+    return depth > 0 ? (sy * sp * v[0] + cp * v[1] + cy * sp * v[2]) / (depth * Math.tan(lens.vertical)) : null;
+  };
+  const lowest = -1 + 2 * (recipe.foot_margin ?? 0);
+  let distance = Math.min(d.most, Math.max(d.least, byHeight, byWidth));
+  let pose = poseAt(distance);
+  while (distance < d.most && drawn.some((one) => (heightInFrame(pose, one) ?? -Infinity) < lowest)) {
+    distance = Math.min(d.most, distance + 0.05);
+    pose = poseAt(distance);
+  }
+  return pose;
+}
+
+/**
+ * The same framing again from where the subjects stand now: `chosen` is a pose framingInSight answered
+ * (its `frame` says how many subjects it framed, from which side, height and third), `anchors` the
+ * subjects as drawn now, in the same order. A pose with no `frame` is answered as it is.
+ */
+export function reframe(chosen, anchors, recipe = MOMENT_FRAMING) {
+  const frame = chosen?.frame;
+  if (!frame) return chosen;
+  const now = (anchors ?? []).slice(0, frame.subjects).filter((one) => one && [one.x, one.y, one.z].every(finite));
+  if (now.length !== frame.subjects) return chosen;
+  const again = framingPose(now, frame.third === recipe.third ? recipe : { ...recipe, third: frame.third }, { side: frame.side, raise: frame.raise });
+  return again ?? chosen;
 }
 
 /**
@@ -181,15 +216,50 @@ export function faceAngle(anchor, pose) {
  * than the framed subjects covers (foregroundShare), at most the recipe's `foreground.share`; of those,
  * the one whose worst shown face is turned least (the first of equals). Where no side shows a face of
  * the pair, the first is framed alone. `seen` is the scene's answer: whether nothing stands between the
- * camera and the point. Null only without a subject: the page keeps its quiet tile.
+ * camera and the point. `bystanders`, the moment's other people as drawn: of the sides that show the most faces,
+ * those from which the fewest stand nearer and larger than the band allows (standsInBand), and by the least,
+ * before the sight tests. Null only without a subject: the page keeps its quiet tile.
  * @param {(pose: { x: number, y: number, z: number, yaw: number, pitch: number }, subjects: readonly object[]) => number} [covered]
  */
-export function framingInSight(anchors, seen, recipe = MOMENT_FRAMING, covered = (_pose, _subjects) => 0) {
+export function framingInSight(anchors, seen, recipe = MOMENT_FRAMING, covered = (_pose, _subjects) => 0, bystanders = []) {
   const drawn = (anchors ?? []).filter((one) => one && [one.x, one.y, one.z].every(finite));
   if (drawn.length === 0) return null;
+  const near = (bystanders ?? []).filter((one) => one && [one.x, one.y, one.z].every(finite));
   const apart = drawn.length > 1 && Math.hypot(drawn[1].x - drawn[0].x, drawn[1].z - drawn[0].z) > (recipe.pair_most_m ?? Infinity);
-  const framed = apart ? null : bestSide(drawn, seen, recipe, covered, []);
-  return framed ?? bestSide(drawn.slice(0, 1), seen, recipe, covered, drawn.slice(1));
+  const framed = apart ? null : bestSide(drawn, seen, recipe, covered, [], near);
+  return framed ?? bestSide(drawn.slice(0, 1), seen, recipe, covered, drawn.slice(1), near);
+}
+
+/**
+ * Whether `one` (an anchor with its drawn `height`, else `subject_height_m`) stands within the frame's size
+ * band from `pose`: out of the frame, or no taller than `tallest_share` of its height with its feet at
+ * least `foot_margin` of it above its foot. A person in a moment's scene who is not framed (a bystander)
+ * is held to it, so nobody stands nearer and larger than the people the picture is about.
+ */
+export function standsInBand(pose, one, recipe = MOMENT_FRAMING) {
+  const lens = lensOf(recipe);
+  const tall = finite(one.height) && one.height > 0 ? one.height : recipe.subject_height_m;
+  if (!framedInside(pose, one, tall, lens)) return true;
+  const away = Math.hypot(one.x - pose.x, one.z - pose.z);
+  if (tall / (2 * away * Math.tan(lens.vertical)) > recipe.tallest_share + 1e-9) return false;
+  const cy = Math.cos(pose.yaw), sy = Math.sin(pose.yaw), cp = Math.cos(pose.pitch), sp = Math.sin(pose.pitch);
+  const v = [one.x - pose.x, one.y - pose.y, one.z - pose.z];
+  const depth = -sy * cp * v[0] + sp * v[1] - cy * cp * v[2];
+  const feet = depth > 0 ? (sy * sp * v[0] + cp * v[1] + cy * sp * v[2]) / (depth * Math.tan(lens.vertical)) : -Infinity;
+  return feet >= -1 + 2 * (recipe.foot_margin ?? 0) - 1e-9;
+}
+
+/** Whether any of a person's feet and head lie inside the frame. */
+function framedInside(pose, one, tall, lens) {
+  const cy = Math.cos(pose.yaw), sy = Math.sin(pose.yaw), cp = Math.cos(pose.pitch), sp = Math.sin(pose.pitch);
+  return [one.y, one.y + tall].some((y) => {
+    const v = [one.x - pose.x, y - pose.y, one.z - pose.z];
+    const depth = -sy * cp * v[0] + sp * v[1] - cy * cp * v[2];
+    if (depth <= 0) return false;
+    const across = (cy * v[0] - sy * v[2]) / (depth * Math.tan(lens.horizontal));
+    const high = (sy * sp * v[0] + cp * v[1] + cy * sp * v[2]) / (depth * Math.tan(lens.vertical));
+    return Math.abs(across) <= 1 && Math.abs(high) <= 1;
+  });
 }
 
 /**
@@ -217,16 +287,32 @@ export function framedWhole(pose, other, recipe = MOMENT_FRAMING) {
 
 /**
  * The side framingInSight chooses for these subjects, or null where no side shows any of their faces.
- * With `others` (the subjects not framed), on the recipe's third or the other one, and only where every
- * other is wholly in or out of the frame (framedWhole); where none is, as though there were no others.
+ * With `others` (the subjects not framed) or `bystanders`, on the recipe's third or the other one, and only
+ * where every other is wholly in or out of the frame (framedWhole), where none is as though there were no
+ * others; among the sides that show the most faces, those where the fewest bystanders stand out of the size
+ * band (standsInBand), and by the least, come first.
  */
-function bestSide(drawn, seen, recipe, covered, others) {
-  const thirds = others.length > 0 ? [...new Set([recipe.third ?? 0, -(recipe.third ?? 0)])] : [recipe.third ?? 0];
-  return chooseSide(drawn, seen, recipe, covered, thirds, (pose) => others.every((other) => framedWhole(pose, other, recipe)))
-    ?? (others.length > 0 ? chooseSide(drawn, seen, recipe, covered, [recipe.third ?? 0], () => true) : null);
+function bestSide(drawn, seen, recipe, covered, others, bystanders = []) {
+  const thirds = others.length > 0 || bystanders.length > 0 ? [...new Set([recipe.third ?? 0, -(recipe.third ?? 0)])] : [recipe.third ?? 0];
+  const whole = (pose) => others.every((other) => framedWhole(pose, other, recipe));
+  // The bystanders out of the band from a pose: how many, and by how much of the frame's height together.
+  const outOfBand = (pose) => {
+    const out = bystanders.filter((one) => !standsInBand(pose, one, recipe));
+    const tallness = (one) => (finite(one.height) && one.height > 0 ? one.height : recipe.subject_height_m)
+      / (2 * Math.max(1e-6, Math.hypot(one.x - pose.x, one.z - pose.z)) * Math.tan(lensOf(recipe).vertical));
+    return { count: out.length, excess: out.reduce((sum, one) => sum + Math.max(0, tallness(one) - recipe.tallest_share), 0) };
+  };
+  return chooseSide(drawn, seen, recipe, covered, thirds, whole, outOfBand)
+    ?? (others.length > 0 ? chooseSide(drawn, seen, recipe, covered, [recipe.third ?? 0], () => true, outOfBand) : null);
 }
 
-function chooseSide(drawn, seen, recipe, covered, thirds, allowed) {
+/** Whether `a` comes before `b`, compared value by value (the first that differs decides; equals keep the first). */
+const comesBefore = (a, b) => {
+  const at = a.findIndex((value, index) => value !== b[index]);
+  return at !== -1 && a[at] < b[at];
+};
+
+function chooseSide(drawn, seen, recipe, covered, thirds, allowed, outOfBand = () => ({ count: 0, excess: 0 })) {
   const subjects = drawn.flatMap((one) => recipe.sight.points_m.map((height) => ({ x: one.x, y: one.y + height, z: one.z })));
   const centre = drawn.reduce((sum, one) => ({ x: sum.x + one.x / drawn.length, y: sum.y + one.y / drawn.length, z: sum.z + one.z / drawn.length }), { x: 0, y: 0, z: 0 });
   // The ground in front of them, toward this camera, a little above it so the ground itself is no wall.
@@ -250,12 +336,17 @@ function chooseSide(drawn, seen, recipe, covered, thirds, allowed) {
         // Something near the camera over more than the recipe's share of the frame counts as one more unseen point.
         const clear = covered(pose, drawn) <= recipe.sight.foreground.share;
         const passed = points.filter((point) => seen(pose, point)).length + (clear ? 1 : 0);
-        const better = best === null || shown > best.shown || (shown === best.shown && (passed > best.passed || (passed === best.passed && worst < best.worst)));
-        if (better) best = { pose, shown, passed, worst };
+        const band = outOfBand(pose);
+        // The most faces shown; then the fewest bystanders out of the band, and by the least; then sight; then faces turned least.
+        const order = [-shown, band.count, band.excess, -passed, worst];
+        if (best === null || comesBefore(order, best.order)) best = { pose, order, side, raise, third };
       }
     }
   }
-  return best?.pose ?? null;
+  if (best === null) return null;
+  // How it was framed, for reframe: not enumerable, so the pose compares and serialises as the camera alone.
+  Object.defineProperty(best.pose, 'frame', { value: Object.freeze({ subjects: drawn.length, side: best.side, raise: best.raise, third: best.third }) });
+  return best.pose;
 }
 
 /**

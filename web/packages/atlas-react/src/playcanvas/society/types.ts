@@ -322,6 +322,12 @@ export interface CrowdRenderable {
    */
   readonly drawsSeats?: boolean;
   /**
+   * Optional: whether the person is drawn in full yet. A catalog person is drawn by its far form while
+   * its look's containers load ('pending'), then in full ('ready'), or never ('unavailable'). One that
+   * omits it is drawn in full once it is made.
+   */
+  readonly status?: 'pending' | 'ready' | 'unavailable';
+  /**
    * Optional: bytes this renderable owns outright, for a renderable that holds its own geometry and
    * textures. A renderable drawn from shared containers omits both, because its bytes belong to the
    * shared host and counting them here would count one container once per person. The crowd's total

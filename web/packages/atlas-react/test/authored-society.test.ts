@@ -175,6 +175,37 @@ describe('a saved world draws its inhabitants over its authored region', () => {
     expect(crowd.drawnAsPerson('teo')).toBeNull();
   });
 
+  it('says who is drawn near and in full yet: a catalog person only once its look has loaded', async () => {
+    const atlas = await binding('saved');
+    const crowd = atlas.authoredSociety!;
+    const state: OwnedSocietyState = {
+      profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'branch', tick: 1,
+      inhabitants: [
+        { id: 'teo', synthetic: true, position_mm: [1000, 0], motion_path_mm: [[1000, 0]], kind: { kind: 'villager', version: 1, sha256: 'v'.repeat(64) } },
+        { id: 'strider', synthetic: true, position_mm: [2000, 0], motion_path_mm: [[2000, 0]], kind: { source: 'workspace', sha256: 'f'.repeat(64) } },
+      ],
+    };
+    // The strider is drawn by a figure of its own that states no status: drawn in full once made.
+    crowd.setFigures({
+      figureFor: (person) => (person.id !== 'strider' ? null : {
+        key: person.id,
+        factory: (_device, parent, identity) => {
+          const root = new pc.Entity(`thing:${identity.inhabitantId}`);
+          parent.addChild(root);
+          return {
+            root, subject: { kind: 'synthetic-inhabitant', ...identity }, standingHeight: 1.8, facing: 0,
+            pose: (pose) => root.setLocalPosition(...pose.position), setVisible: (visible) => { root.enabled = visible; }, destroy: () => root.destroy(),
+          };
+        },
+      }),
+    });
+    crowd.setSociety(state, [0, 0]);
+    atlas.update(1 / 60, 1000);
+    expect(['teo', 'strider'].map((id) => crowd.inhabitantDetail(id))).toEqual(['near', 'near']);
+    // This test registers no loader, so Teo's look never loads: drawn by the far form, not in full.
+    expect(['teo', 'strider', 'nobody'].map((id) => crowd.inhabitantDrawnInFull(id))).toEqual([false, true, false]);
+  });
+
   it('is released with the binding', async () => {
     const atlas = await binding('saved');
     const crowd = atlas.authoredSociety!;

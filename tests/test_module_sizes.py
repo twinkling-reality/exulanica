@@ -76,8 +76,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the contract a model answers under when it runs a person",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
-        1_512,
-        "a society's people as drawn near and far: where each stands, faces and sits",
+        1_518,
+        "a society's people as drawn near and far: where each stands, faces and sits, and whether "
+        "one is drawn in full yet",
     ),
     "exulanica/selection/kind_brief.py": (1_529, "a kind of world as a model drafts it"),
     "tools/previews/world-workspace/contextual-world.ts": (

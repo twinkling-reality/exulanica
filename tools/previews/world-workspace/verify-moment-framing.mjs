@@ -1,9 +1,11 @@
 // Checks moment-framing.mjs in Node: the society read rewritten to a moment's people, and the camera
 // that frames them, from the recipe file. Run: node verify-moment-framing.mjs
 import assert from 'node:assert/strict';
-import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framedWhole, framingInSight, framingPose, lensOf, momentSociety, overviewDistance } from './moment-framing.mjs';
+import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framedWhole, framingInSight, framingPose, lensOf, momentSociety, overviewDistance, reframe, standsInBand } from './moment-framing.mjs';
 
-assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v2');
+assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v3');
+// A near subject is waited for until drawn in full (its far form has no face), within the draw's bound.
+assert.ok(Number.isInteger(MOMENT_FRAMING.wait_ms.near) && MOMENT_FRAMING.wait_ms.near > 0);
 // The widest pair framed together is the widest the lens takes whole, with room each side, at the most distance.
 assert.ok((MOMENT_FRAMING.pair_most_m + 2 * MOMENT_FRAMING.distance_m.room_m) / (2 * Math.tan(lensOf().horizontal)) <= MOMENT_FRAMING.distance_m.most);
 // R23: a moment's picture at the card's 2x (600 x 340); a portrait at 3x of its 52 px orb, on the tile's ground.
@@ -175,6 +177,61 @@ const wide = { ...straddling, outline: [...straddling.outline, ...[-16, -14, -12
 const turnedAway = framingInSight([speaker[0], wide], () => true);
 assert.ok(framedWhole(turnedAway, wide) && faceAngle(speaker[0], turnedAway) <= R.sight.face_limit_deg, 'turned, whole');
 assert.ok(Math.abs(turnedAway.yaw - leftThird.yaw) > 1e-6);
+// Size where each stands (R23, 55 to 65 percent): a subject nearer the camera than the group's middle
+// stands no taller than tallest_share, and every subject's feet stand at least foot_margin above the foot.
+const shareAt = (pose, one) => {
+  const away = Math.hypot(one.x - pose.x, one.z - pose.z);
+  return (one.height ?? R.subject_height_m) / (2 * away * Math.tan(lensOf(R).vertical));
+};
+const footAt = (pose, one) => {
+  const cy = Math.cos(pose.yaw), sy = Math.sin(pose.yaw), cp = Math.cos(pose.pitch), sp = Math.sin(pose.pitch);
+  const v = [one.x - pose.x, one.y - pose.y, one.z - pose.z];
+  const depth = -sy * cp * v[0] + sp * v[1] - cy * cp * v[2];
+  return (sy * sp * v[0] + cp * v[1] + cy * sp * v[2]) / (depth * Math.tan(lensOf(R).vertical));
+};
+// Talking side by side, 0.9 m apart (Lena and Ari), seen 50 degrees round from square on: one stands nearer.
+const staggered = [{ x: 0, y: 0, z: 0, height: 1.7 }, { x: 0.4, y: 0, z: 0.8, height: 1.7 }];
+const sized = framingPose(staggered, { ...R, third: 0 }, { side: 50 });
+const nearest = staggered.reduce((a, b) => (Math.hypot(a.x - sized.x, a.z - sized.z) < Math.hypot(b.x - sized.x, b.z - sized.z) ? a : b));
+assert.ok(shareAt(sized, nearest) <= R.tallest_share + 1e-9 && shareAt(sized, nearest) >= 0.55, `the nearest fills ${shareAt(sized, nearest)}`);
+for (const one of staggered) assert.ok(footAt(sized, one) >= -1 + 2 * R.foot_margin - 1e-9, `feet at ${footAt(sized, one)}`);
+// A raised eye looks down more steeply: the camera stands back until the feet clear the frame's foot.
+const raisedLow = { ...R, third: 0, look_at_height_m: 1.6 };
+const lifted = framingPose([{ x: 0, y: 0, z: 0 }], raisedLow, { side: 0, raise: 1.5 });
+assert.ok(footAt(lifted, { x: 0, y: 0, z: 0 }) >= -1 + 2 * R.foot_margin - 1e-9);
+// A wide margin moves the camera back until the feet clear it, within the most distance.
+const wideMargin = { ...R, third: 0, foot_margin: 0.2 };
+const narrow0 = framingPose([{ x: 0, y: 0, z: 0 }], { ...wideMargin, foot_margin: 0 }, { side: 0 });
+const cleared = framingPose([{ x: 0, y: 0, z: 0 }], wideMargin, { side: 0 });
+assert.ok(footAt(narrow0, { x: 0, y: 0, z: 0 }) < -1 + 2 * wideMargin.foot_margin, 'the case needs the margin');
+assert.ok(footAt(cleared, { x: 0, y: 0, z: 0 }) >= -1 + 2 * wideMargin.foot_margin - 1e-9 && cleared.z > narrow0.z, 'further back, feet clear');
+// Sized where each stands even with no feet margin to push the camera back.
+const unmargined = framingPose(staggered, { ...R, third: 0, foot_margin: 0 }, { side: 50 });
+assert.ok(Math.max(...staggered.map((one) => shareAt(unmargined, one))) <= R.tallest_share + 1e-9);
+// The chosen pose says how it framed, and the same framing is made again from where they stand later.
+const chosen = framingInSight(staggered, () => true);
+assert.deepEqual(chosen.frame, { subjects: 2, side: R.sight.sides_degrees[0], raise: 0, third: R.third });
+assert.equal(JSON.stringify(chosen).includes('frame'), false, 'the pose serialises as the camera alone');
+const moved = [{ ...staggered[0], x: 0.2 }, { ...staggered[1], height: 1.9 }];
+assert.deepEqual(reframe(chosen, moved), framingPose(moved, R, { side: R.sight.sides_degrees[0] }));
+assert.deepEqual(reframe(framingInSight(shore, () => true), [shore[0], shore[1]]), framingPose([shore[0]], R, { side: R.sight.sides_degrees[0] }));
+assert.equal(reframe({ x: 1, y: 2, z: 3, yaw: 0, pitch: 0 }, staggered).x, 1, 'no frame, as it was');
+// A bystander nearer the camera and larger than the band is avoided: the speaker alone, the person beside
+// them a step toward the camera and to one side (Ari, with Lena nearer the camera).
+const loneFront = framingPose([speaker[0]], R, { side: R.sight.sides_degrees[0] });
+const between = { x: 1.0, y: 0, z: 1.2, height: 1.7 };
+assert.equal(standsInBand(loneFront, between), false, 'nearer and larger');
+assert.equal(standsInBand(loneFront, { x: 0, y: 0, z: 60, height: 1.7 }), true, 'out of the frame');
+const aside = framingInSight([speaker[0], { x: 40, y: 0, z: 0 }], () => true, R, undefined, [between]);
+assert.ok(standsInBand(aside, between) && faceAngle(speaker[0], aside) <= R.sight.face_limit_deg, 'another side, the bystander in band');
+// Straight before the speaker, no side within the face limit keeps them in band: the side where they stand
+// least out of it, the speaker's face still shown, and never null.
+const blocking = { x: 0, y: 0, z: 1.3, height: 1.7 };
+const tallness = (pose, one) => one.height / (2 * Math.hypot(one.x - pose.x, one.z - pose.z) * Math.tan(lensOf(R).vertical));
+const plain = framingInSight([speaker[0], { x: 40, y: 0, z: 0 }], () => true);
+const least = framingInSight([speaker[0], { x: 40, y: 0, z: 0 }], () => true, R, undefined, [blocking]);
+assert.ok(least !== null && faceAngle(speaker[0], least) <= R.sight.face_limit_deg);
+assert.ok(tallness(least, blocking) < tallness(plain, blocking), `the bystander ${tallness(least, blocking)} against ${tallness(plain, blocking)}`);
 // Just inside pair_most_m the two are framed together, as before.
 const close = [{ x: 0, y: 0, z: 0 }, { x: R.pair_most_m - 0.01, y: 0, z: 0 }];
 assert.deepEqual(framingInSight(close, () => true), framingPose(close, R, { side: 0 }));

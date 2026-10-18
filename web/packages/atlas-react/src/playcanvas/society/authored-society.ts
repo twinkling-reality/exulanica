@@ -401,6 +401,11 @@ export class AuthoredRegionSociety {
     return this.crowd.representation(id);
   }
 
+  /** Whether an inhabitant is drawn near and in full now (`SocietyCrowd.drawnInFull`). */
+  inhabitantDrawnInFull(id: string): boolean {
+    return this.crowd.drawnInFull(id);
+  }
+
   inhabitantDetail(id: string): 'near' | 'far' | 'indoors' | 'not-drawn' {
     return this.crowd.detailOf(id);
   }

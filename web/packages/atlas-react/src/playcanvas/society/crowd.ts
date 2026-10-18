@@ -1050,6 +1050,12 @@ export class SocietyCrowd {
     return this.near.get(id)?.representation ?? null;
   }
 
+  /** Whether an inhabitant is drawn near and in full now (`CrowdRenderable.status` ready, or none stated). */
+  drawnInFull(id: string): boolean {
+    const renderable = this.near.get(id);
+    return renderable !== undefined && (renderable.status ?? 'ready') === 'ready';
+  }
+
   /**
    * Geometry the drawn crowd is responsible for: the far figures, whatever each full character owns
    * outright, and what the shared character host holds for everyone composed from the catalog.

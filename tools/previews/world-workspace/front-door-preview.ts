@@ -1,6 +1,6 @@
 import { isScenePreview, scenePreviewAddress } from './front-door-routes.mjs';
 import { StaticMeshPicker } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
-import { MOMENT_FRAMING, MOMENT_PICTURE_MESSAGE, MOMENT_SCENE_KEY, foregroundShare, framingInSight, momentSociety, overviewDistance } from './moment-framing.mjs';
+import { MOMENT_FRAMING, MOMENT_PICTURE_MESSAGE, MOMENT_SCENE_KEY, foregroundShare, framingInSight, momentSociety, overviewDistance, reframe } from './moment-framing.mjs';
 import { frameJpeg, takeFrame } from '/src/composition/world-pictures.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
 
@@ -162,12 +162,34 @@ async function drawMoment(renderer: any, key: string): Promise<void> {
   const feet = drawn.map((one, at) => (one === null ? null : {
     ...one, height: society.heightOf?.(subjects[at]!) ?? NaN, heading: society.headingOf?.(subjects[at]!) ?? NaN, outline: outlineOf(subjects[at]!),
   })).filter((one): one is { x: number; y: number; z: number; height: number; heading: number; outline: { x: number; y: number; z: number }[] } => one !== null);
+  // The moment's other people as drawn, so none stands nearer and larger than the band allows.
+  const bystanders = people.slice(2).map(({ id }) => {
+    const at = { x: 0, y: 0, z: 0, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; } };
+    return society.groundOf(id, at) ? { x: at.x, y: at.y, z: at.z, height: society.heightOf?.(id) ?? NaN } : null;
+  }).filter((one) => one !== null);
   const hit = sceneHit(binding.app);
   const sighted = framingInSight(feet, sceneSight(hit, MOMENT_FRAMING.sight.own_m), MOMENT_FRAMING,
-    (pose: { x: number; y: number; z: number; yaw: number; pitch: number }, framed: readonly object[]) => foregroundShare(pose, framed, hit));
+    (pose: { x: number; y: number; z: number; yaw: number; pitch: number }, framed: readonly object[]) => foregroundShare(pose, framed, hit), bystanders);
   if (sighted === null) return answer(null);
   useLens(binding, MOMENT_FRAMING.fov_deg);
   binding.controls.setView({ ...sighted, x: sighted.x + offset.x, y: sighted.y + offset.y, z: sighted.z + offset.z }, 'altitude');
+  // A person's far form, drawn while their look loads, has no face: each subject the crowd now draws near
+  // is waited for until it is drawn in full, at most the recipe's `wait_ms.near`.
+  for (let waited = 0; waited < wait.near; waited += wait.retry) {
+    binding.invalidate();
+    await sleep(wait.retry);
+    if (subjects.every((id) => society.inhabitantDetail?.(id) !== 'near' || society.inhabitantDrawnInFull?.(id) !== false)) break;
+  }
+  // The same framing again from where they stand and how tall they are drawn now (reframe).
+  const now = anchors().map((one, at) => (one === null ? null : {
+    ...one, height: society.heightOf?.(subjects[at]!) ?? NaN, heading: society.headingOf?.(subjects[at]!) ?? NaN,
+  }));
+  const framed = reframe(sighted, now, MOMENT_FRAMING);
+  if (framed !== sighted) {
+    binding.controls.setView({ ...framed, x: framed.x + offset.x, y: framed.y + offset.y, z: framed.z + offset.z }, 'altitude');
+    binding.invalidate();
+    await sleep(wait.retry);
+  }
   const [width, height] = MOMENT_FRAMING.size_px;
   for (let waited = 0; waited < wait.frame; waited += wait.retry) {
     binding.invalidate();

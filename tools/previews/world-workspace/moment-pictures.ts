@@ -1,4 +1,4 @@
-// A History moment's picture (moment-framing.v2.json): drawn once, by the first page that shows the
+// A History moment's picture (moment-framing.v3.json): drawn once, by the first page that shows the
 // moment without one, and kept by the server under the moment and the framing recipe, so every
 // later view on any computer reads the same picture. The moment is drawn in its own hidden scene
 // preview of the saved world, never in the world this page shows: a moment may belong to another
@@ -23,7 +23,7 @@ export interface MomentForPicture {
 }
 
 /** How long a moment's draw may take in all: the frame's load, its people and its frame. */
-const DRAW_BOUND_MS = 30_000 + MOMENT_FRAMING.wait_ms.people + MOMENT_FRAMING.wait_ms.frame;
+const DRAW_BOUND_MS = 30_000 + MOMENT_FRAMING.wait_ms.people + MOMENT_FRAMING.wait_ms.near + MOMENT_FRAMING.wait_ms.frame;
 
 /**
  * A picture drawn in a hidden preview of `entry`: what `held` asks the preview for (a moment's scene,
