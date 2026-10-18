@@ -108,6 +108,9 @@ describe('the cards to start from', () => {
     expect(document.activeElement).toBe(strip.cards[2]);
     expect(strip.cards[2]!.dataset.picture).toBe('blank');
     expect(strip.cards[0]!.dataset.picture).toBe('none');
+    // A quiet card's tile is the material alone: its name is said once, by the line under it (N30).
+    expect(strip.cards[0]!.querySelector('.wu-film-picture')!.textContent).toBe('');
+    expect(strip.cards[0]!.textContent).toBe('Small townNo AI model · Free');
     expect(strip.root.querySelector('[role="group"]')!.getAttribute('aria-labelledby')).toBe(strip.root.querySelector('.wu-light-label')!.id);
   });
 

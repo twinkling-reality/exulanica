@@ -169,9 +169,8 @@ export function filmCard(card: FilmCardWords, onStart: (key: string) => void): H
   button.dataset.picture = card.blank ? 'blank' : card.picture ? 'served' : 'none';
   const picture = element('span', 'wu-film-picture');
   picture.setAttribute('aria-hidden', 'true');
+  // A card with no picture is the quiet card: the surface's material alone, its name the line under it (N30).
   if (!card.blank && card.picture) picture.style.backgroundImage = `url(${JSON.stringify(card.picture)})`;
-  // A card with no picture is the quiet card: its name on the surface's material (N23).
-  else if (!card.blank) picture.textContent = card.name;
   const name = element('span', 'wu-film-name', card.name);
   name.id = nextId('wu-film-name');
   const sub = element('span', 'wu-film-sub', card.sub);

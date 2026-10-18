@@ -119,10 +119,9 @@
 .wu-film-strip:focus-within .wu-film-card[aria-current="true"] .wu-film-picture::after { background: var(--nav-edge); }
 /* Blank's own picture; a card with no served picture is a quiet tile (B5). */
 .wu-film-card[data-picture="blank"] .wu-film-picture { background: linear-gradient(180deg, #eef3f4 0%, #f6f7f3 54%, #e3e2d8 55%, #d9d8cd 100%); }
-/* N23: the quiet card takes the stepped surface's own material, its name centred on it. */
-.wu-film-card[data-picture="none"] .wu-film-picture { display: flex; align-items: center; justify-content: center; padding: 0 calc(14 * var(--u)); text-align: center;
-  background: radial-gradient(ellipse at 12% 75%, rgb(125 166 179 / 38%), transparent 80%), linear-gradient(105deg, rgb(168 203 210 / 64%), rgb(232 240 237 / 14%) 94%);
-  font: 400 max(12px, calc(15 * var(--u)))/1.3 var(--font-sans); color: var(--l-muted); }
+/* N30: the quiet card takes the stepped surface's own material, with no words on it. */
+.wu-film-card[data-picture="none"] .wu-film-picture {
+  background: radial-gradient(ellipse at 12% 75%, rgb(125 166 179 / 38%), transparent 80%), linear-gradient(105deg, rgb(168 203 210 / 64%), rgb(232 240 237 / 14%) 94%); }
 .wu-film-name { display: block; margin-top: calc(9 * var(--u)); font: 400 max(12px, calc(13.5 * var(--u)))/1.35 var(--font-sans); color: var(--l-ink); }
 .wu-film-strip:focus-within .wu-film-card[aria-current="true"] .wu-film-name::before { content: ''; display: inline-block; width: 3px; height: calc(9 * var(--u)); margin-right: calc(7 * var(--u)); background: var(--l-focus); }
 .wu-film-sub { display: block; margin-top: 2px; font: 400 max(12px, calc(12.5 * var(--u)))/1.35 var(--font-sans); color: var(--l-faint); }
