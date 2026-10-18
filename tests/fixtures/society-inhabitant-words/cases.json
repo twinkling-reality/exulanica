@@ -733,7 +733,7 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "waiting for the next choice",
+        "doing": "deciding what to do next",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -763,7 +763,7 @@
       "expected": {
         "who": "Resident 1",
         "what": "Office worker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "waiting for the next choice",
+        "doing": "deciding what to do next",
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
@@ -824,8 +824,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished eating at home",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished eating at home."
       },
       "profile": "exulanica-society/v5"
     },
@@ -885,8 +885,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished eating out",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished eating out."
       },
       "profile": "exulanica-society/v5"
     },
@@ -946,8 +946,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished resting",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished resting."
       },
       "profile": "exulanica-society/v5"
     },
@@ -977,8 +977,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "between things",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished what they were doing."
       },
       "profile": "exulanica-society/v5"
     },
@@ -1038,8 +1038,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished shopping",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished shopping."
       },
       "profile": "exulanica-society/v5"
     },
@@ -1099,8 +1099,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just got up at home",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They got up at home."
       },
       "profile": "exulanica-society/v5"
     },
@@ -1160,8 +1160,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished spending time at home",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished spending time at home."
       },
       "profile": "exulanica-society/v5"
     },
@@ -1221,8 +1221,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished a walk",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished a walk."
       },
       "profile": "exulanica-society/v5"
     },
@@ -1282,8 +1282,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished a visit",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished a visit."
       },
       "profile": "exulanica-society/v5"
     },
@@ -1343,8 +1343,8 @@
       "expected": {
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
-        "doing": "just finished work",
-        "why": "Their routine chose this to meet a need."
+        "doing": "deciding what to do next",
+        "why": "They finished work."
       },
       "profile": "exulanica-society/v5"
     },

@@ -1,7 +1,7 @@
 """Who a simulated person is and what they are doing, in the words the inspector uses.
 
 The words are one data file,
-``assets/catalogs/society-words/society-inhabitant-words.v6.json``, which the browser's inspector
+``assets/catalogs/society-words/society-inhabitant-words.v7.json``, which the browser's inspector
 reads too (``web/packages/app/src/society-inhabitant-words.ts``). The choice of sentence for a
 state is code on both sides, and both are held to one set of cases,
 ``tests/fixtures/society-inhabitant-words/cases.json``, which ``tests/test_inhabitant_words.py`` and
@@ -45,7 +45,7 @@ CATALOG_PATH: Final = (
     / "assets"
     / "catalogs"
     / "society-words"
-    / "society-inhabitant-words.v6.json"
+    / "society-inhabitant-words.v7.json"
 )
 
 ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
@@ -248,6 +248,7 @@ def _living_inhabitant_words(
     kind = action.get("kind", "idle")
     goal = person.get("goal")
     goal_activity = goal.get("activity") if isinstance(goal, Mapping) else None
+    ended = None
     if kind == "move":
         heading = f"living_heading_{goal_activity}"
         if heading not in catalog.tables["doing"]:
@@ -255,14 +256,18 @@ def _living_inhabitant_words(
         doing = ground("doing", heading)
     else:
         doings = catalog.tables["doing"]
-        # An activity that has just ended is said as ended ("just finished resting"), by its kind's
-        # finished words, or the unknown kind's for a kind with no words of its own.
-        finished = (
-            doings.get(f"living_finished_{kind}")
-            or (None if f"living_{kind}" in doings else doings.get("living_finished_unknown"))
-            if action.get("status") == "completed"
-            else None
-        )
+        # An activity that has just ended is said by what they do now, and what they finished as the
+        # why (J36): by its kind's finished words, or the unknown kind's for a kind with no words of
+        # its own.
+        if action.get("status") == "completed":
+            ended = (
+                kind
+                if f"living_finished_{kind}" in doings
+                else None
+                if f"living_{kind}" in doings
+                else "unknown"
+            )
+        finished = None if ended is None else doings.get(f"living_finished_{ended}")
         doing = (
             finished
             or doings.get(kind and f"living_{kind}")
@@ -284,7 +289,7 @@ def _living_inhabitant_words(
         who=phrase["living_who"].format(number=ordinal + 1),
         what=ground("phrase", what_key, **_role_slots(role_label)),
         doing=doing,
-        why=phrase[reason_key],
+        why=(phrase.get(f"living_why_finished_{ended}") if ended else None) or phrase[reason_key],
     )
 
 

@@ -12,7 +12,7 @@ import { buildSocietyComparisonView, type SocietyComparisonView } from '../src/u
 const repository = `${process.cwd()}/..`;
 const golden = JSON.parse(readFileSync(`${repository}/tests/snapshots/society-comparison-documents.json`, 'utf8')) as
   { readonly result: Record<string, unknown>; readonly run: Record<string, unknown> };
-const catalog = JSON.parse(readFileSync(`${repository}/assets/catalogs/society-words/society-inhabitant-words.v6.json`, 'utf8')) as
+const catalog = JSON.parse(readFileSync(`${repository}/assets/catalogs/society-words/society-inhabitant-words.v7.json`, 'utf8')) as
   { entries: { kind: string; code: string; words: string }[] };
 const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
 

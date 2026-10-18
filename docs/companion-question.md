@@ -347,11 +347,13 @@ scene](../exulanica/selection/society_scene.py)), and a society Selection that r
 searched.
 
 Who someone is, what they are doing and why are the inspector's own words, from one data file both
-read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v6.json)), cited
+read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v7.json)), cited
 to the society's state and to the event that explains it, read by its id however long ago it was
 recorded, with no model call. The page and the server choose among those words by one rule, held by
-cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). A living town's
-resident whose activity has just ended is said as ended ("just finished resting"). The words never call
+cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). A person whose
+activity has just ended is said by what they do now, and the why names what they finished: "Standing,
+deciding where to go." and "Because they finished resting at the bench.", or in a living town "deciding
+what to do next" and "They finished work.". The words never call
 a person, a day or a minute simulated: who someone is opens with their role and says they are
 "invented for this world" ("Office worker in this town, invented for this world."), and how many more
 minutes an activity takes is said in minutes; a surface in the world says the activity alone, without
@@ -363,7 +365,9 @@ arrival's record (`what_crossed_world`, `what_crossed_program`). What happened
 over the whole world is chosen by the answer composer role (`answer_composer` in the
 [model manifest](../exulanica/models/models.manifest.json)) from at most 24 event lines rebuilt from each
 event's recorded outcome, reason and minute in the same words, never from a stored summary, a
-position, a seed or a digest. The line of a minute whose goal a person's model chose names that
+position, a seed or a digest. A living town's line says what the person was doing and why in the
+inspector's words, so the composer reads one whose activity had just ended as "At minute 8,
+[inhabitant A] was deciding what to do next. They finished work." The line of a minute whose goal a person's model chose names that
 model, by the name the People panel shows (`Manifest.model_name` in
 [the model manifest](../exulanica/models/manifest.py)), from the one `decision_applied` event of
 that minute and person that applied a choice, read under the same authorization; it names none when

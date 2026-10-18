@@ -1,6 +1,6 @@
 /**
  * Who a simulated person is and what they are doing, in words, read from the one data file the
- * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v6.json`.
+ * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v7.json`.
  *
  * The choice of sentence for a state is code here and in `exulanica/selection/inhabitant_words.py`,
  * and both run the same cases (`tests/fixtures/society-inhabitant-words/cases.json`), so the
@@ -8,7 +8,7 @@
  * sentence here says what anybody talked about.
  */
 
-import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v6.json?raw';
+import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v7.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 import { societyEngine } from './society-engines.js';
@@ -295,11 +295,12 @@ export function livingInhabitantWords(
   const kind = person.action?.kind ?? 'idle';
   const activity = person.goal?.activity;
   const heading = `living_heading_${activity}` in TABLES.doing ? `living_heading_${activity}` : 'living_heading_unknown';
-  // An activity that has just ended is said as ended ("just finished resting"), by its kind's finished words, or
-  // the unknown kind's for a kind with no words of its own.
-  const finished = person.action?.status === 'completed'
-    ? TABLES.doing[`living_finished_${kind}`] ?? (TABLES.doing[`living_${kind}`] === undefined ? TABLES.doing.living_finished_unknown : undefined)
-    : undefined;
+  // An activity that has just ended is said by what they do now, and what they finished as the why (J36): by its
+  // kind's finished words, or the unknown kind's for a kind with no words of its own.
+  const ended = person.action?.status !== 'completed' ? null
+    : TABLES.doing[`living_finished_${kind}`] !== undefined ? kind
+    : TABLES.doing[`living_${kind}`] === undefined ? 'unknown' : null;
+  const finished = ended === null ? undefined : TABLES.doing[`living_finished_${ended}`];
   const doing = kind === 'move'
     ? grounded('doing', heading)
     : finished ?? TABLES.doing[`living_${kind}`] ?? words('doing', 'living_unknown');
@@ -317,7 +318,7 @@ export function livingInhabitantWords(
     who: fill(words('phrase', 'living_who'), { number: ordinal + 1 }),
     what: grounded('phrase', whatKey, roleSlots(person.role ?? 'resident')),
     doing,
-    why: words('phrase', key),
+    why: (ended === null ? undefined : TABLES.phrase[`living_why_finished_${ended}`]) ?? words('phrase', key),
   };
 }
 
