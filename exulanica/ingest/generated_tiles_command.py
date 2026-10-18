@@ -128,7 +128,9 @@ def main(
         description="Bake the tiles generated worlds are waiting for, off the request.",
     )
     parser.add_argument("--workspace", action="append", default=[], help="workspace UUID")
-    parser.add_argument("--poll-seconds", type=float, default=5.0)
+    # A world's first tile is claimed within a second of its making; a pass that finds nothing
+    # costs two short statements a workspace.
+    parser.add_argument("--poll-seconds", type=float, default=1.0)
     parser.add_argument("--once", action="store_true", help="bake what is waiting and exit")
     args = parser.parse_args(argv)
     output = stream or sys.stdout

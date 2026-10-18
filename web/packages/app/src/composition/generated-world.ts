@@ -66,12 +66,12 @@ import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
 /** The media type a baked tile's container is served as. */
 const CONTAINER_MEDIA_TYPE = 'application/vnd.exulanica.owd';
 /**
- * How often a page waiting for a world's tiles asks again, in milliseconds. One bake of the small
- * town's tile took 13.3 s on the development machine, and every tile is baked twice, so asking
- * every five seconds shows the world within five seconds of its last bake while asking a server
- * that is still baking a dozen times a minute at most.
+ * How often a page waiting for a world's tiles asks again, in milliseconds. A small town's two
+ * tiles bake in about 3 and 4 s on the development machine, a tile's two bakes side by side, so
+ * asking every second shows the world within a second of its last bake, for a handful of reads of
+ * its entry, each a small one.
  */
-const WAITING_POLL_MS = 5_000;
+const WAITING_POLL_MS = 1_000;
 /**
  * The spacing of the rings the page searches for ground round a served arrival: the city grammar's
  * 50 mm dimension module, the finest step its surfaces are laid on.

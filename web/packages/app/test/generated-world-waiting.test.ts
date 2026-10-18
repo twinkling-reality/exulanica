@@ -65,9 +65,10 @@ describe('a saved generated world waiting for its tiles', () => {
         .mockResolvedValueOnce(served(later));
       vi.stubGlobal('fetch', fetch);
       const { ready } = await waiting();
-      await vi.advanceTimersByTimeAsync(5_000);
+      // It asks every second, so the world opens within a second of its last bake.
+      await vi.advanceTimersByTimeAsync(1_000);
       expect(ready).toEqual([]);
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(1_000);
       expect(ready).toEqual([{ entryId: 'entry-town' }]);
       // Once it has said so, it reads no more.
       await vi.advanceTimersByTimeAsync(20_000);
@@ -92,7 +93,7 @@ describe('a saved generated world waiting for its tiles', () => {
     const fetch = vi.fn().mockResolvedValue(served(['baked', 'baking']));
     vi.stubGlobal('fetch', fetch);
     const { shell, ready } = await waiting();
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(1_000);
     expect(fetch).toHaveBeenCalledOnce();
     shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     fetch.mockResolvedValue(served(['baked', 'baked']));
