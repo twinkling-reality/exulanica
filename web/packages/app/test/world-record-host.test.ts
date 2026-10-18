@@ -150,6 +150,19 @@ describe('a decision, filled', () => {
     expect(state.toldLabel).toBe('What the person playing Teo was shown');
   });
 
+  it("says an outside program decided where the request was a program's, and that the program was told", async () => {
+    const { recordStates } = await recordHost();
+    const records = recordStates(host({ modelName: () => null }).host);
+    const showing = teoPage();
+    await records.readMoments(showing);
+    const program = { ...detail('say something to Ines', { kind: 'external', bridge: 'b1', answer_sha256: 'a'.repeat(64), latency_ms: 1300 }) };
+    program.request = { ...program.request, provider_config: { kind: 'external', bridge: 'b1', grant_id: 'g1', grant_seq: 1 } } as never;
+    const state = records.decision(showing, { requestId: 'r1', detail: program, failure: null, record: false });
+    expect([state.decider, state.model, state.answered, state.decided]).toEqual(['external', null, null, 'Teo spoke to Ines']);
+    // A machine is told, a person is shown (WORDS.md R5c); the program is named as Teo's, never as a model.
+    expect(state.toldLabel).toBe("What Teo's outside program was told");
+  });
+
   it('names a speaker a kind names in its title form, the sentence around them as their tag does', async () => {
     const { recordStates } = await recordHost();
     const records = recordStates(host().host);

@@ -163,7 +163,7 @@ export function recordStates(host: RecordHost) {
         said: said ? saidWords(who.title ?? who.start, said.line) : null,
         action: !said && moment ? sentenceCase(momentTitle(moment, named)) : null,
         decider,
-        // What a person playing them was shown, or what their model was told (DESIGN, WORDS.md R5b).
+        // What a person playing them was shown, or what their model or outside program was told (DESIGN, WORDS.md R5b, R5c).
         toldLabel: toldLabel(who, decider),
         answered: origin === 'model' && provider ? { latencyMs: provider.latency_ms ?? null, costUsd: provider.cost_usd ?? null, costKnown: provider.cost_known === true } : null,
         choicesHeading: choicesOver(who),

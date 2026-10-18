@@ -12,10 +12,13 @@ const teo = called({ name: 'Teo' }), resident = called({ kind: 'resident' });
 // Frame 10's labels, called by name or kind, never "it".
 assert.equal(toldLabel(teo), "What Teo's model was told");
 assert.equal(toldLabel(resident), "What the resident's model was told");
-// On a decision a person playing them made, what they were shown (WORDS.md R5b); a model's and an outside program's keep the model's words.
+// Each decider names itself (WORDS.md R5b, R5c): a person playing them was shown, a model or an outside program was told.
 assert.equal(toldLabel(teo, 'person'), 'What the person playing Teo was shown');
 assert.equal(toldLabel(resident, 'person'), 'What the person playing the resident was shown');
+assert.equal(toldLabel(teo, 'external'), "What Teo's outside program was told");
+assert.equal(toldLabel(resident, 'external'), "What the resident's outside program was told");
 assert.equal(toldLabel(teo, 'model'), "What Teo's model was told");
+assert.equal(toldLabel(resident, 'model'), "What the resident's model was told");
 assert.equal(choicesLabel(teo, 9), "Teo's choices (9)");
 assert.equal(choicesLabel(resident, 3), "The resident's choices (3)");
 assert.equal(overLabel({ at: askedAt(52, 360), who: teo, said: true, to: 'Ines' }), '06:52 · Day 1 · Teo said to Ines');

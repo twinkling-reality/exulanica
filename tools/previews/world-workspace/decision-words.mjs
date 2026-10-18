@@ -34,11 +34,12 @@ const list = value => Array.isArray(value) ? value : [];
 
 /**
  * Over what the decider was told: "What Teo's model was told"; on a decision a person playing Teo made, "What the
- * person playing Teo was shown" (DESIGN, WORDS.md R5b). `decider` is 'person', 'external', 'model' or null.
+ * person playing Teo was shown" (DESIGN, WORDS.md R5b); on one an outside program made, "What Teo's outside program
+ * was told" (WORDS.md R5c: a machine is told, a person is shown). `decider` is 'person', 'external', 'model' or null.
  */
 export const toldLabel = (who, decider = null) => (decider === 'person'
   ? `What the person playing ${who.within} was shown`
-  : `What ${possessive(who.within)} model was told`);
+  : `What ${possessive(who.within)} ${decider === 'external' ? 'outside program' : 'model'} was told`);
 
 /** "How Teo is", "Near the resident". */
 export const howIsLabel = who => `How ${who.within} is`;
