@@ -181,11 +181,16 @@ export async function mountAtlas(
   beforeStart?.(binding);
   binding.app.start();
 
+  let disposed = false;
   return {
     binding,
     worldKind,
     placements: binding.verifyPlacements(),
+    // Once: a mount replacing this atlas disposes it and may be asked again when that mount fails (main.ts's mount),
+    // and destroying the renderer twice throws.
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
       window.removeEventListener('resize', onResize);
       delete canvas.dataset.worldProfile;
       delete canvas.dataset.worldTopology;

@@ -418,12 +418,35 @@ export interface TileSurfaceBatch {
 }
 
 /**
+ * Whether the triangle a b c (vertex numbers into `positions`, x y z per vertex) has an area: one with two corners at
+ * one point, or all three in a line, has no face, so no normal, and draws nothing. A fresh town held such slivers
+ * (two corners 23 mm from the third, one of them on no other triangle), whose normals came out NaN.
+ */
+function hasArea(positions: ArrayLike<number>, a: number, b: number, c: number): boolean {
+  const ux = positions[b * 3]! - positions[a * 3]!, uy = positions[b * 3 + 1]! - positions[a * 3 + 1]!, uz = positions[b * 3 + 2]! - positions[a * 3 + 2]!;
+  const vx = positions[c * 3]! - positions[a * 3]!, vy = positions[c * 3 + 1]! - positions[a * 3 + 1]!, vz = positions[c * 3 + 2]! - positions[a * 3 + 2]!;
+  return Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) > 0;
+}
+
+/**
+ * Normals of the triangles `indices` over `positions`; a vertex none of them uses stands up rather than NaN (a
+ * furniture form's own surface keeps every vertex, also one only a dropped sliver used).
+ */
+function surfaceNormals(positions: number[], indices: number[]): number[] {
+  const normals = pc.calculateNormals(positions, indices);
+  for (let at = 0; at < normals.length; at += 3) {
+    if (![normals[at], normals[at + 1], normals[at + 2]].every(Number.isFinite)) normals.splice(at, 3, 0, 1, 0);
+  }
+  return normals;
+}
+
+/**
  * Every drawn surface of a tile, batched by what it is drawn with: one batch per texture set, and one
  * for all unavailable surfaces, in key order. A textured surface is placed by its own material record
  * through `surfaceUv`; an unavailable one by the pattern's size and its own orientation. Normals are
  * computed per surface, over that surface's own triangles, so a kerb's vertical face never bends the
- * normals of its horizontal top. Positions are the payload's metres from the projection origin,
- * rotated into the renderer frame as (x, z, -y).
+ * normals of its horizontal top. A triangle with no area (`hasArea`) is left out. Positions are the
+ * payload's metres from the projection origin, rotated into the renderer frame as (x, z, -y).
  *
  * A range `made` holds (street furniture its form draws, `street-furniture-drawing.ts`) is drawn by
  * those surfaces instead of its baked ones, each in the batch, placement and orientation of the
@@ -469,10 +492,15 @@ export function batchTileSurfaces(
             ? unavailableUv(one.st[at]!, one.st[at + 1]!, look, own?.orientation ?? 'vertical')
             : surfaceUv(one.st[at]!, one.st[at + 1]!, placement.reference, placement.entry)));
         }
+        const kept: number[] = [];
+        for (let corner = 0; corner < one.indices.length; corner += 3) {
+          const [a, b, c] = [one.indices[corner]!, one.indices[corner + 1]!, one.indices[corner + 2]!];
+          if (hasArea(local, a, b, c)) kept.push(a, b, c);
+        }
         batch.positions.push(...local);
-        batch.normals.push(...pc.calculateNormals(local, [...one.indices]));
-        for (const index of one.indices) batch.indices.push(first + index);
-        batch.triangles += one.indices.length / 3;
+        batch.normals.push(...surfaceNormals(local, kept));
+        for (const index of kept) batch.indices.push(first + index);
+        batch.triangles += kept.length / 3;
       }
       continue;
     }
@@ -489,24 +517,29 @@ export function batchTileSurfaces(
       const local: number[] = [];
       const surfaceIndices: number[] = [];
       const lastVertex = surface.firstVertex + surface.vertexCount;
-      for (let corner = surface.firstTriangle * 3; corner < (surface.firstTriangle + surface.triangleCount) * 3; corner += 1) {
-        const vertex = render.index[corner]!;
-        if (vertex < surface.firstVertex || vertex >= lastVertex) {
-          throw new Error(`A triangle of the ${surface.role} surface of record ${range.record} uses a vertex outside the surface`);
+      for (let start = surface.firstTriangle * 3; start < (surface.firstTriangle + surface.triangleCount) * 3; start += 3) {
+        const corners = [render.index[start]!, render.index[start + 1]!, render.index[start + 2]!];
+        for (const vertex of corners) {
+          if (vertex < surface.firstVertex || vertex >= lastVertex) {
+            throw new Error(`A triangle of the ${surface.role} surface of record ${range.record} uses a vertex outside the surface`);
+          }
         }
-        let mapped = remap.get(vertex);
-        if (mapped === undefined) {
-          mapped = local.length / 3;
-          remap.set(vertex, mapped);
-          local.push(render.position[vertex * 3]!, render.position[vertex * 3 + 2]!, -render.position[vertex * 3 + 1]!);
-          batch.uvs.push(...place(surfaceMm[vertex * 2]!, surfaceMm[vertex * 2 + 1]!));
+        if (!hasArea(render.position, corners[0]!, corners[1]!, corners[2]!)) continue;
+        for (const vertex of corners) {
+          let mapped = remap.get(vertex);
+          if (mapped === undefined) {
+            mapped = local.length / 3;
+            remap.set(vertex, mapped);
+            local.push(render.position[vertex * 3]!, render.position[vertex * 3 + 2]!, -render.position[vertex * 3 + 1]!);
+            batch.uvs.push(...place(surfaceMm[vertex * 2]!, surfaceMm[vertex * 2 + 1]!));
+          }
+          surfaceIndices.push(mapped);
         }
-        surfaceIndices.push(mapped);
       }
       batch.positions.push(...local);
-      batch.normals.push(...pc.calculateNormals(local, surfaceIndices));
+      batch.normals.push(...surfaceNormals(local, surfaceIndices));
       for (const index of surfaceIndices) batch.indices.push(first + index);
-      batch.triangles += surface.triangleCount;
+      batch.triangles += surfaceIndices.length / 3;
     }
   }
   return [...batches.keys()].sort().map((key) => batches.get(key)!);

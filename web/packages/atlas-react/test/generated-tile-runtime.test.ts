@@ -27,6 +27,8 @@ import {
   type SurfacePlacement,
 } from '../src/playcanvas/generated-tile/tile-runtime.js';
 import { surfaceUv, unavailableUv } from '../src/playcanvas/generated-tile/texture-materials.js';
+import type { MadeFurnitureSurface } from '../src/playcanvas/generated-tile/street-furniture-drawing.js';
+import { validateSurfaceBatch } from '../src/playcanvas/generated-tile/surface-mesh.js';
 import {
   SUPPORT_SAMPLE_SPACING_M,
   composedSupport,
@@ -446,6 +448,45 @@ describe('drawing per surface', () => {
       .toThrow(/kerb_face surface of record 0 uses a vertex outside the surface/);
     expect(() => batchTileSurfaces({ position, index }, surfaceMm, ranges, new Map(), TILE_LOOK_V1))
       .toThrow(/kerb_top surface of record 0 is textured and has no placement/);
+  });
+
+  // A fresh town held two slivers like this (two corners at one point, 23 mm from the third, on no other triangle):
+  // their normals came out NaN and the tile was refused by validateSurfaceBatch, so the town never opened.
+  const drawable = (batch: ReturnType<typeof batchTileSurfaces>[number]): boolean => {
+    validateSurfaceBatch({ ...batch, surfaceMm: batch.uvs });
+    return batch.normals.every(Number.isFinite);
+  };
+
+  it('draws every surface with finite normals as stated: a positive control for the slivers below', () => {
+    expect(batchTileSurfaces({ position, index }, surfaceMm, ranges, placements, TILE_LOOK_V1).every(drawable)).toBe(true);
+  });
+
+  it('leaves a baked sliver with two corners at one point out of its surface, so the tile stays drawable', () => {
+    // The footway's second triangle (8, 10, 11) becomes a sliver: vertex 11 stands where vertex 10 does.
+    const sliver = new Float32Array(position);
+    sliver.set(position.slice(10 * 3, 10 * 3 + 3), 11 * 3);
+    const batches = batchTileSurfaces({ position: sliver, index }, surfaceMm, ranges, placements, TILE_LOOK_V1);
+    expect(batches.every(drawable)).toBe(true);
+    const unavailable = batches.find((batch) => batch.key === '')!;
+    // The kerb's face (2 triangles) and the footway's one triangle with an area; vertex 11 is not drawn.
+    expect([unavailable.triangles, unavailable.indices.length, unavailable.positions.length / 3]).toEqual([3, 9, 7]);
+  });
+
+  it('leaves a sliver out of a furniture form\'s own surface, and stands its unused corner up', () => {
+    const footwayRange = ranges[1]!;
+    const form: MadeFurnitureSurface = {
+      role: 'footway',
+      positions: [0, 0.3, 0.15, 1, 0.3, 0.15, 1, 2, 0.15, 1, 2, 0.15],
+      st: [0, 300, 1000, 300, 1000, 2000, 1000, 2000],
+      indices: [0, 1, 2, 0, 2, 3],
+    };
+    const made = new Map([[footwayRange, [form]]]);
+    const batches = batchTileSurfaces({ position, index }, surfaceMm, ranges, placements, TILE_LOOK_V1, made);
+    expect(batches.every(drawable)).toBe(true);
+    const unavailable = batches.find((batch) => batch.key === '')!;
+    expect(unavailable.triangles).toBe(3);
+    // The form's corner only the sliver used (its fourth, the batch's last) stands up.
+    expect(unavailable.normals.slice(-3).map((value) => value + 0)).toEqual([0, 1, 0]);
   });
 });
 
