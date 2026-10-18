@@ -273,7 +273,8 @@ def served_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     Beside the state, never inside it, ``walk_budgets_mm_per_tick`` names what one tick lets each
     inhabitant whose kind states its own pace walk
     (:func:`~exulanica.world.society_movement.own_walk_budgets`), so a page draws the engine's own
-    figure; it is absent where nobody walks at a pace of their own."""
+    figure; it is absent where nobody walks at a pace of their own. A ``clock`` a read set beside
+    the state (:func:`served_clock`) is served as it is."""
     from exulanica.world.society_movement import own_walk_budgets
 
     served = {key: value for key, value in snapshot.items() if key != "seed"}
@@ -283,6 +284,20 @@ def served_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     if budgets:
         served["walk_budgets_mm_per_tick"] = budgets
     return served
+
+
+def served_clock(start_minute_of_day: int, tick: int) -> dict[str, int]:
+    """The time of day a society that keeps no clock of its own is served at ``tick``, from the
+    first minute its people's day starts at: the minute of the day and the day, counted from 0, as a
+    resident day keeps its own (``society_resident_day``). Nothing of it is stored."""
+    from exulanica.world.society_catalogs import MINUTES_PER_DAY
+
+    absolute = start_minute_of_day + tick
+    return {
+        "start_minute_of_day": start_minute_of_day,
+        "minute_of_day": absolute % MINUTES_PER_DAY,
+        "day": absolute // MINUTES_PER_DAY,
+    }
 
 
 def served_events(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:

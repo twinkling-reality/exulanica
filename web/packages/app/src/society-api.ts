@@ -306,6 +306,24 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
   };
 }
 
+/**
+ * A society of things' state with its time of day, where it has one: its resident day's own clock,
+ * else the clock the server serves beside the state from the day its people start (`clock`), held
+ * to the state's minute as a living state's is. A state with neither is read as it is.
+ */
+function withThingsClock(row: Readonly<Record<string, unknown>>, state: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  const stated = state['clock'] ?? row['clock'];
+  if (stated === undefined) return state;
+  const clock = record(stated);
+  const start = clock['start_minute_of_day'], minute = clock['minute_of_day'], day = clock['day'];
+  if (!boundedInteger(start, 0, MINUTES_PER_DAY - 1) || !boundedInteger(minute, 0, MINUTES_PER_DAY - 1) || !integer(day) ||
+      !Number.isSafeInteger(start + (state['tick'] as number)) || minute !== (start + (state['tick'] as number)) % MINUTES_PER_DAY ||
+      day !== Math.floor((start + (state['tick'] as number)) / MINUTES_PER_DAY)) {
+    throw new Error('Invalid society clock');
+  }
+  return { ...state, start_minute_of_day: start, minute_of_day: minute, day };
+}
+
 const affordance = (value: unknown): value is SocietyAffordance => isObjectActivity(value);
 
 /** The places a read carries, bound to the input the snapshot says its state consumed. */
@@ -520,7 +538,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
     societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
     ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
     populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-    state: withAuthoredEdit(state as unknown as OwnedSocietyState, places), places, presence,
+    state: withAuthoredEdit((things ? withThingsClock(row, state) : state) as unknown as OwnedSocietyState, places), places, presence,
     ...(walkBudgetsMm === null ? {} : { walkBudgetsMm }),
   });
 }

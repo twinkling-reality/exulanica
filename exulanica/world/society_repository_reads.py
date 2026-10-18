@@ -16,9 +16,11 @@ from exulanica.world.society import (
     UnavailableSocietyInput,
     UnknownSociety,
     inputs_ahead,
+    served_clock,
 )
 from exulanica.world.society_engines import (
     INPUT_ENGINES,
+    society_engine,
 )
 
 #: Profiles that consume authorized inputs and record transition receipts, from the engine table.
@@ -36,6 +38,14 @@ LINES_SAID_SQL = (
     "select tick,document from world_society_event "
     "where workspace_id=%s and society_id=%s and subject_id=%s and event_kind='said' "
     "order by tick desc, (document->>'order')::integer nulls last, event_id limit %s"
+)
+
+#: The first minute of the day a society of things' people start at, as its first input's people
+#: frame states it (``day.start_minute_of_day``; only a first input carries one), and nothing else
+#: of that input: null where it carries none.
+PEOPLE_DAY_START_SQL = (
+    "select document->'people'->'day'->'start_minute_of_day' as start from world_society_input "
+    "where workspace_id=%s and society_id=%s and input_seq=1"
 )
 
 
@@ -221,12 +231,30 @@ class SocietyReads:
         snapshot = self._snapshot(row)
         if places and current is not None:
             snapshot["places"] = consumed_places(current)
+        clock = self._served_clock(row)
+        if clock is not None:
+            snapshot["clock"] = clock
         lines = [
             {"tick": int(value["tick"]), "document": value["document"]}
             for value in said
             if value["document"]["input_seq"] not in left_out
         ]
         return snapshot, lines, len(said) - len(lines)
+
+    def _served_clock(self, row: dict[str, Any]) -> dict[str, int] | None:
+        """The clock served beside the state of a society of things whose state keeps none (a
+        resident day keeps its own), from the day its first input's people frame starts
+        (:func:`~exulanica.world.society.served_clock`); None for any other society."""
+        engine = society_engine(row["engine_version"])
+        if engine.state_family != "things" or "clock" in row["state"]:
+            return None
+        found = self.connection.execute(
+            PEOPLE_DAY_START_SQL, (self.workspace_id, row["society_id"])
+        ).fetchone()
+        start = None if found is None else found["start"]
+        if type(start) is not int:
+            return None
+        return served_clock(start, int(row["current_tick"]))
 
     def input_provenance(self, version_id: uuid.UUID, input_seq: int) -> dict[str, Any]:
         """One stored input's identity and the authored state it followed, never the input itself.

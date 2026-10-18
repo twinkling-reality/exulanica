@@ -1637,7 +1637,13 @@ each inhabitant whose kind states its own pace under a walking module that paces
 one tick lets it walk in millimetres, the engine's own figure (`own_walk_budgets` in
 `exulanica/world/society_movement.py`). It is absent where nobody walks at a pace of their own,
 and `state_sha256` does not cover it. A page walks such a body at that budget, and at that budget
-over the tick's simulated seconds when nothing hurries it.
+over the tick's simulated seconds when nothing hurries it. A society of things whose state keeps no
+clock of its own (a resident day keeps one) is read, stepped and brought in or sent away with `clock`
+beside the state: the minute its people's day starts at, as its first input's people frame states it
+(`day.start_minute_of_day`), and the minute of the day and the day, counted from 0, at the state's
+tick (`served_clock` in `exulanica/world/society.py`). The read takes that one value of the first
+input and nothing else of it; the clock is stored nowhere and `state_sha256` does not cover it. A
+society whose first input carries no people frame is read with no clock.
 
 Every society, action, playback, decision, experiment and district route requires the world as a
 `world_id` query parameter, as every world route does, and a world the workspace does not hold

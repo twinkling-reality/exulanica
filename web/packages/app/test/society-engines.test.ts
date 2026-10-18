@@ -166,4 +166,23 @@ describe('a society of things', () => {
     // Any other engine still holds exactly its population.
     expect(() => parseSociety({ ...purposeful('exulanica-society/v2', 8), population_size: 6 })).toThrow('Invalid society response');
   });
+
+  it('reads its time of day: the clock served beside its state, else its resident day\'s own, held to its minute', () => {
+    const row = things(8, 6);
+    // Its people start their day at 06:00, and the state is at minute 2: 06:02 on the first day.
+    const served = parseSociety({ ...row, clock: { start_minute_of_day: 360, minute_of_day: 362, day: 0 } }).state;
+    expect([served.start_minute_of_day, served.minute_of_day, served.day]).toEqual([360, 362, 0]);
+    // A resident day keeps its own clock in the state: from 23:59, minute 2 is 00:01 the next day.
+    const kept = parseSociety({ ...row, state: { ...row.state, clock: { start_minute_of_day: 1439, minute_of_day: 1, day: 1 } } }).state;
+    expect([kept.start_minute_of_day, kept.minute_of_day, kept.day]).toEqual([1439, 1, 1]);
+    // None served, none read; and an engine of another family reads no clock served beside it.
+    expect(parseSociety(row).state.minute_of_day).toBeUndefined();
+    const other = purposeful('exulanica-society/v2', 8);
+    expect(parseSociety({ ...other, clock: { start_minute_of_day: 360, minute_of_day: 362, day: 0 } }).state.minute_of_day).toBeUndefined();
+    // A clock that disagrees with the state's minute is refused, not shown.
+    for (const clock of [{ start_minute_of_day: 360, minute_of_day: 400, day: 0 }, { start_minute_of_day: 360, minute_of_day: 362, day: 1 },
+      { start_minute_of_day: 1440, minute_of_day: 2, day: 1 }, { start_minute_of_day: 360, minute_of_day: 362 }]) {
+      expect(() => parseSociety({ ...row, clock })).toThrow('Invalid society clock');
+    }
+  });
 });

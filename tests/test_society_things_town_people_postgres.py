@@ -2,7 +2,8 @@
 deployment stores it: its first stored input carries what they are made from, authorised by
 composing it again; its villagers are residents with homes and jobs; the document its state
 records is the one the world's own seed makes from that input; a later input states no people;
-and the stored minutes replay.
+its time of day is served beside its state from the day that input's people start; and the stored
+minutes replay.
 
 A town made through the API takes a fresh identity, and its seed, its streets and how many
 positions its premises offer follow from that identity: of 48 small towns made under fixed
@@ -16,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 from exulanica.world import saved_entries
-from exulanica.world.society import world_society_seed
+from exulanica.world.society import served_clock, world_society_seed
 from exulanica.world.town_people import people_from_frame
 
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -122,6 +123,14 @@ def test_a_town_with_a_knight_in_it_keeps_its_bakers_as_a_deployment_stores_them
     assert {p["id"]: p["resident"] for p in body["state"]["inhabitants"] if "resident" in p} == {
         p["id"]: p["resident"] for p in villagers
     }
+    # Its time of day, served beside the state from the day its first input's people start and
+    # stored nowhere: the minutes stepped and the read both carry it, at the minute they are at.
+    start = frame["day"]["start_minute_of_day"]
+    assert body["clock"] == served_clock(start, body["current_tick"])
+    read = api.get(society)
+    assert read.status_code == 200, read.text
+    assert read.json()["clock"] == served_clock(start, read.json()["current_tick"])
+    assert "clock" not in read.json()["state"] and "clock" not in body["state"]
     replayed = api.get(
         f"/world/versions/{entry['authored_version_id']}/society/replay?world_id={entry['world_id']}"
     )
