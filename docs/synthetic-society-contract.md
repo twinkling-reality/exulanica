@@ -1164,8 +1164,11 @@ model's name) and the request that decided it, each line with its own, so a page
 decision, the run it happened in, its scene, and another model's answers to its decision (the
 asks of [decision roles](decision-roles-contract.md)) as branches, each naming whose decision it
 answers and marked when it chose the same; a going made together keeps every one of its people's
-branches. An ask that was not answered is no branch. It writes nothing and asks no model; a page
-words what it answers.
+branches. An ask that was not answered is no branch. With `recipe`, the framing recipe a page draws
+by, each moment's `picture` is the one kept for it by that recipe (its digest and size), so a page
+draws only a moment nobody kept; it is named only to a grant that may read a kept picture's bytes
+(`GET /world/pictures/{sha256}`, `world.write`), and is null for anyone else and without `recipe`.
+It writes nothing and asks no model; a page words what it answers.
 
 ### Erasing a society
 

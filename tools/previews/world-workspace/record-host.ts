@@ -10,6 +10,7 @@ import { deciderOf } from './character-group.mjs';
 import { thingName } from './build-words.mjs';
 import { momentTitle, targetObject } from './history-rows.mjs';
 import { momentWords, saidWords, worldWhen } from './history-words.mjs';
+import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { timeLeft } from './run-words.mjs';
 import { worldTime } from './world-clock.mjs';
 import { choiceAccount, parseDecisionEvents } from '../../../web/packages/app/src/decision-record.ts';
@@ -64,7 +65,7 @@ export function recordStates(host: RecordHost) {
   /** Reads the moments and the version's placed things for a page (`showing`): kept on it, re-read with its rows. */
   async function readMoments(showing: Json): Promise<void> {
     const [moments, version] = await Promise.all([
-      host.read(`${host.versionPath}/history/moments${host.scope}&limit=${MOMENTS_READ}`).catch(() => null),
+      host.read(`${host.versionPath}/history/moments${host.scope}&limit=${MOMENTS_READ}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`).catch(() => null),
       showing.things ? null : host.read(`${host.versionPath}${host.scope}`).catch(() => null),
     ]);
     if (moments) showing.moments = moments.moments ?? [];

@@ -4,13 +4,16 @@
 Put through the routes by the world's own workspace and served by their digest, kept once under
 their name (a second answers the first), kept only for a moment the version records, refused for a
 world that holds a photograph, out of another workspace's reach, gone with their moment when its
-society is erased, and gone with their world. The rules without a database are
+society is erased, and gone with their world. The moments read names a moment's kept picture by
+the recipe a page asks for, to a grant that may read its bytes. The rules without a database are
 ``test_moment_pictures.py``.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import uuid
 from urllib.parse import urlencode
 
@@ -23,7 +26,7 @@ import test_society_stay_requests_api as stays
 from style_pack_upload_support import jpeg
 from test_saved_world_entries_api import _create_entry, _create_starter
 from test_society_person_decisions_postgres import _services
-from test_society_saved_world_api import OWNER, routes
+from test_society_saved_world_api import OWNER, TOKEN, routes
 from test_world_objects_api import ObjectsApi
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
 
@@ -33,11 +36,27 @@ pytestmark = pytest.mark.postgres
 
 MOMENT_RECIPE = "moment-framing/v1"
 PORTRAIT_RECIPE = "portrait/v1"
+READER_TOKEN = "moment-pictures-world-reader-token-long-enough"
+READER = {"Authorization": f"Bearer {READER_TOKEN}"}
 
 
 @pytest.fixture(name="objects_api")
 def _objects_api_alias(request):
     return request.getfixturevalue("imported_objects_api")
+
+
+@pytest.fixture(name="with_a_reader")
+def _with_a_reader(monkeypatch):
+    """A grant beside the owner's that reads the world and changes nothing (``world.read`` alone),
+    in the directory ``app`` loads: requested before it, so its tokens are read through this."""
+    load = stays.load_token_directory
+
+    def with_reader():
+        tokens = json.loads(os.environ["EXULANICA_API_TOKENS"])
+        tokens[READER_TOKEN] = {**tokens[TOKEN], "permissions": ["world.read"]}
+        return load({**os.environ, "EXULANICA_API_TOKENS": json.dumps(tokens)})
+
+    monkeypatch.setattr(stays, "load_token_directory", with_reader)
 
 
 def _put_moment(api: ObjectsApi, entry: dict, moment_id: uuid.UUID, data: bytes, **query):
@@ -140,6 +159,49 @@ def test_a_moment_s_picture_is_kept_once_served_and_erased_with_its_society(app)
     erased = client.delete(version + "/society", headers=OWNER, params=scope)
     assert erased.status_code == 204, erased.text
     assert _pictures_of(connection, moment) == 0
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_the_moments_read_names_a_kept_picture_by_its_recipe_to_who_may_read_it(with_a_reader, app):
+    world, client = app
+    moment = str(_said_moment(world, client))
+    scope, version, _ = routes(world)
+    asked = {"recipe": "moment-framing/v2"}
+
+    def pictures(headers=OWNER, **query) -> dict[str, object]:
+        read = client.get(f"{version}/history/moments", params={**scope, **query}, headers=headers)
+        assert read.status_code == 200, read.text
+        return {one["moment_id"]: one["picture"] for one in read.json()["moments"]}
+
+    assert moment in pictures(**asked) and set(pictures(**asked).values()) == {None}
+    data = jpeg(600, 340)
+    kept = client.put(
+        f"{version}/history/moments/{moment}/picture",
+        params={**scope, **asked},
+        headers={**OWNER, "Content-Type": "image/jpeg"},
+        content=data,
+    )
+    assert kept.status_code == 200, kept.text
+    served = pictures(**asked)
+    assert served.pop(moment) == {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "width": 600,
+        "height": 340,
+    }
+    assert set(served.values()) <= {None}, "the other moments keep none"
+    # Another recipe's picture is another name, and a read that names no recipe is told of none.
+    assert pictures(recipe="moment-framing/v1")[moment] is None
+    assert pictures()[moment] is None
+    # A grant that reads the world but not a picture's bytes is told of none.
+    assert pictures(READER, **asked)[moment] is None
+    refused = client.get(
+        f"{version}/history/moments", params={**scope, "recipe": "Framing"}, headers=OWNER
+    )
+    assert refused.status_code == 422
+    # The society's erasure takes the moment and its picture: the read has nothing left to name.
+    erased = client.delete(version + "/society", headers=OWNER, params=scope)
+    assert erased.status_code == 204, erased.text
+    assert pictures(**asked) == {}
 
 
 def test_a_moment_of_a_version_the_world_does_not_hold_and_a_bad_recipe_are_refused(objects_api):

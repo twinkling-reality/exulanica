@@ -32,6 +32,10 @@ interface History { open(): Promise<void>; close(): void; dispose(): void; key(e
 const module = async (): Promise<{ mountHistory(host: HistoryHost): History }> =>
   import('../../../../tools/previews/world-workspace/' + 'history.ts') as Promise<{ mountHistory(host: HistoryHost): History }>;
 
+// The recipe History draws a moment's picture by, as the preview reads it: its moments read asks by it.
+const recipe = async (): Promise<string> =>
+  ((await import('../../../../tools/previews/world-workspace/' + 'moment-framing.mjs')) as { MOMENT_FRAMING: { recipe: string } }).MOMENT_FRAMING.recipe;
+
 const WORLD = 'world:generated:0b0e0c1d-0000-4000-8000-000000000001';
 const VERSION = '3c4d5e6f-0000-4000-8000-000000000002';
 const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -80,7 +84,10 @@ function reads(overrides: Record<string, unknown> = {}) {
   const read = vi.fn(async (path: string) => {
     asked.push(path);
     const [route, query] = path.split('?');
-    if (route!.startsWith('/world/') && query !== `world_id=${encodeURIComponent(WORLD)}`) throw Error('unscoped');
+    const scoped = `world_id=${encodeURIComponent(WORLD)}`;
+    // The moments read also names the recipe each moment's kept picture is asked by.
+    const asks = route!.endsWith('/history/moments') ? `${scoped}&recipe=${encodeURIComponent(await recipe())}` : scoped;
+    if (route!.startsWith('/world/') && query !== asks) throw Error('unscoped');
     const answer = answers[route!];
     if (answer === undefined || answer instanceof Error) throw answer ?? Error('404');
     return answer;
@@ -133,8 +140,8 @@ describe('History', () => {
     expect(made.root.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('History');
     // It opens with the focus on its title, so a reader announces it (L18).
     expect(document.activeElement?.textContent).toBe('Terraces on the bay');
-    expect(asked.filter((path) => path.startsWith('/world/')).every((path) => path.endsWith(`?world_id=${encodeURIComponent(WORLD)}`))).toBe(true);
-    expect(asked).toContain(`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}`);
+    expect(asked.filter((path) => path.startsWith('/world/')).every((path) => path.includes(`?world_id=${encodeURIComponent(WORLD)}`))).toBe(true);
+    expect(asked).toContain(`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&recipe=${encodeURIComponent(await recipe())}`);
     // Only the characters the moments name are asked for, to be named as the tag and card name them (J20).
     expect(made.names).toHaveBeenCalledWith({ subjects: ['teo', 'ines', 'marco'], placed: [] });
     expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept on GitHub in terraces-on-the-bay, private · up to date');

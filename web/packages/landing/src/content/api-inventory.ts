@@ -4473,7 +4473,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "get",
     "id": "read_version_moments_world_versions__version_id__history_moments_get",
     "title": "Read Version Moments",
-    "description": "The version's moments, newest last.",
+    "description": "The version's moments, newest last, each with its kept picture by the recipe asked for.",
     "group": "history",
     "permission": {
       "requires": [
@@ -4529,6 +4529,25 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
           "minimum": 1,
           "default": 50,
           "title": "Limit"
+        }
+      },
+      {
+        "name": "recipe",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 56,
+              "pattern": "^[a-z][a-z0-9-]{0,47}/v[1-9][0-9]{0,5}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Recipe"
         }
       },
       {

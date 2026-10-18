@@ -12,6 +12,7 @@ import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, targetObject } 
 import { openKeepCard, type KeepCard } from './history-keep.ts';
 import { KEEP_WORDS } from './history-keep-words.mjs';
 import { PATH_WORDS, headLine } from './history-words.mjs';
+import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { page } from './world-ui.ts';
 import { storySvg, svgPart } from './world-ui-history.ts';
 
@@ -149,7 +150,7 @@ export function mountHistory(host: HistoryHost): History {
       optional(`${version}/society/control/sessions${scope}`),
       optional(`/world/github-projects${scope}`),
       generated ? optional(`/worlds/drafts/${encodeURIComponent(host.worldId.slice(GENERATED.length))}`) : null,
-      optional(`${version}/history/moments${scope}`),
+      optional(`${version}/history/moments${scope}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`),
     ]);
     momentsFailed = moments === null;
     // Placed things and made parts named as build mode names them: by kind (a made creature by its label, J20),

@@ -36,6 +36,9 @@ vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () =>
 type Json = Record<string, any>;
 // Joined paths: the test runner still finds the files, and the type checker leaves the preview modules out.
 const recordHost = async (): Promise<any> => import('../../../../tools/previews/world-workspace/' + 'record-host.ts');
+// The recipe History draws a moment's picture by, as the preview reads it: its moments read asks by it.
+const recipe = async (): Promise<string> =>
+  ((await import('../../../../tools/previews/world-workspace/' + 'moment-framing.mjs')) as { MOMENT_FRAMING: { recipe: string } }).MOMENT_FRAMING.recipe;
 const historyHost = async (): Promise<any> => import('../../../../tools/previews/world-workspace/' + 'history-host.ts');
 
 const NAMES: Record<string, string> = { teo: 'Teo', ines: 'Ines', marco: 'Marco' };
@@ -100,7 +103,7 @@ describe("a record page's moments", () => {
     const records = recordStates(made.host);
     const showing = teoPage();
     await records.readMoments(showing);
-    expect(made.host.read).toHaveBeenCalledWith('/world/versions/v1/history/moments?world_id=w1&limit=200');
+    expect(made.host.read).toHaveBeenCalledWith(`/world/versions/v1/history/moments?world_id=w1&limit=200&recipe=${encodeURIComponent(await recipe())}`);
     expect(records.dayRow(showing, { requestId: 'r1' })).toEqual({ title: 'Teo met Ines', said: '“Morning, Ines.”', picture: 'blob:m1' });
     // Marco's moment never titles or pictures a row of Teo's, whatever request the row names.
     expect(records.dayRow(showing, { requestId: 'r9' })).toEqual({});
