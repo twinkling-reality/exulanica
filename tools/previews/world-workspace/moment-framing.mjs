@@ -1,10 +1,11 @@
-// A History moment's picture, as data in and data out (moment-framing.v3.json): the society read a
+// A History moment's picture, as data in and data out (moment-framing.v4.json): the society read a
 // page is served rewritten to the moment's recorded people, and the camera that frames who it is
 // about. Pure, so verify-moment-framing.mjs checks it in Node; the scene preview's moment mode
 // (front-door-preview.ts) draws by it, and moment-pictures.ts names the recipe it kept a picture by.
-// moment-framing.v1.json and v2.json stay beside it: the recipes the pictures kept under their names were
-// drawn by (v3 frames as v2 does and waits for the near subjects to be drawn in full, `wait_ms.near`).
-import framing from './moment-framing.v3.json' with { type: 'json' };
+// moment-framing.v1.json to v3.json stay beside it: the recipes the pictures kept under their names were
+// drawn by (v3 frames as v2 does and waits for the near subjects to be drawn in full, `wait_ms.near`; v4 draws
+// as v3 does with the moment's read made whole: steps in whole millimetres, everyone else indoors on every engine).
+import framing from './moment-framing.v4.json' with { type: 'json' };
 
 /** The framing recipe; each figure a world could want different is a field of the file. */
 export const MOMENT_FRAMING = Object.freeze(framing);
@@ -20,7 +21,8 @@ const point = (value) => Array.isArray(value) && value.length === 2 && value.eve
 /**
  * The served society read (`GET /world/versions/{v}/society`, raw JSON) as the moment's tick drew
  * it: the moment's people where it recorded them, doing what it recorded (merged over the served
- * record, so every field the read's parser asks for stays), each with a step `walk_hint_m` long that
+ * record, so every field the read's parser asks for stays), each with a step `walk_hint_m` long (in whole
+ * millimetres, as the read's parser asks) that
  * ends there, so they face the way they last walked and stand still; everyone else indoors (in their
  * location where the record keeps one), so the crowd draws only the moment's people. The read's other
  * fields are kept as served (the population, the clock). A scene without people, or a read without
@@ -32,8 +34,9 @@ export function momentSociety(body, scene, recipe = MOMENT_FRAMING) {
   if (people.length === 0 || !Array.isArray(inhabitants)) return body;
   const recorded = new Map(people.map((one) => [one.id, one]));
   const hint = recipe.walk_hint_m * 1000;
-  // Indoors as the record says it: in its location where it has one, else on the person.
-  const indoors = (person, inside) => (person.location && typeof person.location === 'object'
+  // Indoors where the record keeps it: in its location where the location says it (the living society's
+  // record), else on the person (a society of things, whose location names only where they stand).
+  const indoors = (person, inside) => (person.location && typeof person.location === 'object' && 'indoors' in person.location
     ? { ...person, location: { ...person.location, indoors: inside } }
     : { ...person, indoors: inside });
   const placed = inhabitants.map((person) => {
@@ -44,7 +47,7 @@ export function momentSociety(body, scene, recipe = MOMENT_FRAMING) {
     const from = path.length > 1 ? path[path.length - 2] : null;
     const along = from ? Math.hypot(east - from[0], south - from[1]) : 0;
     const motion = along > 0
-      ? [[east - ((east - from[0]) / along) * hint, south - ((south - from[1]) / along) * hint], [east, south]]
+      ? [[Math.round(east - ((east - from[0]) / along) * hint), Math.round(south - ((south - from[1]) / along) * hint)], [east, south]]
       : [[east, south]];
     const next = indoors({ ...person, position_mm: [east, south], motion_path_mm: motion }, false);
     // What they were doing: the served record's own action, with what the moment recorded of it.

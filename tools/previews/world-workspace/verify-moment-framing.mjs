@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framedWhole, framingInSight, framingPose, lensOf, momentSociety, overviewDistance, reframe, standsInBand } from './moment-framing.mjs';
 
-assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v3');
+assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v4');
 // A near subject is waited for until drawn in full (its far form has no face), within the draw's bound.
 assert.ok(Number.isInteger(MOMENT_FRAMING.wait_ms.near) && MOMENT_FRAMING.wait_ms.near > 0);
 // The widest pair framed together is the widest the lens takes whole, with room each side, at the most distance.
@@ -42,6 +42,19 @@ assert.equal(ines.indoors, false);
 // Indoors in the location where the record keeps one.
 assert.equal(marco.location.indoors, true);
 assert.equal('indoors' in marco, false);
+// A diagonal last step still ends in whole millimetres, as the read's parser asks (a fraction refused the read).
+const diagonal = momentSociety(body, { people: [{ id: 'teo', position_mm: [1000, 2000], path_mm: [[0, 0], [1000, 2000]] }] }).state.inhabitants[0];
+assert.ok(diagonal.motion_path_mm.flat().every(Number.isInteger), JSON.stringify(diagonal.motion_path_mm));
+assert.deepEqual(diagonal.motion_path_mm.at(-1), [1000, 2000]);
+// A society of things keeps indoors on the person: its location names only where they stand.
+const things = { state: { inhabitants: [
+  { id: 'yara', position_mm: [0, 0], motion_path_mm: [[0, 0]], indoors: null, location: { edge: null, node_id: 'entrance:a' } },
+  { id: 'ines', position_mm: [9000, 0], motion_path_mm: [[9000, 0]], indoors: null, location: { edge: null, node_id: 'entrance:b' } },
+] } };
+const [yara, inesThere] = momentSociety(things, { people: [{ id: 'yara', position_mm: [500, 0], path_mm: [] }] }).state.inhabitants;
+assert.equal(yara.indoors, false);
+assert.equal(inesThere.indoors, true, 'everyone else indoors');
+assert.deepEqual(inesThere.location, { edge: null, node_id: 'entrance:b' }, 'the location as served');
 // The read's own fields stay as served; the served body itself is not changed.
 assert.equal(drawn.population_size, 3);
 assert.equal(drawn.state.minute_of_day, 400);
