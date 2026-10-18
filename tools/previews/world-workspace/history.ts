@@ -8,7 +8,7 @@
 // The record pages' shared parts load first: History's own stylesheet refines them and must come after.
 import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence } from './world-ui-record.ts';
 import { changeParts, thingName } from './build-words.mjs';
-import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
+import { LAYOUTS, earlierBreak, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
 import { KEEP_WORDS } from './history-keep-words.mjs';
 import { PATH_WORDS, headLine } from './history-words.mjs';
@@ -22,6 +22,8 @@ const GENERATED = 'world:generated:';
 const RUNS_READ = 20;
 /** Narrower than this, the page takes its 1440 sizes. */
 const NARROW_BELOW = 1700;
+/** The moments read's own page and its most (exulanica/world/society_moments.py READ_MOST). */
+const MOMENTS_PAGE = 50, MOMENTS_MOST = 200;
 /** While a project is being started or put on GitHub, the projects read is asked again this often. */
 const WATCH_MS = 3000;
 
@@ -112,6 +114,10 @@ export function mountHistory(host: HistoryHost): History {
   let project: Json | null | undefined;
   let request: Json | null = null;
   let momentsFailed = false;
+  /** Moments read back on demand, older than the newest page (oldest first), and whether the read has more before. */
+  let earlier: Json[] = [];
+  let momentsMore = false;
+  let paging = false;
   let state: 'loading' | 'ready' | 'offline' = 'loading';
   let chosen: string | null = null;
   /** The moment or grouped changes opened over the story: a moment's chosen line, a list's row at its top (H15). */
@@ -171,7 +177,11 @@ export function mountHistory(host: HistoryHost): History {
         closed: run.closed ?? null,
         world_minutes: run.used?.minutes ?? null,
       }));
-    const momentList: Json[] = moments?.moments ?? [];
+    // The newest page, with what [←] read before it: oldest first, each moment once.
+    const latest: Json[] = moments?.moments ?? [];
+    const known = new Set(latest.map((one) => one.moment_id));
+    const momentList: Json[] = [...earlier.filter((one) => !known.has(one.moment_id)), ...latest];
+    if (!earlier.length) momentsMore = moments?.more === true;
     const records: Json[] = characters?.records ?? [];
     const choices: Json[] = models?.choices ?? [];
     const named = await host.names({
@@ -270,9 +280,48 @@ export function mountHistory(host: HistoryHost): History {
     return (path?.items ?? []).filter((item: Json) => item.kind === 'moment' || (item.kind === 'change' && item.changes));
   }
 
+  /**
+   * [←] past the oldest moment held, while the read says more lie before it, reads them on demand. The read cuts at a
+   * row limit that may fall within a minute, so it asks from the oldest minute held, inclusive, keeps the moments it
+   * does not hold, and stops where a page brings none. Answers whether any came.
+   */
+  async function readEarlier(): Promise<boolean> {
+    const held = (path?.items ?? []).filter((item: Json) => item.kind === 'moment');
+    const ticks = held.map((item: Json) => item.tick).filter(Number.isSafeInteger);
+    if (!ticks.length) return false;
+    const oldest = Math.min(...ticks);
+    const limit = Math.min(MOMENTS_MOST, MOMENTS_PAGE + ticks.filter((tick: number) => tick === oldest).length);
+    const page = await optional(`${version}/history/moments${scope}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}&before=${oldest + 1}&limit=${limit}`);
+    if (!page || !made) return false;
+    const holding = new Set(held.map((item: Json) => item.moment_id));
+    const fresh = (page.moments ?? []).filter((one: Json) => !holding.has(one.moment_id));
+    earlier = [...fresh, ...earlier];
+    momentsMore = page.more === true && fresh.length > 0;
+    if (fresh.length) await reads();
+    return fresh.length > 0;
+  }
+
+  async function moveEarlier() {
+    paging = true;
+    try {
+      // The moments read back are drawn as the rest are: their pictures and portraits made one at a time.
+      if (await readEarlier() && made) {
+        move(-1);
+        void makePictures();
+      }
+    } finally {
+      paging = false;
+      draw();
+    }
+  }
+
   function move(by: number) {
     const list = stops();
     const index = list.findIndex((item) => item.id === chosen);
+    if (by < 0 && index === 0 && momentsMore) {
+      if (!paging) void moveEarlier();
+      return;
+    }
     const next = list[Math.min(list.length - 1, Math.max(0, (index < 0 ? list.length - 1 : index) + by))];
     if (next && next.id !== chosen) {
       chosen = next.id;
@@ -416,7 +465,17 @@ export function mountHistory(host: HistoryHost): History {
     track.style.transform = `translateX(${view.offset}px)`;
     const local = (screen: number) => screen - view.offset;
     const svg = storySvg(Math.max(width, placed.nowAt + layout.margin) - Math.min(0, view.offset), Math.max(layout.lineY + 360, (made.root.clientHeight || window.innerHeight)));
-    if (state === 'ready') svg.append(svgPart('path', { d: `M ${local(view.from)} ${layout.lineY} L ${local(view.to)} ${layout.lineY}` }, 'line'));
+    if (state === 'ready') {
+      // Where earlier moments are not read yet, the line breaks before the oldest held: two short slanted strokes
+      // across a 6px gap (H17), or, with nothing drawn before it, the line runs on to the window's edge.
+      const gap = earlierBreak(items, placed, view, layout, momentsMore), y = layout.lineY;
+      const from = gap === 'edge' ? local(0) : local(view.from), to = local(view.to);
+      if (typeof gap !== 'number') svg.append(svgPart('path', { d: `M ${from} ${y} L ${to} ${y}` }, 'line'));
+      else {
+        svg.append(svgPart('path', { d: `M ${from} ${y} L ${gap - 3} ${y} M ${gap + 3} ${y} L ${to} ${y}` }, 'line'));
+        for (const x of [gap - 2, gap + 2]) svg.append(svgPart('path', { d: `M ${x - 2} ${y + 5} L ${x + 2} ${y - 5}` }, 'line break'));
+      }
+    }
     track.append(svg);
 
     // Each run's bracket over the part of it in view, cut at the window's edge with no leg there (H16); its words are
@@ -579,7 +638,7 @@ export function mountHistory(host: HistoryHost): History {
       }
       keys.append(keyButton(['Esc'], PATH_WORDS.backToStory, () => closeMoment()));
     } else {
-      if (stops().length >= 2) keys.append(keyButton(['←', '→'], PATH_WORDS.earlierLater, () => move(1)));
+      if (stops().length >= 2 || momentsMore) keys.append(keyButton(['←', '→'], PATH_WORDS.earlierLater, () => move(1)));
       if (choice) keys.append(keyButton(['Enter'], choice.kind === 'moment' ? PATH_WORDS.openMoment : PATH_WORDS.openChanges, () => openMoment(choice.id)));
       // One GitHub key at most (sheet section 11): open it once it is there, keep it there, or keep it at all.
       const url = githubUrl();
@@ -728,6 +787,8 @@ export function mountHistory(host: HistoryHost): History {
     made = null;
     lasting = null;
     opened = null;
+    earlier = [];
+    momentsMore = false;
     offset = null;
     unlisten?.();
     unlisten = null;

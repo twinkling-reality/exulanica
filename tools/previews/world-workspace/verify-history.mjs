@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { changeParts, changeWords } from './build-words.mjs';
-import { LAYOUTS, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
+import { LAYOUTS, earlierBreak, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import {
   HEAD_WORDS, PATH_WORDS, branchWords, didWords, byParts, creationWhen, dayHeading, headLine, momentWords, money, partsText,
   personWhen, runSpanWords, youChangeWords, youModelParts, youPersonalityWords,
@@ -163,6 +163,19 @@ assert.equal(pathView(long.items, longPlaced, wide, 1920, 'moment:l5', back.offs
 assert.equal(pathView(long.items, longPlaced, wide, 1920, 'moment:l0', back.offset).offset, 0);
 // A routine's moment has no who line.
 assert.equal(long.items[1].by, null);
+
+// Moments not read yet (H17): the line breaks midway between the oldest moment held and what is drawn before it (a
+// change's dot; a card's picture end); with nothing drawn before it, the line runs to the window's edge; nothing
+// where the read has no more, or where the oldest moment is out of view.
+assert.equal(earlierBreak(path.items, placed, opening, wide, true), (510 + 600) / 2);
+assert.equal(earlierBreak(path.items, placed, opening, wide, false), null);
+const longBack = pathView(long.items, longPlaced, wide, 1920, 'moment:l0', newest.offset);
+assert.equal(earlierBreak(long.items, longPlaced, longBack, wide, true), Math.round((120 + wide.card + longPlaced.x.get('moment:l0')) / 2));
+assert.equal(earlierBreak(long.items, longPlaced, newest, wide, true), null);
+const alone = historyPath({ moments: [{ moment_id: 'a1', tick: 400, at: iso(16, 7, 0), session_id: null, kind: 'left', subjects: ['ari'],
+  place: null, target: null, with: null, said: [], decider: { kind: 'routine', model: null }, scene: {}, picture: null, branches: [] }] }, names, partsOf, clock, now);
+const alonePlaced = pathLayout(alone.items, wide);
+assert.equal(earlierBreak(alone.items, alonePlaced, pathView(alone.items, alonePlaced, wide, 1920, 'moment:a1'), wide, true), 'edge');
 
 // A run's bracket partly in view (H16): a line over the part in view, cut at the window's edge with no leg there; its
 // words above its left end where that end is in view, else at the margin, and left out there where they would meet

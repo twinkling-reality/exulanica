@@ -61,6 +61,27 @@ export function ownMoment(moments: readonly Json[] | null | undefined, requestId
     || (moment.said ?? []).some((line: Json) => line.request_id === requestId && line.by === subjectId)) ?? null;
 }
 
+/**
+ * The day page's events, newest first, a page at a time (the events read serves the whole society): from the newest,
+ * or on from `next`, where the last read stopped, after what it held (`held`), until `rowsOf(events)` reaches `want`
+ * rows or `pages` pages are read. Answers the events and where a later read goes on from (null where none is left).
+ */
+export async function readDayEvents({ readPage, rowsOf, held = [], next = '', want, pages }: {
+  readonly readPage: (before: string) => Promise<Json>; readonly rowsOf: (events: readonly Json[]) => number;
+  readonly held?: readonly Json[]; readonly next?: string | null; readonly want: number; readonly pages: number;
+}): Promise<{ readonly events: Json[]; readonly next: string | null }> {
+  const events = [...held];
+  let before = next ?? '', more: string | null = null;
+  for (let page = 0; page < pages; page += 1) {
+    const read = await readPage(before);
+    events.push(...(read.events ?? []));
+    more = read.next ?? null;
+    if (!more || rowsOf(events) >= want) break;
+    before = more;
+  }
+  return { events, next: more };
+}
+
 export function recordStates(host: RecordHost) {
   /** Reads the moments and the version's placed things for a page (`showing`): kept on it, re-read with its rows. */
   async function readMoments(showing: Json): Promise<void> {

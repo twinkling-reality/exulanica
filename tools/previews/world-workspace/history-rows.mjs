@@ -383,6 +383,22 @@ export function runBrackets(spans, items, placed, view, layout, width, wordsWidt
 }
 
 /**
+ * Where the story line breaks for moments not yet read (H17, sheet section 3 amended): while the moments read says more
+ * lie before the oldest moment held (`more`), the line is broken midway between that moment's dot and the item drawn
+ * before it (a card's picture end, or a change's dot), in the track's places. Where nothing is drawn before it, 'edge':
+ * the line runs on to the window's left edge. Null where nothing lies unread, or the oldest moment is out of view.
+ */
+export function earlierBreak(items, placed, view, layout, more) {
+  if (!more) return null;
+  const at = items.findIndex((item) => item.kind === 'moment');
+  if (at < 0 || !view.drawn.has(items[at].id)) return null;
+  const before = items.slice(0, at).reverse().find((item) => view.drawn.has(item.id));
+  if (!before) return 'edge';
+  const end = placed.x.get(before.id) + (before.kind === 'creation' ? layout.card : 0);
+  return Math.round((end + placed.x.get(items[at].id)) / 2);
+}
+
+/**
  * The opened changes' window (H15, sheet section 7): a list longer than the column moves a row at a time. `rows` are
  * each row's [top, bottom] in the list, `height` what the column has room for; `first` the row asked to stand at its
  * top, held where the last row ends at the foot and never past it. Answers that row, how far the list is moved, the

@@ -157,6 +157,35 @@ describe("a record page's moments", () => {
   });
 });
 
+describe("the day page's events, read back on demand", () => {
+  // Three pages of the society's events, newest first; each event one row of Teo's.
+  const pages: Record<string, Json> = {
+    '': { events: [{ id: 'e9' }, { id: 'e8' }], next: 'c1' },
+    c1: { events: [{ id: 'e7' }, { id: 'e6' }], next: 'c2' },
+    c2: { events: [{ id: 'e5' }], next: null },
+  };
+  const readPage = vi.fn(async (before: string) => pages[before]!);
+  const rowsOf = (events: readonly Json[]) => events.length;
+
+  it('reads from the newest until the rows wanted are found, and keeps where it stopped', async () => {
+    const { readDayEvents } = await recordHost();
+    readPage.mockClear();
+    const first = await readDayEvents({ readPage, rowsOf, want: 3, pages: 4 });
+    expect([first.events.map((event: Json) => event.id), first.next, readPage.mock.calls.map(([before]) => before)]).toEqual([['e9', 'e8', 'e7', 'e6'], 'c2', ['', 'c1']]);
+    // [↓] past the oldest row reads on from there, after what it held, until the read has no more.
+    readPage.mockClear();
+    const on = await readDayEvents({ readPage, rowsOf, held: first.events, next: first.next, want: 10, pages: 4 });
+    expect([on.events.map((event: Json) => event.id), on.next, readPage.mock.calls.map(([before]) => before)]).toEqual([['e9', 'e8', 'e7', 'e6', 'e5'], null, ['c2']]);
+  });
+
+  it('reads no more than its pages at a time', async () => {
+    const { readDayEvents } = await recordHost();
+    readPage.mockClear();
+    const capped = await readDayEvents({ readPage, rowsOf, want: 99, pages: 1 });
+    expect([capped.events.length, capped.next, readPage.mock.calls.length]).toEqual([2, 'c1', 1]);
+  });
+});
+
 describe('a decision, filled', () => {
   const detail = (label: string, provider: Json | null = { latency_ms: 900, cost_usd: '0.0003', cost_known: true }) => ({
     request: { base_tick: 412, provider_config: { provider: 'nvidia', model_id: 'nemotron-3-nano-30b' }, context: { options: [{ label }, { label: 'walk to the bench' }] } },

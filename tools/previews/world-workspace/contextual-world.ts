@@ -27,7 +27,7 @@ import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePla
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { historyHooks, historyWrite, recordPictures } from './history-host.ts';
-import { recordStates } from './record-host.ts';
+import { readDayEvents, recordStates } from './record-host.ts';
 import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
@@ -59,6 +59,8 @@ const CARD_WAIST = 0.8;
 const BODY_HALF_WIDTH = 0.4;
 /** The most pages of the society's events a character's page reads back for its rows. */
 const DID_PAGES = 4;
+/** The rows of What Teo did the page reads at a time: when it opens, and at each [↓] past the oldest. */
+const DID_ROWS = 7;
 /** How often the reads behind a tag or card are refreshed while one shows, in milliseconds. */
 const SUBJECT_READ_MS = Object.freeze({ society: 3000, models: 5000 });
 
@@ -698,27 +700,24 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (pageView.decision) pageView.decision.page.draw(decisionState());
     if (pageView.comparison) pageView.comparison.page.draw(comparisonState());
   }
-  /** The page's rows: the character's recorded events, read when the page opens and every few seconds. */
-  async function readDid() {
+  /** The page's rows: the character's recorded events, read when the page opens; [↓] past the oldest row reads on
+   * from where the last read stopped, DID_ROWS rows further back (`earlier`), while the read has more. */
+  async function readDid(earlier = false) {
     const showing = pageView;
-    if (!showing) return;
+    if (!showing || (earlier && !showing.didNext)) return;
     try {
       // The events read serves the whole society, newest first, a page at a time: read back until
-      // the character's newest rows are found (counted as they fold, R5e) or DID_PAGES pages are read.
-      const events = [];
-      let before = '';
-      for (let pageNumber = 0; pageNumber < DID_PAGES; pageNumber += 1) {
-        const page = await read(eventsPath(['goal_selected', 'decision_applied', 'said'], '&limit=256' + (before ? '&before=' + encodeURIComponent(before) : '')));
-        events.push(...page.events);
-        if (!page.next || didRows({ events, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null, foldable: () => true }).length >= 7 || showing !== pageView) break;
-        before = page.next;
-      }
+      // the rows wanted are found (counted as they fold, R5e) or DID_PAGES pages are read.
+      const want = earlier ? showing.didWant + DID_ROWS : DID_ROWS;
+      const { events, next } = await readDayEvents({ want, pages: DID_PAGES, held: earlier ? showing.events : [], next: earlier ? showing.didNext : '',
+        readPage: (before) => read(eventsPath(['goal_selected', 'decision_applied', 'said'], '&limit=256' + (before ? '&before=' + encodeURIComponent(before) : ''))),
+        rowsOf: (held) => didRows({ events: held, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null, foldable: () => true, limit: want }).length });
       const facts = characterFacts(subjectReads.society, showing.row.scene.id);
-      showing.events = events;
+      Object.assign(showing, { events, didNext: next, didWant: want });
       await records.readMoments(showing);
       if (showing !== pageView) return;
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
-        options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row),
+        options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row), limit: want,
         wordGoal: (document) => {
           if (!facts) return null;
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };
@@ -726,6 +725,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         } });
       // The chosen row stays where it was; at first it is the newest row a decision stands behind. A
       // line heard is never chosen (T6).
+      // Read on from the oldest row, the choice moves on to the first row the read brought.
+      if (earlier && showing.didFocus !== null) { let at = showing.didFocus + 1; while (showing.did[at]?.heard) at += 1; if (showing.did[at]) showing.didFocus = at; }
       if (showing.didFocus === null || showing.didFocus >= showing.did.length || showing.did[showing.didFocus]?.heard) {
         const first = showing.did.findIndex(row => row.requestId);
         const own = showing.did.findIndex(row => !row.heard);
@@ -1228,6 +1229,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         let next = (pageView.didFocus ?? -1) + step;
         while (pageView.did[next]?.heard) next += step;
         if (pageView.did[next]) pageAct('row', next);
+        else if (step > 0) void readDid(true);
       }
       else if (choosing && ['ArrowUp', 'ArrowDown'].includes(event.code)) {
         event.preventDefault();

@@ -299,6 +299,40 @@ describe('History', () => {
     expect(words()?.style.left).toBe('516px');
   });
 
+  it('reads the moments before the oldest it holds on demand, when [←] passes it and the read says more lie before', async () => {
+    const { read } = reads({ [`/world/versions/${VERSION}/history/moments`]: { ...moments(), more: true } });
+    // The page before: one older moment, and the oldest held again (the read is asked from that minute, inclusive).
+    const left = { moment_id: 'm0', tick: 400, at: at(45), session_id: 's1', kind: 'left', subjects: ['ines'], place: null, target: null, with: null,
+      said: [], decider: model('Nemotron 3 Nano 30B'), scene: {}, picture: { sha256: 'e'.repeat(64), width: 600, height: 340 }, branches: [] };
+    const before: string[] = [];
+    const paging = vi.fn(async (path: string) => {
+      if (!path.includes('&before=')) return read(path);
+      before.push(path);
+      return { moments: [left, moments().moments[0]], more: false };
+    });
+    const addresses: string[] = [];
+    const made = host(paging, { pictureAddress: async (picture: Picture) => { addresses.push(picture.sha256); return `/pictures/${picture.sha256}`; } });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    history.key(press('ArrowLeft'));
+    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    // While more lie before it, the line breaks before the oldest moment held: two short slanted strokes (H17).
+    expect(made.root.querySelectorAll('.wu-hr-path .break')).toHaveLength(2);
+    // At the oldest moment held, with more before it: the earlier page is read, and the choice moves on to it.
+    history.key(press('ArrowLeft'));
+    await vi.waitFor(() => expect(chosen(made.root)).toBe('Ines left'));
+    expect(before).toEqual([`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&recipe=${encodeURIComponent(await recipe())}&before=413&limit=51`]);
+    // Each moment once, oldest first; with no more before, [←] reads nothing further.
+    expect(all(made.root, '.wu-hr-card .wu-hr-words').filter((words) => words !== 'Made from your words')).toEqual(['Ines left', 'Teo met Ines at the bench', 'Marco asked Teo']);
+    // Nothing more lies before: the break goes.
+    expect(made.root.querySelector('.wu-hr-path .break')).toBeNull();
+    // Its picture is made as the others were: read at its address once.
+    await vi.waitFor(() => expect(addresses).toContain('e'.repeat(64)));
+    history.key(press('ArrowLeft'));
+    expect(before).toHaveLength(1);
+    expect(chosen(made.root)).toBe('Ines left');
+  });
+
   it('shows the creation and Now alone with nothing yet, and no arrows with nothing to move to', async () => {
     const { read } = reads({
       [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [], edits: [] },
