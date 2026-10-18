@@ -14,6 +14,7 @@ import {
   type PlaceDrawing, type SeatingLayout, type SeatingMiss, type SeatingResult,
 } from './seating.js';
 import { activityOnSeat, facingRule, type FacingRule } from './activity-facing.js';
+import { spokenPartners } from './spoken-partners.js';
 import type {
   CrowdJump,
   CrowdJumpReason,
@@ -197,6 +198,8 @@ interface Walker {
   readonly facingRule: FacingRule | null;
   /** The partner the state names for the activity, or null. */
   readonly partnerId: string | null;
+  /** Whom they last spoke with by a line said to someone, lately (`./spoken-partners.ts`), or null. */
+  readonly spokenWith: string | null;
   /** The target their action names, under way or just completed, or null. */
   readonly target: string | null;
   /** Their recorded position, millimetres, which their place is found from. */
@@ -535,6 +538,7 @@ export class SocietyCrowd {
     // input writes each person's path, and a legacy state carries none, so no profile is listed here.
     const pathful = state.inhabitants.every((person) => Array.isArray(person.motion_path_mm));
     const walkers = new Map<string, Walker>();
+    const spoken = spokenPartners(state);
     const ownPaces = new Map<string, number>();
     this.ownPaces = ownPaces;
     const jumps: CrowdJump[] = [];
@@ -662,6 +666,7 @@ export class SocietyCrowd {
         place: found?.kind === 'place' ? found.drawing : null,
         facingRule: rule,
         partnerId: statePartner(person),
+        spokenWith: spoken.get(person.id) ?? null,
         target: at?.target ?? null,
         recordedMm: person.position_mm,
         // Moved without walking, they are drawn where they now are, off any seat at once.
@@ -692,7 +697,7 @@ export class SocietyCrowd {
         // Paced, whatever its state records: the step has the visitor's own pace.
         ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? 0,
         rate: null, gateStep: true, startsAtMs: nowMs, activity: null, arrived: total === 0,
-        place: null, facingRule: null, partnerId: null, target: null, settle: null, seatBlend: 0, onSeat: false,
+        place: null, facingRule: null, partnerId: null, spokenWith: null, target: null, settle: null, seatBlend: 0, onSeat: false,
       });
       this.leaving.add(id);
     }
@@ -1315,6 +1320,9 @@ export class SocietyCrowd {
       const partner = this.walkers.get(walker.partnerId);
       if (partner !== undefined && !partner.indoors) return heading(walker.position, partner.position, walker.facing);
     }
+    // Whom they last spoke with, by a line said to someone, while both stand outdoors.
+    const spoken = walker.spokenWith === null ? undefined : this.walkers.get(walker.spokenWith);
+    if (spoken !== undefined && spoken.arrived && !spoken.indoors) return heading(walker.position, spoken.position, walker.facing);
     return walker.facing;
   }
 
