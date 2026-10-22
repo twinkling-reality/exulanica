@@ -60,7 +60,7 @@
    the hint and the keys button too, which the lower bar would cut), and comes back after. The older corner
    parts and the Running strip are named as well, for a page that still draws them (r09 carries a run in the
    pill, which hides with it). */
-.wu-root[data-scene="talking"] :is(.wu-rail, .wu-corner-pill, .wu-top, .wu-clock-pill, .wu-first-hint, .wu-keys-button, .wu-keys-card, .wu-back, .wu-clock, .wu-mode, .wu-hints, .wu-strip) {
+.wu-root[data-scene="talking"] :is(.wu-rail, .wu-corner-pill, .wu-top, .wu-clock-pill, .wu-first-hint, .wu-keys-button, .wu-keys-card, .wu-back, .wu-clock, .wu-mode, .wu-hints) {
   /* Their own fade-in holds their opacity (the world screen's .wu-screen-in), so it is set aside here and they are
      hidden outright; it plays again when they come back. */
   visibility: hidden; opacity: 0; animation: none; pointer-events: none; }

@@ -510,19 +510,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const view = subjectView(row), { connected } = modelOf(row);
     const offer = offers.get(row.key)?.offer ?? null;
     const assignable = !readOnly && Boolean(inventory && offer && subjectReads.models?.takesModelChoices && assignmentSubject(inventory, row, offer));
-    // Someone else the group names (the run's other askers, a line's listener), as their own tag calls them (J20): their
-    // offer is read once, so a person with a name is named here as everywhere else.
-    const named = (id) => { const other = beingRow(id); if (other && !offers.has(other.key) && readBackoff.ready(other.key, performance.now())) void entityOffer(other).catch(() => {}); return whoOf(id); };
     const picking = picker.of(row);
     if (picking) return modelGroup({ who: view.who, models: subjectReads.models?.models ?? [], current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy });
     if (asking) {
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
-      return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : named(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
+      return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : whoOf(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
         model: view.model, limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && (subjectReads.models?.models.length ?? 0) > 1 });
     }
     const said = saidLines.of(row.scene.id, now);
-    return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? named(said.to) : null, startMinute: view.facts?.startMinute ?? null,
+    return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,
       decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable,
       running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading });
   }
