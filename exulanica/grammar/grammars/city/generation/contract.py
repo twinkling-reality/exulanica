@@ -100,7 +100,7 @@ of detail, the 128 m tile, the 64 m halo, the ownership and halo rules, and ``ed
 sorted) into that field; the empty subsequence is ``EMPTY_EDIT_DELTA_DIGEST``. ``baked_tile_id``
 is ``uuid5(ARTIFACT_NAMESPACE, "baked_tile:<version>:<params digest>:<tile_inputs_digest>")``.
 
-2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 20)
+2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 21)
 ===============================================================================
 
 **Container** ``owd/3``, magic ``OWD3``: canonical JSON header (tile record and inputs digest,

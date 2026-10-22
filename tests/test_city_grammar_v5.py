@@ -104,21 +104,20 @@ _NEW = (
     *(f"ground_floor_use_weight_{key}_permille" for key in shop_uses()),
 )
 
-#: What each corridor tile baked to, container SHA-256, with the tessellator at 731066f8, the tree
-#: before it stopped asking a straight join for its follower: the corridor specification at city
-#: grammar versions 3 and 4, every tile. Measured by baking each document with that tree's
-#: ``loom-tess`` CLI and with this one's: 10 of 10 identical.
+#: What each corridor tile baked to, container SHA-256: the corridor specification at city grammar
+#: versions 3 and 4, every tile, baked by tessellator 21, under which a street one tile owns takes
+#: its ground from the next tile's terrain across their seam, so every corridor tile moved.
 _CORRIDOR_CONTAINERS = {
-    (3, 0): "e2b09769bed8f8df4d3d7f321e7f52301476519e819139c9ae5666bd4b9eadf8",
-    (3, 1): "459fa2e539a2f1c3455c80e40d32970e39611c037279739eb2660cb7dfd08bdb",
-    (3, 2): "22b5c2870ce7fb636aabfbe504625b1d6070c1f6be2bcc3f13732cfda2b837e6",
-    (3, 3): "613a58371ad84617299197a180f39124376bb7252085538193527eb5ab5db94d",
-    (3, 4): "d43709781a896a072a0d5202d86dfd965c52f8c1bf1b243f4037034b4baaed7d",
-    (4, 0): "f9fe52ccd2443f4a3b22de8a438797b05239603ab5e7d424f747867541b5ad03",
-    (4, 1): "32f1ef0665103d887b534a85cb3fddeff6da06424f55a018bad2e0a9ab6c0dad",
-    (4, 2): "8b35700741143970b6591b7e64fb536248e02f4caae9a71c5a9dae8548e7511e",
-    (4, 3): "cb2d5fa76208586371aac8f5b310ace4bd748094e5817aebc224e2936f07fe20",
-    (4, 4): "fb296e2b8018a7c2db932d952ba29ccc58b74c4ddb0d5ae7233641a9e996f91f",
+    (3, 0): "a0a41cde6c184317e0d6e51fe4e5342b18faab2d2374b8691a06de654ae94883",
+    (3, 1): "81fe311156796f43e1cbaf633d9fd0442b3389a9660bc8bbfc6bb226b8c85f79",
+    (3, 2): "1c424266a930abfc822cb3abdd55857c37ab1f1fd40e3a3f83b0818a86b8a05c",
+    (3, 3): "2cb37fe4e8ef234ff085e877618dd0b9de2ae98a97ca017c9e4f0fb545962ca7",
+    (3, 4): "cddfefb2acc1673dec74d28802a65a9dc486c34a168e86cbb2ed22aae293984b",
+    (4, 0): "cb29bf4668d99f4c6fddc725af46d9fdea128040a750a24c9cbefae7f66b34dd",
+    (4, 1): "e70edc3d1e0fffcbf95f4c0c888918a85be30fd781f695b420558ab9de7efc88",
+    (4, 2): "a1f8c458a83e60b94fca464bd18977b9a4f78fecaa44466b2870b561b4024fc4",
+    (4, 3): "4416f3759b3253549a1c36cc500b63f291165ce75ecacbce56719b584c9d72eb",
+    (4, 4): "4a7642aa1e6e1bfb8144eaaa4679c5c7fa2086cd02f402166a130c0c45a1a264",
 }
 
 

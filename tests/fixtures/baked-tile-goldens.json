@@ -1,0 +1,22 @@
+{
+  "profile": "exulanica.baked-tile-goldens/v1",
+  "versions": {
+    "21": {
+      "conformance": {
+        "document_sha256": "c380ee5b40f8b5b6b7e5ab31a84a007f87cba4038383012992167d1ff3eaa5f9",
+        "nav_envelope": "f6158941949203038233d445a8a5aeaa9bdb5ce524a092ec6faf7e19f64424a2",
+        "render_batch": "185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4"
+      },
+      "hillside (1,0)": {
+        "document_sha256": "d544a2a14190419a9623bb11fd07256b9af14bed7742b506fcebd013e77b050a",
+        "nav_envelope": "fcfa1bb4836bcdbf02e675192c24386f3428681440ff078ac00e94ad15c4b7e7",
+        "render_batch": "4de57a8e74e43331daf4b0add58eff6e71e5b996a435617e57398c2b4c4ab98f"
+      },
+      "level (0,0)": {
+        "document_sha256": "65ff0774a8aaaa3f289617822c4f6457e82f8667d027d8976e8fac5e38d7b5d6",
+        "nav_envelope": "0cde06cf19b9a8b9deea5a32671ac20059b0991479c3fea7a13c48b0404322dd",
+        "render_batch": "417673b0fa0b08d40f9149f35d58a6feac23532dfce741b82b6a6b73208c77ee"
+      }
+    }
+  }
+}

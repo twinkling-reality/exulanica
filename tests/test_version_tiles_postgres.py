@@ -40,7 +40,9 @@ from exulanica.ingest.stages import STAGES, baked_tile_key
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import version_tile_lock_key
-from exulanica.world.generated_worlds import town_records, version_ground
+from exulanica.world import version_tiles as version_tiles_module
+from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.generated_worlds import BAKE_JOB_KIND, town_records, version_ground
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import ElementOverride
 from exulanica.world.town_parts import town_buildings
@@ -51,6 +53,7 @@ from exulanica.world.version_tiles import (
 )
 from psycopg.rows import dict_row
 
+from baked_tile_stages import stated_stage
 from conftest import scratch_role_database
 from personal_world_support import OWNER_TOKEN, STRANGER_TOKEN
 from test_generated_worlds import _stub_tessellator
@@ -284,6 +287,90 @@ def test_a_changed_tile_is_baked_for_its_workspace_and_served_to_its_version_alo
     assert (
         town.api.get(town.bytes_path(tile.baked_tile_id), token=STRANGER_TOKEN).status_code == 404
     )
+
+
+def test_a_changed_town_s_tiles_of_a_stage_before_are_baked_again_once_by_a_new_worker(
+    town, tmp_path, monkeypatch
+):
+    """A stage change ships with a new worker. A version's changed tiles queue only on a write,
+    so without the worker's first look over its workspace a changed town's changed tiles would
+    read baking for ever; with it, each is baked once again, and the stored bake stays."""
+    before = {t.baked_tile_id for t in _baked(town)}
+    assert {t.state for t in town.tiles()} == {"baked"}
+    owner = town.api.repository.connection
+    spec = STAGES["baked_tile"]
+    monkeypatch.setitem(
+        generated_tiles.STAGES, "baked_tile", dataclasses.replace(spec, version=spec.version + 1)
+    )
+    with stated_stage(owner, spec.version + 1, spec.params_digest):
+        assert {t.state for t in town.tiles()} == {"baking"}
+        worker = GeneratedTileBaker(
+            session=town.api.database.session,
+            publisher=_tiles_publisher(town.scratch),
+            store=town.stores.tiles,
+            web_directory=_stub_tessellator(tmp_path, monkeypatch),
+            worker="test-after-the-stage",
+            version_stores=town.stores.version_tiles,
+        )
+        outcomes = worker.drain([town.workspace_id])
+        assert outcomes and {o.status for o in outcomes} == {"baked"}
+        after = town.tiles()
+        assert {t.state for t in after} == {"baked"}
+        assert not {t.baked_tile_id for t in after} & before
+        # Looked over once: nothing more is queued, and the bakes of the stage before stay.
+        assert worker.drain([town.workspace_id]) == []
+        kept = town.owner_rows(
+            "select baked_tile_id from world_version_baked_tile where baked_tile_id = any(%s)",
+            list(before),
+        )
+        assert {row["baked_tile_id"] for row in kept} == before
+
+
+def test_a_version_whose_changes_its_grammar_refuses_is_passed_over_and_the_worker_bakes_on(
+    town, tmp_path, monkeypatch
+):
+    """A town whose grammar no longer generates it, or refuses a version's changes, raises when its
+    changed tiles are asked for. The new worker's first look passes that version over: it still
+    queues and bakes the town's own tiles, queues nothing for the refused version, and its drain
+    never raises, so one such town cannot stop the worker baking every workspace."""
+    _baked(town)
+    owner = town.api.repository.connection
+    spec = STAGES["baked_tile"]
+    monkeypatch.setitem(
+        generated_tiles.STAGES, "baked_tile", dataclasses.replace(spec, version=spec.version + 1)
+    )
+    read = version_tiles_module.version_changes
+
+    def refused(connection, workspace_id, world_id, snapshot_id, version_id):  # type: ignore[no-untyped-def]
+        if version_id == town.version_id:
+            raise InvalidStructuralData("the town's grammar refuses this version's changes")
+        return read(connection, workspace_id, world_id, snapshot_id, version_id)
+
+    monkeypatch.setattr(version_tiles_module, "version_changes", refused)
+
+    def queued(kind: str) -> int:
+        return len(town.owner_rows("select 1 from job where kind = %s and state = 'queued'", kind))
+
+    with stated_stage(owner, spec.version + 1, spec.params_digest):
+        version_jobs = len(
+            town.owner_rows("select 1 from job where kind = %s", VERSION_BAKE_JOB_KIND)
+        )
+        worker = GeneratedTileBaker(
+            session=town.api.database.session,
+            publisher=_tiles_publisher(town.scratch),
+            store=town.stores.tiles,
+            web_directory=_stub_tessellator(tmp_path, monkeypatch),
+            worker="test-a-refused-version",
+            version_stores=town.stores.version_tiles,
+        )
+        outcomes = worker.drain([town.workspace_id])
+        assert outcomes and {o.status for o in outcomes} == {"baked"}
+        assert queued(BAKE_JOB_KIND) == 0 and queued(VERSION_BAKE_JOB_KIND) == 0
+        assert (
+            len(town.owner_rows("select 1 from job where kind = %s", VERSION_BAKE_JOB_KIND))
+            == version_jobs
+        )
+        assert worker.drain([town.workspace_id]) == []
 
 
 #: The container the refusals name, which no bake stored.

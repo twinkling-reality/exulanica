@@ -167,7 +167,7 @@ drawn surfaces, 1 496 are dressed** by a material record and 86 are not: 85 faca
 the terrain. A later bake of the same tile, container `e59f6cf05d`, is the container
 `tests/test_visual_gate_targets.py` names `WORLD_DRAWN`. The grammar contract measures that
 container as 1 637 drawn surfaces, 1 551 dressed, and the same 86 undressed. The reader accepts
-tessellator version 20 only (`TESSELLATOR_SOURCE_VERSION` in
+tessellator version 21 only (`TESSELLATOR_SOURCE_VERSION` in
 `web/packages/loom-tess/src/core/expand.ts`).
 
 **83 entries state unavailable**, and each names the expander it waits for:
@@ -270,7 +270,7 @@ Every bake of one tile document is stored beside the others (migration 0077), ea
 `uuid5(stage version, stage params digest, tile inputs digest)`. The corridor tile (2, 0) has been
 baked by six tessellator versions. One of those bakes is tessellator 17: params digest
 `33d663f8`, 11 153 540 bytes, container `93df0715f5`, `render_batch` `91350a9045` and
-`nav_envelope` `35388d7849`. The reader accepts tessellator version 20 only. This section does
+`nav_envelope` `35388d7849`. The reader accepts tessellator version 21 only. This section does
 not name the container a clone's store serves. Each bake key after the first was computed from the stage parameters
 before its bake ran, with the bake refused if it disagreed, and each matched.
 

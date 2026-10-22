@@ -899,7 +899,7 @@ STAGES: Final[dict[str, StageSpec]] = {
             # bay's own panels return across the steps in depth between them, and how
             # support is carved clear of what the grammar's navigation table says obstructs a
             # walking capsule.
-            "tessellator": 20,
+            "tessellator": 21,
             # How a projection's triangles are digested; the golden fixture digest depends on it.
             "triangle_digest": "exulanica.owd-triangle-digest/v3",
             # The document the bake reads, whose envelope the city grammar owns.

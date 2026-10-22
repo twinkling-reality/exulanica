@@ -72,6 +72,8 @@ __all__ = [
     "generated_site",
     "generated_tiles",
     "generation_receipt",
+    "queue_workspace_bakes",
+    "queue_world_bakes",
     "states_records",
     "states_site",
     "town_records",
@@ -317,23 +319,56 @@ def _create_authorities(
         style_version_id=style.version_id,
         created_by=actor,
     )
-    # A tile whose bake is already stored under the stage this installation runs, by the digest
-    # over its inputs (the columns its key is derived from, migration 0144), is the same bytes this
-    # world's tile would bake to: it queues no job, and the tile reads baked at once, as a world
-    # with no job for a tile is read (generated_tiles). A bake of another stage is not read, so a
-    # stage change rebakes. A tile stored with a fault the owner has not cleared still queues one,
-    # whose job then fails as every bake of it does. A world made from a world kind states no tiles:
-    # it is drawn from its records and never baked.
-    composer = composed.receipt["composer"]
+    queue_world_bakes(
+        connection,
+        workspace_id,
+        world_id,
+        snapshot.snapshot_id,
+        composed.receipt,
+        composed.receipt_sha256,
+    )
+    return snapshot.snapshot_id, style, version.version_id
+
+
+def queue_world_bakes(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    receipt: Mapping[str, Any],
+    receipt_digest: str,
+) -> tuple[tuple[int, int], ...]:
+    """Queue a bake job for each tile of a generated world's receipt that has no bake stored and
+    servable under the stage this installation runs and no bake queued or running, in the
+    caller's transaction, and return the tiles queued.
+
+    A tile whose bake is already stored under the current stage, by the digest over its inputs
+    (the columns its key is derived from, migration 0144), is the same bytes this world's tile
+    would bake to: it queues no job, and the tile reads baked at once, as a world with no job for a
+    tile is read (:func:`generated_tiles`). A bake of another stage is never read and never
+    deleted, so after a stage change every tile queues one bake. A tile stored with a fault the
+    owner has not cleared queues one again, whose job then fails as every bake of it does. A world
+    made from a world kind states no tiles: it is drawn from its records and never baked.
+    """
+    composer = receipt["composer"]
     inputs = {
         (int(tile_x), int(tile_y)): digest
         for (tile_x, tile_y), digest in composer_module(
             composer["key"], composer["version"]
-        ).tile_inputs(composed.receipt)
+        ).tile_inputs(receipt)
     }
-    for tile_x, tile_y in composed.receipt.get("tiles", ()):
+    queued = []
+    for tile_x, tile_y in receipt.get("tiles", ()):
         stored = current_bake(connection, inputs[(int(tile_x), int(tile_y))])
         if stored is not None and stored.servable:
+            continue
+        with connection.cursor(row_factory=dict_row) as cursor:
+            waiting = cursor.execute(
+                "select 1 from job where workspace_id=%s and kind=%s and payload->>'world_id'=%s "
+                "and payload->'tile'=%s and state in ('queued','running') limit 1",
+                (workspace_id, BAKE_JOB_KIND, world_id, Jsonb([tile_x, tile_y])),
+            ).fetchone()
+        if waiting is not None:
             continue
         connection.execute(
             "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
@@ -343,14 +378,75 @@ def _create_authorities(
                 Jsonb(
                     {
                         "world_id": world_id,
-                        "snapshot_id": str(snapshot.snapshot_id),
-                        "receipt_sha256": composed.receipt_sha256,
+                        "snapshot_id": str(snapshot_id),
+                        "receipt_sha256": receipt_digest,
                         "tile": [tile_x, tile_y],
                     }
                 ),
             ),
         )
-    return snapshot.snapshot_id, style, version.version_id
+        queued.append((int(tile_x), int(tile_y)))
+    return tuple(queued)
+
+
+def queue_workspace_bakes(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> tuple[tuple[str, tuple[int, int]], ...]:
+    """Queue the bakes every generated world of one workspace is missing under the stage this
+    installation runs, in the caller's transaction, and return each world and tile queued: for
+    each snapshot a recipe's composer composed, its own tiles (:func:`queue_world_bakes`) and the
+    tiles each of its versions' building changes alter
+    (:func:`~exulanica.world.version_tiles.queue_version_bakes`). The tile worker runs it once for
+    each workspace it serves, so a stage change bakes each world's tiles, and each changed town's
+    changed tiles, again once. A world whose receipt cannot be read, and a version whose changes
+    its town's grammar refuses, are passed over: their tiles stay as they read."""
+    from exulanica.world.version_tiles import queue_version_bakes, version_changes
+
+    with connection.cursor(row_factory=dict_row) as cursor:
+        rows = cursor.execute(
+            "select world_id, snapshot_id from world_structure_snapshot "
+            "where workspace_id=%s and composer_key = any(%s) order by world_id, snapshot_id",
+            (workspace_id, sorted(generated_composer_keys() - KIND_COMPOSERS)),
+        ).fetchall()
+    queued: list[tuple[str, tuple[int, int]]] = []
+    for row in rows:
+        world_id, snapshot_id = str(row["world_id"]), row["snapshot_id"]
+        try:
+            digest, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+        except (InvalidStructuralData, UnknownWorldResource):
+            continue
+        for tile in queue_world_bakes(
+            connection, workspace_id, world_id, snapshot_id, receipt, digest
+        ):
+            queued.append((world_id, tile))
+        with connection.cursor(row_factory=dict_row) as cursor:
+            versions = cursor.execute(
+                "select version_id from world_alternate_version where workspace_id=%s "
+                "and world_id=%s and source_snapshot_id=%s order by version_id",
+                (workspace_id, world_id, snapshot_id),
+            ).fetchall()
+        for version in versions:
+            # A town whose grammar no longer generates it, or refuses a version's changes, is
+            # passed over as an unreadable receipt is, in a savepoint so nothing it queued stays:
+            # one such version never stops the sweep, the worker's drain or another workspace.
+            try:
+                with connection.transaction():
+                    changes = version_changes(
+                        connection, workspace_id, world_id, snapshot_id, version["version_id"]
+                    )
+                    changed_tiles = queue_version_bakes(
+                        connection,
+                        workspace_id,
+                        world_id,
+                        snapshot_id,
+                        version["version_id"],
+                        changes,
+                    )
+            except (InvalidStructuralData, UnknownWorldResource):
+                continue
+            for changed in changed_tiles:
+                queued.append((world_id, (changed.tile_x, changed.tile_y)))
+    return tuple(queued)
 
 
 def _snapshot(

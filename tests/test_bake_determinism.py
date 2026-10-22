@@ -279,7 +279,7 @@ def test_the_fixture_tile_s_key_is_the_one_every_bake_of_it_was_stored_under():
     digest, not the record)."""
     spec = stage("baked_tile")
     tile = fixture_document().tile
-    known = uuid.UUID("490c2c65-2b97-5cb9-a6ba-5f5e87712135")
+    known = uuid.UUID("ffc977da-6ec6-5990-afca-1c8807a2616b")
     assert baked_tile_id(spec, tile) == known
     assert baked_tile_key(spec, tile_inputs_digest(tile)) == known
     with pytest.raises(ValueError, match="64 lowercase"):

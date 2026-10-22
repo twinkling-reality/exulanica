@@ -96,12 +96,12 @@ def baked(tmp_path_factory) -> list[dict[str, Any]]:  # type: ignore[no-untyped-
 
 
 #: The level small town on this file's world id, each tile's container digest by its place: what a
-#: level town bakes to. The rules for a town on land (a footway's ramp into a mitred corner, the
-#: ground a halo record takes from the tile beside its owner) leave it alone, and its two tiles
-#: share records over their seam.
+#: level town bakes to. The rules for a town on land (a footway's ramp into a mitred corner) leave
+#: it alone; a street one tile owns takes its ground from the other tile's terrain across the seam,
+#: as on land; and its two tiles share records over their seam.
 LEVEL_TOWN_TILES = {
-    (0, 0): "503404ddd2b3e5a01da8f43a27784e9cb3544231a9bd8b9d3cf19390b6d433c3",
-    (1, 0): "c9840d3f6444bb3f0290d3f7f77717874583b3ad3fad3340d0e0729ceb2ffe26",
+    (0, 0): "f33eb4f0df0a8b77fcbf0498a51dea44b9594ddb1deb7a9290156b023141d495",
+    (1, 0): "dfa248a51b9dd966efa22f0976a8328b67a4573e3e41d56bba05c23f670faa64",
 }
 
 
@@ -111,6 +111,68 @@ def test_a_level_town_bakes_byte_for_byte_as_it_did(tmp_path: Path) -> None:
         place: hashlib.sha256(container).hexdigest() for place, container in _bakes(made, tmp_path)
     }
     assert digests == LEVEL_TOWN_TILES
+
+
+#: A level small town one of whose streets, owned by tile (1, 0), crosses the seam into tile (0, 0).
+LEVEL_SEAM_WORLD = "world:generated:brown-0"
+#: The kinds that draw a street's surfaces.
+STREET_KINDS = frozenset({"city.street_segment", "city.curb_edge", "city.junction"})
+
+
+def _plan_height(triangle: list[list[int]], x: float, y: float) -> float | None:
+    """The height of ``triangle``'s plane over plan point ``(x, y)``, or None outside it."""
+    (ax, ay, az), (bx, by, bz), (cx, cy, cz) = triangle
+    area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    if area <= 0:
+        return None
+    wa = ((bx - x) * (cy - y) - (by - y) * (cx - x)) / area
+    wb = ((cx - x) * (ay - y) - (cy - y) * (ax - x)) / area
+    wc = 1 - wa - wb
+    if min(wa, wb, wc) < -1e-9:
+        return None
+    return wa * az + wb * bz + wc * cz
+
+
+def test_no_terrain_stands_over_a_street_a_level_town_draws_across_its_seam(tmp_path: Path) -> None:
+    """A street one tile owns is a halo record in the tile beside it, and takes its ground from that
+    tile's terrain as it does in a town on land. The page stands a person on the highest surface
+    over a point, so terrain left under a carriageway, level at the town's ground while the
+    carriageway's camber falls below it, is the ground they would walk and see."""
+    made = compose_generated_world(town_recipe("small_town"), LEVEL_SEAM_WORLD)
+    terrain: list[list[list[int]]] = []
+    streets: list[list[list[int]]] = []
+    for _place, container in _bakes(made, tmp_path):
+        tile = _read(container)
+        triangles = tile["triangles"]["nav_envelope"]
+        for kind, entry in _entries(tile, "nav_envelope"):
+            if entry["state"] != "drawn":
+                continue
+            drawn = triangles[
+                entry["first_triangle"] : entry["first_triangle"] + entry["triangle_count"]
+            ]
+            if kind == "city.terrain":
+                terrain += drawn
+            elif kind in STREET_KINDS:
+                streets += drawn
+    assert terrain and streets
+    cells: dict[tuple[int, int], list[int]] = {}
+    for index, triangle in enumerate(terrain):
+        xs, ys = [p[0] for p in triangle], [p[1] for p in triangle]
+        for cx in range(min(xs) // 4000, max(xs) // 4000 + 1):
+            for cy in range(min(ys) // 4000, max(ys) // 4000 + 1):
+                cells.setdefault((cx, cy), []).append(index)
+    over = []
+    for street in streets:
+        x = sum(p[0] for p in street) / 3
+        y = sum(p[1] for p in street) / 3
+        under = _plan_height(street, x, y)
+        if under is None:
+            continue
+        for index in cells.get((int(x) // 4000, int(y) // 4000), []):
+            above = _plan_height(terrain[index], x, y)
+            if above is not None and above > under + 1:
+                over.append((round(x), round(y), round(under), round(above)))
+    assert over == [], f"terrain stands over {len(over)} street triangles, first {over[:3]}"
 
 
 def _read(container: bytes) -> dict[str, Any]:

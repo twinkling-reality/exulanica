@@ -60,7 +60,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * level terrain patch expands to the bytes it did (held by the tile golden, the triangle-digest
  * conformance, the bake determinism tests and the street rules' own digest).
  */
-export const TESSELLATOR_SOURCE_VERSION = 20;
+export const TESSELLATOR_SOURCE_VERSION = 21;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the

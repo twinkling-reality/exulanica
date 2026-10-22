@@ -14,7 +14,7 @@ that no production build emits these bytes or the code that reads them.
   pnpm tess bake packages/loom-tess/test/fixtures/tile-conformance.json packages/app/src/dev/tiles/tile-conformance.owd
   ```
 
-- sha256: `7b7c9fe9464a2de7264a56ae830ca0dd7ed59b1f8a51150dde415a1792e51678` (703,588 bytes).
+- sha256: `132cc3839202ec383c945c06ee6decdff9ca1c3024c713b5dc158acb1e67d2e3` (703,588 bytes).
 - render_batch triangle digest: `185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4`,
   the value tess's own conformance test pins.
 
@@ -67,3 +67,9 @@ occasion on which that was predicted in advance and measured afterwards.
 The lesson for whoever moves a schema next: on this format a record's place is content-addressed, so
 "a schema change moves no geometry" is true of the geometry and false of its order. The check that
 tells them apart is the triangle multiset, not the section digest.
+
+The bytes moved again with tessellator 21. This tile carries no street across a seam, so of what
+tessellator 21 changes (a street a neighbour tile owns takes its ground from this tile's terrain in
+every town) nothing reaches it: the header's `tessellator_version` is the only change, from `7b7c9fe9464a2de7264a56ae830ca0dd7ed59b1f8a51150dde415a1792e51678` to
+`132cc3839202ec383c945c06ee6decdff9ca1c3024c713b5dc158acb1e67d2e3`, at the same 703,588 bytes,
+and `render_batch` held at `185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4`.

@@ -568,8 +568,12 @@ entry again every second, reopening the world once every tile is baked. A tile i
 once its bake job is done, both of its bakes having agreed. A tile whose two bakes differed is never
 served, a tile whose bake job failed (the tessellator refused it, a publish was refused through
 every claim, or every claim was stranded) is never drawn, and in either case the page says the world
-is not drawn rather than waiting. The world's people hang from a root at the city's origin under the
-environment root, at the height of the surface where a person arrives (`hostGeneratedSociety`),
+is not drawn rather than waiting. A tessellator that bakes other bytes is a new stage, stated by a
+migration, and the tile worker's first pass over each workspace queues one bake for every tile of
+its generated worlds, and every tile a version's building changes alter, that has none under that
+stage (`queue_workspace_bakes`), so a world made before it is baked again once and its stored bake
+is kept, never served again. The world's people
+hang from a root at the city's origin under the environment root, at the height of the surface where a person arrives (`hostGeneratedSociety`),
 because the society states plan positions only.
 
 **A version's own tiles.** A version of a made town whose changes remove a building or stand it

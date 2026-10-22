@@ -68,7 +68,12 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import WorkspaceStores, version_tile_lock_key
 from exulanica.world.baked_tiles import BakedTileRepository
 from exulanica.world.composers import composer_module
-from exulanica.world.generated_worlds import BAKE_JOB_KIND, town_records, town_records_with
+from exulanica.world.generated_worlds import (
+    BAKE_JOB_KIND,
+    queue_workspace_bakes,
+    town_records,
+    town_records_with,
+)
 from exulanica.world.version_tiles import (
     VERSION_BAKE_JOB_KIND,
     changes_fold,
@@ -304,15 +309,27 @@ class GeneratedTileBaker:
             self._cwd = cli.parent
             required = (node, cli)
         self._worker = worker
+        # The workspaces whose generated worlds this worker has looked over for missing bakes.
+        self._looked_over: set[uuid.UUID] = set()
         for path in required:
             if not path.exists():
                 raise FileNotFoundError(f"the tessellator needs {path}; install or compile it")
 
     def drain(self, workspaces: Iterable[uuid.UUID]) -> list[BakeOutcome]:
         """End each workspace's stranded bakes, then bake every claimable job, one at a time, and
-        say what happened to each."""
+        say what happened to each.
+
+        The first time this worker drains a workspace it queues one bake for each tile of its
+        generated worlds that has none under the stage this worker runs and none waiting
+        (:func:`~exulanica.world.generated_worlds.queue_workspace_bakes`). A stage change ships
+        with a new worker, so every world baked under the stage before is baked again once,
+        and nothing stored is changed or deleted."""
         outcomes = []
         for workspace_id in sorted(workspaces):
+            if workspace_id not in self._looked_over:
+                with self._session(workspace_id) as connection:
+                    queue_workspace_bakes(connection, workspace_id)
+                self._looked_over.add(workspace_id)
             with self._session(workspace_id) as connection:
                 for row in abandon_stranded(connection, workspace_id, self._kinds):
                     payload = row["payload"]

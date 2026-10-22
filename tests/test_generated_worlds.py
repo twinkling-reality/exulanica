@@ -1223,6 +1223,50 @@ def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(
         assert (tile["state"], tile["baked_tile_id"]) == ("baked", str(second.baked_tile_id))
 
 
+def test_a_new_worker_bakes_each_tile_of_a_stage_before_it_again_once_and_deletes_nothing(
+    made, tmp_path, monkeypatch, one_tile_town
+):
+    """A stage change ships with a new worker. Nothing else queues a bake for a world made before
+    it, so without the worker's first look over its workspace the tile would read baking for ever;
+    with it, each tile of the stage before is baked once again, and the stored bake stays."""
+    api = made
+    store = tile_store(tmp_path / "data")
+    api.client.app.state.services = dataclasses.replace(api.client.app.state.services, tiles=store)
+    entry = _town(api, "Healed")
+    workspace = api.repository.workspace_id
+    [first] = _baker(api, store, tmp_path, monkeypatch).drain([workspace])
+    owner = api.repository.connection
+    spec = STAGES["baked_tile"]
+    monkeypatch.setitem(
+        bake_worker.STAGES, "baked_tile", dataclasses.replace(spec, version=spec.version + 1)
+    )
+
+    def jobs() -> int:
+        return owner.execute(
+            "select count(*) as n from job where workspace_id=%s and kind=%s",
+            (workspace, BAKE_JOB_KIND),
+        ).fetchone()["n"]
+
+    with stated_stage(owner, spec.version + 1, spec.params_digest):
+        [tile] = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
+        assert (tile["state"], tile["baked_tile_id"]) == ("baking", None)
+        before = jobs()
+        worker = _baker(api, store, tmp_path, monkeypatch)
+        [second] = worker.drain([workspace])
+        assert jobs() == before + 1
+        assert second.status == "baked" and second.baked_tile_id != first.baked_tile_id
+        [tile] = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
+        assert (tile["state"], tile["baked_tile_id"]) == ("baked", str(second.baked_tile_id))
+        # Looked over once: a later pass, and another look, queue nothing more.
+        assert worker.drain([workspace]) == []
+        assert generated_worlds_module.queue_workspace_bakes(owner, workspace) == ()
+        assert jobs() == before + 1
+        kept = owner.execute(
+            "select count(*) as n from baked_tile where baked_tile_id=%s", (first.baked_tile_id,)
+        ).fetchone()["n"]
+        assert kept == 1
+
+
 def test_a_town_whose_homes_hold_more_than_this_host_runs_is_refused_by_name(made, monkeypatch):
     """A town whose homes hold more people than this host runs a minute of is refused by that name
     where its society is made, and not as a malformed input: an input records a population of any
