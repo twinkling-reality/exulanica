@@ -14,7 +14,7 @@ import {
   createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, quietCommand, sentenceField, sentenceRow, setOrbReady,
   type FilmStrip, type LightPage, type SentenceField,
 } from './world-ui-create.ts';
-import { CREATE_WORDS, madeSpent, priceLine, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
+import { CREATE_WORDS, ceilingAmount, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
 import {
   MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards, writeMade,
 } from './create-steps.mjs';
@@ -59,6 +59,13 @@ const codeOf = (error: unknown): string | null => {
 };
 
 interface StartCard { readonly key: string; readonly start: () => Promise<SavedWorldEntry> }
+
+/** A start refused for its price: the quote expired, or the operation it was for changed (N32). */
+const PRICE_CODES: readonly string[] = ['world_draft_price_expired', 'world_draft_operation_changed', 'world_draft_bound_too_small'];
+/** The page's own mark for a refusal whose new price is higher than the one agreed to, said with its figure (N32). */
+const PRICE_UP = 'price_up';
+/** A price that cannot be read now (N25), said in the plain ink while the offer is read again. */
+const PRICE_UNAVAILABLE = 'world_draft_price_unavailable';
 
 /**
  * Opens Create a world over the front door, or returns null where this page has no credentials or
@@ -105,8 +112,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   // The submission a press of Create sends; the same one again on a retry of the same words, so a
   // start whose answer was lost is never a second draft (the idempotency key).
   let submission: { readonly words: string; readonly sent: WorldMakingStart } | null = null;
-  // A refusal said under the field, with what was spent, until the words change or the offer is read again.
-  let refusal: { readonly code: string; readonly spent: string | null } | null = null;
+  // A refusal said under the field, with what was spent, until the words change or the offer is read again;
+  // `words` where its sentence carries a figure (a higher price, N32).
+  let refusal: { readonly code: string; readonly spent: string | null; readonly words?: string } | null = null;
   let offerFailures = 0, offerOffline = false;
   // The sentence that names the cards where no field is drawn (N24), else null.
   let sentenceId: string | null = null;
@@ -144,7 +152,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const limit = offer?.descriptionCharacters ?? 1000;
       field = sentenceField({ limit, value: keptWords, onInput: (words) => {
         keptWords = words;
-        if (refusal !== null && refusal.code !== 'world_draft_price_expired') { refusal = null; drawCreate(); field?.field.focus(); return; }
+        if (refusal !== null && refusal.code !== 'world_draft_price_expired' && refusal.code !== PRICE_UP && refusal.code !== PRICE_UNAVAILABLE) { refusal = null; drawCreate(); field?.field.focus(); return; }
         if (orb) setOrbReady(orb, ready());
         keys();
       } });
@@ -159,7 +167,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       else if (now !== null) head.push(lightLine(refusalWords(now), { tone: 'refused', live: true }));
       else {
         if (refusal !== null) {
-          head.push(lightLine(refusalWords(refusal.code), { tone: 'refused', live: true }));
+          head.push(lightLine(refusal.words ?? refusalWords(refusal.code), refusal.code === PRICE_UNAVAILABLE ? { live: true } : { tone: 'refused', live: true }));
           if (refusal.spent) head.push(lightLine(refusal.spent, { tone: 'refused' }));
         }
         if (offer?.operation) head.push(lightLine(priceLine(offer.operation.maximumUsd)));
@@ -266,8 +274,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   };
   let priceRetries = 0;
 
-  /** Create: starts a draft of the words (N2), then follows it on frame 21. */
-  const create = async (): Promise<void> => {
+  /** Create: starts a draft of the words (N2), then follows it on frame 21. `requoted` on the start made at once
+   * with a new quote no higher than the one agreed to (N32), which is not made again from its own refusal. */
+  const create = async (requoted = false): Promise<void> => {
     const words = field?.field.value.trim() ?? '';
     if (!ready() || offer?.operation == null) return;
     busy = true;
@@ -276,12 +285,14 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const operation = offer.operation;
       submission = { words, sent: { idempotencyKey: crypto.randomUUID(), operation, maximumUsd: operation.maximumUsd } };
     }
+    // The most the person agreed to spend: a new quote no higher than it starts at once (N32).
+    const agreed = submission.sent.maximumUsd;
     try {
       const draft = await making.start(words, submission.sent);
       submission = null;
       busy = false;
       if (signal.aborted) return;
-      if (draft.state === 'refused') { refused(draft.refusal?.code ?? 'world_draft_failed', null); return; }
+      if (draft.state === 'refused') { refused(draft.refusal?.code ?? 'world_draft_failed', null, requoted ? null : agreed); return; }
       void follow(draft.draftId, words);
     } catch (error) {
       busy = false;
@@ -290,20 +301,47 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       // A start whose answer never came keeps its key, so Create again is the same start.
       if (code === null) { refused('world_draft_failed', null); return; }
       submission = null;
-      refused(code, null);
+      refused(code, null, requoted ? null : agreed);
     }
   };
 
-  /** Back on frame 20 with the words kept, the refusal said and what was spent (N9). */
-  const refused = (code: string, spent: string | null): void => {
+  /**
+   * Back on frame 20 with the words kept, the refusal said and what was spent (N9). A price refused
+   * at the start (the quote expired, or its operation changed) reads the offer again (`requote`).
+   */
+  const refused = (code: string, spent: string | null, agreed: string | null = null): void => {
+    if (PRICE_CODES.includes(code)) { void requote(code, spent, agreed, 0); return; }
     refusal = { code, spent };
-    // A price that changed, or a start refused now: the offer is read again for the new most.
-    if (code === 'world_draft_price_expired' || code === 'world_draft_operation_changed' || code === 'world_draft_bound_too_small') {
-      void readRaw('/worlds/drafts', signal).then((raw) => {
-        offer = parseWorldDraftOffer(raw);
-        if (!signal.aborted && form === 'create') drawCreate();
-      }, () => {});
+    drawCreate();
+    field?.field.focus({ preventScroll: true });
+  };
+
+  /**
+   * The offer read again after a start refused for its price (N32): where the new most it can spend
+   * is no more than `agreed`, the most the person agreed to, it starts at once with the new quote and
+   * says nothing of a price; where it is higher it stops and says the new figure, and Create again
+   * starts at it; with no start agreed to, the new most is shown under "The price changed". Where no
+   * new most can be read, it says so in the plain ink and reads it again with N25's backoff, then the
+   * same rule (N32 as built).
+   */
+  const requote = async (code: string, spent: string | null, agreed: string | null, failures: number): Promise<void> => {
+    let most: string | null = null;
+    try {
+      const raw = await readRaw('/worlds/drafts', signal);
+      offer = parseWorldDraftOffer(raw);
+      rawOffer = raw;
+      most = offer.operation?.maximumUsd ?? null;
+    } catch { most = null; }
+    if (signal.aborted || form !== 'create') return;
+    if (most === null) {
+      refusal = { code: PRICE_UNAVAILABLE, spent };
+      drawCreate();
+      const next = afterRead(failures, false, 0);
+      window.setTimeout(() => { if (!signal.aborted && form === 'create') void requote(code, spent, agreed, next.failed); }, next.retryMs);
+      return;
     }
+    if (agreed !== null && Number(most) <= Number(agreed)) { refusal = null; void create(true); return; }
+    refusal = agreed !== null ? { code: PRICE_UP, spent, words: priceUp(ceilingAmount(most)) } : { code, spent };
     drawCreate();
     field?.field.focus({ preventScroll: true });
   };

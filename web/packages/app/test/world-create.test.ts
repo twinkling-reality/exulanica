@@ -222,7 +222,7 @@ describe('the made note', () => {
 // Create a world as a page (create-world.ts, frames 20 and 21) over stand-in answers: the offer and
 // the draft reads come through the workspace's own read path, a start through the app's client.
 const opened: string[] = [];
-const starts: { words: string; key: string }[] = [];
+const starts: { words: string; key: string; most: string }[] = [];
 let startAnswer: () => Promise<unknown> = async () => ({ draftId: 'd-1', state: 'queued', refusal: null });
 vi.mock('../../../../tools/previews/world-workspace/front-door.ts', () => ({
   chosenWorldPicture: () => null,
@@ -237,7 +237,7 @@ vi.mock('../src/world-making-api.ts', async (original) => {
   return {
     ...real,
     WorldMakingClient: class {
-      async start(words: string, submission: { idempotencyKey: string }) { starts.push({ words, key: submission.idempotencyKey }); return startAnswer(); }
+      async start(words: string, submission: { idempotencyKey: string; maximumUsd: string }) { starts.push({ words, key: submission.idempotencyKey, most: submission.maximumUsd }); return startAnswer(); }
     },
   };
 });
@@ -364,5 +364,92 @@ describe('Create a world as a page', () => {
     await settle();
     expect(opened).toEqual(['starter']);
     expect(JSON.parse(sessionStorage.getItem('exulanica.made.v1')!)).toMatchObject({ entryId: 'starter', build: true });
+  });
+
+  describe('a start refused for its price (N32)', () => {
+    const quoted = (maximum: string) => offerOf({ operation: { ...offerOf().operation, maximum_usd: maximum } });
+    /** The offer first at $1.43, then at `next` once the start is refused for an expired quote. */
+    const pressedWith = async (next: string): Promise<void> => {
+      const offers = [quoted('1.4227'), quoted(next)];
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        const body = address === '/review-api/worlds/drafts' ? (offers.length > 1 ? offers.shift() : offers[0]) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      let answers = 0;
+      startAnswer = async () => (answers++ === 0
+        ? { draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_price_expired' } }
+        : { draftId: 'd-2', state: 'queued', refusal: null });
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+    };
+
+    it('stops and says the new figure when the price went up: a positive control', async () => {
+      await pressedWith('1.6');
+      expect(starts.map((one) => one.most)).toEqual(['1.4227']);
+      expect(document.body.textContent).toContain('The price went up before it started. It can now spend at most $1.60.');
+      // Create again starts at the new price.
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle();
+      expect(starts.map((one) => one.most)).toEqual(['1.4227', '1.6']);
+    });
+
+    it('starts again at once with the new quote and says nothing of a price when it is the same', async () => {
+      await pressedWith('1.4227');
+      expect(starts.map((one) => [one.words, one.most])).toEqual([['A harbour at night', '1.4227'], ['A harbour at night', '1.4227']]);
+      expect(starts[1]!.key).not.toBe(starts[0]!.key);
+      expect(document.body.textContent).not.toMatch(/price changed|price went up/u);
+    });
+
+    it('starts again at once when the new quote is lower, at the lower price', async () => {
+      await pressedWith('1.2');
+      expect(starts.map((one) => one.most)).toEqual(['1.4227', '1.2']);
+      expect(document.body.textContent).not.toMatch(/price changed|price went up/u);
+    });
+
+    it('says the price cannot be read while the new quote is unreadable, then starts at the same price', async () => {
+      const unreadable = offerOf({ offered: false, code: 'world_draft_price_unavailable', operation: null });
+      const offers = [quoted('1.4227'), unreadable, quoted('1.4227')];
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        const body = address === '/review-api/worlds/drafts' ? (offers.length > 1 ? offers.shift() : offers[0]) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      let answers = 0;
+      startAnswer = async () => (answers++ === 0
+        ? { draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_price_expired' } }
+        : { draftId: 'd-2', state: 'queued', refusal: null });
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      const said = document.body.textContent!;
+      expect(said).toContain('The price can’t be read right now. Trying again.');
+      expect(said).not.toContain('The price changed before it started.');
+      expect(starts).toHaveLength(1);
+      // Read again after the first backoff: the same price, so it starts at once and says nothing.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      await settle();
+      expect(starts.map((one) => one.most)).toEqual(['1.4227', '1.4227']);
+    });
+
+    it('says the price cannot be read in the plain ink where the read again fails, not that it changed', async () => {
+      let reads = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        if (address !== '/review-api/worlds/drafts') return { ok: true, status: 200, json: async () => ({ state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 }) };
+        // The offer reads once, then every read again fails.
+        return reads++ === 0 ? { ok: true, status: 200, json: async () => quoted('1.4227') } : { ok: false, status: 503, json: async () => ({}) };
+      }));
+      startAnswer = async () => ({ draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_price_expired' } });
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      const line = [...document.querySelectorAll('p, div, span')].find((one) => one.children.length === 0 && one.textContent === 'The price can’t be read right now. Trying again.');
+      expect(line).toBeDefined();
+      expect(line!.getAttribute('data-tone')).toBeNull(); // The plain ink, not the refusal's.
+      expect(document.body.textContent).not.toContain('The price changed before it started.');
+      expect(starts).toHaveLength(1);
+    });
   });
 });

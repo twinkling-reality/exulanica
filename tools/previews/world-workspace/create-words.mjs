@@ -94,6 +94,9 @@ export const REFUSAL_BY_CODE = Object.freeze({
   world_not_drafted: 'notDrafted',
 });
 
+/** A start refused for its price whose new most is higher than the one agreed to (N32): "$1.60" in, the sentence out. */
+export const priceUp = (amount) => `The price went up before it started. It can now spend at most ${amount}.`;
+
 /** The sentence for a refusal's code; never the code, its `meaning` or its `detail`. */
 export function refusalWords(code) {
   const key = typeof code === 'string' && Object.hasOwn(REFUSAL_BY_CODE, code) ? REFUSAL_BY_CODE[code] : 'failed';

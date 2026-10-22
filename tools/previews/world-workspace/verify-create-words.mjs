@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
   CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, cardSub, ceilingAmount, countWords, madeSpent, priceLine,
-  refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime,
+  priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime,
 } from './create-words.mjs';
 
 // Frame 20's words, as WORDS.md "Making a world" and N1 to N20 say them.
@@ -49,6 +49,8 @@ assert.equal(madeSpent({ spentUsd: 0.31 }, '1.4227'), '$0.31 of the $1.43 set as
 // Money (rule 5): a limit rounded up to the cent; under a cent four places; "less than $0.0001"; "$0".
 assert.equal(ceilingAmount('1.43'), '$1.43');
 assert.equal(ceilingAmount('1.4300001'), '$1.44');
+// N32: a higher price is said with its new figure; the same or a lower one is never said at all.
+assert.equal(priceUp(ceilingAmount('1.6')), 'The price went up before it started. It can now spend at most $1.60.');
 assert.equal(madeSpent({ spentUsd: 0.0042 }, '1.43'), '$0.0042 of the $1.43 set aside');
 assert.equal(madeSpent({ spentUsd: 0.00001 }, '1.43'), 'less than $0.0001 of the $1.43 set aside');
 assert.equal(madeSpent({ spentUsd: 0 }, '1.43'), '$0 of the $1.43 set aside');
@@ -108,7 +110,7 @@ assert.equal(setValue(null), null);
 // Never on screen: a code, "US$", "provider", "session", an em dash; no line ends in the old "Design" line.
 const said = [
   ...Object.values(CREATE_WORDS), ...Object.values(STEP_WORDS), ...Object.values(REFUSAL_WORDS),
-  priceLine('1.43'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2), refusalSpent({ spentUsd: 0.02 }),
+  priceLine('1.43'), priceUp('$1.60'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2), refusalSpent({ spentUsd: 0.02 }),
   setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'By the sea' }], words: ['by the sea'] }),
 ];
 for (const line of said) {
