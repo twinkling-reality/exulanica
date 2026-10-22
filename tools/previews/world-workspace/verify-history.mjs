@@ -98,6 +98,15 @@ assert.deepEqual(asked.lines.map((line) => [line.subject, line.quote, text(line.
   ['marco', '“Any for the hotel?”', 'By a person playing'],
 ]);
 assert.deepEqual([text(went.by), text(asked.by)], ['By Nemotron 3 Super 120B', 'By a person playing']);
+// A meeting the routine made, where a model said the line, names that model (H19); routine throughout, nobody.
+const routineMet = (lineDecider) => historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],
+  said: [said(412, 'teo', 'ines', 'Morning, Ines.', lineDecider)] }] }, names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
+assert.deepEqual([text(routineMet(model('Nemotron 3 Super 120B')).by), routineMet({ kind: 'routine', model: null }).by], ['By Nemotron 3 Super 120B', null]);
+// The first of them: a person playing spoke before the model answered.
+const twoLines = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],
+  said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'person', model: null }), said(413, 'ines', 'teo', 'Morning.', model('Nemotron 3 Super 120B'))] }] },
+  names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
+assert.equal(text(twoLines.by), 'By a person playing');
 // Only an answer that differs is a branch, the newest drawn; a same answer is one small line on the card.
 assert.deepEqual([text(met.branch.head), met.branch.outcome, met.same], ['Asked again with Qwen3 235B', 'Teo would have gone to the market', null]);
 assert.deepEqual([asked.branch, text(asked.same)], [null, 'Qwen3 235B chose the same']);

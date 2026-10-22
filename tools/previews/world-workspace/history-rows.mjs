@@ -140,7 +140,8 @@ function momentItem(moment, names, clock) {
     lines,
     shown: lines.slice(0, CARD_LINES).map((line) => line.words),
     more: lines.length > CARD_LINES ? moreLinesWords(lines.length - CARD_LINES) : null,
-    by: byParts(moment.decider),
+    // Who chose it, else who chose the first of its lines (H19): a model's words are never shown unnamed.
+    by: byParts(moment.decider) ?? lines.find((line) => line.by)?.by ?? null,
     same: same ? sameChoiceParts(same.model?.name ?? '') : null,
     branch: differing ? { head: askedAgainParts(differing.model?.name ?? ''), outcome: answerWords(differing, actor, names) } : null,
     answers: branches.map((branch) => answerParts(branch.model?.name ?? '', branch.same_choice === true, answerWords(branch, actor, names))),
