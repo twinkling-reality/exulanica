@@ -468,15 +468,19 @@ application draws such a world as [readers in the browser](#readers-in-the-brows
 
 ## Settings
 
-The settings catalog (`assets/catalogs/landscape-settings/landscape-setting.v1.json`, read by
-`exulanica/grammar/landscape/settings.py`) names landscapes a world of a kind can stand in. Each entry
-states a `key`, a `label`, a whole `exulanica.landscape/v1` document read and held as every landscape
-is, the shipped kinds whose worlds start on it (`starters`, each a kind's key and version), and a
-reason and a licence. Keys are unique and a kind starts on one setting at most; a catalog that breaks
-a rule is refused where it broke it. Version 1 holds `island_over_the_bay`: a sky island 40 m across
-with a gentle hill for its top, 95 m over a bay with two sea stacks and two smaller islands, its
-site's corner 11 m west and south of the island's middle, so a site up to 22 m square stands on its
-top. Its one starter is the shipped kind `island_hamlet`, "Hamlet on a sky island".
+The settings catalog (`assets/catalogs/landscape-settings/landscape-setting.v2.json`, read by
+`exulanica/grammar/landscape/settings.py`; version 1 stays at its path and is not read) names
+landscapes a world of a kind can stand in. Each entry states a `key`, a `label`, a whole
+`exulanica.landscape/v1` document read and held as every landscape is, the shipped kinds whose worlds
+start on it (`starters`, each a kind's key and version), and a reason and a licence, and may state
+`setting_parts`, a part's key for each axis of the setting parts catalog it names, which a world
+started on it is drawn in ([world kinds contract](world-kinds-contract.md)). Keys are unique and a
+kind starts on one setting at most; a catalog that breaks a rule is refused where it broke it, and a
+part the setting parts catalog does not hold is refused where a world is drawn in it. Version 2 holds
+`island_over_the_bay`: a sky island 40 m across with a gentle hill for its top, 95 m over a bay with
+two sea stacks and two smaller islands, its site's corner 11 m west and south of the island's middle,
+so a site up to 22 m square stands on its top, under a clear noon sky. Its one starter is the shipped
+kind `island_hamlet`, "Hamlet on a sky island".
 
 A world of a starter made with no land, landscape or support of its own, as Create a world's card for
 it makes one, is composed on its setting's landscape exactly as any world on a volume's top is

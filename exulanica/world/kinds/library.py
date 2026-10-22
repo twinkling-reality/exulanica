@@ -30,12 +30,16 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.grammar.documents import read_json
 from exulanica.grammar.errors import CatalogError
 from exulanica.world.kinds.catalogs import CATALOG_DIRECTORY
 from exulanica.world.kinds.document import KindDocument, read_kind
+
+if TYPE_CHECKING:
+    from exulanica.grammar.landscape import LandscapeSetting
+    from exulanica.world.models import StylePackBinding
 
 __all__ = [
     "ADAPTER_PROFILE",
@@ -43,6 +47,8 @@ __all__ = [
     "TownAdapter",
     "shipped_kinds",
     "starter_landscape",
+    "starter_look",
+    "starter_setting_parts",
     "town_adapter",
 ]
 
@@ -126,10 +132,10 @@ def town_adapter() -> TownAdapter:
     return town
 
 
-def starter_landscape(kind: KindDocument) -> dict[str, Any] | None:
-    """The landscape a world of ``kind`` is made on when its making names none: the setting the
-    settings catalog starts it on, for a shipped kind's own document only (its digest the shipped
-    one's); None for every other kind, a workspace's of the same key included."""
+def _starting(kind: KindDocument) -> LandscapeSetting | None:
+    """The setting the settings catalog starts ``kind`` on, for a shipped kind's own document only
+    (its digest the shipped one's); None for every other kind, a workspace's of the same key
+    included."""
     from exulanica.grammar.landscape import starting_setting
 
     shipped = next(
@@ -137,5 +143,50 @@ def starter_landscape(kind: KindDocument) -> dict[str, Any] | None:
     )
     if shipped is None or shipped.sha256 != kind.sha256:
         return None
-    setting = starting_setting(kind.kind, kind.version)
+    return starting_setting(kind.kind, kind.version)
+
+
+def starter_landscape(kind: KindDocument) -> dict[str, Any] | None:
+    """The landscape a world of ``kind`` is made on when its making names none: its setting's,
+    as :func:`_starting` finds it; None where it starts on none."""
+    setting = _starting(kind)
     return None if setting is None else setting.landscape()
+
+
+def starter_setting_parts(kind: KindDocument) -> dict[str, str] | None:
+    """The setting parts a world of ``kind`` made on its setting is drawn in, a part's key for each
+    axis its setting names; None where it starts on no setting or its setting names none. Refuses
+    (:class:`CatalogError`) a part the setting parts catalog does not hold."""
+    from exulanica.world.world_settings import setting_parts
+
+    setting = _starting(kind)
+    if setting is None or not setting.setting_parts:
+        return None
+    held = setting_parts().parts
+    for axis, part in setting.setting_parts:
+        if (axis, part) not in held:
+            raise CatalogError(
+                f"setting {setting.key} names the {axis} part {part!r}, which the setting "
+                "parts catalog does not hold"
+            )
+    return dict(setting.setting_parts)
+
+
+def starter_look(kind: KindDocument) -> StylePackBinding | None:
+    """What a world of ``kind`` made on its setting is drawn in: the host's default look with the
+    setting its setting's parts compose for that look, as a drafted world's taken parts are; None
+    where its setting names no parts or they change nothing of that look."""
+    from exulanica.world.models import StylePackBinding
+    from exulanica.world.style_pack_library import style_pack_context, style_pack_library
+    from exulanica.world.world_settings import bound_setting
+
+    parts = starter_setting_parts(kind)
+    if parts is None:
+        return None
+    library = style_pack_library()
+    pack = library.default_pack
+    chain = library.chain(pack.manifest_sha256)
+    setting = None if chain is None else bound_setting(chain, style_pack_context(), chosen=parts)
+    if setting is None:
+        return None
+    return StylePackBinding(pack.pack_id, pack.version, pack.manifest_sha256, setting=setting)

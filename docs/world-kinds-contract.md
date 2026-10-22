@@ -792,7 +792,12 @@ town's receipt or digest depends on the adapter.
   the erasure routes below; a retained world receipt prevents erasure.
 - The library ships the town's adapter and one site-grammar kind, the island hamlet ("Hamlet on a
   sky island", `island_hamlet.v1.json`), which starts on the settings catalog's sky island over the
-  bay. The kinds under `tests/fixtures/world-kinds` are hand-written test fixtures.
+  bay. A world made from its card (no land, landscape or support of its own) is drawn in the
+  setting parts that setting names (`landscape-setting.v2.json`: a clear noon sky) over the host's
+  look: the host's default pack with those parts composed for it, named as the world's second
+  version as `POST /worlds/generated` names a town's look. A world of a workspace's kind of the same
+  key, or one made with its own landscape, starts on no setting and is drawn in the host's look as
+  it states. The kinds under `tests/fixtures/world-kinds` are hand-written test fixtures.
 - Only the ground storey of a structure is walked inside. A structure stands at most six storeys,
   or as many as bounds version 3 states for a kind that names it; every storey above the ground is
   drawn, not walked, and a taller structure adds no slot to the drawing and no place to the walk.

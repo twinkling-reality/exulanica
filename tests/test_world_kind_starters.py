@@ -1,8 +1,8 @@
 """A served starter: a shipped kind whose worlds start on a setting, a named landscape in the
 settings catalog. The catalog reads and holds each landscape as every landscape is held; only the
-shipped document itself starts there, never a workspace's kind of the same key; and a world of it
-made with no land, landscape or support of its own is composed on its setting's island, arriving
-with something in view."""
+shipped document itself starts there, never a workspace's kind of the same key; a world of it made
+with no land, landscape or support of its own is composed on its setting's island, arriving with
+something in view, and drawn in the setting parts its setting names over the host's look."""
 
 from __future__ import annotations
 
@@ -12,17 +12,26 @@ import re
 from typing import Any
 
 import pytest
+from exulanica.grammar import landscape as landscapes
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.landscape import landscape_settings, read_settings, starting_setting
-from exulanica.grammar.landscape.settings import SETTINGS_DIRECTORY
+from exulanica.grammar.landscape.settings import SETTINGS_DIRECTORY, SETTINGS_VERSION
 from exulanica.world.composers import site_plan
 from exulanica.world.kinds import worker
 from exulanica.world.kinds.document import read_kind
-from exulanica.world.kinds.library import shipped_kinds, starter_landscape
+from exulanica.world.kinds.library import (
+    shipped_kinds,
+    starter_landscape,
+    starter_look,
+    starter_setting_parts,
+)
 from exulanica.world.kinds.samples import SiteRefused, check_samples
+from exulanica.world.style_pack_library import style_pack_library
 
 WORLD = "world:generated:starter"
-SHIPPED = json.loads((SETTINGS_DIRECTORY / "landscape-setting.v1.json").read_text(encoding="utf-8"))
+SHIPPED = json.loads(
+    (SETTINGS_DIRECTORY / f"landscape-setting.v{SETTINGS_VERSION}.json").read_text(encoding="utf-8")
+)
 
 
 def island_hamlet() -> Any:
@@ -33,6 +42,7 @@ def test_the_shipped_setting_stands_the_island_hamlet_on_a_sky_island_over_the_b
     (setting,) = landscape_settings()
     assert (setting.key, setting.label) == ("island_over_the_bay", "Sky island over the bay")
     assert setting.starters == (("island_hamlet", 1),)
+    assert setting.setting_parts == (("sky", "clear_noon"),)
     assert starting_setting("island_hamlet", 1) is setting
     assert starting_setting("island_hamlet", 2) is None and starting_setting("town", 1) is None
     landscape = setting.landscape()
@@ -116,7 +126,7 @@ def _catalog(change: Any) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("change", "where"),
     [
-        (lambda raw: raw.update(catalog_version=2), "catalog_version"),
+        (lambda raw: raw.update(catalog_version=1), "catalog_version"),
         (lambda raw: raw["entries"].append(copy.deepcopy(raw["entries"][0])), "entries"),
         (lambda raw: raw["entries"][0]["landscape"]["site"].update(on="nowhere"), "landscape"),
         (lambda raw: raw["entries"][0].update(starters=[]), "starters"),
@@ -124,6 +134,10 @@ def _catalog(change: Any) -> dict[str, Any]:
         (lambda raw: raw["entries"][0].update(reason="Too short."), "reason"),
         (lambda raw: raw["entries"][0]["licence"].update(spdx="GPL-3.0"), "licence"),
         (lambda raw: raw["entries"][0].pop("label"), "entries[0]"),
+        (lambda raw: raw["entries"][0].update(look="exulanica.cozy-town"), "entries[0]"),
+        (lambda raw: raw["entries"][0].update(setting_parts=["clear_noon"]), "setting_parts"),
+        (lambda raw: raw["entries"][0]["setting_parts"].update(Sky="dusk"), "setting_parts.Sky"),
+        (lambda raw: raw["entries"][0]["setting_parts"].update(sky=3), "setting_parts.sky"),
     ],
 )
 def test_a_settings_catalog_that_breaks_a_rule_is_refused_where_it_broke(change, where):
@@ -140,3 +154,29 @@ def test_a_kind_starts_on_one_setting_at_most():
 
     with pytest.raises(CatalogError, match="one setting at most"):
         read_settings(_catalog(twice))
+
+
+def test_a_starter_is_drawn_in_its_settings_parts_over_the_hosts_look():
+    kind = island_hamlet()
+    assert starter_setting_parts(kind) == {"sky": "clear_noon"}
+    look = starter_look(kind)
+    assert look is not None
+    # The host's look, as every served starter wears it, with the clear noon composed for it.
+    assert look.pack_id == style_pack_library().default_pack.pack_id
+    setting = json.loads(look.setting or "{}")
+    assert setting["parts"] == [{"axis": "sky", "key": "clear_noon"}]
+    assert setting["light"]["changes"]["sun.elevation_mdeg"] > 60_000
+    # A workspace's kind of the same key starts on no setting and is drawn as the host draws it.
+    own = copy.deepcopy(dict(kind.document))
+    own["summary"] = "Our own hamlet, on open ground."
+    assert starter_setting_parts(read_kind(own)) is None and starter_look(read_kind(own)) is None
+
+
+def test_a_setting_naming_a_part_the_parts_catalog_does_not_hold_is_refused(monkeypatch):
+    def unheld(raw: dict[str, Any]) -> None:
+        raw["entries"][0]["setting_parts"] = {"sky": "purple_rain"}
+
+    (setting,) = read_settings(_catalog(unheld))
+    monkeypatch.setattr(landscapes, "starting_setting", lambda kind, version: setting)
+    with pytest.raises(CatalogError, match="purple_rain"):
+        starter_setting_parts(island_hamlet())

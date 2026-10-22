@@ -12,6 +12,7 @@ import uuid
 import pytest
 from exulanica.world.generated_worlds import generation_receipt
 from exulanica.world.site_top import SITE_TOP_PROFILE
+from exulanica.world.style_pack_library import style_pack_library
 
 from test_site_land_postgres import LAND, _farm
 from test_site_on_island import LANDSCAPE
@@ -121,3 +122,27 @@ def test_the_shipped_island_hamlet_is_made_on_its_island_as_its_card_makes_it(ma
         )
     assert receipt["composer"] == {"key": "site-plan", "version": 7}
     assert receipt["landscape"]["site"]["on"] == "isle"
+    # Drawn in its setting's clear noon over the host's look, named as the world's second version.
+    world = f"world_id={entry['world_id']}"
+    versions = sorted(
+        api.get(f"/world/styles/versions?{world}").json(), key=lambda version: version["revision"]
+    )
+    first, second = versions
+    assert first["style_pack"] is None
+    worn = second["style_pack"]
+    assert worn["pack_id"] == style_pack_library().default_pack.pack_id
+    assert worn["setting"]["parts"] == [{"axis": "sky", "key": "clear_noon"}]
+    assert second["provenance"]["origin_reference"] == "world-creation"
+    assert entry["style_version_id"] == second["version_id"]
+    # Made with a landscape of its own, it starts on no setting and is drawn as the host draws it.
+    own = api.post(
+        "/worlds/kinds/island_hamlet/worlds",
+        {
+            "version": card["version"],
+            "preset": card["presets"][0]["key"],
+            "title": "Our own island",
+            "landscape": LANDSCAPE,
+        },
+    )
+    assert own.status_code == 201, own.text
+    assert len(api.get(f"/world/styles/versions?world_id={own.json()['world_id']}").json()) == 1

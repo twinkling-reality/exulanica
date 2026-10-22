@@ -28,6 +28,7 @@ answers at once with a draft the page polls at ``GET /worlds/kinds/drafts/{draft
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import uuid
@@ -72,7 +73,8 @@ from exulanica.selection.kind_drafting import kind_drafting_prompt
 from exulanica.selection.world_drafting import sendable
 from exulanica.world import draft_admission
 from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
-from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.creation_look import name_creation_look
+from exulanica.world.errors import InvalidStructuralData, StyleWriteBusy
 from exulanica.world.generated_worlds import generation_receipt, states_records, states_site
 from exulanica.world.kind_draft_jobs import KindDraftRepository
 from exulanica.world.kinds.document import (
@@ -83,7 +85,7 @@ from exulanica.world.kinds.document import (
     read_kind,
 )
 from exulanica.world.kinds.erasure import KindErasureRefused, erase_kind, removal_preview
-from exulanica.world.kinds.library import shipped_kinds, town_adapter
+from exulanica.world.kinds.library import shipped_kinds, starter_look, town_adapter
 from exulanica.world.kinds.repository import (
     KindCapReached,
     KindUnreadable,
@@ -109,6 +111,7 @@ from exulanica.world.kinds.worker import (
     town_land_job,
     town_land_key,
 )
+from exulanica.world.models import StylePackBinding
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
 from exulanica.world.world_draft_jobs import WorldDraftRefused
 from exulanica.world.world_recipes import (
@@ -948,6 +951,7 @@ def create_kind_world(
         connection, session.workspace_id, services.store, guest=guest
     )
     used_kind: KindDocument | None = None
+    look: StylePackBinding | None = None
     try:
         if kind == town_adapter().kind and body.version in (None, town_adapter().version):
             if body.support is not None:
@@ -990,6 +994,9 @@ def create_kind_world(
                 return _problem(404, "unknown_world_kind", f"no world kind is named {kind!r}")
             used_kind = found
             values = found.values(body.preset, body.values)
+            if body.land is None and body.landscape is None and body.support is None:
+                # Made from its card: a served starter is drawn in the setting it names.
+                look = starter_look(found)
             composer = WorkerComposer(
                 session.workspace_id,
                 support=body.support,
@@ -1039,6 +1046,10 @@ def create_kind_world(
         return _problem(409, exc.code, str(exc), returns_at=exc.returns_at.isoformat())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
+    if look is not None:
+        # Refused as busy, the world stays as made, in the host's look.
+        with contextlib.suppress(StyleWriteBusy):
+            created = name_creation_look(entries, created, look, session.actor)
     return _view(created, societies_of_things=services.societies_of_things)
 
 
