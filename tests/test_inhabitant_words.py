@@ -2,7 +2,7 @@
 
 The inspector (``web/packages/app/src/society-inhabitant-words.ts``) and the Companion
 (``exulanica/selection/inhabitant_words.py``) read
-``assets/catalogs/society-words/society-inhabitant-words.v7.json`` and choose among its words by
+``assets/catalogs/society-words/society-inhabitant-words.v8.json`` and choose among its words by
 the same rule. Both run ``tests/fixtures/society-inhabitant-words/cases.json``; this file runs it
 for the server, and ``web/packages/app/test/society-inhabitant-words.test.ts`` for the page. A
 change to either side's choice, or to the words, fails one of them.
@@ -52,7 +52,13 @@ def _said(case: dict) -> dict:
         place_words=None if place is None else PlaceWords(**place),
         bridge_label=CASES["bridges"].get,
     )
-    return {"who": words.who, "what": words.what, "doing": words.doing, "why": words.why}
+    return {
+        "who": words.who,
+        "what": words.what,
+        "doing": words.doing,
+        "why": words.why,
+        "done": words.done,
+    }
 
 
 @pytest.mark.parametrize("case", CASES["cases"], ids=[case["case"] for case in CASES["cases"]])
@@ -67,6 +73,20 @@ def test_the_cases_reach_every_sentence_of_what_a_person_is_doing():
     for code, template in catalog.tables["doing"].items():
         pattern = re.escape(template)
         for name in ("place", "partner", "still", "around"):
+            pattern = pattern.replace(re.escape("{" + name + "}"), ".*")
+        assert any(re.fullmatch(pattern, said) for said in expected), code
+
+
+def test_the_cases_reach_every_sentence_of_what_a_person_did():
+    """A row of a person's day says the doing it took up in the past: each such sentence is one
+    some case expects, none says how long was left, and none ends as a sentence does (a title)."""
+    catalog = inhabitant_words_catalog()
+    expected = [case["expected"]["done"] for case in CASES["cases"]]
+    assert set(catalog.tables["done"]) == set(catalog.tables["doing"])
+    for code, template in catalog.tables["done"].items():
+        assert "{still}" not in template and not template.endswith("."), code
+        pattern = re.escape(template)
+        for name in ("place", "partner", "around"):
             pattern = pattern.replace(re.escape("{" + name + "}"), ".*")
         assert any(re.fullmatch(pattern, said) for said in expected), code
 
@@ -134,9 +154,13 @@ def test_the_catalog_refuses_an_entry_it_would_misread(tmp_path):
     unknown["entries"].append({**unknown["entries"][0], "kind": "mood", "key": "mood.restore_need"})
     twice = json.loads(json.dumps(document))
     twice["entries"].append(twice["entries"][0])
+    # A doing with no words for what a person did leaves a row of their day with none.
+    lacking = json.loads(json.dumps(document))
+    lacking["entries"] = [e for e in lacking["entries"] if e["key"] != "done.walking_to_visit"]
     for name, broken, message in (
         ("unknown.json", unknown, "unknown kind"),
         ("twice.json", twice, "stated twice"),
+        ("lacking.json", lacking, "what a person did are not those for what they do"),
     ):
         path = tmp_path / name
         path.write_text(json.dumps(broken), encoding="utf-8")

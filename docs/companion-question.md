@@ -347,7 +347,7 @@ scene](../exulanica/selection/society_scene.py)), and a society Selection that r
 searched.
 
 Who someone is, what they are doing and why are the inspector's own words, from one data file both
-read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v7.json)), cited
+read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v8.json)), cited
 to the society's state and to the event that explains it, read by its id however long ago it was
 recorded, with no model call. The page and the server choose among those words by one rule, held by
 cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). A person whose
@@ -357,7 +357,9 @@ what to do next" and "They finished work.". The words never call
 a person, a day or a minute simulated: who someone is opens with their role and says they are
 "invented for this world" ("Office worker in this town, invented for this world."), and how many more
 minutes an activity takes is said in minutes; a surface in the world says the activity alone, without
-its minutes left. A person who
+its minutes left. The same file says each doing in the past for a row of a person's day that their
+routine set ("Went to visit the cafe at number 10", "Waited", "Went to work"), by the same choice;
+the Companion does not read those words. A person who
 came in from outside this world is never called invented for it: the page and the Companion say where
 they came from, as the door lists their bridge for the workspace (or "outside this world" where it
 lists none), and who decides for them there, this world or the program they came with, from their

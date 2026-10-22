@@ -12,7 +12,7 @@ interface Case {
   readonly profile?: string;
   readonly place_words?: PlaceWords;
   readonly person: WordedPerson;
-  readonly expected: { readonly who: string; readonly what: string; readonly doing: string; readonly why: string };
+  readonly expected: { readonly who: string; readonly what: string; readonly doing: string; readonly why: string; readonly done: string };
 }
 
 const CASES = JSON.parse(
@@ -24,7 +24,7 @@ const CASES = JSON.parse(
   readonly cases: readonly Case[];
 };
 const CATALOG = JSON.parse(
-  readFileSync(new URL('../../../../assets/catalogs/society-words/society-inhabitant-words.v7.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../../assets/catalogs/society-words/society-inhabitant-words.v8.json', import.meta.url), 'utf8'),
 ) as { readonly entries: readonly { readonly kind: string; readonly code: string; readonly words: string }[] };
 
 describe('a simulated person in words, as the server says them', () => {
@@ -42,7 +42,7 @@ describe('a simulated person in words, as the server says them', () => {
     expect(inhabitantWordsFrom(saved.state.inhabitants[0]!, () => null, () => null, saved.state.profile))
       .toEqual({ who: 'Ari Ash 1',
         what: 'Walker invented for this world: not anyone you know, and nothing they do is a memory.',
-        doing: 'Standing, deciding where to go.', why: 'Because they have only just arrived.' });
+        doing: 'Standing, deciding where to go.', why: 'Because they have only just arrived.', done: 'Stood, deciding where to go' });
   });
   it('describes a living resident without an identifier or a need level', () => {
     const said = livingInhabitantWords({
@@ -54,7 +54,7 @@ describe('a simulated person in words, as the server says them', () => {
     }, 6);
     expect(said).toEqual({
       who: 'Resident 7', what: 'Shopkeeper in this town, invented for this world. They have a home and an assigned workplace.',
-      doing: 'walking to work', why: 'Their work shift is due.',
+      doing: 'walking to work', why: 'Their work shift is due.', done: 'Went to work',
     });
     expect(JSON.stringify(said)).not.toMatch(/of 1000|premises:|[0-9a-f]{8}-[0-9a-f]{4}/);
   });
@@ -92,6 +92,16 @@ describe('a simulated person in words, as the server says them', () => {
     expect(held.expected.doing).toMatch(/, \d+ more minutes\.$/);
     expect(words(false).doing).toBe('Standing a while.');
     expect({ ...words(false), doing: held.expected.doing }).toEqual(held.expected);
+  });
+
+  it('has words for what a person did for exactly the doings it has, said as a row is, with no minutes left', () => {
+    const codes = (kind: string) => CATALOG.entries.filter((entry) => entry.kind === kind).map((entry) => entry.code).sort();
+    // The positive control: the catalog was read and has doings.
+    expect(codes('doing').length).toBeGreaterThan(20);
+    expect(codes('done')).toEqual(codes('doing'));
+    for (const entry of CATALOG.entries.filter((one) => one.kind === 'done')) {
+      expect(entry.words, entry.code).not.toMatch(/\{still\}|\.$/u);
+    }
   });
 
   it('reads its reason words from the catalog, not from a copy', () => {

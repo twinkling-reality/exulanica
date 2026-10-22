@@ -250,6 +250,7 @@ describe('who a person is and what they are doing, in words', () => {
       what: 'Steward invented for this world: not anyone you know, and nothing they do is a memory.',
       doing: 'Standing, deciding where to go.',
       why: 'Because they have only just arrived.',
+      done: 'Stood, deciding where to go',
     });
     const walking = words({
       goal: { kind: 'rest', target_id: 't-bench', reason: 'restore_need' },

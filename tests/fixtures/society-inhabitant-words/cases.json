@@ -1,5 +1,5 @@
 {
-  "about": "Cases both readers of society-inhabitant-words.v5.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
+  "about": "Cases both readers of society-inhabitant-words.v8.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
   "places": {
     "target:bench": "Bench 2",
     "target:pillar": "Pillar"
@@ -22,7 +22,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Nothing is recorded about what they are doing.",
-        "why": ""
+        "why": "",
+        "done": "Nothing is recorded about what they did"
       }
     },
     {
@@ -37,7 +38,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Nothing is recorded about what they are doing.",
-        "why": ""
+        "why": "",
+        "done": "Nothing is recorded about what they did"
       },
       "profile": "exulanica-society/v2"
     },
@@ -59,7 +61,8 @@
         "who": "Someone",
         "what": "Inhabitant invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because they have only just arrived."
+        "why": "Because they have only just arrived.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -84,7 +87,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
-        "why": "Because every place they could use is taken."
+        "why": "Because every place they could use is taken.",
+        "done": "Waited"
       }
     },
     {
@@ -105,7 +109,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
-        "why": "Because their kind does none of the things people do here."
+        "why": "Because their kind does none of the things people do here.",
+        "done": "Waited"
       }
     },
     {
@@ -130,7 +135,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a spot to stand a while.",
-        "why": "Because they chose to stop and stand a while."
+        "why": "Because they chose to stop and stand a while.",
+        "done": "Went to stand a while"
       }
     },
     {
@@ -156,7 +162,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking over to talk with Bela Ash 2.",
-        "why": "Because they met someone and stopped to talk."
+        "why": "Because they met someone and stopped to talk.",
+        "done": "Went over to talk with Bela Ash 2"
       }
     },
     {
@@ -182,7 +189,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking over to talk with someone nearby.",
-        "why": "Because they met someone and stopped to talk."
+        "why": "Because they met someone and stopped to talk.",
+        "done": "Went over to talk with someone nearby"
       }
     },
     {
@@ -207,7 +215,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a free spot nearby.",
-        "why": "Because they have finished there, and someone else may need the place."
+        "why": "Because they have finished there, and someone else may need the place.",
+        "done": "Went to a free spot nearby"
       }
     },
     {
@@ -232,7 +241,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a free spot nearby.",
-        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
+        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used.",
+        "done": "Went to a free spot nearby"
       }
     },
     {
@@ -257,7 +267,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to Bench 2 to rest.",
-        "why": "Because they need a rest, and it is the nearest place to rest they have not just used."
+        "why": "Because they need a rest, and it is the nearest place to rest they have not just used.",
+        "done": "Went to rest at Bench 2"
       }
     },
     {
@@ -282,7 +293,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to Pillar to visit.",
-        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
+        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used.",
+        "done": "Went to visit Pillar"
       }
     },
     {
@@ -307,7 +319,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Walking to a place that is no longer there to visit.",
-        "why": "Because they are rested enough to look around, and chose this place."
+        "why": "Because they are rested enough to look around, and chose this place.",
+        "done": "Went to visit a place that is no longer there"
       }
     },
     {
@@ -332,7 +345,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Resting at Bench 2, one more minute.",
-        "why": "Because they chose to sit a while."
+        "why": "Because they chose to sit a while.",
+        "done": "Rested at Bench 2"
       }
     },
     {
@@ -357,7 +371,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Visiting Pillar, 4 more minutes.",
-        "why": "Because they are rested enough to look around, and chose this place."
+        "why": "Because they are rested enough to look around, and chose this place.",
+        "done": "Visited Pillar"
       }
     },
     {
@@ -382,7 +397,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because they finished resting at Bench 2."
+        "why": "Because they finished resting at Bench 2.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -407,7 +423,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because they finished visiting Pillar."
+        "why": "Because they finished visiting Pillar.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -432,7 +449,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing a while, 2 more minutes.",
-        "why": "Because they chose to stop and stand a while."
+        "why": "Because they chose to stop and stand a while.",
+        "done": "Stood a while"
       }
     },
     {
@@ -457,7 +475,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing a while, 2 more minutes.",
-        "why": "Because the model you chose for them picked it."
+        "why": "Because the model you chose for them picked it.",
+        "done": "Stood a while"
       }
     },
     {
@@ -482,7 +501,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because they had stood there as long as they meant to."
+        "why": "Because they had stood there as long as they meant to.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -508,7 +528,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Talking with Bela Ash 2, 3 more minutes.",
-        "why": "Because they met someone and stopped to talk."
+        "why": "Because they met someone and stopped to talk.",
+        "done": "Talked with Bela Ash 2"
       }
     },
     {
@@ -534,7 +555,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Talking with Bela Ash 2, 3 more minutes.",
-        "why": "Because the model you chose for them picked it."
+        "why": "Because the model you chose for them picked it.",
+        "done": "Talked with Bela Ash 2"
       }
     },
     {
@@ -560,7 +582,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting for Bela Ash 2, to talk.",
-        "why": "Because the person they are meeting is still on the way."
+        "why": "Because the person they are meeting is still on the way.",
+        "done": "Waited to talk with Bela Ash 2"
       }
     },
     {
@@ -586,7 +609,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting for Bela Ash 2, to talk.",
-        "why": "Because the person they are meeting is still on the way."
+        "why": "Because the person they are meeting is still on the way.",
+        "done": "Waited to talk with Bela Ash 2"
       }
     },
     {
@@ -612,7 +636,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because Bela Ash 2 left while they were talking."
+        "why": "Because Bela Ash 2 left while they were talking.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -638,7 +663,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because the person they were talking with left."
+        "why": "Because the person they were talking with left.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -659,7 +685,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing aside.",
-        "why": "Because they stepped out of the way."
+        "why": "Because they stepped out of the way.",
+        "done": "Stood aside"
       }
     },
     {
@@ -684,7 +711,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because you asked them to go there."
+        "why": "Because you asked them to go there.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -705,7 +733,8 @@
         "who": "Ari Ash 1",
         "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing, deciding where to go.",
-        "why": "Because the reason is only in the record."
+        "why": "Because the reason is only in the record.",
+        "done": "Stood, deciding where to go"
       }
     },
     {
@@ -734,7 +763,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -764,7 +794,8 @@
         "who": "Resident 1",
         "what": "Office worker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -794,7 +825,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "eating at home",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Ate at home"
       },
       "profile": "exulanica-society/v5"
     },
@@ -825,7 +857,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished eating at home."
+        "why": "They finished eating at home.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -855,7 +888,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "eating out",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Ate out"
       },
       "profile": "exulanica-society/v5"
     },
@@ -886,7 +920,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished eating out."
+        "why": "They finished eating out.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -916,7 +951,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "resting",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Rested"
       },
       "profile": "exulanica-society/v5"
     },
@@ -947,7 +983,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished resting."
+        "why": "They finished resting.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -978,7 +1015,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished what they were doing."
+        "why": "They finished what they were doing.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1008,7 +1046,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "shopping",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Shopped"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1039,7 +1078,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished shopping."
+        "why": "They finished shopping.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1069,7 +1109,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "sleeping at home",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Slept at home"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1100,7 +1141,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They got up at home."
+        "why": "They got up at home.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1130,7 +1172,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "spending time at home",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Spent time at home"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1161,7 +1204,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished spending time at home."
+        "why": "They finished spending time at home.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1191,7 +1235,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "taking a walk",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Took a walk"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1222,7 +1267,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished a walk."
+        "why": "They finished a walk.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1252,7 +1298,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "visiting a place",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Visited a place"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1283,7 +1330,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished a visit."
+        "why": "They finished a visit.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1313,7 +1361,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "working",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Worked"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1344,7 +1393,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "deciding what to do next",
-        "why": "They finished work."
+        "why": "They finished work.",
+        "done": "Decided what to do next"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1374,7 +1424,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "carrying out an activity",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Carried out an activity"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1404,7 +1455,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking home to eat",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went home to eat"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1434,7 +1486,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to a meal",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went out to eat"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1464,7 +1517,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to a place to rest",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went to rest"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1494,7 +1548,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to shop",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went shopping"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1524,7 +1579,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking home to sleep",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went home to sleep"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1554,7 +1610,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "going home",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went home"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1584,7 +1641,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "taking a walk",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Took a walk"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1614,7 +1672,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to visit a place",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Went to visit a place"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1644,7 +1703,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking to work",
-        "why": "Their work shift is due."
+        "why": "Their work shift is due.",
+        "done": "Went to work"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1674,7 +1734,8 @@
         "who": "Resident 1",
         "what": "Baker in this town, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking through town",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Walked through town"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1709,7 +1770,8 @@
         "who": "Resident 1",
         "what": "Farmhand on this farm, invented for this world. They have a home and an assigned workplace.",
         "doing": "walking across the farm",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Walked across the farm"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1742,7 +1804,8 @@
         "who": "Resident 3",
         "what": "Builder at this building site, invented for this world. They have an assigned workplace and no recorded home.",
         "doing": "walking to work",
-        "why": "Their work shift is due."
+        "why": "Their work shift is due.",
+        "done": "Went to work"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1773,7 +1836,8 @@
         "who": "Resident 2",
         "what": "Resident at {role}'s yard, invented for this world. They have a home and no assigned workplace.",
         "doing": "walking round {here}",
-        "why": "Their routine chose this to meet a need."
+        "why": "Their routine chose this to meet a need.",
+        "done": "Walked round {here}"
       },
       "profile": "exulanica-society/v5"
     },
@@ -1793,7 +1857,8 @@
         "who": "Visitor 1",
         "what": "Traveller who came in from Block Game, not invented for this world: this world decides what they do here.",
         "doing": "Nothing is recorded about what they are doing.",
-        "why": ""
+        "why": "",
+        "done": "Nothing is recorded about what they did"
       }
     },
     {
@@ -1811,7 +1876,8 @@
         "who": "Visitor 1",
         "what": "Traveller who came in from Block Game, not invented for this world: the program they came with decides what they do here.",
         "doing": "Nothing is recorded about what they are doing.",
-        "why": ""
+        "why": "",
+        "done": "Nothing is recorded about what they did"
       }
     },
     {
@@ -1830,7 +1896,8 @@
         "who": "Visitor 1",
         "what": "Traveller who came in from outside this world, not invented for this world: the program they came with decides what they do here.",
         "doing": "Nothing is recorded about what they are doing.",
-        "why": ""
+        "why": "",
+        "done": "Nothing is recorded about what they did"
       }
     },
     {
@@ -1849,7 +1916,8 @@
         "who": "Visitor 1",
         "what": "Traveller invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Nothing is recorded about what they are doing.",
-        "why": ""
+        "why": "",
+        "done": "Nothing is recorded about what they did"
       }
     },
     {
@@ -1870,7 +1938,8 @@
         "who": "Someone",
         "what": "Inhabitant invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
-        "why": "Because their routine chose to wait."
+        "why": "Because their routine chose to wait.",
+        "done": "Waited"
       }
     },
     {
@@ -1891,7 +1960,8 @@
         "who": "Someone",
         "what": "Inhabitant invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Waiting.",
-        "why": "Because their routine has no preferred activity available here."
+        "why": "Because their routine has no preferred activity available here.",
+        "done": "Waited"
       }
     }
   ]

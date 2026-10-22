@@ -159,7 +159,7 @@ What a role in a world also needs:
   junction signal role is compared by its own records (migration 0132,
   [signal comparisons](traffic-contract.md#signal-comparisons)).
 - **Words.** The page and the Companion have words for the person's reason codes only, the
-  `decision_reason` entries of `assets/catalogs/society-words/society-inhabitant-words.v7.json`,
+  `decision_reason` entries of `assets/catalogs/society-words/society-inhabitant-words.v8.json`,
   held to the person's reasons by `tests/test_companion_decision_model.py` and
   `web/packages/app/test/society-models-words-parity.test.ts`.
 - **One role per subject at a time.** A subject has at most one request a minute, whatever its
@@ -1128,4 +1128,4 @@ admission route.
 | The owner's choice and its read | `exulanica/world/society_model_choice_repository.py`, `exulanica/api/routes/society_models.py`, migrations 0110 and 0117 | `tests/test_society_person_decisions_postgres.py`, `tests/test_decision_roles_postgres.py` |
 | Reservations, receipts and their tables | `exulanica/world/society_decision_repository.py`, migrations 0055, 0110 and 0117 | `tests/test_society_decision_migration.py`, `tests/test_person_role_goldens_postgres.py` |
 | The host's phase and spend | `exulanica/api/decision_host.py`, `exulanica/api/decision_admission.py`, `exulanica/api/society_control_worker.py` | `tests/test_society_person_decisions_postgres.py`, `tests/test_society_model_actions_postgres.py` |
-| Words for reasons | `assets/catalogs/society-words/society-inhabitant-words.v7.json`, `web/packages/app/src/ui/society-models.ts` | `tests/test_companion_decision_model.py`, `web/packages/app/test/society-models-words-parity.test.ts` |
+| Words for reasons | `assets/catalogs/society-words/society-inhabitant-words.v8.json`, `web/packages/app/src/ui/society-models.ts` | `tests/test_companion_decision_model.py`, `web/packages/app/test/society-models-words-parity.test.ts` |

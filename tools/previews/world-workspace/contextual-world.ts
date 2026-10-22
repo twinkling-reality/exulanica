@@ -721,7 +721,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         wordGoal: (document) => {
           if (!facts) return null;
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };
-          return doingLine(characterFacts(shown, showing.row.scene.id)?.doing ?? null);
+          return doingLine(characterFacts(shown, showing.row.scene.id)?.done ?? null);
         } });
       // The chosen row stays where it was; at first it is the newest row a decision stands behind. A
       // line heard is never chosen (T6).

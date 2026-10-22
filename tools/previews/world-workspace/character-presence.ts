@@ -153,8 +153,8 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
 
 /**
  * What the society read says of one character: the catalog's sentence for what they are doing (as
- * the Companion words it), whether the society is a living one, and its clock's first minute
- * (null where the society keeps no clock). Null when the read does not hold the character.
+ * the Companion words it) and the same said in the past (a row of their day), whether the society is a living one, and
+ * its clock's first minute (null where the society keeps no clock). Null when the read does not hold the character.
  */
 export function characterFacts(snapshot: SocietySnapshot | null, subjectId: string, playedByPerson = false): CharacterFacts | null {
   const inhabitants = snapshot?.state.inhabitants ?? [];
@@ -165,20 +165,20 @@ export function characterFacts(snapshot: SocietySnapshot | null, subjectId: stri
   const living = societyEngine(profile ?? DEFAULT_SOCIETY_ENGINE).stateFamily === 'living';
   const held = person as unknown as { readonly role?: unknown; readonly has_home?: boolean; readonly has_work?: boolean; readonly goal?: unknown };
   const role = typeof held.role === 'string' ? held.role : held.role && typeof (held.role as { label?: unknown }).label === 'string' ? (held.role as { label: string }).label : null;
-  let doing: string | null = null;
+  let doing: string | null = null, done: string | null = null;
   try {
     if (living) {
       const goal = held.goal && typeof held.goal === 'object' && 'activity' in held.goal ? held.goal as { activity: string; reason?: string } : null;
-      doing = livingInhabitantWords({ role, has_home: held.has_home === true, has_work: held.has_work === true, action: person.action ?? null, goal }, ordinal).doing;
+      ({ doing, done } = livingInhabitantWords({ role, has_home: held.has_home === true, has_work: held.has_work === true, action: person.action ?? null, goal }, ordinal));
     } else {
       const listed = new Map((snapshot.places?.targets ?? []).filter(target => target.enabled).map(target => [target.targetId, target.place ?? null] as const));
       // In the world the activity is said alone, never how many minutes it has left.
-      doing = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson, { still: false }).doing;
+      ({ doing, done } = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson, { still: false }));
     }
-  } catch { doing = null; }
+  } catch { doing = null; done = null; }
   const state = snapshot.state as unknown as { readonly start_minute_of_day?: unknown; readonly clock?: { readonly start_minute_of_day?: unknown } | null };
   const start = living ? state.start_minute_of_day ?? state.clock?.start_minute_of_day : state.clock?.start_minute_of_day;
-  return { person, kind: role, doing, living, startMinute: Number.isSafeInteger(start) ? start as number : null };
+  return { person, kind: role, doing, done, living, startMinute: Number.isSafeInteger(start) ? start as number : null };
 }
 
 export interface CharacterFacts {
@@ -186,6 +186,8 @@ export interface CharacterFacts {
   /** What the society calls the character's role ("resident", "cook"), or null. */
   readonly kind: string | null;
   readonly doing: string | null;
+  /** What they were doing, said in the past as a row of their day says it ("Went to visit the cafe at number 10"). */
+  readonly done: string | null;
   readonly living: boolean;
   readonly startMinute: number | null;
 }

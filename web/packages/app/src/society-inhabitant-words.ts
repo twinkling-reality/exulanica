@@ -1,6 +1,6 @@
 /**
  * Who a simulated person is and what they are doing, in words, read from the one data file the
- * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v7.json`.
+ * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v8.json`.
  *
  * The choice of sentence for a state is code here and in `exulanica/selection/inhabitant_words.py`,
  * and both run the same cases (`tests/fixtures/society-inhabitant-words/cases.json`), so the
@@ -8,13 +8,16 @@
  * sentence here says what anybody talked about.
  */
 
-import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v7.json?raw';
+import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v8.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 import { societyEngine } from './society-engines.js';
 
-/** The entry kinds the catalog holds; a kind outside these is refused when the page loads. */
-const KINDS = ['reason', 'phrase', 'doing', 'outcome', 'event_reason', 'line', 'decision_reason'] as const;
+/**
+ * The entry kinds the catalog holds; a kind outside these is refused when the page loads. `done` says each `doing` in
+ * the past, as a row of a person's day says what they did.
+ */
+const KINDS = ['reason', 'phrase', 'doing', 'outcome', 'event_reason', 'line', 'decision_reason', 'done'] as const;
 type Kind = (typeof KINDS)[number];
 
 interface CatalogEntry {
@@ -49,6 +52,10 @@ function readTables(entries: readonly CatalogEntry[]): Readonly<Record<Kind, Rea
     if (entry.key !== `${kind}.${entry.code}` || !entry.words) throw new Error(`entry ${entry.key} is malformed`);
     if (entry.code in tables[kind]) throw new Error(`entry ${entry.key} is stated twice`);
     tables[kind][entry.code] = entry.words;
+  }
+  const doings = Object.keys(tables.doing);
+  if (doings.length !== Object.keys(tables.done).length || !doings.every((code) => code in tables.done)) {
+    throw new Error('the words for what a person did are not those for what they do');
   }
   return tables;
 }
@@ -123,12 +130,16 @@ export function reasonWords(code: string): string {
   return TABLES.reason[code] ?? TABLES.event_reason[code] ?? fill(words('phrase', 'reason_unknown'), { code });
 }
 
-/** A person's own words at the top of the inspector: who, what they are doing now, and why. */
+/**
+ * A person's own words at the top of the inspector: who, what they are doing now, and why; and `done`, the same doing
+ * said in the past as a row of their day says it ("Went to visit the cafe at number 10").
+ */
 export interface InhabitantWords {
   readonly who: string;
   readonly what: string;
   readonly doing: string;
   readonly why: string;
+  readonly done: string;
 }
 
 /** What the words read of one person's recorded state. */
@@ -223,7 +234,7 @@ export function inhabitantWordsFrom(
     });
   const action = person.action ?? undefined;
   const goal = person.goal !== null && typeof person.goal === 'object' && 'kind' in person.goal ? (person.goal as WordedGoal) : null;
-  if (action === undefined) return { who, what, doing: words('doing', 'nothing_recorded'), why: '' };
+  if (action === undefined) return { who, what, doing: words('doing', 'nothing_recorded'), why: '', done: words('done', 'nothing_recorded') };
   const where = (targetId: string | null | undefined): string =>
     targetId ? place(targetId) ?? words('phrase', 'place_gone') : words('phrase', 'place_none');
   const remaining = action.remaining_ticks ?? 0;
@@ -251,6 +262,7 @@ export function inhabitantWordsFrom(
       : action.reason === 'waiting_for_partner' ? 'waiting_to_talk' : under.underWayDoing;
   } else chosen = completed ? 'standing_aside' : 'deciding';
   const doing = fill(words('doing', chosen), { place: where(action.target_id), partner: met, still });
+  const done = fill(words('done', chosen), { place: where(action.target_id), partner: met });
   // The goal says why a person set out. Once they are blocked, the action says why; so it does for
   // standing and talking when it records news since they set out (the other person is still on the
   // way, has gone, or the time is up), but not the reason that only restates the activity under
@@ -264,13 +276,13 @@ export function inhabitantWordsFrom(
   const own = TABLES.phrase[`why_${chosen}_${action.reason}`];
   const named = goal?.partner_id ? partner(goal.partner_id) : null;
   const finished = own === undefined ? TABLES.phrase[`why_${chosen}`] : named ? own : undefined;
-  if (finished !== undefined) return { who, what, doing, why: fill(finished, { place: where(action.target_id), partner: met }) };
+  if (finished !== undefined) return { who, what, doing, why: fill(finished, { place: where(action.target_id), partner: met }), done };
   const code = !acting && goal !== null ? goal.reason : action.reason;
   const reason = code !== 'chosen_by_their_model' ? reasonWords(code)
     : playedByPerson ? words('phrase', 'chosen_by_their_player')
     : decidedFromOutside ? words('phrase', 'chosen_by_their_program')
     : reasonWords(code);
-  return { who, what, doing, why: fill(words('phrase', 'because'), { reason }) };
+  return { who, what, doing, why: fill(words('phrase', 'because'), { reason }), done };
 }
 
 /** The living inspector reads the same activity and reason phrases as the Companion. */
@@ -300,10 +312,9 @@ export function livingInhabitantWords(
   const ended = person.action?.status !== 'completed' ? null
     : TABLES.doing[`living_finished_${kind}`] !== undefined ? kind
     : TABLES.doing[`living_${kind}`] === undefined ? 'unknown' : null;
-  const finished = ended === null ? undefined : TABLES.doing[`living_finished_${ended}`];
-  const doing = kind === 'move'
-    ? grounded('doing', heading)
-    : finished ?? TABLES.doing[`living_${kind}`] ?? words('doing', 'living_unknown');
+  const code = ended !== null ? `living_finished_${ended}` : `living_${kind}` in TABLES.doing ? `living_${kind}` : 'living_unknown';
+  const doing = kind === 'move' ? grounded('doing', heading) : words('doing', code);
+  const done = kind === 'move' ? grounded('done', heading) : words('done', code);
   const reason = person.goal?.reason ?? person.action?.reason;
   const home = person.has_home === true;
   const work = person.has_work === true;
@@ -319,6 +330,7 @@ export function livingInhabitantWords(
     what: grounded('phrase', whatKey, roleSlots(person.role ?? 'resident')),
     doing,
     why: (ended === null ? undefined : TABLES.phrase[`living_why_finished_${ended}`]) ?? words('phrase', key),
+    done,
   };
 }
 

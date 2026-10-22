@@ -1,7 +1,7 @@
 """Who a simulated person is and what they are doing, in the words the inspector uses.
 
 The words are one data file,
-``assets/catalogs/society-words/society-inhabitant-words.v7.json``, which the browser's inspector
+``assets/catalogs/society-words/society-inhabitant-words.v8.json``, which the browser's inspector
 reads too (``web/packages/app/src/society-inhabitant-words.ts``). The choice of sentence for a
 state is code on both sides, and both are held to one set of cases,
 ``tests/fixtures/society-inhabitant-words/cases.json``, which ``tests/test_inhabitant_words.py`` and
@@ -45,7 +45,7 @@ CATALOG_PATH: Final = (
     / "assets"
     / "catalogs"
     / "society-words"
-    / "society-inhabitant-words.v7.json"
+    / "society-inhabitant-words.v8.json"
 )
 
 ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
@@ -120,6 +120,8 @@ _KINDS: Final = (
     # Why a person's model was or was not followed. The page's People panel reads them; the
     # server holds them to ``DECISION_REASONS`` (tests/test_companion_decision_model.py).
     "decision_reason",
+    # What a person did, in the past, for each ``doing`` code: a row of their day says it.
+    "done",
 )
 
 
@@ -173,6 +175,8 @@ def inhabitant_words_catalog(path: Path = CATALOG_PATH) -> InhabitantWordsCatalo
         if code in tables[kind]:
             raise WordsCatalogRefused(f"entry {entry['key']!r} is stated twice")
         tables[kind][code] = words
+    if set(tables["done"]) != set(tables["doing"]):
+        raise WordsCatalogRefused("the words for what a person did are not those for what they do")
     return InhabitantWordsCatalog(
         tables=tables,
         profiles=frozenset(document["profiles"]),
@@ -206,12 +210,14 @@ class PlaceWords:
 
 @dataclass(frozen=True, slots=True)
 class InhabitantWords:
-    """A person's own words at the top of the inspector: who, what they are doing now, and why."""
+    """A person's own words at the top of the inspector: who, what they are doing now, and why;
+    and ``done``, the same doing said in the past as a row of their day says it."""
 
     who: str
     what: str
     doing: str
     why: str
+    done: str
 
 
 def _living_inhabitant_words(
@@ -254,6 +260,7 @@ def _living_inhabitant_words(
         if heading not in catalog.tables["doing"]:
             heading = "living_heading_unknown"
         doing = ground("doing", heading)
+        done = ground("done", heading)
     else:
         doings = catalog.tables["doing"]
         # An activity that has just ended is said by what they do now, and what they finished as the
@@ -267,12 +274,15 @@ def _living_inhabitant_words(
                 if f"living_{kind}" in doings
                 else "unknown"
             )
-        finished = None if ended is None else doings.get(f"living_finished_{ended}")
-        doing = (
-            finished
-            or doings.get(kind and f"living_{kind}")
-            or catalog.words("doing", "living_unknown")
+        code = (
+            f"living_finished_{ended}"
+            if ended is not None and f"living_finished_{ended}" in doings
+            else f"living_{kind}"
+            if kind and f"living_{kind}" in doings
+            else "living_unknown"
         )
+        doing = catalog.words("doing", code)
+        done = catalog.words("done", code)
     reason = goal.get("reason") if isinstance(goal, Mapping) else action.get("reason")
     reason_key = (
         "living_why_shift"
@@ -290,6 +300,7 @@ def _living_inhabitant_words(
         what=ground("phrase", what_key, **_role_slots(role_label)),
         doing=doing,
         why=(phrase.get(f"living_why_finished_{ended}") if ended else None) or phrase[reason_key],
+        done=done,
     )
 
 
@@ -338,7 +349,9 @@ def inhabitant_words(
     goal = person.get("goal")
     goal = goal if isinstance(goal, Mapping) and "kind" in goal else None
     if action is None:
-        return InhabitantWords(who, what, doing_words["nothing_recorded"], "")
+        return InhabitantWords(
+            who, what, doing_words["nothing_recorded"], "", words.words("done", "nothing_recorded")
+        )
 
     def where(target_id: str | None) -> str:
         if not target_id:
@@ -390,6 +403,7 @@ def inhabitant_words(
     doing = doing_words[chosen].format(
         place=where(action.get("target_id")), partner=met, still=still
     )
+    done = words.words("done", chosen).format(place=where(action.get("target_id")), partner=met)
     # The goal says why a person set out. Once they are blocked, the action says why; so it does
     # for standing and talking when it records news since they set out (the other person is still
     # on the way, has gone, or the time is up), but not the reason that only restates the activity
@@ -410,5 +424,6 @@ def inhabitant_words(
     finished = phrase.get(f"why_{chosen}") if own is None else own if named else None
     if finished is not None:
         why = finished.format(place=where(action.get("target_id")), partner=met)
-        return InhabitantWords(who, what, doing, why)
-    return InhabitantWords(who, what, doing, phrase["because"].format(reason=words.reason(code)))
+        return InhabitantWords(who, what, doing, why, done)
+    why = phrase["because"].format(reason=words.reason(code))
+    return InhabitantWords(who, what, doing, why, done)
