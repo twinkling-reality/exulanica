@@ -88,3 +88,28 @@ def test_land_alone_composes_no_volumes():
     bare = {key: value for key, value in BAY.items() if key != "volumes"}
     assert compose_volumes(read_landscape_document(bare), SEED) == ()
     assert volumes_section(()) == {"volumes": []}
+
+
+def test_a_landscape_composed_again_realizes_only_volumes_whose_inputs_changed(monkeypatch):
+    from exulanica.grammar.landscape import compose
+
+    landscape = read_landscape_document(BAY)
+    first = compose_volumes(landscape, SEED)
+    realized: list[tuple[str, int]] = []
+    real = compose.realize_volume
+
+    def counted(field, cell_mm):
+        realized.append((field.seed.hex(), cell_mm))
+        return real(field, cell_mm)
+
+    monkeypatch.setattr(compose, "realize_volume", counted)
+    # The same landscape under the same seed is the realization it was, none realized again.
+    assert compose_volumes(landscape, SEED) == first
+    assert realized == []
+    # Another seed is other inputs: every volume at every level, and the same bytes it would be.
+    other = compose_volumes(landscape, SEED + "0")
+    assert len(realized) == len(first) * 2
+    assert volume_bodies(other) != volume_bodies(first)
+    # Only the last composition is held: the first seed is realized again, as it was.
+    assert compose_volumes(landscape, SEED) == first
+    assert len(realized) == len(first) * 4

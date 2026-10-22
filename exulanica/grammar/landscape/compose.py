@@ -50,6 +50,13 @@ __all__ = [
 #: The prefix a placement's seed is drawn under.
 SEED_PREFIX: Final = b"exulanica.landscape-volume/v1"
 
+#: The volumes the last composition realized, by what each realization is a function of (its
+#: field's input digest) and the levels realized: a landscape composed again with one volume's
+#: given top changed (a site's part edit regrades its top) realizes only that volume. One
+#: landscape's worth, replaced by each composition, so it holds no more than a composition does.
+_Realized = tuple[tuple[VolumeChunk, ...], tuple[VolumeSheet, ...]]
+_realized: dict[tuple[str, tuple[int, ...]], _Realized] = {}
+
 
 def placement_seed(seed: str, placement_id: str) -> bytes:
     """The seed a placed volume is realized with, from the landscape's seed and its id."""
@@ -87,8 +94,11 @@ def compose_volumes(
     landscape: LandscapeDocument, seed: str, tops: Mapping[str, TopHeights] | None = None
 ) -> tuple[PlacedVolume, ...]:
     """Every placed volume of the landscape, realized under ``seed``, in the document's order, a
-    placement named in ``tops`` capped by the heights given for it."""
+    placement named in ``tops`` capped by the heights given for it. A volume the last composition
+    realized from the same inputs at the same levels is that realization."""
+    global _realized
     given = tops or {}
+    held, kept = _realized, {}
     placed = []
     for placement in landscape.placements:
         field = VolumeField(
@@ -97,18 +107,27 @@ def compose_volumes(
             rules=landscape.volume_rules,
             top=given.get(placement.id),
         )
-        chunks = tuple(chunk for cell in landscape.levels for chunk in realize_volume(field, cell))
+        digest = input_sha256(field)
+        key = (digest, tuple(landscape.levels))
+        made = held.get(key) or kept.get(key)
+        if made is None:
+            made = (
+                tuple(chunk for cell in landscape.levels for chunk in realize_volume(field, cell)),
+                volume_tops(field),
+            )
+        kept[key] = made
         placed.append(
             PlacedVolume(
                 id=placement.id,
                 volume_sha256=placement.volume.sha256,
-                input_sha256=input_sha256(field),
+                input_sha256=digest,
                 at_mm=placement.at_mm,
                 yaw_mdeg=placement.yaw_mdeg,
-                chunks=chunks,
-                tops=volume_tops(field),
+                chunks=made[0],
+                tops=made[1],
             )
         )
+    _realized = kept
     return tuple(placed)
 
 

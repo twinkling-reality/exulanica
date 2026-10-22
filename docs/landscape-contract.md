@@ -209,7 +209,11 @@ seed of its own, drawn from the landscape's seed and its id under the prefix
 Chunks and tops stay in the volume's own frame, and the placement's origin and turn place them in
 the world, so the drawing's `volumes` section names each placement and the digests of its chunks
 and tops, and the documents those digests name are kept and served by digest. The land is realized
-by its own realizer under its own rules.
+by its own realizer under its own rules. The process that composes keeps the volumes its last
+composition realized, by each field's `input_sha256` and the levels, and the ground below a site on a
+volume's top by its land's digest and frame: a world's landscape drawn again after a part edit
+realizes only the volume whose top was regraded, if any. In the kind worker that process is its child,
+which erasing a world ends.
 
 ## Sea stacks
 

@@ -45,6 +45,9 @@ from typing import Any, Final
 from exulanica.canonical import canonical_json
 from exulanica.grammar.landform import (
     CHUNK_MM,
+    Backdrop,
+    LandChunk,
+    WaterBody,
     WorldFrame,
     realize_backdrop,
     realize_near,
@@ -79,6 +82,11 @@ __all__ = [
 LANDSCAPE_DRAWING_PROFILE: Final = "exulanica.landscape-drawing/v1"
 #: The drawing of a landscape whose site stands on one of its volumes' tops.
 TOP_LANDSCAPE_DRAWING_PROFILE: Final = "exulanica.landscape-drawing/v2"
+
+#: The ground the last drawing realized, by its land's digest and frame (whose seed is the world's):
+#: a world's landscape drawn again for a part edit stands over the same ground.
+_Ground = tuple[tuple[LandChunk, ...], Backdrop, tuple[WaterBody, ...]]
+_grounds: dict[tuple[str, WorldFrame], _Ground] = {}
 
 
 def read_site_landscape(raw: object) -> LandscapeDocument:
@@ -275,8 +283,17 @@ def _ground(
     land = landscape.land
     width, depth = landscape.extent_mm
     frame = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(world_id, land.sha256))
-    chunks = realize_near(land, frame).chunks()
-    backdrop = realize_backdrop(land, frame)
+    key = (land.sha256, frame)
+    held = _grounds.get(key)
+    if held is None:
+        held = (
+            realize_near(land, frame).chunks(),
+            realize_backdrop(land, frame),
+            water_bodies(land, frame),
+        )
+        _grounds.clear()
+        _grounds[key] = held
+    chunks, backdrop, water = held
     section = {
         "land_sha256": land.sha256,
         "chunk_mm": CHUNK_MM,
@@ -284,7 +301,7 @@ def _ground(
             {"chunk": [chunk.chunk_x, chunk.chunk_y], "sha256": chunk.sha256} for chunk in chunks
         ],
         "backdrop_sha256": backdrop.sha256,
-        "water": [body.document() for body in water_bodies(land, frame)],
+        "water": [body.document() for body in water],
     }
     bodies = {chunk.sha256: chunk.document() for chunk in chunks}
     bodies[backdrop.sha256] = backdrop.document()

@@ -463,9 +463,18 @@ def test_a_landscape_past_its_limit_is_kept_and_read_again_by_its_own_workspace_
     receipt_sha256 = args[2]
     worker = KindWorker(lambda: ThreadPoolExecutor(1))
     key = landscape_key("w", receipt_sha256)
+    released = threading.Event()
+
+    def held(*job: Any) -> dict[str, Any]:
+        # Past its limit by waiting, not by being slow: a landscape this process already realized
+        # draws again at once.
+        released.wait(30)
+        return landscape_job(*job)
+
     try:
-        first = worker.run(key, 0.0001, landscape_job, *args, workspace="w", kept=worker.landscapes)
+        first = worker.run(key, 0.0001, held, *args, workspace="w", kept=worker.landscapes)
         assert first.status == "overran"
+        released.set()
         for _ in range(1200):
             if worker.landscapes.get(key) is not None:
                 break

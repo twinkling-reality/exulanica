@@ -9,10 +9,12 @@ composer disagree."""
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from typing import Any
 
 import pytest
+from exulanica.canonical import canonical_json
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SiteStructureRecord
 from exulanica.grammar.islands import make_island_volume, read_island_document
 from exulanica.grammar.landform import land_rules, read_land_chunk
@@ -341,6 +343,73 @@ def test_the_ground_below_the_island_is_drawn_and_served_by_digest(landscape_dra
     for chunk in ground["chunks"]:
         read = read_land_chunk(json.loads(job["ground"][chunk["sha256"]]), chunk["sha256"])
         assert [read.chunk_x, read.chunk_y] == chunk["chunk"]
+
+
+def test_a_landscape_drawn_again_with_its_top_regraded_realizes_only_the_island(
+    made, landscape_drawn, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from exulanica.grammar.landscape import compose as composing
+    from exulanica.world import landscape_drawing as drawing_module
+
+    drawn, drawing, _ = landscape_drawn
+    # Drawn as a read draws it, so the worker's child holds this landscape whatever ran before.
+    primed = worker.landscape_job(
+        WORLD, made.receipt, made.receipt_sha256, drawn["sha256"], drawn["land"]["top"]
+    )
+    assert json.loads(primed["body"]) == drawing
+    # Then as a part edit draws it: the same world, its top regraded one millimetre at one point.
+    top = json.loads(drawn["land"]["top"]["body"])
+    top["height_mm"][len(top["height_mm"]) // 2] -= 1
+    body = canonical_json(top)
+    regraded = {"body": body, "sha256": hashlib.sha256(body).hexdigest()}
+    realized: list[str] = []
+    grounds: list[str] = []
+    real_volume, real_near = composing.realize_volume, drawing_module.realize_near
+
+    def volume(field: Any, cell_mm: int) -> Any:
+        realized.append(input_sha256(field))
+        return real_volume(field, cell_mm)
+
+    def near(land: Any, frame: Any) -> Any:
+        grounds.append(land.sha256)
+        return real_near(land, frame)
+
+    monkeypatch.setattr(composing, "realize_volume", volume)
+    monkeypatch.setattr(drawing_module, "realize_near", near)
+    again = worker.landscape_job(
+        WORLD, made.receipt, made.receipt_sha256, drawn["sha256"], regraded
+    )
+    assert again["status"] == "done", again
+    redrawn = json.loads(again["body"])
+    before = {volume["id"]: volume for volume in drawing["volumes"]}
+    after = {volume["id"]: volume for volume in redrawn["volumes"]}
+    # Only the island is realized again, at each level; every other volume and the ground below
+    # are the ones drawn before.
+    assert after["isle"]["input_sha256"] != before["isle"]["input_sha256"]
+    levels = read_landscape_document(LANDSCAPE).levels
+    assert realized == [after["isle"]["input_sha256"]] * len(levels)
+    assert grounds == []
+    assert {key: value for key, value in after.items() if key != "isle"} == {
+        key: value for key, value in before.items() if key != "isle"
+    }
+    assert redrawn["ground"] == drawing["ground"]
+    assert redrawn["top_sha256"] == regraded["sha256"]
+
+
+def test_two_worlds_on_one_land_each_stand_over_their_own_ground() -> None:
+    from exulanica.world import landscape_drawing as drawing_module
+
+    # A swell each world's seed places: another world on the same land, drawn just after this
+    # one, stands over the ground its own seed makes, as it does drawn first.
+    swell = {"id": "swell", "kind": "undulation", "amplitude_mm": 1500, "wavelength_mm": 80000}
+    rolling = read_landscape_document(
+        {**LANDSCAPE, "land": {**LANDSCAPE["land"], "features": [swell]}}
+    )
+    ours, _ = drawing_module._ground(WORLD, rolling)
+    theirs, _ = drawing_module._ground("world:generated:another", rolling)
+    drawing_module._grounds.clear()
+    assert theirs == drawing_module._ground("world:generated:another", rolling)[0]
+    assert theirs["chunks"] != ours["chunks"]
 
 
 def test_a_landscape_drawing_without_the_sites_kept_top_or_with_another_is_refused(
