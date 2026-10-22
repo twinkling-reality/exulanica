@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import pytest
+from exulanica.grammar.grammars.city import surface
 from exulanica.grammar.grammars.city.document import read_tile_document
 from exulanica.grammar.grammars.city.streets import CrossingRecord, CurbEdgeRecord
 from exulanica.grammar.grammars.city.surface import (
@@ -159,3 +160,52 @@ def test_a_footway_rises_by_its_crossfall_from_the_kerb_top(conformance: list[ob
 
 if __name__ == "__main__":
     Path(sys.argv[1]).write_bytes(town_document_bytes("city-surface-table", (0, 0)))
+
+
+@pytest.mark.parametrize("name", ["conformance", "small_town"])
+def test_a_read_asks_only_its_cells_pieces_and_answers_as_asking_every_piece(
+    name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reading's cell index changes no answer: over each table tile, on a grid, on both sides
+    of every cell edge and at every corner of its triangles (where a footway meets a kerb top at
+    the same height, so the earlier piece answers), an indexed read answers as a read whose one
+    cell holds every piece, the surface and the height both."""
+    records = _records(name)
+    corners: list[tuple[int, int]] = []
+    triangle_height = surface._triangle_height
+
+    def kept(triangle: Any) -> Any:
+        corners.extend((x, y) for x, y, _ in triangle)
+        return triangle_height(triangle)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(surface, "_triangle_height", kept)
+        indexed = surface.city_surface_reading(records)
+    rows = _tile(name)["rows"]
+    low_x, high_x = min(row[0] for row in rows) - 2_000, max(row[0] for row in rows) + 2_000
+    low_y, high_y = min(row[1] for row in rows) - 2_000, max(row[1] for row in rows) + 2_000
+    cell = surface._CELL_MM
+    grid = [(x, y) for x in range(low_x, high_x, 3_001) for y in range(low_y, high_y, 3_001)]
+    edges = [
+        point
+        for edge in range(low_x // cell * cell, high_x, cell)
+        for y in range(low_y, high_y, 9_001)
+        for point in ((edge - 1, y), (edge, y), (y, edge - 1), (y, edge))
+    ]
+    points = [*grid, *edges, *((row[0], row[1]) for row in rows), *sorted(set(corners))]
+    answers = [indexed(point) for point in points]
+    with monkeypatch.context() as patched:
+        patched.setattr(surface, "_CELL_MM", 10**12)
+        every = surface.city_surface_reading(records)
+        expected = [every(point) for point in points]
+    assert sum(answer is not None for answer in expected) > len(points) // 10
+    assert answers == expected
+
+
+def test_where_a_footway_meets_its_kerb_top_at_one_height_the_kerb_top_answers(
+    conformance: list[object],
+) -> None:
+    """Of pieces answering one height, the one listed first answers: at a corner of a footway's
+    triangles on the conformance tile, where the footway starts at its kerb top's height, the kerb
+    top answers."""
+    assert city_surface_reading(conformance)((20_000, 35_050)) == (55, KERB_TOP)

@@ -33,7 +33,11 @@ mitred corner are not stated by this version: it answers ``None`` there, as it d
 records state no street surface at all (a lot, a building, open land). The caller keeps its own
 ground for ``None``.
 
-Heights are exact ratios of integers, rounded half away from zero once at the end.
+Heights are exact ratios of integers, rounded half away from zero once at the end. A reading
+indexes its pieces (each straight kerb top, footway triangle, carriageway strip, corner kerb-top
+triangle and junction fill triangle) by square plan cells once, and a read asks only the pieces
+whose bounds reach its point's cell, in the order the rules above list them, so where two answer
+the same height the earlier still answers.
 ``tests/fixtures/city-surface-table.json`` holds every answer to the page's own walk surface on
 the conformance tile and a generated tile.
 """
@@ -70,6 +74,13 @@ Triangle = tuple[Space, Space, Space]
 
 #: Lengths are taken in millionths of a millimetre, as the corner rule takes them.
 _SCALE: Final = CORNER_LENGTH_SCALE
+
+#: The side of the square plan cells a reading indexes its pieces by, in millimetres: a read asks
+#: only the pieces whose bounds reach its point's cell.
+_CELL_MM: Final = 4_000
+#: How far a piece's indexed bounds reach past its own points, in millimetres: more than the
+#: rounding of any point a piece answers for, so the index never leaves out a piece that answers.
+_BOUNDS_MARGIN_MM: Final = 100
 
 #: The surfaces a height is answered from.
 KERB_TOP: Final = "kerb_top"
@@ -579,6 +590,13 @@ class _Curb:
     kerb_width: int
     footway: tuple[Triangle, ...]
 
+    def kerb_top_bounds(self) -> tuple[Plan, ...]:
+        """The points the kerb top spans: its kerb line and that line moved out to the back."""
+        back = _along(self.outward, self.kerb_width)
+        return tuple(
+            point for each in self.line.points for point in ((each[0], each[1]), _moved(each, back))
+        )
+
     def kerb_top(self, point: Plan) -> _Ratio | None:
         position = self.line.position(point)
         if not 0 <= position <= self.line.position(self.line.points[-1]):
@@ -588,14 +606,6 @@ class _Curb:
         if not 0 <= out <= self.kerb_width * length:
             return None
         return self.line.height(point) + self.kerb_height
-
-    def footway_height(self, point: Plan) -> _Ratio | None:
-        best: _Ratio | None = None
-        for one in self.footway:
-            height = _on_triangle(point, one)
-            if height is not None and (best is None or height.key(best) > 0):
-                best = height
-        return best
 
 
 def city_surface_z_at(records: Iterable[object]) -> Callable[[Plan], int | None]:
@@ -682,26 +692,49 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
     for junction in junctions:
         fills += _junction_fill(junction, nodes, segments, sides, sagitta)
 
+    # Every piece in the order the rules list them, with the points its bounds are taken from.
+    pieces: list[tuple[Callable[[Plan], _Ratio | None], str, Sequence[Sequence[int]]]] = []
+    for curb in straight:
+        pieces.append((curb.kerb_top, KERB_TOP, curb.kerb_top_bounds()))
+        pieces += [(_triangle_height(one), FOOTWAY, one) for one in curb.footway]
+    for strip in strips:
+        bounds = (*strip.centre.points, *strip.left.points, *strip.right.points)
+        pieces.append((strip.height, CARRIAGEWAY, bounds))
+    for surface, triangles in ((KERB_TOP, tops), (CARRIAGEWAY, fills)):
+        pieces += [(_triangle_height(one), surface, one) for one in triangles]
+    cell = _CELL_MM
+    cells: dict[Plan, list[int]] = {}
+    for index, (_, _, points) in enumerate(pieces):
+        low_x, low_y, high_x, high_y = _cells_of(points, cell)
+        for cell_x in range(low_x, high_x + 1):
+            for cell_y in range(low_y, high_y + 1):
+                cells.setdefault((cell_x, cell_y), []).append(index)
+
     def reading(point: Plan) -> tuple[int, str] | None:
-        found: list[tuple[_Ratio, str]] = []
-        for curb in straight:
-            if (top := curb.kerb_top(point)) is not None:
-                found.append((top, KERB_TOP))
-            if (footway := curb.footway_height(point)) is not None:
-                found.append((footway, FOOTWAY))
-        for strip in strips:
-            if (level := strip.height(point)) is not None:
-                found.append((level, CARRIAGEWAY))
-        for surface, triangles in ((KERB_TOP, tops), (CARRIAGEWAY, fills)):
-            for triangle in triangles:
-                if (on := _on_triangle(point, triangle)) is not None:
-                    found.append((on, surface))
-        if not found:
-            return None
-        height, surface = found[0]
-        for other, named in found[1:]:
-            if other.key(height) > 0:
-                height, surface = other, named
-        return height.rounded(), surface
+        height: _Ratio | None = None
+        surface = ""
+        for index in cells.get((point[0] // cell, point[1] // cell), ()):
+            answer, named, _ = pieces[index]
+            on = answer(point)
+            if on is not None and (height is None or on.key(height) > 0):
+                height, surface = on, named
+        return None if height is None else (height.rounded(), surface)
 
     return reading
+
+
+def _triangle_height(triangle: Triangle) -> Callable[[Plan], _Ratio | None]:
+    return lambda point: _on_triangle(point, triangle)
+
+
+def _cells_of(points: Sequence[Sequence[int]], cell: int) -> tuple[int, int, int, int]:
+    """The lowest and highest cells of side ``cell``, east and north, that ``points``' bounds
+    reach, the margin added."""
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    return (
+        (min(xs) - _BOUNDS_MARGIN_MM) // cell,
+        (min(ys) - _BOUNDS_MARGIN_MM) // cell,
+        (max(xs) + _BOUNDS_MARGIN_MM) // cell,
+        (max(ys) + _BOUNDS_MARGIN_MM) // cell,
+    )
