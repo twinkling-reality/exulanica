@@ -1,0 +1,72 @@
+/* Making a creature where it will stand (R-CREATURE-BUILD-SHEET.md): the sheet's 1920 numbers in reference units
+   (--u), its 1440 sizes as floors, every colour and face from world-ui.css's tokens. */
+.wu-creature-field {
+  position: absolute;
+  left: 50%;
+  bottom: calc(136 * var(--u));
+  width: max(640px, calc(800 * var(--u)));
+  transform: translateX(-50%);
+  display: grid;
+  gap: calc(16 * var(--u));
+  justify-items: center;
+}
+.wu-creature-glass {
+  width: 100%;
+  box-sizing: border-box;
+  padding: calc(24 * var(--u)) calc(24 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
+  border-radius: calc(16 * var(--u));
+  display: grid;
+  gap: calc(8 * var(--u));
+  color: var(--ink);
+}
+.wu-creature-label { font: 400 calc(15 * var(--u))/1.6 var(--font-sans); opacity: .8; }
+.wu-creature-words {
+  font: 300 max(20px, calc(24 * var(--u)))/1.42 var(--font-sans);
+  color: inherit;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  resize: none;
+  field-sizing: content;
+  max-height: 5.7em;
+  text-wrap: pretty;
+}
+.wu-creature-row { display: flex; justify-content: flex-end; align-items: center; gap: calc(16 * var(--u)); margin-top: calc(16 * var(--u)); }
+.wu-creature-count { font: 400 calc(12 * var(--u))/1 var(--font-mono); opacity: .58; }
+.wu-creature-quiet { opacity: .55; }
+/* The line under the field keeps its place in the column; its shade is only its backing. */
+.wu-creature-line { position: relative; color: var(--ink); font: 400 calc(15 * var(--u))/1.6 var(--font-sans); }
+.wu-creature-stand { color: var(--ink); font: 450 calc(14 * var(--u))/1.43 var(--font-sans); transform: translate(-50%, calc(-100% - 36 * var(--u))); white-space: nowrap; }
+.wu-creature-group {
+  left: calc(1120 * var(--u));
+  top: calc(404 * var(--u));
+  width: calc(520 * var(--u));
+  display: grid;
+  gap: calc(16 * var(--u));
+  color: var(--ink);
+}
+.wu-creature-title { margin: 0; font: 300 max(36px, calc(44 * var(--u)))/1.1 var(--font-sans); letter-spacing: -.02em; }
+.wu-creature-quote { margin: 0; font: italic 400 max(18px, calc(18 * var(--u)))/1.33 var(--font-sans); }
+.wu-creature-from, .wu-creature-step { margin: 0; font: 400 max(18px, calc(19 * var(--u)))/1.4 var(--font-sans); }
+.wu-creature-small { margin: 0; font: 400 calc(13 * var(--u))/1.85 var(--font-sans); }
+.wu-creature-step { display: flex; align-items: center; gap: calc(12 * var(--u)); }
+.wu-creature-dot { width: calc(10 * var(--u)); height: calc(10 * var(--u)); border-radius: 50%; background: var(--live); box-shadow: 0 0 calc(8 * var(--u)) var(--live); }
+.wu-creature-time { font: 400 calc(13 * var(--u))/1 var(--font-mono); opacity: .58; }
+/* Light rising from the stand while the creature is made: #e8f0ed at .78 at the ring, clear 300 up, blurred 14. */
+.wu-creature-light {
+  position: absolute; width: calc(180 * var(--u)); height: calc(300 * var(--u)); transform: translate(-50%, -100%);
+  background: linear-gradient(to top, rgba(232, 240, 237, .78), rgba(232, 240, 237, 0));
+  filter: blur(calc(14 * var(--u))); pointer-events: none;
+}
+.wu-refused { color: var(--refused-ink); }
+/* While a creature step shows, the keys button and its card give way (N29), as they do under a page; the pill, Back
+   and the clock stay. */
+#contextual-world:has(> .wu-creature-layer) :is(.wu-keys-button, .wu-keys-card) { visibility: hidden; }
+/* While the made card shows, it is the held creature's group (r19b): build mode's own held group gives way. */
+#contextual-world:has(> .wu-creature-layer .wu-creature-made) :is(.wu-held, .wu-names-near) { visibility: hidden; }
+/* The made card's leader from the creature's head: a thin line of the card's ink. */
+.wu-creature-leader { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.wu-creature-leader line { stroke: var(--ink); stroke-opacity: .7; stroke-width: max(1px, calc(1.2 * var(--u))); }
+/* While a creature step shows, the reticle and the look tag give way (as under a scene, T13). */
+#contextual-world:has(> .wu-creature-layer) :is(.wu-reticle, .wu-tag, .cg-look) { visibility: hidden; }

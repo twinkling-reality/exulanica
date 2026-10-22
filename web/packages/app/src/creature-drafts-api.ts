@@ -3,8 +3,11 @@
  * `GET /things/creatures/drafts`, `/drafts/{draft_id}` and `/offered`; docs/things-contract.md,
  * "Drafting a creature from words").
  *
- * Before anyone types, the offer says whether this workspace may ask here, and why not by code, how
- * long a draft's calls take by the record its timeout rests on, and every code a draft may end with.
+ * Before anyone types, the offer says whether this workspace may ask here, and why not by code, the
+ * model a draft asks first and the most a draft may be charged, how long a draft's calls take by the
+ * record its timeout rests on, and every code a draft may end with; every draft says what it spent.
+ * The stand read (`GET /world/versions/{id}/society/stand`) says where a creature put down at a
+ * point would stand, so the page marks that spot before it is made.
  * A draft is `queued` or `running`, then `kept` (naming the kind made and its sketch, each by digest,
  * and the model that drafted it), `refused` (the check's code, the field and the code's fixed
  * sentence), `failed` or `cancelled` (why, by code), or `erased` (kept, and erased since). The page
@@ -16,6 +19,7 @@ import { Transport, type TransportOptions } from '@exulanica/graph-client';
 export const CREATURE_DRAFT_PROFILE = 'exulanica.creature-draft/v1';
 export const CREATURE_OFFER_PROFILE = 'exulanica.creature-offer/v1';
 export const CREATURE_DRAFTS_PROFILE = 'exulanica.creature-drafts/v1';
+export const SOCIETY_STAND_PROFILE = 'exulanica.society-stand/v1';
 /** The longest words for one creature: one plain line, as the drafter's form states its own. */
 export const CREATURE_WORDS_CHARACTERS = 400;
 
@@ -29,6 +33,17 @@ export interface CreatureOffer {
   readonly code: string | null;
   /** How long one call of the creature drafter takes, from the record its timeout rests on. */
   readonly timing: { readonly typicalSeconds: number; readonly longestSeconds: number; readonly timeoutSeconds: number };
+  /** The model a draft asks first, by the name a person reads; null or absent from a server that names none. */
+  readonly model?: { readonly modelId: string; readonly name: string | null } | null;
+  /** The most one draft may be charged, a decimal string of dollars; null or absent where the server states none. */
+  readonly priceUsdAtMost?: string | null;
+}
+
+/** Where a being put down at a point would stand: the walking node its society would take it in at. */
+export interface SocietyStand {
+  readonly nodeId: string;
+  /** East and south in the region's frame, millimetres; a node holds no height. */
+  readonly positionMm: readonly [number, number];
 }
 
 /** A thing's document reference: a key, a version and a digest. */
@@ -51,6 +66,10 @@ export interface CreatureDraft {
   readonly refusal: { readonly code: string; readonly field: string | null; readonly detail: string } | null;
   /** Why it failed or was cancelled, by code. */
   readonly failure: string | null;
+  /** What its calls were charged, a decimal string of dollars, as the server recorded them; null or absent where it records none. */
+  readonly spentUsd?: string | null;
+  /** How its creature's made look stands once one is asked (`look_job.status`: queued, staged, made, ...); null or absent before. */
+  readonly lookStatus?: string | null;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -78,6 +97,20 @@ const maybe = <T>(value: unknown, read: (present: unknown) => T): T | null =>
   value === null || value === undefined ? null : read(value);
 
 const DIGEST = /^[0-9a-f]{64}$/u;
+const DOLLARS = /^\d+\.\d{8}$/u;
+
+function dollars(value: unknown, where: string): string {
+  if (typeof value !== 'string' || !DOLLARS.test(value)) throw new TypeError(`The server returned an invalid ${where}.`);
+  return value;
+}
+
+function model(value: unknown, where: string): { readonly modelId: string; readonly name: string | null } {
+  const held = object(value, where);
+  return Object.freeze({
+    modelId: text(held['model_id'], `${where} id`),
+    name: maybe(held['name'], (name) => text(name, `${where} name`)),
+  });
+}
 
 function reference(value: unknown, field: 'kind' | 'look', where: string): DocumentReference {
   const held = object(value, where);
@@ -99,6 +132,22 @@ export function parseCreatureOffer(raw: unknown): CreatureOffer {
       longestSeconds: whole(timing['call_longest_seconds'], 'longest call time'),
       timeoutSeconds: whole(timing['call_timeout_seconds'], 'call timeout'),
     }),
+    model: maybe(held['model'], (value) => model(value, 'creature offer model')),
+    priceUsdAtMost: maybe(held['price'], (value) => dollars(object(value, 'creature price')['usd_at_most'], 'creature price')),
+  });
+}
+
+/** The stand read's answer: where to stand, or null where the society has no open walking node there. */
+export function parseSocietyStand(raw: unknown): SocietyStand | null {
+  const held = object(raw, 'society stand');
+  if (held['profile'] !== SOCIETY_STAND_PROFILE) throw new TypeError('The server returned a society stand of another profile.');
+  return maybe(held['stand'], (value) => {
+    const stand = object(value, 'society stand');
+    const position = stand['position_mm'];
+    if (!Array.isArray(position) || position.length !== 2 || !position.every(Number.isInteger)) {
+      throw new TypeError('The server returned an invalid society stand position.');
+    }
+    return Object.freeze({ nodeId: text(stand['node_id'], 'society stand node'), positionMm: Object.freeze([position[0], position[1]]) as readonly [number, number] });
   });
 }
 
@@ -115,13 +164,7 @@ export function parseCreatureDraft(raw: unknown): CreatureDraft {
     label: maybe(held['label'], (value) => text(value, 'creature label')),
     kind: maybe(held['kind'], (value) => reference(value, 'kind', 'creature kind')),
     look: maybe(held['look'], (value) => reference(value, 'look', 'creature look')),
-    model: maybe(held['model'], (value) => {
-      const model = object(value, 'creature model');
-      return Object.freeze({
-        modelId: text(model['model_id'], 'creature model id'),
-        name: maybe(model['name'], (name) => text(name, 'creature model name')),
-      });
-    }),
+    model: maybe(held['model'], (value) => model(value, 'creature model')),
     refusal: maybe(held['refusal'], (value) => {
       const refusal = object(value, 'creature refusal');
       return Object.freeze({
@@ -131,6 +174,8 @@ export function parseCreatureDraft(raw: unknown): CreatureDraft {
       });
     }),
     failure: maybe(held['failure'], (value) => text(value, 'creature failure code')),
+    spentUsd: maybe(held['spend'], (value) => dollars(object(value, 'creature spend')['spent_usd'], 'creature spend')),
+    lookStatus: maybe(held['look_job'], (value) => text(object(value, 'creature look job')['status'], 'creature look job status')),
   });
 }
 
@@ -163,5 +208,11 @@ export class CreatureDraftsClient {
 
   async draft(draftId: string): Promise<CreatureDraft> {
     return parseCreatureDraft(await this.#transport.getJson<unknown>(`/things/creatures/drafts/${encodeURIComponent(draftId)}`));
+  }
+
+  /** Where a creature put down at a point of the region's frame would stand in the version's society, or null. */
+  async stand(versionId: string, worldId: string, at: { readonly xMm: number; readonly zMm: number }): Promise<SocietyStand | null> {
+    const query = new URLSearchParams({ world_id: worldId, x_mm: String(Math.round(at.xMm)), z_mm: String(Math.round(at.zMm)) });
+    return parseSocietyStand(await this.#transport.getJson<unknown>(`/world/versions/${encodeURIComponent(versionId)}/society/stand?${query}`));
   }
 }

@@ -3,6 +3,8 @@
 // screen uses them. Nothing here reads a world. ?view=create, creating, refused, no-model and made
 // show making a world's light parts (world-ui-create.ts) with stand-in answers; ?empty leaves the
 // field empty, ?chosen=<n> marks a card chosen and ?thumbs=<folder> draws the cards' pictures.
+// ?view=creature-describe, creature-making and creature-made show making a creature where it will
+// stand (world-ui-creature.ts) with the sheet's example words, over ?picture= as the world.
 import {
   areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
   nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
@@ -12,6 +14,7 @@ import {
 } from './world-ui-create.ts';
 import { CREATE_WORDS, madeSpent, priceLine, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
 import { draftSteps, madeColumns, startCards } from './create-steps.mjs';
+import { creatureField, madeGroup, makerLine, makingGroup, standLabel } from './world-ui-creature.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
 
@@ -25,7 +28,24 @@ const div = (className: string): HTMLDivElement => { const made = document.creat
 const press = (): void => {};
 
 const view = query.get('view');
-if (view === 'create' || view === 'creating' || view === 'no-model' || view === 'refused') {
+if (view === 'creature-describe' || view === 'creature-making' || view === 'creature-made') {
+  // Making a creature where it will stand (r17t, r19t, r19b), with stand-in answers: the round wader of the final pictures.
+  const words = 'a round yellow body with a pale flat bill on two short legs', price = '0.37355520';
+  const layer = add(div('wu-creature-layer'));
+  if (view === 'creature-describe') {
+    add(creatureField({ maximum: 400, onMake: press }).root, layer);
+    const made = layer.querySelector('textarea')!; made.value = query.has('empty') ? '' : words;
+    const under = layer.querySelector('.wu-creature-line')!; under.textContent = makerLine(price, 18);
+    const count = layer.querySelector('.wu-creature-count')!; count.textContent = `${made.value.length} of 400`;
+    const over = add(standLabel(), layer); over.style.left = 'calc(960 * var(--u))'; over.style.top = 'calc(640 * var(--u))';
+  } else if (view === 'creature-making') {
+    const making = makingGroup({ words, priceUsdAtMost: price });
+    making.step('Making the creature 0:14');
+    add(making.root, layer);
+  } else {
+    add(madeGroup({ label: 'yellow pond wader', words, modelName: 'Nemotron 3 Super 120B', spentUsd: '0.00420000', sketch: query.has('sketch'), placeable: true }), layer);
+  }
+} else if (view === 'create' || view === 'creating' || view === 'no-model' || view === 'refused') {
   // Making a world's light parts (frames 20 and 21) with the frames' example words and stand-in
   // answers; ?picture= is the chosen world's still picture behind them.
   (root.querySelector('.parts-world') as HTMLElement).hidden = true;

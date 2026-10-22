@@ -20,7 +20,7 @@
 // It is drawn with build mode's own parts (world-ui-build.ts) and the world's corners (the Building
 // pill, the keys card and the note); what a key does in each state, and every sentence, is
 // build-words.mjs.
-import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
+import { GROUND_RING, createGroundRing, pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
@@ -348,8 +348,11 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (!kind) return null;
     return kind.source === 'workspace' ? 'made:' + kind.sha256 : 'kind:' + kind.kind;
   }
+  // While a creature is made over the world (unit 9) the tray hides, as the sheet's steps show none, and every key is
+  // the maker's (`makerKey`), so nothing else of the world acts on Esc, Enter or what is typed in its field.
+  let making = false, makerKey = null;
   function drawTray() {
-    if (!on || inspecting() || placingRegion() === null) { trayView.hide(); trayDrawn = ''; return; }
+    if (!on || making || inspecting() || placingRegion() === null) { trayView.hide(); trayDrawn = ''; return; }
     const tiles = trayTab === 'things' ? thingTiles() : creatureTiles();
     const make = makeCreature ? [{ id: MAKE_TILE, name: TRAY.make, picture: null, make: true }] : [];
     // The library could not be read: the world's own offline line, the tiles dimmed, until it can.
@@ -382,7 +385,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** A tile picked: its thing carried under the pointer (or stood at the ground point `at`) to be placed, or the creature maker opened. */
   function pick(tile, at = null) {
     if (!on || busy) return;
-    if (tile.make) { putBack(); deselect(); makeCreature?.(); return; }
+    // The maker is handed what places what it makes where it was made: hold, and the ground ahead of the eye.
+    if (tile.make) {
+      putBack(); deselect();
+      makeCreature?.({ hold: (kind, at) => built.hold(kind, at), ahead: groundAhead, mark: standMark, head: heldHeadOnScreen, showing: (now, key = null) => { making = now; makerKey = now ? key : null; drawTray(); renderCorners(); } });
+      return;
+    }
     if (placing?.tileId === tile.id) { putBack(); return; }
     const regionId = placingRegion();
     if (regionId === null) return;
@@ -394,7 +402,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     void kindBox(tile.kind).then(box => { held.box = box; if (placing === held && groupShows()) layHeldRing(); });
     const pointed = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
     const ground = at ?? groundAt(pointed.x, pointed.y);
-    if (ground !== null) placeTo(ground, false);
+    // Held at a point the page names (a creature made at its stand): stood there exactly and drawn solid in its own
+    // look; the half-metre snap and the light copy start once the person moves or turns it.
+    held.solid = at !== null;
+    // ... and it stays there until the pointer moves again: a pointer last seen elsewhere does not carry it off.
+    if (at !== null) pointer = null;
+    if (ground !== null) placeTo(ground, at !== null);
     render();
     canvas.focus({ preventScroll: true });
   }
@@ -404,8 +417,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (!library) return null;
     try {
       const document = await library.kindDocument(kind.source === 'workspace' ? kind : { key: kind.kind, version: kind.version, sha256: kind.sha256 });
-      const box = document?.body?.box_mm;
-      return Number.isFinite(box?.width) && Number.isFinite(box?.depth) ? { width: box.width, depth: box.depth } : null;
+      // A thing's kind states its box; a creature's its body's extent (its length along, its width across).
+      const box = document?.body?.box_mm, extent = document?.body?.extent_mm;
+      const width = box?.width ?? extent?.width, depth = box?.depth ?? extent?.length, height = box?.height ?? extent?.height;
+      return Number.isFinite(width) && Number.isFinite(depth) ? { width, depth, height: Number.isFinite(height) ? height : null } : null;
     } catch { return null; }
   }
   /** A new thing's id: its kind's key, or "creature", and a short random part the server has not seen. */
@@ -435,6 +450,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   function standNew(to) {
     if (placing === null) return;
     if (placing.to && placing.to.x === to.x && placing.to.z === to.z && placing.to.yaw === to.yaw) return;
+    if (placing.to) placing.solid = false;
     placing.to = to;
     placing.verdict = { state: 'checking', words: '' };
     // Turned or stood elsewhere after a click let it go: that click is taken back.
@@ -474,7 +490,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   });
   function showKindCopy(held, refused) {
     const to = held.to; if (to === null) return;
-    void things()?.layer?.setKindGhost?.({ kind: held.kind, regionId: held.regionId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused });
+    void things()?.layer?.setKindGhost?.({ kind: held.kind, regionId: held.regionId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused, solid: held.solid === true });
     // The ring is laid with the copy, so the two show together at the height answered (W11, W12.6b).
     if (held === placing && groupShows()) layHeldRing();
   }
@@ -523,10 +539,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** Tells the corners what building shows now: the Building pill, the keys card and no hints. */
   function renderCorners() {
     const question = confirming !== null || moving !== null || placing !== null;
-    const show = !on ? 'off' : `on:${question}`;
+    // A creature step over the world (unit 9) shows Back alone at the top left (N29), its made creature held too.
+    const show = !on ? 'off' : making ? 'making' : `on:${question}`;
     if (show === cornersShow) return;
     const was = cornersShow;
     cornersShow = show;
+    if (show === 'making') { corners.mode(null); corners.hints(null); corners.keys?.(null); corners.back('Back'); return; }
     if (!on) {
       if (!was || was === 'off') return;
       corners.mode(null); corners.hints(null); corners.keys?.(null); corners.back('Your worlds'); corners.notes.place('world');
@@ -629,6 +647,40 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    * of the ground under where the pointer's ray passes that many metres above it, where a thing grabbed that high is
    * carried.
    */
+  // The ring at a creature's stand while it is made (unit 9): its own, so build mode's marks never move or hide it.
+  let standRing = null;
+  /**
+   * Lays the stand's ring on the ground at the region point `at` (millimetres) with `radiusM`, or hides it with null;
+   * answers where it is on the screen, or null out of view.
+   */
+  function standMark(at, radiusM) {
+    const society = b.authoredSociety;
+    if (at === null || !society?.root) { standRing?.hide(); return null; }
+    standRing ??= createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: GROUND_RING });
+    // The inverse of the ground point a ray names: the frame's metres on its ground, through its root.
+    const x = at.xMm / 1000, z = at.zMm / 1000;
+    const world = society.root.getWorldTransform().transformPoint(point.clone().set(x, society.groundHeightAt?.(x, z) ?? 0, z));
+    // A stand round a corner or behind a building is no stand, as a being's mark is not drawn there.
+    if (state.worldSight && !state.worldSight.sees(b.camera.getPosition(), world)) { standRing.hide(); return null; }
+    standRing.place({ x: world.x, y: world.y, z: world.z }, radiusM);
+    const screen = b.camera.camera.worldToScreen(world, seen);
+    return screen.z > 0 ? { x: screen.x, y: screen.y } : null;
+  }
+  /** Where the held new thing's head shows on the screen (its copy's foot raised by its height), or null out of view. */
+  function heldHeadOnScreen() {
+    const height = placing?.box?.height;
+    const at = Number.isFinite(height) ? heldInWorld() : null;
+    if (at === null) return null;
+    const screen = b.camera.camera.worldToScreen(point.clone().set(at.x, at.y + height / 1000, at.z), seen);
+    return screen.z > 0 ? { x: screen.x, y: screen.y } : null;
+  }
+  /** The ground point (region frame, millimetres) `millimetres` ahead of the eye along the level of its look, or null off the ground. */
+  function groundAhead(millimetres) {
+    const eye = b.interactionRay?.()?.origin, look = b.camera.forward, level = Math.hypot(look.x, look.z);
+    if (!eye || level < 1e-6) return null;
+    const metres = millimetres / 1000;
+    return b.authoredSociety?.groundPoint([eye[0] + look.x / level * metres, eye[1], eye[2] + look.z / level * metres], [0, -1, 0]) ?? null;
+  }
   function groundAt(x, y, lift = 0) {
     const ray = pointerRay(b, x, y); if (!ray) return null;
     const origin = lift > 0 ? [ray.origin[0], ray.origin[1] - lift, ray.origin[2]] : ray.origin;
@@ -1022,7 +1074,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   listen(canvas, 'pointerleave', () => { pointer = null; });
   render();
 
-  return {
+  const built = {
     active: () => on,
     undo,
     redo,
@@ -1054,6 +1106,9 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     kindLabels,
     /** Act on a key; true when build mode took it. */
     key(event) {
+      // A creature step over the world takes every key: its own, and typing, which keeps its default.
+      // Once it hands its keys back (a made creature held at its stand), build mode's own keys place it or put it back.
+      if (making && makerKey !== null) { makerKey(event); return true; }
       // While the server is asked about where the held thing stands, Enter lets it go there, as a click does.
       const now = flags(), asking = (placing ?? moving)?.verdict.state === 'checking';
       const action = keyAction(asking ? { ...now, ready: true } : now, event);
@@ -1195,6 +1250,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       canvas.style.cursor = '';
       for (const part of [origin.root, trail.root, chosen.root, copy.root, names.root, tag.root, group.root, trayView.root]) part.remove();
       groundRing?.dispose();
+      standRing?.dispose();
     },
   };
+  return built;
 }

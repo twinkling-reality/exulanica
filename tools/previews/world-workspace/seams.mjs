@@ -74,6 +74,7 @@ export function patchSource(file, code, here) {
 import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here}/front-door.ts';
 import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-preview.ts';
 import { mountCreateWorld } from '/@fs/${here}/create-world.ts';
+import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
 ` + code
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
@@ -84,11 +85,10 @@ import { mountCreateWorld } from '/@fs/${here}/create-world.ts';
 ` + seam('start() deep link'))
     .replace(seam('begin() await'), `await environmentSelection.begin();\n  ${report(2)}`)
     .replace(seam('land drawn'), `  ${report(1)}\n` + seam('land drawn'))
-    // No creature maker is handed to the world: the shell's sheet is hidden behind it, so build mode's tray offers none
-    // until unit 9's maker in the world lands (DESIGN's W12.2).
+    // Build mode's "Make a creature" tile opens the maker in the world (unit 9), where the page can ask.
     .replace(seam('objects.begin mount'), `await objects.begin(state.activeWorldEntry?.authoredVersionId);
       if (scenePreviewPage()) mountScenePreview({ state, renderer });
-      else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects, send: sendPlanned, binding: activeEntryWriteBinding});`)
+      else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects, send: sendPlanned, binding: activeEntryWriteBinding, makeCreature: creatureMakerFor(state)});`)
     .replace(seam('Your worlds pictures'), '    picture: (entry) => frontDoorPicture(entry) ?? worldPicture(entry),')
     .replace(seam('Your worlds open'), '  const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => openFromFrontDoor(entry.entryId);')
     .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries });')

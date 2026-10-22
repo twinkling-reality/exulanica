@@ -179,6 +179,11 @@ export interface KindGhost {
   readonly zMm: number;
   readonly yawMicroradians: number;
   readonly refused: boolean;
+  /**
+   * Drawn in its own look (its materials and shadows), not as a light copy: a creature just made, standing where it
+   * was made. Asked again without it, or refused, the copy turns into the light copy and stays one.
+   */
+  readonly solid?: boolean;
 }
 /** The name a kind's copy is made under, never a placed id. */
 const KIND_GHOST = 'thing-ghost:kind';
@@ -323,8 +328,10 @@ export class ThingLayer {
     readonly parent: pc.Entity;
     readonly figure: ThingFigure;
     readonly seen: WeakSet<pc.MeshInstance>;
-    readonly materials: pc.StandardMaterial[];
+    materials: pc.StandardMaterial[];
     refused: boolean;
+    /** Still in its own look; a light copy once it is not. */
+    solid: boolean;
   } | null = null;
   /** The kind copy asked for last, posed as soon as it is made. */
   private kindGhostWanted: KindGhost | null = null;
@@ -545,9 +552,11 @@ export class ThingLayer {
       return false;
     }
     const refused = this.kindGhostWanted?.refused ?? false;
+    const solid = (this.kindGhostWanted?.solid ?? false) && !refused;
     const seen = new WeakSet<pc.MeshInstance>();
-    // Its own figure, posed by its own bones: every part a light copy.
-    this.kindGhost = { key, parent, figure: made.figure, seen, materials: lightCopy(made.figure.root, refused, true, seen), refused };
+    // Its own figure, posed by its own bones: every part a light copy, or, while solid, its own look.
+    const materials = solid ? [] : lightCopy(made.figure.root, refused, true, seen);
+    this.kindGhost = { key, parent, figure: made.figure, seen, materials, refused, solid };
     this.poseKindGhost();
     return true;
   }
@@ -556,7 +565,12 @@ export class ThingLayer {
   private poseKindGhost(): void {
     const ghost = this.kindGhostWanted, copy = this.kindGhost;
     if (ghost === null || copy === null) return;
-    if (copy.refused !== ghost.refused) {
+    if (copy.solid && (!ghost.solid || ghost.refused)) {
+      // Moved, turned or refused: a light copy from now on.
+      copy.materials = lightCopy(copy.figure.root, ghost.refused, true, copy.seen);
+      copy.solid = false;
+      copy.refused = ghost.refused;
+    } else if (!copy.solid && copy.refused !== ghost.refused) {
       for (const material of copy.materials) asGhost(material, ghost.refused);
       copy.refused = ghost.refused;
     }
@@ -1001,9 +1015,10 @@ export class ThingLayer {
       this.applySociety();
     }
     for (const entry of this.entries.values()) this.poseOne(entry, dt, reduced);
-    // A part the kind copy's figure added since (a person's full form, loaded later) joins its light.
+    // A part the kind copy's figure added since (a person's full form, loaded later) joins its light; a solid copy
+    // keeps its own look, and its parts join the light once it turns into the light copy.
     const copy = this.kindGhost;
-    if (copy !== null) copy.materials.push(...lightCopy(copy.figure.root, copy.refused, true, copy.seen));
+    if (copy !== null && !copy.solid) copy.materials.push(...lightCopy(copy.figure.root, copy.refused, true, copy.seen));
     const camera = this.options.camera.getPosition();
     for (const entry of this.entries.values()) {
       if (entry.figure instanceof PresenceFigure) entry.figure.face(camera);

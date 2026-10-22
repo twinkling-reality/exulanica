@@ -52,7 +52,7 @@ function diagnostics(file: string, text: string): string[] {
  * What the edit adds, beyond what the file says unpatched. The workspace imports are `/@fs/` paths
  * Vite serves, never resolvable here, so they are expected to be unresolved.
  */
-const EXPECTED = [/^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world)\.ts'/u];
+const EXPECTED = [/^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world|world-creature)\.ts'/u];
 function introduced(file: string, before: string, after: string): string[] {
   const left = new Map<string, number>();
   for (const one of diagnostics(file, before)) left.set(one, (left.get(one) ?? 0) + 1);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { draftEnded, parseCreatureDraft, parseCreatureOffer } from '../src/creature-drafts-api.js';
+import { draftEnded, parseCreatureDraft, parseCreatureOffer, parseSocietyStand } from '../src/creature-drafts-api.js';
 
 /*
  * The creature routes' answers as exulanica/api/routes/thing_creatures.py writes them, written here
@@ -34,7 +34,33 @@ describe('a creature from words, as the server answers it', () => {
   it('reads the offer: whether a world may ask here, why not by code, and how long a draft takes', () => {
     expect(parseCreatureOffer(offer)).toEqual({
       offered: false, code: 'creatures_not_run_here', timing: { typicalSeconds: 18, longestSeconds: 25, timeoutSeconds: 50 },
+      model: null, priceUsdAtMost: null,
     });
+  });
+
+  it('reads the model a draft asks first and the most it may be charged, and what a draft spent', () => {
+    const priced = parseCreatureOffer({
+      ...offer, offered: true, code: null,
+      model: { model_id: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron 3 Super 120B' },
+      price: { usd_at_most: '0.37355520', provider: 'nebius_token_factory', provider_description: 'Nebius Token Factory', basis: { kind: 'full_context_ceiling' } },
+    });
+    expect(priced.model).toEqual({ modelId: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron 3 Super 120B' });
+    expect(priced.priceUsdAtMost).toBe('0.37355520');
+    expect(parseCreatureDraft({ ...kept, spend: { spent_usd: '0.00420000', held_usd: '0.00000000' } }).spentUsd).toBe('0.00420000');
+    expect(parseCreatureDraft({ ...kept, spend: null }).spentUsd).toBeNull();
+    expect(parseCreatureDraft(kept).spentUsd).toBeNull();
+    expect(parseCreatureDraft(kept).lookStatus).toBeNull();
+    expect(parseCreatureDraft({ ...kept, look_job: { profile: 'exulanica.creature-look/v1', status: 'made' } }).lookStatus).toBe('made');
+    expect(() => parseCreatureOffer({ ...offer, price: { usd_at_most: 0.37 } })).toThrow(TypeError);
+    expect(() => parseCreatureDraft({ ...kept, spend: { spent_usd: '4E-3' } })).toThrow(TypeError);
+  });
+
+  it('reads where a creature put down at a point would stand, or that nowhere is open there', () => {
+    const profile = 'exulanica.society-stand/v1';
+    expect(parseSocietyStand({ profile, stand: { node_id: 'n-12', position_mm: [4200, -1800] } })).toEqual({ nodeId: 'n-12', positionMm: [4200, -1800] });
+    expect(parseSocietyStand({ profile, stand: null })).toBeNull();
+    expect(() => parseSocietyStand({ profile: 'exulanica.society-stand/v0', stand: null })).toThrow(TypeError);
+    expect(() => parseSocietyStand({ profile, stand: { node_id: 'n-12', position_mm: [4200.5, 0] } })).toThrow(TypeError);
   });
 
   it('reads a kept draft naming its kind and sketch by digest, and the model that drafted it', () => {

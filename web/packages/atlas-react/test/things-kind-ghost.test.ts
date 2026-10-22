@@ -128,6 +128,41 @@ describe('an editor\'s see-through copy of a kind not yet placed', () => {
     expect(looks.made).toEqual(['primitive-well', 'primitive-well']);
   });
 
+  it('stands solid in its own look while asked so, and turns into the light copy once moved or refused', async () => {
+    const { layer, region, ghost } = setup();
+    expect(await layer.setKindGhost(ghost('well', 2, 9000, { solid: true }))).toBe(true);
+    const [copy] = copies(region);
+    // Its own look: lit, opaque, throwing its shadow, as a placed thing of its kind is drawn.
+    const own = materialsOf(copy!);
+    expect(own.length).toBeGreaterThan(0);
+    for (const material of own) expect([material.useLighting, material.opacity]).toEqual([true, 1]);
+    expect((copy!.findComponents('render') as pc.RenderComponent[]).some((render) => render.castShadows)).toBe(true);
+    // A frame on, still its own look: the light the layer gives a copy's later parts is the light copy's alone.
+    (layer as unknown as { step(dt: number): void }).step(1 / 60);
+    for (const material of materialsOf(copy!)) expect([material.useLighting, material.opacity]).toEqual([true, 1]);
+    // Asked again where it stood, still solid; asked without it (the person moved it), a light copy from then on.
+    await layer.setKindGhost(ghost('well', 2, 9000, { solid: true }));
+    expect(materialsOf(copy!).every((material) => material.opacity === 1)).toBe(true);
+    await layer.setKindGhost(ghost('well', 2, 8500));
+    for (const material of materialsOf(copy!)) {
+      expect(material.useLighting).toBe(false);
+      expect(material.opacity).toBeCloseTo(0.3, 6);
+    }
+    for (const render of copy!.findComponents('render') as pc.RenderComponent[]) expect(render.castShadows).toBe(false);
+    await layer.setKindGhost(ghost('well', 2, 8500, { solid: true }));
+    expect(materialsOf(copy!).every((material) => material.opacity < 1)).toBe(true);
+    expect(copies(region)).toEqual([copy]);
+  });
+
+  it('is never solid where the world refused its spot', async () => {
+    const { layer, region, ghost } = setup();
+    await layer.setKindGhost(ghost('well', 2, 9000, { solid: true, refused: true }));
+    for (const material of materialsOf(copies(region)[0]!)) {
+      expect(light(material)).toEqual([0xff, 0x8f, 0x7e]);
+      expect(material.opacity).toBeCloseTo(0.4, 6);
+    }
+  });
+
   it('goes with null, and gives way to a copy of another kind', async () => {
     const { layer, region, ghost } = setup();
     await layer.setKindGhost(ghost('well', 2, 9000));
