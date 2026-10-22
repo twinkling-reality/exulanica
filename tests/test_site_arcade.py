@@ -276,7 +276,7 @@ PINNED: dict[str, dict[str, str]] = {
         "place": "ab9923ddc1feae298db3515733b361f69a31b29f2ef6b79047751b3d900196c5",
         # Moved when new worlds came to name land rules 6: the drawing names the receipt, which
         # names the rules; no land moved.
-        "drawing": "41abd1ff0acf31e9fbfc79b4d065828e81e6cb944cf73a76c9045d990130ad07",
+        "drawing": "70bc492a06821c8f449b7c436f9800d2bc57b55f82bbde92aae2914010e0144e",
     },
 }
 

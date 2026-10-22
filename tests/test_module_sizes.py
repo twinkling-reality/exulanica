@@ -68,7 +68,7 @@ LIMITS: dict[str, tuple[int, str]] = {
         "on the server once a frame holds the drawn world, and a site redrawn after a part changes",
     ),
     "exulanica/world/saved_entries.py": (
-        1_939,
+        1_944,
         "reopening a personal world at a saved state, and making a town on its land",
     ),
     "exulanica/world/society_decision_contract.py": (

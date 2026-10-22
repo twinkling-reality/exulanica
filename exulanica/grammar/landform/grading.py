@@ -445,7 +445,8 @@ def _corners(work: _Work, side: list[int], low: list[int], high: list[int], step
     nx, ny = n.nx, n.ny
     h = work.h
     limit = step * step
-    past = (step * 101 // 100) ** 2
+    near = step * 101 // 100
+    past = near * near
     # Each cell's two triangles: the right angle, then its legs' ends, as (row, column) steps.
     shapes = (((0, 1), (0, 0), (1, 1)), ((1, 0), (0, 0), (1, 1)))
     # Each pass only lowers fill cells and raises cut cells, in whole millimetres within their
@@ -457,7 +458,8 @@ def _corners(work: _Work, side: list[int], low: list[int], high: list[int], step
             for c in range(nx - 1):
                 for shape in shapes:
                     v, a, b = ((r + dr) * nx + c + dc for dr, dc in shape)
-                    if (h[a] - h[v]) ** 2 + (h[b] - h[v]) ** 2 <= past:
+                    da, db = h[a] - h[v], h[b] - h[v]
+                    if da * da + db * db <= past:
                         continue
                     for way in (1, -1):
                         # The corner farthest out on the bank's side, if a bank cell of that side.
@@ -486,7 +488,8 @@ def _eased_corner(h: list[int], v: int, a: int, b: int, t: int, limit: int, way:
         middle = (p + q + way * integer_sqrt(root)) * way
         return (middle // 2) * way if way == 1 else -(middle // 2)
     other = b if t == a else a
-    rest = limit - (h[other] - h[v]) ** 2
+    leg = h[other] - h[v]
+    rest = limit - leg * leg
     if rest < 0:
         return None
     return h[v] + way * integer_sqrt(rest)

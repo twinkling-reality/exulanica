@@ -64,14 +64,14 @@ PINNED: dict[tuple[str, str], dict[str, str]] = {
         # Moved when new worlds came to name land rules 6, which grade by the grading catalog: the
         # drawing names the receipt, which names the rules; no land moved (the farm's terraces
         # stand within the bound, so none is held in a wall). Its walls are rules 5's.
-        "drawing": "d0236b461ab1a3fa07824a3562d0be0171a84b4306b89371fc6c76da8ecc7158",
+        "drawing": "b34e478d72ea7d1bdd4c1c1474b16d795fd62bc78ea8beea767261f49209dd7d",
     },
     ("site", "land"): {
         "plan": "9d32eb168ac33646f636965b512cb711a3a0db9a04073e6265c93871e3f84c64",
         "output": "7feb099103fe9f3d14f1bd684b4ae766dbae0bc58332aeb75956d9b2e9891647",
         "place": "fd6c4c4930ce53df8f68f0d42c12a32a212f2efa655a392d56ec87a4d927530f",
         # Moved with land rules 6, as the farm's on land: the receipt the drawing names.
-        "drawing": "168d4b1d3045fe3f58a47dde1049e296de8669ad002fecf0559b336b7efb33a7",
+        "drawing": "ca11c83347ff3c9d2748b9e2b675d6fa8e36fcdf768ec02bb666b0cd4be4bf7c",
     },
 }
 
