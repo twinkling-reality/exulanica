@@ -1137,7 +1137,8 @@ decision to talk with someone (the first between two characters is a meeting, `m
 `spoke` or `talked`), a line said to everyone near (`spoke_to_all`), a decision to go somewhere or to
 leave (`went`, with the place and activity chosen, or `left`, at most once in 15 of the world's minutes
 for one character), following someone, and a thing picked up, put down, given or taken. A routine's choices, waiting and carrying on are never moments; a first meeting is, whoever
-decided it. One character makes at most one moment a minute, the first kind in the rule's order.
+decided it. One character makes at most one moment a minute, the first kind in the rule's order; a
+line it says that minute to the other one in its moment joins that moment, so the words are read with it.
 
 `exulanica/world/society_moments.py` writes them in the same transaction as the minute that made
 them, so a minute and its moments land together or not at all. Each is a row of

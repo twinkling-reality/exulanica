@@ -210,6 +210,7 @@ def form_moments(
     decided = _decisions_of(events)
     met_now: set[frozenset[uuid.UUID]] = set()
     candidates: list[tuple[int, Moment]] = []
+    spoken: list[Moment] = []
 
     def met(first: uuid.UUID, second: uuid.UUID) -> bool:
         return frozenset((first, second)) in met_now or known.met(first, second)
@@ -263,7 +264,9 @@ def form_moments(
             kind = "spoke" if met(event.subject_id, to) else "met"
             if kind == "met":
                 met_now.add(frozenset((event.subject_id, to)))
+            before = len(candidates)
             add(kind, event, (event.subject_id, to), decider, request_id=request_id)
+            spoken.extend(moment for _, moment in candidates[before:])
         elif event.kind == "social_contact" and event.document.get("outcome") == "talk_started":
             goal = event.document.get("goal")
             partner = _uuid(goal.get("partner_id")) if isinstance(goal, Mapping) else None
@@ -329,6 +332,14 @@ def form_moments(
         held = chosen.get(moment.subjects[0])
         if held is None or rank < held[0]:
             chosen[moment.subjects[0]] = (rank, moment)
+    # A line said between the people of the moment kept for its speaker joins that moment's events,
+    # so it is read with it: the engine's own meeting of the two comes first in a minute, and would
+    # otherwise keep the minute without the words. Its anchor, kind and id stay the kept moment's.
+    for line in spoken:
+        rank, kept = chosen[line.subjects[0]]
+        if kept is not line and set(kept.subjects) == set(line.subjects):
+            joined = (*kept.event_ids, *line.event_ids)
+            chosen[line.subjects[0]] = (rank, replace(kept, event_ids=joined))
     kept = sorted((moment for _, moment in chosen.values()), key=lambda m: str(m.anchor_event_id))
     return [
         replace(

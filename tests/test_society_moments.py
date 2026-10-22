@@ -128,6 +128,32 @@ def test_the_first_line_between_two_characters_is_a_meeting_and_a_later_one_is_s
     assert everyone.decider == {"kind": "person", "model": None}
 
 
+def test_a_line_said_as_the_two_meet_is_read_with_the_meeting():
+    """The engine's meeting of two comes first in a minute; a line one says to the other then is
+    part of that moment, so History shows it; its id, anchor and kind stay the meeting's."""
+    contact = _event(
+        "social_contact", TEO, 4, outcome="talk_started", goal={"partner_id": str(INES)}
+    )
+    line = _said(TEO, INES, 6)
+    (alone,) = _form([contact])
+    (met,) = _form([contact, line])
+    assert (met.kind, met.subjects, met.anchor_event_id) == ("met", (TEO, INES), contact.event_id)
+    assert met.moment_id == alone.moment_id
+    assert met.event_ids == (contact.event_id, line.event_id)
+    # The positive control: without the meeting, the line makes its own moment.
+    (said,) = _form([line])
+    assert said.event_ids == (line.event_id,)
+    # A line to someone else that minute is not part of the meeting.
+    (other,) = _form([contact, _said(TEO, MARCO, 7)])
+    assert other.event_ids == (contact.event_id,)
+    # The one spoken to keeps a line of their own in their own moment.
+    moments = _form([contact, _said(INES, TEO, 8)])
+    assert {m.subjects[0]: m.event_ids for m in moments} == {
+        TEO: (contact.event_id,),
+        INES: (uuid.UUID(int=8),),
+    }
+
+
 def test_a_routine_meeting_is_a_moment_once_and_a_routine_s_choices_never():
     contact = _event(
         "social_contact", TEO, 4, outcome="talk_started", goal={"partner_id": str(INES)}
