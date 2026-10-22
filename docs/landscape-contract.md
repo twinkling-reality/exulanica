@@ -424,8 +424,15 @@ datum. In order:
    face an open rim away from the site: of the bearings 10 degrees apart from east through south
    to west whose rock ends within reach, walked in half-metre steps over nothing taller than eye
    height (1.6 m: a building, a wall or fixture that tall, or ground rising so far), first one with
-   something in the middle distance in view, then the one whose rock ends nearest within 10 to 25 m
-   (else nearest that range), then the one that holds what is in view nearest the view's middle;
+   the sea just past its rim across the middle third of the view and something still in view
+   (`sea_past_rim`: along the bearing and 22.5 degrees either side, the line from the eyes over the
+   rim's edge comes down to the sea's level, or runs 2 km out, before dry land rises to it; the
+   third is the page's arrival view, 70 degrees high and so 51 degrees either side on a 16:9
+   screen; in view is what is in view below, or dry land straight along a bearing up to 40 degrees
+   aside), so the island reads as floating over the sea with the coast or another volume beside it;
+   then one with something in the middle distance in view, then the one whose rock ends nearest
+   within 10 to 25 m (else nearest that range), then the one that holds what is in view nearest the
+   view's middle;
    straight out of the gate where no rim is open. In view is another placed volume whose box's
    middle stands 30 to 400 m ahead, within 30 degrees either side of the bearing and with some of
    it within 25 degrees above or below eyes 1.6 m over the top, or the landscape's dry land (above

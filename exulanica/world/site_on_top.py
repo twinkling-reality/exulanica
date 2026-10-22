@@ -26,7 +26,9 @@ altitude enters no height the site states. Here:
   :data:`RIM_NEAREST_MM` to :data:`RIM_FARTHEST_MM`, nothing between taller than
   :data:`EYE_HEIGHT_MM` (a building, a wall or a fixture, or the ground rising so far), so a person
   arriving sees the island's edge and the world below it, and no fence across the middle of the
-  view.
+  view. An open rim with the sea just past its edge across the middle third of the view
+  (:func:`sea_past_rim`, :data:`SEA_THIRD_MDEG` either side) and the coast or another volume
+  still in view comes first, so the island reads as floating over the sea.
 * :func:`top_world_of` reads a version 7 receipt's world back: its landscape, the graded top for
   its records and the capped field, as :class:`TopWorld`, which stands where a site's graded land
   stands for the drawing, the place and part edits.
@@ -47,7 +49,14 @@ from exulanica.grammar.grammars.site.records import (
     SiteStructureRecord,
     SiteWallRecord,
 )
-from exulanica.grammar.landform import CELL_MM, NearLand, WorldFrame, height_at, water_bodies
+from exulanica.grammar.landform import (
+    CELL_MM,
+    LandDocument,
+    NearLand,
+    WorldFrame,
+    height_at,
+    water_bodies,
+)
 from exulanica.grammar.landscape import (
     LandscapeDocument,
     LandscapeRefused,
@@ -75,6 +84,8 @@ __all__ = [
     "RIM_NEAREST_MM",
     "ROCK_MARGIN_MM",
     "ROCK_UNDER_MM",
+    "SEA_REACH_MM",
+    "SEA_THIRD_MDEG",
     "VIEW_FARTHEST_MM",
     "VIEW_HALF_HEIGHT_PERMILLE",
     "VIEW_HALF_WIDTH_PERMILLE",
@@ -86,6 +97,7 @@ __all__ = [
     "natural_top",
     "on_top",
     "open_rim_facing",
+    "sea_past_rim",
     "top_field",
     "top_rules",
     "top_world_of",
@@ -106,6 +118,14 @@ VIEW_NEAREST_MM: Final = 30_000
 VIEW_FARTHEST_MM: Final = 400_000
 #: How often along a heading the land is asked whether it is dry.
 LAND_STEP_MM: Final = 10_000
+#: How far either side of a heading the sea must show past the rim: the middle third of the view
+#: as the page draws an arrival, 70 degrees high by default and so 51 degrees either side on a
+#: 16:9 screen, a third of that half's tangent (tan 22.5 degrees is 414 thousandths).
+SEA_THIRD_MDEG: Final = 22_500
+#: How far along a heading the line over the rim's edge is followed to the sea; past it, open.
+SEA_REACH_MM: Final = 2_000_000
+#: How many bearing steps either side dry land straight along one is still in that view.
+_IN_VIEW_STEPS: Final = 4
 #: The bearings tried, from north clockwise, and how far and in what steps each is walked.
 BEARING_STEP_MDEG: Final = 10_000
 _REACH_MM: Final = 64_000
@@ -296,28 +316,51 @@ def open_rim_facing(
     records: Sequence[object],
     bearings: range = range(0, _FULL_TURN, BEARING_STEP_MDEG),
     seen: Callable[[int], int | None] | None = None,
+    sea: Callable[[int, int], bool] | None = None,
 ) -> list[int] | None:
     """The facing, in thousandths along north and east, toward the nearest open rim from the
     arrival, of ``bearings`` (every one by default): within :data:`RIM_NEAREST_MM` to
     :data:`RIM_FARTHEST_MM` where one is, else the open rim nearest that range, the first bearing
     among equals; None where no open rim lies within reach. With ``seen`` (what lies in view along
     a bearing, :func:`landmarks_in_view`), an open rim with something in view comes first, the one
-    that holds it nearest the middle of the view among equals."""
+    that holds it nearest the middle of the view among equals. With ``sea`` too
+    (:func:`sea_past_rim`), before them an open rim with the sea past its edge along the bearing
+    and :data:`SEA_THIRD_MDEG` either side, and something in view: another volume or dry land at
+    the view's middle, or dry land straight along a bearing up to four steps either side."""
     blockers = _blockers(records)
     start = (int(position_mm[0]), int(position_mm[1]))
-    best: tuple[int, int, int, int, int] | None = None
+
+    def over_sea(bearing: int) -> bool:
+        if seen is None or sea is None:
+            return False
+        for side in (-SEA_THIRD_MDEG, 0, SEA_THIRD_MDEG):
+            reach = _rim(field, on, top, start, bearing + side, blockers)
+            if reach is None or not sea(bearing + side, reach):
+                return False
+        steps = range(1, _IN_VIEW_STEPS + 1)
+        aside = (bearing + way * step * BEARING_STEP_MDEG for step in steps for way in (-1, 1))
+        return seen(bearing) is not None or any(seen(other) == 0 for other in aside)
+
+    best: tuple[int, int, int, int, int, int] | None = None
     for bearing in bearings:
         distance = _rim(field, on, top, start, bearing, blockers)
         if distance is None:
             continue
         outside = max(0, RIM_NEAREST_MM - distance, distance - RIM_FARTHEST_MM)
         off = None if seen is None else seen(bearing)
-        found = (0 if off is not None else 1, outside, off or 0, distance, bearing)
+        found = (
+            0 if over_sea(bearing) else 1,
+            0 if off is not None else 1,
+            outside,
+            off or 0,
+            distance,
+            bearing,
+        )
         if best is None or found < best:
             best = found
     if best is None:
         return None
-    sine, cosine = sin_cos(best[4])
+    sine, cosine = sin_cos(best[5])
     return [sine * 1000 // TURN_ONE, cosine * 1000 // TURN_ONE]
 
 
@@ -336,24 +379,9 @@ def landmarks_in_view(
     (:data:`VIEW_HALF_WIDTH_PERMILLE` each side, :data:`VIEW_HALF_HEIGHT_PERMILLE` up and down, from
     eyes :data:`EYE_HEIGHT_MM` over the top). The answer is how far off the view's middle the
     nearest to it lies, as a tangent in thousandths, or None where nothing is in view."""
-    from exulanica.world.site_land import land_seed
-
-    sine, cosine = sin_cos(placement.yaw_mdeg)
-    east, north = on.at_mm
-    x, y = int(position_mm[0]) + east, int(position_mm[1]) + north
-    world_x, world_y, world_z = placement.at_mm
-    eye = (
-        world_x + (cosine * x - sine * y) // TURN_ONE,
-        world_y + (sine * x + cosine * y) // TURN_ONE,
-        world_z + top.height_at(int(position_mm[0]), int(position_mm[1])) + EYE_HEIGHT_MM,
-    )
+    eye = _landscape_point(placement, on, top, position_mm, EYE_HEIGHT_MM)
     boxes = [placement_reach(other) for other in landscape.placements if other.id != placement.id]
-    land = landscape.land
-    width, depth = landscape.extent_mm
-    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(world_id, land.sha256))
-    seas = [body.level_mm for body in water_bodies(land, frame) if body.kind == "sea"]
-    # Dry land is above the sea where the land has one; a land with none is dry everywhere.
-    sea = min(seas) if seas else None
+    land, frame, sea = _land_and_sea(landscape, world_id)
 
     def high_enough(low_z: int, high_z: int, distance: int) -> bool:
         reach = distance * VIEW_HALF_HEIGHT_PERMILLE // 1000
@@ -384,6 +412,84 @@ def landmarks_in_view(
         return best
 
     return seen
+
+
+def sea_past_rim(
+    landscape: LandscapeDocument,
+    placement: Placement,
+    on: OnTop,
+    top: SiteTop,
+    world_id: str,
+    position_mm: Sequence[int],
+) -> Callable[[int, int], bool]:
+    """Whether a person arriving at ``position_mm`` (the site's frame) on ``placement``'s top and
+    looking along a bearing (the site's frame) over the rim that far ahead sees the sea just past
+    its edge: the line from their eyes over the rim's edge comes down to the sea's level, or runs
+    :data:`SEA_REACH_MM` out, before any dry land rises to it. Never where the land has no sea, or
+    where the rim's edge is not below the eyes."""
+    eye = _landscape_point(placement, on, top, position_mm, EYE_HEIGHT_MM)
+    land, frame, sea = _land_and_sea(landscape, world_id)
+
+    @functools.cache
+    def past(bearing: int, rim_mm: int) -> bool:
+        sine, cosine = sin_cos(bearing)
+        edge = _landscape_point(
+            placement,
+            on,
+            top,
+            (
+                int(position_mm[0]) + rim_mm * sine // TURN_ONE,
+                int(position_mm[1]) + rim_mm * cosine // TURN_ONE,
+            ),
+            0,
+        )
+        drop = eye[2] - edge[2]
+        if sea is None or drop <= 0:
+            return False
+        along_x, along_y = sin_cos(bearing - placement.yaw_mdeg)
+        reach = min(SEA_REACH_MM, (eye[2] - sea) * rim_mm // drop)
+        for distance in range(rim_mm, reach + 1, LAND_STEP_MM):
+            ground = height_at(
+                land,
+                frame,
+                eye[0] + distance * along_x // TURN_ONE,
+                eye[1] + distance * along_y // TURN_ONE,
+            )
+            if ground > sea and ground >= eye[2] - drop * distance // rim_mm:
+                return False
+        return True
+
+    return past
+
+
+def _landscape_point(
+    placement: Placement, on: OnTop, top: SiteTop, position_mm: Sequence[int], over_mm: int
+) -> tuple[int, int, int]:
+    """A point of the site's frame on ``placement``'s top, ``over_mm`` above the top there, in the
+    landscape's frame: the volume's frame is turned by its yaw and stands at its place."""
+    sine, cosine = sin_cos(placement.yaw_mdeg)
+    east, north = on.at_mm
+    x, y = int(position_mm[0]) + east, int(position_mm[1]) + north
+    world_x, world_y, world_z = placement.at_mm
+    return (
+        world_x + (cosine * x - sine * y) // TURN_ONE,
+        world_y + (sine * x + cosine * y) // TURN_ONE,
+        world_z + top.height_at(int(position_mm[0]), int(position_mm[1])) + over_mm,
+    )
+
+
+def _land_and_sea(
+    landscape: LandscapeDocument, world_id: str
+) -> tuple[LandDocument, WorldFrame, int | None]:
+    """The landscape's land, its frame under the world's seed, and its sea's level: dry land is
+    above it; a land with no sea is dry everywhere (None)."""
+    from exulanica.world.site_land import land_seed
+
+    land = landscape.land
+    width, depth = landscape.extent_mm
+    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(world_id, land.sha256))
+    seas = [body.level_mm for body in water_bodies(land, frame) if body.kind == "sea"]
+    return land, frame, min(seas) if seas else None
 
 
 @dataclass(frozen=True)

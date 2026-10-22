@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 from typing import Any
 
 import pytest
@@ -24,6 +25,7 @@ from exulanica.world import site_on_top
 from exulanica.world.composers import site_plan
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.kinds import worker
+from exulanica.world.kinds.library import shipped_kinds, starter_landscape
 from exulanica.world.landscape_drawing import TOP_LANDSCAPE_DRAWING_PROFILE
 from exulanica.world.site_drawing import TOP_DRAWING_PROFILE, site_drawing
 from exulanica.world.site_land import site_land_of
@@ -199,7 +201,7 @@ def over_the_sea(*others: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_a_person_arrives_facing_another_island_over_the_rim_rather_than_open_sea() -> None:
+def test_a_person_arrives_facing_the_sea_with_another_island_in_view() -> None:
     found = kind("hamlet")
     values = found.values(found.presets[0][0])
 
@@ -211,12 +213,80 @@ def test_a_person_arrives_facing_another_island_over_the_rim_rather_than_open_se
 
     # Alone over the sea, every open rim looks at open sea: the nearest is taken.
     alone = facing(over_the_sea())
-    # Another island 120 m east at the same height: among the open rims, the one facing it.
+    # Another island 120 m east at the same height: among the open rims, the one with the sea past
+    # it across the middle third and that island in view, 17 degrees aside (due east, the coast
+    # shows past the rim at the third's left edge).
     beside = facing(
         over_the_sea({"id": "far_isle", "volume": ISLAND, "at_mm": [184000, -120000, 60000]})
     )
-    assert beside == [1000, 0]
+    assert beside == [984, -174]
     assert alone != beside
+
+
+def test_a_person_arrives_facing_the_sea_past_the_rim_with_the_coast_still_in_view(made) -> None:
+    ground = ground_of(made)
+    position = made.receipt["arrival"]["position_mm"]
+    # Stand-ins for what lies past the rim and in view: the sea past it straight along 200 degrees
+    # and from 217.5 to 262.5, dry land straight along 180 to 200, nothing else.
+    sea = lambda bearing, rim_mm: bearing == 200_000 or 217_500 <= bearing <= 262_500  # noqa: E731
+    seen = lambda bearing: 0 if 180_000 <= bearing <= 200_000 else None  # noqa: E731
+
+    def facing(**ranked: Any) -> int:
+        fx, fy = site_on_top.open_rim_facing(
+            ground.field, ground.site.on, ground.site, position, made.records,
+            site_on_top.AWAY_FROM_SITE, **ranked,
+        )  # fmt: skip
+        return next(
+            b for b in site_on_top.AWAY_FROM_SITE
+            if [s * 1000 // site_on_top.TURN_ONE for s in site_on_top.sin_cos(b)] == [fx, fy]
+        )  # fmt: skip
+
+    # Only 240 has the sea past the rim across the middle third (22.5 degrees either side) with
+    # land still in view, 40 degrees aside: 200 has the sea at the middle alone, 230 and 250 not
+    # at one edge.
+    assert facing(seen=seen, sea=sea) == 240_000
+    # Without the sea's answer the land at the middle of the view is taken, as before.
+    assert 180_000 <= facing(seen=seen) <= 200_000
+
+
+def test_the_served_starter_arrives_facing_the_sea_past_its_rim_with_the_coast_aside() -> None:
+    hamlet = next(kind for kind in shipped_kinds() if kind.kind == "island_hamlet")
+    made = site_plan.compose_kind(
+        hamlet,
+        hamlet.values(hamlet.presets[0][0]),
+        WORLD,
+        place_id="place:isle",
+        landscape=starter_landscape(hamlet),
+    )
+    fx, fy = made.receipt["arrival"]["facing_mm"]
+    # The bay's coast runs north-east of the island: south of east, past the coast that a view
+    # taken straight at it (about 120 degrees) would hold in its middle.
+    assert 150 <= math.degrees(math.atan2(fx, fy)) % 360 <= 200
+
+
+def test_the_line_over_the_rim_meets_the_sea_where_the_land_falls_to_it_and_never_without_one(
+    made,
+) -> None:
+    ground = ground_of(made)
+    position = made.receipt["arrival"]["position_mm"]
+    placement = next(p for p in ground.landscape.placements if p.id == ground.placement_id)
+    over = read_landscape_document(over_the_sea())
+    out_there = next(p for p in over.placements if p.id == "isle")
+    # The island 120 m out over a sea to the south: past its rim, sea every way.
+    sea = site_on_top.sea_past_rim(over, out_there, ground.site.on, ground.site, WORLD, position)
+    assert all(sea(bearing, 10_000) for bearing in site_on_top.AWAY_FROM_SITE)
+    # Over the bay, the coast and its hills rise to the line north of the island, and a land
+    # with no sea never shows one.
+    bay = site_on_top.sea_past_rim(
+        ground.landscape, placement, ground.site.on, ground.site, WORLD, position
+    )
+    assert not bay(0, 10_000)
+    dry = read_landscape_document({**LANDSCAPE, "land": {**LANDSCAPE["land"], "features": []}})
+    landlocked = next(p for p in dry.placements if p.id == "isle")
+    nowhere = site_on_top.sea_past_rim(
+        dry, landlocked, ground.site.on, ground.site, WORLD, position
+    )
+    assert not any(nowhere(bearing, 10_000) for bearing in site_on_top.AWAY_FROM_SITE)
 
 
 def test_a_site_that_fills_its_top_to_the_rim_stands_its_arrival_in_the_gate(
