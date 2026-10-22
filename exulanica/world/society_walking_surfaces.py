@@ -107,6 +107,7 @@ from exulanica.world.society_water import (
     records_swimming,
     water_graph,
 )
+from exulanica.world.thing_landing import rests_on_footprint
 
 __all__ = [
     "SEAT_NODE_PREFIX",
@@ -827,9 +828,12 @@ def build_walking_surfaces_input(
     records one. Any other input states no water.
 
     ``rest`` is the height a placed thing rests at, at a point of the region, in the frame its pose
-    is in: a town's own surface (:func:`~exulanica.world.thing_landing_source.town_surface`), the
-    one a placing is held to, so a thing placed where the landing rests it rests here too. Left out
-    (a site), a thing rests by the walking line nearest it (:func:`surface_height_above`)."""
+    is in: a town's own surface (:func:`~exulanica.world.thing_landing_source.town_surface`) or a
+    volume's graded top (:func:`~exulanica.world.thing_landing_source.society_rest`), the one a
+    placing is held to, read by the highest of it under the thing's footprint as the landing reads
+    it, so a thing placed where the landing rests it rests here too. Left out (a site on level
+    ground or on land), a thing rests by the walking line nearest it
+    (:func:`surface_height_above`)."""
     if (day_place is not None or day_routine is not None) and (
         not things
         or input_seq != 1
@@ -990,9 +994,15 @@ def build_walking_surfaces_input(
     )
     reason = reason or support_refusal
     records_list.extend(support_records)
-    # Only a society of things reads how high a thing stands: v1 and v2 read no height.
+    # Only a society of things reads how high a thing stands: v1 and v2 read no height. Where the
+    # ground states the height a thing rests at, it is read by the highest of it under the thing's
+    # footprint, as a placing is held to it (`thing_landing.rests_on_footprint`).
     height_above = (
-        (surface_height_above(place, ground) if rest is None else rests_on_surface(rest))
+        (
+            surface_height_above(place, ground)
+            if rest is None
+            else rests_on_footprint(rest, RESTS_ON_SURFACE_MM)
+        )
         if things
         else None
     )
