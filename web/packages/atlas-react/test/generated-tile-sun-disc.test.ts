@@ -37,6 +37,32 @@ describe('the skybox chunk with the disc', () => {
     expect(removed).toBe(SKYBOX);
   });
 
+  it('takes every derivative where a pixel and its neighbours take the same branches', () => {
+    // A derivative inside a branch a pixel decides for itself is undefined in GLSL; the block may branch
+    // there only on what a look states, the same for every pixel.
+    const open: string[] = [];
+    let derivatives = 0;
+    for (const line of SKY_BLOCK.split('\n')) {
+      if (/\b(fwidth|dFdx|dFdy)\(/.test(line)) {
+        derivatives += 1;
+        for (const branch of open) expect(branch).toMatch(/^if \(exu(SunDisc|Stars)\.w > 0\.0\)$/);
+      }
+      let from = 0;
+      for (let at = 0; at < line.length; at += 1) {
+        if (line[at] === '{') open.push(line.slice(from, at).trim());
+        if (line[at] === '}') open.pop();
+        if (line[at] === '{' || line[at] === '}' || line[at] === ';') from = at + 1;
+      }
+    }
+    expect(open).toEqual([]);
+    expect(derivatives).toBeGreaterThanOrEqual(2);
+  });
+
+  it('works out the moon\'s face only inside its disc', () => {
+    const line = SKY_BLOCK.split('\n').find((l) => l.includes('exuMoonFace(exuDir)'))!;
+    expect(line.trim().startsWith('if (inDisc > 0.0)')).toBe(true);
+  });
+
   it('declines a chunk it was not written for', () => {
     expect(sunDiscSkyChunk('void main(void) { gl_FragColor = vec4(1.0); }')).toBeNull();
   });

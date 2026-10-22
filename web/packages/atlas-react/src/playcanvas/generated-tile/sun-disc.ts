@@ -18,12 +18,14 @@ import { SUN_DISC_COS } from './sky.js';
  * axes (no skybox rotation is set anywhere), which the block relies on.
  *
  * The same block draws what a look states of the night (`sky.stars`, `sky.moon`). The disc becomes a
- * moon with darker seas and a limb a little darker than its middle. Stars are points a pixel wide,
- * one at most in each cell of a grid of `STAR_CELLS` a cube face, placed in the middle half of its
- * cell so a neighbouring cell never cuts it, behind the clouds by the share of the sky they leave
- * clear (the drawn sky's alpha, `renderSkyFaces`), and fading out over the lowest 7 degrees. Their
- * hashes are integer only, so the same seed draws the same stars on every GPU. A look that states
- * neither skips both branches.
+ * moon with darker seas and a limb a little darker than its middle, worked out only inside the disc.
+ * Stars are points a pixel wide, one at most in each cell of a grid of `STAR_CELLS` a cube face, placed
+ * in the middle half of its cell. A star's size is the angle from it to the pixel, so it is the same at
+ * a face's middle, its edges and its corners, and each pixel draws the stars of its own cell and the
+ * three round its nearest corner, so a star is drawn whole where a cell is only a few pixels across.
+ * They are behind the clouds by the share of the sky they leave clear (the drawn sky's alpha,
+ * `renderSkyFaces`) and fade out over the lowest 7 degrees. Their hashes are integer only, so the same
+ * seed draws the same stars on every GPU. A look that states neither skips both branches.
  *
  * GLSL only: on a WebGPU device nothing is installed and the faces keep their baked disc.
  */
@@ -74,11 +76,13 @@ export const SKY_BLOCK = `
                 float discCos = dot(exuDir, exuSunDisc.xyz);
                 float discEdge = max(fwidth(discCos), 1e-7);
                 float inDisc = smoothstep(exuSunDisc.w - discEdge, exuSunDisc.w + discEdge, discCos);
-                linear += exuSunDiscColour * (exuMoon.z > 0.0 ? exuMoonFace(exuDir) : 1.0) * inDisc;
+                // The moon's face is worked out only where its disc is drawn.
+                if (inDisc > 0.0) linear += exuSunDiscColour * (exuMoon.z > 0.0 ? exuMoonFace(exuDir) : 1.0) * inDisc;
             }
             if (exuStars.w > 0.0) {
-                // A pixel's angle, taken before any branch a pixel decides for itself.
-                float pixelAngle = max(length(fwidth(exuDir)), 1e-6);
+                // A pixel's angle, taken before any branch a pixel decides for itself: its two screen steps, as
+                // the length of fwidth gives it for a view along the sky's axes, but the same at any heading.
+                float pixelAngle = max(0.70710678 * (length(dFdx(exuDir)) + length(dFdy(exuDir))), 1e-6);
                 #ifdef SKY_CUBEMAP
                     float clearShare = textureCube(texture_cubeMap, dir).a;
                 #else
@@ -93,15 +97,28 @@ export const SKY_BLOCK = `
                 else { major = a.z; across = exuDir.xy; face = exuDir.z > 0.0 ? 4u : 5u; }
                 vec2 grid = (across / major * 0.5 + 0.5) * EXU_STAR_CELLS;
                 vec2 cell = floor(grid);
-                uint h = exuHash(face * 0x9e3779b9u ^ exuHash(uint(cell.x) * 0x85ebca6bu ^ exuHash(uint(cell.y) * 0xc2b2ae35u ^ uint(exuStars.z))));
-                if (exuDir.y > 0.0 && exuUnit(h) < exuStars.x) {
-                    uint h2 = exuHash(h);
-                    uint h3 = exuHash(h2 ^ 0x68e31da4u);
-                    vec2 at = cell + 0.25 + 0.5 * vec2(exuUnit(h2), exuUnit(exuHash(h2)));
-                    float pixels = length(grid - at) / max(pixelAngle * EXU_STAR_CELLS * 0.5 / major, 1e-4);
-                    float brightness = 0.08 + 0.92 * pow(exuUnit(h3), 6.0);
-                    vec3 tint = mix(vec3(1.0, 0.86, 0.72), vec3(0.78, 0.86, 1.0), exuUnit(exuHash(h3)));
-                    linear += exuStars.y * brightness * tint * exp(-pixels * pixels * 1.6) * clearShare * smoothstep(0.0, 0.12, exuDir.y);
+                // The pixel's own cell and the three round the corner it is nearest, so a star wider than its
+                // cell's margin is drawn whole where a cell is only a few pixels across.
+                vec2 toward = vec2(grid.x - cell.x < 0.5 ? -1.0 : 1.0, grid.y - cell.y < 0.5 ? -1.0 : 1.0);
+                float side = (face & 1u) == 0u ? 1.0 : -1.0;
+                if (exuDir.y > 0.0) {
+                    for (int k = 0; k < 4; k++) {
+                        vec2 near = cell + toward * vec2(float(k & 1), float(k >> 1));
+                        if (any(lessThan(near, vec2(0.0))) || any(greaterThanEqual(near, vec2(EXU_STAR_CELLS)))) continue;
+                        uint h = exuHash(face * 0x9e3779b9u ^ exuHash(uint(near.x) * 0x85ebca6bu ^ exuHash(uint(near.y) * 0xc2b2ae35u ^ uint(exuStars.z))));
+                        if (exuUnit(h) >= exuStars.x) continue;
+                        uint h2 = exuHash(h);
+                        uint h3 = exuHash(h2 ^ 0x68e31da4u);
+                        vec2 at = near + 0.25 + 0.5 * vec2(exuUnit(h2), exuUnit(exuHash(h2)));
+                        // The star's own direction, from its point on the face as the grid was taken from the
+                        // pixel's: its distance is an angle, so a star keeps its size across the face.
+                        vec2 onFace = (at / EXU_STAR_CELLS - 0.5) * 2.0;
+                        vec3 star = face < 2u ? vec3(side, onFace) : face < 4u ? vec3(onFace.x, side, onFace.y) : vec3(onFace, side);
+                        float pixels = length(exuDir - normalize(star)) / pixelAngle;
+                        float brightness = 0.08 + 0.92 * pow(exuUnit(h3), 6.0);
+                        vec3 tint = mix(vec3(1.0, 0.86, 0.72), vec3(0.78, 0.86, 1.0), exuUnit(exuHash(h3)));
+                        linear += exuStars.y * brightness * tint * exp(-pixels * pixels * 1.6) * clearShare * smoothstep(0.0, 0.12, exuDir.y);
+                    }
                 }
             }
 `;
