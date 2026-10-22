@@ -457,6 +457,8 @@ def test_a_sentence_that_asks_for_a_town_is_made_by_the_town_tool(drafts, fixed_
         assert entry["generated_site"] is None
         assert entry["generated_ground"]["recipe_key"] == "small_town"
         assert _receipt(client, entry)["recipe"]["key"] == "small_town"
+        # Titled from the person's own words (N33), not by the preset's label.
+        assert entry["title"] == "A quiet town with two cafes and low buildings"
         # What the words asked for that no value says is said back in the person's own words.
         assert ended["left_out"] == left_out
         # A town's parts are the town adapter's, which state no box.

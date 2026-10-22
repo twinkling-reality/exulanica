@@ -1862,7 +1862,7 @@
   "entry": {
    "entry_id": "00000000-0000-0000-0000-000000000003",
    "world_id": "world:generated:00000000-0000-0000-0000-000000000001",
-   "title": "A small town",
+   "title": "A quiet town with two cafes and low buildings",
    "source_kind": "generated",
    "source_snapshot_id": "00000000-0000-0000-0000-000000000004",
    "source_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",

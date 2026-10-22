@@ -37,15 +37,18 @@ drafted town's own. The making asks it again under the workspace's lock, where t
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Final
 
 from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, drafted_kind
 from exulanica.api.world_draft_offer import calls_at_most as counted_calls
+from exulanica.grammar.catalogs import CatalogSchema, load_catalog, text_field
 from exulanica.grammar.landform import LandformRefused
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
@@ -89,6 +92,8 @@ __all__ = [
     "guarded",
     "make_world",
     "site_parts",
+    "title_from_words",
+    "title_joining_words",
     "town_parts",
 ]
 
@@ -184,6 +189,60 @@ class _Taken:
     def parts(self) -> dict[str, str]:
         chosen = [] if self.setting is None else self.setting["parts"]
         return {str(part["axis"]): str(part["key"]) for part in chosen}
+
+
+#: The most characters of a person's sentence a town made from it takes as its title.
+TITLE_FROM_WORDS_CHARACTERS: Final = 48
+#: The joining words a title cut from a person's sentence never ends on, each with why.
+TITLE_JOINING_WORDS_PATH: Final = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "catalogs"
+    / "world-titles"
+    / "title-joining-word.v1.json"
+)
+_TITLE_JOINING_WORD: Final = CatalogSchema(
+    "title-joining-word", 1, (("class", text_field), ("reason", text_field))
+)
+
+
+@functools.cache
+def title_joining_words(path: Path = TITLE_JOINING_WORDS_PATH) -> frozenset[str]:
+    """The articles, determiners, prepositions, conjunctions and relative words the catalog at
+    ``path`` lists: a title cut short drops them from its end, since each joins on to words the
+    title no longer holds."""
+    return frozenset(entry.key for entry in load_catalog(path, _TITLE_JOINING_WORD).entries)
+
+
+def title_from_words(sent: SentDescription) -> str | None:
+    """The title of a town made from a person's words, taken from them: their sentence as typed
+    up to its first comma, or its first 48 characters ending on a whole word where it runs longer,
+    with a capital first letter and no full stop. It claims nothing the person did not write and
+    carries no saved name: where one stands inside it (a span the drafting replaced, as typed), it
+    ends before that name. Cut short in any of these ways, it never ends on a joining word
+    (:func:`title_joining_words`). None where fewer than two words are left, and the town keeps
+    its preset's label."""
+    typed = sent.typed
+    start = len(typed) - len(typed.lstrip())
+    comma = typed.find(",", start)
+    end = len(typed) if comma < 0 else comma
+    cut = comma >= 0
+    for _sent_start, _sent_end, typed_start, _typed_end in sent.replaced:
+        if start <= typed_start < end:
+            end, cut = typed_start, True
+            break
+    clause = " ".join(typed[start:end].split())
+    if len(clause) > TITLE_FROM_WORDS_CHARACTERS:
+        within = clause[: TITLE_FROM_WORDS_CHARACTERS + 1]
+        clause, cut = (within[: within.rfind(" ")] if " " in within else ""), True
+    words = clause.rstrip(" .,;:").split()
+    joining = title_joining_words() if cut else frozenset()
+    while words and words[-1].rstrip(".,;:").casefold() in joining:
+        words.pop()
+    title = " ".join(words).rstrip(" .,;:")
+    if len(title.split()) < 2:
+        return None
+    return title[0].upper() + title[1:]
 
 
 def _take(client: ModelClient, sent: SentDescription, log: CallLog) -> _Taken:
@@ -747,7 +806,7 @@ def _make_town(
         with opened() as connection:
             entries = SavedWorldEntryRepository(connection, draft.workspace_id, store, guest=guest)
             return entries.create_generated(
-                title=label,
+                title=title_from_words(sent) or label,
                 recipe_key=town.preset,
                 created_by=actor,
                 values=town.values,
