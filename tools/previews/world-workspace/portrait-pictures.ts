@@ -11,6 +11,7 @@ import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { frameJpeg, takeFrame, type PictureSource } from '/src/composition/world-pictures.ts';
 import { workspaceCharacterLoader } from '/src/character-catalog.ts';
 import { HistoryPicturesClient, type HistoryPicture } from '/src/world-pictures-api.ts';
+import type { MomentPicture } from './moment-pictures.ts';
 
 const PORTRAIT = MOMENT_FRAMING.portrait;
 
@@ -99,7 +100,8 @@ export function headOf(frame: HTMLCanvasElement, depth: number, tolerance: numbe
 
 /**
  * The look's kept portrait in the world: the one kept, else drawn here and kept (or the one another
- * page kept first). Null where none can be made or kept.
+ * page kept first), else, where the server does not keep it (a read-only page), the one drawn here
+ * with its bytes, shown from the page's memory (`MomentPicture.unkept`). Null where none can be drawn.
  */
 export async function renderPortrait({ worldId, look, catalog, credentials, kept = null, signal }: {
   readonly worldId: string;
@@ -108,7 +110,7 @@ export async function renderPortrait({ worldId, look, catalog, credentials, kept
   readonly credentials: TransportOptions;
   readonly kept?: HistoryPicture | null;
   readonly signal?: AbortSignal;
-}): Promise<HistoryPicture | null> {
+}): Promise<MomentPicture | null> {
   if (kept) return kept;
   const picture = await drawPortrait({ look, catalog, credentials, ...(signal ? { signal } : {}) });
   if (picture === null || signal?.aborted) return null;
@@ -116,6 +118,7 @@ export async function renderPortrait({ worldId, look, catalog, credentials, kept
     return await new HistoryPicturesClient({ ...credentials, ...(signal ? { signal } : {}) })
       .putPortrait(worldId, lookDigest(look), PORTRAIT.recipe, picture);
   } catch {
-    return null;
+    if (signal?.aborted) return null;
+    return { sha256: `unkept:portrait:${lookDigest(look)}`, width: PORTRAIT.size_px, height: PORTRAIT.size_px, unkept: picture };
   }
 }

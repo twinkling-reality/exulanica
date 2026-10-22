@@ -33,7 +33,13 @@ vi.mock('../../../../tools/previews/world-workspace/moment-pictures.ts', () => (
 vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () => ({
   lookDigest: () => 'd',
   lookOfSubject: (id: string) => ({ id }),
-  renderPortrait: async ({ look }: { look: { id: string } }) => { people.drawn.push(look.id); return { sha256: 'c'.repeat(64), width: 156, height: 156 }; },
+  // A face the server would not keep (Ines's, on a read-only page) comes back drawn, with its own bytes.
+  renderPortrait: async ({ look }: { look: { id: string } }) => {
+    people.drawn.push(look.id);
+    return look.id === 'ines'
+      ? { sha256: 'unkept:portrait:ines', width: 156, height: 156, unkept: new Blob(['face'], { type: 'image/jpeg' }) }
+      : { sha256: 'c'.repeat(64), width: 156, height: 156 };
+  },
 }));
 
 type Json = Record<string, any>;
@@ -387,6 +393,10 @@ describe("a world's pictures", () => {
     const town = await open();
     expect(await town.portrait('marco')).toBe('blob:made-2');
     expect(people.drawn).toEqual(['teo', 'marco']);
+    // A face the server did not keep shows from the bytes drawn here, read from nowhere.
+    reads.length = 0;
+    expect(await town.portrait('ines')).toBe('blob:made-3');
+    expect(reads).toEqual([]);
     people.served = false;
   });
 });
