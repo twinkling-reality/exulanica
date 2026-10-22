@@ -4648,6 +4648,16 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
         }
       },
       {
+        "name": "story",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "title": "Story"
+        }
+      },
+      {
         "name": "authorization",
         "in": "header",
         "required": false,

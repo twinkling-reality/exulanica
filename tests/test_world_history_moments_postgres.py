@@ -136,6 +136,60 @@ def _later(connection, world, society_id, anchor, tick, kind, subjects) -> None:
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_the_story_keeps_what_was_decided_and_who_was_touched_and_not_strangers_meetings(app):
+    """H18: History's line holds what a model, a person playing or a program decided, and the
+    moments of a being the person touched; a routine meeting of two nobody touched stays in the
+    record (the read without story) but not on the line."""
+    world, client = app
+    services = _services(client)
+    _, knight = erasure._played_line(world, client, services)
+    knight = uuid.UUID(str(knight))
+    connection = world["connection"]
+    society_id = erasure._society_id(world)
+    said = connection.execute(
+        "select event_id, tick from world_society_event "
+        "where society_id=%s and event_kind='said' order by tick limit 1",
+        (society_id,),
+    ).fetchone()
+    tick = int(said["tick"])
+    strangers = [uuid.uuid4(), uuid.uuid4()]
+    with connection.transaction():
+        _later(connection, world, society_id, said["event_id"], tick + 1, "met", strangers)
+        _later(
+            connection, world, society_id, said["event_id"], tick + 2, "met", [strangers[0], knight]
+        )
+        _later(connection, world, society_id, said["event_id"], tick + 3, "met", strangers[::-1])
+    scope, version, _ = routes(world)
+
+    def read(**more):
+        return client.get(
+            version + "/history/moments", headers=OWNER, params={**scope, **more}
+        ).json()
+
+    every = read()["moments"]
+    story = read(story="true")["moments"]
+    # The positive control: the record holds the strangers' two meetings.
+    stranger_ticks = {tick + 1, tick + 3}
+    assert stranger_ticks <= {moment["tick"] for moment in every}
+    assert not stranger_ticks & {moment["tick"] for moment in story}
+    assert tick + 2 in {moment["tick"] for moment in story}, "a meeting with the placed knight"
+    lines = [one["line"] for moment in story for one in moment["said"]]
+    assert erasure.LINE in lines, "the person playing's line, with its words"
+    # What the line leaves out is routine and names nobody the person touched.
+    kept = {moment["moment_id"] for moment in story}
+    left = [moment for moment in every if moment["moment_id"] not in kept]
+    assert stranger_ticks <= {moment["tick"] for moment in left}
+    assert all(m["decider"]["kind"] == "routine" and str(knight) not in m["subjects"] for m in left)
+    assert kept <= {moment["moment_id"] for moment in every}
+    # Paging counts within the story: one at a time, the strangers' meetings never fill a page.
+    newest = read(story="true", limit=1)
+    assert [moment["tick"] for moment in newest["moments"]] == [tick + 2]
+    assert newest["more"] is True
+    older = read(story="true", limit=1, before=tick + 2)["moments"]
+    assert older and older[0]["tick"] <= tick
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_back_fill_forms_each_minute_from_the_moments_before_it_alone(app, monkeypatch):
     world, client = app
     services = _services(client)

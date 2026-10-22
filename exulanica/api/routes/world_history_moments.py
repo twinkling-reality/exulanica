@@ -12,6 +12,10 @@
     so a page draws only what nobody kept. The read itself needs less than a picture's bytes do, so
     a moment names its picture only to a caller whose grant reads them
     (``GET /world/pictures/{sha256}``); for anyone else, and without ``recipe``, it is null.
+
+    With ``story=true``, only the moments History's line draws: those a model, a person playing or
+    an outside program decided, and those with a being this person touched (given a model, asked
+    in a run, placed); ``before``, ``limit`` and ``more`` count within them.
 """
 
 from __future__ import annotations
@@ -59,6 +63,7 @@ def read_version_moments(
     recipe: Annotated[
         str | None, Query(min_length=4, max_length=56, pattern=RECIPE_PATTERN.pattern)
     ] = None,
+    story: bool = False,
 ) -> Any:
     """The version's moments, newest last, each with its kept picture by the recipe asked for."""
 
@@ -85,6 +90,7 @@ def read_version_moments(
                 limit=limit,
                 sessions=sessions,
                 model_name=manifest.model_name,
+                story=story,
             )
             if recipe is not None and _reads_pictures(held):
                 moments = answer["moments"]

@@ -30,6 +30,7 @@ from typing import Any, Final, Protocol
 
 from psycopg.types.json import Jsonb
 
+from exulanica.world.decision_roles import CHOICE_SUBJECT_FIELDS
 from exulanica.world.society import SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import POINT_KIND
 
@@ -47,6 +48,7 @@ __all__ = [
     "option_did",
     "read_moments",
     "record_moments",
+    "touched_subjects",
 ]
 
 RULES_PROFILE: Final = "exulanica.society-moment-rules/v1"
@@ -62,6 +64,8 @@ _MOMENT_NAMESPACE: Final = uuid.uuid5(uuid.NAMESPACE_URL, "exulanica:society-mom
 READ_MOST: Final = 200
 #: The moment kinds a line said makes.
 _SPOKEN: Final = frozenset({"met", "spoke", "talked"})
+#: Who decides a moment that is the world's story whoever is in it (H18): anyone but the routine.
+_STORY_DECIDERS: Final = ("model", "person", "external")
 
 
 @dataclass(frozen=True, slots=True)
@@ -788,6 +792,35 @@ def _session_of(tick: int, sessions: Sequence[Mapping[str, Any]]) -> str | None:
     return None
 
 
+def touched_subjects(
+    connection: Any, workspace_id: uuid.UUID, row: Mapping[str, Any]
+) -> list[uuid.UUID]:
+    """The beings a person touched in a society (H18), from what it stores: those given a model
+    (its model choices), those asked in a run (its decision requests, whoever decided them) and
+    those placed in it (its state's beings that came by being placed; a personality is written on
+    a placed being)."""
+    chosen = " || ".join(
+        f"case when jsonb_typeof(document->'{name}') = 'array' "
+        f"then document->'{name}' else '[]'::jsonb end"
+        for name in CHOICE_SUBJECT_FIELDS
+    )
+    rows = connection.execute(
+        f"select jsonb_array_elements_text({chosen}) as subject from world_society_model_choice "
+        "where workspace_id=%s and world_id=%s and society_id=%s "
+        "union select subject_id::text from world_society_decision_request "
+        "where workspace_id=%s and society_id=%s",
+        (workspace_id, row["world_id"], row["society_id"], workspace_id, row["society_id"]),
+    ).fetchall()
+    found = {_uuid(one["subject"]) for one in rows}
+    state = row.get("state") or {}
+    found |= {
+        _uuid(person.get("id"))
+        for person in state.get("inhabitants", ())
+        if person.get("came_by") == "placed"
+    }
+    return sorted((one for one in found if one is not None), key=str)
+
+
 def read_moments(
     connection: Any,
     workspace_id: uuid.UUID,
@@ -798,17 +831,33 @@ def read_moments(
     sessions: Sequence[Mapping[str, Any]],
     model_name: Callable[[str], str | None],
     rules: MomentRules | None = None,
+    story: bool = False,
 ) -> dict[str, Any]:
     """A version's moments, newest last, at most ``limit`` before minute ``before``: each with its
     lines (an exchange joins the moment it answers), who decided, where, its run, its scene and the
-    other models' answers to its decision as branches. ``more`` says whether earlier ones exist."""
+    other models' answers to its decision as branches. ``more`` says whether earlier ones exist.
+    With ``story``, only the moments a person's History draws (H18): each one a model, a person
+    playing or an outside program decided, and each one with a being they touched
+    (:func:`touched_subjects`); ``before``, ``limit`` and ``more`` count within them."""
     rules = load_rules() if rules is None else rules
     society_id = row["society_id"]
+    touched = touched_subjects(connection, workspace_id, row) if story else []
     rows = connection.execute(
         "select moment_id, tick, kind, anchor_event_id, event_ids, request_id, subjects, document "
         "from world_society_moment where workspace_id=%s and society_id=%s "
-        "and (%s::int is null or tick < %s::int) order by tick desc, moment_id desc limit %s",
-        (workspace_id, society_id, before, before, limit + 1),
+        "and (%s::int is null or tick < %s::int) "
+        "and (not %s or document->'decider'->>'kind' = any(%s) or subjects && %s::uuid[]) "
+        "order by tick desc, moment_id desc limit %s",
+        (
+            workspace_id,
+            society_id,
+            before,
+            before,
+            story,
+            list(_STORY_DECIDERS),
+            touched,
+            limit + 1,
+        ),
     ).fetchall()
     more = len(rows) > limit
     rows = list(reversed(rows[:limit]))
