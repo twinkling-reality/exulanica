@@ -412,9 +412,10 @@ texture coordinates. The frame is `city_local`: x east, y north, z up, integer m
 `metric_authored`. A direction is an integer vector, never an angle. The rules for surface frames,
 stop lines, frontage lines, the camber profile and texture coordinates are written in the module
 docstrings and are the contract the tessellator reads. `surface.py` reads the same records back
-into the height a person stands at on a kerb top, footway or carriageway, in integer millimetres,
-held within a millimetre of the page's walk surface by `tests/fixtures/city-surface-table.json`;
-it answers nothing yet on a corner's footway wedge.
+into the height a person stands at on a kerb top, footway or carriageway, a corner's footway wedge
+included, in integer millimetres, held within a millimetre of the page's walk surface by
+`tests/fixtures/city-surface-table.json`. The wedge is carved by `carve.py`, the tessellator's
+integer planar carve, which `tests/test_city_carve.py` holds to the tessellator's own output.
 
 **Catalog keys are labels.** No reader draws a shape from a key: a furniture class's parts, a roof
 family's form and a material's texture set are resolved into the record that uses them.

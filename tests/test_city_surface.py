@@ -4,10 +4,12 @@ height the page stands a person on.
 ``tests/fixtures/city-surface-table.json`` is the page's own walk surface (each tile's
 ``nav_envelope`` read by atlas-react's ``composedSupport``), sampled over the street surfaces of
 tess's conformance tile and tile (0, 0) of a small town, written by
-``web/packages/atlas-react/test/write-city-surface-table.ts``. Every answer, from a kerb top, a
-footway or a carriageway, is held to it within the rounding of one millimetre. Where this version
-states no surface (a corner's footway wedge) the answer is None, and how many rows that is on
-each tile is pinned, so a rule that stops answering fails here.
+``web/packages/atlas-react/test/write-city-surface-table.ts``. Every row is answered, from a kerb
+top, a footway (a corner's wedge included) or a carriageway, and every answer is held to it within
+the rounding of one millimetre. The table's point is the page's own placement, up to a millimetre
+from the drawn one: where a corner wedge's thin triangle climbs several millimetres in one
+millimetre of plan, a row is held to the answer within a millimetre of its point instead, and how
+many rows that is on each tile is pinned, so a rule that drifts fails here.
 
 Run as a script with a path, it writes the small town's tile (0, 0) document the table was made
 from: ``PYTHONPATH=. .venv/bin/python tests/test_city_surface.py <path>``.
@@ -39,11 +41,8 @@ TABLE: Final = ROOT / "tests" / "fixtures" / "city-surface-table.json"
 #: How far, in micrometres, an answer may be from the page's height: half a millimetre of the
 #: answer's own rounding and one millimetre of the tessellator's floored placement of a point.
 WITHIN_UM: Final = 1_500
-#: Rows each tile's surface answers None for (a corner's footway wedge), by drawing kind.
-UNSTATED: Final = {
-    "conformance": {"city.curb_edge": 61},
-    "small_town": {"city.curb_edge": 94},
-}
+#: Rows each tile holds to an answer within a millimetre of their point (a wedge's thin triangle).
+PLACED_NEARBY: Final = {"conformance": 0, "small_town": 1}
 
 
 def town_document_bytes(world_id: str, tile: tuple[int, int]) -> bytes:
@@ -87,17 +86,20 @@ def conformance() -> list[object]:
 @pytest.mark.parametrize("name", ["conformance", "small_town"])
 def test_every_answer_is_the_height_the_page_stands_a_person_on(name: str) -> None:
     reading = city_surface_reading(_records(name))
-    unstated: Counter[str] = Counter()
     rules: Counter[str] = Counter()
+    nearby = 0
     for x, y, page_um, kind in _tile(name)["rows"]:
         answer = reading((x, y))
-        if answer is None:
-            unstated[kind] += 1
-            continue
+        assert answer is not None, (name, x, y, kind)
         height, rule = answer
         rules[rule] += 1
-        assert abs(height * 1_000 - page_um) <= WITHIN_UM, (name, x, y, rule, height, page_um)
-    assert dict(unstated) == UNSTATED[name]
+        if abs(height * 1_000 - page_um) > WITHIN_UM:
+            around = [reading((x + dx, y + dy)) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+            assert any(
+                near is not None and abs(near[0] * 1_000 - page_um) <= WITHIN_UM for near in around
+            ), (name, x, y, rule, height, page_um)
+            nearby += 1
+    assert nearby == PLACED_NEARBY[name]
     assert rules[KERB_TOP] and rules[FOOTWAY] and rules[CARRIAGEWAY]
 
 
@@ -209,3 +211,38 @@ def test_where_a_footway_meets_its_kerb_top_at_one_height_the_kerb_top_answers(
     triangles on the conformance tile, where the footway starts at its kerb top's height, the kerb
     top answers."""
     assert city_surface_reading(conformance)((20_000, 35_050)) == (55, KERB_TOP)
+
+
+def test_a_corner_wedge_stands_a_footway_rise_above_its_apex(conformance: list[object]) -> None:
+    """Inside a corner's footway wedge, away from its back arc, a person stands where the page does:
+    on the footway, a footway's rise above the corner's apex (135 mm on the conformance tile)."""
+    assert city_surface_reading(conformance)((55_193, 49_548)) == (135, FOOTWAY)
+
+
+def test_where_a_block_takes_part_of_a_corner_the_wedge_gives_way_to_it() -> None:
+    """The blocks a curb names carve its corner's wedge as the frontage does: on the small town's
+    tile (0, 0), at a point a named block takes from a corner's slice, the wedge stands nothing and
+    the footway beside it answers (96 mm, where the wedge without the block would stand 106 mm)."""
+    assert city_surface_reading(_records("small_town"))((89_107, 115_125)) == (96, FOOTWAY)
+
+
+def test_a_corner_the_carve_refuses_leaves_only_its_wedge_unstated(
+    conformance: list[object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A corner the carve refuses goes unstated alone, as the tessellator refuses only that tile's
+    drawing: with every corner refused, the conformance tile still reads, its wedge rows answer
+    None (61 of them) and every other row is the page's height."""
+
+    def refused(*_: object) -> list[list[tuple[int, int]]]:
+        raise ValueError("a ring has no ear left to cut")
+
+    monkeypatch.setattr(surface, "open_regions", refused)
+    reading = city_surface_reading(conformance)
+    unstated = 0
+    for x, y, page_um, _kind in _tile("conformance")["rows"]:
+        answer = reading((x, y))
+        if answer is None:
+            unstated += 1
+            continue
+        assert abs(answer[0] * 1_000 - page_um) <= WITHIN_UM, (x, y, answer, page_um)
+    assert unstated == 61

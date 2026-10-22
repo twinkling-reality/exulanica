@@ -23,21 +23,27 @@ records' own fields and the corner rule's measure; nothing is measured from a dr
 * **A corner's kerb top** runs along the corner's arc, the fillet arc rule's points from ``P`` to
   ``Q``, as many as keep each chord within the navigation contract's resolution of the circle, out
   to the back arc ``kerb_width_mm`` nearer the centre, at the arc's heights plus the kerb's.
+* **A corner's footway wedge** is the slice from that back arc in to the arc's centre, less the
+  blocks the curb names and, unless the corner mitres, the quadrilateral its two frontage lines cut
+  off toward the centre, carved as the tessellator carves it
+  (:mod:`~exulanica.grammar.grammars.city.carve`) and cut by the ring rule. A point of the carve on
+  the back arc stands at the kerb top's height there, the centre at the crossfall of its own
+  distance above the apex (the kerb top's height at the arc's mean end height), and every other
+  point at a footway's rise above the apex.
 * **A junction's fill** is the junction rule's ring: each leg's mouth (the segment rule's five
   points across its strip's end at the node), back along its kerb line, and round each corner's
   arc to the next leg, cut by the ring rule.
 
-Where surfaces overlap, the highest is the answer, as on the page. A **corner's footway wedge**
-(carved by the block rings it meets) and a footway piece whose sloping kerb line ramps into a
-mitred corner are not stated by this version: it answers ``None`` there, as it does where the
-records state no street surface at all (a lot, a building, open land). The caller keeps its own
-ground for ``None``.
+Where surfaces overlap, the highest is the answer, as on the page. A footway piece whose sloping
+kerb line ramps into a mitred corner is not stated by this version, nor a corner's wedge the carve
+or the ring rule refuses: it answers ``None`` there, as it does where the records state no street
+surface at all (a lot, a building, open land). The caller keeps its own ground for ``None``.
 
 Heights are exact ratios of integers, rounded half away from zero once at the end. A reading
 indexes its pieces (each straight kerb top, footway triangle, carriageway strip, corner kerb-top
-triangle and junction fill triangle) by square plan cells once, and a read asks only the pieces
-whose bounds reach its point's cell, in the order the rules above list them, so where two answer
-the same height the earlier still answers.
+triangle, corner wedge triangle and junction fill triangle) by square plan cells once, and a read
+asks only the pieces whose bounds reach its point's cell, in the order the rules above list them,
+so where two answer the same height the earlier still answers.
 ``tests/fixtures/city-surface-table.json`` holds every answer to the page's own walk surface on
 the conformance tile and a generated tile.
 """
@@ -45,16 +51,19 @@ the conformance tile and a generated tile.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from itertools import pairwise
 from typing import Final
 
 from exulanica.grammar.geometry import integer_sqrt
 from exulanica.grammar.grammars.city import CITY_GRAMMAR
+from exulanica.grammar.grammars.city.carve import open_regions, ring_triangles
 from exulanica.grammar.grammars.city.corners import CORNER_LENGTH_SCALE, footway_rise_mm
 from exulanica.grammar.grammars.city.corners import along as _along
 from exulanica.grammar.grammars.city.roads import JunctionRecord
 from exulanica.grammar.grammars.city.streets import (
+    BlockRecord,
     CurbEdgeRecord,
     StreetNodeRecord,
     StreetSegmentRecord,
@@ -261,18 +270,24 @@ def _mitre(curb: CurbEdgeRecord, follower: CurbEdgeRecord) -> _Mitre | None:
     from_p = _moved(p, _along(_left(into), radius))
     from_q = _moved(q, _along(_left(out), radius))
     centre = ((from_p[0] + from_q[0]) // 2, (from_p[1] + from_q[1]) // 2)
-    # The frontage corner: where the two frontage lines meet, each axis floored.
-    first = _moved(p, _along(_left(into), reach))
-    second = _moved(q, _along(_left(out), other))
-    numerator = _cross(_sub(second, first), out)
-    frontage = (
-        first[0] + into[0] * numerator // turning,
-        first[1] + into[1] * numerator // turning,
-    )
+    frontage = _frontage(p, into, q, out, reach, other)
     crossfall = curb.footway_crossfall_millionths
     return _Mitre(
         (*centre, apex + (radius - curb.kerb_width_mm) * crossfall // _SCALE),
         (*frontage, apex + footway_rise_mm(curb)),
+    )
+
+
+def _frontage(p: Space, into: Plan, q: Space, out: Plan, reach: int, other: int) -> Plan:
+    """The frontage corner: where the frontage line ``reach`` to the left of the piece arriving at
+    ``p`` meets the one ``other`` to the left of the piece leaving ``q``, each axis floored."""
+    first = _moved(p, _along(_left(into), reach))
+    second = _moved(q, _along(_left(out), other))
+    numerator = _cross(_sub(second, first), out)
+    turning = _cross(into, out)
+    return (
+        first[0] + into[0] * numerator // turning,
+        first[1] + into[1] * numerator // turning,
     )
 
 
@@ -369,6 +384,49 @@ def _kerb_top_arc(curb: CurbEdgeRecord, arc: tuple[Plan, list[Space]]) -> tuple[
     for (a, b), (back_a, back_b) in zip(pairwise(points), pairwise(back), strict=True):
         top_a, top_b = (a[0], a[1], a[2] + height), (b[0], b[1], b[2] + height)
         triangles += [(top_a, top_b, back_b), (top_a, back_b, back_a)]
+    return tuple(triangles)
+
+
+def _corner_wedge(
+    curb: CurbEdgeRecord,
+    follower: CurbEdgeRecord,
+    arc: tuple[Plan, list[Space]],
+    blocks: Sequence[Sequence[Sequence[int]]],
+) -> tuple[Triangle, ...]:
+    """A corner's footway wedge: the slice from its back arc in to the arc's centre, less
+    ``blocks`` (the rings of the blocks the curb names) and, unless the corner mitres, the
+    quadrilateral from its frontage lines to the centre, carved and cut as the tessellator does."""
+    centre, points = arc
+    walk, following = _walk(curb), _walk(follower)
+    p, q = walk[-1], following[0]
+    into, out = _sub(p, walk[-2]), _sub(following[1], q)
+    height, inner = curb.kerb_height_mm, curb.corner_radius_mm - curb.kerb_width_mm
+    back = [
+        (*_moved(centre, _along(_sub(point, centre), inner)), point[2] + height) for point in points
+    ]
+    on_back = {(x, y): z for x, y, z in back}
+    apex = (p[2] + q[2]) // 2 + height
+    at_centre = apex + inner * curb.footway_crossfall_millionths // _SCALE
+    raised = apex + footway_rise_mm(curb)
+    taken = [[(int(x), int(y)) for x, y in block] for block in blocks]
+    if _mitre(curb, follower) is None:
+        reach = curb.kerb_width_mm + curb.footway_width_mm
+        other = follower.kerb_width_mm + follower.footway_width_mm
+        taken.append(
+            [
+                _moved(p, _along(_left(into), reach)),
+                _frontage(p, into, q, out, reach, other),
+                _moved(q, _along(_left(out), other)),
+                centre,
+            ]
+        )
+    triangles: list[Triangle] = []
+    for carved in open_regions([*((x, y) for x, y, _ in back), centre], taken):
+        ring = [
+            (x, y, on_back.get((x, y), at_centre if (x, y) == centre else raised))
+            for x, y in carved
+        ]
+        triangles += [(ring[a], ring[b], ring[c]) for a, b, c in ring_triangles(ring)]
     return tuple(triangles)
 
 
@@ -629,6 +687,7 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
     curbs: dict[str, CurbEdgeRecord] = {}
     nodes: dict[str, StreetNodeRecord] = {}
     junctions: list[JunctionRecord] = []
+    blocks: dict[str, tuple[tuple[int, int], ...]] = {}
     for record in records:
         if isinstance(record, StreetSegmentRecord):
             segments[record.identity] = record
@@ -638,6 +697,8 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
             nodes[record.identity] = record
         elif isinstance(record, JunctionRecord):
             junctions.append(record)
+        elif isinstance(record, BlockRecord):
+            blocks[record.identity] = record.boundary_mm
     # The walk surface's resolution, as the city grammar's navigation contract states it: how far
     # a chord of a corner's arc may stand from its circle.
     sagitta = CITY_GRAMMAR.projection("nav_envelope").resolution_mm
@@ -683,11 +744,17 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
                     _Strip(centre, left, right, low, high, segment.carriageway_width_mm, gutters)
                 )
     tops: list[Triangle] = []
+    wedges: list[Triangle] = []
     for curb in curbs.values():
         followers = [curbs[identity] for identity in curb.next_curb_identity if identity in curbs]
         arc = None if not followers else _corner_arc(curb, followers[0], sagitta)
         if arc is not None:
             tops += _kerb_top_arc(curb, arc)
+            named = [blocks[identity] for identity in curb.block_identity if identity in blocks]
+            # A corner the carve or the ring rule refuses is one the tessellator refuses too, and
+            # only that corner's wedge goes unstated: the rest of the town still answers.
+            with suppress(ValueError):
+                wedges += _corner_wedge(curb, followers[0], arc, named)
     fills: list[Triangle] = []
     for junction in junctions:
         fills += _junction_fill(junction, nodes, segments, sides, sagitta)
@@ -700,7 +767,7 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
     for strip in strips:
         bounds = (*strip.centre.points, *strip.left.points, *strip.right.points)
         pieces.append((strip.height, CARRIAGEWAY, bounds))
-    for surface, triangles in ((KERB_TOP, tops), (CARRIAGEWAY, fills)):
+    for surface, triangles in ((KERB_TOP, tops), (FOOTWAY, wedges), (CARRIAGEWAY, fills)):
         pieces += [(_triangle_height(one), surface, one) for one in triangles]
     cell = _CELL_MM
     cells: dict[Plan, list[int]] = {}
