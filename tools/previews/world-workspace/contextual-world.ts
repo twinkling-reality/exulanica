@@ -570,7 +570,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     sceneView.draw({
       before: scened.before ? { speaker: whoOf(scened.before.speaker).start, words: scened.before.words } : null,
       now: scened.now.words,
-      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: null },
+      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: pictures.portraitNow(scened.now.speaker) },
       day: dayWord(speaker),
       stopFollowing: SCENE_WORDS.stopFollowing,
       dot: head ? { x: head.x, y: head.y - SPEAKING_ABOVE * popScale() } : null,
