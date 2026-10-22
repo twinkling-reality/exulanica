@@ -501,25 +501,44 @@ SPENDING_MODES = ("process", "durable")
 SPENDING_WITNESS_NAME = "spending-witness"
 
 
-def scripted_environment(run_dir: Path, logs: Path, spending: str) -> dict[str, str]:
+def scripted_environment(witness: Path, logs: Path, spending: str) -> dict[str, str]:
     """What a scripted API is given beyond the plain one's environment: its request log and the
-    spending authority it states, never left to a default."""
+    spending authority it states, never left to a default; a durable one's witness directory is
+    ``SPENDING_WITNESS_NAME`` under ``witness`` (:func:`witness_root`)."""
     environment = {
         "EXULANICA_SCRIPTED_MODEL_LOG": str(logs / SCRIPTED_LOG_NAME),
         "EXULANICA_SPENDING": spending,
     }
     if spending == "durable":
-        environment["EXULANICA_SPENDING_WITNESS_DIR"] = str(run_dir / SPENDING_WITNESS_NAME)
+        environment["EXULANICA_SPENDING_WITNESS_DIR"] = str(witness / SPENDING_WITNESS_NAME)
     return environment
 
 
-def model_witness_environment(environment: Mapping[str, str], run_dir: Path) -> dict[str, str]:
+def model_witness_environment(environment: Mapping[str, str], witness: Path) -> dict[str, str]:
     """What a ``--model`` API spending under the durable authority is given beyond
-    ``model_environment``: the run's witness directory, the one its operator's grants are written
-    with. A process without one refuses to spend under a witnessed authority."""
+    ``model_environment``: the run's witness directory (``SPENDING_WITNESS_NAME`` under ``witness``,
+    :func:`witness_root`), the one its operator's grants are written with. A process without one
+    refuses to spend under a witnessed authority."""
     if environment.get("EXULANICA_SPENDING") != "durable":
         return {}
-    return {"EXULANICA_SPENDING_WITNESS_DIR": str(run_dir / SPENDING_WITNESS_NAME)}
+    return {"EXULANICA_SPENDING_WITNESS_DIR": str(witness / SPENDING_WITNESS_NAME)}
+
+
+def witness_root(run_dir: Path, personal: bool) -> Path:
+    """Where a run's spending witness directory lives: a person's own install keeps it in their
+    folder (:func:`personal_folder`), so every ``up`` hands its processes the directory its
+    authority recorded and a restart never closes that authority; any other run keeps it in its
+    run directory, with everything else it keeps."""
+    return personal_folder() if personal else run_dir
+
+
+def recorded_witness_root(state: Mapping[str, object], run_dir: Path) -> Path:
+    """The witness root a running install was started with: its recorded witness directory's,
+    else, for a run recorded before it was kept, :func:`witness_root`'s."""
+    recorded = state.get("spending_witness")
+    if isinstance(recorded, str) and recorded:
+        return Path(recorded).parent
+    return witness_root(run_dir, bool(state.get("personal")))
 
 
 def api_command(python: Path, worktree: Path, port: int, plan: Path | None) -> list[str]:
@@ -1817,6 +1836,7 @@ def guest_entry(
     logs: Path,
     origin: str,
     *,
+    witness: Path,
     ceiling_usd: str = GUEST_POLICY_CEILING_USD,
     playing_maximum: int | None = None,
     play_seconds: int | None = None,
@@ -1843,7 +1863,7 @@ def guest_entry(
     operator_environment = {
         **clean_environment(),
         "EXULANICA_DATABASE_URL": exports["OWNER_URL"],
-        "EXULANICA_SPENDING_WITNESS_DIR": str(run_dir / SPENDING_WITNESS_NAME),
+        "EXULANICA_SPENDING_WITNESS_DIR": str(witness / SPENDING_WITNESS_NAME),
     }
     issued = []
     for provider in providers:
@@ -1991,6 +2011,7 @@ def up(arguments: argparse.Namespace) -> None:
     run_id = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     run_dir = directory / run_id
     data_dir = run_dir / "data" if folder is None else personal_store(folder)
+    witness = witness_root(run_dir, folder is not None)
     run_dir.mkdir(parents=True)
     if folder is None:
         data_dir.mkdir()
@@ -2199,6 +2220,7 @@ def up(arguments: argparse.Namespace) -> None:
             run_dir,
             logs,
             edge_origin(arguments.edge_port),
+            witness=witness,
             ceiling_usd=ceiling,
             playing_maximum=arguments.guest_playing_maximum,
             play_seconds=arguments.guest_play_seconds,
@@ -2250,12 +2272,12 @@ def up(arguments: argparse.Namespace) -> None:
         projects=projects,
         personal=arguments.personal,
     )
-    environment.update(model_witness_environment(environment, run_dir))
+    environment.update(model_witness_environment(environment, witness))
     plan = None
     if arguments.scripted_model is not None:
         plan = run_dir / SCRIPTED_PLAN_NAME
         plan.write_bytes(Path(arguments.scripted_model).read_bytes())
-        environment.update(scripted_environment(run_dir, logs, arguments.spending))
+        environment.update(scripted_environment(witness, logs, arguments.spending))
         state["scripted_model"] = {
             "plan": str(plan),
             "plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(),
@@ -2277,6 +2299,7 @@ def up(arguments: argparse.Namespace) -> None:
             "model": bool(arguments.model),
             "worlds_held": arguments.worlds_held,
             "personal": bool(arguments.personal),
+            "spending_witness": str(witness / SPENDING_WITNESS_NAME),
             "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
             "actor": actor,
@@ -2653,11 +2676,12 @@ def restart_api(arguments: argparse.Namespace) -> None:
     if state.get("model"):
         model_environment()  # refuse before the running API is stopped, not after
     environment = recorded_api_environment(state, run_dir, grants, model=bool(state.get("model")))
-    environment.update(model_witness_environment(environment, run_dir))
+    witness = recorded_witness_root(state, run_dir)
+    environment.update(model_witness_environment(environment, witness))
     scripted = state.get("scripted_model")
     if isinstance(scripted, Mapping):
         environment.update(
-            scripted_environment(run_dir, logs, scripted.get("spending", SPENDING_MODES[0]))
+            scripted_environment(witness, logs, scripted.get("spending", SPENDING_MODES[0]))
         )
     pid_key, port_role, log_name = (
         ("api_2", "spare", "api-2.log") if second else ("api", "api", "api.log")

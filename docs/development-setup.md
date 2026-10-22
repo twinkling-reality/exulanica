@@ -455,8 +455,9 @@ One command starts a person's own install on this computer:
 makes in `~/Exulanica`, a folder of theirs that no other account can write: the durable
 [local database](local-database.md) in `database/` (made on the first run, started on every later one,
 and upgraded first when this checkout has migrations it lacks, after a file copy of the stopped data),
-the workspace's identity and token in `install/`, the content store in `store/` and the world projects
-in `projects/`. It then starts the API with a personal install's settings and its workers, and the
+the workspace's identity and token in `install/`, the content store in `store/`, the world projects
+in `projects/` and the spending witness in `spending-witness/`, the same directory on every run, so an
+allowance granted to the install stays open across `down` and `up`. It then starts the API with a personal install's settings and its workers, and the
 world workspace on the slot's app port, and prints that page's address. `down` stops the database
 through `exulanica-local-db stop`, which takes a backup. Worlds played before this checkout kept
 their moments get them from `python3 scripts/acceptance/launch.py moments-backfill --worktree .`,

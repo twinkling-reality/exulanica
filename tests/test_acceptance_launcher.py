@@ -428,6 +428,43 @@ def test_a_model_run_is_refused_until_it_has_a_key_an_allowlist_and_a_bound():
     }
 
 
+def test_a_personal_install_keeps_one_witness_directory_across_its_runs(tmp_path, monkeypatch):
+    """Each up of a person's own install gets a new run directory; its spending processes are
+    handed the same witness directory every time, in the person's folder, so the authority it
+    recorded stays open after a restart. A slot run keeps its witness in its run directory."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    first, second = tmp_path / "runs" / "20261022T100000Z", tmp_path / "runs" / "20261022T110000Z"
+    durable = {"EXULANICA_SPENDING": "durable"}
+    named = [
+        LAUNCH.model_witness_environment(durable, LAUNCH.witness_root(run, True))
+        | LAUNCH.scripted_environment(LAUNCH.witness_root(run, True), run / "logs", "durable")
+        for run in (first, second)
+    ]
+    kept = str(tmp_path / "home" / "Exulanica" / LAUNCH.SPENDING_WITNESS_NAME)
+    assert [one["EXULANICA_SPENDING_WITNESS_DIR"] for one in named] == [kept, kept]
+    # The positive control: a slot run's two runs name two directories, each its own.
+    assert LAUNCH.witness_root(first, False) == first
+    assert LAUNCH.witness_root(second, False) == second
+
+
+def test_restart_api_names_the_witness_directory_its_run_was_started_with(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    run = tmp_path / "runs" / "20261022T100000Z"
+    kept = tmp_path / "home" / "Exulanica"
+    recorded = {"personal": True, "spending_witness": str(kept / LAUNCH.SPENDING_WITNESS_NAME)}
+    assert LAUNCH.recorded_witness_root(recorded, run) == kept
+    # The record wins: a restart under another HOME still names the directory the run started with.
+    monkeypatch.setenv("HOME", str(tmp_path / "elsewhere"))
+    (tmp_path / "elsewhere").mkdir()
+    assert LAUNCH.recorded_witness_root(recorded, run) == kept
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    # A run recorded before the directory was kept: a personal one's is the person's folder.
+    assert LAUNCH.recorded_witness_root({"personal": True}, run) == kept
+    assert LAUNCH.recorded_witness_root({"personal": False}, run) == run
+
+
 def test_a_durable_model_run_spends_with_the_runs_own_witness(tmp_path):
     durable = {"EXULANICA_SPENDING": "durable"}
 
