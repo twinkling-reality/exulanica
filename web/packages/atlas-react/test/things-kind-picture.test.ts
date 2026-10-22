@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import type { LookDrawing } from '../src/playcanvas/things/documents.js';
 import { ThingFigureMaker } from '../src/playcanvas/things/figure-maker.js';
-import { KindPictures, uprightPixels, type PictureFrame } from '../src/playcanvas/things/kind-picture.js';
+import { KindPictures, drawnPoints, headOf, uprightPixels, type PictureFrame } from '../src/playcanvas/things/kind-picture.js';
+import type { ThingFigure } from '../src/playcanvas/things/figures.js';
 import { ThingLibrary } from '../src/playcanvas/things/library.js';
 import { ThingLayer } from '../src/playcanvas/things/thing-layer.js';
 import { servedLibrary, thingsJson, until } from './things-fixtures.js';
@@ -26,7 +27,21 @@ interface Seen {
   readonly lightLayers: ReadonlyArray<readonly number[]>;
   readonly shadows: readonly boolean[];
   readonly corners: ReadonlyArray<readonly [number, number]>;
+  /** The camera's view of the corners of every part the stage draws. */
+  readonly drawnCorners: ReadonlyArray<readonly [number, number]>;
+  /** The camera's view of the corners of each named part (`part:<name>`) the figure draws. */
+  readonly parts: ReadonlyMap<string, ReadonlyArray<readonly [number, number]>>;
 }
+
+/** A blocky body's joints standing (the things contract's figures, glTF metres), and the boxes drawn on some of them. */
+const BLOCKY: Record<string, [number, number, number]> = {
+  hips: [0, 0.9, 0], spine: [0, 1, 0], chest: [0, 1.15, 0], neck: [0, 1.4, 0], head: [0, 1.45, 0],
+  leftUpperLeg: [0.09, 0.86, 0], leftLowerLeg: [0.09, 0.46, 0], leftFoot: [0.09, 0.08, 0],
+  rightUpperLeg: [-0.09, 0.86, 0], rightLowerLeg: [-0.09, 0.46, 0], rightFoot: [-0.09, 0.08, 0],
+  leftUpperArm: [0.2, 1.35, 0], leftLowerArm: [0.46, 1.35, 0], leftHand: [0.7, 1.35, 0],
+  rightUpperArm: [-0.2, 1.35, 0], rightLowerArm: [-0.46, 1.35, 0], rightHand: [-0.7, 1.35, 0],
+};
+const BLOCKY_BOXES: Record<string, [number, number, number]> = { head: [0.3, 0.3, 0.3], neck: [0.12, 0.06, 0.12], chest: [0.5, 0.4, 0.25], hips: [0.4, 0.8, 0.25] };
 
 function setup({ answer = PICTURE as string | null, held = false } = {}) {
   const canvas = document.createElement('canvas');
@@ -45,6 +60,22 @@ function setup({ answer = PICTURE as string | null, held = false } = {}) {
   const instantiate = (look: LookDrawing) => {
     made.push(look.look);
     const model = new pc.Entity(`model:${look.look}`);
+    if (look.lookKind === 'rigid_on_bones') {
+      for (const [bone, at] of Object.entries(BLOCKY)) {
+        const node = new pc.Entity(`bone:${bone}`);
+        node.setLocalPosition(...at);
+        const size = BLOCKY_BOXES[bone];
+        if (size !== undefined) {
+          const part = new pc.Entity(`part:${bone}`);
+          part.addComponent('render', { type: 'box' });
+          part.setLocalScale(...size);
+          part.setLocalPosition(0, bone === 'hips' || bone === 'neck' ? -size[1] / 2 : size[1] / 2, 0);
+          node.addChild(part);
+        }
+        model.addChild(node);
+      }
+      return Promise.resolve({ model, tracks: new Map<string, pc.AnimTrack>() });
+    }
     const part = new pc.Entity(`part:${look.look}`);
     part.addComponent('render', { type: 'box' });
     model.addChild(part);
@@ -68,7 +99,21 @@ function setup({ answer = PICTURE as string | null, held = false } = {}) {
         }
       }
     }
+    const drawnCorners = drawnPoints(stage).map((point) => {
+      const at = frame.camera.camera.worldToScreen(point, frame.width, frame.height);
+      return [at.x, at.y] as const;
+    });
+    const parts = new Map<string, Array<readonly [number, number]>>();
+    for (const render of stage.findComponents('render') as pc.RenderComponent[]) {
+      if (!render.entity.name.startsWith('part:')) continue;
+      parts.set(render.entity.name.slice('part:'.length), drawnPoints(render.entity).map((point) => {
+        const at = frame.camera.camera.worldToScreen(point, frame.width, frame.height);
+        return [at.x, at.y] as const;
+      }));
+    }
     seen.push({
+      parts,
+      drawnCorners,
       frame,
       layerId,
       worldCameraLayers: [...world.camera!.layers],
@@ -113,6 +158,17 @@ describe('a kind\'s picture for build mode\'s tray', () => {
     expect(await pictures.picture(well, { width: 128, height: 96 })).toBe(PICTURE);
     expect(made).toEqual(['primitive-well', 'primitive-well']);
     expect(seen.map((one) => [one.frame.width, one.frame.height])).toEqual([[96, 96], [128, 96]]);
+  });
+
+  it('draws a kind in a look it is given, its first look without one, each its own picture', async () => {
+    const { pictures, made, served } = setup();
+    const sword = { key: 'sword', version: 3, sha256: served.kindRef('sword', 3).sha256 };
+    const second = (thingsJson('kinds/sword.v3.json')['looks'] as { look: string; version: number; sha256: string }[])[1]!;
+    const look = { key: second.look, version: second.version, sha256: second.sha256 };
+    expect(await pictures.picture(sword, { width: 96, height: 96 })).toBe(PICTURE);
+    expect(await pictures.picture(sword, { width: 96, height: 96 }, { look })).toBe(PICTURE);
+    expect(await pictures.picture(sword, { width: 96, height: 96 }, { look })).toBe(PICTURE);
+    expect(made).toEqual(['kaykit-sword', 'primitive-sword']);
   });
 
   it('draws pictures asked for together one at a time', async () => {
@@ -162,6 +218,64 @@ describe('a kind\'s picture for build mode\'s tray', () => {
     expect(contact.y).toBeLessThan(Math.max(...ys) + 1);
     expect(contact.rx).toBeGreaterThan(0);
     expect(contact.ry).toBeGreaterThanOrEqual(contact.rx * 0.2 - 1e-9);
+  });
+
+  it('framed round, fills the circle inscribed in the picture with all it draws, centred, a picture of its own', async () => {
+    const { pictures, seen, made, well } = setup();
+    expect(await pictures.picture(well, { width: 156, height: 156 }, { round: true })).toBe(PICTURE);
+    const [one] = seen;
+    // Every corner of every part it draws inside the circle, the farthest nearly on it, all of it centred; no shadow.
+    expect(one!.drawnCorners).toHaveLength(8);
+    const radii = one!.drawnCorners.map(([x, y]) => Math.hypot(x - 78, y - 78) / 78);
+    for (const radius of radii) expect(radius).toBeLessThan(0.97);
+    expect(Math.max(...radii)).toBeGreaterThan(0.92);
+    const xs = one!.drawnCorners.map(([x]) => x), ys = one!.drawnCorners.map(([, y]) => y);
+    expect(Math.abs((Math.min(...xs) + Math.max(...xs)) / 2 - 78)).toBeLessThan(156 * 0.02);
+    expect(Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - 78)).toBeLessThan(156 * 0.02);
+    expect(one!.frame.contact).toBeNull();
+    // The same kind framed whole is another picture.
+    expect(await pictures.picture(well, { width: 156, height: 156 })).toBe(PICTURE);
+    expect(made).toEqual(['primitive-well', 'primitive-well']);
+  });
+
+  it('framed round, an upright body with a head by its head, as large in the circle as a person\'s, the body out of it', async () => {
+    const { pictures, seen, served } = setup();
+    const knight = { key: 'knight', version: 1, sha256: served.kindRef('knight', 1).sha256 };
+    expect(await pictures.picture(knight, { width: 156, height: 156 }, { round: true })).toBe(PICTURE);
+    const parts = seen[0]!.parts;
+    // The head's box in the picture, nine tenths of it tall (the head drawn within it measures about three
+    // quarters, as a person's portrait shows one) and its middle about halfway down; the legs run out below it.
+    expect([...parts.keys()].sort()).toEqual(['chest', 'head', 'hips', 'neck']);
+    const head = parts.get('head')!.map(([, y]) => y);
+    for (const [x, y] of parts.get('head')!) expect(x >= 0 && x <= 156 && y >= 0 && y <= 156).toBe(true);
+    expect((Math.max(...head) - Math.min(...head)) / 156).toBeGreaterThan(0.85);
+    expect((Math.max(...head) - Math.min(...head)) / 156).toBeLessThan(0.95);
+    expect(Math.abs((Math.max(...head) + Math.min(...head)) / 2 - 78)).toBeLessThan(156 * 0.1);
+    expect(Math.min(...parts.get('hips')!.map(([, y]) => y))).toBeGreaterThan(156);
+    // Seen nearer its face than a whole figure is: about 15 degrees round from its front, not 35.
+    const eye = seen[0]!.frame.camera.entity.getPosition(), at = seen[0]!.frame.camera.entity.forward;
+    expect(Math.abs((Math.atan2(-at.x, -at.z) * 180) / Math.PI)).toBeLessThan(25);
+    expect(eye.z).toBeGreaterThan(0);
+  });
+
+  it('frames a portrait by the head its skeleton names, past the neck, only for an upright body with a head', () => {
+    const root = new pc.Entity('figure');
+    const nodes = new Map<string, pc.Entity>();
+    for (const bone of ['chest', 'neck', 'head', 'hips']) {
+      const node = new pc.Entity(`bone:${bone}`);
+      nodes.set(bone, node);
+      (bone === 'head' ? nodes.get('neck')! : root).addChild(node);
+    }
+    const limb = (role: string, bones: string[]) => ({ role, from: 'chest', bones });
+    const figure = (lying: boolean, limbs: ReturnType<typeof limb>[] | null) =>
+      ({ root, ...(limbs === null ? {} : { skeleton: { lying, limbs } }) }) as unknown as ThingFigure;
+    const person = [limb('arm', ['leftUpperArm']), limb('head', ['neck', 'head']), limb('leg', ['leftUpperLeg'])];
+    expect(headOf(figure(false, person))).toBe(nodes.get('head'));
+    // A body along the ground, a body with no head, a head whose joint is not drawn, a figure with no skeleton: framed whole.
+    expect(headOf(figure(true, person))).toBeNull();
+    expect(headOf(figure(false, [limb('arm', ['leftUpperArm'])]))).toBeNull();
+    expect(headOf(figure(false, [limb('head', ['skull'])]))).toBeNull();
+    expect(headOf(figure(false, null))).toBeNull();
   });
 
   it('answers null for a kind that cannot be made, and draws nothing for it', async () => {

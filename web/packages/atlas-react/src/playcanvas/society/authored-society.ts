@@ -5,7 +5,7 @@ import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { createObjectContainerAsset } from '../scene-objects.js';
 import { SocietyCrowd, type CrowdCounts, type CrowdFigures, type CrowdGround, type CrowdSeatingMiss } from './crowd.js';
 import type { SeatingLayout } from './seating.js';
-import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
+import type { CrowdJump, CrowdTiming, OwnedSocietyState, SocietyInhabitantSnapshot } from './types.js';
 
 /**
  * The inhabitants of a saved world, drawn over the region they live in.
@@ -207,10 +207,15 @@ export class AuthoredRegionSociety {
    * null while that is not known: not in the snapshot, or a kind named before the figures are given.
    */
   drawnAsPerson(id: string): boolean | null {
-    const person = this.state?.inhabitants.find((one) => one.id === id);
-    if (person === undefined) return null;
+    const person = this.inhabitantOf(id);
+    if (person === null) return null;
     if (person.kind === undefined) return true;
     return this.figures === null ? null : this.figures.figureFor(person) === null;
+  }
+
+  /** An inhabitant as the latest snapshot holds them (what they are, their kind), or null for one it does not. */
+  inhabitantOf(id: string): SocietyInhabitantSnapshot | null {
+    return this.state?.inhabitants.find((one) => one.id === id) ?? null;
   }
 
   /** Whether a person's drawn walk for the latest state has ended (`SocietyCrowd.walkEnded`). */

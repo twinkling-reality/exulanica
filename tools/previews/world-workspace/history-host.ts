@@ -11,6 +11,7 @@ import type { TransportOptions } from '@exulanica/graph-client';
 import { inhabitantCatalog, type CharacterCatalog } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { renderBeginningPicture, renderMomentPicture, type MomentForPicture } from './moment-pictures.ts';
+import type { ThingCrowdFigures, ThingLayer } from '../../../web/packages/atlas-react/src/playcanvas/things/index.ts';
 import { lookDigest, lookOfSubject, renderPortrait } from './portrait-pictures.ts';
 
 type Access = Parameters<typeof accessHeaders>[0] & { readonly baseUrl: string };
@@ -27,13 +28,46 @@ export function historyWrite(access: Access, signal: AbortSignal) {
   };
 }
 
+/** What draws a being by its own look: the world's things (MountedThings), its layer and the crowd's figures. */
+export interface BeingThings {
+  readonly layer: Pick<ThingLayer, 'drawKindPicture'>;
+  readonly crowdFigures: Pick<ThingCrowdFigures, 'drawnAs'>;
+}
+
 /**
- * The world's canvas as the pictures read it: a frame source, asked to draw, and a saved world's
- * society, which says who it draws as one of its people (AuthoredRegionSociety.drawnAsPerson).
+ * A being's portrait (one the world draws by a look of its own: a creature, a knight), never a face:
+ * its whole figure, in the kind and look the crowd draws it by, from the build tray's three-quarter
+ * view, framed round so it fills the portrait's circle, over a clear ground (the round frame's own
+ * shows through), the portrait recipe's `size_px` square, as a PNG data URL. Drawn once a look a page
+ * by the world's things; null where it has no look of its own, the world draws no things, or the
+ * figure cannot be drawn.
+ */
+export async function beingPortrait({ being, things }: {
+  readonly being: Parameters<ThingCrowdFigures['drawnAs']>[0];
+  readonly things: BeingThings | null;
+}): Promise<string | null> {
+  const drawn = things?.crowdFigures.drawnAs(being) ?? null;
+  if (things === null || drawn === null) return null;
+  // The society's name for the kind, as a placed thing names it.
+  const { kind: named } = drawn;
+  const kind = named.source === 'workspace' ? { source: 'workspace' as const, sha256: named.sha256 } : { kind: named.kind, version: named.version, sha256: named.sha256 };
+  const side = MOMENT_FRAMING.portrait.size_px;
+  return things.layer.drawKindPicture(kind, { width: side, height: side }, { look: drawn.look, round: true }).catch(() => null);
+}
+
+/**
+ * The world's canvas as the pictures read it: a frame source, asked to draw, a saved world's
+ * society, which says who it draws as one of its people (AuthoredRegionSociety.drawnAsPerson) and
+ * what the others are (inhabitantOf), and the world's things, which draw those others by their own
+ * looks (beingPortrait).
  */
 export type StillSource = PictureSource & {
   invalidate?(): void;
-  readonly authoredSociety?: { drawnAsPerson?(id: string): boolean | null } | null;
+  readonly authoredSociety?: {
+    drawnAsPerson?(id: string): boolean | null;
+    inhabitantOf?(id: string): Parameters<BeingThings['crowdFigures']['drawnAs']>[0] | null;
+  } | null;
+  __workspaceThings?(): BeingThings | null;
 };
 
 export interface RecordPictures {
@@ -129,11 +163,14 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     const making = serial(async () => {
       if (own.aborted) return null;
       // A face from the people catalog only for one the world draws as one of its people: one drawn by a
-      // look of its own (a creature, a knight) keeps the quiet circle until portraits draw that look. A
-      // world with no saved society (a generated town) draws everyone so.
+      // look of its own (a creature, a knight) is drawn by that look, never with a face, or keeps the
+      // quiet circle where it cannot be. A world with no saved society (a generated town) draws everyone so.
       const society = source.authoredSociety;
       const person = society ? society.drawnAsPerson?.(subjectId) ?? null : true;
-      if (person === false) return null;
+      if (person === false) {
+        const being = society?.inhabitantOf?.(subjectId) ?? null;
+        return being === null ? null : beingPortrait({ being, things: source.__workspaceThings?.() ?? null });
+      }
       const catalog = person === null ? null : people();
       // Before that is known, or before the people are served, there is no look to draw; asked again by the next draw.
       if (catalog === null) {

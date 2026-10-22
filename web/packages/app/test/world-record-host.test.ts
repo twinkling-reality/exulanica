@@ -335,25 +335,46 @@ describe("a world's pictures", () => {
     expect(pictures.still()).toBeNull();
   });
 
-  it("draws a face only for one the world draws as one of its people: a creature keeps the quiet circle", async () => {
+  it("draws a face only for one the world draws as one of its people: a creature is drawn by its own look", async () => {
     urls();
     people.served = true;
     people.drawn.length = 0;
-    // The saved world's society: Teo from the people catalog, the canopy strider by its own look, a newcomer not yet known.
+    // The saved world's society: Teo from the people catalog, the canopy strider and the knight by their own looks, a
+    // newcomer not yet known. The things draw the strider in its chosen look; the knight's look cannot be drawn.
     const asked: string[] = [];
-    const drawnAsPerson = (id: string) => { asked.push(id); return id === 'teo' ? true : id === 'strider' ? false : null; };
+    const drawnAsPerson = (id: string) => { asked.push(id); return id === 'teo' ? true : id === 'strider' || id === 'knight' ? false : null; };
+    const being = (id: string) => ({ id, kind: { kind: id, version: 1, sha256: id[0]!.repeat(64) } });
+    const inhabitantOf = (id: string) => (id === 'strider' || id === 'knight' ? being(id) : null);
+    const look = { key: 'strider-dusk', version: 1, sha256: 'e'.repeat(64) };
+    const drawn: unknown[][] = [];
+    const things = {
+      crowdFigures: { drawnAs: (person: { id: string; kind: unknown }) => ({ kind: person.kind, look: person.id === 'strider' ? look : null }) },
+      layer: { drawKindPicture: async (...args: unknown[]) => { drawn.push(args); return (args[2] as { look: typeof look | null }).look === look ? 'data:image/png;base64,U1RSSURFUg==' : null; } },
+    };
     const pictures = await (await historyHost()).recordPictures({
       entry: { worldId: 'w1', entryId: 'e1', authoredVersionId: 'v1' }, credentials: { baseUrl: 'http://api.test' },
-      source: { ...source, authoredSociety: { drawnAsPerson } },
+      source: { ...source, authoredSociety: { drawnAsPerson, inhabitantOf }, __workspaceThings: () => things },
     });
-    expect(await pictures.portrait('strider')).toBeNull();
+    expect(await pictures.portrait('strider')).toBe('data:image/png;base64,U1RSSURFUg==');
+    expect(await pictures.portrait('knight')).toBeNull();
     expect(await pictures.portrait('teo')).toBe('blob:made-1');
     expect(await pictures.portrait('newcomer')).toBeNull();
+    // Never a face for a being: the strider is its kind in its look, framed round in the recipe's square; the knight keeps the quiet circle.
     expect(people.drawn).toEqual(['teo']);
-    // The strider's answer is kept; the newcomer is asked again by the next draw.
-    expect(await pictures.portrait('strider')).toBeNull();
+    expect(drawn).toEqual([[being('strider').kind, { width: 156, height: 156 }, { look, round: true }], [being('knight').kind, { width: 156, height: 156 }, { look: null, round: true }]]);
+    // The beings' answers are kept; the newcomer is asked again by the next draw.
+    expect(await pictures.portrait('strider')).toBe('data:image/png;base64,U1RSSURFUg==');
+    expect(await pictures.portrait('knight')).toBeNull();
     expect(await pictures.portrait('newcomer')).toBeNull();
-    expect(asked).toEqual(['strider', 'teo', 'newcomer', 'newcomer']);
+    expect(asked).toEqual(['strider', 'knight', 'teo', 'newcomer', 'newcomer']);
+    expect(drawn).toHaveLength(2);
+    // A world that draws no things keeps the quiet circle for its beings.
+    const bare = await (await historyHost()).recordPictures({
+      entry: { worldId: 'w1', entryId: 'e1', authoredVersionId: 'v1' }, credentials: { baseUrl: 'http://api.test' },
+      source: { ...source, authoredSociety: { drawnAsPerson, inhabitantOf } },
+    });
+    expect(await bare.portrait('strider')).toBeNull();
+    expect(people.drawn).toEqual(['teo']);
     // A generated town has no saved society: everyone is one of its people.
     const town = await open();
     expect(await town.portrait('marco')).toBe('blob:made-2');

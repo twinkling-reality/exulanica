@@ -18,7 +18,7 @@ import * as pc from 'playcanvas';
 import type { CharacterSubject } from '@exulanica/atlas-core';
 import { CHARACTER_RENDERABLE_TAG } from '../character/renderable.js';
 import type { CrowdFigures } from '../society/crowd.js';
-import type { CrowdPose, CrowdRenderable, CrowdRenderableFactory, InhabitantIdentity, SocietyInhabitantSnapshot } from '../society/types.js';
+import type { CrowdPose, CrowdRenderable, CrowdRenderableFactory, InhabitantIdentity, SocietyInhabitantSnapshot, ThingKindReference } from '../society/types.js';
 import { isMadeKind } from '../society/types.js';
 import type { ThingFigureMaker } from './figure-maker.js';
 import { refusalOf } from './figure-maker.js';
@@ -28,6 +28,9 @@ import type { Named } from './library.js';
 
 /** A person's figure while its look is read: how tall to treat it before it stands. */
 const PENDING_HEIGHT = 1.7;
+
+/** A look by `key/version/sha256`, or `none`. */
+const lookKeyOf = (look: Named | null): string => look === null ? 'none' : `${look.key}/${look.version}/${look.sha256}`;
 
 export interface ThingFigureMiss {
   readonly subjectId: string;
@@ -152,22 +155,32 @@ export class ThingCrowdFigures implements CrowdFigures {
 
   constructor(private readonly options: ThingCrowdFiguresOptions) {
     const library = options.maker.library;
-    this.catalogLooks = new Set(library.list.looks.filter((look) => look.lookKind === 'catalog_person').map((look) => `${look.look}/${look.version}/${look.sha256}`));
+    this.catalogLooks = new Set(library.list.looks.filter((look) => look.lookKind === 'catalog_person').map((look) => lookKeyOf({ key: look.look, version: look.version, sha256: look.sha256 })));
+  }
+
+  /**
+   * The kind and look a person is drawn by when that look is its own (a creature, a knight): the
+   * look chosen for it, else its kind's first look (null for a kind its workspace keeps, whose
+   * maker draws its sketch). Null for one of the world's people: no kind, or a look that is the
+   * people catalog's. A being's portrait is drawn from this, as the crowd draws it.
+   */
+  drawnAs(person: SocietyInhabitantSnapshot): { readonly kind: ThingKindReference; readonly look: Named | null } | null {
+    const kind = person.kind;
+    if (kind === undefined) return null;
+    // A kind its workspace keeps is named by its digest alone: the maker asks the workspace for
+    // it, and with no look chosen draws its kind's first look, its sketch.
+    const listed = isMadeKind(kind) ? undefined : this.options.maker.library.list.kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256);
+    const look = this.options.lookOf?.(person) ?? (listed === undefined ? null : listed.looks[0] ?? null);
+    // A person whose look is the people catalog's is one of the world's people, drawn as today.
+    return this.catalogLooks.has(lookKeyOf(look)) ? null : { kind, look };
   }
 
   figureFor(person: SocietyInhabitantSnapshot): { readonly key: string; readonly factory: CrowdRenderableFactory } | null {
-    const kind = person.kind;
-    if (kind === undefined) return null;
-    const library = this.options.maker.library;
-    // A kind its workspace keeps is named by its digest alone: the maker asks the workspace for
-    // it, and with no look chosen draws its kind's first look, its sketch.
+    const drawn = this.drawnAs(person);
+    if (drawn === null) return null;
+    const { kind, look } = drawn;
     const made = isMadeKind(kind);
-    const listed = made ? undefined : library.list.kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256);
-    const look = this.options.lookOf?.(person) ?? (listed === undefined ? null : listed.looks[0] ?? null);
-    const lookKey = look === null ? 'none' : `${look.key}/${look.version}/${look.sha256}`;
-    // A person whose look is the people catalog's is one of the world's people, drawn as today.
-    if (this.catalogLooks.has(lookKey)) return null;
-    const key = `${made ? 'workspace' : `${kind.kind}/${kind.version}`}/${kind.sha256}|${lookKey}`;
+    const key = `${made ? 'workspace' : `${kind.kind}/${kind.version}`}/${kind.sha256}|${lookKeyOf(look)}`;
     const factory: CrowdRenderableFactory = (_device, parent, identity) => {
       const renderable = new ThingCrowdRenderable(parent, identity, (miss) => this.missed.set(miss.subjectId, miss), async (root, stale) => {
         const figure = await this.options.maker.make(root, {

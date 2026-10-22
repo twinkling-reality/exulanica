@@ -53,7 +53,7 @@ import type { Grip, LookDrawing } from './documents.js';
 import type { InstancedContainer } from './dispatch.js';
 import { ThingFigureMaker, refusalOf, type FigureMade } from './figure-maker.js';
 import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
-import { KindPictures, UNPLACED_THING, type PictureSize } from './kind-picture.js';
+import { KindPictures, UNPLACED_THING, type PictureOf, type PictureSize } from './kind-picture.js';
 import type { Named, ThingLibrary, WorkspaceNamed } from './library.js';
 import { PickRing, rayMeets, ringRadius } from './ring.js';
 
@@ -579,11 +579,12 @@ export class ThingLayer {
   /**
    * A picture of a kind not yet placed, for build mode's tray (`./kind-picture.ts`): the figure a
    * placed thing of the kind is drawn as, alone, `width` by `height` device pixels, as a PNG data
-   * URL; null where the kind cannot be made or drawn. A kind is drawn once a size on a page, and never
-   * in the world's own frame.
+   * URL; null where the kind cannot be made or drawn. With `of`, the figure wears its look and is
+   * framed round, as a being's portrait is. A kind is drawn once a look, a framing and a size on a
+   * page, and never in the world's own frame.
    */
-  drawKindPicture(kind: PlacedKind, size: PictureSize): Promise<string | null> {
-    return this.pictures.picture(namedKindOf(kind), size);
+  drawKindPicture(kind: PlacedKind, size: PictureSize, of: PictureOf = {}): Promise<string | null> {
+    return this.pictures.picture(namedKindOf(kind), size, of);
   }
 
   private dropBoxGhost(): void {

@@ -81,6 +81,25 @@ describe('a society\'s things drawn by their looks', () => {
     expect(figures.figureOf('knight-1')).toBeNull();
   });
 
+  it('says the kind and look a being is drawn by, for its portrait, and nothing for one of the world\'s people', () => {
+    const { app, served, library } = setup();
+    const chosen = { key: 'blocky-knight', version: 1, sha256: '6'.repeat(64) };
+    const figures = new ThingCrowdFigures({
+      maker: new ThingFigureMaker({ app, library, instantiate: instance }),
+      lookOf: (person) => (person.id === 'knight-2' ? chosen : null),
+    });
+    const at = (id: string, kind: SocietyInhabitantSnapshot['kind']): SocietyInhabitantSnapshot => ({ id, synthetic: true, position_mm: [0, 0], ...(kind ? { kind } : {}) });
+    const listed = (thingsJson('kinds/knight.v2.json')['looks'] as { look: string; version: number; sha256: string }[])[0]!;
+    const first = { key: listed.look, version: listed.version, sha256: listed.sha256 };
+    const made = { source: 'workspace' as const, sha256: 'f'.repeat(64) };
+    // Its kind's first look, a look chosen for it, a made kind's sketch; a villager and someone with no kind are people.
+    expect(figures.drawnAs(at('knight-1', served.kindRef('knight', 2)))).toEqual({ kind: served.kindRef('knight', 2), look: first });
+    expect(figures.drawnAs(at('knight-2', served.kindRef('knight', 2)))).toEqual({ kind: served.kindRef('knight', 2), look: chosen });
+    expect(figures.drawnAs(at('strider', made))).toEqual({ kind: made, look: null });
+    expect(figures.drawnAs(at('villager-1', served.kindRef('villager', 1)))).toBeNull();
+    expect(figures.drawnAs(at('old', undefined))).toBeNull();
+  });
+
   it('names a person whose kind the library does not hold', async () => {
     const { app, device, region, library } = setup();
     const figures = new ThingCrowdFigures({ maker: new ThingFigureMaker({ app, library, instantiate: instance }) });

@@ -171,8 +171,12 @@ describe('a saved world draws its inhabitants over its authored region', () => {
     expect(['teo', 'strider', 'old'].map((id) => crowd.drawnAsPerson(id))).toEqual([null, null, true]);
     crowd.setFigures(figures);
     expect(['teo', 'knight', 'strider', 'old', 'nobody'].map((id) => crowd.drawnAsPerson(id))).toEqual([true, false, false, true, null]);
+    // What each is, as the snapshot holds them (a being's portrait asks its kind).
+    expect(crowd.inhabitantOf('strider')?.kind).toEqual({ source: 'workspace', sha256: 'f'.repeat(64) });
+    expect(crowd.inhabitantOf('nobody')).toBeNull();
     crowd.clearSociety();
     expect(crowd.drawnAsPerson('teo')).toBeNull();
+    expect(crowd.inhabitantOf('strider')).toBeNull();
   });
 
   it('says who is drawn near and in full yet: a catalog person only once its look has loaded', async () => {
