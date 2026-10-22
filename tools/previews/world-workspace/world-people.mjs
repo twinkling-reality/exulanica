@@ -10,13 +10,14 @@ export const PEOPLE_TIMING = Object.freeze({ arrivedMs: 60_000 });
 
 /**
  * The people state of one world view. `people` is the corners' read (world-corners.ts CornerPeople:
- * clock() and the panel's bringIn()); `canBringIn` whether this page may bring people in (never the
+ * clock(), the panel's bringIn() and play()); `canBringIn` whether this page may bring people in (never the
  * read-only observer); `canBuild` whether the clock may offer Build where people have nowhere to go;
  * `note` shows one note. Returns:
  * - line(now?): the pill's people line, or null while the world's people are not read yet;
  * - clockOffer(): what the clock holds in its place, { state: 'offer' | 'bringing' | 'nowhere', keys, word },
  *   keys null while asking, or null where the clock shows or this page offers nothing;
- * - offersBringIn(): whether P brings people in now; bringIn(): asks, as P and the clock's prompt do;
+ * - offersBringIn(): whether P brings people in now; bringIn(): asks, as P and the clock's prompt do,
+ *   and once they live here starts the world playing as P would, so they arrive walking (F2);
  * - building(): build mode opened, so with nowhere for people to go the clock offers again;
  * - onChange(listener): called when an answer changes what the pill or the clock says; returns its removal.
  */
@@ -44,8 +45,13 @@ export function mountPeople({ people, canBringIn, canBuild, note, timing = PEOPL
       const after = people.clock();
       bringing = false;
       // Once they live here the pill says so for a minute (line()); no note repeats it (DESIGN's K14).
-      if (after.society === 'present') arrivedAt = now();
-      else note(NOTE_WORDS.peopleRefused);
+      if (after.society === 'present') {
+        arrivedAt = now();
+        // They arrive walking (F2): the world plays as P would start it; a refusal says so as P's does.
+        if (after.mode !== 'playing' && typeof people.play === 'function') {
+          Promise.resolve().then(() => people.play()).then(() => { if (people.clock().mode !== 'playing') note(NOTE_WORDS.playRefused); }, () => note(NOTE_WORDS.playRefused));
+        }
+      } else note(NOTE_WORDS.peopleRefused);
     }, (error) => {
       const refused = bringInRefused(error);
       bringing = false;

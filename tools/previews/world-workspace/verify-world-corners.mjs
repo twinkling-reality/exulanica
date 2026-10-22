@@ -104,12 +104,16 @@ assert.equal(PEOPLE_TIMING.arrivedMs, 60_000);
 
 // The people state the pill and the clock read (world-people.mjs), driven by a stand-in for the
 // corners' people read: its society, its population, and a bring-in that answers when told.
-function standIn(society = 'absent') {
-  const read = { society, population: null };
-  const asked = [];
+function standIn(society = 'absent', { plays = true } = {}) {
+  const read = { society, population: null, mode: null };
+  const asked = [], played = [];
   return {
-    read, asked,
-    people: { clock: () => ({ ...read, mode: null, minute: null, busy: false }), bringIn: () => new Promise((resolve, reject) => asked.push({ resolve, reject })) },
+    read, asked, played,
+    people: {
+      clock: () => ({ ...read, minute: null, busy: false }),
+      bringIn: () => new Promise((resolve, reject) => asked.push({ resolve, reject })),
+      play: async () => { played.push(read.mode); if (plays) read.mode = 'playing'; },
+    },
   };
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -130,11 +134,14 @@ const offer = { state: 'offer', keys: ['P'], word: 'Bring people in' };
   assert.equal(people.offersBringIn(), false);
   assert.equal(people.line(), 'Nobody lives here yet');
   assert.equal(changes, 1);
-  // They arrive: the clock takes its place, one note, and the pill says "now" for a minute.
-  Object.assign(world.read, { society: 'present', population: 24 });
-  world.asked[0].resolve(); await settle();
+  // They arrive: the clock takes its place, one note, and the pill says "now" for a minute; they arrive
+  // walking (F2): the world is played once, as P would.
+  Object.assign(world.read, { society: 'present', population: 24, mode: 'paused' });
+  world.asked[0].resolve(); await settle(); await settle();
   assert.equal(people.clockOffer(), null);
   assert.deepEqual(notes, [], 'the pill says it; no note repeats it');
+  assert.deepEqual(world.played, ['paused']);
+  assert.equal(world.read.mode, 'playing');
   assert.equal(people.line(), '24 people now live here, invented for this world');
   at += PEOPLE_TIMING.arrivedMs - 1;
   assert.equal(people.line(), '24 people now live here, invented for this world');
@@ -163,6 +170,21 @@ const offer = { state: 'offer', keys: ['P'], word: 'Bring people in' };
   without.bringIn();
   unbuilt.asked[0].reject({ status: 409, code: 'no_reachable_targets' }); await settle();
   assert.equal(without.clockOffer(), null);
+}
+{
+  // A world already playing when they arrive is left as it is; one that will not start playing says so as P does.
+  const playing = standIn();
+  const already = mountPeople({ people: playing.people, canBringIn: true, canBuild: true, note: () => {} });
+  already.bringIn();
+  Object.assign(playing.read, { society: 'present', population: 3, mode: 'playing' });
+  playing.asked[0].resolve(); await settle(); await settle();
+  assert.deepEqual(playing.played, []);
+  const stuck = standIn('absent', { plays: false }), notes = [];
+  const refusing = mountPeople({ people: stuck.people, canBringIn: true, canBuild: true, note: (words) => notes.push(words) });
+  refusing.bringIn();
+  Object.assign(stuck.read, { society: 'present', population: 3, mode: 'paused' });
+  stuck.asked[0].resolve(); await settle(); await settle();
+  assert.deepEqual([stuck.played, notes], [['paused'], [NOTE_WORDS.playRefused]]);
 }
 for (const [refusal, words] of [
   [{ status: 409, code: 'society_engine_differs' }, NOTE_WORDS.peopleChanged],

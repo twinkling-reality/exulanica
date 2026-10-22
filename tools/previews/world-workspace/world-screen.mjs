@@ -65,11 +65,12 @@ export function clockText(hhmm, day) {
 }
 
 /**
- * What the clock says: the world's time (`at`, worldTime's answer) where the world keeps one, else
+ * What the clock says, its state in words (F2): the world's time (`at`, worldTime's answer) where the
+ * world keeps one, with "Paused" after it while it does not play ("06:55 · Day 1 · Paused"); else
  * whether it plays ("Playing", "Paused"), as for a society that keeps no time of day.
  */
 export function clockLabel(at, mode) {
-  if (at) return clockText(at.hhmm, at.day);
+  if (at) return mode === 'playing' ? clockText(at.hhmm, at.day) : `${clockText(at.hhmm, at.day)} · ${SCREEN_WORDS.paused}`;
   return mode === 'playing' ? SCREEN_WORDS.playing : SCREEN_WORDS.paused;
 }
 

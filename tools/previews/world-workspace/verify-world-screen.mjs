@@ -23,8 +23,11 @@ assert.deepEqual(words(keysCardRows({ build: false, history: true, clock: false 
 assert.equal(keysCardRows({}).find((row) => row.word === 'Look').keys, 'mouse-click');
 
 assert.equal(clockText('06:55', 1), '06:55 · Day 1');
+// The clock says its state in words (F2): the time alone while playing, "Paused" after it otherwise.
+assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, 'playing'), '06:55 · Day 1');
+assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, 'paused'), '06:55 · Day 1 · Paused');
+assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, null), '06:55 · Day 1 · Paused');
 // A world that keeps no time of day still has its clock: whether it plays.
-assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, 'paused'), '06:55 · Day 1');
 assert.equal(clockLabel(null, 'playing'), 'Playing');
 assert.equal(clockLabel(null, 'paused'), 'Paused');
 assert.equal(clockLabel(null, null), 'Paused');

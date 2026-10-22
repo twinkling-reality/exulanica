@@ -42,12 +42,16 @@ describe('the clock of a world that keeps no time of day', () => {
     made.dispose();
   });
 
-  it('shows the time where the world keeps one', async () => {
+  it('shows the time where the world keeps one, and says in words, with no glyph, when it is paused (F2)', async () => {
     const { mountCorners } = await corners();
     const host = document.createElement('div');
     const state: Clock = { society: 'present', mode: 'paused', minute: 55, startMinuteOfDay: 360, population: 24, busy: false };
     mountCorners({ host, people: { clock: () => state, play: vi.fn(async () => {}), pause: vi.fn(async () => {}) }, onLeave: () => {} });
-    expect(clockOf(host)?.textContent).toBe('06:55 · Day 1');
+    expect(clockOf(host)?.textContent).toBe('06:55 · Day 1 · Paused');
+    expect(clockOf(host)?.querySelector('i, .wu-pause, .wu-play')).toBeNull();
+    const playing = document.createElement('div');
+    mountCorners({ host: playing, people: { clock: () => ({ ...state, mode: 'playing' }), play: vi.fn(async () => {}), pause: vi.fn(async () => {}) }, onLeave: () => {} });
+    expect(clockOf(playing)?.textContent).toBe('06:55 · Day 1');
   });
 });
 

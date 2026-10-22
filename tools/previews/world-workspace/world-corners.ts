@@ -240,10 +240,10 @@ export function mountCorners({
   }
 
   // ---------- The clock, and K13's offer in its place ----------
+  // The clock says its state in words (F2: no glyph, which read as the button's action).
   const clock = button('wu-glass-thin wu-pill wu-clock-pill wu-screen-in');
-  const glyph = span('wu-pause'), time = span('');
-  glyph.setAttribute('aria-hidden', 'true');
-  clock.append(glyph, time);
+  const time = span('');
+  clock.append(time);
   clock.setAttribute('aria-keyshortcuts', 'P');
   clock.addEventListener('click', () => togglePlay());
   clock.hidden = true;
@@ -322,7 +322,7 @@ export function mountCorners({
   const notes = mountNotes(host, { place: 'world' });
 
   let own: readonly Hint[] = [], handed: readonly Hint[] | null = null, vertical = false;
-  let since = performance.now(), wokenAt = -Infinity, held = false, lastRead = -Infinity, shownTime = '', shownMode: string | null = null;
+  let since = performance.now(), wokenAt = -Infinity, held = false, lastRead = -Infinity, shownTime = '';
   let playing = false, present = false, sending = false;
   // Bringing people in (K13): world-people.mjs decides; the clock's place and the pill draw it.
   const folk = mountPeople({ people, canBringIn: canBringIn && !readOnly, canBuild: onBuild !== null, note: (words: string) => notes.show(words) });
@@ -381,11 +381,6 @@ export function mountCorners({
     playing = read.mode === 'playing';
     const text = clockLabel(at, read.mode);
     if (text !== shownTime) { time.textContent = text; shownTime = text; }
-    if (read.mode !== shownMode) {
-      shownMode = read.mode;
-      glyph.className = playing ? 'wu-play' : 'wu-pause';
-      glyph.replaceChildren(...(playing ? [] : [document.createElement('i'), document.createElement('i')]));
-    }
     // The clock is the play and pause button: it names what pressing it does.
     clock.setAttribute('aria-label', `${playing ? CORNER_WORDS.pause : CORNER_WORDS.play}, ${text}`);
     clock.disabled = readOnly || read.busy || sending;

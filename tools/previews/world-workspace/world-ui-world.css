@@ -43,9 +43,6 @@
 /* ---------- The clock (section 3), and K13's offer in its place ---------- */
 .wu-clock-pill { position: absolute; right: var(--edge-inset); top: var(--edge-inset); margin: 0; border: 0; color: var(--ink); font-variant-numeric: tabular-nums; cursor: pointer; pointer-events: auto; }
 .wu-clock-pill:disabled { cursor: default; }
-.wu-clock-pill .wu-pause { display: flex; gap: 3px; }
-.wu-clock-pill .wu-pause i { width: 3px; height: calc(12 * var(--u)); border-radius: 1px; background: currentColor; }
-.wu-clock-pill .wu-play { width: 0; height: 0; border-left: calc(9 * var(--u)) solid currentColor; border-top: calc(5.5 * var(--u)) solid transparent; border-bottom: calc(5.5 * var(--u)) solid transparent; }
 .wu-clock-pill.wu-offer { cursor: pointer; }
 .wu-clock-pill.wu-waiting { cursor: default; color: var(--ink-2); }
 
