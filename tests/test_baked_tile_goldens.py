@@ -91,7 +91,9 @@ def _level_document() -> bytes:
 
 def _digests(document: Path, out: Path) -> dict[str, str]:
     if not TSX.exists():
-        pytest.skip(f"the web toolchain is not installed ({TSX} is missing)")
+        pytest.skip(
+            f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/"
+        )
     if shutil.which("node") is None:
         pytest.skip("node is not on PATH")
     printed = subprocess.run(
