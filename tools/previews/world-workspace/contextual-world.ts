@@ -604,7 +604,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const connected = Boolean(subjectReads.models && !subjectReads.models.hostRefusal && !choice?.refusal);
     return { choice, model: choice?.model ?? null, connected };
   }
-  // The question before a run (frame 08), while it is asked.
+  // The question before a run (frame 08), while it is asked; it reads the running state again as it opens.
   let asking = null;
   function askRun() {
     const { model, connected } = modelOf(held);
@@ -612,6 +612,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (runWatch.run) { void stopNow(); return; }
     if (!model || !connected) return;
     asking = { refusal: null, busy: false, shown: runWatch.limits(subjectReads.models) };
+    void runWatch.refresh().then(() => { if (asking && !asking.busy) { asking.shown = runWatch.limits(subjectReads.models); drawQuestion(); } });
     drawQuestion();
   }
   // The Run question is the chosen character's group in its question state (r08): chosenGroup draws it each frame.

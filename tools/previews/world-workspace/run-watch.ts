@@ -4,8 +4,9 @@
 // while a run is open, and once when asked otherwise. The pops over characters who said or chose
 // something come from contextual-world.ts's read while the world plays (T2), on the same cadence. Starting and stopping are
 // entity-execution.mjs's startRun and stopRun; the words are run-words.mjs's.
-import { SocietyControlClient, type SocietyPlaybackControl } from '/src/society-control-api.ts';
-import type { SocietyModels } from '/src/society-models-api.ts';
+// The app's modules are named by their paths, which the preview serves as /src/… (one module each) and the tests load.
+import { SocietyControlClient, type SocietyPlaybackControl } from '../../../web/packages/app/src/society-control-api.ts';
+import type { SocietyModels } from '../../../web/packages/app/src/society-models-api.ts';
 import { openRun, startRun, stopRun } from './entity-execution.mjs';
 import { defaultRunLimits, endedNote, pillRunLine } from './run-words.mjs';
 
@@ -67,6 +68,9 @@ export function mountRunWatch({ pill, askers, entry, credentials, isCurrent, rea
       try {
         control = await startRun({ modelsClient, controlClient, entry, subjectId, expectedModel, current: () => live && isCurrent(), refresh, requestId,
           limitsFor: (fresh: SocietyPlaybackControl, models: SocietyModels) => {
+            // The start's own read is the world's running state now: kept, so the limits a refused start shows next
+            // are the ones a second press asks under (the page may have opened before the world had people).
+            control = fresh;
             const limits = defaultRunLimits(fresh.hostPlayback?.intervalMs ?? fresh.tickIntervalMs, models.choices.filter(choice => choice.model).length);
             if (JSON.stringify(limits) !== JSON.stringify(shown)) throw Object.assign(Error('limits changed'), { code: 'stale_society_state' });
             return limits;
