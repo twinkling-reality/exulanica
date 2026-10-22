@@ -17,8 +17,17 @@ import uuid
 import pytest
 from exulanica.world import society_repository
 from exulanica.world.repository import WorldStyleRepository
-from exulanica.world.society_moments import MOMENTS_PROFILE, RULES_PROFILE, _Stored, backfill
+from exulanica.world.society import society_state_sha256
+from exulanica.world.society_decision_contract import person_role
+from exulanica.world.society_moments import (
+    MOMENTS_PROFILE,
+    RULES_PROFILE,
+    _Stored,
+    backfill,
+    touched_subjects,
+)
 from exulanica.world.society_repository import SocietyRepository
+from psycopg.types.json import Jsonb
 
 import test_society_erasure_postgres as erasure
 import test_society_stay_requests_api as stays
@@ -267,3 +276,68 @@ def test_a_version_s_history_reads_its_own_society_s_moments_and_lines_alone(app
         assert read and read <= {str(moment_id) for moment_id in own}
         said = {one["line"] for moment in body["moments"] for one in moment["said"]}
         assert said == {line}, said
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_each_source_of_a_touched_being_counts_alone(app):
+    """A being counts as touched by any one source alone: a decision request for them, their
+    coming by being placed, or a model choice naming them (H18's three sources, each apart)."""
+    world, client = app
+    _, knight = erasure._played_line(world, client, _services(client))
+    knight = uuid.UUID(str(knight))
+    connection = world["connection"]
+    _, row = _replayed(world)
+
+    def touched(inhabitants: list[dict], **where) -> set[uuid.UUID]:
+        state = {"inhabitants": inhabitants}
+        return set(
+            touched_subjects(connection, world["workspace"], {**row, **where, "state": state})
+        )
+
+    # A decision request alone: read as of a world with no model choices (the choices' half names
+    # its world; a request has no world column) and with nobody placed, the knight the person
+    # played is touched by the requests made for them.
+    assert knight in touched([], world_id=f"world:generated:{uuid.uuid4()}")
+    asked = touched([])
+    # A placement alone: a being placed counts with no request or choice; one that came otherwise
+    # does not.
+    placed, populated = uuid.uuid4(), uuid.uuid4()
+    people = [
+        {"id": str(placed), "came_by": "placed"},
+        {"id": str(populated), "came_by": "populated"},
+    ]
+    assert touched(people) - asked == {placed}
+    # A model choice alone: a being named by one counts with no request or placement.
+    chosen, role = uuid.uuid4(), person_role()
+    sequence = connection.execute(
+        "select coalesce(max(choice_seq), 0) + 1 as next from world_society_model_choice "
+        "where workspace_id=%s and world_id=%s and society_id=%s",
+        (world["workspace"], row["world_id"], row["society_id"]),
+    ).fetchone()["next"]
+    document = {
+        "profile": role.choice_profile,
+        "choice_seq": sequence,
+        "request_id": str(uuid.uuid4()),
+        "society_id": str(row["society_id"]),
+        role.choice_subjects: [str(chosen)],
+        "model": None,
+        "contract": {},
+        "chosen_by": str(world["session"].actor),
+    }
+    document["document_sha256"] = society_state_sha256(document)
+    with connection.transaction():
+        connection.execute(
+            "insert into world_society_model_choice(workspace_id,world_id,society_id,choice_seq,"
+            "request_id,document,document_sha256,chosen_by) values(%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                world["workspace"],
+                row["world_id"],
+                row["society_id"],
+                sequence,
+                uuid.UUID(document["request_id"]),
+                Jsonb(document),
+                document["document_sha256"],
+                world["session"].actor,
+            ),
+        )
+    assert touched([]) - asked == {chosen}
