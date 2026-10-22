@@ -351,20 +351,11 @@ def _placed(
     place_id: str, receipt: Mapping[str, Any], records: tuple[object, ...]
 ) -> dict[str, Any]:
     """The place a site world's society walks, made from its records within the walking graph's
-    budget, or why it cannot be, by name. With the place goes ``blocked``, the site's blocked
-    boxes as plain figures: what a society of things keeps a placed thing's standing places clear
-    of, which only the records state and the place does not carry; ``blocked_parts``, the same
-    boxes each with what it is and its words, which a move of a placed thing is kept off and told
-    about by name; and ``water``, the water the records hold with the swim lattice's points inside
-    it (:func:`~exulanica.world.composers.site_plan.swim_nodes`), which a swimmer crosses."""
+    budget (:func:`_place_answer`), or why it cannot be, by name."""
     from exulanica.grammar.errors import CatalogError
-    from exulanica.world.composers.site_plan import society_place, swim_nodes
+    from exulanica.world.composers.site_plan import society_place
     from exulanica.world.errors import InvalidStructuralData
-    from exulanica.world.society_site_place import (
-        GraphOverBudget,
-        site_blocked_boxes,
-        site_blocked_parts,
-    )
+    from exulanica.world.society_site_place import GraphOverBudget
 
     try:
         if receipt["composer"]["version"] in TERRAIN_COMPOSER_VERSIONS:
@@ -376,13 +367,7 @@ def _placed(
                 "code": "terrain_society_projection_unavailable",
                 "detail": "This terrain has no society projection.",
             }
-        return {
-            "status": "done",
-            "place": society_place(place_id, receipt, records),
-            "blocked": site_blocked_boxes(records),
-            "blocked_parts": site_blocked_parts(records, _part_uses(receipt)),
-            "water": swim_nodes(receipt, records),
-        }
+        return _place_answer(society_place(place_id, receipt, records), receipt, records)
     except GraphOverBudget as exc:
         return {
             "status": "refused",
@@ -391,6 +376,38 @@ def _placed(
         }
     except (CatalogError, InvalidStructuralData, ValueError) as exc:
         return {"status": "refused", "code": "kind_place_refused", "detail": str(exc)}
+
+
+def _place_answer(
+    place: Mapping[str, Any], receipt: Mapping[str, Any], records: tuple[object, ...]
+) -> dict[str, Any]:
+    """A made place as the worker answers and keeps it, from a place job or with the world it
+    composes. With the place goes ``blocked``, the site's blocked boxes as plain figures: what a
+    society of things keeps a placed thing's standing places clear of, which only the records
+    state and the place does not carry; ``blocked_parts``, the same boxes each with what it is and
+    its words, which a move of a placed thing is kept off and told about by name; ``water``, the
+    water the records hold with the swim lattice's points inside it
+    (:func:`~exulanica.world.composers.site_plan.swim_nodes`), which a swimmer crosses; and on a
+    volume's top, ``top``, the open top round the site a person walks to its rim, which a placed
+    thing stands on (:func:`~exulanica.world.site_top_ground.top_ground_document`)."""
+    from exulanica.world.composers.site_plan import TOP_COMPOSER_VERSION, receipt_land, swim_nodes
+    from exulanica.world.society_site_place import site_blocked_boxes, site_blocked_parts
+
+    answer = {
+        "status": "done",
+        "place": place,
+        "blocked": site_blocked_boxes(records),
+        "blocked_parts": site_blocked_parts(records, _part_uses(receipt)),
+        "water": swim_nodes(receipt, records),
+    }
+    if receipt["composer"]["version"] == TOP_COMPOSER_VERSION:
+        from exulanica.world.site_on_top import TopWorld
+        from exulanica.world.site_top_ground import top_ground_document
+
+        land = receipt_land(receipt, records)
+        if isinstance(land, TopWorld):
+            answer["top"] = top_ground_document(land)
+    return answer
 
 
 def _part_uses(receipt: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -437,10 +454,9 @@ def compose_job(
     drawn without its landscape's: :func:`landscape_job` realizes its volumes when it is read."""
     from exulanica.grammar.landform import LandformRefused
     from exulanica.grammar.landscape import LandscapeRefused
-    from exulanica.world.composers.site_plan import compose_kind, swim_nodes
+    from exulanica.world.composers.site_plan import compose_kind
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
-    from exulanica.world.society_site_place import site_blocked_boxes, site_blocked_parts
     from exulanica.world.support_surfaces import SupportRefused
 
     place_id = site_ground_place_id()
@@ -484,14 +500,8 @@ def compose_job(
         "composed": composed,
         **_drawn(world_id, composed.receipt, composed.receipt_sha256, records),
         "place_id": place_id,
-        # Kept as the place job keeps it: the place, the site's blocked boxes and its water.
-        "placed": {
-            "status": "done",
-            "place": composed.place,
-            "blocked": site_blocked_boxes(records),
-            "blocked_parts": site_blocked_parts(records, _part_uses(composed.receipt)),
-            "water": swim_nodes(composed.receipt, records),
-        },
+        # Kept as the place job answers: the place with what goes with it.
+        "placed": _place_answer(composed.place, composed.receipt, records),
     }
 
 

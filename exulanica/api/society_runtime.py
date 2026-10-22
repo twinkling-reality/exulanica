@@ -125,7 +125,7 @@ from exulanica.world.society_walking_surfaces import (
 )
 from exulanica.world.society_water import WaterStatement
 from exulanica.world.society_water_sources import site_water, town_water, water_for_input
-from exulanica.world.thing_landing_source import town_surface
+from exulanica.world.thing_landing_source import society_rest
 from exulanica.world.town_people import TownPeopleRefused, people_frame
 from exulanica.world.version_town import TownKey, composed_town_key, town_and_made, town_key
 
@@ -222,6 +222,10 @@ class _TownRead:
     support_source: Any = None
     #: The water the world holds, which a swimming society's things input lays swim nodes over.
     water: WaterStatement | None = None
+    #: For a site on a volume's top, the open top round it the worker states with the place
+    #: (``exulanica.top-ground/v1``): a society of things rests a thing placed there on the graded
+    #: top, as a placing is held to it.
+    site_top: Mapping[str, Any] | None = None
 
 
 def _stored_site_place(
@@ -297,7 +301,7 @@ def _site_read(
     ).fetchone()["present"]
     if bound:
         place = None  # A bound thing requires the canonical source place, not a derived history.
-    blocked = water = None
+    blocked = water = top = None
     if place is None:
         worker = kind_worker()
         workspace = str(binding.workspace_id)
@@ -323,7 +327,7 @@ def _site_read(
         if answer["status"] != "done":
             return _TownRead(None, None, None, place_refusal=str(answer["detail"]))
         place = answer["place"]
-        blocked, water = answer.get("blocked"), site_water(answer)
+        blocked, water, top = answer.get("blocked"), site_water(answer), answer.get("top")
     support_source = None
     if bound and receipt.get("composer") == {"key": "site-plan", "version": 2}:
         from exulanica.world.kinds.worker import drawing_job, drawing_key
@@ -370,6 +374,7 @@ def _site_read(
         obstructions=None if blocked is None else site_obstructions(blocked),
         support_source=support_source,
         water=water,
+        site_top=top,
     )
 
 
@@ -2056,11 +2061,16 @@ class SocietyRuntime:
                 support_source=town.support_source,
                 made_records=town.made,
                 water=water_for_input(connection, binding, seq, town.water),
-                # A town's things rest on its own surface, as a placing is held to it.
-                rest=town_surface(
-                    connection, *scope, town.records, surface_height_at(place, ground)
+                # A thing rests where a placing is held to rest it.
+                rest=society_rest(
+                    connection,
+                    scope,
+                    town.records,
+                    surface_height_at(place, ground),
+                    site=town.site_receipt is not None,
+                    top=town.site_top,
                 )
-                if chosen == WALKING_SURFACES_COMPOSITION_V3 and town.site_receipt is None
+                if chosen == WALKING_SURFACES_COMPOSITION_V3
                 else None,
             )
         raise UnavailableSocietyInput(

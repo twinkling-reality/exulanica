@@ -6,7 +6,10 @@ the rule that refuses those, read from the same figures the world's society read
 may be put and what the world's people can reach never disagree:
 
 * **The world's edge**: the society's walkable area (:class:`WalkableArea`), when the world's own
-  ground states it. An endless ground, or an area the society only declared, has no edge here.
+  ground states it. An endless ground, or an area the society only declared, has no edge here. A
+  site on a volume's top is walked past its area, over the open top out to the rim
+  (:mod:`~exulanica.world.site_top_ground`): there a thing stands on the top's land, and is told
+  it is in the water where the top's own water stands.
 * **Resting on the ground**: the society's own rule for how high a thing stands above the surface
   under it (``height_above``: the ground plane's, or the walking surfaces' nearest line,
   :func:`exulanica.world.society_walking_surfaces.surface_height_above`). One it would read as
@@ -105,6 +108,11 @@ class BlockedPart:
     ring: tuple[Point, ...]
 
 
+#: The water standing on the open ground past a world's area (:attr:`LandingGround.beyond`): it is
+#: no part of the world's records, so it has no ring and no words of its own.
+_OPEN_WATER: Final = BlockedPart("water", "", ())
+
+
 @dataclass(frozen=True, slots=True)
 class LandingGround:
     """A world's ground as a move reads it: its edge (None where it has none), how high a thing
@@ -120,6 +128,10 @@ class LandingGround:
     #: Where a thing rests on the highest of ``rest_height`` under its footprint (a town's surface,
     #: whose kerbs are steps), not at its centre alone.
     rests_on_footprint: bool = False
+    #: Where the ground runs on past ``area`` (a site on a volume's top: the open top round it out
+    #: to the rim), what a point of the region past it is: ``"land"``, ``"water"``, or None past
+    #: the ground's edge.
+    beyond: Callable[[tuple[int, int]], Literal["land", "water"] | None] | None = None
 
     def resting_y(self, thing: PlacedThing) -> int | None:
         """The height ``thing`` rests at where it is posed, where the ground states one: under its
@@ -169,7 +181,16 @@ def landing_refusal(
         if half_extents_mm is None
         else tuple(footprint_ring(centre, half_extents_mm, thing.transform.yaw_microradians)[:-1])
     )
-    if ground.area is not None and not all(_within(point, ground.area) for point in shape):
+    past = (
+        []
+        if ground.area is None
+        else [
+            None if ground.beyond is None else ground.beyond(point)
+            for point in shape
+            if not _within(point, ground.area)
+        ]
+    )
+    if None in past:
         return ThingLandingRefused(
             OUTSIDE_WORLD, {"part": None}, "That spot is past the edge of this world."
         )
@@ -188,6 +209,8 @@ def landing_refusal(
         for part in (*ground.parts, *others)
         if (_inside(centre, part.ring) if len(shape) == 1 else _overlaps(shape, part.ring))
     ]
+    if "water" in past:
+        met.append(_OPEN_WATER)
     if not met:
         return None
     first = min(met, key=lambda part: (_PRECEDENCE[part.kind], part.label))

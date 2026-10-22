@@ -1061,12 +1061,17 @@ support-bound thing also clears its support affinity. A move, and a placing of a
 held to the world's ground as the world's society reads it (`exulanica/world/thing_landing.py`), so
 where a thing may be put and what the world's people can reach never disagree: inside the walkable
 area where the world's own
-ground states one, resting on the ground by the society's own rule (the ground plane; a town's
-own surface, as `landing.rest_y_mm` below states it; or a site's nearest walking line), and with
+ground states one, and on a site laid out on a volume's top also anywhere on the open top round it
+out to the rim, as a person walks it (`exulanica/world/site_top_ground.py`), resting on the ground
+by the society's own rule (the ground plane; a town's
+own surface, as `landing.rest_y_mm` below states it; a site's nearest walking line; or, on a
+volume's top, the graded top the page stands a person on, the highest of it under the thing's
+footprint), and with
 its kind's box, turned
 with it, overlapping nothing people cannot walk through: a site's structures, water and other
-areas, walls, blocking fixtures and closed zones, a town's buildings, street furniture and trees,
-and the version's other placed objects whose kinds block walking. A being is held by its centre.
+areas, walls, blocking fixtures and closed zones, the open top's own water, a town's buildings,
+street furniture and trees, and the version's other placed objects whose kinds block walking. A
+being is held by its centre.
 Touching a face is not overlapping. A refusal is `422` with one code per kind,
 `thing_landing_outside`, `thing_landing_off_ground` or `thing_landing_blocked`, a `where` naming
 what refused it (the part's kind and words, or the height above the ground) and a sentence a person

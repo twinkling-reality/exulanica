@@ -11,8 +11,12 @@ ground the rule cannot read, which is edited as before and said to be unchecked:
   elevation, edged where the world's own ground states its area;
 * a site world: its place and named blocked parts from the kind worker, through the cache its
   society reads (made with the world, or asked of the worker here, outside any lock, answered as
-  :class:`~exulanica.world.kinds.worker.KindWorkWaiting` while it is being made); a site world
-  made from terrain has no society projection and is not checked;
+  :class:`~exulanica.world.kinds.worker.KindWorkWaiting` while it is being made); on a volume's
+  top, the open top round the site too, which a thing stands on out to the rim, resting on the
+  graded top the page stands it on, the site included, on the highest of it under its footprint
+  (:mod:`~exulanica.world.site_top_ground`), so a bank's step is no refusal within the step a
+  thing rests across; a site world made from terrain has no society projection and is not
+  checked;
 * a town: its records with the version's changes to its buildings
   (:mod:`~exulanica.world.version_town`) and their blocked parts, so a thing lands where a removed
   building stood and against a taller or lower one's own massing, and rests on the city's own
@@ -42,6 +46,7 @@ from exulanica.world.kinds.worker import (
     site_ground_place_id,
 )
 from exulanica.world.site_parts import changes_document, changes_sha256
+from exulanica.world.site_top_ground import TopGround, top_landing
 from exulanica.world.society_authored_ground import SocietyGround, read_authored_ground
 from exulanica.world.society_city_place import city_blocked_parts
 from exulanica.world.society_walking_surfaces import (
@@ -64,7 +69,7 @@ if TYPE_CHECKING:
 
     from exulanica.world.object_repository import WorldObjectRepository
 
-__all__ = ["prepare_landing", "prepare_landing_in_region", "town_surface"]
+__all__ = ["prepare_landing", "prepare_landing_in_region", "society_rest", "town_surface"]
 
 
 def prepare_landing(
@@ -120,9 +125,11 @@ def prepare_landing_in_region(
         answer = _site_place(repository, ground, version_id)
         if answer is None:
             return None
-        place, parts = answer
-        rest = surface_height_at(place, ground)
-        return LandingGround(ground.region_id, ground.area, rests_on_surface(rest), parts, rest)
+        place, parts, top = answer
+        if top is None:
+            rest = surface_height_at(place, ground)
+            return LandingGround(ground.region_id, ground.area, rests_on_surface(rest), parts, rest)
+        return top_landing(TopGround.read(top), ground.region_id, ground.area, parts)
     scope = (repository.workspace_id, repository.world_id, ground.snapshot_id)
     key, changes = town_key(connection, *scope, version_id)
     if key is None:
@@ -175,12 +182,32 @@ def town_surface(
     return rest
 
 
+def society_rest(
+    connection: psycopg.Connection,
+    scope: tuple[uuid.UUID, str, uuid.UUID],
+    records: Sequence[object],
+    lines: Callable[[tuple[int, int]], int],
+    *,
+    site: bool,
+    top: Mapping[str, Any] | None,
+) -> Callable[[tuple[int, int]], int] | None:
+    """The height a society of things rests a placed thing at, the one a placing is held to (as
+    :func:`prepare_landing_in_region` reads it): on a town, its own street surface
+    (:func:`town_surface`, by the ground's walking ``lines`` where it states none); on a site on a
+    volume's top (``top``, ``exulanica.top-ground/v1``), the graded top; None on any other site,
+    whose things rest by their nearest walking line."""
+    if not site:
+        return town_surface(connection, *scope, records, lines)
+    return None if top is None else TopGround.read(top).height_at
+
+
 def _site_place(
     repository: WorldObjectRepository, ground: SocietyGround, version_id: uuid.UUID
-) -> tuple[Mapping[str, Any], tuple[BlockedPart, ...]] | None:
-    """A site world's place and blocked parts as the version's society reads them, made from its
-    records with the version's changes to its parts, or None for a site the worker makes no place
-    for (one made from terrain)."""
+) -> tuple[Mapping[str, Any], tuple[BlockedPart, ...], Mapping[str, Any] | None] | None:
+    """A site world's place, blocked parts and, on a volume's top, the open top round it
+    (``exulanica.top-ground/v1``) as the version's society reads them, made from its records with
+    the version's changes to its parts, or None for a site the worker makes no place for (one made
+    from terrain)."""
     digest, receipt = generation_receipt(
         repository.connection, repository.workspace_id, repository.world_id, ground.snapshot_id
     )
@@ -207,7 +234,8 @@ def _site_place(
     if named is None:
         # A place the worker kept before it named its parts: the same boxes, unnamed.
         named = [{"part": "blocked", "label": "", "box": box} for box in placed.value["blocked"]]
-    return placed.value["place"], tuple(_site_part(part) for part in named)
+    parts = tuple(_site_part(part) for part in named)
+    return placed.value["place"], parts, placed.value.get("top")
 
 
 def _site_part(part: Mapping[str, Any]) -> BlockedPart:
