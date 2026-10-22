@@ -10,7 +10,7 @@ from collections import Counter, deque
 from itertools import pairwise
 
 import pytest
-from exulanica.grammar.errors import InvalidRecordError
+from exulanica.grammar.errors import CatalogError, InvalidRecordError
 from exulanica.grammar.geometry import OUTSIDE, Extent, point_in_ring
 from exulanica.grammar.grammars.city import CITY_GRAMMAR
 from exulanica.grammar.grammars.city.document import TileDocument, support_top_mm
@@ -27,6 +27,8 @@ from exulanica.grammar.grammars.city.streets import (
     StreetRecord,
     StreetSegmentRecord,
 )
+from exulanica.world import society_catalogs
+from exulanica.world.society_catalogs import load_routine_model
 from exulanica.world.society_city_place import (
     CORNER_TOLERANCE_MM,
     city_navigation,
@@ -610,6 +612,92 @@ def test_a_door_whose_stated_step_is_not_the_footway_beneath_it_is_stated():
     )
     # The door is still a door: the place states the disagreement rather than dropping the unit.
     assert any(d["origin"] == "premises" for d in place["destinations"])
+
+
+def test_a_town_made_under_the_fifth_policy_stands_its_doors_clear_of_their_frontage():
+    records = owned_records()
+    curbs = {r.identity: r for r in of_kind(records, CurbEdgeRecord)}
+    radius = city_navigation().capsule_radius_mm
+
+    def town(versions: dict) -> dict:
+        model = load_routine_model(versions=versions)
+        place = place_from_city_records(place_id="fixture-tile", records=records, routine=model)
+        validate_place(place, model)
+        return place
+
+    clear = town(society_catalogs.TOWN_ROUTINE_VERSIONS)
+    kept = town(society_catalogs.TOWN_ROUTINE_VERSIONS_BEFORE_DOORSTEPS)
+    standing = {n["node_id"]: n for n in clear["nodes"]}
+    held = {n["node_id"]: n for n in kept["nodes"]}
+    doors = 0
+    for entrance in of_kind(records, EntranceRecord):
+        name = f"entrance:{entrance.identity}"
+        if name not in standing:
+            continue
+        doors += 1
+        threshold = [entrance.threshold_x_mm, entrance.threshold_y_mm]
+        # A town made before stands the door on its threshold, a step above the footway.
+        assert held[name]["position_mm"] == threshold
+        assert held[name]["support_z_mm"] == entrance.threshold_z_mm
+        # Made now, one capsule radius out along the door's edge to the footway point it is
+        # reached from, on the footway surface there: the stated step, and the footway's fall
+        # over that radius toward the kerb, below the threshold.
+        door = standing[name]["position_mm"]
+        [edge] = [e for e in clear["edges"] if name in (e["from_node_id"], e["to_node_id"])]
+        assert edge["kind"] == "premises_access"
+        other = edge["to_node_id"] if edge["from_node_id"] == name else edge["from_node_id"]
+        footway = standing[other]["position_mm"]
+        out, on = ceil_distance(threshold, door), ceil_distance(door, footway)
+        assert abs(out - radius) <= 1
+        assert abs(out + on - ceil_distance(threshold, footway)) <= 2
+        fall = curbs[entrance.approach_curb_identity[0]].footway_crossfall_millionths
+        below = entrance.threshold_z_mm - standing[name]["support_z_mm"]
+        assert 0 <= below - entrance.step_height_mm <= fall * radius // 10**6 + 1
+    assert doors == 3
+    assert not any(line.startswith("doors stood within") for line in clear["unsupported"])
+    # The distance is the navigation table's capsule, read as data: a wider capsule stands the door
+    # out by its own radius.
+    twice = dataclasses.replace(city_navigation(), capsule_radius_mm=2 * radius)
+    model = load_routine_model(versions=society_catalogs.TOWN_ROUTINE_VERSIONS)
+    wider = {
+        n["node_id"]: n["position_mm"]
+        for n in place_from_city_records(
+            place_id="fixture-tile", records=records, routine=model, navigation=twice
+        )["nodes"]
+    }
+    for entrance in of_kind(records, EntranceRecord):
+        door = wider.get(f"entrance:{entrance.identity}")
+        if door is not None:
+            out = ceil_distance([entrance.threshold_x_mm, entrance.threshold_y_mm], door)
+            assert abs(out - 2 * radius) <= 1
+    # Where a capsule could not stand clear there, the place says so: a capsule wider than the way
+    # from a door to its footway point is stood at that point, still within its reach of the wall.
+    wide = dataclasses.replace(city_navigation(), capsule_radius_mm=10 * radius)
+    model = load_routine_model(versions=society_catalogs.TOWN_ROUTINE_VERSIONS)
+    crowded = place_from_city_records(
+        place_id="fixture-tile", records=records, routine=model, navigation=wide
+    )
+    assert "doors stood within a capsule radius of an obstruction (3)" in crowded["unsupported"]
+
+
+def test_a_policy_stands_a_door_clear_of_its_frontage_or_on_its_threshold_and_says_nothing_else(
+    tmp_path,
+):
+    for path in society_catalogs.ROUTINE_DIRECTORY.glob("*.json"):
+        (tmp_path / path.name).write_bytes(path.read_bytes())
+    policy = tmp_path / "society-policy.v5.json"
+    catalog = json.loads(policy.read_text())
+    [entry] = [e for e in catalog["entries"] if e["key"] == "door_stands_clear"]
+    for value in (0, 2):
+        entry["value"] = value
+        policy.write_text(json.dumps(catalog))
+        if value == 0:
+            # The positive control: the copied catalogs load, and the policy reads what it says.
+            model = load_routine_model(tmp_path, versions=society_catalogs.TOWN_ROUTINE_VERSIONS)
+            assert model.policy["door_stands_clear"] == 0
+        else:
+            with pytest.raises(CatalogError, match="door stands clear of its frontage"):
+                load_routine_model(tmp_path, versions=society_catalogs.TOWN_ROUTINE_VERSIONS)
 
 
 def test_two_footways_meet_at_a_corner_only_while_their_surfaces_are_within_a_step():

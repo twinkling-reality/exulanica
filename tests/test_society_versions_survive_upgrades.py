@@ -161,6 +161,9 @@ RELEASED_CATALOGS = {
         "d8f0f3314be76e869d067e69672b8f75a0caada55e355b4b076623db2441b79d"
     ),
     "society-policy.v4.json": "0874443760e55277949e2bd52058227295b87e4d07a9dd1bc8bd036389a731f6",
+    # A new town stands each door's standing point a capsule radius before its threshold (the town
+    # routine's fifth policy).
+    "society-policy.v5.json": "bbab9144272d6bfcf4983a7e78d00ac625bfcbbc4fb313da44c0ddbb1f730393",
     "society-comparison-seeds.v6.json": (
         "012fc1270c313e47628b35148992cc01d9e51de2a11c7021cbea31f22606474d"
     ),

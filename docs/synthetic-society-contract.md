@@ -1744,7 +1744,12 @@ sorted list of what the place cannot supply. Two producers exist:
   path crosses a carriageway at a junction; a carriageway is crossed only on a crossing record,
   and the place's crossing keeps that record's identity and its signal. A premises unit is reached
   through the first of its entrances that opens onto a footway in the place, by a
-  `premises_access` edge from the footway to the threshold. A door onto a lot is stated, and a
+  `premises_access` edge from the footway to the door. In a town made under `society-policy` v5 or
+  later (`door_stands_clear`), each door stands one capsule radius of the nav envelope (340 mm)
+  before its threshold along its `premises_access` edge, on the footway there, so someone visiting a
+  place, or standing after a visit, stands on the footway beside the frontage and never half inside
+  it; the place states any door that stands within a capsule radius of an obstruction. A town made
+  earlier keeps its doors on their thresholds. A door onto a lot is stated, and a
   unit with no door onto a footway in the place is listed as unsupported, never given one. A use
   class maps to capacities, role and shift; an unknown use class is listed as unsupported, never
   guessed. A bench seats its catalogued visitors side by side along its own direction vector,
@@ -1754,11 +1759,12 @@ sorted list of what the place cannot supply. Two producers exist:
   so restyling a street never changes a society's input. Every node states the height of what it
   stands on, taken from the record it came from: a footway station stands on the footway surface
   that curb's own fields put there, a corner climbs across its arc between the two footways it
-  joins, a door stands on its threshold, and a bench stands on the footway beneath it. The place
-  holds each door's stated `step_height_mm` to the footway surface it derives under that door and
-  states any door where the two disagree. Two footways meet at a corner only while their surfaces
-  stand within one step of each other. Merging two places at one plan point into one node is
-  plan-only, and the place states how many of the surfaces it merged stood at another height.
+  joins, a door stands on its threshold (or, stood clear, on the footway before it), and a bench
+  stands on the footway beneath it. The place holds each door's stated `step_height_mm` to the
+  footway surface it derives under that door and states any door where the two disagree. Two
+  footways meet at a corner only while their surfaces stand within one step of each other.
+  Merging two places at one plan point into one node is plan-only, and the place states how many
+  of the surfaces it merged stood at another height.
 - **What a person may stand on is the city descriptor's navigation table, read as data**
   (`city_navigation`), never a list of kinds in the producer's code. A footway exists because
   `city.curb_edge` is support, and a place whose curbs are not is refused; a crossing or a door is
@@ -1941,9 +1947,11 @@ catalogs of its own under `assets/catalogs/society/`, each entry with its reason
 `society-activity` v2, the living routine's activities with which of them are free time and a
 visit lasting 15 to 45 minutes; `society-use-class` v3, which states each use class's opening
 hours, the shifts its positions work in turn and, for a home, the floor area one dwelling takes;
-`society-shift` v1, the early, day, late and evening shifts; and `society-policy` v4, which
+`society-shift` v1, the early, day, late and evening shifts; and `society-policy` v5, which
 employs six in ten residents, starts the town's day at 06:00, states how many people a new town
-starts with and how much farther a destination counts for being full.
+starts with, how much farther a destination counts for being full and that a door is stood clear
+of its frontage (`door_stands_clear`, as the city place reads it). A town made under v4
+(`TOWN_ROUTINE_VERSIONS_BEFORE_DOORSTEPS`) keeps its doors on their thresholds.
 
 **Free time and how full a place is.** A person goes out to eat, to shop or to sit down because
 the need presses: with no need at its threshold, a town's person is offered free time alone, the

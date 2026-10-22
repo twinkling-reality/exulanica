@@ -91,7 +91,7 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the world kinds library, its drafts and the worlds made of it, and a site world's "
         "drawing, land, graded top and landscape reads",
     ),
-    "exulanica/world/society_catalogs.py": (1_509, "the living society routine model as data"),
+    "exulanica/world/society_catalogs.py": (1_519, "the living society routine model as data"),
 }
 
 #: What writes the generated files below.

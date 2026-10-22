@@ -23,8 +23,12 @@ shape. Everything is integer geometry in the grammar's ``city_local`` frame:
   whose curbs are not support is refused.
 - **Entrances.** A premises unit is an indoor destination reached through the first of its
   entrances that opens onto a footway in the place: a premises-access edge runs from the footway
-  point nearest the threshold to the threshold. A door onto a lot reaches no footway; a unit with
-  no door onto a footway in the place is stated as unsupported and is never given one.
+  point nearest the threshold to the door. Under a routine whose policy stands doors clear
+  (``door_stands_clear``, from the fifth policy) the door is stood at one nav envelope capsule
+  radius before its threshold, along that edge, on the footway surface there, so whoever visits
+  or stands after a visit stands beside the frontage and not half inside it; under an earlier
+  policy, on the threshold. A door onto a lot reaches no footway; a unit with no door onto a
+  footway in the place is stated as unsupported and is never given one.
 - **Furniture.** Street furniture whose furniture class has a use-class entry (a bench) is an
   outdoor destination with one seat per catalogued visitor, side by side along the record's
   direction vector, which is its local ``+x`` and runs along its seat.
@@ -940,6 +944,7 @@ def place_from_city_records(
     if lot_doors:
         unsupported.add(f"entrances onto a lot, not a footway ({lot_doors})")
     doors: dict[str, tuple[str, int]] = {}
+    doors_clear = policy.get("door_stands_clear", 0) == 1
     mis_stepped: set[str] = set()
     access: dict[str, tuple[str, int]] = {}
     unknown_uses: dict[str, int] = {}
@@ -968,13 +973,19 @@ def place_from_city_records(
                     != entrance.step_height_mm
                 ):
                     mis_stepped.add(identity)
-                name = node(
-                    f"entrance:{identity}",
-                    threshold,
-                    kerb.segment.street_identity,
-                    entrance.threshold_z_mm,
-                )
-                joins.append((station(kerb, along), name, "premises_access"))
+                stood, stood_z = threshold, entrance.threshold_z_mm
+                footway = station(kerb, along)
+                toward = _sub(positions[footway], threshold)
+                if doors_clear and toward != (0, 0):
+                    # Never past the footway point the door is reached from.
+                    reach = min(
+                        navigation.capsule_radius_mm, ceil_distance(threshold, positions[footway])
+                    )
+                    stood = _add(threshold, _scaled(toward, reach))
+                    gap, at = kerb.project(stood)
+                    stood_z = kerb.surface_z(at, math.isqrt(gap))
+                name = node(f"entrance:{identity}", stood, kerb.segment.street_identity, stood_z)
+                joins.append((footway, name, "premises_access"))
                 doors[identity] = (name, kerb.segment.segment_ordinal)
             access[premises.identity] = doors[identity]
             break
@@ -1083,6 +1094,12 @@ def place_from_city_records(
         unsupported.add(
             f"walking pieces that pass within a capsule radius of an obstruction ({crowded})"
         )
+    if doors_clear:
+        close = sum(
+            1 for name, _ in doors.values() if obstructions.blocks_standing(nodes[alias[name]])
+        )
+        if close:
+            unsupported.add(f"doors stood within a capsule radius of an obstruction ({close})")
 
     radius = policy["standing_radius_mm"]
     spots: dict[str, dict[str, Any]] = {}

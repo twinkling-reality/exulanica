@@ -99,6 +99,7 @@ __all__ = [
     "SHIFT_CATALOG",
     "STATES_AND_ACTS",
     "TOWN_ROUTINE_VERSIONS",
+    "TOWN_ROUTINE_VERSIONS_BEFORE_DOORSTEPS",
     "TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA",
     "TOWN_ROUTINE_VERSIONS_BEFORE_FREE_TIME",
     "UNRECORDED_ROUTINE_VERSIONS",
@@ -160,17 +161,21 @@ SHIFT_CATALOG: Final = "society-shift"
 #: many people a new town starts with (``society-policy`` v3). From the second activity catalog
 #: and the fourth policy, a person with no need pressing spends free time, drawn by their own
 #: weights, and a destination is chosen by its walking cost grown by how full it is
-#: (:func:`~exulanica.world.society_day.day_options`). A town's receipt pins the versions it was
-#: made under and its input records the versions its living place was built under; its society
-#: reads them from there, so a town made under earlier versions keeps its people and their day.
+#: (:func:`~exulanica.world.society_day.day_options`); from the fifth policy a door stands clear of
+#: its frontage. A town's receipt pins the versions it was made under and its input records the
+#: versions its living place was built under; its society reads them from there, so a town made
+#: under earlier versions keeps its people, their day and where they stand.
 TOWN_ROUTINE_VERSIONS: Final = {
     "society-activity": 2,
     "society-capacity": 1,
     "society-need": 1,
-    "society-policy": 4,
+    "society-policy": 5,
     SHIFT_CATALOG: 1,
     "society-use-class": 3,
 }
+#: The versions a town was made under before doors were stood clear of the frontage, each door on
+#: its threshold. Every town made then pins them and keeps its doors there.
+TOWN_ROUTINE_VERSIONS_BEFORE_DOORSTEPS: Final = {**TOWN_ROUTINE_VERSIONS, "society-policy": 4}
 #: The versions a town was made under before free time and the crowding order: with nothing
 #: pressing, the most urgent of every activity, and a destination emptiest first. Every town made
 #: then pins them, and its people keep that day.
@@ -334,6 +339,10 @@ POLICY_KEYS_BY_VERSION: Final = {
     # The fourth also states how much farther a destination counts for being full
     # (:func:`~exulanica.world.society_day.day_options`).
     4: POLICY_KEYS | {"employment_share_milli", "town_people_default", "crowding_detour_milli"},
+    # The fifth also states whether a door stands clear of its frontage (society_city_place).
+    5: POLICY_KEYS
+    | {"employment_share_milli", "town_people_default", "crowding_detour_milli"}
+    | {"door_stands_clear"},
 }
 
 
@@ -671,7 +680,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             version,
             (("value", integer_field(0, 10**9)), ("reason", text_field)),
         )
-        for version in (1, 2, 3, 4)
+        for version in (1, 2, 3, 4, 5)
     },
     **{
         (PURPOSEFUL_CATALOG, version): CatalogSchema(
@@ -1185,6 +1194,8 @@ def load_routine_model(
         raise CatalogError("the employment share is a positive share of residents, at most 1000")
     if policy.get("town_people_default", 1) < 1:
         raise CatalogError("a new town starts with at least one person")
+    if policy.get("door_stands_clear", 0) not in (0, 1):
+        raise CatalogError("a door stands clear of its frontage (1) or on its threshold (0)")
     if not 0 < policy["occupancy_target_milli"] <= policy["occupancy_maximum_milli"] <= 1000:
         raise CatalogError("occupancy target is positive and at most the maximum, at most 1000")
     if not 0 < policy["walk_speed_minimum_mm_per_tick"] <= policy["walk_speed_maximum_mm_per_tick"]:
