@@ -165,6 +165,12 @@ def _held_status(folder: Path) -> dict[str, Any] | None:
     return None
 
 
+def _named(unexpected: str | None) -> dict[str, str]:
+    """An event's ``exception``: the class of what a step raised unexpectedly, never its message,
+    which may hold a path or a credential; nothing where the step refused for a reason it names."""
+    return {} if unexpected is None else {"exception": unexpected}
+
+
 def _stamp(seconds: float) -> str:
     """An instant in the project files' one spelling."""
     return datetime.fromtimestamp(seconds, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -490,6 +496,7 @@ class Follower:
                 continue
             request_id, world_id = request["request_id"], request["world_id"]
             now = datetime.fromtimestamp(self.clock(), UTC)
+            unexpected: str | None = None
             if any(
                 (item.settings["world_id"], item.settings["version_id"])
                 == (world_id, request["version_id"])
@@ -535,14 +542,14 @@ class Follower:
                 code = "nothing_to_keep"
             except (ProjectError, OSError):
                 code = "world_unreadable"
-            except Exception:
+            except Exception as exc:
                 # Its class names it in the follower's own events; the request says only "failed".
-                code = "failed"
+                code, unexpected = "failed", type(exc).__name__
             else:
                 remove_request(self.directory, request_id)
                 return [{"project": name, "state": "started"}]
             refuse_request(self.directory, request_id, code, now)
-            return [{"project": None, "state": "refused", "error": code}]
+            return [{"project": None, "state": "refused", "error": code, **_named(unexpected)}]
         return []
 
     def take_publication(self) -> list[dict[str, Any]]:
@@ -559,6 +566,7 @@ class Follower:
                 continue
             request_id = request["request_id"]
             now = datetime.fromtimestamp(self.clock(), UTC)
+            unexpected: str | None = None
             if request["started_at"] is not None:
                 refuse_request(self.directory, request_id, "failed", now)
                 return [{"project": None, "state": "refused", "error": "failed"}]
@@ -598,15 +606,15 @@ class Follower:
                 publication.create(item.project, item.settings, started, self.access)
             except publication.Refused as refused:
                 code = refused.code
-            except Exception:
+            except Exception as exc:
                 # Its class names it in the follower's own events; the request says "failed".
-                code = "failed"
+                code, unexpected = "failed", type(exc).__name__
             else:
                 told = [{"project": item.name, "state": "linked"}, *self._publish(item)]
                 remove_request(self.directory, request_id)
                 return told
             refuse_request(self.directory, request_id, code, now)
-            return [{"project": item.name, "state": "refused", "error": code}]
+            return [{"project": item.name, "state": "refused", "error": code, **_named(unexpected)}]
         return []
 
     def scan(self) -> list[dict[str, Any]]:

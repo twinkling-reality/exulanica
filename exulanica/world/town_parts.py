@@ -58,13 +58,16 @@ __all__ = [
 @dataclass(frozen=True, slots=True)
 class TownBuilding:
     """A building of a made town as it stands: its identity, what it is and its words, its
-    storeys, and the premises it holds."""
+    storeys, the premises it holds, and where it stands: the centre of its ground tier's footprint,
+    east and north in the town's frame, as a site's part states its centre. It is never moved or
+    turned, so its document states no turn (``quarter_turns`` 0), as a site part made so would."""
 
     identity: str
     typology: str
     label: str
     storeys: int
     premises: tuple[str, ...]
+    centre_mm: tuple[int, int]
 
     def document(self) -> dict[str, Any]:
         return {
@@ -74,11 +77,22 @@ class TownBuilding:
             "label": self.label,
             "storeys": self.storeys,
             "premises": list(self.premises),
+            "centre_mm": list(self.centre_mm),
+            "quarter_turns": 0,
         }
 
 
 def _label(typology: str) -> str:
     return str(entry("typology", typology).get("label") or typology.replace("_", " "))
+
+
+def _centre(record: MassingRecord) -> tuple[int, int]:
+    """The centre of a building's ground tier's footprint box, east and north (the city frame is
+    x east, y north)."""
+    ground = min(record.tiers, key=lambda tier: tier.first_storey)
+    xs = [x for x, _ in ground.ring_mm]
+    ys = [y for _, y in ground.ring_mm]
+    return (min(xs) + max(xs)) // 2, (min(ys) + max(ys)) // 2
 
 
 def town_buildings(records: Sequence[object]) -> tuple[TownBuilding, ...]:
@@ -94,6 +108,7 @@ def town_buildings(records: Sequence[object]) -> tuple[TownBuilding, ...]:
             label=_label(record.typology),
             storeys=record.storeys,
             premises=tuple(sorted(premises.get(record.identity, ()))),
+            centre_mm=_centre(record),
         )
         for record in records
         if isinstance(record, MassingRecord)

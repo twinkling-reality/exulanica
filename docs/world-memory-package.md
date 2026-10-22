@@ -742,7 +742,8 @@ revision is kept, so a change is still seen and no word is. A world made from a 
 garden or a farm made from a sentence) also has its made parts kept in an optional `parts` list:
 each building, garden fixture and area a person may change, as the version has it (`part_id`,
 `kind`, `centre_mm` east and north, `quarter_turns` from how it was made, a building's
-`storeys`, `removed`), and its `label` only with readable text, since a kind made from a person's words is worded from them. A
+`storeys`, `removed`), and its `label` only with readable text, since a kind made from a person's words is worded from them; a
+made town's buildings are kept the same way, each at its lot and never turned. A
 placed thing of a kind its workspace made (a creature drafted from a person's words) keeps its
 kind's `label` the same way, only with readable text, taken from the kind bytes the project keeps
 for it; a thing of a shipped kind carries none. A town's own people, who are no placed things,

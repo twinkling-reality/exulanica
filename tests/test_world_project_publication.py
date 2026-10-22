@@ -207,6 +207,19 @@ def test_files_whose_rights_cannot_be_read_refuse_the_review(kept, monkeypatch):
     assert refused(projects) == "rights_refused" and person.rest_calls == []
 
 
+def test_a_review_that_raises_names_its_class_in_the_follower_s_event_alone(kept, monkeypatch):
+    projects, _folder, person, follower = kept
+
+    def broken(*_args):
+        raise RuntimeError("an answer nobody planned for, with a path /tmp/secret in it")
+
+    monkeypatch.setattr(publication, "review", broken)
+    ask(projects)
+    told = {"project": "demo", "state": "refused", "error": "failed", "exception": "RuntimeError"}
+    assert told_about(follower) == [told]
+    assert refused(projects) == "failed" and person.rest_calls == []
+
+
 def test_a_creation_a_stopped_follower_began_is_never_tried_again(kept):
     projects, folder, person, follower = kept
     request = ask(projects)

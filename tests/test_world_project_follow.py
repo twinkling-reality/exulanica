@@ -854,6 +854,7 @@ def test_a_project_that_cannot_start_leaves_its_request_refused_and_no_folder(wo
         assert refused["refused"]["code"] == "world_unreadable"
         # Asked again once the world reads, but with nothing a project can keep.
         world.broken = False
+        things_before = world.routes[f"/world/versions/{VERSION}"]["things"]
         world.routes[f"/world/versions/{VERSION}"]["things"] = []
         request_project(
             projects,
@@ -865,6 +866,24 @@ def test_a_project_that_cannot_start_leaves_its_request_refused_and_no_folder(wo
         )
         assert {"project": None, "state": "refused", "error": "nothing_to_keep"} in follower.scan()
         assert [r["refused"]["code"] for r in read_requests(projects)] == ["nothing_to_keep"]
+        # A capture that raises what no rule names is "failed" on the request, and the follower's
+        # own event names the exception's class (never its message), so its log tells the cause.
+        world.routes[f"/world/versions/{VERSION}"]["things"] = things_before
+        world.routes[f"/world/versions/{VERSION}/parts"] = {
+            "parts": [{"part_id": "part-1", "kind": "building"}],
+            "changes": [],
+        }
+        request_project(
+            projects,
+            workspace_id=WORKSPACE,
+            world_id=WORLD,
+            version_id=VERSION,
+            readable=False,
+            now=when,
+        )
+        told = {"project": None, "state": "refused", "error": "failed", "exception": "KeyError"}
+        assert told in follower.scan()
+        assert [r["refused"]["code"] for r in read_requests(projects)] == ["failed"]
         assert not any(path.name.startswith("world-") for path in projects.iterdir())
         assert follower.followed() == []
     finally:

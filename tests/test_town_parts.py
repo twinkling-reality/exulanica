@@ -212,6 +212,18 @@ def test_the_buildings_name_their_premises_and_a_removal_takes_them(town):
     assert premises_taken(made, unchanged, building.identity) == ()
 
 
+def test_a_building_states_where_it_stands_and_no_turn(town):
+    # Its centre is its ground tier's footprint box's, east and north as the city frame has them,
+    # so a project keeps a town's buildings as it keeps a site's parts; it is never turned.
+    made = records(town.receipt)
+    for building in town_buildings(made):
+        ground = min(_buildings(made)[building.identity].tiers, key=lambda tier: tier.first_storey)
+        xs, ys = [x for x, _ in ground.ring_mm], [y for _, y in ground.ring_mm]
+        assert building.centre_mm == ((min(xs) + max(xs)) // 2, (min(ys) + max(ys)) // 2)
+        document = building.document()
+        assert document["centre_mm"] == list(building.centre_mm) and document["quarter_turns"] == 0
+
+
 def test_people_are_found_by_the_premises_either_engine_names():
     state = {
         "people": {

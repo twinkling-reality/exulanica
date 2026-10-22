@@ -1285,7 +1285,9 @@ the town's tiles as a version's changes leave them are its workspace's own
 serve a made town's buildings (the city grammar's `city.massing` records, by identity). The grammar
 makes the town again from its receipt with the version's changes and this one, so a neighbour's
 party wall follows by the grammar's own rule; the parts read lists the buildings as the changes
-leave them (`exulanica.town-parts/v1`: identity, typology and its words, storeys, premises). A storey
+leave them (`exulanica.town-parts/v1`: identity, typology and its words, storeys, premises, and
+`centre_mm`, the centre of its ground floor's footprint east and north, with `quarter_turns` 0, as a
+site's parts read states a part that was never turned). A storey
 count outside the lot's range (its typology's storeys within the district's band) is refused in words
 (`part_storeys_refused`: "Not taller: a shophouse here has at most 4 storeys."), and a move is refused
 (`part_not_changeable`): a town's building stands on its lot. A removal is refused while anybody of

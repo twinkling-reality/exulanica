@@ -10,6 +10,7 @@ from exulanica.canonical import canonical_json
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.objects import ObjectOrigin, Transform
 from exulanica.world.placed_things import PlacedThing, named_kind, placed_thing_document
+from exulanica.world.town_parts import TownBuilding
 from exulanica.world_package.projects.capture import (
     WorldReader,
     capture,
@@ -844,6 +845,63 @@ def test_a_made_world_s_parts_are_kept_as_the_version_has_them(world):
     bare = captured(world, readable=False)
     assert all("label" not in part for part in bare["parts"])
     assert "Tea house" not in canonical_json(bare).decode()
+
+
+def test_a_made_town_s_buildings_are_kept_as_its_parts_read_lists_them(world):
+    # A made town's parts read (exulanica.town-parts/v1) lists each building by the town's own
+    # document: on its lot, never moved or turned. One removed is left out, named by its change.
+    standing = [
+        TownBuilding(
+            "city-building-0001",
+            "shophouse",
+            "Shophouse",
+            3,
+            ("city-premises-0001",),
+            (12_000, -8_000),
+        ),
+        TownBuilding("city-building-0002", "rowhouse", "Rowhouse", 2, (), (30_500, 4_250)),
+    ]
+    world.routes[PARTS] = {
+        "profile": "exulanica.town-parts/v1",
+        "world_id": WORLD,
+        "version_id": VERSION,
+        "parts": [building.document() for building in standing],
+        "changes": [
+            {
+                "identity": "city-building-0003",
+                "removed": True,
+                "centre_mm": None,
+                "quarter_turns": 0,
+            }
+        ],
+    }
+    assert captured(world)["parts"] == [
+        {
+            "part_id": "city-building-0001",
+            "kind": "building",
+            "centre_mm": [12_000, -8_000],
+            "quarter_turns": 0,
+            "removed": False,
+            "label": "Shophouse",
+            "storeys": 3,
+        },
+        {
+            "part_id": "city-building-0002",
+            "kind": "building",
+            "centre_mm": [30_500, 4_250],
+            "quarter_turns": 0,
+            "removed": False,
+            "label": "Rowhouse",
+            "storeys": 2,
+        },
+        {
+            "part_id": "city-building-0003",
+            "kind": None,
+            "centre_mm": None,
+            "quarter_turns": 0,
+            "removed": True,
+        },
+    ]
 
 
 def test_a_world_not_made_from_a_kind_keeps_no_parts_and_one_still_drawing_is_tried_again(world):
