@@ -516,7 +516,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
       return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : whoOf(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
-        model: view.model, limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && (subjectReads.models?.models.length ?? 0) > 1 });
+        models: askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model?.name), limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && (subjectReads.models?.models.length ?? 0) > 1 });
     }
     const said = saidLines.of(row.scene.id, now);
     return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,

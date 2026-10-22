@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, modelsDecide, priceWords, quoted, readingRecord, routineRow, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, modelsDecide, modelsNamed, priceWords, quoted, readingRecord, routineRow, saidUnder, stopsAfter } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -131,11 +131,11 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
  * The Run question (r08, R-RUN-BUILD-SHEET section 1): R turns the same group, in place, into the question. Top to
  * bottom: the name, "Run for 10 minutes", whose models the run asks (J28: `askers`, called()'s with the chosen
  * character first; `others` whether anybody else lives here), the rows "[Enter] Run" and, where another model is
- * offered and this page may choose one, "[M] Choose another model", then the model and the cap as small print with
- * when it stops under it. A refusal (`refusal`, the server's code) takes the small print's place in its own
+ * offered and this page may choose one, "[M] Choose another model", then the models it asks (`models`, their names with
+ * the chosen character's first) and the cap as small print with when it stops under it. A refusal (`refusal`, the server's code) takes the small print's place in its own
  * sentence and dims Run, which still answers its key; `busy` while the start is asked, when Run does nothing.
  */
-export function questionGroup({ who, askers = [who], others = true, model, limits, refusal = null, busy = false, anotherModel = false }) {
+export function questionGroup({ who, askers = [who], others = true, models = [], limits, refusal = null, busy = false, anotherModel = false }) {
   const rows = [{ action: 'run', key: 'Enter', word: RUN_WORDS.run, shortcut: 'Enter', disabled: busy }];
   if (anotherModel) rows.push({ action: 'model', key: 'M', word: ANOTHER_MODEL, shortcut: 'M' });
   return Object.freeze({
@@ -145,7 +145,7 @@ export function questionGroup({ who, askers = [who], others = true, model, limit
     note: modelsDecide(askers.length ? askers : [who], { others }),
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     list: null,
-    print: refusal ? runRefusalWords(refusal) : `${plain(model) ?? ''} \u00b7 ${atMost(limits)}`.replace(/^ \u00b7 /u, ''),
+    print: refusal ? runRefusalWords(refusal) : `${modelsNamed(models) ?? ''} \u00b7 ${atMost(limits)}`.replace(/^ \u00b7 /u, ''),
     after: refusal ? null : stopsAfter(Math.round(limits.wallSeconds / 60)),
     refused: Boolean(refusal),
   });

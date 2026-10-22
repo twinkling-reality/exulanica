@@ -144,7 +144,7 @@ assert.equal(modelsDecide([]), null);
 assert.equal(stopsAfter(10), 'It stops after 10 minutes, or when you stop it.');
 assert.equal(stopsAfter(1), 'It stops after 1 minute, or when you stop it.');
 const limits = { wallSeconds: 600, usd: '0.05000000' };
-const asked = questionGroup({ who: teo, askers: [teo], model: 'Nemotron 3 Nano 30B', limits, anotherModel: true });
+const asked = questionGroup({ who: teo, askers: [teo], models: ['Nemotron 3 Nano 30B'], limits, anotherModel: true });
 assert.equal(asked.name, 'Teo');
 assert.equal(asked.doing, 'Run for 10 minutes');
 assert.equal(asked.said, null);
@@ -154,17 +154,22 @@ assert.deepEqual(asked.rows.map(row => row.action), ['run', 'model']);
 assert.equal(asked.print, 'Nemotron 3 Nano 30B · at most $0.05');
 assert.equal(asked.after, 'It stops after 10 minutes, or when you stop it.');
 assert.equal(asked.refused, false);
-assert.deepEqual(keys(questionGroup({ who: teo, model: 'M', limits })), ['Enter Run'], 'no other model offered, or this page cannot choose: no M');
-assert.equal(questionGroup({ who: teo, model: 'M', limits, busy: true }).rows[0].disabled, true);
+assert.deepEqual(keys(questionGroup({ who: teo, models: ['M'], limits })), ['Enter Run'], 'no other model offered, or this page cannot choose: no M');
+assert.equal(questionGroup({ who: teo, models: ['M'], limits, busy: true }).rows[0].disabled, true);
 // A refusal takes the small print's place in its own sentence; Run stays (dimmed), its key still answers.
-const refusedRun = questionGroup({ who: teo, model: 'M', limits, refusal: 'society_not_paused' });
+const refusedRun = questionGroup({ who: teo, models: ['M'], limits, refusal: 'society_not_paused' });
 assert.equal(refusedRun.print, 'The world is playing. Pause it first, then run.');
 assert.equal(refusedRun.after, null);
 assert.equal(refusedRun.refused, true);
 assert.equal(refusedRun.rows[0].disabled, false);
-assert.equal(questionGroup({ who: teo, model: 'M', limits, refusal: 'unheard_of' }).print, 'The run did not start. Nothing was spent.');
-assert.equal(questionGroup({ who: teo, askers: [], model: 'M', limits }).note, "Teo's model decides. Everyone else carries on as before.", 'the chosen one at least');
-assert.equal(questionGroup({ who: teo, model: 'M', limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run for 5 minutes');
+assert.equal(questionGroup({ who: teo, models: ['M'], limits, refusal: 'unheard_of' }).print, 'The run did not start. Nothing was spent.');
+assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, "Teo's model decides. Everyone else carries on as before.", 'the chosen one at least');
+assert.equal(questionGroup({ who: teo, models: ['M'], limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run for 5 minutes');
+// The models a run asks, as they are (DESIGN's aha 20): three people, three models, named by the chosen one's.
+const three = questionGroup({ who: teo, askers: [teo, ari, resident], models: ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B'], limits });
+assert.equal(three.print, 'Nemotron 3 Nano 30B and 2 other models · at most $0.05');
+assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], limits }).print, 'Nemotron 3 Nano 30B and Qwen3 235B Instruct · at most $0.05');
+assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Nemotron 3 Nano 30B', 'Nemotron 3 Nano 30B'], limits }).print, 'Nemotron 3 Nano 30B · at most $0.05', 'one model two people use is named once');
 
 // Choose a model (r07): the served models in the server's order, Routine last, Current on theirs, the chosen row marked.
 const served = [

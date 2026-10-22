@@ -4,7 +4,7 @@
 // model chip. character-group.mjs decides what it says and where it stands; character-presence.ts shows it
 // and places it each frame, so it follows the person and flips side near the screen's edge.
 import './character-group.css';
-import { glyphRows, shade } from './world-ui.ts';
+import { chip, glyphRows, setChipLive, shade } from './world-ui.ts';
 import { groupPlace } from './character-group.mjs';
 import { CHARACTER_WORDS } from './character-words.mjs';
 
@@ -164,8 +164,11 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
   return [text('p', 'cg-list-head', list.head), rows, keys];
 }
 
-/** What the label over a looked-at character says (r04): their name (or kind) and what they are doing. */
-export interface LookWords { readonly name: string; readonly doing: string | null }
+/**
+ * What the label over a looked-at character says (r04): their name (or kind), what they are doing and, where a model
+ * decides for them, its name (`model`), with the live dot while a run asks it (`live`).
+ */
+export interface LookWords { readonly name: string; readonly doing: string | null; readonly model?: string | null; readonly live?: boolean }
 
 export interface LookLabel {
   readonly root: HTMLElement;
@@ -186,16 +189,19 @@ const LOOK_LAYOUT = Object.freeze({ over: 16, inset: 32 });
 /**
  * The label over a looked-at character (r04, R-RUN-BUILD-SHEET section 4): the name label grows into one soft label,
  * centred 16 px over the head, on the speech label's shade (.wu-speech, world-ui-talk.css): the name, what they are doing,
- * and "[E] Inspect" where E chooses them. No model chip: who decides is the character screen's small print (J30).
+ * the model's chip where a model decides for them (DESIGN's aha 19), so the world says who has one before a run and during
+ * it, and "[E] Inspect" where E chooses them.
  */
 export function lookLabel({ scale, onInspect }: { readonly scale: () => number; readonly onInspect: () => void }): LookLabel {
   const root = shade();
   root.classList.add('wu-speech', 'cg-look');
   root.hidden = true;
   const name = text('p', 'cg-look-name', ''), doing = text('p', 'cg-look-doing', '');
+  const model = chip('');
+  model.classList.add('cg-look-chip');
   const rows = glyphRows([{ key: 'E', word: CHARACTER_WORDS.inspect, shortcut: 'E', onPress: onInspect }], LOOK_ROW_SIZES);
   rows.classList.add('cg-look-rows');
-  root.append(name, doing, rows);
+  root.append(name, doing, model, rows);
   let shown = '', placed = '';
   return {
     root,
@@ -208,6 +214,9 @@ export function lookLabel({ scale, onInspect }: { readonly scale: () => number; 
       name.textContent = words.name;
       doing.textContent = words.doing ?? '';
       doing.hidden = !words.doing;
+      model.querySelector('.wu-chip-words')!.textContent = words.model ?? '';
+      model.hidden = !words.model;
+      setChipLive(model, Boolean(words.model && words.live));
       rows.hidden = !inspectable;
       rows.querySelector('button')?.setAttribute('aria-label', `${CHARACTER_WORDS.inspect} ${words.name}`);
     },

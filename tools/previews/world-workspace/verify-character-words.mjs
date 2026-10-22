@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
+import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -96,4 +96,10 @@ assert.equal(chosenLine(teo, null), "Teo's routine.");
 assert.equal(rowSub({ decider: 'person' }), 'A person playing');
 assert.equal(rowSub({ decider: 'external' }), 'An outside program');
 assert.equal(rowSub({ decider: 'model' }), 'Routine', 'a model with no name read is no decider word');
+// The models a run asks (DESIGN's aha 20): one by its name, two joined with "and", more the first and how many others.
+assert.equal(modelsNamed(['Nemotron 3 Nano 30B']), 'Nemotron 3 Nano 30B');
+assert.equal(modelsNamed(['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct']), 'Nemotron 3 Nano 30B and Qwen3 235B Instruct');
+assert.equal(modelsNamed(['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B']), 'Nemotron 3 Nano 30B and 2 other models');
+assert.equal(modelsNamed(['A', 'B', 'A', ' B ', null, '']), 'A and B', 'each model once, however many people it decides for');
+assert.equal(modelsNamed([]), null);
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

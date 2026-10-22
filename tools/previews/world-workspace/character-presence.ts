@@ -87,7 +87,7 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
     tagBox: () => looked.box(),
     look(words, head, inspectable = false) {
       if (!words || !head || covered) { looked.set(null, false); return; }
-      looked.set({ name: words.name, doing: words.doing ?? null }, inspectable);
+      looked.set({ name: words.name, doing: words.doing ?? null, model: words.model ?? null, live: words.live === true }, inspectable);
       looked.place(head);
     },
     choose(content) {

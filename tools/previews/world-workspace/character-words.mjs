@@ -265,6 +265,16 @@ export function modelsDecide(whos, { others = true } = {}) {
   return others ? `${owners} Everyone else carries on as before.` : owners;
 }
 
+/**
+ * The models a run asks (r08, DESIGN's aha 20), the chosen character's first, each named once: one by its name, two
+ * joined with "and", more than two the first "and 2 other models"; null when none has a name.
+ */
+export function modelsNamed(names) {
+  const named = [...new Set((names ?? []).map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean))];
+  if (named.length <= 2) return named.join(' and ') || null;
+  return `${named[0]} and ${named.length - 1} other models`;
+}
+
 /** Under the Run question's model and cap (r08): when the run stops, naming no control. */
 export const stopsAfter = minutes => `It stops after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}, or when you stop it.`;
 
