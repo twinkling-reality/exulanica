@@ -78,7 +78,7 @@ vi.mock('../src/door-bridges-api.js', () => ({
 }));
 
 const WORLD = 'world:authored:saved';
-const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v8.json`, 'utf8')) as
+const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v9.json`, 'utf8')) as
   { entries: { kind: string; code: string; words: string }[] };
 /** Why an event happened, as the words catalog says it. */
 const because = (code: string): string => catalog.entries.find((entry) => entry.kind === 'event_reason' && entry.code === code)!.words;
@@ -361,7 +361,7 @@ describe('a visitor of a kind its workspace made', () => {
 
 describe('why a visitor its own program decides for did something', () => {
   it('credits its own program, never a model, where a world-run being and a placed one credit their model', async () => {
-    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v8.json`, 'utf8')) as
+    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v9.json`, 'utf8')) as
       { entries: { kind: string; code: string; words: string }[] };
     const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
     const chose = { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'chosen_by_their_model' };
@@ -394,7 +394,7 @@ describe('why a visitor its own program decides for did something', () => {
 
 describe('why one of the world\'s own people a grant hands to an outside program did something', () => {
   it('credits that program, never a model, as the models read lists them', async () => {
-    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v8.json`, 'utf8')) as
+    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v9.json`, 'utf8')) as
       { entries: { kind: string; code: string; words: string }[] };
     const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
     const because = (reason: string) => words('phrase', 'because').replace('{reason}', reason);

@@ -1,7 +1,7 @@
 """Who a simulated person is and what they are doing, in the words the inspector uses.
 
 The words are one data file,
-``assets/catalogs/society-words/society-inhabitant-words.v8.json``, which the browser's inspector
+``assets/catalogs/society-words/society-inhabitant-words.v9.json``, which the browser's inspector
 reads too (``web/packages/app/src/society-inhabitant-words.ts``). The choice of sentence for a
 state is code on both sides, and both are held to one set of cases,
 ``tests/fixtures/society-inhabitant-words/cases.json``, which ``tests/test_inhabitant_words.py`` and
@@ -45,7 +45,7 @@ CATALOG_PATH: Final = (
     / "assets"
     / "catalogs"
     / "society-words"
-    / "society-inhabitant-words.v8.json"
+    / "society-inhabitant-words.v9.json"
 )
 
 ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
@@ -400,10 +400,13 @@ def inhabitant_words(
         chosen = "standing_aside"
     else:
         chosen = "deciding"
-    doing = doing_words[chosen].format(
-        place=where(action.get("target_id")), partner=met, still=still
-    )
-    done = words.words("done", chosen).format(place=where(action.get("target_id")), partner=met)
+    # A place its town names nothing (the catalog's own place_listed words) is said by no place at
+    # all, where the catalog gives the code such a form: "Resting", never "Resting at a place".
+    spot = where(action.get("target_id"))
+    unnamed = f"{chosen}@unnamed_place"
+    form = unnamed if spot == phrase["place_listed"] and unnamed in doing_words else chosen
+    doing = doing_words[form].format(place=spot, partner=met, still=still)
+    done = words.words("done", form).format(place=spot, partner=met)
     # The goal says why a person set out. Once they are blocked, the action says why; so it does
     # for standing and talking when it records news since they set out (the other person is still
     # on the way, has gone, or the time is up), but not the reason that only restates the activity

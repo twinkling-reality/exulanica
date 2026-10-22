@@ -1,6 +1,6 @@
 /**
  * Who a simulated person is and what they are doing, in words, read from the one data file the
- * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v8.json`.
+ * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v9.json`.
  *
  * The choice of sentence for a state is code here and in `exulanica/selection/inhabitant_words.py`,
  * and both run the same cases (`tests/fixtures/society-inhabitant-words/cases.json`), so the
@@ -8,7 +8,7 @@
  * sentence here says what anybody talked about.
  */
 
-import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v8.json?raw';
+import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v9.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 import { societyEngine } from './society-engines.js';
@@ -261,8 +261,12 @@ export function inhabitantWordsFrom(
       ? under.finishedDoing
       : action.reason === 'waiting_for_partner' ? 'waiting_to_talk' : under.underWayDoing;
   } else chosen = completed ? 'standing_aside' : 'deciding';
-  const doing = fill(words('doing', chosen), { place: where(action.target_id), partner: met, still });
-  const done = fill(words('done', chosen), { place: where(action.target_id), partner: met });
+  // A place its town names nothing (the catalog's own place_listed words) is said by no place at all, where the
+  // catalog gives the code such a form: "Resting", never "Resting at a place".
+  const spot = where(action.target_id), unnamed = `${chosen}@unnamed_place`;
+  const form = spot === words('phrase', 'place_listed') && unnamed in TABLES.doing ? unnamed : chosen;
+  const doing = fill(words('doing', form), { place: spot, partner: met, still });
+  const done = fill(words('done', form), { place: spot, partner: met });
   // The goal says why a person set out. Once they are blocked, the action says why; so it does for
   // standing and talking when it records news since they set out (the other person is still on the
   // way, has gone, or the time is up), but not the reason that only restates the activity under

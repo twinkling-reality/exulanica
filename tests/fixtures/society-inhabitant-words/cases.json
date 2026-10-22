@@ -1,8 +1,9 @@
 {
-  "about": "Cases both readers of society-inhabitant-words.v8.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
+  "about": "Cases both readers of society-inhabitant-words.v9.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
   "places": {
     "target:bench": "Bench 2",
-    "target:pillar": "Pillar"
+    "target:pillar": "Pillar",
+    "target:unnamed": "a place"
   },
   "people": {
     "p-b": "Bela Ash 2"
@@ -347,6 +348,58 @@
         "doing": "Resting at Bench 2, one more minute.",
         "why": "Because they chose to sit a while.",
         "done": "Rested at Bench 2"
+      }
+    },
+    {
+      "case": "walking to rest at a place its town names nothing",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": "target:unnamed",
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "rest",
+          "reason": "restore_need",
+          "target_id": "target:unnamed"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to rest.",
+        "why": "Because they need a rest, and it is the nearest place to rest they have not just used.",
+        "done": "Went to rest"
+      }
+    },
+    {
+      "case": "resting at a place its town names nothing",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "rest",
+          "status": "active",
+          "target_id": "target:unnamed",
+          "remaining_ticks": 1,
+          "reason": "needs_a_rest"
+        },
+        "goal": {
+          "kind": "rest",
+          "reason": "sitting_a_while",
+          "target_id": "target:unnamed"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "Walker invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Resting, one more minute.",
+        "why": "Because they chose to sit a while.",
+        "done": "Rested"
       }
     },
     {
