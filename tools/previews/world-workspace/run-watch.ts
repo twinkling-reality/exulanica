@@ -31,6 +31,8 @@ export interface RunWatch {
   limits(models: SocietyModels | null): ReturnType<typeof defaultRunLimits>;
   /** Reads the running state now (after a start, a stop or a page opening). */
   refresh(): Promise<void>;
+  /** Reads the running state now and answers the limits Run would open with under it, for a page that shows them. */
+  refreshed(models: SocietyModels | null): Promise<ReturnType<typeof defaultRunLimits>>;
   /**
    * Opens a run for `subjectId`'s world with the limits shown; answers null when it opened, or the
    * refusal code. The same request id is reused until a start succeeds.
@@ -62,6 +64,7 @@ export function mountRunWatch({ pill, askers, entry, credentials, isCurrent, rea
       return defaultRunLimits(control?.hostPlayback?.intervalMs ?? control?.tickIntervalMs ?? 60_000, models?.choices.filter(choice => choice.model).length ?? 0);
     },
     async refresh() { await read(); },
+    async refreshed(models) { await read(); return watch.limits(models); },
     async start({ subjectId, expectedModel, shown, modelsClient, refresh }) {
       if (readOnly) return 'forbidden';
       requestId ||= crypto.randomUUID();

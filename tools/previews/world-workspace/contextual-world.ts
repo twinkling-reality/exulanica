@@ -1020,7 +1020,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     drawPage();
     void readDid();
     if (placedId) void readPersonality(pageView);
-    void runWatch.refresh();
+    void runWatch.refreshed(subjectReads.models).then((shown) => { if (pageView?.row === row && !pageView.run.busy) { pageView.run.shown = shown; drawPage(); } });
   }
   function closePage() {
     if (!pageView) return;

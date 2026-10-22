@@ -46,6 +46,25 @@ describe('the running state a run asks under', () => {
     watch.dispose();
   });
 
+  it('gives a page opening the limits its first press opens under', async () => {
+    const { mountRunWatch } = await runWatch();
+    const { defaultRunLimits } = await runWords();
+    server.control = null;
+    const watch = mountRunWatch({ pill: { run: vi.fn(), runEnded: vi.fn() }, askers: () => [], entry: { worldId: 'w1', authoredVersionId: 'v1' },
+      credentials: {}, isCurrent: () => true, readOnly: false, onChange: () => {} });
+    await watch.refresh();
+    // Held since the world opened, before people came in: the fallback interval's limits.
+    expect(watch.limits(MODELS)).toEqual(defaultRunLimits(60_000, 1));
+    server.control = { versionId: 'v1', hostPlayback: { intervalMs: 8000 }, tickIntervalMs: 8000 };
+    // A person's page opens: it shows the limits read as it opens, and the first press opens under them.
+    const shown = await watch.refreshed(MODELS);
+    expect(shown).toEqual(defaultRunLimits(8000, 1));
+    const starts = server.starts.length;
+    expect(await watch.start({ subjectId: 'teo', expectedModel: MODELS.choices[0]!.model, shown, modelsClient: {}, refresh: async () => ({}) })).toBeNull();
+    expect(server.starts).toHaveLength(starts + 1);
+    watch.dispose();
+  });
+
   it("gives the question the world's limits once it reads the running state again", async () => {
     const { mountRunWatch } = await runWatch();
     const { defaultRunLimits } = await runWords();
