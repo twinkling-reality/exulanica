@@ -8,6 +8,16 @@ import { plural } from './history-words.mjs';
 import { heardRow, saidRow } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
+/**
+ * The minute of the day a society's state starts at, by which a day's rows say their time of day: a living state and a
+ * society of things whose read serves its clock beside the state (society-api.ts folds it in) state it themselves, a
+ * planner's state keeps it in its own clock; null where the society keeps no clock, and the rows say minutes.
+ */
+export function dayStartMinute(state) {
+  const start = state?.start_minute_of_day ?? state?.clock?.start_minute_of_day;
+  return Number.isSafeInteger(start) ? start : null;
+}
+
 const plain = value => typeof value === 'string' && value.trim() ? value.trim() : null;
 
 /**

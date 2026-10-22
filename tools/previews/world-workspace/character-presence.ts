@@ -5,6 +5,7 @@
 // world (atlas-react ground-ring.ts), so walls cover it as they cover the feet.
 import { chip, keyWord, promptColumn, promptRow, rule, scaleOf, sideCard, cardWords, orb, type NameTagWords, type SubjectBounds } from './world-ui.ts';
 import { characterGroup, lookLabel, type GroupContent } from './character-group.ts';
+import { dayStartMinute } from './character-view.mjs';
 import type { SocietySnapshot } from '/src/society-api.ts';
 import { DEFAULT_SOCIETY_ENGINE, societyEngine } from '/src/society-engines.ts';
 import { inhabitantWords } from '/src/ui/world-inhabitants.ts';
@@ -176,9 +177,7 @@ export function characterFacts(snapshot: SocietySnapshot | null, subjectId: stri
       ({ doing, done } = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson, { still: false }));
     }
   } catch { doing = null; done = null; }
-  const state = snapshot.state as unknown as { readonly start_minute_of_day?: unknown; readonly clock?: { readonly start_minute_of_day?: unknown } | null };
-  const start = living ? state.start_minute_of_day ?? state.clock?.start_minute_of_day : state.clock?.start_minute_of_day;
-  return { person, kind: role, doing, done, living, startMinute: Number.isSafeInteger(start) ? start as number : null };
+  return { person, kind: role, doing, done, living, startMinute: dayStartMinute(snapshot.state) };
 }
 
 export interface CharacterFacts {

@@ -400,6 +400,30 @@ describe("Teo's day keys", () => {
   });
 });
 
+describe("Teo's day keeps the world's clock", () => {
+  type View = {
+    dayStartMinute(state: unknown): number | null;
+    didRows(read: Record<string, unknown>): Array<{ time: string }>;
+  };
+  const view = async (): Promise<View> =>
+    import('../../../../tools/previews/world-workspace/' + 'character-view.mjs') as Promise<View>;
+
+  it('reads the first minute a society of things is served with, so its rows say the time of day', async () => {
+    const { dayStartMinute, didRows } = await view();
+    // As society-api.ts folds the clock the read serves beside the state into a society of things' state.
+    const things = { profile: 'exulanica-society/v7', tick: 42, start_minute_of_day: 360, minute_of_day: 402, day: 0 };
+    expect(dayStartMinute(things)).toBe(360);
+    // A planner's state keeps its clock in its own field; a society with neither has no clock.
+    expect(dayStartMinute({ profile: 'exulanica-society/v2', tick: 42, clock: { start_minute_of_day: 480 } })).toBe(480);
+    expect(dayStartMinute({ profile: 'exulanica-society/v7', tick: 42 })).toBeNull();
+    // A routine's row at minute 42 of a day that starts at 06:00 says 06:42, not "Minute 42".
+    const events = [{ tick: 42, event_kind: 'goal_selected', subject_id: 'teo', document: { reason: 'routine' } }];
+    const read = { events, subjectId: 'teo', wordGoal: () => 'Went to rest', modelName: () => null };
+    expect(didRows({ ...read, startMinute: dayStartMinute(things) }).map((row) => row.time)).toEqual(['06:42']);
+    expect(didRows({ ...read, startMinute: dayStartMinute({ tick: 42 }) }).map((row) => row.time)).toEqual(['Minute 42']);
+  });
+});
+
 describe("Teo's day at 1440 by 900", () => {
   it("takes History's 1440 rules: margins 80, the title 60, pictures 0.86, and keeps the chosen card in view", async () => {
     const { root, page } = await open(1440, 900);
