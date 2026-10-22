@@ -802,9 +802,9 @@ export function drawSiteLand(
     draws += 1;
     triangles += mesh.primitive[0]!.count / 3;
   }
-  // The retaining walls where the land's levels meet: one mesh in one plain material, the surfaces'
-  // rock where they are handed, the engine's rock where they are not. Seen, never walked.
-  const walls = (land.top === null ? land.section.walls : undefined) ?? [];
+  // The retaining walls where the land's levels meet, or a top's: one mesh in one plain material,
+  // the surfaces' rock where they are handed, the engine's rock where they are not. Seen, never walked.
+  const walls = land.section.walls ?? [];
   const rock = surfaces?.bands.find((band) => band.key === 'rock')?.linear;
   const stone = walls.length === 0 ? null
     : plainMaterial('site-land:walls', rock === undefined ? VOLUME_ROCK_RGB : [gamma(rock[0]), gamma(rock[1]), gamma(rock[2])], 0.1);

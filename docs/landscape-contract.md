@@ -457,7 +457,9 @@ contract](world-kinds-contract.md)): version 5's slots, drape and arrival standi
 top, with a `top` section in place of `land`: the graded top's digest, the landscape's digest, the
 placement and the site's corner in the volume's frame, the water on the top, and `rock_cells`, the
 graded lattice's cells (rows from the south, from its south-west corner, as runs `[row, first,
-last]`) whose four corners have rock 1 m under the top. The graded top itself
+last]`) whose four corners have rock 1 m under the top, and, where the top's grading lists them
+(land rules from version 5, so a top under volume rules 4), `walls`, the retaining walls where its
+levels meet, stated and drawn as a site on land's. The graded top itself
 (`exulanica.site-top/v1`) is kept with the drawing and served by its digest
 (`GET /world/versions/{version_id}/land/top`); such a world has no land chunks or backdrop. A part
 change that leaves the graded top off the rock is refused as a grading refusal is

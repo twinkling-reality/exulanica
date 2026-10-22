@@ -121,7 +121,8 @@ export interface SiteLandSection {
  * `land/top`), the landscape and the placement it is a top of, the site's south-west corner in the
  * volume's frame, the water on the top, and the runs of the top's lattice cells with rock under all
  * four corners, which are drawn as land (rows from the south, columns from the west, from the
- * lattice's south-west corner); the volume's own rock draws the rest of the top.
+ * lattice's south-west corner); the volume's own rock draws the rest of the top. Where its grading
+ * lists them, the retaining walls where the top's levels meet, as a land section's.
  */
 export interface SiteTopSection {
   readonly topSha256: string;
@@ -130,6 +131,8 @@ export interface SiteTopSection {
   readonly offsetMm: readonly [east: number, north: number];
   readonly water: readonly LandWater[];
   readonly rockCells: readonly SiteTopRun[];
+  /** Absent where the section states no walls. */
+  readonly walls?: readonly SiteLandWall[];
 }
 
 export type SiteRectMm = readonly [x0: number, y0: number, x1: number, y1: number];
@@ -374,16 +377,18 @@ const PLACEMENT = /^[a-z][a-z0-9_]*$/u;
 
 /**
  * The top section of a site on a placed volume's top: the graded top's and the landscape's digests,
- * the placement, the site's corner in the volume's frame, the water on the top and the runs of
- * cells drawn as land, each `[row, first, last]` in whole cells from the lattice's south-west
- * corner, every field closed.
+ * the placement, the site's corner in the volume's frame, the water on the top, the runs of cells
+ * drawn as land, each `[row, first, last]` in whole cells from the lattice's south-west corner, and
+ * the retaining walls it may list, every field closed.
  */
 export function parseSiteTopSection(value: unknown): SiteTopSection {
-  const row = closed(value, 'top_sha256 landscape_sha256 placement offset_mm water rock_cells', 'top');
+  const walled = object(value, 'top')['walls'] !== undefined;
+  const row = closed(value, `top_sha256 landscape_sha256 placement offset_mm water rock_cells${walled ? ' walls' : ''}`, 'top');
   const placement = text(row['placement'], 'top placement');
   if (!PLACEMENT.test(placement)) fail("The site drawing's top placement is not a placement's key.");
-  const water = row['water'], cells = row['rock_cells'];
+  const water = row['water'], cells = row['rock_cells'], walls = row['walls'];
   if (!Array.isArray(water) || !Array.isArray(cells)) fail("The site drawing's top states no water list or no list of cells.");
+  if (walled && !Array.isArray(walls)) fail("The site drawing's top walls are not a list.");
   return Object.freeze({
     topSha256: digest(row['top_sha256'], 'top digest'),
     landscapeSha256: digest(row['landscape_sha256'], 'top landscape digest'),
@@ -396,6 +401,7 @@ export function parseSiteTopSection(value: unknown): SiteTopSection {
       if (run < 0 || first < 0 || first > last) fail(`The site drawing's top cells ${index} is not a row and its first and last column.`);
       return Object.freeze([run, first, last] as const);
     })),
+    ...(Array.isArray(walls) ? { walls: Object.freeze(walls.map(landWall)) } : {}),
   });
 }
 

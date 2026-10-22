@@ -9,6 +9,7 @@ composer disagree."""
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import json
 import math
@@ -18,7 +19,7 @@ import pytest
 from exulanica.canonical import canonical_json
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SiteStructureRecord
 from exulanica.grammar.islands import make_island_volume, read_island_document
-from exulanica.grammar.landform import land_rules, read_land_chunk
+from exulanica.grammar.landform import RetainingWall, land_rules, read_land_chunk
 from exulanica.grammar.landscape import LandscapeRefused, landscape_rules, read_landscape_document
 from exulanica.grammar.volumes import input_sha256, read_volume_sheet
 from exulanica.world import site_on_top
@@ -401,6 +402,26 @@ def test_the_landscape_is_drawn_round_the_site_with_the_islands_graded_top(
     # Most of the site is walked on the island's own top; the banks between its terraces, steeper
     # than 1 in 4, are not.
     assert compared >= (extent.width_mm // 1000) * (extent.depth_mm // 1000) * 3 // 4
+
+
+def test_a_top_states_the_retaining_walls_its_grading_lists_as_a_site_on_land_does(made) -> None:
+    ground = ground_of(made)
+    # Graded by the land rules volume rules 4 name (7): its grading lists its walls, here none.
+    assert ground.site.graded.retaining == ()
+    assert ground.drawing_section()["walls"] == []
+
+    def graded(retaining: Any) -> TopWorld:
+        site = dataclasses.replace(
+            ground.site, graded=dataclasses.replace(ground.site.graded, retaining=retaining)
+        )
+        return dataclasses.replace(ground, site=site)
+
+    # A wall where its levels meet is stated as a site on land states one.
+    wall = RetainingWall(from_mm=(4000, 6000), to_mm=(9000, 6000), high="north")
+    assert graded((wall,)).drawing_section()["walls"] == [wall.document()]
+    # Graded by land rules before walls were listed (volume rules 3), it states none, so a world
+    # made then keeps its drawing's bytes.
+    assert "walls" not in graded(None).drawing_section()
 
 
 def test_the_ground_below_the_island_is_drawn_and_served_by_digest(landscape_drawn) -> None:

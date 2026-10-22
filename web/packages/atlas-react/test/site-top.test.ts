@@ -288,6 +288,23 @@ describe("a volume's graded top as a site's land", () => {
     drawn.destroy();
   });
 
+  it("reads the walls a top's grading lists and draws them as a site on land's, and refuses walls not in a list", () => {
+    const { app } = nullApp();
+    const walled = served();
+    topOf(walled)['walls'] = [{ from_mm: [4000, 6000], to_mm: [9000, 6000], high: 'north' }];
+    const parsed = parseStructuredSiteDrawing(walled);
+    expect(parsed.top!.walls).toEqual([{ fromMm: [4000, 6000], toMm: [9000, 6000], high: 'north' }]);
+    expect(drawing.top!.walls).toBeUndefined();
+    const land = readSiteTopLand(parsed, structuredClone(FIXTURE.top), sha256);
+    const drawn = drawSiteLand(app.graphicsDevice, land, new pc.StandardMaterial(), [0.4, 0.5, 0.3]);
+    expect(drawn.root.children.map((child) => child.name)).toEqual(['site-land:top', 'site-land:walls']);
+    expect(drawn.draws).toBe(2);
+    drawn.destroy();
+    const listed = served();
+    topOf(listed)['walls'] = { from_mm: [4000, 6000], to_mm: [9000, 6000], high: 'north' };
+    expect(() => parseStructuredSiteDrawing(listed)).toThrow('top walls are not a list');
+  });
+
   it('lays the land surfaces over it with heights above the sea, from the level the island stands at', () => {
     const plain = 'uniform vec3 material_diffuse;\nvoid getAlbedo() {\n    dAlbedo = material_diffuse.rgb;\n}\n';
     expect(withLandSurfaces(plain, SURFACES, false)).toContain('\tfloat h = vPositionW.y * 1000.0;\n');

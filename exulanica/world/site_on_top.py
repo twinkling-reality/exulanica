@@ -545,8 +545,9 @@ class TopWorld:
         """What a site drawing (``exulanica.site-drawing/v6``) states of the top it stands on: the
         graded top's digest (served by ``GET /world/versions/{version_id}/land/top``), the
         landscape and placement it is a top of, the site's corner in the volume's frame, the water
-        on it, and the cells drawn as land."""
-        return {
+        on it, the cells drawn as land and, where its grading lists them (land rules from
+        version 5), the retaining walls where its levels meet, as a site on land states them."""
+        section: dict[str, Any] = {
             "top_sha256": self.site.sha256,
             "landscape_sha256": self.landscape.sha256,
             "placement": self.placement_id,
@@ -554,6 +555,9 @@ class TopWorld:
             "water": [body.document() for body in self.site.water],
             "rock_cells": [list(run) for run in self.rock_cells],
         }
+        if self.site.graded.retaining is not None:
+            section["walls"] = [wall.document() for wall in self.site.graded.retaining]
+        return section
 
     def documents(self) -> dict[str, Any]:
         """What the land routes serve for a world on a top: no chunks or backdrop, and the graded
