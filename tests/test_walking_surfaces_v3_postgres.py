@@ -43,21 +43,34 @@ def _offering_things(api) -> None:
     app.state.services = dataclasses.replace(app.state.services, societies_of_things=True)
 
 
+#: Where the asked point is taken, the points tried next along the south axis, millimetres. A test
+#: town is seeded by its world id, so one run's town can have its own bench where another's has
+#: open footway; a refused placing writes nothing, so the next point is asked on the same state.
+NEXT_POINTS_MM = (0, 1_500, -1_500, 3_000, -3_000, 4_500, -4_500, 6_000, -6_000)
+
+
 def _place(api, entry, thing_id: str, kind: str, version: int, east: int, south: int) -> None:
     root = f"/world/versions/{entry['authored_version_id']}?world_id={entry['world_id']}"
     base = api.get(root).json()["state_sha256"]
-    placed = api.post(
-        f"/world/versions/{entry['authored_version_id']}/things?world_id={entry['world_id']}",
-        {
-            "base_state_sha256": base,
-            "thing_id": thing_id,
-            "kind": {"kind": kind, "version": version},
-            "region_id": entry["generated_ground"]["region_id"],
-            "pose": {"x_mm": east, "y_mm": 0, "z_mm": south, "yaw_microradians": 0},
-            "origin_role": "fictional",
-        },
-    )
-    assert placed.status_code == 201, placed.text
+    refusals = []
+    for along in NEXT_POINTS_MM:
+        placed = api.post(
+            f"/world/versions/{entry['authored_version_id']}/things?world_id={entry['world_id']}",
+            {
+                "base_state_sha256": base,
+                "thing_id": thing_id,
+                "kind": {"kind": kind, "version": version},
+                "region_id": entry["generated_ground"]["region_id"],
+                "pose": {"x_mm": east, "y_mm": 0, "z_mm": south + along, "yaw_microradians": 0},
+                "origin_role": "fictional",
+            },
+        )
+        if placed.status_code == 201:
+            return
+        assert placed.status_code == 422, placed.text
+        assert placed.json()["code"].startswith("thing_landing_"), placed.text
+        refusals.append(placed.text)
+    raise AssertionError(f"no point near the asked one took {thing_id}: {refusals}")
 
 
 def _step(api, entry: dict, body: dict) -> dict:
