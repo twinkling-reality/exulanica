@@ -2,17 +2,25 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { splatsAfterToneMapping } from '@exulanica/atlas-react/playcanvas';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   PAINTED_FRAME_ROUTE,
   PAINTED_LAB_MARKER,
   PAINTED_SPLAT_ROUTE,
   layoutUndrawn,
+  openPaintedLab,
   paintedLabAsked,
   paintedLayout,
   paintedPush,
   readPaintedFrame,
 } from '../src/dev/painted-splat.js';
+
+// The display itself is atlas-react's (splat-display.test.ts); here only that the lab hands it its splat.
+vi.mock('@exulanica/atlas-react/playcanvas', async (original) => ({
+  ...await original<typeof import('@exulanica/atlas-react/playcanvas')>(),
+  splatsAfterToneMapping: vi.fn(),
+}));
 
 describe('painted lab: who may ask', () => {
   it('opens only for the plain word on a development build', () => {
@@ -68,6 +76,41 @@ describe('painted lab: the layout under the splat', () => {
     held.dispose();
     expect(wall.visible).toBe(true);
     expect(handlers.size).toBe(0);
+  });
+});
+
+describe('painted lab: the splat on the screen', () => {
+  it('is drawn after the camera frame\'s tone mapping, and given back when the lab closes', async () => {
+    const shown = { active: true, splats: 1, refresh: vi.fn(), dispose: vi.fn() };
+    vi.mocked(splatsAfterToneMapping).mockReturnValue(shown);
+    class Piece {
+      constructor(readonly name: string) {}
+      setLocalPosition(): void {}
+      setLocalRotation(): void {}
+      addChild(): void {}
+      addComponent(): void {}
+      destroy(): void {}
+    }
+    const app = {
+      on: () => undefined, off: () => undefined,
+      assets: { loadFromUrlAndFilename: (...args: unknown[]) => (args[3] as (e: null, a: object) => void)(null, { unload: () => undefined }), remove: () => undefined },
+    };
+    const camera = { camera: { name: 'the scene camera' } };
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('fetch', async (url: string) => (url === PAINTED_FRAME_ROUTE
+      ? new Response(null, { status: 404 })
+      : new Response(null, { status: 200, headers: { 'x-painted-lab-format': 'ply' } })));
+    try {
+      const lab = openPaintedLab({ app, environmentRoot: new Piece('environment'), camera } as never, [], '?painted=1')!;
+      await vi.waitFor(() => expect(lab.state().phase).toBe('drawn'));
+      expect(splatsAfterToneMapping).toHaveBeenCalledWith(lab.splat(), camera.camera);
+      expect(lab.state().display).toBe(true);
+      lab.dispose();
+      expect(shown.dispose).toHaveBeenCalledOnce();
+      expect(lab.state().display).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

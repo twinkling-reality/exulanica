@@ -6,7 +6,9 @@
  * renders and given back after it, so the walk and picking (a CPU ray test between frames) find
  * them as before while the splat is what is seen: a splat trained to the layout's depth paints its
  * own ground and walls, and people and things test against the depth they write themselves. Water
- * and glass, which are drawn blended, stay as they are.
+ * and glass, which are drawn blended, stay as they are. The splat is drawn after the camera frame's
+ * tone mapping (`splatsAfterToneMapping`), as its trainer drew it and tested against the scene's
+ * depth, so the undrawn ground does not let the world's own water draw over it.
  *
  * `layout=depth` beside the word makes the layout depth-only instead (`layoutDepthOnly`), for a
  * splat not held to the layout: still there for hiding people behind walls the splat paints thinly,
@@ -29,7 +31,8 @@
 
 import { islandId } from '@exulanica/atlas-core';
 import {
-  SPLAT_OCCLUSION, createSceneSplatAsset, layoutDepthOnly, validateSogBundle, type TrainedSceneGeometry,
+  SPLAT_OCCLUSION, createSceneSplatAsset, layoutDepthOnly, splatsAfterToneMapping, validateSogBundle,
+  type SplatDisplay, type TrainedSceneGeometry,
 } from '@exulanica/atlas-react/playcanvas';
 import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 
@@ -128,6 +131,8 @@ export interface PaintedLabState {
   readonly layout: 'undrawn' | 'depth';
   /** How far a depth-only layout is pushed back from the eye, in metres. */
   readonly pushMetres: number;
+  /** Whether the splat is drawn after the camera frame's tone mapping now, rather than in the scene. */
+  readonly display: boolean;
   readonly reason: string | null;
 }
 
@@ -222,9 +227,10 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
   const layout = paintedLayout(search);
   let state: PaintedLabState = {
     phase: 'loading', format: null, standIn: false, label: null, frame: IDENTITY, pointCount: null,
-    layout, pushMetres: look.pushMetres, reason: null,
+    layout, pushMetres: look.pushMetres, display: false, reason: null,
   };
   let splat: Entity | null = null;
+  let display: SplatDisplay | null = null;
   let asset: Asset | null = null;
   let disposed = false;
   const roots = [...siteRoots] as Entity[];
@@ -250,6 +256,8 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
       host.environmentRoot.addChild(entity);
       entity.addComponent('gsplat', { asset: made.asset });
       splat = entity;
+      const camera = host.camera.camera;
+      if (camera !== undefined && camera !== null) display = splatsAfterToneMapping(entity, camera);
       state = {
         ...state, phase: 'drawn', format: made.format, standIn: made.format === 'ply', frame, pointCount: made.pointCount,
         label: made.format === 'ply' ? 'A layout-shaped stand-in splat, not paint.' : 'Invented appearance: a SOG held to the trained scene checks.',
@@ -262,13 +270,15 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
     }
   })();
   const lab: PaintedLab = {
-    state: () => state,
+    state: () => ({ ...state, display: display?.active ?? false }),
     splat: () => splat,
     depthOnly: () => depthOnly?.instances ?? 0,
     undrawn: () => undrawn?.instances ?? 0,
     dispose() {
       disposed = true;
       giveBack();
+      display?.dispose();
+      display = null;
       splat?.destroy();
       splat = null;
       if (asset !== null) { asset.unload(); host.app.assets.remove(asset); asset = null; }
