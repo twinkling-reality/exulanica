@@ -67,6 +67,21 @@ def test_worker_uses_runtime_claims_owner_publication_and_one_workspace(tmp_path
     assert state["pids"] == {"tile_worker": 12345}
 
 
+def test_worker_runs_by_the_checkout_s_interpreter_so_a_trampoline_script_is_recognised(
+    tmp_path, monkeypatch
+):
+    """A venv under a long path, or one with a space, gets console scripts that begin with a /bin/sh
+    exec trampoline; started directly the worker reads "/bin/sh <script> ..." and is refused."""
+    observed, state = _worker(tmp_path, monkeypatch, "startup")
+    python = str(tmp_path / "checkout" / ".venv" / "bin" / "python")
+    program = str(tmp_path / "checkout" / ".venv" / "bin" / "exulanica-generated-tile-worker")
+    assert observed["command"] == [python, program, "--workspace", "workspace"]
+    assert LAUNCH.tile_worker_running(state)
+    # The positive control: the trampoline's own first command is not the worker.
+    identity = {"executable": program, "workspace": "workspace"}
+    assert not LAUNCH.worker_command_matches(f"/bin/sh {program} --workspace workspace", identity)
+
+
 def test_worker_startup_failure_is_refused_with_a_recorded_pid_for_cleanup(tmp_path, monkeypatch):
     _worker(tmp_path, monkeypatch, "startup_failed")
 

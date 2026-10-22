@@ -1220,7 +1220,13 @@ def start_tile_worker(
         }
     )
     log = logs / "generated-tile-worker.log"
-    pid = spawn([str(program), "--workspace", workspace_id], worktree, environment, log)
+    # Run by the checkout's own interpreter: a console script in a venv whose path is long or holds a
+    # space begins with a /bin/sh exec trampoline, which would show as "/bin/sh <script> ..." and never
+    # as the worker; the interpreter's form is one worker_command_matches accepts.
+    python = worktree / ".venv" / "bin" / "python"
+    pid = spawn(
+        [str(python), str(program), "--workspace", workspace_id], worktree, environment, log
+    )
     state["pids"]["tile_worker"] = pid
     write_state(state_file, state)
     deadline = time.monotonic() + TILE_WORKER_START_SECONDS
