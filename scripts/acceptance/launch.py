@@ -527,10 +527,10 @@ def model_witness_environment(environment: Mapping[str, str], witness: Path) -> 
 
 def witness_root(run_dir: Path, personal: bool) -> Path:
     """Where a run's spending witness directory lives: a person's own install keeps it in their
-    folder (:func:`personal_folder`), so every ``up`` hands its processes the directory its
+    folder (:func:`personal_witness`), so every ``up`` hands its processes the directory its
     authority recorded and a restart never closes that authority; any other run keeps it in its
     run directory, with everything else it keeps."""
-    return personal_folder() if personal else run_dir
+    return personal_witness(personal_folder()) if personal else run_dir
 
 
 def recorded_witness_root(state: Mapping[str, object], run_dir: Path) -> Path:
@@ -1411,6 +1411,15 @@ def personal_store(folder: Path) -> Path:
     if not own_directory(store):
         refuse("personal-folder", str(store))
     return store
+
+
+def personal_witness(folder: Path) -> Path:
+    """The person's folder as their witness root, its ``SPENDING_WITNESS_NAME`` directory held to
+    the same rule as the folder, since the witness of every authority they grant is written there."""
+    witness = folder / SPENDING_WITNESS_NAME
+    if not own_directory(witness):
+        refuse("personal-folder", str(witness))
+    return folder
 
 
 def local_database_command(python: Path, *arguments: str) -> list[str]:

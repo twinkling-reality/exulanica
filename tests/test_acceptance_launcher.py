@@ -1232,6 +1232,22 @@ def test_a_person_s_store_is_held_to_its_folder_s_rule(tmp_path):
     assert _refusal(LAUNCH.personal_store, folder) == "personal-folder"
 
 
+def test_a_person_s_witness_is_held_to_its_folder_s_rule(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    run = tmp_path / "runs" / "20261022T100000Z"
+    assert LAUNCH.witness_root(run, True) == tmp_path / "Exulanica"
+    witness = tmp_path / "Exulanica" / LAUNCH.SPENDING_WITNESS_NAME
+    assert witness.stat().st_mode & 0o777 == 0o700, "made at 0700 before any process writes it"
+    witness.chmod(0o777)
+    assert _refusal(LAUNCH.witness_root, run, True) == "personal-folder"
+    witness.rmdir()
+    (tmp_path / "elsewhere").mkdir(mode=0o700)
+    witness.symlink_to(tmp_path / "elsewhere")
+    assert _refusal(LAUNCH.witness_root, run, True) == "personal-folder"
+    # A slot run's witness is in its run directory, which the run makes itself.
+    assert LAUNCH.witness_root(run, False) == run and not run.exists()
+
+
 def test_a_person_s_folder_is_their_own_and_nobody_else_writes_it(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     folder = LAUNCH.personal_folder()
