@@ -20,7 +20,9 @@ const module = async (): Promise<Module> => import('../../../../tools/previews/w
 
 const WORLD = 'world:generated:0b0e0c1d-0000-4000-8000-000000000001';
 const SCOPE = `?world_id=${encodeURIComponent(WORLD)}`;
-const review = (repository: string, readable = false) => ({ owner: 'learner', repository, readable, checkpoints: 3, review_sha256: `r-${repository}`, reviewed_at: '2026-10-16T10:00:00Z' });
+// A review as the follower writes it (tests/test_world_project_publication.py): the repository is the account's own,
+// "owner/name"; the field holds the name alone.
+const review = (name: string, readable = false) => ({ owner: 'learner', repository: `learner/${name}`, readable, checkpoints: 3, review_sha256: `r-${name}`, reviewed_at: '2026-10-16T10:00:00Z' });
 
 /** The follower as a fake: each request it is sent is answered by `answer` at its next read. */
 function follower(answer: (request: Json) => Json) {
@@ -147,7 +149,9 @@ describe('Keep on GitHub, from History', () => {
     const { keepState } = await module();
     expect(keepState(null, '').checking).toBe(true);
     const reviewed = { review: review('bay-terraces') };
-    expect(keepState(reviewed, 'bay-terraces').ready).toBe(true);
+    expect(keepState(reviewed, 'bay-terraces')).toMatchObject({ ready: true, account: 'learner', proposed: 'bay-terraces' });
+    // The account's name is never part of the name in the field.
+    expect(keepState(reviewed, 'learner/bay-terraces').ready).toBe(false);
     expect(keepState(reviewed, 'bay-terraces', true).ready).toBe(false);
     expect(keepState(reviewed, 'other-name').ready).toBe(false);
     expect(keepState({ refused: { code: 'name_taken' } }, 'bay-terraces')).toMatchObject({ ready: false, refusal: 'You already have a repository with that name. Choose another.' });

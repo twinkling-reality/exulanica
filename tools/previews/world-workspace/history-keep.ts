@@ -42,10 +42,12 @@ export function keepState(publication: Json | null, name: string, creating = fal
   }
   const review = publication.review;
   if (!review) return { checking: true, refusal: null, account: null, proposed: null, readable: null, ready: false };
+  // The follower reviews "owner/name" (the account's own repository); the field holds the name, the account shows apart.
+  const proposed = String(review.repository).split('/').pop() as string;
   return {
-    checking: false, refusal: null, account: review.owner as string, proposed: review.repository as string, readable: review.readable === true,
+    checking: false, refusal: null, account: review.owner as string, proposed, readable: review.readable === true,
     // Create says yes to exactly what was reviewed: the name in the field is the reviewed one.
-    ready: !creating && nameAllowed(name) && name === review.repository,
+    ready: !creating && nameAllowed(name) && name === proposed,
   };
 }
 
