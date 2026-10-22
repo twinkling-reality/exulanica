@@ -1075,7 +1075,9 @@ being is held by its centre.
 Touching a face is not overlapping. A refusal is `422` with one code per kind,
 `thing_landing_outside`, `thing_landing_off_ground` or `thing_landing_blocked`, a `where` naming
 what refused it (the part's kind and words, or the height above the ground) and a sentence a person
-reads as `detail`; nothing is written. The world's ground is prepared before the edit's
+reads as `detail`, its words read as data from `assets/catalogs/landing-words`
+(`landing-sentence.v1.json`, the sentences with the slots the rule fills, and `landing-part.v1.json`,
+each part kind's own name and sentence); nothing is written. The world's ground is prepared before the edit's
 transaction, through the kind worker's place cache for a site world, so a move or a placing asked
 while that place is being made is answered `503` with `Retry-After` and writes nothing. A world
 whose ground the rule cannot read, such as one made from terrain, which has no society projection,

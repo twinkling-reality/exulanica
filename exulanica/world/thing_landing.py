@@ -21,9 +21,10 @@ may be put and what the world's people can reach never disagree:
   overlap it. A being has no box here: its centre is held to the same parts.
 
 Each refusal is a :class:`~exulanica.world.errors.ThingLandingRefused` with one code per kind of
-refusal, what refused it (``where``) and a sentence a person reads. Nothing here reads the
-database: :mod:`exulanica.world.thing_landing_source` prepares a world's :class:`LandingGround`
-before a write's transaction, as support placement prepares its source.
+refusal, what refused it (``where``) and a sentence a person reads, its words read as data
+(:func:`landing_words`: ``assets/catalogs/landing-words``). Nothing here reads the database:
+:mod:`exulanica.world.thing_landing_source` prepares a world's :class:`LandingGround` before a
+write's transaction, as support placement prepares its source.
 
 Pure and exact: footprints are integer millimetres, a turned town part is held in fractions, and
 overlap is a positive area of the two shapes' common part, so touching a face never refuses.
@@ -31,11 +32,16 @@ overlap is a positive area of the two shapes' common part, so touching a face ne
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import functools
+import string
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
+from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal
 
+from exulanica.grammar.catalogs import CatalogSchema, FieldValue, load_catalog, text_field
+from exulanica.grammar.errors import CatalogError
 from exulanica.world.errors import InvalidThingPlacement, ThingLandingRefused
 from exulanica.world.placed_things import PlacedThing, ThingKindReference, shipped_kind
 from exulanica.world.society_composition import footprint_ring
@@ -45,13 +51,17 @@ if TYPE_CHECKING:
 
 __all__ = [
     "LANDING_CODES",
+    "LANDING_WORDS_DIRECTORY",
     "PART_KINDS",
+    "SENTENCE_SLOTS",
     "BlockedPart",
     "LandingGround",
+    "LandingWords",
     "blocking_things",
     "footprint_half_extents",
     "footprint_points",
     "landing_refusal",
+    "landing_words",
     "plane_height",
     "resting_height",
     "rests_on_footprint",
@@ -192,17 +202,15 @@ def landing_refusal(
         ]
     )
     if None in past:
-        return ThingLandingRefused(
-            OUTSIDE_WORLD, {"part": None}, "That spot is past the edge of this world."
-        )
+        return ThingLandingRefused(OUTSIDE_WORLD, {"part": None}, _said("outside"))
     above = ground.height_above(thing)
     if above is not None:
         # Said as the ground's step, not as the thing buried or floating: what to do is plain.
-        step = f"{step_words(abs(above))} {'lower' if above > 0 else 'higher'}"
+        side = _said("side_lower" if above > 0 else "side_higher")
         return ThingLandingRefused(
             OFF_GROUND,
             {"height_above_mm": above},
-            f"The ground there is {step}. Choose a spot on the same level.",
+            _said("off_ground", step=step_words(abs(above)), side=side),
         )
     met = [
         part
@@ -219,46 +227,119 @@ def landing_refusal(
     )
 
 
-#: How a refusing step is said: under a metre in whole centimetres, from a metre in metres to one
-#: place, each rounded up, so a refused step never reads as one a thing would rest across.
-CENTIMETRES_FORM: Final = "{} cm"
-METRES_FORM: Final = "{}.{} m"
+#: Where a landing refusal's words are read from: ``landing-sentence.v1.json``, its sentences by
+#: key, and ``landing-part.v1.json``, each part kind's own name and the sentence it is said with.
+LANDING_WORDS_DIRECTORY: Final = (
+    Path(__file__).resolve().parents[2] / "assets" / "catalogs" / "landing-words"
+)
+#: The slots the rule fills in each sentence: one the catalog states with any other is refused.
+SENTENCE_SLOTS: Final[Mapping[str, frozenset[str]]] = {
+    "outside": frozenset(),
+    "off_ground": frozenset({"step", "side"}),
+    "side_lower": frozenset(),
+    "side_higher": frozenset(),
+    "step_centimetres": frozenset({"centimetres"}),
+    "step_metres": frozenset({"metres", "tenths"}),
+    "in_part": frozenset({"name"}),
+    "inside_part": frozenset({"name"}),
+    "on_part": frozenset({"name"}),
+    "unnamed_part": frozenset(),
+}
+#: The sentences a part kind may be said with.
+PART_SENTENCES: Final = ("in_part", "inside_part", "on_part", "unnamed_part")
+
+
+def _sentence_words(where: str, value: object) -> FieldValue:
+    return text_field(where, value)
+
+
+def _part_name(where: str, value: object) -> FieldValue:
+    """A part kind's own name, or "" for a kind with no words of its own."""
+    return value if value == "" else text_field(where, value)
+
+
+def _part_sentence(where: str, value: object) -> FieldValue:
+    if value not in PART_SENTENCES:
+        raise CatalogError(f"{where} is one of {list(PART_SENTENCES)}, got {value!r}")
+    return str(value)
+
+
+_SENTENCE: Final = CatalogSchema(
+    "landing-sentence", 1, (("words", _sentence_words), ("reason", text_field))
+)
+_PART: Final = CatalogSchema(
+    "landing-part",
+    1,
+    (("name", _part_name), ("sentence", _part_sentence), ("reason", text_field)),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class LandingWords:
+    """What a landing refusal says: its sentences by key, and each part kind's own name and the
+    sentence it is said with."""
+
+    sentences: Mapping[str, str]
+    parts: Mapping[str, tuple[str, str]]
+
+
+@functools.cache
+def landing_words(directory: Path = LANDING_WORDS_DIRECTORY) -> LandingWords:
+    """The landing refusals' words, read from the two catalogs in ``directory``: refused by name
+    where a sentence the rule says is missing or fills other slots than :data:`SENTENCE_SLOTS`,
+    where a part kind of :data:`PART_KINDS` is not named exactly once, or where a kind said by its
+    name has none (only an unnamed kind has no name)."""
+    sentences = {
+        entry.key: str(dict(entry.values)["words"])
+        for entry in load_catalog(directory / "landing-sentence.v1.json", _SENTENCE).entries
+    }
+    if set(sentences) != set(SENTENCE_SLOTS):
+        raise CatalogError(
+            f"landing-sentence states {sorted(sentences)}, the rule says {sorted(SENTENCE_SLOTS)}"
+        )
+    for key, words in sentences.items():
+        slots = {field for _text, field, _spec, _conversion in string.Formatter().parse(words)}
+        slots.discard(None)
+        if slots != SENTENCE_SLOTS[key]:
+            raise CatalogError(
+                f"landing-sentence {key} fills {sorted(slots)}, "
+                f"the rule fills {sorted(SENTENCE_SLOTS[key])}"
+            )
+    parts = {
+        entry.key: (str(dict(entry.values)["name"]), str(dict(entry.values)["sentence"]))
+        for entry in load_catalog(directory / "landing-part.v1.json", _PART).entries
+    }
+    if set(parts) != set(PART_KINDS):
+        raise CatalogError(f"landing-part names {sorted(parts)}, a part is one of {PART_KINDS}")
+    for kind, (name, sentence) in parts.items():
+        if (name == "") != (sentence == "unnamed_part"):
+            raise CatalogError(
+                f"landing-part {kind}: a part said by its name has one, "
+                "and only an unnamed one has none"
+            )
+    return LandingWords(sentences, parts)
+
+
+def _said(key: str, **slots: object) -> str:
+    return landing_words().sentences[key].format(**slots)
 
 
 def step_words(step_mm: int) -> str:
-    """A refusing step's height in words: "25 cm", "1.3 m"."""
+    """A refusing step's height in words: under a metre in whole centimetres, from a metre in
+    metres to one place, each rounded up, so a refused step never reads as one a thing would rest
+    across ("25 cm", "1.3 m")."""
     centimetres = -(-step_mm // 10)
     if centimetres < 100:
-        return CENTIMETRES_FORM.format(centimetres)
-    return METRES_FORM.format(*divmod(-(-step_mm // 100), 10))
+        return _said("step_centimetres", centimetres=centimetres)
+    metres, tenths = divmod(-(-step_mm // 100), 10)
+    return _said("step_metres", metres=metres, tenths=tenths)
 
 
 def _blocked_words(part: BlockedPart) -> str:
-    name = (
-        part.label
-        or {
-            "water": "water",
-            "structure": "building",
-            "building": "building",
-            "wall": "wall",
-            "closed": "closed ground",
-            "fixture": "fixture",
-            "furniture": "street furniture",
-            "tree": "tree",
-            "area": "area",
-            "thing": "thing",
-            "blocked": "",
-        }[part.kind]
-    )
-    if part.kind == "water":
-        return f"That spot is in the {name}."
-    if part.kind in ("structure", "building", "closed"):
-        return f"That spot is inside the {name}."
-    if part.kind == "wall":
-        return f"That spot is in the {name}."
-    if part.kind == "blocked" or not name:
-        return "That spot is somewhere people cannot walk through."
-    return f"It would stand on the {name}."
+    """What a part says it refuses with: its own words or its kind's name, in its kind's sentence;
+    a kind with no name is somewhere people cannot walk through, whatever its words."""
+    kind_name, sentence = landing_words().parts[part.kind]
+    return _said(sentence, name=part.label or kind_name)
 
 
 def _within(point: Point, area: WalkableArea) -> bool:

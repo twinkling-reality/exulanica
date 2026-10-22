@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "catalog_id": "landing-part",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "area",
+      "name": "area",
+      "sentence": "on_part",
+      "reason": "A site's blocking area other than water: a thing stands on it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "blocked",
+      "name": "",
+      "sentence": "unnamed_part",
+      "reason": "A part the world blocks walking through with no words of its own: said as somewhere people cannot walk.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "building",
+      "name": "building",
+      "sentence": "inside_part",
+      "reason": "A town's building: a thing stands inside it, by its own massing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "closed",
+      "name": "closed ground",
+      "sentence": "inside_part",
+      "reason": "A closed zone of a site: a thing stands inside ground people may not enter.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "fixture",
+      "name": "fixture",
+      "sentence": "on_part",
+      "reason": "A blocking fixture of a site: a thing stands on top of it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "furniture",
+      "name": "street furniture",
+      "sentence": "on_part",
+      "reason": "A town's street furniture: a thing stands on top of it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "structure",
+      "name": "building",
+      "sentence": "inside_part",
+      "reason": "A site's structure: a thing stands inside it, as inside a building.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "thing",
+      "name": "thing",
+      "sentence": "on_part",
+      "reason": "Another placed thing whose kind blocks walking: a thing stands on top of it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "tree",
+      "name": "tree",
+      "sentence": "on_part",
+      "reason": "A town's street tree: a thing stands on it, where the tree's pit and trunk are.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "wall",
+      "name": "wall",
+      "sentence": "in_part",
+      "reason": "A wall or fence: a thing stands in its line, so it is in the wall.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "water",
+      "name": "water",
+      "sentence": "in_part",
+      "reason": "A world's water: a thing stands in it, named by its own words where it has them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    }
+  ]
+}

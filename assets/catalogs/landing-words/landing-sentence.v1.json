@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "catalog_id": "landing-sentence",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "in_part",
+      "words": "That spot is in the {name}.",
+      "reason": "Said of a part a thing would stand in, as water or a wall: the part by its own name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "inside_part",
+      "words": "That spot is inside the {name}.",
+      "reason": "Said of a part a thing would stand inside, as a building or closed ground: the part by its own name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "off_ground",
+      "words": "The ground there is {step} {side}. Choose a spot on the same level.",
+      "reason": "Said where the ground under a thing steps more than a thing rests across: the step as the ground's, and what to do.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "on_part",
+      "words": "It would stand on the {name}.",
+      "reason": "Said of a part a thing would stand on top of, as a fixture or street furniture: the part by its own name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "outside",
+      "words": "That spot is past the edge of this world.",
+      "reason": "Said where a thing would stand past the edge of the ground a person walks: what refused it, and nothing to move.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "side_higher",
+      "words": "higher",
+      "reason": "The step's side where the thing would stand below the ground: the ground there is higher.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "side_lower",
+      "words": "lower",
+      "reason": "The step's side where the thing would stand above the ground: the ground there is lower.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "step_centimetres",
+      "words": "{centimetres} cm",
+      "reason": "A refused step under a metre, in whole centimetres rounded up, so it never reads as a step that rests.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "step_metres",
+      "words": "{metres}.{tenths} m",
+      "reason": "A refused step of a metre or more, in metres to one place rounded up.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    },
+    {
+      "key": "unnamed_part",
+      "words": "That spot is somewhere people cannot walk through.",
+      "reason": "Said where the part that refuses has no name a person reads: what it is, not what it is called.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's landing refusals; see the entry reasons"
+      }
+    }
+  ]
+}
