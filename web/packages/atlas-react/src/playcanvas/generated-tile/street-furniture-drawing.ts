@@ -21,6 +21,8 @@ export interface MadeFurnitureSurface {
   /** Metres from the projection's origin, x east, y north, z up, three to a vertex. */
   readonly positions: readonly number[];
   readonly st: readonly number[];
+  /** The form's own normals turned with it into the tile frame, unit, three to a vertex. */
+  readonly normals: readonly number[];
   readonly indices: readonly number[];
 }
 
@@ -94,7 +96,12 @@ export function madeStreetFurniture<Range extends StatedRange>(
           (z + up - oz) / 1000,
         );
       }
-      return { role: surface.role, positions, st: surface.st, indices: surface.indices };
+      const normals: number[] = [];
+      for (let at = 0; at < surface.normals.length; at += 3) {
+        const [along, left, up] = [surface.normals[at]!, surface.normals[at + 1]!, surface.normals[at + 2]!];
+        normals.push(along * ux - left * uy, along * uy + left * ux, up);
+      }
+      return { role: surface.role, positions, st: surface.st, normals, indices: surface.indices };
     }));
   }
   return made;

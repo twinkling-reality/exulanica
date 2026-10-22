@@ -223,6 +223,74 @@ describe('street furniture forms drawn', () => {
     expect([feet, walls]).toEqual([2 * 13, 2 * 13]);
   });
 
+  it('states a unit normal at every vertex, facing out of each triangle it bounds', () => {
+    const drawn: [string, FurnitureSurface[]][] = [
+      ...CLASSES.map((key): [string, FurnitureSurface[]] => [key, furnitureFormSurfaces(FORMS2, key, partsOf(key))!]),
+      ...[...FORMS2.bySlotLeaf.keys()].map((leaf): [string, FurnitureSurface[]] => [`slot ${leaf}`, slotFurnitureSurfaces(FORMS2, leaf, [2000, 500, 450])!]),
+    ];
+    for (const [what, surfaces] of drawn) {
+      for (const surface of surfaces) {
+        expect(surface.normals.length, `${what} ${surface.role}`).toBe(surface.positions.length);
+        const n = (i: number): number[] => [surface.normals[i * 3]!, surface.normals[i * 3 + 1]!, surface.normals[i * 3 + 2]!];
+        for (let at = 0; at < surface.normals.length / 3; at += 1) expect(Math.hypot(...n(at)), `${what} vertex ${at}`).toBeCloseTo(1, 12);
+        const p = (i: number): number[] => [surface.positions[i * 3]!, surface.positions[i * 3 + 1]!, surface.positions[i * 3 + 2]!];
+        for (let t = 0; t < surface.indices.length; t += 3) {
+          const corners = [surface.indices[t]!, surface.indices[t + 1]!, surface.indices[t + 2]!];
+          const [a, b, c] = corners.map(p) as [number[], number[], number[]];
+          const u = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!];
+          const v = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!];
+          const face = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+          const length = Math.hypot(...face);
+          // A corner's normal leans from its triangle's by less than a right angle: the triangle and its corners face one way.
+          for (const corner of corners) {
+            const lean = (n(corner)[0]! * face[0]! + n(corner)[1]! * face[1]! + n(corner)[2]! * face[2]!) / length;
+            expect(lean, `${what} ${surface.role} triangle ${t / 3}`).toBeGreaterThan(0.5);
+          }
+        }
+      }
+    }
+  });
+
+  it('turns a round body\'s normals with it, the same where a ring\'s first and last vertices meet as anywhere round it', () => {
+    // The page once made these from the triangles: a ring's first and last vertices meet where s wraps, each with the
+    // triangles of one side only, so the normals there turned 15 degrees off round on the stand (down its broad face),
+    // 11 on the sign's pole and 6 on the bin: a line down each, shaded as a crease.
+    for (const key of ['litter_bin', 'sign_post']) {
+      const form = forms.byClass.get(key)!;
+      const parts = partsOf(key);
+      form.draws.forEach((draw, at) => {
+        if (draw.form !== 'lathe') return;
+        const part = parts[draw.parts[0]!]!;
+        expect(part.sizeXMm, `${key}: a round part`).toBe(part.sizeYMm);
+        const [surface] = furnitureFormSurfaces(onlyDraw(form, at), key, parts)!;
+        for (let i = 0; i < surface!.positions.length / 3; i += 1) {
+          const [x, y] = [surface!.positions[i * 3]! - part.offsetXMm, surface!.positions[i * 3 + 1]! - part.offsetYMm];
+          const [nx, ny] = [surface!.normals[i * 3]!, surface!.normals[i * 3 + 1]!];
+          // Level part of the normal straight out from the axis (none on a flat disc or at the axis itself).
+          expect(Math.abs(x * ny - y * nx), `${key} vertex ${i}`).toBeLessThan(1e-9);
+          expect(x * nx + y * ny, `${key} vertex ${i}`).toBeGreaterThanOrEqual(-1e-9);
+        }
+      });
+    }
+    const parts = partsOf('cycle_stand');
+    const [hoop] = furnitureFormSurfaces(forms, 'cycle_stand', parts)!;
+    const radius = parts[0]!.sizeXMm / 2;
+    let checked = 0;
+    for (let i = 0; i < hoop!.positions.length / 3; i += 1) {
+      const [x, y, z] = [hoop!.positions[i * 3]!, hoop!.positions[i * 3 + 1]!, hoop!.positions[i * 3 + 2]!];
+      // On each post's straight run, its foot to below the bend: straight out from the post, or down on its foot.
+      const post = parts.slice(0, 2).find((one) => Math.abs(x - one.offsetXMm) <= radius + 1e-9);
+      if (post === undefined || z >= 500) continue;
+      const normal = [hoop!.normals[i * 3]!, hoop!.normals[i * 3 + 1]!, hoop!.normals[i * 3 + 2]!];
+      const out = [(x - post.offsetXMm) / radius, (y - post.offsetYMm) / radius, 0];
+      const down = normal[2]! < -0.5;
+      (down ? [0, 0, -1] : out).forEach((value, axis) => expect(normal[axis]!, `cycle stand vertex ${i}`).toBeCloseTo(value, 9));
+      checked += 1;
+    }
+    // Both posts' feet: each a ring of 13 (its first and last meeting) and a foot of 13.
+    expect(checked).toBe(2 * (13 + 13));
+  });
+
   it('lays slats with their gaps and frames with their bars, as stated', () => {
     const bench = partsOf('bench');
     const seat = furnitureFormSurfaces(onlyDraw(forms.byClass.get('bench')!, 0), 'bench', bench)!;

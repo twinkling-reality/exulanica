@@ -104,6 +104,11 @@ export interface FurnitureSurface {
   readonly positions: readonly number[];
   /** `s` and `t`, millimetres, two to a vertex. */
   readonly st: readonly number[];
+  /**
+   * The surface's way out at each vertex, unit, in the same frame, three to a vertex: a flat face's own, and a round
+   * body's as it turns, so where a ring's first and last vertices meet (its `s` wrapping round) it reads round.
+   */
+  readonly normals: readonly number[];
   /** Counter-clockwise seen from outside, three to a triangle. */
   readonly indices: readonly number[];
 }
@@ -280,19 +285,22 @@ type Vec3 = readonly [number, number, number];
 class Builder {
   readonly positions: number[] = [];
   readonly st: number[] = [];
+  readonly normals: number[] = [];
   readonly indices: number[] = [];
   constructor(readonly role: string) {}
 
-  vertex(p: Vec3, s: number, t: number): number {
+  /** A vertex at `p`, its surface coordinates `s` and `t`, the surface's way out there along `n` (any length). */
+  vertex(p: Vec3, s: number, t: number, n: Vec3): number {
     this.positions.push(p[0], p[1], p[2]);
     this.st.push(s, t);
+    this.normals.push(...norm(n));
     return this.positions.length / 3 - 1;
   }
 
   /** A flat quad, its corners counter-clockwise seen from outside; s and t by its own normal. */
   quad(a: Vec3, b: Vec3, c: Vec3, d: Vec3): void {
     const n = normalOf(a, b, c);
-    const corners = [a, b, c, d].map((p) => this.vertex(p, ...flatSt(p, n)));
+    const corners = [a, b, c, d].map((p) => this.vertex(p, ...flatSt(p, n), n));
     this.indices.push(corners[0]!, corners[1]!, corners[2]!, corners[0]!, corners[2]!, corners[3]!);
   }
 
@@ -407,14 +415,23 @@ function lathe(out: Builder, part: FurniturePart, segments: number, profile: rea
     const upper = ring(height(h1), r1 / 1000);
     const first = out.positions.length / 3;
     const sAt = (k: number): number => (2 * Math.PI * k * Math.max(rx, ry)) / segments;
+    // The band's way out at the k-th of its segments' corners round it (a fraction between two at a fan's tip): the
+    // body turned, so the same at a ring's first and last vertices, where s wraps; level on a wall, up or down on a
+    // flat ring, between on a slope.
+    const dz = height(h1) - height(h0);
+    const dr = (r1 - r0) / 1000;
+    const way = (k: number): Vec3 => {
+      const angle = (2 * Math.PI * k) / segments;
+      return [ry * dz * Math.cos(angle), rx * dz * Math.sin(angle), -rx * ry * dr];
+    };
     if (r0 === 0 || r1 === 0) {
       // A ring of no radius is one point, so the band is a fan: one triangle a segment, each with its own tip.
       // A quad's second triangle would have two corners on that point and no area, and a vertex whose only
       // triangle has no area gets no normal, which keeps a tile from drawing at all.
       const rim = r1 === 0 ? lower : upper;
       const tip = (r1 === 0 ? upper : lower)[0]!;
-      for (let k = 0; k <= segments; k += 1) out.vertex(rim[k % segments]!, sAt(k), -rim[k % segments]![2]);
-      for (let k = 0; k < segments; k += 1) out.vertex(tip, sAt(r1 === 0 ? k + 1 : k), -tip[2]);
+      for (let k = 0; k <= segments; k += 1) out.vertex(rim[k % segments]!, sAt(k), -rim[k % segments]![2], way(k));
+      for (let k = 0; k < segments; k += 1) out.vertex(tip, sAt(r1 === 0 ? k + 1 : k), -tip[2], way(k + 0.5));
       for (let k = 0; k < segments; k += 1) {
         const [a, b, t] = [first + k, first + k + 1, first + segments + 1 + k];
         // Counter-clockwise from outside, as the quads below: up the seam, then across.
@@ -424,8 +441,8 @@ function lathe(out: Builder, part: FurniturePart, segments: number, profile: rea
     }
     for (let k = 0; k <= segments; k += 1) {
       const i = k % segments;
-      out.vertex(lower[i]!, sAt(k), -lower[i]![2]);
-      out.vertex(upper[i]!, sAt(k), -upper[i]![2]);
+      out.vertex(lower[i]!, sAt(k), -lower[i]![2], way(k));
+      out.vertex(upper[i]!, sAt(k), -upper[i]![2], way(k));
     }
     for (let k = 0; k < segments; k += 1) {
       const a = first + k * 2;
@@ -437,8 +454,9 @@ function lathe(out: Builder, part: FurniturePart, segments: number, profile: rea
     if (scale === 0) return;
     const z = height(permille);
     const points = ring(z, scale);
-    const centre = out.vertex([part.offsetXMm, part.offsetYMm, z], part.offsetXMm, up ? part.offsetYMm : -part.offsetYMm);
-    const around = points.map((p) => out.vertex(p, p[0], up ? p[1] : -p[1]));
+    const facing: Vec3 = [0, 0, up ? 1 : -1];
+    const centre = out.vertex([part.offsetXMm, part.offsetYMm, z], part.offsetXMm, up ? part.offsetYMm : -part.offsetYMm, facing);
+    const around = points.map((p) => out.vertex(p, p[0], up ? p[1] : -p[1], facing));
     for (let k = 0; k < segments; k += 1) {
       const a = around[k]!;
       const b = around[(k + 1) % segments]!;
@@ -507,7 +525,8 @@ function tube(out: Builder, parts: readonly FurniturePart[], through: readonly (
         radius * (Math.cos(angle) * side[2] + Math.sin(angle) * up[2]),
       ];
       const p: Vec3 = [path[at]![0] + offset[0], path[at]![1] + offset[1], path[at]![2] + offset[2]];
-      indices.push(out.vertex(p, along, radius * angle));
+      // Straight out from the path, so where the ring's first and last vertices meet (s wrapping) it reads round.
+      indices.push(out.vertex(p, along, radius * angle, offset));
     }
     rings.push(indices);
     tangent = next;
@@ -521,8 +540,8 @@ function tube(out: Builder, parts: readonly FurniturePart[], through: readonly (
   // would lean the wall's normals there toward its own, shading a straight run as if it bent toward its end.
   const cap = (ring: readonly number[], centre: Vec3, facing: Vec3, start: boolean): void => {
     const corner = (index: number): Vec3 => [out.positions[index * 3]!, out.positions[index * 3 + 1]!, out.positions[index * 3 + 2]!];
-    const middle = out.vertex(centre, ...flatSt(centre, facing));
-    const around = ring.slice(0, segments).map((index) => out.vertex(corner(index), ...flatSt(corner(index), facing)));
+    const middle = out.vertex(centre, ...flatSt(centre, facing), facing);
+    const around = ring.slice(0, segments).map((index) => out.vertex(corner(index), ...flatSt(corner(index), facing), facing));
     for (let k = 0; k < segments; k += 1) {
       const [a, b] = [around[k]!, around[(k + 1) % segments]!];
       // A ring runs counter-clockwise round the way the tube runs, so its start faces back against its order.
@@ -677,7 +696,7 @@ function drawForm(form: FurnitureForm, parts: readonly FurniturePart[]): Furnitu
     if (!made) return null;
   }
   return [...builders.values()].filter((one) => one.indices.length > 0)
-    .map((one) => Object.freeze({ role: one.role, positions: one.positions, st: one.st, indices: one.indices }));
+    .map((one) => Object.freeze({ role: one.role, positions: one.positions, st: one.st, normals: one.normals, indices: one.indices }));
 }
 
 /**

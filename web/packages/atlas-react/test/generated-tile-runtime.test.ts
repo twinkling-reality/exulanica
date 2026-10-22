@@ -472,12 +472,14 @@ describe('drawing per surface', () => {
     expect([unavailable.triangles, unavailable.indices.length, unavailable.positions.length / 3]).toEqual([3, 9, 7]);
   });
 
-  it('leaves a sliver out of a furniture form\'s own surface, and stands its unused corner up', () => {
+  it('leaves a sliver out of a furniture form\'s own surface, and draws every corner with the normal the form states', () => {
     const footwayRange = ranges[1]!;
+    // Each corner's normal stated east, so what is drawn is the form's, not one made from its triangles (up).
     const form: MadeFurnitureSurface = {
       role: 'footway',
       positions: [0, 0.3, 0.15, 1, 0.3, 0.15, 1, 2, 0.15, 1, 2, 0.15],
       st: [0, 300, 1000, 300, 1000, 2000, 1000, 2000],
+      normals: [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
       indices: [0, 1, 2, 0, 2, 3],
     };
     const made = new Map([[footwayRange, [form]]]);
@@ -485,8 +487,8 @@ describe('drawing per surface', () => {
     expect(batches.every(drawable)).toBe(true);
     const unavailable = batches.find((batch) => batch.key === '')!;
     expect(unavailable.triangles).toBe(3);
-    // The form's corner only the sliver used (its fourth, the batch's last) stands up.
-    expect(unavailable.normals.slice(-3).map((value) => value + 0)).toEqual([0, 1, 0]);
+    // Every corner keeps the form's normal, also the one only the sliver used (its fourth, the batch's last).
+    expect(unavailable.normals.slice(-12).map((value) => value + 0)).toEqual([1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0]);
   });
 });
 

@@ -428,10 +428,7 @@ function hasArea(positions: ArrayLike<number>, a: number, b: number, c: number):
   return Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) > 0;
 }
 
-/**
- * Normals of the triangles `indices` over `positions`; a vertex none of them uses stands up rather than NaN (a
- * furniture form's own surface keeps every vertex, also one only a dropped sliver used).
- */
+/** Normals of the triangles `indices` over `positions`; a vertex whose triangles give it none stands up rather than NaN. */
 function surfaceNormals(positions: number[], indices: number[]): number[] {
   const normals = pc.calculateNormals(positions, indices);
   for (let at = 0; at < normals.length; at += 3) {
@@ -450,7 +447,7 @@ function surfaceNormals(positions: number[], indices: number[]): number[] {
  *
  * A range `made` holds (street furniture its form draws, `street-furniture-drawing.ts`) is drawn by
  * those surfaces instead of its baked ones, each in the batch, placement and orientation of the
- * record's own surface of its role.
+ * record's own surface of its role, with the normals its form states.
  */
 export function batchTileSurfaces(
   render: Pick<DecodedProjection, 'position' | 'index'>,
@@ -487,6 +484,9 @@ export function batchTileSurfaces(
         const first = batch.positions.length / 3;
         const local: number[] = [];
         for (let at = 0; at < one.positions.length; at += 3) local.push(one.positions[at]!, one.positions[at + 2]!, -one.positions[at + 1]!);
+        // The form states its own normals: a round body's run round it, where calculateNormals would part them where
+        // a ring's first and last vertices meet. A vertex only a dropped sliver used keeps its own too.
+        for (let at = 0; at < one.normals.length; at += 3) batch.normals.push(one.normals[at]!, one.normals[at + 2]!, -one.normals[at + 1]!);
         for (let at = 0; at < one.st.length; at += 2) {
           batch.uvs.push(...(placement === undefined
             ? unavailableUv(one.st[at]!, one.st[at + 1]!, look, own?.orientation ?? 'vertical')
@@ -498,7 +498,6 @@ export function batchTileSurfaces(
           if (hasArea(local, a, b, c)) kept.push(a, b, c);
         }
         batch.positions.push(...local);
-        batch.normals.push(...surfaceNormals(local, kept));
         for (const index of kept) batch.indices.push(first + index);
         batch.triangles += kept.length / 3;
       }

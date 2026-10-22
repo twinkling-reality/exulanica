@@ -97,4 +97,35 @@ describe('street furniture drawn by its forms', () => {
     expect(drawn).toBeGreaterThan(baked);
     expect(triangles(after)).toBe(triangles(before) - baked + drawn);
   });
+
+  it('draws a form\'s own normals turned with its record, so a cycle stand\'s posts read round to the ground', () => {
+    // The page once made these from the triangles: where a ring's first and last vertices meet they turned 15 degrees
+    // off round (a crease down the hoop's broad face), and the rest of the ring at a post's foot 5 more.
+    const made = madeStreetFurniture(records, tile.ranges, render.header.origin_mm, SHIPPED);
+    const stands = [...made.keys()].filter((range) => records[range.record]!.fields['furniture_class'] === 'cycle_stand');
+    expect(stands).toHaveLength(2);
+    const [ox, oy, oz] = render.header.origin_mm as [number, number, number];
+    for (const range of stands) {
+      const fields = records[range.record]!.fields as { readonly [name: string]: number };
+      const [batch] = batchTileSurfaces(render, new Float64Array(render.position.length / 3 * 2), [range as DrawnTileRange], new Map(), TILE_LOOK_V1, new Map([[range, made.get(range)!]]));
+      const facing = Math.hypot(fields['facing_dx_mm']!, fields['facing_dy_mm']!);
+      const [ux, uy] = [fields['facing_dx_mm']! / facing, fields['facing_dy_mm']! / facing];
+      let checked = 0;
+      for (let at = 0; at < batch!.positions.length / 3; at += 1) {
+        // The renderer's frame: x east, y up, z south. A vertex at the ground is on a post's foot or its wall.
+        const [x, y, z] = [batch!.positions[at * 3]!, batch!.positions[at * 3 + 1]!, batch!.positions[at * 3 + 2]!];
+        if (Math.abs(y - (fields['z_mm']! - oz) / 1000) > 1e-6) continue;
+        const normal = [batch!.normals[at * 3]!, batch!.normals[at * 3 + 1]!, batch!.normals[at * 3 + 2]!];
+        // Each post stands 350 mm along the facing either way from the stand's base: the nearer one's axis.
+        const posts = [-350, 350].map((along) => [(fields['x_mm']! + along * ux - ox) / 1000, -(fields['y_mm']! + along * uy - oy) / 1000]);
+        const [px, pz] = posts.sort((a, b) => Math.hypot(x - a[0]!, z - a[1]!) - Math.hypot(x - b[0]!, z - b[1]!))[0]!;
+        const out = Math.hypot(x - px!, z - pz!);
+        const expected = normal[1]! < -0.5 ? [0, -1, 0] : [(x - px!) / out, 0, (z - pz!) / out];
+        expected.forEach((value, axis) => expect(normal[axis]!, `${range.identity} vertex ${at}`).toBeCloseTo(value, 6));
+        checked += 1;
+      }
+      // Both posts' feet: each a ring of 13 (its first and last meeting where s wraps) and a foot of 13.
+      expect(checked).toBe(2 * (13 + 13));
+    }
+  });
 });
