@@ -257,8 +257,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   /** A character's row by its society id. */
   const beingRow = (id) => rows.find(item => item.scene?.type === 'being' && item.scene.id === id) ?? null;
   const personName = (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? selection.societyNames?.()?.people.get(id) ?? null;
-  /** A person inside History's sentences (J20): as their tag and card call them, else "the" and their kind. */
-  const calledAs = (id) => { const row = beingRow(id); return row ? subjectView(row).who : called({ name: null, kind: characterFacts(subjectReads.society, id)?.kind ?? null }); };
+  /** A person inside History's sentences and the record pages (J20, T12): in the same words as the plate and tags (whoOf). */
+  const calledAs = (id) => whoOf(id);
   const calledWithin = (id) => calledAs(id).within;
   /** A person as the tag and card call them (J20), by society id: from their offer, else their society name, else "the" and their kind. */
   function whoOf(id) {
