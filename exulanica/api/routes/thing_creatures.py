@@ -11,7 +11,14 @@ creature's newest look job (``look_job``, as ``GET /things/creatures/looks/{look
 a draft from words alone asks its creature's made look as it keeps it; ``erased``, a kept draft
 whose creature the workspace has erased since; ``refused``, with the check's code, the field of the
 drafter's form it refused and the code's fixed sentence; ``failed``, with why by code; or
-``cancelled``, ended by its workspace's erasure (``workspace_deleted``).
+``cancelled``, ended by its workspace's erasure (``workspace_deleted``). Every state carries what
+the draft has spent (``spend``), as the durable spending authority recorded its attempts, or null
+where no durable authority admits this process's calls and nothing is recorded to read.
+
+``GET /things/creatures/offered`` says whether the workspace may ask, the model a draft asks first,
+the most one draft may be charged and to which account (``price``, from the route's bounds and the
+manifest's prices: :func:`exulanica.selection.creature_drafts.price_at_most`), how long a draft
+usually takes and every code a draft may end with.
 
 The words are sent with every saved name replaced (:func:`exulanica.selection.world_drafting.
 sendable`) and are kept only in the draft's job until it ends; the draft keeps nothing of them.
@@ -91,7 +98,12 @@ def _refusal(status: int, code: str, detail: str) -> JSONResponse:
     return JSONResponse({"code": code, "detail": detail}, status_code=status, headers=_HEADERS)
 
 
-def _view(connection: Any, workspace_id: uuid.UUID, draft: drafts.CreatureDraft) -> dict[str, Any]:
+def _view(
+    connection: Any,
+    workspace_id: uuid.UUID,
+    draft: drafts.CreatureDraft,
+    services: Services,
+) -> dict[str, Any]:
     status = draft.status
     kind = look = None
     label = None
@@ -125,6 +137,11 @@ def _view(connection: Any, workspace_id: uuid.UUID, draft: drafts.CreatureDraft)
             "detail": drafts.refusal_sentence(draft.refusal_code, draft.refusal_field),
         },
         "failure": draft.failure,
+        # What its attempts were charged, as the durable authority recorded them; null where
+        # none admits this process's calls, so nothing was recorded.
+        "spend": None
+        if services.spending is None
+        else drafts.draft_spend(connection, workspace_id, draft),
         "created_at": draft.created_at.isoformat(),
         "started_at": None if draft.started_at is None else draft.started_at.isoformat(),
         "finished_at": None if draft.finished_at is None else draft.finished_at.isoformat(),
@@ -151,15 +168,30 @@ def creature_offer(
 ) -> JSONResponse:
     """Whether this workspace may ask for a creature here, why not by code, how long a draft
     usually takes by the creature drafter's measured calls, and every code a draft may end with."""
+    # Also the model a draft asks first and the most a draft may be charged, to which account.
     code = services.creature_offer_refusal(session.workspace_id)
     offered = code is None
-    binding = load_manifest()[Role.CREATURE_DRAFTER]
+    manifest = load_manifest()
+    binding = manifest[Role.CREATURE_DRAFTER]
     basis = binding.timeout_basis
+    client = services.model_client
     return JSONResponse(
         {
             "profile": OFFER_PROFILE,
             "offered": offered,
             "code": code,
+            # The route's first model; a fallback answers only for one withdrawn, and the draft
+            # names the model that answered.
+            "model": {
+                "model_id": binding.primary.model_id,
+                "name": manifest.model_name(binding.primary.model_id),
+            },
+            # With no model client here, no attempt is counted and no price is stated.
+            "price": None
+            if client is None
+            else drafts.price_at_most(
+                manifest, client.maximum_wire_attempts(Role.CREATURE_DRAFTER)
+            ),
             # From the record the role's timeout rests on: its primary's calls, never a number
             # typed here. A draft is a call and, when a check refuses it, one repair.
             "timing": {
@@ -179,14 +211,20 @@ def creature_offer(
 
 
 @router.get("/creatures/drafts")
-def list_creature_drafts(connection: ReadOnlyConnection, session: CurrentSession) -> JSONResponse:
+def list_creature_drafts(
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> JSONResponse:
     """The requester's own drafts, newest first: a reload or a second tab finds one still
     running."""
     listed = drafts.list_drafts(connection, session.workspace_id, owner_actor_id=session.actor)
     return JSONResponse(
         {
             "profile": DRAFTS_PROFILE,
-            "drafts": [_view(connection, session.workspace_id, draft) for draft in listed],
+            "drafts": [
+                _view(connection, session.workspace_id, draft, services) for draft in listed
+            ],
         },
         headers=_HEADERS,
     )
@@ -235,13 +273,18 @@ def draft_creature(
             f"{drafts.MAX_PER_ACTOR_HOUR} an hour for one requester",
         )
     return JSONResponse(
-        _view(connection, session.workspace_id, made), status_code=202, headers=_HEADERS
+        _view(connection, session.workspace_id, made, services),
+        status_code=202,
+        headers=_HEADERS,
     )
 
 
 @router.get("/creatures/drafts/{draft_id}")
 def read_creature_draft(
-    draft_id: uuid.UUID, connection: ReadOnlyConnection, session: CurrentSession
+    draft_id: uuid.UUID,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> JSONResponse:
     """One creature draft: queued, running, kept with its kind and look, erased since, refused with
     the check's code and its fixed sentence, or failed with why."""
@@ -250,7 +293,7 @@ def read_creature_draft(
     )
     if found is None:
         return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
-    return JSONResponse(_view(connection, session.workspace_id, found), headers=_HEADERS)
+    return JSONResponse(_view(connection, session.workspace_id, found, services), headers=_HEADERS)
 
 
 def _look_view(look: look_jobs.CreatureLook) -> dict[str, Any]:

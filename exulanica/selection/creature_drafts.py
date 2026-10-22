@@ -61,6 +61,7 @@ from collections.abc import Callable, Collection, Iterable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import ROUND_CEILING, Decimal
 from typing import Any, Final, Protocol
 
 import psycopg
@@ -72,10 +73,10 @@ from exulanica.epistemics.saved_names import PLACEHOLDER, redact_names, saved_na
 from exulanica.errors import ExulanicaError, TombstonedError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Manifest, Role
 from exulanica.models.policy import HostedRequestPolicy, HostedRequestRefused
 from exulanica.models.spending import SpendingRefused, spending_request_key
-from exulanica.models.usage import CallOutcome, CallUsage, CostBasis
+from exulanica.models.usage import USD_QUANTUM, CallOutcome, CallUsage, CostBasis, usd_string
 from exulanica.references import store as reference_store
 from exulanica.references.bundle import BASES, THINGS_PICTURE_PROFILE
 from exulanica.references.drafting import prompts_for_request
@@ -88,6 +89,8 @@ from exulanica.references.for_drafting import (
 from exulanica.selection.calls import CallLog
 from exulanica.selection.creature_drafting import (
     CHECK_SENTENCES,
+    DRAFT_ATTEMPTS,
+    DRAFTER_ROLE,
     NOT_DRAFTED_SENTENCE,
     CreatureDraftRefusalCode,
     draft_creature,
@@ -125,16 +128,19 @@ __all__ = [
     "claim",
     "create_draft",
     "creature_workspaces",
+    "draft_spend",
     "end_unserved",
     "expire_unclaimed",
     "finish",
     "list_drafts",
     "plays_creatures_here",
+    "price_at_most",
     "read_draft",
     "refusal_codes",
     "refusal_field",
     "refusal_sentence",
     "refusal_sentences",
+    "spending_key",
 ]
 
 _LOG = logging.getLogger(__name__)
@@ -228,6 +234,77 @@ def refusal_sentence(code: str, field: str | None = None) -> str:
         if spec is not None and spec.get("refusal"):
             return str(spec["refusal"])
     return refusal_sentences().get(code, NOT_DRAFTED_SENTENCE)
+
+
+def spending_key(job_id: uuid.UUID) -> str:
+    """The key a draft's attempts are admitted under, counted from one in the order they are made
+    (:func:`~exulanica.models.spending.spending_request_key`): its job's, stable across a claim
+    taken again."""
+    return f"creature:{job_id}"
+
+
+def price_at_most(manifest: Manifest, wire_attempts: int) -> dict[str, Any]:
+    """The most one draft may be charged, a decimal string, with the account it is charged to and
+    its basis.
+
+    Each dispatch is priced at a whole context window of input and the route's answer bound, at the
+    manifest's prices, which the spending authority prices every attempt by: no request sends more,
+    so neither an attempt's reported cost nor the reservation one of unknown outcome keeps passes
+    it. A draft is a form and one repair (``DRAFT_ATTEMPTS``), each sent at most ``wire_attempts``
+    times (every fallback and retry of the client), all priced at the route's dearest model. The
+    reservation the client holds for an attempt counts prompt characters at a fixed rate and leaves
+    the form's schema out, so it is no bound and is not used here.
+    """
+    binding = manifest[DRAFTER_ROLE]
+    answer = binding.default_max_tokens if binding.max_tokens is None else binding.max_tokens.value
+    each = max(
+        spec.cost_usd(prompt_tokens=spec.context_window_tokens, completion_tokens=answer)
+        for spec in binding.chain
+    )
+    dispatches = DRAFT_ATTEMPTS * wire_attempts
+    return {
+        "usd_at_most": usd_string(
+            (each * dispatches).quantize(USD_QUANTUM, rounding=ROUND_CEILING)
+        ),
+        "provider": binding.provider,
+        "provider_description": manifest.provider(binding.provider).description,
+        "basis": {
+            "kind": "full_context_ceiling",
+            "attempts_at_most": DRAFT_ATTEMPTS,
+            "wire_attempts_per_attempt_at_most": wire_attempts,
+            "input_tokens_at_most": max(spec.context_window_tokens for spec in binding.chain),
+            "answer_tokens_at_most": answer,
+        },
+    }
+
+
+#: What the spending authority recorded of one draft's attempts, from migration 0124's
+#: reservations under the draft's key: what those that ended settled at, and what those still under
+#: way hold.
+_SPEND_SQL: Final = (
+    "select coalesce(sum(settled_usd) filter (where state not in ('admitted', 'dispatched')), 0) "
+    "as spent, coalesce(sum(reserved_usd) filter (where state in ('admitted', 'dispatched')), 0) "
+    "as held from spending_reservation where workspace_id=%s and starts_with(request_key, %s)"
+)
+
+
+def draft_spend(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, draft: CreatureDraft
+) -> dict[str, str]:
+    """What the durable spending authority recorded of a draft's attempts, never an estimate:
+    ``spent_usd``, what those that ended settled at (a reported cost, nothing for one that never
+    left, the whole reservation of one whose outcome is unknown, or what an operator reconciled it
+    to), and ``held_usd``, what those still under way hold; both zero before the first. Only a
+    durable authority keeps attempts: under a process's own budget there is nothing to read."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            _SPEND_SQL, (workspace_id, f"{spending_key(draft.job_id)}#")
+        ).fetchone()
+    assert row is not None
+    return {
+        "spent_usd": usd_string(Decimal(row["spent"])),
+        "held_usd": usd_string(Decimal(row["held"])),
+    }
 
 
 #: Absent or on, this process plays creature drafts in a thread; ``off`` (or ``0``, ``false``,
@@ -761,7 +838,7 @@ class CreatureDraftWorker:
         if claimed is None:
             return None
         # Keyed by the job alone: a job taken again replays the same key.
-        with spending_request_key(f"creature:{claimed.job_id}"):
+        with spending_request_key(spending_key(claimed.job_id)):
             return self._play(claimed)
 
     def _play(self, claimed: ClaimedDraft) -> str:

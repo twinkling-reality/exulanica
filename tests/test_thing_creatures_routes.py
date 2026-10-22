@@ -13,6 +13,10 @@ worker played by the test, so each step is seen. What is shown:
 *   words that are not one plain line are refused before anything is queued; a workspace this
     installation does not list is told so; one requester has one draft open at a time;
 *   asking needs world.write and model.invoke;
+*   the offer names the model a draft asks first and the most a draft may be charged, with the
+    account it is charged to: the route's dearest model at a whole context window of input and its
+    answer bound, for a form and one repair each sent as often as the client may send it; a draft
+    states no spend where no durable spending authority records this process's calls;
 *   a made look of a kept creature is asked once, answered 202 and queued, and read by any member
     of the workspace; a kind the workspace does not keep, asked anywhere, is absent, and so is the
     route to a caller without world.write and model.invoke.
@@ -31,6 +35,7 @@ from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.usage import usd_string
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
@@ -118,6 +123,8 @@ def test_asking_queues_a_draft_that_is_kept_and_served(served):
     assert asked.status_code == 202
     draft = asked.json()
     assert "references" not in draft and "look_job" not in draft
+    # No durable authority admits this process's calls, so no spend is recorded to read.
+    assert draft["spend"] is None
     assert (draft["profile"], draft["status"], draft["kind"]) == (
         "exulanica.creature-draft/v1",
         "queued",
@@ -132,6 +139,7 @@ def test_asking_queues_a_draft_that_is_kept_and_served(served):
     kept = _get(client, path).json()
     assert "references" not in kept
     assert kept["status"] == "kept" and kept["label"] == "hill walker"
+    assert kept["spend"] is None
     assert kept["kind"]["kind"] == "hill_walker" and kept["model"]["model_id"]
     # The sketch the draft names is served by the workspace's own look routes.
     look = _get(client, f"/things/looks/{kept['look']['sha256']}")
@@ -302,6 +310,30 @@ def test_the_offer_says_whether_a_workspace_may_ask_and_how_long_drafts_take(ser
         "call_p50_seconds": 18,
         "call_longest_seconds": 25,
         "call_timeout_seconds": 50,
+    }
+    # The model a draft asks first, by the name a person reads.
+    primary = binding.primary.model_id
+    assert offer["model"] == {"model_id": primary, "name": load_manifest().model_name(primary)}
+    # The most one draft may be charged: no request sends more than a context window of input and
+    # the answer bound, priced at the route's dearest model, for a form and one repair, each sent
+    # once to the primary and once to the fallback a withdrawn primary is answered by.
+    answer = binding.max_tokens.value
+    dearest = max(
+        spec.cost_usd(prompt_tokens=spec.context_window_tokens, completion_tokens=answer)
+        for spec in binding.chain
+    )
+    assert len(binding.chain) == 2
+    assert offer["price"] == {
+        "usd_at_most": usd_string(dearest * 2 * 2),
+        "provider": binding.provider,
+        "provider_description": load_manifest().provider(binding.provider).description,
+        "basis": {
+            "kind": "full_context_ceiling",
+            "attempts_at_most": 2,
+            "wire_attempts_per_attempt_at_most": 2,
+            "input_tokens_at_most": max(spec.context_window_tokens for spec in binding.chain),
+            "answer_tokens_at_most": answer,
+        },
     }
     assert "creature_movement_unbuilt" in offer["codes"]["refused"]
     assert "creature_not_drafted" in offer["codes"]["refused"]

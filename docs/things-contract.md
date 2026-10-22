@@ -844,11 +844,27 @@ it goes:
 | `failed` | Why, by code: `drafter_unavailable`, `spending_refused`, `request_refused`, `reference_withdrawn`, `expired`, `stranded`, `not_served` |
 | `cancelled` | Why, by code: `workspace_deleted`, its workspace erased before the draft ended |
 
+In every status a draft states what it spent (`spend`), read from the durable spending authority's
+own records of its attempts, which are admitted under its job's key: `spent_usd`, what those that
+ended settled at (a reported cost, nothing for one that never left, the whole reservation of one
+whose outcome is unknown, or what an operator reconciled it to), and `held_usd`, what attempts
+still under way hold, both decimal strings at the ledger's eight places. It is never an estimate:
+where no durable authority admits the process's calls, nothing is recorded and `spend` is null.
+
 `GET /things/creatures/offered` (`exulanica.creature-offer/v1`) says before anyone types whether
-the workspace may ask here and why not by code, how long the drafter's calls take by the record its
-timeout rests on (the median and longest call, rounded up to whole seconds, and the timeout), and
-the closed lists of codes a draft may end with: a refusal outside the list is carried as
-`creature_not_drafted`. `GET /things/creatures/drafts` lists the requester's own drafts, newest
+the workspace may ask here and why not by code, the model a draft asks first (`model`, by id and
+the name a person reads), the most one draft may be charged (`price`), how long the drafter's calls
+take by the record its timeout rests on (the median and longest call, rounded up to whole seconds,
+and the timeout), and the closed lists of codes a draft may end with: a refusal outside the list is
+carried as `creature_not_drafted`. The price is `usd_at_most`, a decimal string, with the account
+it is charged to (`provider` and `provider_description`) and its basis
+(`full_context_ceiling`): each dispatch priced at a whole context window of input and the route's
+answer bound, at the manifest's prices, which the spending authority prices attempts by, for a form
+and one repair, each sent as often as the client may send it (every fallback and retry), at the
+route's dearest model. No request sends more, so neither a reported cost nor the reservation an
+attempt of unknown outcome keeps passes it; a typical draft spends a small part of it. The
+reservation an attempt holds counts prompt characters at a fixed rate and leaves out the form's
+schema, so it is no bound and the price does not use it. With no model client the price is null. `GET /things/creatures/drafts` lists the requester's own drafts, newest
 first, so a reload finds one still running; a draft states when it was asked, when a worker first
 took it and when it ended.
 

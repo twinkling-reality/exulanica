@@ -319,6 +319,9 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
     """
     found = _model_routes()
     assert sorted(found) == [
+        # Reads the client's attempt count to state the most a creature draft may be charged; it
+        # never asks a model or starts a job.
+        ("GET", "/things/creatures/offered"),
         # Reads provider rate metadata and eligibility; it never asks a model or starts a job.
         ("GET", "/worlds/drafts"),
         # Probe preparation reads provider capabilities; start authorizes the paid worker job.
@@ -342,7 +345,7 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
     assert found <= set(SWEPT)
     for key in found:
         rule = ROUTE_RULES[key]
-        if key == ("GET", "/worlds/drafts"):
+        if key in (("GET", "/things/creatures/offered"), ("GET", "/worlds/drafts")):
             assert isinstance(rule, Requires) and rule.permissions == {Permission.WORLD_READ}
             continue
         assert isinstance(rule, Requires) and Permission.MODEL_INVOKE in rule.permissions, key

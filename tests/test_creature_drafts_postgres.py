@@ -13,6 +13,9 @@ replies scripted (no network, no key, no money):
     model; an owner at their look limits keeps the creature with no job, and a refused draft asks
     nothing;
 *   a drafter that does not answer fails the draft by name;
+*   what a draft spent is read from the durable spending authority's own records of its attempts,
+    by its job's key: what a kept draft's calls settled at, a failed call's whole reservation while
+    its outcome is unknown, what an attempt still under way holds, and nothing of another draft's;
 *   a draft is queued only for a workspace a worker here serves, one open at a time for one
     requester, and is read by its requester alone;
 *   a draft queued and never taken, or its workspace no longer served, ends as failed with its
@@ -44,6 +47,7 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.policy import HostedRequestRefused
 from exulanica.models.spending import SpendingRefused
 from exulanica.models.transport import HttpResponse
+from exulanica.models.usage import usd_string
 from exulanica.selection import creature_drafts as drafts
 from exulanica.selection.creature_drafting import CHECK_SENTENCES, NOT_DRAFTED_SENTENCE
 from exulanica.store.configured import local_content_stores
@@ -53,6 +57,8 @@ from exulanica.world.thing_store import ThingStore
 from conftest import scratch_role_database
 from creature_support import form_of
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
+from spending_support import WorkspacePolicy, spending_client, spending_request
+from spending_support import bench as bench
 
 pytestmark = pytest.mark.postgres
 
@@ -273,6 +279,71 @@ def test_a_drafter_that_does_not_answer_fails_the_draft_by_name(served):
         failed = drafts.read_draft(connection, workspace_id, queued.draft_id)
         assert failed is not None
         assert (failed.status, failed.failure) == ("failed", "drafter_unavailable")
+
+
+def test_what_a_draft_spent_is_read_from_its_own_recorded_attempts(bench, tmp_path):
+    workspace_id = uuid.uuid4()
+    authority = bench.issue(ceiling="1")
+    bench.grant(authority, workspace_id, ceiling="1")
+    database, stores = bench.runtime, local_content_stores(tmp_path / "data")
+
+    def worker(transport) -> drafts.CreatureDraftWorker:
+        return drafts.CreatureDraftWorker(
+            database,
+            client=spending_client(bench.durable(), transport),
+            policy_for=WorkspacePolicy,
+            looks_for=stores.looks.for_workspace,
+            workspaces=lambda: [workspace_id],
+        )
+
+    def attempts(draft: drafts.CreatureDraft) -> list[dict]:
+        key = drafts.spending_key(draft.job_id)
+        return [
+            row
+            for row in bench.reservations(workspace_id)
+            if row["request_key"].startswith(f"{key}#")
+        ]
+
+    def spend(draft: drafts.CreatureDraft) -> dict[str, str]:
+        with database.session(workspace_id) as connection:
+            return drafts.draft_spend(connection, workspace_id, draft)
+
+    held_none = {"held_usd": "0.00000000"}
+    nothing = {"spent_usd": "0.00000000", **held_none}
+    with database.session(workspace_id) as connection:
+        kept = _queue(connection, workspace_id, uuid.uuid4())
+    assert spend(kept) == nothing
+    assert worker(_transport(form_of("horse", label="hill walker"))).run_once(workspace_id) == (
+        "kept"
+    )
+    (call,) = attempts(kept)
+    assert (call["request_key"], call["state"]) == (
+        f"{drafts.spending_key(kept.job_id)}#1",
+        "settled",
+    )
+    assert spend(kept) == {"spent_usd": usd_string(call["settled_usd"]), **held_none}
+    assert call["settled_usd"] > 0
+
+    # A drafter that answered an error may have billed: its whole reservation is what was spent.
+    with database.session(workspace_id) as connection:
+        failed = _queue(connection, workspace_id, uuid.uuid4())
+    assert worker(_transport()).run_once(workspace_id) == "failed"
+    (unknown,) = attempts(failed)
+    assert unknown["state"] == "unknown"
+    assert spend(failed) == {"spent_usd": usd_string(unknown["settled_usd"]), **held_none}
+    assert unknown["settled_usd"] == unknown["reserved_usd"]
+
+    # An attempt admitted and not yet sent holds its reservation and has spent nothing.
+    with database.session(workspace_id) as connection:
+        waiting = _queue(connection, workspace_id, uuid.uuid4())
+    held = (
+        bench.durable()
+        .for_workspace(workspace_id)
+        .admit(spending_request(key=f"{drafts.spending_key(waiting.job_id)}#1"))
+    )
+    assert spend(waiting) == {"spent_usd": "0.00000000", "held_usd": usd_string(held.usd)}
+    # Each draft reads its own attempts alone.
+    assert spend(kept)["spent_usd"] == usd_string(call["settled_usd"])
 
 
 def test_a_draft_is_queued_only_where_served_one_at_a_time_and_read_by_its_requester(served):
