@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MAX_YAW, TRAY, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, HISTORY, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 
 // What build mode's note says: History's sentence for a change build mode made, or for an undo's or a redo's preview.
@@ -61,10 +61,12 @@ assert.equal(refusalWords('thing_landing_blocked', 'That spot is in the water ba
 assert.equal(refusalWords('stale_object_base', 'base state 0000 is stale'), 'Someone changed this world a moment ago. Look again and try once more.');
 assert.equal(refusalWords('something_new', 'it_was_refused'), 'That could not be done. Nothing changed.');
 assert.equal(refusalWords('http_404', 'Not Found'), 'That could not be done. Nothing changed.');
-for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), removeTitle('well'), removeLine(), did({ kind: 'remove_thing', thing_id: 'well:1' }, 'well')]) assert.doesNotMatch(words, /_|[0-9a-f]{12}/);
+for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), removeTitle('well'), removeLine(true), did({ kind: 'remove_thing', thing_id: 'well:1' }, 'well')]) assert.doesNotMatch(words, /_|[0-9a-f]{12}/);
 // The remove question as the card draws it: the question, then what it does.
 assert.equal(removeTitle('bench'), 'Remove the bench?');
-assert.equal(removeLine(), 'Nobody can use it from the next minute.');
+assert.equal(removeLine(true), 'Nobody can use it from the next minute.');
+// Where nobody lives yet the question stands alone (ruling W13 T4).
+assert.equal(removeLine(false), null);
 
 // What an undo did, from its preview, as History says it (sheet section 7: the "You" forms, no full stop).
 const well = { kind: { kind: 'well', version: 2 } };
@@ -194,6 +196,17 @@ assert.equal(turned(0, 15, false), 261_799);
 assert.equal(turned(0, -15, false), 6_021_386);
 assert.equal(turned(6_100_000, 15, false), 0);
 assert.equal(turned(100_000, 1, true), 117_453);
+// A new thing faces the person placing it on the turn's own step (ruling W13 T5): a kind's front is its +y (where a
+// bench seats its people), held to the north (-z) unturned, so the eye due north is yaw 0, due west a quarter turn,
+// due south a half turn; nowhere to face, 0.
+assert.equal(TURN_DEGREES, 15);
+assert.equal(facingYaw(0, -5_000), 0);
+assert.equal(facingYaw(-5_000, 0), turned(0, 90, false));
+assert.equal(facingYaw(0, 5_000), turned(0, 180, false));
+assert.equal(facingYaw(5_000, 0), turned(0, -90, false));
+assert.equal(facingYaw(-1_000, -3_800), turned(0, TURN_DEGREES, false));
+assert.equal(facingYaw(0, 0), 0);
+assert.equal(facingYaw(Number.NaN, 1), 0);
 for (const yaw of [0, 1, 3_000_000, MAX_YAW]) for (const step of [15, -15, 1, -1]) {
   const next = turned(yaw, step, step === 1 || step === -1);
   assert.ok(Number.isSafeInteger(next) && next >= 0 && next <= MAX_YAW, `${yaw} ${step} ${next}`);

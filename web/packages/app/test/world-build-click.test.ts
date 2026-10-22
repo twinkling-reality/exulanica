@@ -79,7 +79,7 @@ const post = {
  */
 /** A ground ring that keeps where it was laid, for a test of the held thing's ring. */
 interface Ring { place(at: { x: number; y: number; z: number }, radius: number): void; hide(): void; dispose(): void }
-async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null) {
+async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null, peopleLive = false) {
   const writes: Write[] = [], waiting: Array<(body: unknown) => void> = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -97,7 +97,8 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
   };
   const shown: Array<{ readonly words: string; readonly prompt: string }> = [];
   const notes = { show: (words: string, options: { prompt?: Element } = {}) => { shown.push({ words, prompt: options.prompt?.textContent ?? '' }); }, clear: () => {}, place: () => {} };
-  const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes };
+  // The clock's pill: whether people live in this world.
+  const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes, hasClock: () => peopleLive };
   const project = (p: Point, out = new Point()): Point => {
     if (view === null) return out.set(0, 0, -1);
     const relative = [p.x - EYE[0], p.y - EYE[1], p.z - EYE[2]], depth = dot(view.forward, relative);
@@ -183,17 +184,36 @@ describe('carrying a chosen thing by the point a press met on it', () => {
   // The bench stands 4 m ahead; the press meets its back 0.8 m above the ground, whose ray reaches the ground 8 m out.
   const back = towards(0, 0.8, -4), down = towards(0, 0, -3);
 
-  it('keeps it where it stands when the press lets go unmoved: a positive control', async () => {
+  it('leaves it chosen where it stands when the press lets go unmoved (W13 T2)', async () => {
     rays.set('500,300', back.ray);
+    // The tremble's point meets the bench too: carried, it would be asked about where it stands.
+    rays.set('502,301', back.ray);
+    const { mode, writes } = await mount({ direction: back.ray.direction, distance: back.distance });
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    expect(mode.pointerDown(new MouseEvent('mousedown', { button: 0, clientX: 500, clientY: 300 }))).toBe(true);
+    // A tremble under the drag rule carries nothing.
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 502, clientY: 301 }));
+    document.dispatchEvent(new MouseEvent('mouseup', { clientX: 502, clientY: 301 }));
+    await settled();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(writes.some((write) => write.actionId.startsWith('things.move'))).toBe(false);
+  });
+
+  it('keeps a dragged thing where it is let go, with no second Place (W13 T2): a positive control', async () => {
+    rays.set('500,300', back.ray);
+    rays.set('500,400', down.ray);
     const { mode, writes, answer } = await mount({ direction: back.ray.direction, distance: back.distance });
     expect(press(mode, 'KeyB')).toBe(true);
     await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
     await settled();
     expect(mode.pointerDown(new MouseEvent('mousedown', { button: 0, clientX: 500, clientY: 300 }))).toBe(true);
-    document.dispatchEvent(new MouseEvent('mouseup', { clientX: 500, clientY: 300 }));
-    await vi.waitFor(() => expect(writes.find((write) => write.actionId === 'things.move.preview')).toBeDefined());
-    expect(writes.find((write) => write.actionId === 'things.move.preview')!.body.pose).toMatchObject({ x_mm: 0, z_mm: -4000 });
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 500, clientY: 400 }));
+    document.dispatchEvent(new MouseEvent('mouseup', { clientX: 500, clientY: 400 }));
     await answer();
+    await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.move')).toBe(true));
+    expect(writes.find((write) => write.actionId === 'things.move')!.body.pose).toMatchObject({ x_mm: 0, z_mm: -1500 });
   });
 
   it('keeps the met point under the pointer as it is dragged, not the ground behind the thing', async () => {
@@ -409,5 +429,53 @@ describe("the note after a made part is kept turned or moved (W12.7 item 3)", ()
 
   it('says a barn turned where it stood was turned', async () => {
     expect(await noted((mode) => { expect(press(mode, 'BracketRight')).toBe(true); })).toBe('You turned the barn');
+  });
+});
+
+describe('the remove question where people live and where nobody lives yet (W13 T4)', () => {
+  const back = towards(0, 0.8, -4);
+  /** What build mode shows once the bench is chosen and Delete asks to remove it. */
+  const asked = async (peopleLive: boolean): Promise<string> => {
+    rays.set('500,300', back.ray);
+    const { mode, answer } = await mount({ direction: back.ray.direction, distance: back.distance }, null, null, peopleLive);
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    expect(press(mode, 'Delete')).toBe(true);
+    await answer();
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Remove the bench?'));
+    return document.body.textContent ?? '';
+  };
+
+  it('says what removing does where people live: a positive control', async () => {
+    expect(await asked(true)).toContain('Nobody can use it from the next minute.');
+  });
+
+  it('asks the question alone where nobody lives yet', async () => {
+    expect(await asked(false)).not.toContain('Nobody can use it');
+  });
+});
+
+describe('a new thing held from the tray faces the person placing it (W13 T5)', () => {
+  it('starts turned toward the ground under the eye, on the turn\'s step', async () => {
+    // The eye looks down the middle of the picture from 1.6 m over the region's origin.
+    rays.set(`${innerWidth / 2},${innerHeight / 2}`, towards(0, 0, -3).ray);
+    const { mode, writes, answer } = await mount();
+    void mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 2000, zMm: -6000 });
+    await answer();
+    expect(press(mode, 'Enter')).toBe(true);
+    await vi.waitFor(() => expect(placed(writes)).toHaveLength(1));
+    // From the thing the eye lies 2 m west and 6 m south, about 18 degrees west of south: its front, north unturned,
+    // turns 165 degrees, the nearest 15 degree step, to face it.
+    expect(placed(writes)[0]!.body.pose).toMatchObject({ x_mm: 2000, z_mm: -6000, yaw_microradians: 2_879_793 });
+  });
+
+  it('starts unturned where the eye\'s ground is unknown: a positive control', async () => {
+    const { mode, writes, answer } = await mount();
+    void mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 2000, zMm: -6000 });
+    await answer();
+    expect(press(mode, 'Enter')).toBe(true);
+    await vi.waitFor(() => expect(placed(writes)).toHaveLength(1));
+    expect(placed(writes)[0]!.body.pose).toMatchObject({ yaw_microradians: 0 });
   });
 });

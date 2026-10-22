@@ -103,9 +103,12 @@ export function removeTitle(name) {
   return `Remove the ${name}?`;
 }
 
-/** What removing a thing will do, the line under the question. */
-export function removeLine() {
-  return 'Nobody can use it from the next minute.';
+/**
+ * What removing a thing will do, the line under the question, said only where people live (ruling W13 T4): where
+ * nobody lives yet the question stands alone (null).
+ */
+export function removeLine(peopleLive) {
+  return peopleLive ? 'Nobody can use it from the next minute.' : null;
 }
 
 /**
@@ -366,6 +369,8 @@ export function namesTogether(names) {
 
 /** The largest yaw a pose may state (one revolution, in microradians, as the server bounds it). */
 export const MAX_YAW = 6_283_185;
+/** The degrees one press of [ or ] turns a thing, the step its turn snaps to. */
+export const TURN_DEGREES = 15;
 
 /**
  * A yaw turned by `degrees`, in microradians within one revolution; snapped to whole steps of
@@ -378,6 +383,18 @@ export function turned(yaw, degrees, free) {
   const turn = 2 * Math.PI * 1e6;
   next = ((next % turn) + turn) % turn;
   return Math.min(MAX_YAW, Math.round(next));
+}
+
+/**
+ * The turn a new thing starts at so its front faces a point `dxMm` east and `dzMm` south of it (millimetres): the
+ * whole turn step nearest that heading, so the person placing it sees it from the front (ruling W13 T5); 0 where the
+ * point is where it stands or is unknown. A kind's front is its own +y (where a bench seats its people), which an
+ * unturned thing holds to the north, and a yaw turns it as it turns the kind's box (`footprint_ring`).
+ */
+export function facingYaw(dxMm, dzMm) {
+  if (!Number.isFinite(dxMm) || !Number.isFinite(dzMm) || (dxMm === 0 && dzMm === 0)) return 0;
+  const steps = Math.round(Math.atan2(-dxMm, -dzMm) * 180 / Math.PI / TURN_DEGREES);
+  return steps === 0 ? 0 : turned(0, steps * TURN_DEGREES, false);
 }
 
 /** A ground point snapped to half metres unless `free` (millimetres). */

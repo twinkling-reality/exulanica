@@ -56,6 +56,7 @@ __all__ = [
     "resting_height",
     "rests_on_footprint",
     "rests_on_plane",
+    "step_words",
 ]
 
 Number = int | Fraction
@@ -197,12 +198,11 @@ def landing_refusal(
     above = ground.height_above(thing)
     if above is not None:
         # Said as the ground's step, not as the thing buried or floating: what to do is plain.
-        metres = f"{abs(above) / 1000:.1f}"
-        side = "lower" if above > 0 else "higher"
+        step = f"{step_words(abs(above))} {'lower' if above > 0 else 'higher'}"
         return ThingLandingRefused(
             OFF_GROUND,
             {"height_above_mm": above},
-            f"The ground there is {metres} m {side}. Choose a spot on the same level.",
+            f"The ground there is {step}. Choose a spot on the same level.",
         )
     met = [
         part
@@ -217,6 +217,20 @@ def landing_refusal(
     return ThingLandingRefused(
         BLOCKED, {"part": first.kind, "label": first.label}, _blocked_words(first)
     )
+
+
+#: How a refusing step is said: under a metre in whole centimetres, from a metre in metres to one
+#: place, each rounded up, so a refused step never reads as one a thing would rest across.
+CENTIMETRES_FORM: Final = "{} cm"
+METRES_FORM: Final = "{}.{} m"
+
+
+def step_words(step_mm: int) -> str:
+    """A refusing step's height in words: "25 cm", "1.3 m"."""
+    centimetres = -(-step_mm // 10)
+    if centimetres < 100:
+        return CENTIMETRES_FORM.format(centimetres)
+    return METRES_FORM.format(*divmod(-(-step_mm // 100), 10))
 
 
 def _blocked_words(part: BlockedPart) -> str:

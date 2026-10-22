@@ -24,7 +24,7 @@ import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/ind
 import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
-import { BUSY, REDO_KEY, TRAY, UNDO_KEY, buildKeys, changeParts, createKindLabels, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -32,6 +32,8 @@ import { NOTE_WORDS } from './world-words.mjs';
 
 /** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
 const ASK_AFTER_MS = 180;
+/** How far a press moves (CSS pixels) before it carries what it holds: the page's own drag rule (contextual-world.ts). */
+const DRAG_PX = 4;
 /** How much wider than the footprint's half diagonal the ring at a thing's foot is, so it encloses the outline's corners. */
 const RING_MARGIN = 1.18;
 /** How far below the eye a point grabbed on a thing is carried at most, in metres, so the pointer's ray still comes down to it. */
@@ -366,7 +368,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     dropMove(); dropPlacing();
     selected = null; confirming = null; failure = ''; removeRefused = false;
     const name = tile.kind.source === 'workspace' ? thingName({ kind: tile.kind }, () => creatures?.find(made => made.sha256 === tile.kind.sha256)?.label ?? null) : thingName({ kind: tile.kind });
-    placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' }, letGo: false };
+    placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' }, letGo: false, turnedByHand: false };
     const held = placing;
     void kindBox(tile.kind).then(box => { held.box = box; if (placing === held && groupShows()) layHeldRing(); });
     const pointed = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
@@ -399,7 +401,14 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   function placeTo(ground, free) {
     if (placing === null) return;
     const x = snapped(ground.xMm, free), z = snapped(ground.zMm, free);
-    standNew({ x, y: groundHeightMm(x, z), z, yaw: placing.to?.yaw ?? 0 });
+    // It faces the person wherever it is carried until they turn it themselves (W13 T5).
+    standNew({ x, y: groundHeightMm(x, z), z, yaw: placing.turnedByHand && placing.to !== null ? placing.to.yaw : facingTheEye(x, z) });
+  }
+  /** The turn a new thing at (`x`, `z`) starts at, its front toward the ground under the eye (W13 T5); 0 unknown. */
+  function facingTheEye(x, z) {
+    const ray = pointerRay(b, innerWidth / 2, innerHeight / 2);
+    const eye = ray ? b.authoredSociety?.groundPoint(ray.origin, [0, -1, 0]) ?? null : null;
+    return eye === null ? 0 : facingYaw(eye.xMm - x, eye.zMm - z);
   }
   /** Stand the new thing's copy at `to` and ask the server about it once it rests. */
   function standNew(to) {
@@ -524,7 +533,11 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       return { title: titled(placing.name), line, rows: rowsOf({ placing: true, ready: verdict.state === 'ready', refused: verdict.state === 'refused' }) };
     }
     const name = nameOf(selected) || 'thing';
-    if (confirming !== null) return { title: removeTitle(name), line: { words: removeLine() }, rows: rowsOf({ confirming: true }) };
+    if (confirming !== null) {
+      // Said only where people live, as the clock's pill tells (W13 T4).
+      const said = removeLine(corners?.hasClock?.() === true);
+      return { title: removeTitle(name), line: said === null ? null : { words: said }, rows: rowsOf({ confirming: true }) };
+    }
     if (moving !== null) {
       const verdict = moving.verdict;
       const line = verdict.state === 'refused' ? { words: verdict.words, refused: verdict.words !== BUSY } : verdict.words ? { words: verdict.words } : null;
@@ -675,7 +688,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   function turn(degrees, free) {
     if (placing !== null) {
-      if (placing.to !== null) standNew({ ...placing.to, yaw: turned(placing.to.yaw, degrees, free) });
+      if (placing.to !== null) { placing.turnedByHand = true; standNew({ ...placing.to, yaw: turned(placing.to.yaw, degrees, free) }); }
       return;
     }
     const move = beginMove(); if (move === null) return;
@@ -810,8 +823,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     else if (action === 'remove') void askRemove();
     else if (action === 'confirm') void confirmRemove();
     else if (action === 'undo') void undo();
-    else if (action === 'turn-left') turn(15 * (free ? 1 / 15 : 1), free);
-    else if (action === 'turn-right') turn(-15 * (free ? 1 / 15 : 1), free);
+    else if (action === 'turn-left') turn(free ? 1 : TURN_DEGREES, free);
+    else if (action === 'turn-right') turn(free ? -1 : -TURN_DEGREES, free);
     else if (action === 'put-back') putBack();
     else if (action === 'place') void (placing !== null ? placeNew() : keepMove());
     else if (action === 'redo') void redo();
@@ -1030,6 +1043,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const met = pickedAt(event.clientX, event.clientY);
       if (met?.id !== selected) return false;
       const flat = groundAt(event.clientX, event.clientY);
+      const fresh = moving === null;
       const move = flat === null ? null : beginMove();
       if (move === null) return false;
       // Carried by the point the press met, at its height above the thing's foot, so that point stays under the
@@ -1043,9 +1057,24 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         if (where === null || moving !== move) return;
         moveTo({ ...move.to, x: snapped(where.xMm + move.grip.east, free), z: snapped(where.zMm + move.grip.south, free) });
       };
+      // A drag ends where it is let go (ruling W13 T2): kept there as Place keeps it, or held with its refusal and Put
+      // back. A press that never moves past the drag rule carries nothing: what was chosen stays chosen where it
+      // stands, and a move already held by the keys is kept, as a click keeps it.
+      let dragged = false;
       const follow = new AbortController();
-      document.addEventListener('mousemove', at => carry(at, at.altKey), { signal: follow.signal });
-      document.addEventListener('mouseup', at => { carry(at, at.altKey); follow.abort(); if (moving === move) move.grip = null; }, { signal: follow.signal, capture: true });
+      document.addEventListener('mousemove', at => {
+        dragged ||= Math.hypot(at.clientX - event.clientX, at.clientY - event.clientY) > DRAG_PX;
+        if (dragged) carry(at, at.altKey);
+      }, { signal: follow.signal });
+      document.addEventListener('mouseup', at => {
+        follow.abort();
+        if (moving !== move) return;
+        if (dragged) carry(at, at.altKey);
+        move.grip = null;
+        if (dragged || !fresh) void keepMove();
+        else dropMove();
+        render();
+      }, { signal: follow.signal, capture: true });
       lifetime.signal.addEventListener('abort', () => follow.abort());
       canvas.style.cursor = 'grabbing';
       render();

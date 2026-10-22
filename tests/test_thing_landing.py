@@ -86,7 +86,13 @@ def test_past_the_edge_is_refused_before_the_ground_is_asked():
         # Standing above the ground: the ground there is lower.
         (1_500, "The ground there is 1.5 m lower. Choose a spot on the same level."),
         # Standing below it: the ground there is higher.
-        (-400, "The ground there is 0.4 m higher. Choose a spot on the same level."),
+        (-400, "The ground there is 40 cm higher. Choose a spot on the same level."),
+        # Under a metre in whole centimetres rounded up, so a refused step never reads as one that
+        # rests (200 mm and less), and from a metre in metres to one place rounded up.
+        (-250, "The ground there is 25 cm higher. Choose a spot on the same level."),
+        (201, "The ground there is 21 cm lower. Choose a spot on the same level."),
+        (-999, "The ground there is 1.0 m higher. Choose a spot on the same level."),
+        (1_201, "The ground there is 1.3 m lower. Choose a spot on the same level."),
     ],
 )
 def test_off_the_ground_says_how_far_the_ground_steps(y, words):
