@@ -886,7 +886,7 @@ its identity is the SHA-256 of its canonical bytes, written as a manifest's are.
 | --- | --- |
 | `origin`, `provenance` | `authored`, or `drafted` with the model id, prompt version and execution id of the call that drafted it |
 | `parts` | The named parts it was composed from, one an axis, in the axes' order; none for a setting stated outright |
-| `light` | Changes to one of the pack's own presets (`from`), each a dotted path of a preset replaced whole, such as `sun.elevation_mdeg` or `fog`; or none |
+| `light` | Changes to one of the pack's own presets (`from`), each a dotted path of a preset replaced whole, such as `sun.elevation_mdeg`, `fog` or `haze`; or none |
 | `surfaces` | The colour a look role's surfaces are drawn in, with an emission, whatever the pack dresses the role with |
 | `up` | The colour a look role's upward faces take, or null for none |
 | `swatches` | Swatches of the pack restated: a colour, an emission, or both |
@@ -931,7 +931,7 @@ as drawn (`tests/test_world_settings.py`, `web/packages/atlas-core/test/world-se
 Every look the library holds stands in light its own setting rule accepts, in every version it
 still serves.
 
-**Named parts.** `setting-parts.v3.json` lists parts a person or a model chooses by name, one an
+**Named parts.** `setting-parts.v4.json` lists parts a person or a model chooses by name, one an
 axis, each stated for any pack (the night has its stars, the moon's face, a moon dim enough for its face to show and
 its own gradient sky on any look; earlier versions stay at their paths and are not read, version 1
 for the record that names it by digest):
@@ -950,8 +950,12 @@ preset the pack states, so dusk is a pack's own evening preset where it has one.
 pack computes from its sun (`sky.model`), an alternative also takes its figures for that model's
 kind (`for_sky_model`) when the sky is still computed after its changes: such a sky grows brighter
 as its sun climbs, which a gradient's colours do not, so clear noon states its own dimmer sky and
-image light there, and overcast and thick fog draw their own gradient under their full cloud, as
-the night does on any look. The setting stores
+image light there, and dawn mist, overcast and thick fog draw their own gradient under their cloud
+and mist, as the night does on any look. A pack whose preset states haze draws it in place of any
+fog, so over such a preset an alternative also takes its own haze (`for_haze`): dawn mist,
+overcast, thick fog and the night state their fog as a haze of the same density, even with height,
+in the colour their sky draws at the horizon, so the land and the water fade into it alike and the
+far sea meets the sky; clear noon and dusk keep the look's own haze. The setting stores
 the figures and the parts' keys, so a later version of the parts file never changes a world. Each
 part, composed for every look of the library, is drawn by the browser's reader and held to the bound
 every look's own light is held to, a surface in shade lit at most twice as blue as red

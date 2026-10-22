@@ -16,6 +16,7 @@
    "sky.moon",
    "sky.model",
    "fog",
+   "haze",
    "sun.elevation_mdeg",
    "sun.azimuth_mdeg",
    "sun.colour",

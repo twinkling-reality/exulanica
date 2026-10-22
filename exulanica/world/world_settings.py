@@ -24,15 +24,17 @@ told apart. What a setting may change in a preset, the rules' figures and the bo
 ``assets/style-packs/settings/setting-cases.v1.json`` holds both to the same verdict on every case:
 the same refusal by reason and path, or the same digest of the setting and of the pack as drawn.
 
-**Named parts.** ``assets/style-packs/settings/setting-parts.v3.json`` (:data:`PARTS_FILE`) lists
+**Named parts.** ``assets/style-packs/settings/setting-parts.v4.json`` (:data:`PARTS_FILE`) lists
 parts a person or a model may choose by name, one an axis (a sky, a ground, a cover), each stated
 for any pack. :func:`compose_setting` turns the chosen parts into the exact setting for one pack: a
 part's swatch the pack does not have is left out, its colour for a family's upward faces becomes one
 entry for each surface of that family the pack dresses, and its light is the first of its
 alternatives whose preset the pack states. An alternative may state what it changes over a sky the
 pack computes from its sun (``for_sky_model``, by the model's kind): such a sky grows brighter as
-its sun climbs, which a gradient's colours do not, so the same figures cannot serve both. The
-setting stores the figures, not the names, so a later version of the parts never changes a world.
+its sun climbs, which a gradient's colours do not, so the same figures cannot serve both. It may
+also state what it changes over a pack whose preset states haze (``for_haze``): a haze draws in
+place of any fog, so a weather's fog would not show there without its own haze. The setting stores
+the figures, not the names, so a later version of the parts never changes a world.
 Earlier versions stay at their paths and are not read, version 1 for the record that names it by
 digest.
 
@@ -102,8 +104,9 @@ __all__ = [
 PROFILE: Final = "exulanica.world-setting/v1"
 RULES_PROFILE: Final = "exulanica.world-setting-rules/v1"
 PARTS_PROFILE: Final = "exulanica.world-setting-parts/v1"
-#: The parts file read: version 3 states what a part's light changes over a computed sky.
-PARTS_FILE: Final = "setting-parts.v3.json"
+#: The parts file read: version 4 states the haze a part's light draws over a look that states
+#: haze, and version 3 what it changes over a computed sky.
+PARTS_FILE: Final = "setting-parts.v4.json"
 #: The kinds of computed sky a look's preset may state (``sky.model``), as its reader reads them.
 SKY_MODEL_KINDS: Final = ("analytic",)
 #: The profile of the parts as ``GET /world/style-packs`` lists them.
@@ -636,6 +639,7 @@ def load_setting_parts(
                 "from": _nullable(key),
                 "changes": changes,
                 "for_sky_model": _Optional(_record(model_kind, changes, len(SKY_MODEL_KINDS))),
+                "for_haze": _Optional(changes),
             },
         )
 
@@ -717,8 +721,8 @@ def compose_setting(
     faces becomes one entry for each surface of that family the pack or an earlier part dresses;
     its light is the first alternative whose preset the pack states (None names the pack's
     default), with what the alternative changes over a sky computed by the preset's model when the
-    sky is still computed after its changes, and a second part's light adds its changes to the
-    first's. A part that is not
+    sky is still computed after its changes and over a look whose preset states haze when it still
+    does, and a second part's light adds its changes to the first's. A part that is not
     listed is refused by name. The result is unchecked: :func:`apply_setting` checks it."""
     for axis, key in chosen.items():
         if (axis, key) not in parts.parts:
@@ -754,6 +758,11 @@ def compose_setting(
             over = alternative.get("for_sky_model", {})
             if model is not None and model["kind"] in over:
                 changes.update(copy.deepcopy(over[model["kind"]]))
+            # A look's haze draws in place of any fog, so a part says what its light does to it.
+            preset = pack.light["presets"][setting["light"]["from"]]
+            haze = changes["haze"] if "haze" in changes else preset.get("haze")
+            if haze is not None and "for_haze" in alternative:
+                changes.update(copy.deepcopy(alternative["for_haze"]))
             break
         for role, colour in part["surfaces"].items():
             setting["surfaces"][role] = dict(colour)

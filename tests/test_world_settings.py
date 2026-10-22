@@ -165,12 +165,14 @@ def test_a_setting_may_change_no_part_of_a_looks_finish_or_frame_cost() -> None:
         if leaf in holder:
             continue
         # A value the profile added later, which a preset may leave out (the night's stars and
-        # moon): a part states it, and the preset reads with it.
+        # moon, a haze): a part states it, over any look or over one that states haze, and the
+        # preset reads with it.
         stated = [
-            alternative["changes"][path]
+            changes[path]
             for part in PARTS.parts.values()
             for alternative in part["light"]
-            if path in alternative["changes"]
+            for changes in (alternative["changes"], alternative.get("for_haze", {}))
+            if path in changes
         ]
         assert stated, f"{path} is no value of a preset"
         changed = copy.deepcopy(preset)
@@ -178,7 +180,10 @@ def test_a_setting_may_change_no_part_of_a_looks_finish_or_frame_cost() -> None:
         for name in parents:
             target = target[name]
         target[leaf] = stated[0]
-        assert style_packs._light_preset(changed, "")[parents[0]][leaf] == stated[0]
+        read = style_packs._light_preset(changed, "")
+        for name in parents:
+            read = read[name]
+        assert read[leaf] == stated[0]
     assert len(set(RULES.light_changes)) == len(RULES.light_changes)
 
 
@@ -332,6 +337,70 @@ def test_a_computed_sky_takes_a_parts_own_figures_for_it_and_a_gradient_none() -
         assert drawn.preset["sky"]["model"] is None
 
 
+#: A look's haze as a preset states one, for the parts' haze over it.
+HAZE = {
+    "density_micro": 120,
+    "falloff_micro": 900,
+    "base_mm": 0,
+    "max_depth_permille": 2200,
+    "colour": [200, 216, 234],
+}
+
+
+def _hazed(pack: ws.ResolvedPack) -> ws.ResolvedPack:
+    """``pack`` with every preset stating a haze, which draws in place of any fog."""
+    presets = copy.deepcopy(dict(pack.light["presets"]))
+    for preset in presets.values():
+        preset["haze"] = dict(HAZE)
+    return ws.ResolvedPack(
+        light={**pack.light, "presets": presets},
+        edge=pack.edge,
+        swatches=pack.swatches,
+        surfaces=pack.surfaces,
+    )
+
+
+def test_a_look_that_states_haze_takes_a_parts_haze_and_one_without_none() -> None:
+    town = _case_pack("town")
+    hazed = _hazed(town)
+    # A look's haze draws in place of its fog, so a weather that states a fog states its haze too.
+    for key in ("thick_fog", "dawn_mist", "overcast", "night"):
+        light = _part_light(key)
+        plain = ws.compose_setting({"sky": key}, town, _case_context(), PARTS)
+        assert "haze" not in plain["light"]["changes"]
+        composed = ws.compose_setting({"sky": key}, hazed, _case_context(), PARTS)
+        assert composed["light"]["changes"] == {**plain["light"]["changes"], **light["for_haze"]}
+        drawn = ws.apply_setting(hazed, ws.read_setting(composed, RULES), _case_context(), RULES)
+        assert drawn.preset["haze"] == light["for_haze"]["haze"]
+        # The fog stays, for a renderer that draws no haze, and the haze fades by its density.
+        assert drawn.preset["fog"] == light["changes"]["fog"]
+        assert drawn.preset["haze"]["density_micro"] == light["changes"]["fog"]["density_micro"]
+    # A clear sky keeps the look's own haze.
+    for key in ("clear_noon", "dusk"):
+        composed = ws.compose_setting({"sky": key}, hazed, _case_context(), PARTS)
+        assert "haze" not in composed["light"]["changes"]
+        drawn = ws.apply_setting(hazed, ws.read_setting(composed, RULES), _case_context(), RULES)
+        assert drawn.preset["haze"] == HAZE
+    # Over a computed sky and a haze, the mist draws its own sky and its own haze.
+    both = ws.compose_setting({"sky": "dawn_mist"}, _computed(hazed), _case_context(), PARTS)
+    assert both["light"]["changes"]["sky.model"] is None
+    assert both["light"]["changes"]["haze"] == _part_light("dawn_mist")["for_haze"]["haze"]
+
+
+def test_a_parts_haze_states_only_values_a_setting_may_change(tmp_path: Path) -> None:
+    source = json.loads((STYLE_PACKS / "settings" / ws.PARTS_FILE).read_text("utf-8"))
+    at = next(index for index, part in enumerate(source["parts"]) if part["key"] == "thick_fog")
+    source["parts"][at]["light"][0]["for_haze"]["tone_mapping"] = "linear"
+    (tmp_path / "settings").mkdir()
+    (tmp_path / "settings" / ws.PARTS_FILE).write_text(json.dumps(source), "utf-8")
+    with pytest.raises(style_packs.StylePackRefused) as refused:
+        ws.load_setting_parts(tmp_path / "settings", RULES)
+    assert (refused.value.reason, refused.value.path) == (
+        "reference",
+        f"parts[{at}].light[0].for_haze.tone_mapping",
+    )
+
+
 def test_a_sky_a_part_turns_to_the_gradient_takes_none_of_its_computed_figures(
     tmp_path: Path,
 ) -> None:
@@ -363,6 +432,20 @@ def test_the_earlier_parts_file_still_reads_and_composes_as_it_did(tmp_path: Pat
         {"sky": "clear_noon"}, _computed(_case_pack("town")), _case_context(), parts
     )
     assert composed["light"]["changes"]["sky.intensity_permille"] == 1000
+
+
+def test_version_3_still_reads_and_keeps_a_looks_own_haze(tmp_path: Path) -> None:
+    """Version 3, unread by the host, stays as it was: its thick fog over a look that states haze
+    leaves the look's haze, which then draws in place of the fog."""
+    earlier = (STYLE_PACKS / "settings" / "setting-parts.v3.json").read_text("utf-8")
+    assert '"version": 3' in earlier and "for_haze" not in earlier
+    (tmp_path / "settings").mkdir()
+    (tmp_path / "settings" / ws.PARTS_FILE).write_text(earlier, "utf-8")
+    parts = ws.load_setting_parts(tmp_path / "settings", RULES)
+    assert parts.version == 3 and parts.parts.keys() == PARTS.parts.keys()
+    hazed = _hazed(_case_pack("town"))
+    composed = ws.compose_setting({"sky": "thick_fog"}, hazed, _case_context(), parts)
+    assert "haze" not in composed["light"]["changes"]
 
 
 def test_a_parts_figures_for_a_computed_sky_name_a_model_and_values_a_setting_may_change(
