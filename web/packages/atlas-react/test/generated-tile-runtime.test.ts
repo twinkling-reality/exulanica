@@ -846,6 +846,25 @@ describe('a world of several tiles, drawn', () => {
     expect(served.worldTiles).toEqual(world.worldTiles);
   }, VERIFIED_LOAD_TIMEOUT_MS);
 
+  it('picks what any of its tiles draws, named by that tile and read in that tile\'s own header', () => {
+    // A ray straight down over every 4 m of the world: what it meets is the drawn record of whichever tile draws it.
+    const met = new Map<string, number>();
+    for (let x = 2000; x < 256000; x += 4000) {
+      for (let y = 2000; y < 128000; y += 4000) {
+        const [rx, , rz] = tileToRenderer(x, y, 0);
+        const hit = world.pick([rx, 50, rz], [0, -1, 0]);
+        if (hit === null) continue;
+        met.set(hit.tile, (met.get(hit.tile) ?? 0) + 1);
+        // The record the range draws is that tile's own record, of the range's kind.
+        expect(hit.header.records[hit.range.record]!.kind).toBe(hit.range.kind);
+      }
+    }
+    expect(met.get('the west half')).toBeGreaterThan(0);
+    // Positive control for the neighbour: before every drawn tile was picked, none of these met the east half.
+    expect(met.get('the east half')).toBeGreaterThan(0);
+    expect([...met.keys()].sort()).toEqual(['the east half', 'the west half']);
+  });
+
   it('draws the neighbour, and counts each tile under its own name rather than adding them up', () => {
     const renderOf = (bytes: Uint8Array): DecodedProjection =>
       decodeOwd(bytes).projections.find((projection) => projection.header.name === 'render_batch')!;

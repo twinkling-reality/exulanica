@@ -79,7 +79,7 @@ const post = {
  */
 /** A ground ring that keeps where it was laid, for a test of the held thing's ring. */
 interface Ring { place(at: { x: number; y: number; z: number }, radius: number): void; hide(): void; dispose(): void }
-async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null, peopleLive = false) {
+async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null, peopleLive = false, town: { readonly direction: readonly number[]; readonly record: unknown } | null = null) {
   const writes: Write[] = [], waiting: Array<(body: unknown) => void> = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -114,7 +114,12 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
     ? { thing: { pick: { placedId: 'bench:1' }, distance: picked.distance } } : null;
   // The generated region's root at the world's origin: a point of the region is the same point of the world.
   const regionRoots = new Map(ring === null ? [] : [['region:generated', { getWorldTransform: () => ({ transformPoint: (p: Point, out: Point) => out.set(p.x, p.y, p.z) }) }]]);
-  const b = { camera, regionRoots, authoredSociety, __workspaceThings: () => (view === null ? null : { layer }), __workspacePick: pick };
+  // With `town`, a made town whose tiles draw one record where that ray meets them.
+  const worldKind = town === null ? undefined : { ground: { form: 'generated-tile', tile: {
+    pick: (_: unknown, direction: unknown) => direction === town.direction
+      ? { range: { record: 0, kind: 'city.street_furniture' }, triangle: 0, distance: 6, tile: 'the market', header: { records: [town.record] } } : null,
+  } } };
+  const b = { camera, regionRoots, authoredSociety, worldKind, __workspaceThings: () => (view === null ? null : { layer }), __workspacePick: pick };
   const { mountBuildMode } = await build();
   mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false, groundRing: ring });
   /** The oldest preview still waiting is answered. */
@@ -477,5 +482,47 @@ describe('a new thing held from the tray faces the person placing it (W13 T5)', 
     expect(press(mode, 'Enter')).toBe(true);
     await vi.waitFor(() => expect(placed(writes)).toHaveLength(1));
     expect(placed(writes)[0]!.body.pose).toMatchObject({ yaw_microradians: 0 });
+  });
+});
+
+describe('a town\'s own thing is named and said to have come with the world (W13 T3)', () => {
+  const bin = towards(2, 0.5, -6);
+  const record = { kind: 'city.street_furniture', fields: { furniture_class: 'litter_bin' } };
+  /** The words on the page a person can see: those under no hidden element. */
+  const shownWords = (): string => [...document.body.querySelectorAll('*')]
+    .filter((element) => element.children.length === 0 && element.closest('[hidden]') === null)
+    .map((element) => element.textContent ?? '').join(' ');
+
+  it('names a chosen town bin with no prompts, and Delete and Turn change nothing: a positive control', async () => {
+    rays.set('700,300', bin.ray);
+    const { mode, writes } = await mount(null, null, null, false, { direction: bin.ray.direction, record });
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(700, 300)).toBe(true));
+    await settled();
+    await vi.waitFor(() => expect(shownWords()).toContain('Litter bin'));
+    expect(shownWords()).toContain('Made with this world');
+    // A thing's name tag floats on the shared small shade, so its words read over a sunlit canopy.
+    expect(document.querySelector('.wu-tag.wu-shade.wu-small')).not.toBeNull();
+    expect(shownWords()).not.toMatch(/Move|Remove|Turn/);
+    press(mode, 'Delete');
+    press(mode, 'BracketRight');
+    await settled();
+    expect(writes).toEqual([]);
+    // Esc lets it go, as it lets anything chosen go: its card is hidden.
+    expect(press(mode, 'Escape')).toBe(true);
+    await settled();
+    expect(shownWords()).not.toContain('Made with this world');
+    // Build mode stays open: the tray still shows.
+    expect(shownWords()).toContain('Things');
+  });
+
+  it('names nothing a town draws that is not one of its things', async () => {
+    rays.set('700,300', bin.ray);
+    const terrace = { kind: 'city.massing', fields: { typology: 'terrace' } };
+    const { mode } = await mount(null, null, null, false, { direction: bin.ray.direction, record: terrace });
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(700, 300)).toBe(true));
+    await settled();
+    expect(shownWords()).not.toContain('Made with this world');
   });
 });

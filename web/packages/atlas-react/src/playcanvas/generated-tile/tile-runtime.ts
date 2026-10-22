@@ -180,8 +180,8 @@ export interface GeneratedTileSources {
    *
    * A tile is 128,000 mm across and the route rule asks for 125,000 plus a 6,000 stopping margin, so
    * ground for a whole route does not fit on the tile a route is laid on. These are composed into
-   * the navigation world and into nothing else: NOT drawn, NOT picked, NOT measured, and no record
-   * of theirs reaches the page's list of what is undressed. Each is verified against its own digest
+   * the navigation world, drawn and picked with the tile, and NOT measured: no record of theirs
+   * reaches the page's list of what is undressed. Each is verified against its own digest
    * exactly as the tile is, because it is ground a person stands on.
    *
    * ONLY THE `nav_envelope` OF EACH IS READ. A caller that can serve a container's sections
@@ -203,6 +203,9 @@ export interface TilePick {
   readonly triangle: number;
   /** Along the ray, in metres. */
   readonly distance: number;
+  /** The drawn tile the range is one of, by name, and its header, whose records `range.record` indexes. */
+  readonly tile: string;
+  readonly header: OwdHeader;
 }
 
 export interface LoadedGeneratedTile extends GeneratedTileMount {
@@ -733,6 +736,15 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   let setBytes = 0;
   for (const set of prepared.values()) if (set.state === 'decoded') setBytes += set.transferredBytes;
 
+  // What a pick reads of each drawn tile, prepared on the first pick: most worlds are never picked.
+  let picking: readonly { readonly tile: DrawnTile; readonly drawn: readonly DrawnTileRange[]; readonly vertices: ArrayLike<number> }[] | null = null;
+  const pickable = () => (picking ??= planned.map((one, at) => ({
+    tile: one,
+    drawn: at === 0 ? drawn : one.ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
+      .sort((a, b) => a.firstTriangle - b.firstTriangle),
+    vertices: at === 0 ? vertices : absoluteVertices(one.render),
+  })));
+
   const rangeAtTriangle = (triangle: number): DrawnTileRange | null => {
     let low = 0;
     let high = drawn.length - 1;
@@ -762,14 +774,21 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
       const o = rendererToTile(origin[0], origin[1], origin[2]);
       // A direction is rotated, not translated or scaled: millimetres per metre cancel in the distance.
       const d = rendererToTile(direction[0], direction[1], direction[2]);
-      const at = (vertex: number): Vec3 => [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
       let best: TilePick | null = null;
-      for (const range of drawn) {
-        const entry = rayBox(o, d, range.extentMm);
-        if (entry === null || (best !== null && entry > best.distance)) continue;
-        for (let triangle = range.firstTriangle; triangle < range.firstTriangle + range.triangleCount; triangle += 1) {
-          const hit = rayTriangle(o, d, at(render.index[triangle * 3]!), at(render.index[triangle * 3 + 1]!), at(render.index[triangle * 3 + 2]!));
-          if (hit !== null && (best === null || hit < best.distance)) best = { range, triangle, distance: hit };
+      // EVERY DRAWN TILE IS PICKED, each by its own ranges, vertices and indices, so the nearest drawn
+      // triangle wins whichever tile draws it.
+      for (const one of pickable()) {
+        const at = (vertex: number): Vec3 => [one.vertices[vertex * 3]!, one.vertices[vertex * 3 + 1]!, one.vertices[vertex * 3 + 2]!];
+        const index = one.tile.render.index;
+        for (const range of one.drawn) {
+          const entry = rayBox(o, d, range.extentMm);
+          if (entry === null || (best !== null && entry > best.distance)) continue;
+          for (let triangle = range.firstTriangle; triangle < range.firstTriangle + range.triangleCount; triangle += 1) {
+            const hit = rayTriangle(o, d, at(index[triangle * 3]!), at(index[triangle * 3 + 1]!), at(index[triangle * 3 + 2]!));
+            if (hit !== null && (best === null || hit < best.distance)) {
+              best = { range, triangle, distance: hit, tile: one.tile.name, header: one.tile.header };
+            }
+          }
         }
       }
       return best;

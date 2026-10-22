@@ -24,7 +24,8 @@ import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/ind
 import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
-import { BUSY, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { townThingName } from './town-thing-names.mjs';
+import { BUSY, MADE_WITH_WORLD, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -34,6 +35,8 @@ import { NOTE_WORDS } from './world-words.mjs';
 const ASK_AFTER_MS = 180;
 /** How far a press moves (CSS pixels) before it carries what it holds: the page's own drag rule (contextual-world.ts). */
 const DRAG_PX = 4;
+/** How far above the pointer (CSS pixels) a town's own thing is named while the pointer is on it. */
+const TOWN_TAG_ABOVE_PX = 28;
 /** How much wider than the footprint's half diagonal the ring at a thing's foot is, so it encloses the outline's corners. */
 const RING_MARGIN = 1.18;
 /** How far below the eye a point grabbed on a thing is carried at most, in metres, so the pointer's ray still comes down to it. */
@@ -79,6 +82,9 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const worldQuery = '?world_id=' + encodeURIComponent(entry.worldId);
 
   const tag = nameTag({ scale });
+  // The name of a thing floats over whatever is behind it, a sunlit canopy included: the shared small shade keeps its
+  // words 3:1 by the ring measure (ruling W13b), as the creature stand's label is kept.
+  tag.root.classList.add('wu-shade', 'wu-small');
   const group = heldGroup();
   const names = namesNear();
   const trayView = tray({
@@ -96,6 +102,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   trayHeight.observe(trayView.root);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
+  /** The town's own thing the pointer is on, and the one chosen: named, never changed (W13 T3). */
+  let townHovered = null, townChosen = null;
   /** Whether the server refused removing what is chosen: its rows then offer moving it only. */
   let removeRefused = false;
   /**
@@ -159,7 +167,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   const things = () => b.__workspaceThings?.() ?? null;
   const focused = () => group.root.contains(document.activeElement) || trayView.root.contains(document.activeElement);
   const flags = () => ({
-    on, selected: selected !== null, placing: placing !== null, confirming: confirming !== null, moving: moving !== null,
+    // A town's own thing chosen is let go by Esc as anything chosen is; nothing else acts on it.
+    on, selected: selected !== null || townChosen !== null, placing: placing !== null, confirming: confirming !== null, moving: moving !== null,
     ready: (placing ?? moving)?.verdict.state === 'ready', refused: (placing ?? moving)?.verdict.state === 'refused',
     busy, removeRefused, focused: focused(),
   });
@@ -233,6 +242,18 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    */
   function placedAt(x, y) {
     return pickedAt(x, y)?.id ?? null;
+  }
+  /**
+   * The town's own thing a screen point meets first (one of its benches, bins, lamps or trees, from the town's tiles),
+   * named, or null: what came with the world, which build mode names and nothing changes (ruling W13 T3).
+   */
+  function townThingAt(x, y) {
+    const ground = b.worldKind?.ground;
+    if (ground?.form !== 'generated-tile' || typeof ground.tile?.pick !== 'function') return null;
+    const ray = pointerRay(b, x, y); if (!ray) return null;
+    const hit = ground.tile.pick(ray.origin, ray.direction);
+    const name = hit ? townThingName(hit.header?.records?.[hit.range.record]) : null;
+    return name === null ? null : { key: `${hit.tile}:${hit.range.record}`, name };
   }
   /** What `placedAt` meets, with how far along the pointer's ray (metres) and the ray itself, or null. */
   function pickedAt(x, y) {
@@ -366,7 +387,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const regionId = placingRegion();
     if (regionId === null) return;
     dropMove(); dropPlacing();
-    selected = null; confirming = null; failure = ''; removeRefused = false;
+    selected = null; townChosen = null; confirming = null; failure = ''; removeRefused = false;
     const name = tile.kind.source === 'workspace' ? thingName({ kind: tile.kind }, () => creatures?.find(made => made.sha256 === tile.kind.sha256)?.label ?? null) : thingName({ kind: tile.kind });
     placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' }, letGo: false, turnedByHand: false };
     const held = placing;
@@ -532,6 +553,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const line = verdict.state === 'refused' ? { words: verdict.words, refused: verdict.words !== BUSY } : verdict.words ? { words: verdict.words } : null;
       return { title: titled(placing.name), line, rows: rowsOf({ placing: true, ready: verdict.state === 'ready', refused: verdict.state === 'refused' }) };
     }
+    if (townChosen !== null && selected === null) return { title: titled(townChosen.name), line: { words: MADE_WITH_WORLD }, rows: [] };
     const name = nameOf(selected) || 'thing';
     if (confirming !== null) {
       // Said only where people live, as the clock's pill tells (W13 T4).
@@ -558,16 +580,22 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   function hideMarks() { chosen.hide(); copy.hide(); origin.hide(); trail.hide(); groundRing?.hide(); names.hide(); }
   /** Whether the held group and the marks show: building, something chosen or held, nothing over them. */
-  const groupShows = () => on && (selected !== null || placing !== null) && !inspecting();
+  const groupShows = () => on && (selected !== null || placing !== null || townChosen !== null) && !inspecting();
 
   function select(placedId) {
     dropMove(); dropPlacing();
-    selected = placedId; confirming = null; failure = ''; removeRefused = false;
+    selected = placedId; townChosen = null; confirming = null; failure = ''; removeRefused = false;
+    render();
+  }
+  /** Choose one of the town's own things: its name and where it came from, and nothing to change on it. */
+  function chooseTown(made) {
+    dropMove(); dropPlacing();
+    selected = null; townChosen = made; confirming = null; failure = ''; removeRefused = false;
     render();
   }
   function deselect() {
     dropMove(); dropPlacing();
-    selected = null; confirming = null; failure = ''; removeRefused = false;
+    selected = null; townChosen = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
   }
   function cancel() { confirming = null; failure = ''; removeRefused = false; render(); }
@@ -581,7 +609,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
   function leave() {
     dropMove(); dropPlacing();
-    on = false; hovered = null; tag.hide();
+    on = false; hovered = null; townHovered = null; townChosen = null; tag.hide();
     selected = null; confirming = null; failure = ''; removeRefused = false;
     render(); canvas.focus({ preventScroll: true });
   }
@@ -1088,7 +1116,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       // While it is asked about, the click lets it go there and the answer places it (placeNew, keepMove).
       if (placing !== null || moving !== null) { if ((placing ?? moving).verdict.state !== 'refused') act('place', false); return true; }
       const placedId = placedAt(x, y);
-      if (placedId === null) { if (selected !== null) deselect(); return true; }
+      if (placedId === null) {
+        const made = townThingAt(x, y);
+        if (made !== null) chooseTown(made);
+        else if (selected !== null || townChosen !== null) deselect();
+        return true;
+      }
       if (placedId !== selected) select(placedId);
       return true;
     },
@@ -1097,7 +1130,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (now - lastPick >= 50) {
         lastPick = now;
         hovered = pointer && !inspecting() && moving?.grip == null && placing === null ? placedAt(pointer.x, pointer.y) : null;
-        canvas.style.cursor = moving?.grip != null ? 'grabbing' : placing !== null ? 'crosshair' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : '';
+        townHovered = hovered === null && pointer && !inspecting() && moving === null && placing === null ? townThingAt(pointer.x, pointer.y) : null;
+        canvas.style.cursor = moving?.grip != null ? 'grabbing' : placing !== null ? 'crosshair' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : townHovered !== null ? 'pointer' : '';
         // A new thing's copy follows the pointer over the ground, until a click lets it go.
         if (placing !== null && !placing.letGo && pointer && !inspecting()) { const ground = groundAt(pointer.x, pointer.y); if (ground !== null) placeTo(ground, pointer.free); }
       }
@@ -1114,6 +1148,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         }
       }
       if (head && head.z > 0) { tag.set({ name: titled(nameOf(hovered)) }); tag.place(head.x, head.y); }
+      else if (townHovered !== null && townHovered.key !== townChosen?.key && pointer) {
+        tag.set({ name: titled(townHovered.name), doing: MADE_WITH_WORLD });
+        tag.place(pointer.x, pointer.y - TOWN_TAG_ABOVE_PX);
+      }
       else tag.hide();
       if (!groupShows()) { hideMarks(); lastPlacedKey = ''; }
       else {

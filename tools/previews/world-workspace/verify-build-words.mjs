@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
+import { townThingName } from './town-thing-names.mjs';
 
 // What build mode's note says: History's sentence for a change build mode made, or for an undo's or a redo's preview.
 const did = (edit, name, partName = () => null) => youChangeWords(changeParts(edit, [], () => name, partName));
@@ -65,6 +66,15 @@ for (const words of [refusalWords('http_403', ''), refusalWords(null, ''), remov
 // The remove question as the card draws it: the question, then what it does.
 assert.equal(removeTitle('bench'), 'Remove the bench?');
 assert.equal(removeLine(true), 'Nobody can use it from the next minute.');
+// A town's own things are named as the catalogs the town was made from name them, and said to have come with the
+// world (ruling W13 T3); anything else a town draws is no thing of it.
+assert.equal(MADE_WITH_WORLD, 'Made with this world');
+assert.equal(townThingName({ kind: 'city.street_furniture', fields: { furniture_class: 'litter_bin' } }), 'Litter bin');
+assert.equal(townThingName({ kind: 'city.street_furniture', fields: { furniture_class: 'sign_post' } }), 'Street name sign');
+assert.equal(townThingName({ kind: 'city.street_tree', fields: { species: 'platanus_x_acerifolia' } }), 'London planetree');
+assert.equal(townThingName({ kind: 'city.street_tree', fields: { species: 'unknown_tree' } }), 'Street tree');
+assert.equal(townThingName({ kind: 'city.massing', fields: { typology: 'terrace' } }), null);
+assert.equal(townThingName(undefined), null);
 // Where nobody lives yet the question stands alone (ruling W13 T4).
 assert.equal(removeLine(false), null);
 

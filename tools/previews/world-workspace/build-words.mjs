@@ -369,6 +369,8 @@ export function namesTogether(names) {
 
 /** The largest yaw a pose may state (one revolution, in microradians, as the server bounds it). */
 export const MAX_YAW = 6_283_185;
+/** What build mode says of a thing that came with the world and cannot be changed in it (ruling W13 T3). */
+export const MADE_WITH_WORLD = 'Made with this world';
 /** The degrees one press of [ or ] turns a thing, the step its turn snaps to. */
 export const TURN_DEGREES = 15;
 
