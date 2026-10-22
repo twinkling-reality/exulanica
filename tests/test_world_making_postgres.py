@@ -992,6 +992,30 @@ def test_an_allowance_left_below_a_draft_s_most_is_said_with_both_figures_before
     assert transport.requests == []
 
 
+def test_what_is_left_for_a_draft_counts_each_provider_at_most_its_ceiling():
+    """A provider with more left than its ceiling does not cover another that is short (N31, AUDIT's
+    O1): each provider's grant counts at most what the draft could reserve against it, so the offer
+    says the draft is short wherever one of its providers is, however much another has left."""
+    from types import SimpleNamespace
+
+    from exulanica.api.routes.world_making import _left_for
+
+    quote = {
+        "maximum_usd": "2",
+        "providers": [
+            {"provider": "plenty", "ceiling_usd": "1"},
+            {"provider": "short", "ceiling_usd": "1"},
+        ],
+    }
+    figures = SimpleNamespace(available_usd={"plenty": Decimal("5"), "short": Decimal("0.2")})
+    services = SimpleNamespace(spending_refusals=lambda _connection, _workspace: figures)
+    left = _left_for(services, None, uuid.uuid4(), quote)
+    assert left == Decimal("1.2") < Decimal(quote["maximum_usd"])
+    # Every provider covered: the whole most, no more.
+    figures.available_usd["short"] = Decimal("3")
+    assert _left_for(services, None, uuid.uuid4(), quote) == Decimal("2")
+
+
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _SHA256 = re.compile(r"\b[0-9a-f]{64}\b")
 _MOMENT = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)")

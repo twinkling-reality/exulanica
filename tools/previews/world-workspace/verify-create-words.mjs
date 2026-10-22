@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, madeSpent, priceLine,
+  CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, leftAmount, madeSpent, priceLine,
   priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime,
 } from './create-words.mjs';
 
@@ -53,6 +53,18 @@ assert.equal(ceilingAmount('1.4300001'), '$1.44');
 assert.equal(budgetShort('1.4227', '0.5'),
   'Making a world from your words can cost up to $1.43, more than the $0.50 left for AI models here. You can still start from these:');
 assert.equal(budgetShort('1.4227', '0.509'), budgetShort('1.4227', '0.5'));
+// Under a cent left: P1's four places rounded down, never "$0" while something is left.
+assert.equal(leftAmount('0.00428'), '$0.0042');
+assert.equal(leftAmount('0.0099999'), '$0.0099');
+assert.equal(leftAmount('0.01'), '$0.01');
+assert.equal(leftAmount('0.00004'), 'less than $0.0001');
+assert.equal(leftAmount('0.00009'), 'less than $0.0001');
+assert.equal(leftAmount('0'), '$0');
+assert.equal(budgetShort('1.4227', '0.00428'),
+  'Making a world from your words can cost up to $1.43, more than the $0.0042 left for AI models here. You can still start from these:');
+// Below a ten-thousandth the sentence turns rather than say "more than the less than".
+assert.equal(budgetShort('1.4227', '0.00004'),
+  'Making a world from your words can cost up to $1.43, and less than $0.0001 is left for AI models here. You can still start from these:');
 // N32: a higher price is said with its new figure; the same or a lower one is never said at all.
 assert.equal(priceUp(ceilingAmount('1.6')), 'The price went up before it started. It can now spend at most $1.60.');
 assert.equal(madeSpent({ spentUsd: 0.0042 }, '1.43'), '$0.0042 of the $1.43 set aside');

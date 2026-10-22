@@ -95,12 +95,32 @@ export const REFUSAL_BY_CODE = Object.freeze({
 });
 
 /**
- * Making from words costs more than the budget has left (N31), from the two served figures: the
- * offer's most, rounded up to the cent as the price line says it, and what is left, rounded down so
- * it never says more than there is. In place of the field, naming the cards under it (N7).
+ * What is left of a budget, rounded down so it never says more than there is, and never "$0" while
+ * something is left: whole cents from a cent up, P1's four places below a cent ("$0.0042"), and
+ * "less than $0.0001" below that (N31 as built, DESIGN's later touch).
  */
-export const budgetShort = (maximumUsd, leftUsd) =>
-  `Making a world from your words can cost up to ${ceilingAmount(maximumUsd)}, more than the ${amount(Math.floor(Number(leftUsd) * 100 + 1e-9) / 100)} left for AI models here. You can still start from these:`;
+export function leftAmount(usd) {
+  const value = Number(usd);
+  if (!(value > 0)) return amount(0);
+  if (value >= 0.01) return amount(Math.floor(value * 100 + 1e-9) / 100);
+  const four = Math.floor(value * 10000 + 1e-9) / 10000;
+  // Under a ten-thousandth: amount's own words for any figure that small, "less than $0.0001".
+  return four > 0 ? amount(four) : amount(0.00001);
+}
+
+/**
+ * Making from words costs more than the budget has left (N31), from the two served figures: the
+ * offer's most, rounded up to the cent as the price line says it, and what is left (`leftAmount`).
+ * Below a ten-thousandth the sentence turns, as "more than the less than" would not read (DESIGN,
+ * N31's later touch). In place of the field, naming the cards under it (N7).
+ */
+export function budgetShort(maximumUsd, leftUsd) {
+  const most = ceilingAmount(maximumUsd), left = Number(leftUsd);
+  const tiny = left > 0 && Math.floor(left * 10000 + 1e-9) === 0;
+  return tiny
+    ? `Making a world from your words can cost up to ${most}, and ${leftAmount(leftUsd)} is left for AI models here. You can still start from these:`
+    : `Making a world from your words can cost up to ${most}, more than the ${leftAmount(leftUsd)} left for AI models here. You can still start from these:`;
+}
 
 /** A start refused for its price whose new most is higher than the one agreed to (N32): "$1.60" in, the sentence out. */
 export const priceUp = (figure) => `The price went up before it started. It can now spend at most ${figure}.`;
