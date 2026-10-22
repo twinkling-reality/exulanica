@@ -1271,7 +1271,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyM' && being && groupActions.has('model')) { event.preventDefault(); if (!event.repeat) act('model'); event.stopImmediatePropagation(); return; }
     }
-    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn() }, Boolean((event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt')));
+    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn(), scene: root.dataset.scene === 'talking' }, Boolean((event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
     if (fate === 'inspect') void choose();

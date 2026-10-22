@@ -4,7 +4,8 @@
 // - 'move': the renderer's own movement keys go on to it (W A S D, arrows, Shift, F; Space and C only
 //   while flying);
 // - 'inspect', 'leave', 'play', 'history': the workspace's own keys; 'bring-in': P where nobody lives
-//   yet and the clock's corner offers to bring people in (K13);
+//   yet and the clock's corner offers to bring people in (K13); E inspects nobody while the talking
+//   scene shows, since the reticle and the look tag are hidden under it;
 // - 'pass': Tab moves the focus, and Enter presses a focused corner prompt, as anywhere;
 // - 'quiet': a combination with Cmd, Ctrl or Alt the workspace does not use goes no further (the old
 //   shell's Cmd+K palette included) but keeps the browser's own shortcut (no preventDefault);
@@ -14,15 +15,16 @@
 const MOVING = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 
 /**
- * `state`: { flying, clock, history, bringIn } where clock says whether the world has a clock to play
- * (people live there), history whether H opens History here and bringIn whether the clock's corner
- * offers to bring people in; `onPrompt` whether the key's target is a corner prompt (a button).
+ * `state`: { flying, clock, history, bringIn, scene } where clock says whether the world has a clock to
+ * play (people live there), history whether H opens History here, bringIn whether the clock's corner
+ * offers to bring people in and scene whether the talking scene shows; `onPrompt` whether the key's
+ * target is a corner prompt (a button).
  */
 export function worldKey(event, state, onPrompt = false) {
   if (event.metaKey || event.ctrlKey || event.altKey) return 'quiet';
   if (MOVING.has(event.code) || event.code === 'KeyF') return 'move';
   if (state.flying && (event.code === 'Space' || event.code === 'KeyC')) return 'move';
-  if (event.code === 'KeyE') return event.repeat ? 'silence' : 'inspect';
+  if (event.code === 'KeyE') return event.repeat || state.scene ? 'silence' : 'inspect';
   if (event.code === 'Escape') return event.repeat ? 'silence' : 'leave';
   if (event.code === 'KeyP') return event.repeat ? 'silence' : state.clock ? 'play' : state.bringIn ? 'bring-in' : 'silence';
   if (event.code === 'KeyH') return state.history && !event.repeat ? 'history' : 'silence';

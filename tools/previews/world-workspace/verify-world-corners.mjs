@@ -38,6 +38,9 @@ assert.equal(worldKey(key('Space'), air), 'move');
 assert.equal(worldKey(key('KeyC'), air), 'move');
 assert.equal(worldKey(key('KeyE'), ground), 'inspect');
 assert.equal(worldKey(key('KeyE', { repeat: true }), ground), 'silence');
+// Under the talking scene the reticle and the look tag are hidden, so E chooses nobody there.
+assert.equal(worldKey(key('KeyE'), { ...ground, scene: true }), 'silence', 'E chooses nobody under the scene');
+assert.equal(worldKey(key('KeyE'), { ...ground, scene: false }), 'inspect');
 assert.equal(worldKey(key('Escape'), ground), 'leave');
 assert.equal(worldKey(key('KeyP'), ground), 'play');
 assert.equal(worldKey(key('KeyP'), empty), 'silence', 'no clock, no P (K5)');
