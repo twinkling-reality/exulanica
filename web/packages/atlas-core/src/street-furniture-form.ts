@@ -516,15 +516,21 @@ function tube(out: Builder, parts: readonly FurniturePart[], through: readonly (
     const [a, b] = [rings[at - 1]!, rings[at]!];
     for (let k = 0; k < segments; k += 1) out.indices.push(a[k]!, b[k + 1]!, b[k]!, a[k]!, a[k + 1]!, b[k + 1]!);
   }
-  // Its two ends closed, so the tube is a solid like every other form.
-  const cap = (ring: readonly number[], centre: Vec3, outward: boolean): void => {
-    const middle = out.vertex(centre, 0, 0);
+  // Its two ends closed, so the tube is a solid like every other form: each end a flat disc facing out along the
+  // tube, on its own vertices as a lathe's disc is, so the end's edge stays sharp. A disc sharing the wall's ring
+  // would lean the wall's normals there toward its own, shading a straight run as if it bent toward its end.
+  const cap = (ring: readonly number[], centre: Vec3, facing: Vec3, start: boolean): void => {
+    const corner = (index: number): Vec3 => [out.positions[index * 3]!, out.positions[index * 3 + 1]!, out.positions[index * 3 + 2]!];
+    const middle = out.vertex(centre, ...flatSt(centre, facing));
+    const around = ring.slice(0, segments).map((index) => out.vertex(corner(index), ...flatSt(corner(index), facing)));
     for (let k = 0; k < segments; k += 1) {
-      if (outward) out.indices.push(middle, ring[k]!, ring[k + 1]!); else out.indices.push(middle, ring[k + 1]!, ring[k]!);
+      const [a, b] = [around[k]!, around[(k + 1) % segments]!];
+      // A ring runs counter-clockwise round the way the tube runs, so its start faces back against its order.
+      if (start) out.indices.push(middle, b, a); else out.indices.push(middle, a, b);
     }
   };
-  cap(rings[0]!, path[0]!, true);
-  cap(rings[rings.length - 1]!, path[path.length - 1]!, false);
+  cap(rings[0]!, path[0]!, norm(sub(path[0]!, path[1]!)), true);
+  cap(rings[rings.length - 1]!, path[path.length - 1]!, norm(sub(path[path.length - 1]!, path[path.length - 2]!)), false);
   return true;
 }
 

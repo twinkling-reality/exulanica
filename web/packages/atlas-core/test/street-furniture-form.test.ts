@@ -56,6 +56,26 @@ function unpairedEdges(surfaces: readonly FurnitureSurface[]): string[] {
   return [...count].filter(([edge, n]) => count.get(edge.split(' ').reverse().join(' ')) !== n).map(([edge]) => edge);
 }
 
+/** A surface's normals as the page makes them (PlayCanvas `calculateNormals`): each vertex's triangles' unit normals, summed and normalised. */
+function pageNormals(surface: FurnitureSurface): number[] {
+  const normals = surface.positions.map(() => 0);
+  const p = (i: number): number[] => [surface.positions[i * 3]!, surface.positions[i * 3 + 1]!, surface.positions[i * 3 + 2]!];
+  for (let t = 0; t < surface.indices.length; t += 3) {
+    const corners = [surface.indices[t]!, surface.indices[t + 1]!, surface.indices[t + 2]!];
+    const [a, b, c] = corners.map(p) as [number[], number[], number[]];
+    const u = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!];
+    const v = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!];
+    const face = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+    const length = Math.hypot(...face);
+    for (const corner of corners) for (let k = 0; k < 3; k += 1) normals[corner * 3 + k] = normals[corner * 3 + k]! + face[k]! / length;
+  }
+  for (let at = 0; at < normals.length; at += 3) {
+    const length = Math.hypot(normals[at]!, normals[at + 1]!, normals[at + 2]!);
+    for (let k = 0; k < 3; k += 1) normals[at + k] = normals[at + k]! / length;
+  }
+  return normals;
+}
+
 /** A form of one class with only one of its draws, to hold that draw to its own envelope. */
 function onlyDraw(form: FurnitureForm, at: number): FurnitureForms {
   return { version: 1, byClass: new Map([[form.key, { ...form, draws: [form.draws[at]!] }]]), bySlotLeaf: new Map() };
@@ -174,10 +194,33 @@ describe('street furniture forms drawn', () => {
         const box = (envelope.max[0] - envelope.min[0]) * (envelope.max[1] - envelope.min[1]) * (envelope.max[2] - envelope.min[2]);
         expect(enclosed, `${key} draw ${at}`).toBeGreaterThan(0);
         expect(enclosed, `${key} draw ${at}`).toBeLessThanOrEqual(box * 1.000001);
-        // A tube's edges do not pair by position at this rounding (not looked into); every other draw closes exactly.
-        if (draw.form !== 'tube') expect(unpairedEdges(surfaces), `${key} draw ${at}`).toEqual([]);
+        // A face turned inward crosses its edges the same way as its neighbours, so an end of a tube that faced into it
+        // (its volume unchanged, the cycle stand's ends lying at height 0) leaves its rim unpaired.
+        expect(unpairedEdges(surfaces), `${key} draw ${at}`).toEqual([]);
       });
     }
+  });
+
+  it('shades a cycle stand\'s posts level down to the ground: its ends are flat discs facing out on their own vertices', () => {
+    // The page makes a vertex's normal from the unit normals of the triangles that use it (calculateNormals). An end
+    // sharing the wall's last ring leaned the normals there toward its own, so each post's straight run from the
+    // ground to its bend shaded as if it curled toward the sky (or the ground) at its foot.
+    const [tube] = furnitureFormSurfaces(forms, 'cycle_stand', partsOf('cycle_stand'))!;
+    const normals = pageNormals(tube!);
+    // Both posts stand on the ground: every vertex there is a foot's, facing straight down, or a wall's, level.
+    let walls = 0, feet = 0;
+    for (let at = 0; at < tube!.positions.length / 3; at += 1) {
+      if (tube!.positions[at * 3 + 2] !== 0) continue;
+      const nz = normals[at * 3 + 2]!;
+      if (nz === -1) feet += 1;
+      else {
+        // Level to a ten-thousandth: the run's top ring tilts a little into the bend; a shared end leaned it 0.7.
+        expect(Math.abs(nz), `vertex ${at}`).toBeLessThan(1e-4);
+        walls += 1;
+      }
+    }
+    // Each foot a centre and its 12 corners; each wall's ring 13 vertices, its first and last meeting where s wraps.
+    expect([feet, walls]).toEqual([2 * 13, 2 * 13]);
   });
 
   it('lays slats with their gaps and frames with their bars, as stated', () => {
