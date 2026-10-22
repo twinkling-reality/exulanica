@@ -14,7 +14,7 @@ import {
   createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, quietCommand, sentenceField, sentenceRow, setOrbReady,
   type FilmStrip, type LightPage, type SentenceField,
 } from './world-ui-create.ts';
-import { CREATE_WORDS, ceilingAmount, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
+import { CREATE_WORDS, budgetShort, ceilingAmount, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
 import {
   MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards, writeMade,
 } from './create-steps.mjs';
@@ -141,11 +141,12 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     sentenceId = null;
     if (rawOffer === null) {
       head.push(lightLine(offerOffline ? CREATE_WORDS.offline : CREATE_WORDS.loading, { live: true }));
-    } else if (state.page === 'no-model' || state.page === 'budget' || state.page === 'not-offered') {
-      // No field and no orb (N7, N24, N25): the sentence, which names the cards under it.
+    } else if (state.page === 'no-model' || state.page === 'budget' || state.page === 'short' || state.page === 'not-offered') {
+      // No field and no orb (N7, N24, N25, N31): the sentence, which names the cards under it.
       const sentence = document.createElement('p'); sentence.className = 'wu-light-sentence';
       sentence.id = sentenceId = 'wu-create-sentence';
-      sentence.textContent = state.page === 'no-model' ? CREATE_WORDS.noModel : state.page === 'budget' ? CREATE_WORDS.budgetSpent : CREATE_WORDS.notOffered;
+      sentence.textContent = state.page === 'no-model' ? CREATE_WORDS.noModel : state.page === 'budget' ? CREATE_WORDS.budgetSpent
+        : state.page === 'short' ? budgetShort(state.maximumUsd, state.leftUsd) : CREATE_WORDS.notOffered;
       head.push(sentence);
       field = null; orb = null;
     } else {

@@ -81,6 +81,10 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_exceeds_left",
+    "meaning": "The most a draft may spend is more than this workspace has left."
+   },
+   {
     "code": "world_draft_bound_too_small",
     "meaning": "The confirmed ceiling cannot cover this operation."
    },
@@ -369,7 +373,8 @@
     }
    ],
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-  }
+  },
+  "left_usd": null
  },
  "started": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -687,6 +692,10 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_exceeds_left",
+    "meaning": "The most a draft may spend is more than this workspace has left."
+   },
+   {
     "code": "world_draft_bound_too_small",
     "meaning": "The confirmed ceiling cannot cover this operation."
    },
@@ -842,6 +851,10 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_exceeds_left",
+    "meaning": "The most a draft may spend is more than this workspace has left."
+   },
+   {
     "code": "world_draft_bound_too_small",
     "meaning": "The confirmed ceiling cannot cover this operation."
    },
@@ -914,7 +927,8 @@
     "meaning": "This server's database role cannot register a world."
    }
   ],
-  "operation": null
+  "operation": null,
+  "left_usd": null
  },
  "ready_place": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -1481,6 +1495,10 @@
    {
     "code": "unknown_reference",
     "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_bound_exceeds_left",
+    "meaning": "The most a draft may spend is more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",
@@ -2071,6 +2089,10 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_exceeds_left",
+    "meaning": "The most a draft may spend is more than this workspace has left."
+   },
+   {
     "code": "world_draft_bound_too_small",
     "meaning": "The confirmed ceiling cannot cover this operation."
    },
@@ -2512,6 +2534,10 @@
    {
     "code": "unknown_reference",
     "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_bound_exceeds_left",
+    "meaning": "The most a draft may spend is more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",

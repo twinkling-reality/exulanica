@@ -51224,6 +51224,17 @@
        }
       ],
       "title": "Operation"
+     },
+     "left_usd": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Left Usd"
      }
     },
     "type": "object",

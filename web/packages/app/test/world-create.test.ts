@@ -294,6 +294,21 @@ describe('Create a world as a page', () => {
     expect(document.querySelector<HTMLButtonElement>('.wu-light-orb')!.disabled).toBe(true);
   });
 
+  it('says what making could cost against what is left, with no field, where the budget left is short (N31)', async () => {
+    serve(offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.5' }));
+    await mount();
+    const text = document.body.textContent!;
+    expect(text).toContain('Making a world from your words can cost up to $1.43, more than the $0.50 left for AI models here. You can still start from these:');
+    expect(text).not.toContain('The budget for AI models here is spent.');
+    expect(document.querySelector('.wu-light-field')).toBeNull();
+  });
+
+  it('still says a spent budget is spent: a control for N31', async () => {
+    serve(offerOf({ offered: false, code: 'budget_exceeded', operation: null }));
+    await mount();
+    expect(document.body.textContent).toContain('The budget for AI models here is spent. You can still start from these:');
+  });
+
   it('opens with the focus in the field and starts once for Enter, with the same key on a retry', async () => {
     serve(offerOf());
     await mount();

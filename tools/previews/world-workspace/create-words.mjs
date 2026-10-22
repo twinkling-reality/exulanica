@@ -94,8 +94,16 @@ export const REFUSAL_BY_CODE = Object.freeze({
   world_not_drafted: 'notDrafted',
 });
 
+/**
+ * Making from words costs more than the budget has left (N31), from the two served figures: the
+ * offer's most, rounded up to the cent as the price line says it, and what is left, rounded down so
+ * it never says more than there is. In place of the field, naming the cards under it (N7).
+ */
+export const budgetShort = (maximumUsd, leftUsd) =>
+  `Making a world from your words can cost up to ${ceilingAmount(maximumUsd)}, more than the ${amount(Math.floor(Number(leftUsd) * 100 + 1e-9) / 100)} left for AI models here. You can still start from these:`;
+
 /** A start refused for its price whose new most is higher than the one agreed to (N32): "$1.60" in, the sentence out. */
-export const priceUp = (amount) => `The price went up before it started. It can now spend at most ${amount}.`;
+export const priceUp = (figure) => `The price went up before it started. It can now spend at most ${figure}.`;
 
 /** The sentence for a refusal's code; never the code, its `meaning` or its `detail`. */
 export function refusalWords(code) {

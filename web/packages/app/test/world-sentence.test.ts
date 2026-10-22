@@ -67,7 +67,7 @@ const ready = wire('ready', {
 const offerWire = (extra: Record<string, unknown> = {}) => ({
   operation: null, offered: true, code: null, detail: null, calls_at_most: 5,
   starts: { an_hour: 12, left: 12, retry_after_seconds: null },
-  description_characters: 1000, running_draft_id: null,
+  description_characters: 1000, running_draft_id: null, left_usd: null,
   refusals: [...REFUSALS, { code: 'world_limit_reached', meaning: 'The workspace already holds as many worlds as it may.' }],
   ...extra,
 });

@@ -607,6 +607,7 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         registry.starts_per_hour = 2
         before = _offer(client)
         assert (before["offered"], before["code"], before["detail"]) == (True, None, None)
+        assert before["left_usd"] is None  # Nothing short: no figure of what is left is said.
         # The operation sheet includes bounded transport attempts and both native paths.
         assert before["calls_at_most"] == before["operation"]["calls_at_most"]
         assert before["operation"]["estimate_is_expected_spend"] is False
@@ -937,6 +938,58 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
         bound = connection.execute("select bound_id from world_draft_bound").fetchall()
         used = connection.execute("select bound_id from spending_reservation").fetchall()
     assert {row["bound_id"] for row in used} <= {row["bound_id"] for row in bound}
+
+
+def test_an_allowance_left_below_a_draft_s_most_is_said_with_both_figures_before_a_word(
+    drafts, spine_schema, tmp_path
+):
+    """A workspace whose allowances have something left, but less than the most one draft may
+    spend, is told so by the offer with what is left (N31): not that its budget is spent."""
+    from exulanica.api.world_draft_offer import read_operation_sheet
+    from exulanica.spending.ledger import DurableSpending, holder_label
+    from exulanica.spending.operator import SpendingOperator
+    from exulanica.spending.witness import FileSpendingWitness
+
+    from tests_support_api import scratch_database
+
+    app, transport = drafts
+    _psycopg, scratch = spine_schema
+    database = scratch_database(scratch)
+    witness = FileSpendingWitness(tmp_path / "spending-witness", lock_timeout_s=5.0)
+    operator = SpendingOperator(database, witness)
+    until = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    durable = DurableSpending(database, witness, holder=holder_label("world-drafts"))
+    with app(spending=durable) as client:
+        quoted = read_operation_sheet(client.app.state.services.model_client)
+        # Each provider the operation reserves against is granted half its ceiling.
+        halves = {p["provider"]: Decimal(p["ceiling_usd"]) / 2 for p in quoted["providers"]}
+        for provider, half in sorted(halves.items()):
+            authority = operator.issue(
+                provider=provider,
+                ceiling_usd=Decimal("10"),
+                max_calls=1000,
+                valid_until=until,
+                dispatch_seconds=60,
+                witnessed=True,
+                operator="test-operator",
+                reason="a test installation's allowance",
+            )
+            operator.grant(
+                authority,
+                _workspace(),
+                ceiling_usd=half,
+                max_calls=100,
+                valid_until=until,
+                operator="test-operator",
+                reason="a test workspace's small allowance",
+            )
+        short = _offer(client)
+    assert (short["offered"], short["code"]) == (False, "world_draft_bound_exceeds_left")
+    assert short["code"] in {code["code"] for code in short["refusals"]}
+    # Both figures are served: the most it may spend, and what is left for it here.
+    assert Decimal(short["operation"]["maximum_usd"]) == Decimal(quoted["maximum_usd"])
+    assert Decimal(short["left_usd"]) == sum(halves.values())
+    assert transport.requests == []
 
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")

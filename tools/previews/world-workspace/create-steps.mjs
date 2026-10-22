@@ -18,11 +18,14 @@ export const NO_MODEL_CODES = Object.freeze(['provider_credential_absent', 'kind
 export const NOT_OFFERED_CODES = Object.freeze(['not_authorised', 'world_draft_spending_not_durable', 'world_draft_worker_not_running']);
 /** Offer codes that mean the budget for AI models is spent (J22, M11). */
 export const BUDGET_CODES = Object.freeze(['budget_exceeded', 'process_budget_spent', 'process_share_spent']);
+/** The offer code where the budget has something left, but less than making could cost (N31), served with both figures. */
+export const SHORT_CODE = 'world_draft_bound_exceeds_left';
 
 /**
  * The page's state from the offer read (`GET /worlds/drafts`, raw): 'loading' before it answers;
- * 'following' where this person's draft runs (N12 opens frame 21); 'no-model' and 'budget' put the
- * sentence in place of the field and orb (N7); 'refused' carries a code said under the field (N9);
+ * 'following' where this person's draft runs (N12 opens frame 21); 'no-model', 'budget' and 'short'
+ * (the budget left is less than making could cost, with both figures, N31) put the sentence in place
+ * of the field and orb (N7); 'refused' carries a code said under the field (N9);
  * 'offered' otherwise.
  */
 export function offerState(offer) {
@@ -33,6 +36,11 @@ export function offerState(offer) {
   if (NO_MODEL_CODES.includes(code)) return { page: 'no-model' };
   if (NOT_OFFERED_CODES.includes(code)) return { page: 'not-offered' };
   if (BUDGET_CODES.includes(code)) return { page: 'budget' };
+  // Told apart from a spent budget by its served code and figures, never by the detail's words (N31).
+  if (code === SHORT_CODE) {
+    const most = offer.operation?.maximum_usd, left = offer.left_usd;
+    return typeof most === 'string' && typeof left === 'string' ? { page: 'short', maximumUsd: most, leftUsd: left } : { page: 'budget' };
+  }
   return { page: 'refused', code };
 }
 
