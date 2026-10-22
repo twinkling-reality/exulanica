@@ -5,12 +5,12 @@
 // The app's modules are named by their paths, which the preview serves as /src/… (one module each) and the tests load.
 import { accessHeaders } from '../../../web/packages/app/src/config.ts';
 import { frameJpeg, ownWorldPicture, takeFrame, type PictureSource } from '../../../web/packages/app/src/composition/world-pictures.ts';
-import { HistoryPicturesClient, type HistoryPicture } from '../../../web/packages/app/src/world-pictures-api.ts';
+import { HistoryPicturesClient } from '../../../web/packages/app/src/world-pictures-api.ts';
 import type { SavedWorldEntry } from '../../../web/packages/app/src/world-entry-api.ts';
 import type { TransportOptions } from '@exulanica/graph-client';
 import { inhabitantCatalog, type CharacterCatalog } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
-import { renderBeginningPicture, renderMomentPicture, type MomentForPicture } from './moment-pictures.ts';
+import { renderBeginningPicture, renderMomentPicture, type MomentForPicture, type MomentPicture } from './moment-pictures.ts';
 import type { ThingCrowdFigures, ThingLayer } from '../../../web/packages/atlas-react/src/playcanvas/things/index.ts';
 import { lookDigest, lookOfSubject, renderPortrait } from './portrait-pictures.ts';
 
@@ -78,11 +78,11 @@ export interface RecordPictures {
   /** How the world began: its kept picture, else its first view drawn once (MOTION's renderBeginningPicture). */
   beginningPicture(signal?: AbortSignal): Promise<string | null>;
   /** A kept picture's address (read once as bytes: an object address), or null where it cannot be read. */
-  pictureAddress(picture: HistoryPicture | null | undefined): Promise<string | null>;
+  pictureAddress(picture: MomentPicture | null | undefined): Promise<string | null>;
   /** A kept picture's address where it is read already; else null, its read starts and `changed` follows. */
-  pictureNow(picture: HistoryPicture | null | undefined): string | null;
+  pictureNow(picture: MomentPicture | null | undefined): string | null;
   /** A moment's missing picture, made once and kept (MOTION's renderMomentPicture), one draw at a time. */
-  renderMomentPicture(moment: MomentForPicture, signal?: AbortSignal): Promise<HistoryPicture | null>;
+  renderMomentPicture(moment: MomentForPicture, signal?: AbortSignal): Promise<MomentPicture | null>;
   /** A moment's picture address where it is known; else null, its picture is read or made and `changed` follows. */
   momentNow(moment: MomentForPicture | null | undefined): string | null;
   /** A character's round portrait, kept or made once from its look; null where it cannot be made. */
@@ -96,7 +96,8 @@ export interface RecordPictures {
 }
 
 /**
- * The pictures of one world for its pages. Addresses are object addresses made from the bytes read (the preview's
+ * The pictures of one world for its pages. Addresses are object addresses made from the bytes read, or from a
+ * moment's picture drawn here that the server did not keep (the preview's
  * reader does not pass an image's bytes to an <img>), each made once per page and kept until the page closes or
  * the world goes (release, dispose); a draw never makes or revokes one. Drawing a moment or a portrait makes a
  * stage of its own, so they are made one at a time. A read that fails answers null and is not asked again until
@@ -113,7 +114,7 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
   const made = new Set<string>();
   const addresses = new Map<string, Promise<string | null>>();
   const known = new Map<string, string | null>();
-  const rendered = new Map<string, HistoryPicture | null>();
+  const rendered = new Map<string, MomentPicture | null>();
   const rendering = new Set<string>();
   const portraits = new Map<string, Promise<string | null>>();
   const portraitKnown = new Map<string, string | null>();
@@ -139,13 +140,16 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     }
   }
 
-  function pictureAddress(picture: HistoryPicture | null | undefined): Promise<string | null> {
+  function pictureAddress(picture: MomentPicture | null | undefined): Promise<string | null> {
     if (disposed || !picture?.sha256) return Promise.resolve(null);
     const held = addresses.get(picture.sha256);
     if (held) return held;
     const own = lifetime.signal;
-    const reading = client(own).picture(entry.worldId, picture.sha256)
-      .then((bytes) => (own.aborted ? null : keep(URL.createObjectURL(bytes))), () => null);
+    // A picture drawn here that the server did not keep is shown from its own bytes, for this page only.
+    const unkept = picture.unkept;
+    const reading = unkept ? Promise.resolve(keep(URL.createObjectURL(unkept)))
+      : client(own).picture(entry.worldId, picture.sha256)
+        .then((bytes) => (own.aborted ? null : keep(URL.createObjectURL(bytes))), () => null);
     addresses.set(picture.sha256, reading);
     void reading.then((address) => {
       if (own.aborted) return;
@@ -194,14 +198,14 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     return making;
   }
 
-  function pictureNow(picture: HistoryPicture | null | undefined): string | null {
+  function pictureNow(picture: MomentPicture | null | undefined): string | null {
     if (!picture?.sha256) return null;
     if (known.has(picture.sha256)) return known.get(picture.sha256) ?? null;
     void pictureAddress(picture);
     return null;
   }
 
-  function renderMoment(moment: MomentForPicture, signal?: AbortSignal): Promise<HistoryPicture | null> {
+  function renderMoment(moment: MomentForPicture, signal?: AbortSignal): Promise<MomentPicture | null> {
     if (disposed) return Promise.resolve(null);
     const own = lifetime.signal;
     return serial(() => (own.aborted || signal?.aborted ? Promise.resolve(null)
@@ -290,7 +294,7 @@ export function historyHooks(pictures: RecordPictures) {
   return {
     still: () => pictures.still(),
     beginningPicture: (signal: AbortSignal) => pictures.beginningPicture(signal),
-    pictureAddress: (picture: HistoryPicture) => pictures.pictureAddress(picture),
+    pictureAddress: (picture: MomentPicture) => pictures.pictureAddress(picture),
     renderMomentPicture: (moment: MomentForPicture, signal: AbortSignal) => pictures.renderMomentPicture(moment, signal),
     portrait: (subjectId: string, signal: AbortSignal) => pictures.portrait(subjectId, signal),
   };

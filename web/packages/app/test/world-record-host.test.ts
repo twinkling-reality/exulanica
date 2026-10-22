@@ -25,7 +25,10 @@ vi.mock('../src/world-pictures-api.ts', () => ({
 vi.mock('../../atlas-react/src/playcanvas/index.ts', () => ({ inhabitantCatalog: () => { if (people.served) return {}; throw new Error('the people are not served yet'); } }));
 vi.mock('../../../../tools/previews/world-workspace/moment-pictures.ts', () => ({
   renderBeginningPicture: async () => null,
-  renderMomentPicture: async () => ({ sha256: 'b'.repeat(64), width: 600, height: 340 }),
+  // A moment the server would not keep (m6) comes back drawn, with its own bytes; any other comes back kept.
+  renderMomentPicture: async ({ moment }: { moment: { moment_id: string } }) => (moment.moment_id === 'm6'
+    ? { sha256: 'unkept:m6', width: 600, height: 340, unkept: new Blob(['drawn'], { type: 'image/jpeg' }) }
+    : { sha256: 'b'.repeat(64), width: 600, height: 340 }),
 }));
 vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () => ({
   lookDigest: () => 'd',
@@ -316,7 +319,7 @@ describe("a world's pictures", () => {
     expect(reads.length).toBe(2);
   });
 
-  it('keeps one still, replacing the last when a new one is taken, and makes a missing moment picture once', async () => {
+  it('keeps one still, replacing the last when a new one is taken, and makes a missing moment picture once, shown even where it is not kept', async () => {
     const revoked = urls();
     const pictures = await open();
     expect(await pictures.takeStill()).toBe('blob:made-1');
@@ -330,8 +333,13 @@ describe("a world's pictures", () => {
     // Portraits wait for the people to be served, asked again by a later draw.
     expect(await pictures.portrait('teo')).toBeNull();
     expect(pictures.portraitNow('teo')).toBeNull();
+    // One the server did not keep shows from the bytes drawn here, read from nowhere, and goes with the page.
+    const unkept = { moment_id: 'm6', scene: { people: [{}] }, picture: null };
+    expect(pictures.momentNow(unkept)).toBeNull();
+    await vi.waitFor(() => expect(pictures.momentNow(unkept)).toBe('blob:made-4'));
+    expect(reads).toEqual(['b'.repeat(64)]);
     pictures.release();
-    expect(revoked).toEqual(['blob:made-1', 'blob:made-2', 'blob:made-3']);
+    expect(revoked).toEqual(['blob:made-1', 'blob:made-2', 'blob:made-3', 'blob:made-4']);
     expect(pictures.still()).toBeNull();
   });
 

@@ -4,15 +4,23 @@
 // preview of the saved world, never in the world this page shows: a moment may belong to another
 // version, and drawing it must not move this page's camera or people. The preview reads the world as
 // any preview does (GET only), its society as the moment recorded it, and answers with the frame;
-// this page keeps it. A moment of a world that holds or held a photograph, a moment without a
-// recorded scene or of another version than the saved world opens, and a draw that never held the
-// world make no picture (null): the page shows its quiet tile.
+// this page keeps it. Where the server does not keep it (a read-only page, a copy that refuses the
+// write), the picture drawn is still shown, from the page's memory, for as long as the page is open.
+// A moment of a world that holds or held a photograph, a moment without a recorded scene or of
+// another version than the saved world opens, and a draw that never held the world make no picture
+// (null): the page shows its quiet tile.
 import { MOMENT_FRAMING, MOMENT_PICTURE_MESSAGE, MOMENT_SCENE_KEY } from './moment-framing.mjs';
 import { momentPreviewAddress } from './front-door-routes.mjs';
 import { FIRST_VIEW_SIZE, mayPutPicture, ownWorldPicture, readServedPictures } from '/src/composition/world-pictures.ts';
 import { HistoryPicturesClient, type HistoryPicture } from '/src/world-pictures-api.ts';
 import type { TransportOptions } from '@exulanica/graph-client';
 import { WorldEntryClient, type SavedWorldEntry } from '/src/world-entry-api.ts';
+
+/**
+ * A moment's picture as the page shows it: the one kept by the server, or one drawn here that the
+ * server did not keep, which carries its own bytes (`unkept`) and is named by its moment.
+ */
+export type MomentPicture = HistoryPicture & { readonly unkept?: Blob };
 
 /** What a moment carries for its picture, as the moments read serves it. */
 export interface MomentForPicture {
@@ -88,16 +96,17 @@ export function drawMomentPicture({ entry, moment, signal }: {
 }
 
 /**
- * The moment's kept picture: the one it has, else drawn here and kept by the server (or the one
- * another page kept first). Null where none can be made or kept: the page shows its quiet tile and
- * does not ask again in this view.
+ * The moment's picture: the one it has, else drawn here and kept by the server (or the one another
+ * page kept first), else, where the server does not keep it, the one drawn here with its bytes
+ * (`MomentPicture.unkept`). Null where none can be made: the page shows its quiet tile and does not
+ * ask again in this view.
  */
 export async function renderMomentPicture({ entry, moment, credentials, signal }: {
   readonly entry: SavedWorldEntry;
   readonly moment: MomentForPicture;
   readonly credentials: TransportOptions;
   readonly signal?: AbortSignal;
-}): Promise<HistoryPicture | null> {
+}): Promise<MomentPicture | null> {
   if (moment.picture) return moment.picture;
   if (!mayPutPicture(entry)) return null;
   const picture = await drawMomentPicture({ entry, moment, ...(signal ? { signal } : {}) });
@@ -107,7 +116,9 @@ export async function renderMomentPicture({ entry, moment, credentials, signal }
       entry.worldId, moment.version_id ?? entry.authoredVersionId, moment.moment_id, MOMENT_FRAMING.recipe, picture,
     );
   } catch {
-    return null;
+    if (signal?.aborted) return null;
+    const [width, height] = MOMENT_FRAMING.size_px as unknown as readonly [number, number];
+    return { sha256: `unkept:${moment.moment_id}`, width, height, unkept: picture };
   }
 }
 
