@@ -81,7 +81,8 @@ fn exuRippleSlope(q: vec2f) -> vec2f {
  * The body, its foam and its caustics are emitted in the light the look's colours were chosen in, by
  * the share of it the world's light gives (`RenderWater.light`), so a darker sky dims them as it dims
  * the land, and the body's colour and the foam's white fall by the same share toward a neutral grey of
- * the body's brightness, duller and never another hue; the surface's reflection reads the scene's own sky.
+ * the body's brightness, duller and never another hue; the foam takes the share once more, so the surf
+ * stands over the sand no more than in its look's own day; the surface's reflection reads the scene's own sky.
  * The surface is blended over the drawn scene with one transmittance (the mean of the three
  * channels), so no copy of the scene's colour is needed: with multisampling on a tile GPU that copy
  * alone cost 4 to 6 ms in the graphics lab. Reflection is the material's own environment specular.
@@ -131,7 +132,9 @@ void getOpacity() {
     vec3 grey = vec3(dot(body, vec3(0.2126, 0.7152, 0.0722)));
     body = mix(grey, body, exuWaterFinish.z);
     vec3 white = mix(grey, vec3(0.85, 0.9, 0.9), exuWaterFinish.z);
-    exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + white * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
+    // White foam is lighter than the sand beside it under one light: it takes the share once more, so the surf
+    // stands over the sand by no more than it does in its look's own day.
+    exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + white * exuWaterFinish.z * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
 }
 `;
 

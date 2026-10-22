@@ -206,9 +206,11 @@ describe('a water material', () => {
     const grey = chunk.indexOf('vec3 grey = vec3(dot(body, vec3(0.2126, 0.7152, 0.0722)));');
     const body = chunk.indexOf('body = mix(grey, body, exuWaterFinish.z);');
     const white = chunk.indexOf('vec3 white = mix(grey, vec3(0.85, 0.9, 0.9), exuWaterFinish.z);');
-    const emitted = chunk.indexOf('exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + white * foam');
+    const emitted = chunk.indexOf('exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + white * exuWaterFinish.z * foam');
     expect([grey, body, white].every((at) => at > 0 && at < emitted)).toBe(true);
     expect(grey).toBeLessThan(body);
+    // The foam takes the share once more than the body, so the surf rises over the sand no more than in its own day.
+    expect(chunk).toContain('+ white * exuWaterFinish.z * foam +');
   });
 
   it('on a WebGPU device keeps its ripples alone', () => {
@@ -332,7 +334,7 @@ describe('a water meeting what stands in it and lies under it', () => {
     expect(chunk).toContain(`for (int i = 0; i < ${WATER_CONTACT_TAPS}; i++)`);
     expect(chunk).toContain('gathered * shown * (1.0 - foam)');
     expect(chunk).toMatch(/exuWaterBody = exuWaterFinish\.z \* \(body \*/);
-    expect(chunk).toContain('+ white * foam + gathered * shown * (1.0 - foam)');
+    expect(chunk).toContain('+ white * exuWaterFinish.z * foam + gathered * shown * (1.0 - foam)');
     expect(chunk).not.toContain('dAlpha = 1.0 - through * (1.0 - foam);');
     const [wet, down, reach, facing] = contactOf(sea);
     expect([wet, down, reach, facing].map((n) => Math.round(n! * 1000) / 1000)).toEqual([0.6, 0.5, 2.5, 1]);
