@@ -10,6 +10,7 @@ import dataclasses
 import hashlib
 import io
 import json
+import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -38,6 +39,13 @@ from workspace_asset_support import AssetsApi, assets_api, declaration, without
 
 pytestmark = pytest.mark.postgres
 QUOTA = "workspace_asset_quota_exceeded"
+
+#: How long a check waits for every connection the application opened to be returned, as long as a
+#: loaded machine needs. The kind draft worker the application starts polls each workspace on the
+#: same database every half second, so one of its short connections may be open when the check
+#: runs; a connection a route holds while it streams is returned only after the last byte, so it is
+#: still open when this runs out.
+RETURN_SECONDS = 30
 
 
 @pytest.fixture
@@ -502,9 +510,10 @@ def test_withdrawal_is_final_hides_everything_and_destroys_nothing(api: AssetsAp
 def _sessions_opened(
     monkeypatch: pytest.MonkeyPatch, database: Database
 ) -> list[psycopg.Connection]:
-    """Every connection the application opens through its own ``database``, as it opens them.
-    A session another database opens in this process, such as an earlier test's background
-    worker still running, is not the application's and is not recorded."""
+    """Every connection the application opens through its own ``database``, as it opens them,
+    its background workers' included. A session another database opens in this process, such as
+    an earlier test's background worker still running, is not the application's and is not
+    recorded."""
     opened: list[psycopg.Connection] = []
     session = Database.session
 
@@ -517,6 +526,16 @@ def _sessions_opened(
 
     monkeypatch.setattr(Database, "session", recording)
     return opened
+
+
+def _all_returned(opened: list[psycopg.Connection]) -> bool:
+    """Whether every recorded connection is closed within ``RETURN_SECONDS``."""
+    deadline = time.monotonic() + RETURN_SECONDS
+    while not all(connection.closed for connection in opened):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
+    return True
 
 
 def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
@@ -532,7 +551,7 @@ def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
     chunks = AuthorizedOutput.chunks
 
     def watched(self: AuthorizedOutput) -> Iterator[bytes]:
-        closed_at_first_chunk.append(all(connection.closed for connection in opened))
+        closed_at_first_chunk.append(_all_returned(opened))
         yield from chunks(self)
 
     def whole(*_args: object) -> bytes:
