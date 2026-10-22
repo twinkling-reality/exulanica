@@ -1670,11 +1670,14 @@ being put down at a point of the region's frame would stand: the walking node of
 latest input it would be taken in at now, by the rules a placed being is taken in by (the nearest
 node by distance and then id that is no activity's place, has an edge and that nobody stands at or
 is headed to, first among those nobody waiting would be in the way at), as `stand`
-`{node_id, position_mm}`, or null where none is open. A walking node holds a position on the ground
-plane and no height, so a page sets the stand on the ground it draws there. The read writes nothing
-and answers the moment it is asked: a being that walks to the node before anything is placed there
-takes it, and the society then takes the newcomer in at the next. Its inputs are authorized as the
-state's are, so it is refused as the state read is; a version with no society answers
+`{node_id, position_mm, height_mm}`, or null where none is open. A walking node holds a position on
+the ground plane and no height; `height_mm` is the height a thing placed at the node rests at, as a
+placing is held to the world's ground (a town's street surface, a site's surface, a plane's
+elevation), in the frame a pose is in, or null where the ground states none or cannot be read yet,
+so a creature stands on the surface the things beside it stand on. The read writes nothing and
+answers the moment it is asked: a being that walks to the node before anything is placed there takes
+it, and the society then takes the newcomer in at the next. Its inputs are authorized as the state's
+are, so it is refused as the state read is; a version with no society answers
 `404 unknown_reference` as that read does, a society that reads no input answers
 `424 unavailable_society_input`, and a point outside the 32-bit range or none at all answers `422`.
 

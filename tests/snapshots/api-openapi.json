@@ -1781,7 +1781,7 @@
      "society"
     ],
     "summary": "Society Stand",
-    "description": "Where a being put down at a point of the region's frame would stand: the walking node of the\nsociety's latest input it would be taken in at now, with its position, or null where none is\nopen there. Its rights are asked as the state's are.",
+    "description": "Where a being put down at a point of the region's frame would stand: the walking node of the\nsociety's latest input it would be taken in at now, with its position and the height a thing\nplaced there rests at, or null where none is open there. Its rights are asked as the state's\nare.",
     "operationId": "society_stand_world_versions__version_id__society_stand_get",
     "parameters": [
      {

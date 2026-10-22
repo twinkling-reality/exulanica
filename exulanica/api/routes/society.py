@@ -26,7 +26,10 @@ from exulanica.api.society_making import (
     society_repository,
     take_newcomers_in,
 )
+from exulanica.api.world_edit import ReadObjects
 from exulanica.api.world_scope import WorldId
+from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.society import (
     served_events,
     served_snapshot,
@@ -46,6 +49,7 @@ from exulanica.world.society_repository import (
     SocietyRepository,
 )
 from exulanica.world.society_stand import STAND_PROFILE, stand_near
+from exulanica.world.thing_landing_source import prepare_landing_in_region
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
@@ -223,18 +227,39 @@ def society_stand(
     world_id: WorldId,
     x_mm: Annotated[int, Query(ge=-STAND_POINT_MM, le=STAND_POINT_MM)],
     z_mm: Annotated[int, Query(ge=-STAND_POINT_MM, le=STAND_POINT_MM)],
+    objects: ReadObjects,
 ) -> Any:
     """Where a being put down at a point of the region's frame would stand: the walking node of the
-    society's latest input it would be taken in at now, with its position, or null where none is
-    open there. Its rights are asked as the state's are."""
+    society's latest input it would be taken in at now, with its position and the height a thing
+    placed there rests at, or null where none is open there. Its rights are asked as the state's
+    are."""
 
     def stand() -> dict[str, Any]:
-        document, people = _repository(connection, session, request, world_id).stand_input(
-            version_id
-        )
-        return {"profile": STAND_PROFILE, "stand": stand_near(document, people, (x_mm, z_mm))}
+        document, people, region_id = _repository(
+            connection, session, request, world_id
+        ).stand_input(version_id)
+        return {
+            "profile": STAND_PROFILE,
+            "stand": stand_near(
+                document, people, (x_mm, z_mm), _rest_height(objects, version_id, region_id)
+            ),
+        }
 
     return _call(stand, invalid_status=409)
+
+
+def _rest_height(
+    objects: Any, version_id: uuid.UUID, region_id: str
+) -> Callable[[tuple[int, int]], int] | None:
+    """The height a thing placed in ``region_id`` rests at, at a point, as a placing is held to it
+    (:func:`~exulanica.world.thing_landing_source.prepare_landing_in_region`), or None where the
+    ground states none, cannot be read now (a site's place still being made) or cannot be read at
+    all: the stand is answered without its height rather than not at all."""
+    try:
+        landing = prepare_landing_in_region(objects, version_id, region_id)
+    except (KindWorkWaiting, InvalidStructuralData):
+        return None
+    return None if landing is None else landing.rest_height
 
 
 @router.delete("/versions/{version_id}/society", status_code=204)

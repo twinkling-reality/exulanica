@@ -3,8 +3,9 @@
 On a small town made under a fixed identity, with its society of things, through the routes:
 
 *   the read names the walking node of the society's latest input nearest the point that nobody
-    stands at or is headed to, with its position, and a being placed at that point is then taken
-    in at exactly that node: the stand drawn under a creature is where it arrives;
+    stands at or is headed to, with its position and the height a thing placed there rests at (the
+    town's street surface, as a placing is held to it), and a being placed at that point is then
+    taken in at exactly that node: the stand drawn under a creature is where it arrives;
 *   a node somebody stands at is no stand: the read asked at a resident's own node names another;
 *   the read authorizes the society's inputs as the state read does, so where the installation's
     authorizer refuses one, both reads are refused alike (424) and no stand is named; with a
@@ -16,9 +17,13 @@ On a small town made under a fixed identity, with its society of things, through
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from exulanica.api.society_runtime import UnavailableSocietyInput
 from exulanica.world import saved_entries
+from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.thing_landing_source import prepare_landing_in_region
 
 from test_society_made_world import made as imported_made  # noqa: F401
 from test_society_take_in_postgres import TOWN
@@ -78,7 +83,18 @@ def test_a_being_placed_at_a_point_is_taken_in_where_the_stand_read_says(made):
     answer = read.json()
     assert answer["profile"] == "exulanica.society-stand/v1"
     stand = answer["stand"]
-    assert stand is not None and set(stand) == {"node_id", "position_mm"}
+    assert stand is not None and set(stand) == {"node_id", "position_mm", "height_mm"}
+    # The height a thing placed at the node rests at, as the placing's own landing reads it.
+    with api.database.session(api.repository.workspace_id) as connection:
+        landing = prepare_landing_in_region(
+            WorldObjectRepository(
+                connection, api.repository.workspace_id, world_id=entry["world_id"]
+            ),
+            uuid.UUID(entry["authored_version_id"]),
+            entry["generated_ground"]["region_id"],
+        )
+    assert landing is not None and landing.rest_height is not None
+    assert stand["height_mm"] == landing.rest_height(tuple(stand["position_mm"]))
     # Reading wrote nothing.
     assert _society_rows(api) == before
     # Nobody stands at the stand or is on the way there.
@@ -157,6 +173,37 @@ def test_the_latest_input_a_placement_queued_is_authorized_before_the_stand_is_r
     assert stand.json()["code"] == "unavailable_society_input"
     app.state.society_input_authorizer = authorize
     assert _stand(api, entry, east, south).status_code == 200
+
+
+@pytest.mark.parametrize("unreadable", ["waiting", "invalid"])
+def test_a_ground_that_cannot_be_read_now_leaves_the_stand_without_its_height(
+    made, monkeypatch, unreadable
+):
+    import exulanica.api.routes.society as society_routes
+    from exulanica.world.errors import InvalidStructuralData
+    from exulanica.world.kinds.worker import KindWorkWaiting
+
+    api = made
+    _offering_things(api)
+    made_town = api.post("/worlds/generated", {"recipe": "small_town", "title": "A cloudy town"})
+    entry = made_town.json()
+    east, _height, south = entry["generated_ground"]["arrival_mm"]
+    society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
+    created = api.post(
+        society, {"region_id": entry["generated_ground"]["region_id"], "profile": V7}
+    )
+    assert created.status_code in (200, 201), created.text
+
+    def unread(*_args):
+        if unreadable == "waiting":
+            raise KindWorkWaiting("busy")
+        raise InvalidStructuralData("an unreadable site receipt")
+
+    monkeypatch.setattr(society_routes, "prepare_landing_in_region", unread)
+    read = _stand(api, entry, east - 2_000, south + 1_000)
+    assert read.status_code == 200, read.text
+    stand = read.json()["stand"]
+    assert stand is not None and stand["height_mm"] is None
 
 
 @pytest.mark.parametrize(
