@@ -23,6 +23,9 @@ import { SUN_DISC_COS } from './sky.js';
  * in the middle half of its cell. A star's size is the angle from it to the pixel, so it is the same at
  * a face's middle, its edges and its corners, and each pixel draws the stars of its own cell and the
  * three round its nearest corner, so a star is drawn whole where a cell is only a few pixels across.
+ * A star keeps its light for its share of the sky at any picture size: where a pixel spans more of
+ * the sky than a full-size view's (`STAR_FULL_PIXEL`) it is drawn dimmer, never bigger, so a small
+ * picture shows the stars a large one does, shrunk, and not a sky of snow.
  * They are behind the clouds by the share of the sky they leave clear (the drawn sky's alpha,
  * `renderSkyFaces`) and fade out over the lowest 7 degrees. Their hashes are integer only, so the same
  * seed draws the same stars on every GPU. A look that states neither skips both branches.
@@ -33,12 +36,20 @@ import { SUN_DISC_COS } from './sky.js';
 /** Cells along a cube face's edge for the stars: about 0.7 degrees each, ten pixels at a 70 degree view a thousand high. */
 export const STAR_CELLS = 128;
 
+/**
+ * The pixel a star is drawn at full brightness on, in radians: one of a view 1,080 pixels high with a
+ * 70 degree field, the workspace's own. A pixel spanning more of the sky draws each star dimmer by the
+ * square of the ratio, the light the same star gives over the same share of the sky.
+ */
+export const STAR_FULL_PIXEL = (2 * Math.tan((35 * Math.PI) / 180)) / 1080;
+
 export const SKY_DECLARATIONS = `
 uniform vec4 exuSunDisc;        // xyz toward the sun, w the cosine of the disc's radius (0: off)
 uniform vec3 exuSunDiscColour;  // linear radiance of the disc
 uniform vec4 exuMoon;           // x how much darker its seas, y the seed, z 1 to draw the disc as a moon (0: off)
 uniform vec4 exuStars;          // x the share of cells with a star, y the brightest one's radiance, z the seed, w 1 to draw (0: off)
 const float EXU_STAR_CELLS = ${STAR_CELLS.toFixed(1)};
+const float EXU_STAR_PIXEL = ${(Math.SQRT2 * STAR_FULL_PIXEL).toExponential(8)}; // STAR_FULL_PIXEL as the block's pixel angle measures it
 
 uint exuHash(uint v) {
     v ^= v >> 16u; v *= 0x7feb352du;
@@ -83,6 +94,8 @@ export const SKY_BLOCK = `
                 // A pixel's angle, taken before any branch a pixel decides for itself: its two screen steps, as
                 // the length of fwidth gives it for a view along the sky's axes, but the same at any heading.
                 float pixelAngle = max(0.70710678 * (length(dFdx(exuDir)) + length(dFdy(exuDir))), 1e-6);
+                // A star's light for its share of the sky: dimmer where a pixel spans more than a full-size view's.
+                float starLight = min(1.0, (EXU_STAR_PIXEL / pixelAngle) * (EXU_STAR_PIXEL / pixelAngle));
                 #ifdef SKY_CUBEMAP
                     float clearShare = textureCube(texture_cubeMap, dir).a;
                 #else
@@ -117,7 +130,7 @@ export const SKY_BLOCK = `
                         float pixels = length(exuDir - normalize(star)) / pixelAngle;
                         float brightness = 0.08 + 0.92 * pow(exuUnit(h3), 6.0);
                         vec3 tint = mix(vec3(1.0, 0.86, 0.72), vec3(0.78, 0.86, 1.0), exuUnit(exuHash(h3)));
-                        linear += exuStars.y * brightness * tint * exp(-pixels * pixels * 1.6) * clearShare * smoothstep(0.0, 0.12, exuDir.y);
+                        linear += exuStars.y * starLight * brightness * tint * exp(-pixels * pixels * 1.6) * clearShare * smoothstep(0.0, 0.12, exuDir.y);
                     }
                 }
             }

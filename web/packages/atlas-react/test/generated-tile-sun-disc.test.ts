@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { StylePackManifest } from '@exulanica/atlas-core';
 import { sunDirection, validateRenderLook, type RenderLook } from '../src/playcanvas/generated-tile/look.js';
 import { SUN_DISC_COS, cubeTexelWorldDirection, renderSkyFaces, renderSkyRadiance, skyClearShare, sunDiscRadiance } from '../src/playcanvas/generated-tile/sky.js';
-import { SKY_BLOCK, SKY_DECLARATIONS, setSkyMarks, sunDiscSkyChunk } from '../src/playcanvas/generated-tile/sun-disc.js';
+import { SKY_BLOCK, SKY_DECLARATIONS, STAR_FULL_PIXEL, setSkyMarks, sunDiscSkyChunk } from '../src/playcanvas/generated-tile/sun-disc.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 /*
@@ -61,6 +61,15 @@ describe('the skybox chunk with the disc', () => {
   it('works out the moon\'s face only inside its disc', () => {
     const line = SKY_BLOCK.split('\n').find((l) => l.includes('exuMoonFace(exuDir)'))!;
     expect(line.trim().startsWith('if (inDisc > 0.0)')).toBe(true);
+  });
+
+  it('draws a star dimmer, never brighter, where a pixel spans more of the sky than a full-size view\'s', () => {
+    // The block compares its pixel angle (two screen steps) with STAR_FULL_PIXEL measured the same way.
+    const stated = Number(/const float EXU_STAR_PIXEL = ([^;]+);/.exec(SKY_DECLARATIONS)![1]);
+    expect(stated).toBeCloseTo(Math.SQRT2 * STAR_FULL_PIXEL, 10);
+    expect(SKY_BLOCK).toContain('float starLight = min(1.0, (EXU_STAR_PIXEL / pixelAngle) * (EXU_STAR_PIXEL / pixelAngle));');
+    const star = SKY_BLOCK.split('\n').find((l) => l.includes('linear += exuStars.y'))!;
+    expect(star).toContain('* starLight *');
   });
 
   it('declines a chunk it was not written for', () => {
