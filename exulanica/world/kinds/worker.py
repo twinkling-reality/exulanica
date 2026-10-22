@@ -706,13 +706,13 @@ def part_job(
 
 
 #: What a part check's answer adds to the place it answers with (:func:`part_job`).
-_PART_ANSWER_KEYS: Final = frozenset({"part_ids", "label"})
+_PART_ANSWER_KEYS: Final = frozenset({"part_ids", "label", "made_centre_mm"})
 
 
 def placed_of(answer: Mapping[str, Any]) -> dict[str, Any]:
     """The place a done part check answers with, whole, as :func:`place_job` answers for the same
     changes: what a part edit keeps for the changed world's society to read (its water included),
-    without the part's own ids and words."""
+    without the part's own ids, words and centre as made."""
     return {key: value for key, value in answer.items() if key not in _PART_ANSWER_KEYS}
 
 

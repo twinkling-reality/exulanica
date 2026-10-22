@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 from exulanica.db.session import set_workspace
 from exulanica.world import saved_entries
+from exulanica.world.kinds.worker import kind_worker
 from exulanica.world.site_parts import QUARTER_TURNS
 from exulanica.world.society_water import WATER_FIELD
 from exulanica.world.starter import create_starter_authorities
@@ -200,6 +201,35 @@ def test_after_a_building_moves_a_swimming_society_is_still_handed_the_pond_s_wa
     consumed = _consumed_input(api, entry)
     assert consumed["authored_state"]["edit_seq"] == moved.json()["edit_seq"]
     assert consumed[WATER_FIELD]["bodies"] == water["bodies"]
+
+
+def test_a_kept_part_change_keeps_a_place_and_nothing_of_the_part_check(made, monkeypatch):
+    """The place a kept part change keeps for the changed world (``kinds.worker.placed_of``) has
+    the fields the world's place as made is kept with, though the part check answered more (the
+    part's ids and words, and where it stood as made)."""
+    api = made
+    entry = _farm(api)
+    created = api.post(
+        _path(entry, "/society"), {"region_id": "region:generated", "profile": THINGS}
+    )
+    assert created.status_code in (200, 201), created.text
+    worker = kind_worker()
+    put, kept = worker.places.put, {}
+
+    def keeps(key: str, value: dict[str, Any]) -> None:
+        kept[key] = value
+        put(key, value)
+
+    monkeypatch.setattr(worker.places, "put", keeps)
+    barn = _parts(api, entry)["barn"]
+    east, north = barn["centre_mm"]
+    moved = _move(api, entry, barn, east - 3_000, north)
+    assert moved.status_code == 200, moved.text
+    [check] = [value for key, value in kept.items() if ":check:" in key]
+    [(key, changed)] = [(key, value) for key, value in kept.items() if ":check:" not in key]
+    as_made = worker.places.get(key.rsplit(":", 1)[0])
+    assert as_made is not None
+    assert set(changed) == set(as_made) < set(check)
 
 
 def _place_well(api, entry: dict, east: int, north: int):
