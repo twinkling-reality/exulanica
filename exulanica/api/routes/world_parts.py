@@ -85,6 +85,7 @@ from exulanica.world.kinds.worker import (
     part_job,
     parts_job,
     place_key,
+    placed_of,
     site_ground_place_id,
 )
 from exulanica.world.object_edit_preview import preview_part_change
@@ -358,9 +359,8 @@ def _site_check(site: _Site, change: PartChange) -> dict[str, Any]:
         if "where" in answer:
             raise PartChangeRefused(answer["code"], answer["where"], answer["detail"])
         raise InvalidStructuralData(str(answer["detail"]))
-    placed = {key: answer[key] for key in ("status", "place", "blocked", "blocked_parts")}
     worker.keep_composed(
-        epoch, None, (place_key(site.workspace, site.digest, place_id, digest), placed)
+        epoch, None, (place_key(site.workspace, site.digest, place_id, digest), placed_of(answer))
     )
     return answer
 

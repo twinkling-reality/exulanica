@@ -18,9 +18,12 @@ import pytest
 from exulanica.db.session import set_workspace
 from exulanica.world import saved_entries
 from exulanica.world.site_parts import QUARTER_TURNS
+from exulanica.world.society_water import WATER_FIELD
 from exulanica.world.starter import create_starter_authorities
 from exulanica.world.worlds import AUTHORED_STARTER, new_world_id
 
+import test_site_society_of_things_postgres as farm_site
+import test_society_swimming_postgres as swimming
 from test_site_land_postgres import LAND
 from test_society_made_world import made as imported_made  # noqa: F401
 
@@ -176,6 +179,27 @@ def test_a_society_keeps_stepping_after_a_made_building_moves(made, profile):
     assert door_after is not None
     assert door_after["position_mm"][0] == door_before["position_mm"][0] - 3_000
     assert door_after["position_mm"][1:] == door_before["position_mm"][1:]
+
+
+def test_after_a_building_moves_a_swimming_society_is_still_handed_the_pond_s_water(
+    made, monkeypatch
+):
+    """A kept part change keeps the changed world's place whole (``kinds.worker.placed_of``), so
+    the society's next input still carries the water the kind worker states with that place."""
+    monkeypatch.setattr(saved_entries, "new_world_id", lambda kind: farm_site.FARM)
+    api = made
+    entry, society = swimming._farm_with_a_swimmer(api)
+    created = api.post(society, {"region_id": "region:generated", "profile": THINGS})
+    assert created.status_code in (200, 201), created.text
+    water = farm_site._input(api, entry, 1)[WATER_FIELD]
+    barn = _parts(api, entry)["barn"]
+    east, north = barn["centre_mm"]
+    moved = _move(api, entry, barn, east - 3_000, north)
+    assert moved.status_code == 200, moved.text
+    _step(api, entry)
+    consumed = _consumed_input(api, entry)
+    assert consumed["authored_state"]["edit_seq"] == moved.json()["edit_seq"]
+    assert consumed[WATER_FIELD]["bodies"] == water["bodies"]
 
 
 def _place_well(api, entry: dict, east: int, north: int):
