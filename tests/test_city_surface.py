@@ -6,7 +6,7 @@ height the page stands a person on.
 tess's conformance tile and tile (0, 0) of a small town, written by
 ``web/packages/atlas-react/test/write-city-surface-table.ts``. Every answer, from a kerb top, a
 footway or a carriageway, is held to it within the rounding of one millimetre. Where this version
-states no surface (a corner, a junction's fill) the answer is None, and how many rows that is on
+states no surface (a corner's footway wedge) the answer is None, and how many rows that is on
 each tile is pinned, so a rule that stops answering fails here.
 
 Run as a script with a path, it writes the small town's tile (0, 0) document the table was made
@@ -38,10 +38,10 @@ TABLE: Final = ROOT / "tests" / "fixtures" / "city-surface-table.json"
 #: How far, in micrometres, an answer may be from the page's height: half a millimetre of the
 #: answer's own rounding and one millimetre of the tessellator's floored placement of a point.
 WITHIN_UM: Final = 1_500
-#: Rows each tile's surface answers None for (a corner or a junction's fill), by drawing kind.
+#: Rows each tile's surface answers None for (a corner's footway wedge), by drawing kind.
 UNSTATED: Final = {
-    "conformance": {"city.curb_edge": 93, "city.junction": 19},
-    "small_town": {"city.curb_edge": 190, "city.junction": 74},
+    "conformance": {"city.curb_edge": 61},
+    "small_town": {"city.curb_edge": 94},
 }
 
 

@@ -20,9 +20,15 @@ records' own fields and the corner rule's measure; nothing is measured from a dr
   line, between the strip's two ends (:mod:`~exulanica.grammar.grammars.city.streets`, the
   segment's step 1). A crossing's band is drawn on that carriageway and states no surface of its
   own, and its kerb upstand draws nothing, so a crossing answers the carriageway's height.
+* **A corner's kerb top** runs along the corner's arc, the fillet arc rule's points from ``P`` to
+  ``Q``, as many as keep each chord within the navigation contract's resolution of the circle, out
+  to the back arc ``kerb_width_mm`` nearer the centre, at the arc's heights plus the kerb's.
+* **A junction's fill** is the junction rule's ring: each leg's mouth (the segment rule's five
+  points across its strip's end at the node), back along its kerb line, and round each corner's
+  arc to the next leg, cut by the ring rule.
 
-Where surfaces overlap, the highest is the answer, as on the page. A **corner's kerb top and
-footway wedge**, a **junction's fill**, and a footway piece whose sloping kerb line ramps into a
+Where surfaces overlap, the highest is the answer, as on the page. A **corner's footway wedge**
+(carved by the block rings it meets) and a footway piece whose sloping kerb line ramps into a
 mitred corner are not stated by this version: it answers ``None`` there, as it does where the
 records state no street surface at all (a lot, a building, open land). The caller keeps its own
 ground for ``None``.
@@ -40,9 +46,15 @@ from itertools import pairwise
 from typing import Final
 
 from exulanica.grammar.geometry import integer_sqrt
+from exulanica.grammar.grammars.city import CITY_GRAMMAR
 from exulanica.grammar.grammars.city.corners import CORNER_LENGTH_SCALE, footway_rise_mm
 from exulanica.grammar.grammars.city.corners import along as _along
-from exulanica.grammar.grammars.city.streets import CurbEdgeRecord, StreetSegmentRecord
+from exulanica.grammar.grammars.city.roads import JunctionRecord
+from exulanica.grammar.grammars.city.streets import (
+    CurbEdgeRecord,
+    StreetNodeRecord,
+    StreetSegmentRecord,
+)
 
 __all__ = [
     "CARRIAGEWAY",
@@ -253,6 +265,232 @@ def _mitre(curb: CurbEdgeRecord, follower: CurbEdgeRecord) -> _Mitre | None:
     )
 
 
+#: How far, in millimetres, a point the corner rule places may lie inside its circle: the diagonal
+#: of one millimetre, which the fillet arc rule's chord test allows for (``filletSegmentsWithin``).
+_CORNER_ROUNDING_MM: Final = 2
+
+
+def _fillet_centre(p: Space, into: Plan, q: Space, out: Plan, radius: int) -> Plan:
+    """The fillet arc rule's centre: the floored middle of the two centres the corner rule finds
+    from each tangent point, the radius along its piece's normal toward the turn."""
+    turn = 1 if _cross(into, out) > 0 else -1
+    from_p = _moved(p, _along((-turn * into[1], turn * into[0]), radius))
+    from_q = _moved(q, _along((-turn * out[1], turn * out[0]), radius))
+    return ((from_p[0] + from_q[0]) // 2, (from_p[1] + from_q[1]) // 2)
+
+
+def _fillet_arc(
+    p: Space, into: Plan, q: Space, out: Plan, radius: int, segments: int
+) -> tuple[Plan, list[Space]]:
+    """The fillet arc rule's points from ``p`` to ``q``: each halves the gap between two placed
+    points, the radius from the centre along the sum of their vectors, at their floored mean
+    height; and the centre."""
+    centre = _fillet_centre(p, into, q, out, radius)
+    points: list[Space | None] = [None] * (segments + 1)
+    points[0], points[segments] = p, q
+    gap = segments
+    while gap > 1:
+        for start in range(0, segments, gap):
+            first, last = points[start], points[start + gap]
+            assert first is not None and last is not None
+            toward = (
+                first[0] - centre[0] + last[0] - centre[0],
+                first[1] - centre[1] + last[1] - centre[1],
+            )
+            x, y = _moved(centre, _along(toward, radius))
+            points[start + gap // 2] = (x, y, (first[2] + last[2]) // 2)
+        gap //= 2
+    return centre, [point for point in points if point is not None]
+
+
+def _fillet_segments(
+    p: Space, into: Plan, q: Space, out: Plan, radius: int, sagitta_mm: int
+) -> int:
+    """The least power of two, up to the least at or above the radius, whose every chord keeps
+    within ``sagitta_mm`` of the circle and the corner rule's own rounding."""
+    centre = _fillet_centre(p, into, q, out, radius)
+    reach = radius - sagitta_mm - _CORNER_ROUNDING_MM
+    if reach <= 0:
+        return 1
+    least = 4 * reach * reach
+    bound = 1
+    while bound < radius:
+        bound *= 2
+    segments = 1
+    while segments <= bound:
+        _centre, points = _fillet_arc(p, into, q, out, radius, segments)
+        sums = (
+            (a[0] - centre[0] + b[0] - centre[0], a[1] - centre[1] + b[1] - centre[1])
+            for a, b in pairwise(points)
+        )
+        if all(_dot(one, one) >= least for one in sums):
+            return segments
+        segments *= 2
+    raise ValueError("a corner arc needs more segments than its radius allows")
+
+
+def _corner_arc(
+    curb: CurbEdgeRecord, follower: CurbEdgeRecord, sagitta_mm: int
+) -> tuple[Plan, list[Space]] | None:
+    """The arc of the corner ``curb`` turns into ``follower``, from its walk's end ``P`` to the
+    follower's start ``Q``, or None where it turns right (a concave corner) or has no radius."""
+    radius = curb.corner_radius_mm
+    if radius == 0:
+        return None
+    walk, following = _walk(curb), _walk(follower)
+    p, q = walk[-1], following[0]
+    into, out = _sub(p, walk[-2]), _sub(following[1], q)
+    if _cross(into, out) <= 0:
+        return None
+    segments = _fillet_segments(p, into, q, out, radius, sagitta_mm)
+    return _fillet_arc(p, into, q, out, radius, segments)
+
+
+def _kerb_top_arc(curb: CurbEdgeRecord, arc: tuple[Plan, list[Space]]) -> tuple[Triangle, ...]:
+    """A corner's kerb top: for each chord of the arc, the quad from it to the back arc, the radius
+    less the kerb's width from the centre, both at the arc's heights plus the kerb's."""
+    centre, points = arc
+    height, inner = curb.kerb_height_mm, curb.corner_radius_mm - curb.kerb_width_mm
+    back = [
+        (*_moved(centre, _along(_sub(point, centre), inner)), point[2] + height) for point in points
+    ]
+    triangles: list[Triangle] = []
+    for (a, b), (back_a, back_b) in zip(pairwise(points), pairwise(back), strict=True):
+        top_a, top_b = (a[0], a[1], a[2] + height), (b[0], b[1], b[2] + height)
+        triangles += [(top_a, top_b, back_b), (top_a, back_b, back_a)]
+    return tuple(triangles)
+
+
+def _height_on(line: Sequence[Space], direction: Plan, point: Sequence[int]) -> int:
+    """A line's height at ``point`` as the segment rule places a point on it, floored."""
+    at = 0
+    for index in range(1, len(line) - 1):
+        if _dot(_sub(point, line[index]), direction) >= 0:
+            at = index
+    near, far = line[at], line[at + 1]
+    end = _dot(_sub(far, near), direction)
+    return near[2] + (far[2] - near[2]) * _dot(_sub(point, near), direction) // end
+
+
+def _strip_ends(
+    segment: StreetSegmentRecord, left: CurbEdgeRecord, right: CurbEdgeRecord
+) -> tuple[tuple[Space, ...], tuple[Space, ...]] | None:
+    """The segment rule's five points across each end of a strip, left kerb point to right, or None
+    where the strip waits (a bent line, or kerbs that leave no strip)."""
+    direction = _sub(segment.centreline_mm[-1], segment.centreline_mm[0])
+    lines = [
+        _line(points, direction)
+        for points in (segment.centreline_mm, left.kerb_line_mm, right.kerb_line_mm)
+    ]
+    if any(line is None for line in lines):
+        return None
+    centre, left_line, right_line = (line.points for line in lines if line is not None)
+    origin, width = centre[0], segment.carriageway_width_mm
+    to_left, to_right = _left(direction), (direction[1], -direction[0])
+
+    def position(point: Sequence[int]) -> int:
+        return _dot(_sub(point, origin), direction)
+
+    def ends(left_point: Space, right_point: Space, later_wins: bool) -> tuple[Space, Space]:
+        left_first = position(left_point) > position(right_point)
+        if left_first if later_wins else not left_first:
+            across = _moved(left_point, _along(to_right, width))
+            return left_point, (*across, _height_on(right_line, direction, across))
+        across = _moved(right_point, _along(to_left, width))
+        return (*across, _height_on(left_line, direction, across)), right_point
+
+    def across(left_point: Space, right_point: Space) -> tuple[Space, ...]:
+        middle = ((left_point[0] + right_point[0]) // 2, (left_point[1] + right_point[1]) // 2)
+        crown = (*middle, _height_on(centre, direction, middle))
+
+        def gutter(kerb: Space, toward: Plan, width_mm: int) -> Space:
+            at = _moved(kerb, _along(toward, width_mm))
+            return (*at, kerb[2] + (crown[2] - kerb[2]) * 2 * width_mm // width)
+
+        return (
+            left_point,
+            gutter(left_point, to_right, left.gutter_width_mm),
+            crown,
+            gutter(right_point, to_left, right.gutter_width_mm),
+            right_point,
+        )
+
+    left0, right0 = ends(left_line[0], right_line[0], True)
+    left1, right1 = ends(left_line[-1], right_line[-1], False)
+    low, high = position(left0), position(left1)
+    if low >= high:
+        return None
+    for line in (centre, left_line, right_line):
+        if any(low < position(point) < high for point in line[1:-1]):
+            return None
+    return across(left0, right0), across(left1, right1)
+
+
+def _junction_fill(
+    junction: JunctionRecord,
+    nodes: dict[str, StreetNodeRecord],
+    segments: dict[str, StreetSegmentRecord],
+    sides: dict[tuple[str, str], CurbEdgeRecord],
+    sagitta_mm: int,
+) -> tuple[Triangle, ...]:
+    """The junction rule's carriageway fill: for each leg, its mouth's five points from
+    outward-right to outward-left, back along its outward-left kerb line to ``Q``, then round the
+    corner the next leg's outward-right curb turns, from ``Q`` back to ``P``; cut by the ring rule.
+    None of it where a leg, curb or node is not among the records."""
+    node = nodes.get(junction.node_identity)
+    if node is None:
+        return ()
+    legs: list[tuple[tuple[Space, ...], CurbEdgeRecord, CurbEdgeRecord]] = []
+    for identity in junction.segment_identities:
+        segment = segments.get(identity)
+        left, right = sides.get((identity, "left")), sides.get((identity, "right"))
+        if segment is None or left is None or right is None:
+            return ()
+        ends = _strip_ends(segment, left, right)
+        if ends is None:
+            return ()
+        first, last = segment.centreline_mm[0], segment.centreline_mm[-1]
+        at_start = (first[0], first[1]) == (node.x_mm, node.y_mm)
+        if at_start == ((last[0], last[1]) == (node.x_mm, node.y_mm)):
+            return ()
+        if at_start:
+            legs.append((tuple(reversed(ends[0])), left, right))
+        else:
+            legs.append((ends[1], right, left))
+    ring: list[Space] = []
+
+    def push(point: Space) -> None:
+        if not ring or ring[-1] != point:
+            ring.append(point)
+
+    for index, (mouth, outward_left, _right) in enumerate(legs):
+        _mouth, _left_curb, next_right = legs[(index + 1) % len(legs)]
+        for point in mouth:
+            push(point)
+        walk_a, walk_b = _walk(outward_left), _walk(next_right)
+        q, p = walk_a[0], walk_b[-1]
+        push(q)
+        if (
+            not next_right.next_curb_identity
+            or next_right.next_curb_identity[0] != outward_left.identity
+        ):
+            return ()
+        radius = next_right.corner_radius_mm
+        if radius == 0:
+            if p != q:
+                return ()
+            continue
+        into, out = _sub(p, walk_b[-2]), _sub(walk_a[1], q)
+        segments_count = _fillet_segments(p, into, q, out, radius, sagitta_mm)
+        _centre, arc = _fillet_arc(p, into, q, out, radius, segments_count)
+        for step in range(segments_count - 1, 0, -1):
+            push(arc[step])
+        push(p)
+    if len(ring) > 1 and ring[0] == ring[-1]:
+        ring.pop()
+    return tuple(_ears(ring))
+
+
 def _footway(
     curb: CurbEdgeRecord, line: _Line, outward: Plan, turned: _Mitre | None, met: _Mitre | None
 ) -> tuple[Triangle, ...]:
@@ -379,11 +617,20 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
     or :data:`CARRIAGEWAY`."""
     segments: dict[str, StreetSegmentRecord] = {}
     curbs: dict[str, CurbEdgeRecord] = {}
+    nodes: dict[str, StreetNodeRecord] = {}
+    junctions: list[JunctionRecord] = []
     for record in records:
         if isinstance(record, StreetSegmentRecord):
             segments[record.identity] = record
         elif isinstance(record, CurbEdgeRecord):
             curbs[record.identity] = record
+        elif isinstance(record, StreetNodeRecord):
+            nodes[record.identity] = record
+        elif isinstance(record, JunctionRecord):
+            junctions.append(record)
+    # The walk surface's resolution, as the city grammar's navigation contract states it: how far
+    # a chord of a corner's arc may stand from its circle.
+    sagitta = CITY_GRAMMAR.projection("nav_envelope").resolution_mm
     sides = {(curb.segment_identity, curb.side): curb for curb in curbs.values()}
     # The curb whose corner ends at a curb's start: the first, in record order, naming it next.
     owners: dict[str, CurbEdgeRecord] = {}
@@ -425,6 +672,15 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
                 strips.append(
                     _Strip(centre, left, right, low, high, segment.carriageway_width_mm, gutters)
                 )
+    tops: list[Triangle] = []
+    for curb in curbs.values():
+        followers = [curbs[identity] for identity in curb.next_curb_identity if identity in curbs]
+        arc = None if not followers else _corner_arc(curb, followers[0], sagitta)
+        if arc is not None:
+            tops += _kerb_top_arc(curb, arc)
+    fills: list[Triangle] = []
+    for junction in junctions:
+        fills += _junction_fill(junction, nodes, segments, sides, sagitta)
 
     def reading(point: Plan) -> tuple[int, str] | None:
         found: list[tuple[_Ratio, str]] = []
@@ -436,6 +692,10 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
         for strip in strips:
             if (level := strip.height(point)) is not None:
                 found.append((level, CARRIAGEWAY))
+        for surface, triangles in ((KERB_TOP, tops), (CARRIAGEWAY, fills)):
+            for triangle in triangles:
+                if (on := _on_triangle(point, triangle)) is not None:
+                    found.append((on, surface))
         if not found:
             return None
         height, surface = found[0]

@@ -414,7 +414,7 @@ stop lines, frontage lines, the camber profile and texture coordinates are writt
 docstrings and are the contract the tessellator reads. `surface.py` reads the same records back
 into the height a person stands at on a kerb top, footway or carriageway, in integer millimetres,
 held within a millimetre of the page's walk surface by `tests/fixtures/city-surface-table.json`;
-it answers nothing yet on a corner's wedge or a junction's fill.
+it answers nothing yet on a corner's footway wedge.
 
 **Catalog keys are labels.** No reader draws a shape from a key: a furniture class's parts, a roof
 family's form and a material's texture set are resolved into the record that uses them.
