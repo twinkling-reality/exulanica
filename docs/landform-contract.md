@@ -6,8 +6,8 @@ Python and in the browser, and a site world can be made on land through its rout
 regenerated from its receipt, its people's places standing on the land, its drawing and its land
 served. The application draws such a site on its land, to the horizon, and stands its people and
 things on it. A place drafted from a person's words stands on land chosen from what was said where
-the deployment turns that on (`EXULANICA_WORLDS_ON_LAND`, off by default); elsewhere, and for every
-town, worlds stand on level ground, as the [world kinds contract](world-kinds-contract.md) and the
+the deployment leaves that on (`EXULANICA_WORLDS_ON_LAND`, on unless set off); elsewhere, and for a
+town made from a preset, worlds stand on level ground, as the [world kinds contract](world-kinds-contract.md) and the
 [city grammar](grammar-package.md) state.
 
 This document owns the land document (`exulanica.landform/v1`), the landform catalogs, the pure
@@ -449,7 +449,7 @@ appearance are; that naming is planned, not built (see [Limits](#limits)).
 
 ## Land for a world made from a sentence
 
-Where the deployment turns it on (`EXULANICA_WORLDS_ON_LAND=on`, [deployment](deployment.md)), a
+Where the deployment leaves it on (`EXULANICA_WORLDS_ON_LAND`, on unless set off, [deployment](deployment.md)), a
 place or a town drafted from a person's words (`POST /worlds/drafts`,
 [world kinds](world-kinds-contract.md#a-world-made-from-a-sentence)) stands on one of the land
 recipes in [`landform-recipe.v2.json`](../assets/catalogs/landform/landform-recipe.v2.json), read by

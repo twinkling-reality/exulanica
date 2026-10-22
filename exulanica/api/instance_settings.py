@@ -141,8 +141,8 @@ KINDS_FROM_PEOPLE_ENV: Final = env_name("KINDS_FROM_PEOPLE")
 #: ``EXULANICA_SOCIETY_OF_THINGS`` is set off. A shared server leaves it off and states both.
 PERSONAL_INSTALL_ENV: Final = env_name("PERSONAL_INSTALL")
 #: Whether a place made from a sentence stands on land chosen from its words (a land recipe,
-#: :mod:`exulanica.world.land_choice`), or on level ground as a place made before it does. Off
-#: unless it is set on.
+#: :mod:`exulanica.world.land_choice`), or on level ground as a place made before it does. On
+#: unless it is set off.
 WORLDS_ON_LAND_ENV: Final = env_name("WORLDS_ON_LAND")
 
 
@@ -225,6 +225,15 @@ def _societies_of_things(value: str | None, *, personal: bool) -> bool:
     if value is None or not value.strip():
         return personal
     return _explicitly_enabled(value, "society_of_things_not_boolean", SOCIETY_OF_THINGS_ENV)
+
+
+def _worlds_on_land(value: str | None) -> bool:
+    """Whether a place made from a sentence stands on land (:data:`WORLDS_ON_LAND_ENV`), or a
+    named refusal: on when it is absent or empty, off only where it is stated off, and any other
+    value refused rather than read as either."""
+    if value is None or not value.strip():
+        return True
+    return _explicitly_enabled(value, "worlds_on_land_not_boolean", WORLDS_ON_LAND_ENV)
 
 
 def _society_control_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:

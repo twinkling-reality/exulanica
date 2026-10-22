@@ -141,6 +141,9 @@ services:
       # A process holding NEBIUS_API_KEY states how it spends. This stack runs one API process and
       # bounds it by the ceilings above alone, as it always has (docs/model-spending-contract.md).
       EXULANICA_SPENDING: process
+      # Whether a place made from a sentence stands on land chosen from its words
+      # (docs/deployment.md): empty takes the default, on; `off` keeps every new place level.
+      EXULANICA_WORLDS_ON_LAND: ${EXULANICA_WORLDS_ON_LAND:-}
     volumes:
       - media:/var/lib/exulanica
     expose:

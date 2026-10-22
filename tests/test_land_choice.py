@@ -7,11 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
-from exulanica.api.instance_settings import (
-    WORLDS_ON_LAND_ENV,
-    SocietySettingRefused,
-    _explicitly_enabled,
-)
+from exulanica.api.instance_settings import SocietySettingRefused, _worlds_on_land
 from exulanica.grammar.landform import WorldFrame, land_recipes, read_land_document, water_bodies
 from exulanica.world.composers import site_plan
 from exulanica.world.kinds.document import read_kind
@@ -108,17 +104,33 @@ def test_the_land_answers_only_a_phrase_that_names_it_alone() -> None:
     assert not said_by_land("on the", _recipe("coast"))
 
 
-def test_land_is_off_unless_the_installation_says_on_and_other_values_are_refused() -> None:
-    read = lambda value: _explicitly_enabled(  # noqa: E731
-        value, "worlds_on_land_not_boolean", WORLDS_ON_LAND_ENV
+def test_land_is_on_unless_the_installation_says_off_and_other_values_are_refused() -> None:
+    assert (
+        _worlds_on_land(None),
+        _worlds_on_land(""),
+        _worlds_on_land("  "),
+        _worlds_on_land("on"),
+        _worlds_on_land("true"),
+        _worlds_on_land("off"),
+        _worlds_on_land("0"),
+    ) == (True, True, True, True, True, False, False)
+    for value in ("hills", "maybe"):
+        with pytest.raises(SocietySettingRefused) as caught:
+            _worlds_on_land(value)
+        assert caught.value.code == "worlds_on_land_not_boolean"
+
+
+def test_a_server_that_states_nothing_makes_worlds_on_land(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from exulanica.api.services import build_services
+
+    monkeypatch.setattr(
+        "exulanica.api.services.load_account_runtime", lambda _: SimpleNamespace(guest=None)
     )
-    assert (read(None), read(""), read("off"), read("on"), read("true")) == (
-        False,
-        False,
-        False,
-        True,
-        True,
-    )
-    with pytest.raises(SocietySettingRefused) as caught:
-        read("hills")
-    assert caught.value.code == "worlds_on_land_not_boolean"
+    environ = {"EXULANICA_DATABASE_URL": "postgresql://unused", "EXULANICA_DATA_DIR": str(tmp_path)}
+    assert build_services(environ).worlds_on_land is True
+    assert build_services({**environ, "EXULANICA_WORLDS_ON_LAND": ""}).worlds_on_land is True
+    assert build_services({**environ, "EXULANICA_WORLDS_ON_LAND": "off"}).worlds_on_land is False
+    with pytest.raises(SocietySettingRefused):
+        build_services({**environ, "EXULANICA_WORLDS_ON_LAND": "hills"})

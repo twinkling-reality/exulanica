@@ -147,6 +147,9 @@ services:
       EXULANICA_SOCIETY_OF_THINGS: ${EXULANICA_SOCIETY_OF_THINGS:-off}
       EXULANICA_CREATURE_WORKSPACES: ${EXULANICA_CREATURE_WORKSPACES:-}
       EXULANICA_PROJECTS_DIRECTORY: ${EXULANICA_PROJECTS_DIRECTORY:-}
+      # Whether a place made from a sentence stands on land chosen from its words
+      # (docs/deployment.md): empty takes the default, on; `off` keeps every new place level.
+      EXULANICA_WORLDS_ON_LAND: ${EXULANICA_WORLDS_ON_LAND:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.
