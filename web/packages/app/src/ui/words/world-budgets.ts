@@ -5,7 +5,8 @@
  * generated worlds it may hold at once, and the tiles its towns may come to in a day. A making
  * past the first is `world_limit_reached`; past the second it is `tile_budget_reached`, whose
  * answer carries `returns_at`, the instant room returns. The page says that instant as a person
- * reads a clock, in their own time ("tomorrow at 09:14"), and never as a count of tiles.
+ * reads a clock, in their own time ("tomorrow at 09:14"), and never as a count of tiles. Both say
+ * worlds, whatever kind is being made, as the policy counts generated worlds of every kind.
  */
 
 import { ApiError } from '@exulanica/graph-client';
@@ -27,7 +28,7 @@ export function whenWords(at: Date, now: Date): string {
 
 /**
  * The words for each budget's refusal of this making, keyed by its code, for
- * `problemSentence(error, worldBudgetWords(error))`. The day's budget says when another town can
+ * `problemSentence(error, worldBudgetWords(error))`. The day's budget says when another world can
  * be made where the answer gave the instant, and that it is within a day where it did not.
  */
 export function worldBudgetWords(error: unknown, now: Date = new Date()): Readonly<Record<string, ProblemWords>> {
@@ -36,12 +37,12 @@ export function worldBudgetWords(error: unknown, now: Date = new Date()): Readon
   const when = at === null || Number.isNaN(at.getTime()) ? 'within a day' : whenWords(at, now);
   return {
     world_limit_reached: {
-      happened: 'This workspace already holds as many towns as it may at once.',
-      next: 'Open one of the towns you already have instead.',
+      happened: 'This workspace already holds as many worlds as it may at once.',
+      next: 'Open one of the worlds you already have instead.',
     },
     tile_budget_reached: {
-      happened: 'This workspace has made as many towns as it may in one day.',
-      next: `You can make another town ${when}.`,
+      happened: 'This workspace has made as many worlds as it may in one day.',
+      next: `You can make another world ${when}.`,
     },
   };
 }

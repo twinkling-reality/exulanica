@@ -1042,6 +1042,23 @@ def test_a_personal_install_tells_the_api_so_and_a_shell_setting_never_does(tmp_
 
     assert environment(True)["EXULANICA_PERSONAL_INSTALL"] == "on"
     assert "EXULANICA_PERSONAL_INSTALL" not in environment(False)
+    # A person's own install holds as many worlds as the count policy says; a slot run states its
+    # own figure, so the foundation's row makes three and reads the fourth refused.
+    assert "EXULANICA_WORLDS_HELD" not in environment(True)
+    assert environment(False)["EXULANICA_WORLDS_HELD"] == str(LAUNCH.WORLDS_HELD)
+    stated = LAUNCH.api_environment(
+        exports=exports,
+        grant={},
+        data_dir=tmp_path,
+        model=False,
+        derivative_worker=True,
+        society_playback={},
+        personal=True,
+        worlds_held=7,
+        environ={"HOME": "/home/someone"},
+    )
+    assert stated["EXULANICA_WORLDS_HELD"] == "7", "a figure asked for is stated even at home"
+    assert LAUNCH.build_parser().parse_args(["up", "--worktree", "w"]).worlds_held is None
     # Nothing else of a personal install is stated here: the API derives its defaults.
     assert set(environment(True)) - set(environment(False)) == {"EXULANICA_PERSONAL_INSTALL"}
 

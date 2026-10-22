@@ -292,7 +292,8 @@ TILES_LIMIT = 16
 #: The generated worlds a workspace of the stack may hold: what the stack states to the API in
 #: EXULANICA_WORLDS_HELD, as a deployment states its own figure in place of the count policy's.
 #: Three, so the foundation's row (scripts/acceptance/foundation.py, GENERATED_WORLDS_ALLOWED)
-#: makes three towns and reads the fourth refused.
+#: makes three towns and reads the fourth refused. A person's own install states none of its own,
+#: so the count policy's figures hold there.
 WORLDS_HELD = 3
 
 #: What ``--model`` passes from this process's environment to the API, each required.
@@ -969,8 +970,12 @@ def api_environment(
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     # The stack states the generated worlds its workspaces may hold, as a deployment does: the
-    # foundation's row makes that many towns and reads the next refused by name.
-    environment["EXULANICA_WORLDS_HELD"] = str(WORLDS_HELD if worlds_held is None else worlds_held)
+    # foundation's row makes that many towns and reads the next refused by name. A person's own
+    # install states none unless asked, so the count policy's own figures hold for it.
+    if worlds_held is not None or not personal:
+        environment["EXULANICA_WORLDS_HELD"] = str(
+            WORLDS_HELD if worlds_held is None else worlds_held
+        )
     if model:
         environment.update(model_environment(environ))
     environment.update(
@@ -2955,9 +2960,10 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument(
                 "--worlds-held",
                 type=int,
-                default=WORLDS_HELD,
+                default=None,
                 help="the generated worlds a workspace of this stack may hold, stated to the API "
-                "as EXULANICA_WORLDS_HELD (default: WORLDS_HELD, which the foundation's row makes)",
+                "as EXULANICA_WORLDS_HELD (default: WORLDS_HELD, which the foundation's row makes; "
+                "a --personal install states none, so the count policy's figures hold)",
             )
             command.add_argument(
                 "--tiles",
