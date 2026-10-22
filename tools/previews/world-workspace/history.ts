@@ -26,6 +26,9 @@ const NARROW_BELOW = 1700;
 const MOMENTS_PAGE = 50, MOMENTS_MOST = 200;
 /** While a project is being started or put on GitHub, the projects read is asked again this often. */
 const WATCH_MS = 3000;
+/** How long after K the page keeps saying a project is starting though the follower has taken the request and its
+ * project is not listed yet (F13); after it, the page reads where the world is kept as it stands. */
+const STARTING_MS = 120_000;
 
 type Json = Record<string, any>;
 export interface Picture { readonly sha256: string; readonly width: number; readonly height: number }
@@ -140,6 +143,8 @@ export function mountHistory(host: HistoryHost): History {
   /** A server that keeps no projects answers K once; K is not offered again there. */
   let keepsProjects = true;
   let watching: ReturnType<typeof setTimeout> | null = null;
+  /** When K last asked for a project here (F13). */
+  let keptAt: number | null = null;
   /** The card just opened: the story under it fades out over a frame rather than vanishing. */
   let fadeNext = false;
   /** The card grows when its review answers: what lies under it is measured again then. */
@@ -355,7 +360,11 @@ export function mountHistory(host: HistoryHost): History {
       try {
         const projects = await host.read(`/world/github-projects${scope}`);
         project = (projects.projects ?? []).find((one: Json) => one.version_id === host.versionId) ?? null;
-        request = (projects.requests ?? []).find((one: Json) => one.version_id === host.versionId) ?? null;
+        const listed = (projects.requests ?? []).find((one: Json) => one.version_id === host.versionId) ?? null;
+        // The follower takes the request before its project is listed (F13): the one sent is still starting until
+        // the project is there, a refusal says why, or STARTING_MS has passed.
+        const taken = !listed && project === null && request !== null && !request.refused && keptAt !== null && Date.now() - keptAt < STARTING_MS;
+        request = taken ? request : listed;
         if (project?.link) putting = false;
       } catch {
         // A read that fails is asked again at the next turn.
@@ -370,7 +379,10 @@ export function mountHistory(host: HistoryHost): History {
     if (!host.write || !offersKeep()) return;
     const answer = await host.write('POST', `/world/github-projects${scope}`, { version_id: host.versionId, readable: false }).catch(() => null);
     if (!made) return;
-    if (answer?.status === 202) request = answer.body;
+    if (answer?.status === 202) {
+      request = answer.body;
+      keptAt = Date.now();
+    }
     else if (answer?.status === 409 && answer.body?.code === 'projects_not_kept') keepsProjects = false;
     else request = { version_id: host.versionId, refused: { code: 'failed' } };
     draw();
@@ -738,7 +750,7 @@ export function mountHistory(host: HistoryHost): History {
     const column = element('div', 'wu-hr-column');
     px(column, sizes.left, sizes.top, sizes.width);
     column.style.bottom = `${sizes.foot}px`;
-    if (item.when) column.append(element('div', 'wu-hr-time', item.when));
+    if (item.span) column.append(element('div', 'wu-hr-time', item.span));
     column.append(element('div', 'wu-hr-moment-title', item.words));
     const rows = element('div', 'wu-hr-rows');
     for (const change of item.changes) {

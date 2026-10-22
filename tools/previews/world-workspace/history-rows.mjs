@@ -47,10 +47,17 @@ function changes(reads, names, partsOf) {
     const time = at(edit.recorded_at);
     if (time !== null) found.push({ at: time, words: youChangeWords(partsOf(edit, reads.edits)) });
   }
-  // A model given, changed or taken away; a person's play and an outside program are not changes of model.
-  for (const choice of reads.models ?? []) {
+  // A model given, changed or taken away; a person's play and an outside program are not changes of model, and a
+  // choice of the model the same characters already have changes nothing (F12b), oldest first.
+  const held = new Map();
+  for (const choice of [...(reads.models ?? [])].sort((a, b) => a.choice_seq - b.choice_seq)) {
     const time = at(choice.recorded_at);
     if (time === null || choice.ended || !['model', 'routine'].includes(choice.decider?.kind)) continue;
+    const who = [...choice.subjects].sort().join();
+    const what = choice.decider.kind === 'model' ? `model:${choice.model?.model_id ?? choice.model?.name ?? ''}` : 'routine';
+    const same = held.get(who) === what;
+    held.set(who, what);
+    if (same) continue;
     const whose = choice.subjects.length === 1 ? `${possessive(names.subject(choice.subjects[0]))} model` : `${choice.subjects.length} characters' models`;
     found.push({ at: time, words: youModelParts(whose, choice.decider?.kind === 'model' ? choice.model?.name ?? null : null) });
   }
@@ -193,10 +200,12 @@ export function historyPath(reads, names, partsOf, clock, now = Date.now()) {
       if (previous?.kind === 'change' && previous.merging) {
         previous.count += 1;
         previous.words = changesWords(previous.count);
-        previous.when = personSpan(previous.first, entry.at, now);
+        previous.span = personSpan(previous.first, entry.at, now);
         previous.changes.push(row);
       } else {
-        items.push({ id: `change:${entry.at}:${items.length}`, kind: 'change', merging: true, count: 1, first: entry.at, at: entry.at, when: row.when, words: entry.words, changes: [row] });
+        // On the line a change carries no time: none records the world's time it was made, and the wall clock never
+        // stands among world times (F12b). Its opened list keeps its span and each change's own time.
+        items.push({ id: `change:${entry.at}:${items.length}`, kind: 'change', merging: true, count: 1, first: entry.at, at: entry.at, when: null, span: row.when, words: entry.words, changes: [row] });
       }
       continue;
     }
@@ -207,7 +216,10 @@ export function historyPath(reads, names, partsOf, clock, now = Date.now()) {
     items.push(entry);
   }
   for (const item of items) {
-    if (item.kind === 'change' && item.count < 2) delete item.changes;
+    if (item.kind === 'change' && item.count < 2) {
+      delete item.changes;
+      delete item.span;
+    }
     delete item.merging;
     delete item.count;
     delete item.first;

@@ -78,7 +78,8 @@ const path = historyPath(stand, names, partsOf, clock, now);
 const text = (words) => (typeof words === 'string' ? words : words === null ? null : partsText(words));
 assert.deepEqual(path.items.map((item) => [item.kind, item.when, text(item.words)]), [
   ['creation', 'Yesterday · 21:40', 'Made from your words'],
-  ['change', '08:30', 'You placed the bench'],
+  // No change records the world's time it was made: on the line it carries no time (F12b).
+  ['change', null, 'You placed the bench'],
   ['moment', '06:52 · Day 1', 'Teo met Ines at the bench'],
   ['moment', '06:55 · Day 1', 'Ines and Teo went to the market'],
   ['moment', '07:09 · Day 1', 'Marco asked Teo'],
@@ -260,7 +261,7 @@ const busy = historyPath({
   nowTick: 1446,
 }, names, partsOf, clock, now);
 assert.deepEqual(busy.items.map((item) => [item.kind, item.when ?? null, text(item.words)]), [
-  ['change', '08:30 to 08:41', 'You made 3 changes'],
+  ['change', null, 'You made 3 changes'],
   ['moment', '23:50 · Day 1', 'Ari picked up the lantern'],
   ['day', null, 'Day 2'],
   ['moment', '00:05 · Day 2', 'Marco left'],
@@ -273,6 +274,22 @@ assert.deepEqual(busy.items[0].changes.map((row) => [row.when, text(row.words)])
   ['08:35', "You changed Teo's model to Qwen3 235B"],
   ['08:41', 'You moved the lantern'],
 ]);
+
+// A choice of the model the same characters already have is no change (F12b, JOURNEY's 18:23): Teo given Nemotron,
+// a moment, Nemotron chosen again, then Qwen: the dot after the moment is one change, said as its sentence. A choice
+// for other characters is theirs alone.
+const nemotron = { model_id: 'nemotron', name: 'Nemotron 3 Super 120B' }, qwen = { model_id: 'qwen', name: 'Qwen3 235B Instruct' };
+const chose = (seq, minute, subjects, model) => ({ choice_seq: seq, recorded_at: iso(16, 8, minute), subjects, decider: { kind: 'model' }, model, ended: false });
+const switched = historyPath({
+  models: [chose(3, 24, ['teo'], qwen), chose(2, 23, ['teo'], nemotron), chose(1, 19, ['teo'], nemotron), chose(4, 25, ['ines'], qwen)],
+  moments: [{ moment_id: 'w1', tick: 400, at: iso(16, 8, 21), session_id: null, kind: 'left', subjects: ['ari'], place: null, target: null, with: null, said: [], decider: { kind: 'routine', model: null }, picture: null, branches: [] }],
+}, names, partsOf, clock, now);
+assert.deepEqual(switched.items.map((item) => [item.kind, text(item.words)]), [
+  ['change', "You changed Teo's model to Nemotron 3 Super 120B"],
+  ['moment', 'Ari left'],
+  ['change', 'You made 2 changes'],
+]);
+assert.deepEqual(switched.items[2].changes.map((row) => text(row.words)), ["You changed Teo's model to Qwen3 235B Instruct", "You changed Ines's model to Qwen3 235B Instruct"]);
 
 // The opened list's window (H15): a list that fits never moves and offers no arrows; a longer one moves a row at a
 // time, held where its last row ends at the foot, never past it and never before its first row.

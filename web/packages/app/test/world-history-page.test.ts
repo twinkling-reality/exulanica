@@ -429,6 +429,44 @@ describe('History', () => {
     expect(keys(watching.root)).toEqual(['←→Earlier, later', 'EnterOpen this moment', 'EscBack']);
   });
 
+  it('says a project is starting until it is listed, though the follower took the request first (F13)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const local = { version_id: VERSION, project_id: 'project:demo', link: null, github: null, publications_per_day: 4 };
+      // The follower removes the request as it starts the project, and lists the project a scan later.
+      let listed: unknown[] = [];
+      const { read } = reads({ '/world/github-projects': { get projects() { return listed; }, requests: [], publications: [] } });
+      const write = vi.fn(async () => ({ status: 202, body: { request_id: 'k1', version_id: VERSION, refused: null } }));
+      const made = host(read, { write });
+      const history = (await module()).mountHistory(made);
+      await history.open();
+      const kept = () => made.root.querySelector('.wu-hr-kept')?.textContent;
+      history.key(press('KeyK'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(kept()).toBe('Starting a project…');
+      // A read with neither the request nor the project: still starting, and read again.
+      await vi.advanceTimersByTimeAsync(3_100);
+      expect(kept()).toBe('Starting a project…');
+      listed = [local];
+      await vi.advanceTimersByTimeAsync(3_100);
+      expect(kept()).toBe('Kept in a project on this computer, not on GitHub');
+      history.close();
+      // Where no project is ever listed, the page reads where the world is kept as it stands after two minutes.
+      listed = [];
+      const again = host(read, { write });
+      const second = (await module()).mountHistory(again);
+      await second.open();
+      second.key(press('KeyK'));
+      await vi.advanceTimersByTimeAsync(118_000);
+      expect(again.root.querySelector('.wu-hr-kept')?.textContent).toBe('Starting a project…');
+      await vi.advanceTimersByTimeAsync(6_100);
+      expect(again.root.querySelector('.wu-hr-kept')?.textContent).toBe('Not kept in a project');
+      second.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("asks H12's question with G where the project is kept on this computer only, its keys alone in the row", async () => {
     const local = { version_id: VERSION, project_id: 'project:demo', link: null, github: null, publications_per_day: 4 };
     const { read } = reads({ '/world/github-projects': { projects: [local], requests: [], publications: [] } });
@@ -492,6 +530,8 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(newest);
     expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
     expect(keys(made.root)).toEqual(['←→Earlier, later', 'GOpen on GitHub', 'EscBack']);
+    // Among world times a change states no wall clock: none records the world's time it was made (F12b).
+    expect(made.root.querySelectorAll('.wu-hr-change .wu-hr-time')).toHaveLength(0);
     history.key(press('ArrowRight'));
     expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(newest);
     history.key(press('ArrowLeft'));
