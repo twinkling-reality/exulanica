@@ -411,7 +411,10 @@ awnings and entrances, object parts for furniture, trees, rooftop plant and vitr
 texture coordinates. The frame is `city_local`: x east, y north, z up, integer millimetres,
 `metric_authored`. A direction is an integer vector, never an angle. The rules for surface frames,
 stop lines, frontage lines, the camber profile and texture coordinates are written in the module
-docstrings and are the contract the tessellator reads.
+docstrings and are the contract the tessellator reads. `surface.py` reads the same records back
+into the height a person stands at on a kerb top, footway or carriageway, in integer millimetres,
+held within a millimetre of the page's walk surface by `tests/fixtures/city-surface-table.json`;
+it answers nothing yet on a corner's wedge or a junction's fill.
 
 **Catalog keys are labels.** No reader draws a shape from a key: a furniture class's parts, a roof
 family's form and a material's texture set are resolved into the record that uses them.
