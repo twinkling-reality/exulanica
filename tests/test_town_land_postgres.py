@@ -7,9 +7,14 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import time
+import uuid
 
 import pytest
 from exulanica.grammar.landform import land_recipes, read_land_document
+from exulanica.world import generated_worlds
+from exulanica.world.composers import GeneratedWorldRefused
+from exulanica.world.generated_worlds import generation_receipt
+from exulanica.world.world_recipes import preset_land
 
 from test_society_made_world import made as imported_made  # noqa: F401
 from test_world_kinds_postgres import _uploaded
@@ -96,3 +101,66 @@ def test_a_town_on_level_ground_and_a_site_answer_by_name(made):
         f"/world/versions/{site['authored_version_id']}/land?world_id={site['world_id']}"
     )
     assert (answer.status_code, answer.json()["code"]) == (404, "unknown_reference")
+
+
+def test_a_town_made_from_its_card_stands_on_its_presets_land_where_worlds_are_made_on_land(made):
+    """POST /worlds/generated, what a town's card sends, lays the town on its preset's land where
+    the deployment makes worlds on land, and on level ground where it does not."""
+    api = made
+
+    def card(on_land: bool):  # type: ignore[no-untyped-def]
+        services = api.client.app.state.services
+        api.client.app.state.services = dataclasses.replace(services, worlds_on_land=on_land)
+        try:
+            response = api.post("/worlds/generated", {"recipe": "small_town", "title": "A town"})
+        finally:
+            api.client.app.state.services = services
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    land = preset_land("small_town")
+    assert land is not None
+    on = card(True)
+    assert on["generated_ground"]["land_sha256"] == read_land_document(dict(land.land)).sha256
+    assert card(False)["generated_ground"]["land_sha256"] is None
+
+
+def test_a_card_town_its_land_refuses_is_made_level_and_its_receipt_says_which_land_and_why(
+    made, monkeypatch
+):
+    """A town's card never meets a refusal for its land: where no layout of the town fits its
+    preset's land, the town is made on level ground and its receipt's recipe names that land and
+    the refusal."""
+    api = made
+    composed = generated_worlds.compose_generated_world
+
+    def refusing_land(recipe, world_id):  # type: ignore[no-untyped-def]
+        if recipe.land is not None:
+            raise GeneratedWorldRefused(recipe.key, [{"candidate": 0, "refusal": "no fit"}])
+        return composed(recipe, world_id)
+
+    monkeypatch.setattr(generated_worlds, "compose_generated_world", refusing_land)
+    services = api.client.app.state.services
+    api.client.app.state.services = dataclasses.replace(services, worlds_on_land=True)
+    try:
+        response = api.post("/worlds/generated", {"recipe": "market_town", "title": "A town"})
+    finally:
+        api.client.app.state.services = services
+    assert response.status_code == 201, response.text
+    entry = response.json()
+    assert entry["generated_ground"]["land_sha256"] is None
+    land = preset_land("market_town")
+    assert land is not None
+    with api.database.session(api.repository.workspace_id) as connection:
+        _, receipt = generation_receipt(
+            connection,
+            api.repository.workspace_id,
+            entry["world_id"],
+            uuid.UUID(entry["source_snapshot_id"]),
+        )
+    assert "land" not in receipt
+    assert receipt["recipe"]["land_refused"] == {
+        "recipe": land.key,
+        "land_sha256": land.land_sha256,
+        "code": "generated_world_refused",
+    }

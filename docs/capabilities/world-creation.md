@@ -36,7 +36,11 @@ every value asked for to it before anything is generated
 ([`exulanica/world/world_recipes.py`](../../exulanica/world/world_recipes.py)): a value the schema
 does not offer, one outside its range, and two values the schema says do not go together (a town
 three tiles long needs cross streets at least 130 m apart) are each refused by name with the range
-broken, and the page offers only what the schema allows. The
+broken, and the page offers only what the schema allows. Where the deployment makes worlds on land
+(`EXULANICA_WORLDS_ON_LAND`, on unless set off), the town stands on the land its preset names in
+[`world-recipe-land.v1.json`](../../assets/catalogs/world-recipes/world-recipe-land.v1.json), the
+small town on gentle hills and the market town in a valley
+([land for a town made from a preset](../landform-contract.md#land-for-a-town-made-from-a-preset)). The
 server generates the town from the city grammar for the world's own identity (`POST
 /worlds/generated`,
 [`exulanica/world/generated_worlds.py`](../../exulanica/world/generated_worlds.py)), keeping a seed

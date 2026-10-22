@@ -5,10 +5,10 @@ DEPLOYMENT TURNS IT ON**. A world's land can be stated as data, realized, graded
 Python and in the browser, and a site world can be made on land through its route: graded,
 regenerated from its receipt, its people's places standing on the land, its drawing and its land
 served. The application draws such a site on its land, to the horizon, and stands its people and
-things on it. A place drafted from a person's words stands on land chosen from what was said where
-the deployment leaves that on (`EXULANICA_WORLDS_ON_LAND`, on unless set off); elsewhere, and for a
-town made from a preset, worlds stand on level ground, as the [world kinds contract](world-kinds-contract.md) and the
-[city grammar](grammar-package.md) state.
+things on it. Where the deployment leaves it on (`EXULANICA_WORLDS_ON_LAND`, on unless set off), a
+place drafted from a person's words stands on land chosen from what was said, and a town made from
+a preset stands on the land its preset names; elsewhere worlds stand on level ground, as the
+[world kinds contract](world-kinds-contract.md) and the [city grammar](grammar-package.md) state.
 
 This document owns the land document (`exulanica.landform/v1`), the landform catalogs, the pure
 function that realizes a land, the grading a layout applies to it, and the chunk and backdrop
@@ -487,6 +487,25 @@ the place's south edge, centred, and falls in steps of at most 2 m to the sea 80
 reach along its side is measured from the place's edge, so it clears a layout of any width and
 lies in its near land. Where the coast drops faster than the pools step, the cascade's lips stand
 as walls up to about 4 m.
+
+## Land for a town made from a preset
+
+Where the deployment leaves it on, a town made from a preset (`POST /worlds/generated`, what a
+town's card on World menu, Create sends) stands on the land recipe its preset names in
+[`world-recipe-land.v1.json`](../assets/catalogs/world-recipes/world-recipe-land.v1.json), read by
+[`world_recipes.py`](../exulanica/world/world_recipes.py): the small town on `rolling`, the default,
+and the market town in a `valley`, where its high street runs between the ridges. A preset the
+catalog does not name stands on the default, and one it names `level` on level ground. The town is
+laid on the recipe's land document by the town composer's version 3, its receipt keeping the
+document, in the request, trying one identity's seed candidates. Where none of them fits the land,
+the town is made on level ground instead, so a card is never refused for its land, and its
+receipt's recipe says so (`land_refused`: the land recipe, its land's digest and the refusal's
+code). Measured under land rules 6 on the
+development machine, every one of six identities made a town on every recipe, a small town in 2.1
+to 4.8 s median by land and a market town in 4.2 s in a valley against 16.3 s on the coast. The land is a
+catalog of its own rather than a field of the presets, so a level town's recipe, which its seed is
+drawn from, is the same with the setting on or off; a new or changed choice is a new catalog
+version. Where the deployment turns land off, a town made from a preset stands on level ground.
 
 ## Refusals
 

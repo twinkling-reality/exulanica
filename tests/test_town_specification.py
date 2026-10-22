@@ -22,6 +22,7 @@ from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATHS
 from exulanica.grammar.grammars.city.document import descriptor_sha256
 from exulanica.grammar.grammars.specified import REGISTRY
+from exulanica.grammar.landform import land_recipes
 from exulanica.world import world_recipes as recipe_catalog
 from exulanica.world.composers import GeneratedWorldRefused, composer_module
 from exulanica.world.composers import city_grammar_town as town_composer
@@ -36,9 +37,14 @@ from exulanica.world.society_grounds import society_ground_for_composer
 from exulanica.world.world_recipes import (
     CANDIDATES_MAXIMUM,
     CATALOG_DIRECTORY,
+    LAND_CATALOG_ID,
+    LAND_CATALOG_VERSION,
+    LEVEL,
     SpecificationRefused,
+    load_preset_lands,
     load_specification_schemas,
     load_world_recipes,
+    preset_land,
     specification_document,
     town_recipe,
     world_recipe,
@@ -466,3 +472,44 @@ def test_a_schema_is_read_only_when_its_ranges_lie_inside_the_grammar_and_preset
                 )
             )
         )
+
+
+def test_each_preset_stands_on_the_land_its_land_catalog_names_or_the_default(
+    tmp_path, monkeypatch
+):
+    """A town of a preset stands on the land recipe the preset land catalog names, on the land
+    recipes' default where it names none, and on level ground only where it says level; only a level
+    town the composer lays on land names a land. A land catalog that names no preset, or a land
+    that is no land recipe, is refused when it is read."""
+    named = load_preset_lands()
+    [default] = [recipe for recipe in land_recipes() if recipe.default]
+    assert named, "the served catalog names each preset's land"
+    for recipe in world_recipes():
+        land = preset_land(recipe.key)
+        if named.get(recipe.key) == LEVEL:
+            assert land is None
+            continue
+        assert land is not None
+        assert land.key == named.get(recipe.key, default.key)
+        assert (recipe.composer_key, recipe.composer_version) == (town_composer.COMPOSER_KEY, 2)
+
+    monkeypatch.setattr(recipe_catalog, "_preset_lands", lambda: MappingProxyType({}))
+    assert preset_land("small_town") == default
+    monkeypatch.setattr(
+        recipe_catalog, "_preset_lands", lambda: MappingProxyType({"small_town": LEVEL})
+    )
+    assert preset_land("small_town") is None
+
+    def with_entry(**changed: str) -> object:
+        target = tmp_path / str(uuid.uuid4())
+        shutil.copytree(CATALOG_DIRECTORY, target)
+        path = target / f"{LAND_CATALOG_ID}.v{LAND_CATALOG_VERSION}.json"
+        document = json.loads(path.read_text())
+        document["entries"][0].update(changed)
+        path.write_text(json.dumps(document))
+        return target
+
+    with pytest.raises(CatalogError, match="'seaside_town', which is no preset"):
+        load_preset_lands(with_entry(key="seaside_town"))
+    with pytest.raises(CatalogError, match="'moon', which is no land recipe"):
+        load_preset_lands(with_entry(land="moon"))

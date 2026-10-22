@@ -20,6 +20,12 @@ specification passes.
   of it the preset was reviewed under) and how many seed candidates a world tries, with why. Version
   1's recipes each named a specification file under ``specifications/``, pinned by its digest; they
   are read for the receipts of the worlds made from them and are no longer offered.
+* ``world-recipe-land.v<N>.json``, **where each preset's town stands** when the server makes
+  worlds on land (``EXULANICA_WORLDS_ON_LAND``): a land recipe's key
+  (:mod:`exulanica.grammar.landform.recipes`), or ``level`` for level ground, with why. A preset it
+  does not name stands on the land recipes' default. It is a catalog of its own, not a field of the
+  presets, so a level town's recipe, which a world's seed is drawn from, is the same either way;
+  a town on land carries its land's digest and land rules in its recipe instead.
 * ``specifications/``, the files version 1's recipes name.
 
 **The gate.** A person, an open model drafting a specification on a person's behalf and an API
@@ -50,7 +56,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from exulanica.grammar.catalogs import (
     CatalogSchema,
@@ -72,11 +78,17 @@ from exulanica.grammar.grammars.specified import REGISTRY, Specification, specif
 from exulanica.grammar.parameters import CLOSED_VOCABULARY
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, SPEEDS
 
+if TYPE_CHECKING:
+    from exulanica.grammar.landform import LandRecipe
+
 __all__ = [
     "CANDIDATES_MAXIMUM",
     "CATALOG_DIRECTORY",
     "CATALOG_ID",
     "CATALOG_VERSION",
+    "LAND_CATALOG_ID",
+    "LAND_CATALOG_VERSION",
+    "LEVEL",
     "REFUSALS",
     "SCHEMA_ID",
     "SPECIFICATION_FIELDS",
@@ -88,8 +100,10 @@ __all__ = [
     "SpecificationValue",
     "UnknownWorldRecipe",
     "WorldRecipe",
+    "load_preset_lands",
     "load_specification_schemas",
     "load_world_recipes",
+    "preset_land",
     "read_specification",
     "specification_document",
     "specification_tiles",
@@ -102,6 +116,11 @@ __all__ = [
 CATALOG_ID: Final = "world-recipe"
 #: The presets a running server offers.
 CATALOG_VERSION: Final = 4
+#: Where each preset's town stands when the server makes worlds on land.
+LAND_CATALOG_ID: Final = "world-recipe-land"
+LAND_CATALOG_VERSION: Final = 1
+#: What that catalog states for a preset whose town stands on level ground.
+LEVEL: Final = "level"
 #: The specification schemas' catalog: what a preset's values, and a person's, are checked against.
 SCHEMA_ID: Final = "world-specification"
 #: The newest schema the directory holds; every earlier one stays for the presets that name it.
@@ -519,6 +538,9 @@ class WorldRecipe:
     land: Mapping[str, Any] | None = None
     land_sha256: str | None = None
     land_rules: Mapping[str, Any] | None = None
+    #: Where the town was asked on land that refused it and was made on level ground instead: the
+    #: land recipe's key (``recipe``), its land's SHA-256 and the refusal's code; None otherwise.
+    land_refused: Mapping[str, str] | None = None
 
     def reference(self) -> dict[str, object]:
         """What a world made from this recipe records of it; a world's seed is drawn from it, so
@@ -536,6 +558,8 @@ class WorldRecipe:
         if self.land is not None:
             stated["land_sha256"] = self.land_sha256
             stated["land_rules"] = dict(self.land_rules or {})
+        if self.land_refused is not None:
+            stated["land_refused"] = dict(self.land_refused)
         return stated
 
 
@@ -842,9 +866,11 @@ def _recipe_catalog(version: int, pins: Mapping[str, Mapping[str, str]]) -> Cata
 def _claimed_files(directory: Path, catalog_version: int) -> None:
     """The directory holds the catalogs this module reads and nothing it does not."""
     present = {path.name for path in directory.glob("*.json")}
-    claimed = {f"{CATALOG_ID}.v{n}.json" for n in range(1, CATALOG_VERSION + 1)} | {
-        f"{SCHEMA_ID}.v{n}.json" for n in range(1, SCHEMA_VERSION + 1)
-    }
+    claimed = (
+        {f"{CATALOG_ID}.v{n}.json" for n in range(1, CATALOG_VERSION + 1)}
+        | {f"{SCHEMA_ID}.v{n}.json" for n in range(1, SCHEMA_VERSION + 1)}
+        | {f"{LAND_CATALOG_ID}.v{n}.json" for n in range(1, LAND_CATALOG_VERSION + 1)}
+    )
     wanted = f"{CATALOG_ID}.v{catalog_version}.json"
     if not present <= claimed or wanted not in present:
         raise CatalogError(
@@ -959,6 +985,58 @@ def town_recipe(key: str, values: Mapping[str, object] | None = None) -> WorldRe
         tiles=specification_tiles(document),
         catalog_version=preset.catalog_version,
         values=MappingProxyType(dict(sorted(chosen.items()))),
+    )
+
+
+def load_preset_lands(
+    directory: Path = CATALOG_DIRECTORY, *, catalog_version: int = LAND_CATALOG_VERSION
+) -> MappingProxyType[str, str]:
+    """Where each preset that catalog version names stands on land: a land recipe's key, or
+    :data:`LEVEL`. A key that names no preset of the served catalog, or a land that is no recipe of
+    the newest land catalog, is refused by name."""
+    from exulanica.grammar.landform import land_recipes
+
+    catalog = load_catalog(
+        directory.joinpath(f"{LAND_CATALOG_ID}.v{catalog_version}.json"),
+        CatalogSchema(
+            LAND_CATALOG_ID, catalog_version, (("land", text_field), ("reason", text_field))
+        ),
+    )
+    presets = {recipe.key for recipe in load_world_recipes(directory)}
+    lands = {recipe.key for recipe in land_recipes()} | {LEVEL}
+    named: dict[str, str] = {}
+    for entry in catalog.entries:
+        land = str(dict(entry.values)["land"])
+        if entry.key not in presets:
+            raise CatalogError(f"{LAND_CATALOG_ID} names {entry.key!r}, which is no preset")
+        if land not in lands:
+            raise CatalogError(
+                f"{LAND_CATALOG_ID} stands {entry.key} on {land!r}, which is no land recipe and "
+                f"not {LEVEL!r}"
+            )
+        named[entry.key] = land
+    return MappingProxyType(named)
+
+
+@functools.cache
+def _preset_lands() -> MappingProxyType[str, str]:
+    return load_preset_lands()
+
+
+def preset_land(key: str) -> LandRecipe | None:
+    """The land recipe a town of the preset ``key`` stands on where the server makes worlds on
+    land: the one the preset's land names, the land recipes' default where it names none, or None
+    where it names level ground. The newest land recipes are read, as a world made from a sentence
+    reads them; a made town's receipt keeps its land document itself."""
+    from exulanica.grammar.landform import land_recipes
+
+    named = _preset_lands().get(key)
+    if named == LEVEL:
+        return None
+    return next(
+        recipe
+        for recipe in land_recipes()
+        if (recipe.key == named if named is not None else recipe.default)
     )
 
 

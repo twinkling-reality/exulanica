@@ -6,7 +6,8 @@ import datetime as dt
 import unicodedata
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal
 
 import psycopg
@@ -442,6 +443,7 @@ class SavedWorldEntryRepository:
         values: Mapping[str, object] | None = None,
         fixed_world_id: str | None = None,
         land: object | None = None,
+        land_refused: Mapping[str, str] | None = None,
     ) -> SavedWorldEntry:
         """Generate a world from a preset, with ``values`` in place of its own, and save its entry,
         in one transaction.
@@ -467,7 +469,10 @@ class SavedWorldEntryRepository:
         lock, where its answer holds.
 
         With ``land`` the town is laid on it (``city_grammar_town.on_land``, a refused document
-        refused by name before anything is generated), trying one identity only.
+        refused by name before anything is generated), trying one identity only. ``land_refused``
+        is for a town asked on land that refused it, made here on level ground instead: the land
+        recipe, its land's digest and the refusal's code, which its recipe, and so its receipt,
+        states.
         """
         from exulanica.world.composers import (
             GeneratedWorldIdentitiesRefused,
@@ -482,6 +487,8 @@ class SavedWorldEntryRepository:
 
         clean_title = _clean_title(title)
         recipe = town_recipe(recipe_key, values)
+        if land_refused is not None:
+            recipe = replace(recipe, land_refused=MappingProxyType(dict(land_refused)))
         if land is not None:
             recipe = on_land(recipe, land)
         refuse_past_limit(

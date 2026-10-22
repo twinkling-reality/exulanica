@@ -44,6 +44,7 @@ from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
 from exulanica.api.world_edit import object_problem, object_read_repository
 from exulanica.api.world_scope import WorldId
+from exulanica.grammar.landform import LandformRefused, LandRecipe
 from exulanica.world.baked_tiles import (
     TILE_MEDIA_TYPE,
     BakedTileError,
@@ -58,11 +59,16 @@ from exulanica.world.errors import InvalidStructuralData, InvalidStyleData, Styl
 from exulanica.world.generated_worlds import generated_tiles
 from exulanica.world.models import StylePackBinding
 from exulanica.world.object_repository import WorldObjectRepository
-from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
+from exulanica.world.saved_entries import (
+    InvalidSavedWorldTitle,
+    SavedWorldEntry,
+    SavedWorldEntryRepository,
+)
 from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.world_recipes import (
     SpecificationRefused,
     UnknownWorldRecipe,
+    preset_land,
     specification_document,
     world_recipes,
 )
@@ -168,6 +174,14 @@ def create_generated_world(
     database role cannot register a world is refused 403 `worlds_read_only` before anything is
     generated.
 
+    Where the deployment makes worlds on land (``EXULANICA_WORLDS_ON_LAND``), the town stands on
+    its preset's land (``world-recipe-land``): the land recipe the preset names, the land recipes'
+    default where it names none, or level ground where it says so; a town on land tries one
+    identity. Where no layout of the town fits that land, it is made on level ground instead, and
+    its receipt's recipe says which land refused it and why (``land_refused``), so a town's card
+    is never refused for its land. Where the deployment does not, every town stands on level
+    ground.
+
     The world is made, then its look named in its appearance's next version, the entry's resume
     pointer moved with it. When that write is refused as busy, the world stays as made, naming no
     pack, which a page draws in the default look.
@@ -176,6 +190,7 @@ def create_generated_world(
         require_world_registration(connection)
     except WorldsReadOnly as exc:
         return _problem(403, exc.code, str(exc))
+    land = preset_land(body.recipe) if services.worlds_on_land else None
     library = style_pack_library()
     named = body.style_pack
     try:
@@ -201,13 +216,29 @@ def create_generated_world(
     entries = SavedWorldEntryRepository(
         connection, session.workspace_id, services.store, guest=guest
     )
-    try:
-        created = entries.create_generated(
+
+    def made(on: LandRecipe | None, refused: dict[str, str] | None = None) -> SavedWorldEntry:
+        return entries.create_generated(
             title=body.title,
             recipe_key=body.recipe,
             created_by=session.actor,
             values=body.values,
+            land=None if on is None else on.land,
+            land_refused=refused,
         )
+
+    try:
+        try:
+            created = made(land)
+        except (GeneratedWorldRefused, LandformRefused) as refusal:
+            if land is None:
+                raise
+            # No layout of the town fits its preset's land: it is made on level ground, and its
+            # recipe says which land refused it and why.
+            created = made(
+                None,
+                {"recipe": land.key, "land_sha256": land.land_sha256, "code": refusal.code},
+            )
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
     except InvalidSavedWorldTitle as exc:

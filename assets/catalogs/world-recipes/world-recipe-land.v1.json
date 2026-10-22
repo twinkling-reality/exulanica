@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-recipe-land",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "small_town",
+      "land": "rolling",
+      "reason": "The land a place stands on when nothing names another, so a small town made from its card stands where one made from a sentence that names no land does. Measured under land rules 6 on the development machine: six of six identities made a town on it, 4.7 s median to compose one in the request.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    },
+    {
+      "key": "market_town",
+      "land": "valley",
+      "reason": "A market town stands where roads meet on a valley floor, its high street running between the two ridges. Measured under land rules 6 on the development machine: six of six identities made a town on every land recipe, and the valley composed fastest in the request, 4.2 s median against 6.8 s on gentle hills and 16.3 s on the coast.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    }
+  ]
+}
