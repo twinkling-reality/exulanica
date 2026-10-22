@@ -204,6 +204,14 @@ def preview_object_removal(
         )
 
 
+def _rests_at(landing: LandingGround | None, transform: Transform) -> dict[str, int]:
+    """The height a thing posed by ``transform`` rests at (``rest_y_mm``), where its ``landing``
+    states one, so the page stands it there and keeps that pose; nothing where it does not."""
+    if landing is None or landing.rest_height is None:
+        return {}
+    return {"rest_y_mm": landing.rest_height((transform.x_mm, transform.z_mm))}
+
+
 def preview_thing_move(
     repository: WorldObjectRepository,
     version_id: uuid.UUID,
@@ -250,7 +258,7 @@ def preview_thing_move(
             placed_thing_document(current),
             placed_thing_document(moved),
             None,
-            checked,
+            {**checked, **_rests_at(landing, moved.transform)},
         )
 
 
@@ -289,7 +297,7 @@ def preview_thing_add(
             None,
             placed_thing_document(placed),
             None,
-            checked,
+            {**checked, **_rests_at(landing, placed.transform)},
         )
 
 

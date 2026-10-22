@@ -119,11 +119,13 @@ from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_site_place import site_obstructions
 from exulanica.world.society_walking_surfaces import (
     build_walking_surfaces_input,
+    surface_height_at,
     town_head_count,
     walking_surfaces_place,
 )
 from exulanica.world.society_water import WaterStatement
 from exulanica.world.society_water_sources import site_water, town_water, water_for_input
+from exulanica.world.thing_landing_source import town_surface
 from exulanica.world.town_people import TownPeopleRefused, people_frame
 from exulanica.world.version_town import TownKey, composed_town_key, town_and_made, town_key
 
@@ -2054,6 +2056,12 @@ class SocietyRuntime:
                 support_source=town.support_source,
                 made_records=town.made,
                 water=water_for_input(connection, binding, seq, town.water),
+                # A town's things rest on its own surface, as a placing is held to it.
+                rest=town_surface(
+                    connection, *scope, town.records, surface_height_at(place, ground)
+                )
+                if chosen == WALKING_SURFACES_COMPOSITION_V3 and town.site_receipt is None
+                else None,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"

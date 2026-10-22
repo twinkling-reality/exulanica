@@ -239,7 +239,10 @@ def test_a_well_moved_onto_open_ground_is_moved_as_its_preview_said(made):
     preview = _move(api, entry, version, pose, preview=True)
     assert preview.status_code == 200, preview.text
     verdict = preview.json()
-    assert (verdict["availability"], verdict["landing"]) == ("ready", {"checked": True})
+    assert (verdict["availability"], verdict["landing"]) == (
+        "ready",
+        {"checked": True, "rest_y_mm": 0},
+    )
     assert _version(api, entry) == version
 
     moved = _move(api, entry, version, pose)

@@ -20,6 +20,7 @@ from exulanica.world.placed_things import PlacedThing, named_kind
 from exulanica.world.society_authored_ground import WalkableArea, _height_above_plane
 from exulanica.world.society_city_place import city_blocked_parts, city_obstructions
 from exulanica.world.society_site_place import SiteSociety, site_blocked_boxes, site_blocked_parts
+from exulanica.world.society_walking_surfaces import surface_height_above, surface_height_at
 from exulanica.world.thing_landing import (
     LANDING_CODES,
     BlockedPart,
@@ -27,6 +28,7 @@ from exulanica.world.thing_landing import (
     blocking_things,
     footprint_half_extents,
     landing_refusal,
+    plane_height,
     rests_on_plane,
 )
 from exulanica.world.world_recipes import town_recipe
@@ -224,3 +226,39 @@ def test_a_town_s_named_parts_are_what_its_people_walk_round():
     )
     refused = landing_refusal(ground, middle, footprint_half_extents(middle))
     assert refused is not None and refused.where == {"part": "building", "label": "building"}
+
+
+class _Ground:
+    """The one figure the walking surfaces' height rule reads of a society's ground: its plane."""
+
+    elevation_mm = 0
+
+
+# A footway 2 m wide whose kerb line rises from the road's 0 to the paving's 150 mm: a walking
+# line from (0, 0) to (0, 2000) in the place's plan (east, north), and a second line on the paving.
+_KERB = {
+    "nodes": [
+        {"node_id": "road", "support_z_mm": 0, "position_mm": [0, 0]},
+        {"node_id": "kerb", "support_z_mm": 150, "position_mm": [0, 2_000]},
+        {"node_id": "shop", "support_z_mm": 150, "position_mm": [6_000, 2_000]},
+    ],
+    "edges": [
+        {"edge_id": "a", "from_node_id": "road", "to_node_id": "kerb"},
+        {"edge_id": "b", "from_node_id": "kerb", "to_node_id": "shop"},
+    ],
+}
+
+
+def test_a_thing_rests_at_the_walking_surface_s_own_height_where_it_stands():
+    rest = surface_height_at(_KERB, _Ground())
+    # On the paving's line, on the kerb's rise half way up, and at the road's end (south is -north).
+    assert (rest((3_000, -2_000)), rest((0, -1_000)), rest((0, 0))) == (150, 75, 0)
+    above = surface_height_above(_KERB, _Ground())
+    # Posed at that height it rests; 300 mm over it, it stands 150 mm above the paving's.
+    assert above(_thing(3_000, -2_000, y=150)) is None
+    assert above(_thing(3_000, -2_000, y=450)) == 300
+
+
+def test_a_plane_ground_rests_a_thing_at_its_elevation_everywhere():
+    assert [plane_height(250)(point) for point in ((0, 0), (40_000, -9_000))] == [250, 250]
+    assert rests_on_plane(250)(_thing(40_000, -9_000, y=250)) is None

@@ -48,6 +48,7 @@ __all__ = [
     "blocking_things",
     "footprint_half_extents",
     "landing_refusal",
+    "plane_height",
     "rests_on_plane",
 ]
 
@@ -104,12 +105,15 @@ class BlockedPart:
 @dataclass(frozen=True, slots=True)
 class LandingGround:
     """A world's ground as a move reads it: its edge (None where it has none), how high a thing
-    stands above the surface under it (None where it rests on it), and what blocks."""
+    stands above the surface under it (None where it rests on it), and what blocks; and, where the
+    ground states it, the height a thing rests at, at a point of the region (east and south,
+    millimetres), which a placing's preview answers so the page stands it there."""
 
     region_id: str
     area: WalkableArea | None
     height_above: Callable[[PlacedThing], int | None]
     parts: tuple[BlockedPart, ...]
+    rest_height: Callable[[tuple[int, int]], int] | None = None
 
 
 def rests_on_plane(elevation_mm: int) -> Callable[[PlacedThing], int | None]:
@@ -123,6 +127,12 @@ def rests_on_plane(elevation_mm: int) -> Callable[[PlacedThing], int | None]:
         return None if above == 0 else above
 
     return height
+
+
+def plane_height(elevation_mm: int) -> Callable[[tuple[int, int]], int]:
+    """The height a thing rests at on a plane ground: its elevation, wherever it stands
+    (``rests_on_plane``'s rule)."""
+    return lambda _point: elevation_mm
 
 
 def landing_refusal(

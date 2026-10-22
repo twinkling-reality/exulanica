@@ -413,11 +413,9 @@ def _at(a: Sequence[int], b: Sequence[int], along: int, length: int) -> Point:
     )
 
 
-def surface_height_above(
-    place: Mapping[str, Any], ground: SocietyGround
-) -> Callable[[PlacedThing], int | None]:
-    """How high a placed thing stands above the walking line nearest it, or None where it rests on
-    the surface there (within ``RESTS_ON_SURFACE_MM``).
+def surface_height_at(place: Mapping[str, Any], ground: SocietyGround) -> Callable[[Point], int]:
+    """The walking surface's height at a point of the place's plan (east and south, millimetres):
+    the height a thing placed there rests at.
 
     The surface's height is read along the place's own edges: the nearest point of the nearest
     edge (by squared distance, then edge identity), its height the two ends' support heights
@@ -445,6 +443,22 @@ def surface_height_above(
                 rise = (heights[b] - heights[a]) * along
                 height = heights[a] + (2 * rise + length) // (2 * length)
         return height
+
+    return surface
+
+
+def surface_height_above(
+    place: Mapping[str, Any], ground: SocietyGround
+) -> Callable[[PlacedThing], int | None]:
+    """How high a placed thing stands above the walking line nearest it (``surface_height_at``), or
+    None where it rests on the surface there (within ``RESTS_ON_SURFACE_MM``)."""
+    return rests_on_surface(surface_height_at(place, ground))
+
+
+def rests_on_surface(surface: Callable[[Point], int]) -> Callable[[PlacedThing], int | None]:
+    """How high a placed thing stands above ``surface`` (its height at a point of the region, east
+    and south, in the frame a thing's pose is in), or None where it rests on it (within
+    ``RESTS_ON_SURFACE_MM``)."""
 
     def height_above(thing: PlacedThing) -> int | None:
         above = thing.transform.y_mm - surface((thing.transform.x_mm, thing.transform.z_mm))
@@ -790,6 +804,7 @@ def build_walking_surfaces_input(
     support_source: Any = None,
     made_records: Sequence[object] | None = None,
     water: WaterStatement | None = None,
+    rest: Callable[[Point], int] | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -809,7 +824,12 @@ def build_walking_surfaces_input(
     input of a society that swims carries the graph laid over it (:func:`~exulanica.world.
     society_water.water_graph`), a first input where the movement modules it records name a
     swimming, a later one where its caller hands it, having read that its society's first input
-    records one. Any other input states no water."""
+    records one. Any other input states no water.
+
+    ``rest`` is the height a placed thing rests at, at a point of the region, in the frame its pose
+    is in: a town's own surface (:func:`~exulanica.world.thing_landing_source.town_surface`), the
+    one a placing is held to, so a thing placed where the landing rests it rests here too. Left out
+    (a site), a thing rests by the walking line nearest it (:func:`surface_height_above`)."""
     if (day_place is not None or day_routine is not None) and (
         not things
         or input_seq != 1
@@ -971,7 +991,11 @@ def build_walking_surfaces_input(
     reason = reason or support_refusal
     records_list.extend(support_records)
     # Only a society of things reads how high a thing stands: v1 and v2 read no height.
-    height_above = surface_height_above(place, ground) if things else None
+    height_above = (
+        (surface_height_above(place, ground) if rest is None else rests_on_surface(rest))
+        if things
+        else None
+    )
     if things and unknown is not None:
         reason = reason or unknown
     if (

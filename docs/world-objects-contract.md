@@ -619,7 +619,13 @@ placed (`invalid_object_state`), a version holding as many things as it may
 does not take) and holds a thing of a shipped kind to the same ground the placing is held to,
 answering a landing refusal by its code and `landing.where`; a creature made from words is placed
 where its maker stands it, so its preview says `landing.checked` false, as the placing checks
-nothing there. The base is checked before the object is
+nothing there. A ready preview of a placing or a move that was held to the ground also says
+`landing.rest_y_mm`, the height in millimetres the ground's own rule rests the thing at where it
+stands, so the page places the thing at that height rather than at the one it asked about: in a
+town the city's own street surface there (kerb top, footway or carriageway, the surface its tiles
+draw and its walkers walk on), elsewhere the walking line nearest it, measured from the town's
+arrival height, where its region hangs, or from the city's datum for a town on land; on a site the
+walking surface's height; on a plane its elevation. The base is checked before the object is
 looked up, as the write checks it, and an unknown or foreign version or object answers the write's
 `404 unknown_reference`. A preview does not compose the society input a purposeful society takes
 from every accepted edit, so a write whose preview was ready can still answer
@@ -1052,8 +1058,9 @@ support-bound thing also clears its support affinity. A move, and a placing of a
 held to the world's ground as the world's society reads it (`exulanica/world/thing_landing.py`), so
 where a thing may be put and what the world's people can reach never disagree: inside the walkable
 area where the world's own
-ground states one, resting on the ground by the society's own rule (the ground plane, or the
-nearest walking line of a world that states its walking surfaces), and with its kind's box, turned
+ground states one, resting on the ground by the society's own rule (the ground plane; a town's
+own surface, as `landing.rest_y_mm` below states it; or a site's nearest walking line), and with
+its kind's box, turned
 with it, overlapping nothing people cannot walk through: a site's structures, water and other
 areas, walls, blocking fixtures and closed zones, a town's buildings, street furniture and trees,
 and the version's other placed objects whose kinds block walking. A being is held by its centre.

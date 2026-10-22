@@ -312,3 +312,30 @@ describe('the note after a chosen thing is kept turned or moved (W12.7)', () => 
     expect(await noted((mode) => { expect(press(mode, 'BracketRight')).toBe(true); })).toBe('You turned the bench');
   });
 });
+
+describe('a held thing stands at the height its ground says it rests at (W12.6)', () => {
+  const RESTS = (y: number) => ({ availability: 'ready', landing: { checked: true, rest_y_mm: y } });
+
+  it('places it at the answered height, not the height it was asked about', async () => {
+    const { mode, writes, answer } = await mount();
+    void mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 2000, zMm: -6000 });
+    await answer(RESTS(150));
+    expect(press(mode, 'Enter')).toBe(true);
+    await vi.waitFor(() => expect(placed(writes)).toHaveLength(1));
+    expect(placed(writes)[0]!.body.pose).toMatchObject({ x_mm: 2000, y_mm: 150, z_mm: -6000 });
+  });
+
+  it('keeps a moved thing at the answered height too', async () => {
+    const back = towards(0, 0.8, -4);
+    rays.set('500,300', back.ray);
+    const { mode, writes, answer } = await mount({ direction: back.ray.direction, distance: back.distance });
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    expect(press(mode, 'BracketRight')).toBe(true);
+    await answer(RESTS(120));
+    expect(press(mode, 'Enter')).toBe(true);
+    await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.move')).toBe(true));
+    expect(writes.find((write) => write.actionId === 'things.move')!.body.pose).toMatchObject({ y_mm: 120, z_mm: -4000 });
+  });
+});

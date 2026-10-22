@@ -98,7 +98,11 @@ def test_a_well_on_open_ground_is_placed_as_its_preview_said(made):
     pose = _pose(*_open_ground(entry))
 
     verdict = _verdict(_preview(api, entry, "well", WELL, pose))
-    assert (verdict["availability"], verdict["landing"]) == ("ready", {"checked": True})
+    # Ready, checked, and the height the well rests at there: the farm's level floor.
+    assert (verdict["availability"], verdict["landing"]) == (
+        "ready",
+        {"checked": True, "rest_y_mm": 0},
+    )
     assert verdict["would_change"]["subject_id"] == "well"
     assert verdict["would_change"]["before"] is None
     assert _version(api, entry) == before

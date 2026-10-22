@@ -2437,9 +2437,13 @@ before, and its stored minutes replay byte for byte
 before the key refuses an input carrying it, so a society that has consumed one cannot be read by
 an older release. A lattice ground's things input carries no people. A town's footways stand on its kerbs, above the
 ground's plane, so a thing rests on the surface when it stands within 200 mm (`RESTS_ON_SURFACE_MM`)
-of the height of the walking line nearest it, read along the town's own edges between their ends'
-support heights; one that does not states its `height_mm` above that line, offers nothing
-(`authored_object_off_ground`) and still blocks. A placed object whose kind blocks walking removes
+of the town's own surface where it stands, the one a placing is held to
+(`exulanica/world/thing_landing_source.py` `town_surface`): the city's street surface there
+(kerb top, footway, carriageway; `exulanica/grammar/grammars/city/surface.py`), elsewhere the
+walking line nearest it, read along the town's own edges between their ends' support heights,
+measured from the town's arrival height where its region hangs (from the city's datum on land). A
+site's things rest by the walking line nearest them. One that does not rest states its `height_mm`
+above that surface, offers nothing (`authored_object_off_ground`) and still blocks. A placed object whose kind blocks walking removes
 every walking-line node within the walking clearance of its box turned with it, and cuts every line
 that passes within that clearance: from each end that stays, the line keeps the part a person walks
 clear of the thing, ending at a node of its own (`cut:`); a premises or a seat left with no node to

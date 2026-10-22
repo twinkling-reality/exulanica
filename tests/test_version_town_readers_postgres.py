@@ -9,6 +9,8 @@ an element override named ``part:<building>``, suppressed for a removal or stati
 
 from __future__ import annotations
 
+import dataclasses
+import math
 import uuid
 from fractions import Fraction
 
@@ -19,16 +21,23 @@ from exulanica.grammar.grammars.city.generation.massing import (
     BuildingStoreysRefused,
 )
 from exulanica.grammar.grammars.city.massing import MassingRecord
+from exulanica.grammar.grammars.city.streets import CurbEdgeRecord
+from exulanica.grammar.grammars.city.surface import city_surface_z_at
 from exulanica.selection.validation import Session
-from exulanica.world import saved_entries
+from exulanica.world import saved_entries, thing_landing_source
 from exulanica.world.composers import composer_module
 from exulanica.world.generated_worlds import town_records
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import ElementOverride
+from exulanica.world.society_authored_ground import read_authored_ground
 from exulanica.world.society_authored_ground_area import ground_place_id
 from exulanica.world.society_city_place import city_blocked_parts
 from exulanica.world.society_living import town_routine_of
-from exulanica.world.society_walking_surfaces import town_head_count, walking_surfaces_place
+from exulanica.world.society_walking_surfaces import (
+    surface_height_at,
+    town_head_count,
+    walking_surfaces_place,
+)
 from exulanica.world.thing_landing_source import prepare_landing_in_region
 from exulanica.world.town_parts import town_buildings
 from exulanica.world.town_people import people_frame
@@ -302,3 +311,93 @@ def test_two_changes_of_a_version_in_one_transaction_never_share_a_town_read(tow
     routine = town_routine_of(town.made.receipt)
     lived_in = runtime._living_place(ground, changed, routine)
     assert not _premises_in(people_frame(lived_in, routine), building.premises)
+
+
+def _beside(curb: CurbEdgeRecord, out: int) -> tuple[int, int]:
+    """The point ``out`` millimetres from the middle of the curb's first kerb piece, towards its
+    footway (or into the road, below 0), in the region's frame (east and south)."""
+    (ax, ay, _), (bx, by, _) = curb.kerb_line_mm[:2]
+    dx, dy = bx - ax, by - ay
+    side = 1 if curb.side == "left" else -1
+    length = math.isqrt(dx * dx + dy * dy)
+    x = (ax + bx) // 2 - side * dy * out // length
+    y = (ay + by) // 2 + side * dx * out // length
+    return x, -y
+
+
+def _curb(town: _Town) -> CurbEdgeRecord:
+    return min(
+        (r for r in town.made.records if isinstance(r, CurbEdgeRecord)), key=lambda r: r.identity
+    )
+
+
+def test_a_thing_rests_on_the_town_s_own_surface_above_its_arrival(town):
+    # The town hangs its region at its arrival's height, so a thing on its footway or its road
+    # rests at the city's own surface there less that height, the kerb between them.
+    curb = _curb(town)
+    footway = _beside(curb, curb.kerb_width_mm + curb.footway_width_mm // 2)
+    road = _beside(curb, -1_000)
+    surface = city_surface_z_at(town.made.records)
+    arrival = town.entry["generated_ground"]["arrival_mm"][1]
+    landing = _landing(town)
+    assert landing.rest_height is not None
+    rests = [landing.rest_height(point) for point in (footway, road)]
+    assert rests == [surface((east, -south)) - arrival for east, south in (footway, road)]
+    assert rests[0] - rests[1] > curb.kerb_height_mm // 2
+    # Where the city states no street surface (open land beyond the town), the walking line nearest.
+    beyond = (-50_000, 50_000)
+    assert surface((beyond[0], -beyond[1])) is None
+    with town.api.database.session(town.workspace) as connection:
+        ground = read_authored_ground(
+            connection, town.workspace, town.world, town.snapshot, region_id=town.region
+        )
+    lines = surface_height_at(walking_surfaces_place(ground.place_id, town.made.records), ground)
+    assert landing.rest_height(beyond) == lines(beyond) - arrival
+    # The placing's preview answers the same height, whatever height it was asked about.
+    east, south = footway
+    answered = town.api.post(
+        f"/world/versions/{town.version_id}/things/preview?world_id={town.world}",
+        {
+            "base_state_sha256": town.state(),
+            "thing_id": "well",
+            "kind": {"kind": "well", "version": 2},
+            "region_id": town.region,
+            "pose": {"x_mm": east, "y_mm": 0, "z_mm": south, "yaw_microradians": 0},
+            "origin_role": "fictional",
+        },
+    )
+    assert answered.status_code == 200, answered.text
+    assert answered.json()["landing"] == {"checked": True, "rest_y_mm": rests[0]}
+
+
+def test_a_bench_resting_where_the_landing_rests_it_offers_itself_to_the_town_s_people(
+    town, monkeypatch
+):
+    # However high a town's arrival stands (here 150 mm up), a bench placed on its road at the
+    # height the landing rests it at is read by the town's society of things as resting there,
+    # from the same surface, not as standing off the walking lines.
+    stated = thing_landing_source.generated_extent
+
+    def raised(*scope):
+        extent = stated(*scope)
+        east, _height, south = extent.arrival_mm
+        return dataclasses.replace(extent, arrival_mm=(east, 150, south))
+
+    monkeypatch.setattr(thing_landing_source, "generated_extent", raised)
+    east, south = _beside(_curb(town), -1_000)
+    rest = _landing(town).rest_height((east, south))
+    placed = town.api.post(
+        f"/world/versions/{town.version_id}/things?world_id={town.world}",
+        {
+            "base_state_sha256": town.state(),
+            "thing_id": "bench",
+            "kind": {"kind": "bench", "version": 1},
+            "region_id": town.region,
+            "pose": {"x_mm": east, "y_mm": rest, "z_mm": south, "yaw_microradians": 0},
+            "origin_role": "fictional",
+        },
+    )
+    assert placed.status_code == 201, placed.text
+    document = _society(town)
+    assert [r for r in document["unavailable_affordances"] if r["object_id"] == "bench"] == []
+    assert [t["affordance"] for t in document["targets"] if t["object_id"] == "bench"]

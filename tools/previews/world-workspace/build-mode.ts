@@ -421,9 +421,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     try {
       const answered = (await post('things.place.preview', '/things/preview', { base_state_sha256: stateBase, ...placingBody(held, to) })).body;
       if (request !== asked || placing !== held) return;
-      held.verdict = answered.availability === 'ready'
-        ? { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to }
-        : { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
+      if (answered.availability === 'ready') {
+        // Stood at the height the ground says it rests at there, so its copy, its ring and the kept pose agree (W12.6).
+        const at = restingAt(answered, to);
+        held.to = at;
+        held.verdict = { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to: at };
+      } else held.verdict = { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
     } catch (error) {
       if (request !== asked || placing !== held) return;
       held.verdict = { state: 'refused', words: problem(error) };
@@ -433,6 +436,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     // Let go here while it was asked about: placed now that the server says it may stand here, else carried on.
     if (held.letGo) { held.letGo = false; if (held.verdict.state === 'ready') void placeNew(); }
   }
+  /** `to` at the height a ready preview says the thing rests at (`landing.rest_y_mm`), where it says one. */
+  const restingAt = (answered, to) => (Number.isFinite(answered.landing?.rest_y_mm) && answered.landing.rest_y_mm !== to.y ? { ...to, y: answered.landing.rest_y_mm } : to);
   const placingBody = (held, to) => ({
     thing_id: held.thingId, kind: held.kind, region_id: held.regionId,
     pose: { x_mm: to.x, y_mm: to.y, z_mm: to.z, yaw_microradians: to.yaw }, origin_role: 'fictional',
@@ -628,14 +633,17 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const answered = (await post(actionOf(move.placedId, 'move.preview'), routeOf(move.placedId) + '/move/preview',
         { base_state_sha256: stateBase, pose: poseOf(move.placedId, to) })).body;
       if (request !== asked || moving !== move) return;
-      move.verdict = answered.availability === 'ready'
-        ? { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to }
-        : { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
+      if (answered.availability === 'ready') {
+        // A thing stands at the height its ground says it rests at there; a made part keeps its floor.
+        const at = isPart(move.placedId) ? to : restingAt(answered, to);
+        move.to = at;
+        move.verdict = { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to: at };
+      } else move.verdict = { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
     } catch (error) {
       if (request !== asked || moving !== move) return;
       move.verdict = { state: 'refused', words: problem(error) };
     }
-    showCopy(move, to, move.verdict.state === 'refused');
+    showCopy(move, move.to, move.verdict.state === 'refused');
     render();
     // Let go here while it was asked about: kept now that the server says it may stand here, else carried on.
     if (move.letGo) { move.letGo = false; if (move.verdict.state === 'ready') void keepMove(); }
