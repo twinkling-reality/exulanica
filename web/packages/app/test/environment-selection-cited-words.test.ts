@@ -62,7 +62,7 @@ const control = parseSocietyControl({
 
 async function mount(held: SocietySnapshot) {
   const crowd = {
-    setSociety: vi.fn(() => 2), clearSociety: vi.fn(), revealInhabitant: vi.fn(),
+    setSociety: vi.fn(() => 2), clearSociety: vi.fn(), revealInhabitant: vi.fn(), setFigures: vi.fn(),
     visibleInhabitantIds: ['person-0', 'person-1'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['person-0']),
     societyCounts: { population: 2, outdoors: 2, indoors: 0, near: 2, far: 0, drawn: 2 },

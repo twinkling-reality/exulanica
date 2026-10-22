@@ -39,7 +39,7 @@ LIMITS: dict[str, tuple[int, str]] = {
         "buildings' storeys among them",
     ),
     "web/packages/app/src/composition/environment-selection.ts": (
-        3_341,
+        3_345,
         "the people, picking and society views of a mounted world, in one closure, with the "
         "world's clock and population",
     ),
@@ -76,7 +76,7 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the contract a model answers under when it runs a person",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
-        1_526,
+        1_556,
         "a society's people as drawn near and far: where each stands, faces and sits (two who "
         "spoke facing each other), and whether one is drawn in full yet",
     ),

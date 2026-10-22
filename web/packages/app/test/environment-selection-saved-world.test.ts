@@ -93,7 +93,7 @@ function mount() {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   let held: SocietySnapshot | null = null;
   const crowd = {
-    setSociety: vi.fn(() => 100), clearSociety: vi.fn(), revealInhabitant: vi.fn(),
+    setSociety: vi.fn(() => 100), clearSociety: vi.fn(), revealInhabitant: vi.fn(), setFigures: vi.fn(),
     visibleInhabitantIds: ['person-0', 'person-1'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['person-0']),
     societyCounts: { population: 100, outdoors: 100, indoors: 0, near: 2, far: 0, drawn: 2 },

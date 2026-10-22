@@ -69,7 +69,7 @@ function mount(options: { mode: 'playing' | 'paused'; host: unknown }) {
   let version = versionWith([object('plate', 'Marker plate', 3000, 5000)]);
   const crowd = {
     setSociety: vi.fn((_state: unknown, _observer: unknown, _timing?: unknown) => 1), clearSociety: vi.fn(),
-    revealInhabitant: vi.fn(), visibleInhabitantIds: ['ada'], inhabitantRepresentation: vi.fn(() => null),
+    revealInhabitant: vi.fn(), setFigures: vi.fn(), visibleInhabitantIds: ['ada'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['ada']),
     societyCounts: { population: 1, outdoors: 1, indoors: 0, near: 1, far: 0, drawn: 1 },
     drawnInhabitantCount: 1, pickInhabitant: vi.fn(() => 'ada'),

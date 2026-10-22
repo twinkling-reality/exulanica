@@ -184,3 +184,70 @@ describe('a rigged being of a society of things', () => {
     crowd.destroy();
   });
 });
+
+describe('someone who stops with nothing to face', () => {
+  const walker = (id: string, path: readonly (readonly [number, number])[], partner: string | null = null): SocietyInhabitantSnapshot => ({
+    id, synthetic: true, position_mm: path.at(-1)!, motion_path_mm: path,
+    ...(partner === null ? {} : {
+      action: { kind: 'talk', status: 'active' as const, target_id: null, remaining_ticks: 3, reason: 'talking' },
+      goal: { kind: 'talk' as const, target_id: null, reason: 'stopped_to_talk', partner_id: partner },
+    }),
+  });
+  const state = (tick: number, inhabitants: SocietyInhabitantSnapshot[]): OwnedSocietyState => ({
+    profile: 'exulanica-society/v2', society_id: 'society', branch_id: 'branch', tick, movement_budget_mm_per_tick: 60_000, inhabitants,
+  });
+
+  it('keeps the way they walked where it is open, turns from a wall close ahead, and is asked once a point', () => {
+    const { device, root } = setup();
+    const last = new Map<string, number>();
+    const factory: CrowdRenderableFactory = (d, parent, identity, detail) => {
+      const real = inhabitantRenderable(d, parent, identity, detail);
+      const pose = real.pose.bind(real);
+      real.pose = (handed) => {
+        pose(handed);
+        last.set(identity.inhabitantId, (real as LayeredCharacterRenderable).facing);
+      };
+      return real;
+    };
+    // Dee walks north up to a frontage: the way she came meets it, so she is turned south. Eve walks
+    // north into the open and keeps that way. Cal stands where he was placed and is never asked.
+    const asked: { id: string; at: readonly [number, number]; walked: number }[] = [];
+    const arrivalFacingAt = vi.fn((id: string, at: readonly [number, number], walked: number) => {
+      asked.push({ id, at, walked });
+      return id === 'dee' ? Math.PI : walked;
+    });
+    const crowd = new SocietyCrowd(device, root, { factory });
+    crowd.setFigures({ figureFor: () => null, arrivalFacingAt });
+    const run = (from: number, to: number) => {
+      for (let at = from + FRAME_MS; at <= to; at += FRAME_MS) crowd.update(at);
+    };
+    crowd.set(state(0, [walker('dee', [[0, 4_000]]), walker('eve', [[6_000, 4_000]]), walker('cal', [[-6_000, 0]])]), [0, 0], { ...TIMING, nowMs: 0 });
+    crowd.set(state(1, [walker('dee', [[0, 4_000], [0, 0]]), walker('eve', [[6_000, 4_000], [6_000, 0]]), walker('cal', [[-6_000, 0]])]), [0, 0], { ...TIMING, nowMs: 0 });
+    run(0, 8_000);
+    expect(Math.cos(last.get('dee')!)).toBeCloseTo(-1, 6);
+    expect(Math.cos(last.get('eve')!)).toBeCloseTo(1, 6);
+    // Asked with the way each walked (north, 0) at the point each stopped, once each over hundreds of frames.
+    expect(asked.map((one) => one.id).sort()).toEqual(['dee', 'eve']);
+    for (const one of asked) {
+      expect(Math.cos(one.walked)).toBeCloseTo(1, 6);
+      expect(one.at[1]).toBeCloseTo(0, 6);
+    }
+    crowd.destroy();
+  });
+
+  it('still faces a partner standing outdoors, and is not turned from the wall instead', () => {
+    const { device, root } = setup();
+    const arrivalFacingAt = vi.fn(() => Math.PI);
+    const crowd = new SocietyCrowd(device, root);
+    crowd.setFigures({ figureFor: () => null, arrivalFacingAt });
+    const run = (from: number, to: number) => {
+      for (let at = from + FRAME_MS; at <= to; at += FRAME_MS) crowd.update(at);
+    };
+    // Ann walks north to the frontage and talks with Bob, who stands 3 m east of where she stops.
+    crowd.set(state(0, [walker('ann', [[0, 4_000]]), walker('bob', [[3_000, 0]])]), [0, 0], { ...TIMING, nowMs: 0 });
+    crowd.set(state(1, [walker('ann', [[0, 4_000], [0, 0]], 'bob'), walker('bob', [[3_000, 0]], 'ann')]), [0, 0], { ...TIMING, nowMs: 0 });
+    run(0, 8_000);
+    expect(arrivalFacingAt).not.toHaveBeenCalled();
+    crowd.destroy();
+  });
+});

@@ -189,6 +189,39 @@ describe('which way someone standing faces where nothing says', () => {
     expect(ways.size).toBeGreaterThan(2);
   });
 
+  it('stops a line from a point on a building\'s own line where it runs into the building, not out of it', () => {
+    // On the house's far wall, as a town's walking line can lie on a frontage's ring.
+    const at = { x: 0, z: 30 };
+    // Its ring wound either way round, as a plan may state it.
+    for (const plan of [sight, planSight([[...HOUSE].reverse(), POST], MARGIN_MM)]) {
+      expect(reachAhead(plan, at, 0)).toBe(0);
+      expect(reachAhead(plan, at, Math.PI)).toBe(Number.POSITIVE_INFINITY);
+      // Along it, to the house's corner.
+      expect(reachAhead(plan, at, Math.PI / 2)).toBeCloseTo(5, 9);
+      expect(plan.sees(at, { x: 0, z: 24 })).toBe(false);
+      expect(plan.sees(at, { x: 0, z: 36 })).toBe(true);
+      // Never turned into the house, nor slanting into it.
+      for (let n = 0; n < 40; n += 1) expect(Math.cos(openFacing(plan, at, `resident-${n}`))).toBeLessThan(1e-9);
+    }
+  });
+
+  it('keeps a way it is handed while that way is open, and turns from it where a wall stands close ahead', () => {
+    // 40 cm before the house's wall, as a walk up a footway to a shopfront ends: north is into it.
+    const at = { x: 0, z: 30.4 };
+    for (const key of ['a', 'resident-7', 'b']) {
+      // Walked north into the wall: turned to the open way nearest north, along the wall one way or
+      // the other, never out to the street behind them while a way along it is open.
+      const turned = openFacing(sight, at, key, undefined, 0);
+      expect(reachAhead(sight, at, turned)).toBeGreaterThanOrEqual(3);
+      expect(Math.abs(Math.sin(turned))).toBeCloseTo(1, 9);
+      // Walked a little east of north: the open way along the wall to the east side is the nearer.
+      expect(Math.sin(openFacing(sight, at, key, undefined, -0.2))).toBeCloseTo(-1, 9);
+      // Walked south, away from it, or a little off south, between the eight ways: kept exactly.
+      expect(openFacing(sight, at, key, undefined, Math.PI)).toBe(Math.PI);
+      expect(openFacing(sight, at, key, undefined, Math.PI - 0.3)).toBe(Math.PI - 0.3);
+    }
+  });
+
   it('faces the most open way where every way is closer than the rule', () => {
     // A booth 4 m east to west and 2 m north to south around the one standing in it.
     const booth = planSight([[[-2000, -1000], [2000, -1000], [2000, 1000], [-2000, 1000]]], MARGIN_MM);

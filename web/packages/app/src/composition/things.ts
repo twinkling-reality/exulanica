@@ -29,7 +29,7 @@ import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { BODY_MOTION } from '../body-motion.js';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
-import { openFacing, type Sight } from './sight.js';
+import { STANDING_FACING_DEFAULTS, openFacing, type Sight } from './sight.js';
 import { tokenBlock } from '../ui/system/token-values.js';
 import type { ThingLookChoice } from '../thing-looks-api.js';
 import type { PlacedThing, VersionEdit } from '../world-objects-api.js';
@@ -81,6 +81,44 @@ export interface ThingsDependencies {
    * turns a resident first drawn standing toward the open way (`openFacing`); none, when left out.
    */
   readonly sight?: () => Sight | null;
+}
+
+/** What the open-way facing reads: the session's plan sight and the society's crowd root. */
+export interface CrowdFacingSources {
+  readonly sight?: (() => Sight | null) | undefined;
+  readonly society?: ThingLayerOptions['society'] | undefined;
+}
+
+/**
+ * Which way someone faces where nothing says, for any society's crowd: first drawn standing, the
+ * open way where they stand; stopped after a walk, the way they walked while it is open ahead, else
+ * the open way nearest it (`openFacing`). Each point and way carried to the sight's world frame
+ * through the crowd's root and back; null while there is no sight or no root.
+ */
+export function crowdFacing(sources: CrowdFacingSources): {
+  readonly standingFacingAt: (person: OwnedSocietyState['inhabitants'][number]) => number | null;
+  readonly arrivalFacingAt: (id: string, at: readonly [number, number], walked: number) => number | null;
+} {
+  const facing = (key: string, east: number, south: number, walked: number | null): number | null => {
+    const sight = sources.sight?.() ?? null;
+    const root = sources.society?.()?.root ?? null;
+    if (sight === null || root === null) return null;
+    // The root's world matrix, column-major: its own x and z axes, and where it stands.
+    const m = root.getWorldTransform().data;
+    const at = { x: m[0]! * east + m[8]! * south + m[12]!, z: m[2]! * east + m[10]! * south + m[14]! };
+    const turn = Math.atan2(m[8]!, m[10]!);
+    return openFacing(sight, at, key, STANDING_FACING_DEFAULTS, walked === null ? null : walked + turn) - turn;
+  };
+  return {
+    standingFacingAt: (person) => facing(person.id, person.position_mm[0] / 1000, person.position_mm[1] / 1000, null),
+    arrivalFacingAt: (id, [east, south], walked) => facing(id, east, south, walked),
+  };
+}
+
+/** A crowd's figures for a society with no things: each person drawn as everyone is, facing as `crowdFacing` says. */
+export function facingFigures(sources: CrowdFacingSources) {
+  const { standingFacingAt, arrivalFacingAt } = crowdFacing(sources);
+  return { figureFor: () => null, standingFacingOf: standingFacingAt, arrivalFacingAt };
 }
 
 export interface MountedThings {
@@ -258,18 +296,8 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
       ?? (person.kind !== undefined && 'source' in person.kind && person.kind.source === 'workspace' ? kindLooks.get(person.kind.sha256) : undefined)
       ?? null,
     placedYawOf: (placedId) => placedYaw.get(placedId) ?? null,
-    // A resident first drawn standing faces the open way where they stand, never a wall close ahead:
-    // their point carried to the sight's world frame through the crowd's root, the facing back to it.
-    standingFacingAt: (person) => {
-      const sight = deps.sight?.() ?? null;
-      const root = deps.society?.()?.root ?? null;
-      if (sight === null || root === null) return null;
-      // The root's world matrix, column-major: its own x and z axes, and where it stands.
-      const m = root.getWorldTransform().data;
-      const east = person.position_mm[0] / 1000, south = person.position_mm[1] / 1000;
-      const at = { x: m[0]! * east + m[8]! * south + m[12]!, z: m[2]! * east + m[10]! * south + m[14]! };
-      return openFacing(sight, at, person.id) - Math.atan2(m[8]!, m[10]!);
-    },
+    // Whoever stands or stops with nothing to face faces an open way, never a wall close ahead.
+    ...crowdFacing({ sight: deps.sight, society: deps.society }),
   });
   let destroyed = false;
   /** The being the viewer plays, as last handed to the layer. */

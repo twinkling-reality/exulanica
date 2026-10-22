@@ -137,6 +137,12 @@ export interface CrowdFigures {
    * none: everyone else starts facing as the crowd does.
    */
   standingFacingOf?(person: SocietyInhabitantSnapshot): number | null;
+  /**
+   * The way someone who has stopped faces at `at` (east and south in metres, the crowd's frame):
+   * `walked`, the way they came, while it is open ahead; else the nearest open way. Null where
+   * nothing says, and they keep the way they walked.
+   */
+  arrivalFacingAt?(id: string, at: readonly [number, number], walked: number): number | null;
 }
 
 export interface CrowdCounts {
@@ -225,6 +231,8 @@ interface Walker {
   drawn: readonly [number, number, number];
   /** What draws them when they are a thing drawn by its own look, or null for one of the people. */
   figure: { readonly key: string; readonly factory: CrowdRenderableFactory } | null;
+  /** The way they were turned where they stopped (`arrivalFacingAt`), asked once a point and place (`by`). */
+  opened: { readonly at: Point; readonly by: string | null; readonly facing: number } | null;
 }
 
 /**
@@ -677,6 +685,7 @@ export class SocietyCrowd {
         beside: leaving ? NO_STEP : standing,
         drawn: fresh ? [position[0] + standing[0], this.groundUnder(position[0] + standing[0], position[1] + standing[1]), position[1] + standing[1]] : previous.drawn,
         figure: this.figures?.figureFor(person) ?? null,
+        opened: previous?.opened ?? null,
       };
       walkers.set(person.id, walker);
     }
@@ -1315,7 +1324,8 @@ export class SocietyCrowd {
 
   /** The way a walker standing at the end of their path faces, by their activity's rule. */
   private facingOf(walker: Walker): number {
-    if (walker.facingRule === 'place' && walker.place !== null && walker.place.facesAsHeld !== true) return walker.place.facing;
+    const place = walker.facingRule === 'place' ? walker.place : null;
+    if (place !== null && place.facesAsHeld !== true) return place.seat === null ? this.stoppedFacing(walker, place) : place.facing;
     if (walker.facingRule === 'partner' && walker.partnerId !== null) {
       const partner = this.walkers.get(walker.partnerId);
       if (partner !== undefined && !partner.indoors) return heading(walker.position, partner.position, walker.facing);
@@ -1323,7 +1333,27 @@ export class SocietyCrowd {
     // Whom they last spoke with, by a line said to someone, while both stand outdoors.
     const spoken = walker.spokenWith === null ? undefined : this.walkers.get(walker.spokenWith);
     if (spoken !== undefined && spoken.arrived && !spoken.indoors) return heading(walker.position, spoken.position, walker.facing);
-    return walker.facing;
+    // A talker whose partner or listener is not yet standing outdoors turns as anyone stopping does.
+    return this.stoppedFacing(walker, null);
+  }
+
+  /**
+   * The way someone faces who stopped with nothing to face (or a talker whose partner or listener is
+   * not yet standing outdoors), or who uses a place with no seat: the way they walked, or the
+   * place's, while it is open ahead, else turned where they stand to the open way nearest it
+   * (`arrivalFacingAt`), so a walk that ends at a frontage, or at a door in one, leaves them beside
+   * it, not nose to the wall; a counter is no wall, so a stall's visitor faces it. Asked once at each
+   * point they stop; anyone who has not walked and still stands as they were placed keeps that.
+   */
+  private stoppedFacing(walker: Walker, place: PlaceDrawing | null): number {
+    const preferred = place?.facing ?? walker.facing;
+    if ((place === null && walker.asPlaced && walker.total === 0) || walker.indoors || this.figures?.arrivalFacingAt === undefined) return preferred;
+    const by = place === null ? null : `${place.objectId}#${place.placeIndex}`;
+    const opened = walker.opened;
+    if (opened !== null && opened.by === by && apart(opened.at, walker.position) <= SAME_POINT_METRES) return opened.facing;
+    const facing = this.figures.arrivalFacingAt(walker.id, walker.position, preferred) ?? preferred;
+    walker.opened = { at: walker.position, by, facing };
+    return facing;
   }
 
   /**

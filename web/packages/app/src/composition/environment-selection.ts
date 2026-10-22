@@ -100,7 +100,7 @@ import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import { CONVERSATION_DISTANCE_METRES } from '../society-presentation.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
-import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
+import { facingFigures, LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
 import { DECIDER_MARKS } from '../decider-marks.js';
 import { DecisionWatch, deciderCounts, statedIndoors } from './thing-decisions.js';
@@ -611,7 +611,7 @@ export function mountEnvironmentSelection(
   /** The open saved world's placed things, drawn by their looks; null until it is attached. */
   let things: MountedThings | null = null;
   /** Whether the society's crowd draws its things through `things`, and whether that is being set up. */
-  let figuresSet = false;
+  let figuresSet = false, facingSet = false;
   let thingsMounting = false;
   /** Who runs each being of the open saved world's society, marked over it; null until attached. */
   let marks: AttachedMarks | null = null;
@@ -2631,6 +2631,10 @@ export function mountEnvironmentSelection(
         runtime.setFigures(things.crowdFigures);
         figuresSet = true;
       }
+    } else if (!facingSet) {
+      // A society of people only: its crowd's figures are the open-way facing alone.
+      runtime.setFigures(facingFigures({ sight: () => deps.state.worldSight, society: () => runtime }));
+      facingSet = true;
     }
     for (const minute of [...unread, next.state]) {
       runtime.setSociety(minute, observer, timing, layout);
@@ -3283,7 +3287,7 @@ export function mountEnvironmentSelection(
       supportedThings.destroy();
       things?.destroy();
       things = null;
-      figuresSet = false;
+      figuresSet = facingSet = false;
       marks?.destroy();
       marks = null;
       bridges = null;

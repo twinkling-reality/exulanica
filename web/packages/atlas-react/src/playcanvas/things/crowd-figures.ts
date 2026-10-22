@@ -141,6 +141,12 @@ export interface ThingCrowdFiguresOptions {
    * seen walk), or null where nothing says: they then face as the crowd does.
    */
   readonly standingFacingAt?: (person: SocietyInhabitantSnapshot) => number | null;
+  /**
+   * The way someone who has stopped faces at a point of the crowd's frame (east and south in
+   * metres): the way they walked while it is open ahead, else the nearest open way; null where
+   * nothing says.
+   */
+  readonly arrivalFacingAt?: (id: string, at: readonly [number, number], walked: number) => number | null;
 }
 
 /**
@@ -208,6 +214,11 @@ export class ThingCrowdFigures implements CrowdFigures {
     if (placedId === null) return this.options.standingFacingAt?.(person) ?? null;
     const yaw = this.options.placedYawOf?.(placedId) ?? null;
     return yaw === null ? null : facingOfYaw(yaw);
+  }
+
+  /** Where someone stopped, the way the crowd turns them: as `arrivalFacingAt` says. */
+  arrivalFacingAt(id: string, at: readonly [number, number], walked: number): number | null {
+    return this.options.arrivalFacingAt?.(id, at, walked) ?? null;
   }
 
   /** The figure drawing a person now, or null while it is not drawn in full or not yet made. */

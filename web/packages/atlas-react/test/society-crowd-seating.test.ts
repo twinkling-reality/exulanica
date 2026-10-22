@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
 import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
@@ -293,6 +293,27 @@ describe('a person using an object', () => {
     expect(pose.position[1]).toBe(0);
     expect(pose.seated).toBeUndefined();
     expect(crowd.seatedOn('visiting')).toBe(false);
+  });
+
+  it('turns from a place whose way meets a wall close ahead, a door in a frontage, and keeps a counter', () => {
+    const found = placeDrawing(LAYOUT, 'target:1', STATE.inhabitants[1]!.position_mm);
+    if (found.kind !== 'place') throw new Error('the stall place was not found');
+    // The open way nearest the place's: its own where nothing stands close ahead (a counter is no
+    // wall), else a quarter turn along the frontage the door is in.
+    for (const turned of [0, Math.PI / 2]) {
+      // Drawn with no seat posture, the bench's user stands at its place and faces as the seat says.
+      const { crowd, poses } = setup(false);
+      const arrivalFacingAt = vi.fn((_id: string, _at: readonly [number, number], walked: number) => walked + turned);
+      crowd.setFigures({ figureFor: () => null, arrivalFacingAt });
+      run(crowd, 2);
+      // Asked once, for the visitor alone, with the place's way: the bench's user and the lost
+      // person who stands as placed are not.
+      expect(arrivalFacingAt).toHaveBeenCalledTimes(1);
+      expect(arrivalFacingAt.mock.calls[0]![0]).toBe('visiting');
+      expect(arrivalFacingAt.mock.calls[0]![2]).toBeCloseTo(found.drawing.facing, 12);
+      expect(last(poses, 'visiting').yaw).toBeCloseTo(found.drawing.facing + turned, 12);
+      crowd.destroy();
+    }
   });
 
   it('faces the counter on arriving after the visit completed, as a one-minute visit does', () => {

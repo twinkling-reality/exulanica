@@ -618,8 +618,15 @@ They face as their activity's rule says (`society/activity-facing.ts`): `rest` a
 object across the place, so a visitor at the market stall faces its counter and one at the tree
 faces the tree, also in the minute after a visit completes while the visitor still stands there;
 `talk` faces the partner the goal names; standing and walking keep the way they last walked, and an
-activity with no rule is drawn that way and named. Every turn the crowd makes is a pivot: no figure
-draws a step for it.
+activity with no rule is drawn that way and named. Someone who stops keeps the way they last walked
+while it is open ahead. Where a wall or a frontage, glass included, stands within 3 m of their face,
+they turn on the spot to the nearest open way, the way they walked tried first, as someone first drawn
+standing does; a town's walking line can lie on a shopfront's own line or 0.4 m off it, and someone
+standing on a building's line counts that building as close ahead. A visitor at a place with no seat
+turns the same way, the place's way tried first: a door is part of its frontage, so a visitor at a
+shop's door turns along the footway, while a counter is not a wall, so a visitor at a stall still
+faces it. A talker whose partner or listener is not yet standing outdoors turns the same way until
+that person is. Every turn the crowd makes is a pivot: no figure draws a step for it.
 
 **A conversation's distance.** A society stands each of two talkers at a point of its own walking
 lines, and two such points can lie a few hundred millimetres apart, so two bodies would be drawn

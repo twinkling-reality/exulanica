@@ -84,7 +84,7 @@ function mount(options: {
   const crowd = {
     // The crowd already hung from the region it lives in, as `hostRegionSociety` finds it.
     root: { parent: regionRoots.get(options.livesIn)! },
-    setSociety: vi.fn(() => 8), clearSociety: vi.fn(), revealInhabitant: vi.fn(),
+    setSociety: vi.fn(() => 8), clearSociety: vi.fn(), revealInhabitant: vi.fn(), setFigures: vi.fn(),
     visibleInhabitantIds: ['person-0'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['person-0']),
     societyCounts: { population: 8, outdoors: 8, indoors: 0, near: 1, far: 0, drawn: 1 },

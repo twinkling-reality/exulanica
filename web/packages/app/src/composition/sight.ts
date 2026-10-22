@@ -4,7 +4,9 @@
  * A town already states what stands at a standing person's eye height, as closed plan rings: every
  * building's base and each trunk and post that crosses that height (`sightBlockersOfTown`, read
  * once to choose the first view). The same rings answer for the mark and name over a being, for a
- * line of speech and for a click: a sight line is followed in plan until a ring's edge crosses it.
+ * line of speech and for a click: a sight line is followed in plan until a ring's edge crosses it,
+ * and one from a point on an edge (a walking line can lie on a frontage) is stopped there when it
+ * runs into that ring.
  *
  * A made place states its plan in its drawing: every box it draws that stands across eye height (a
  * wall piece, a post, a tall thing), turned as it is drawn (`siteSightRings`). Its walls are pieces
@@ -166,6 +168,8 @@ export function holdSight(
 const CELL_MM = 16_000;
 /** How far a click's ray is followed in plan: past where anyone is drawn large enough to click. */
 const REACH_MM = 2_000_000;
+/** How near an edge a point is on it, in millimetres: well under anything a plan states. */
+const ON_EDGE_MM = 1;
 
 /**
  * The sight a plan of rings gives. `marginMm` is how near its end a sight line may be crossed and
@@ -182,17 +186,20 @@ export function planSight(rings: readonly SightBlocker[], marginMm: number, seen
 
 /** The sight every ring in a plan hides by. */
 function ringSight(rings: readonly SightBlocker[], marginMm: number): Sight {
-  // Every ring edge, four numbers each (ax, ay, bx, by), and the squares each lies across.
+  // Every ring edge, five numbers each (ax, ay, bx, by, and the sign of its ring's turning, which
+  // says which side of it the ring's inside is), and the squares each lies across.
   const edges: number[] = [];
   const cells = new Map<number, number[]>();
   const key = (cx: number, cy: number): number => cx * 1_048_576 + cy;
   for (const ring of rings) {
+    let turning = 0;
+    for (let i = 0; i < ring.length; i += 1) turning += ring[i]![0] * ring[(i + 1) % ring.length]![1] - ring[(i + 1) % ring.length]![0] * ring[i]![1];
     for (let i = 0; i < ring.length; i += 1) {
       const a = ring[i]!;
       const b = ring[(i + 1) % ring.length]!;
       if (![a[0], a[1], b[0], b[1]].every(Number.isFinite) || (a[0] === b[0] && a[1] === b[1])) continue;
-      const index = edges.length / 4;
-      edges.push(a[0], a[1], b[0], b[1]);
+      const index = edges.length / 5;
+      edges.push(a[0], a[1], b[0], b[1], Math.sign(turning));
       const x0 = Math.floor(Math.min(a[0], b[0]) / CELL_MM), x1 = Math.floor(Math.max(a[0], b[0]) / CELL_MM);
       const y0 = Math.floor(Math.min(a[1], b[1]) / CELL_MM), y1 = Math.floor(Math.max(a[1], b[1]) / CELL_MM);
       for (let cx = x0; cx <= x1; cx += 1) {
@@ -222,13 +229,18 @@ function ringSight(rings: readonly SightBlocker[], marginMm: number): Sight {
       const held = cells.get(key(cx, cy));
       if (held !== undefined) {
         for (const index of held) {
-          const ax = edges[index * 4]!, ay = edges[index * 4 + 1]!;
-          const ex = edges[index * 4 + 2]! - ax, ey = edges[index * 4 + 3]! - ay;
+          const ax = edges[index * 5]!, ay = edges[index * 5 + 1]!;
+          const ex = edges[index * 5 + 2]! - ax, ey = edges[index * 5 + 3]! - ay;
           const across = tx * ey - ty * ex;
           if (Math.abs(across) < 1e-9) continue;
           const t = ((ax - fx) * ey - (ay - fy) * ex) / across;
           const u = ((ax - fx) * ty - (ay - fy) * tx) / across;
-          if (t > 0 && u >= 0 && u <= 1 && t < nearest) nearest = t;
+          if (u < 0 || u > 1) continue;
+          // A line from a point on an edge (someone standing on a building's line) is stopped there
+          // when it runs into the ring, and not when it runs out of it.
+          if (Math.abs(t) <= ON_EDGE_MM) {
+            if (across * edges[index * 5 + 4]! < 0) nearest = 0;
+          } else if (t > 0 && t < nearest) nearest = t;
         }
       }
       if (nextX < nextY) {
@@ -282,22 +294,32 @@ export const STANDING_FACING_DEFAULTS: StandingFacingRule = Object.freeze({ open
  * walk and nobody placed them facing a way): of the rule's ways, evenly apart and starting from the
  * one `key` draws so that neighbours face differently, the first whose sight line runs at least the
  * rule's distance before the plan stands in it; where none does, the most open, the first of equals.
+ * Someone who stopped facing `preferred`, the way they walked, keeps it while it is open, and else
+ * turns to the open way nearest it (of equals, the first the key draws).
  * A crowd facing: radians, 0 north, forward (-sin, -cos) along x east and z south, in metres.
  */
 export function openFacing(
   sight: Sight, at: { readonly x: number; readonly z: number }, key: string, rule: StandingFacingRule = STANDING_FACING_DEFAULTS,
+  preferred: number | null = null,
 ): number {
+  // A wall the eye sees through is still a wall to stand facing.
+  const openAlong = (facing: number): number => (sight.wallReach ?? sight.reach)([at.x, 0, at.z], [-Math.sin(facing), 0, -Math.cos(facing)]) * 1000;
+  if (preferred !== null && openAlong(preferred) >= rule.openMm) return preferred;
   // FNV-1a over the key: the same person starts from the same way on every load.
   let drawn = 0x811c9dc5;
   for (let i = 0; i < key.length; i += 1) drawn = Math.imul(drawn ^ key.charCodeAt(i), 0x01000193) >>> 0;
-  let most = 0, mostOpen = -1;
+  let most = 0, mostOpen = -1, nearest: number | null = null, nearestTurn = Number.POSITIVE_INFINITY;
   for (let step = 0; step < rule.ways; step += 1) {
     const turn = (((drawn + step) % rule.ways) * 2 * Math.PI) / rule.ways;
     const facing = Math.atan2(Math.sin(turn), Math.cos(turn));
-    // A wall the eye sees through is still a wall to stand facing.
-    const open = (sight.wallReach ?? sight.reach)([at.x, 0, at.z], [-Math.sin(facing), 0, -Math.cos(facing)]) * 1000;
-    if (open >= rule.openMm) return facing;
+    const open = openAlong(facing);
+    if (open >= rule.openMm) {
+      if (preferred === null) return facing;
+      // How far they would turn from the way they walked, either way round.
+      const away = Math.abs(Math.atan2(Math.sin(facing - preferred), Math.cos(facing - preferred)));
+      if (away < nearestTurn - 1e-9) [nearest, nearestTurn] = [facing, away];
+    }
     if (open > mostOpen) [most, mostOpen] = [facing, open];
   }
-  return most;
+  return nearest ?? most;
 }

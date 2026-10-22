@@ -10,7 +10,7 @@ import type { PlacedThingRecord, ThingLayerOptions, ThingPick } from '@exulanica
 import { mountEnvironmentSelection, type SelectedThing } from '../src/composition/environment-selection.js';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
-import { THING_PICK_EVENT, type ThingPickDetail } from '../src/composition/things.js';
+import { THING_PICK_EVENT, crowdFacing, type ThingPickDetail } from '../src/composition/things.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import { planSight, type Sight } from '../src/composition/sight.js';
@@ -114,7 +114,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight; readonly objectDistance?: number; readonly supported?: boolean } = {}) {
+function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight; readonly objectDistance?: number; readonly supported?: boolean; readonly peopleOnly?: boolean } = {}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -149,6 +149,11 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     read: vi.fn(async () => {
       if (!withSociety) throw missing();
       const read = thingsSociety();
+      if (scene.peopleOnly === true) {
+        // A society of people only: its state names no things.
+        const { things: _none, ...people } = read.state;
+        return { ...read, state: people };
+      }
       if (scene.everyoneIndoors !== true) return read;
       // As a state that says who is indoors reaches the page: every one of its people inside.
       return { ...read, state: { ...read.state, inhabitants: read.state.inhabitants.map((person) => ({ ...person, indoors: true })) } };
@@ -289,6 +294,42 @@ describe('a saved world\'s placed things', () => {
     expect(typeof figures.figureFor).toBe('function');
     // The layer is told what the state says of the things.
     expect((layer.society as { things: { placed_id: string }[] }).things.map((thing) => thing.placed_id)).toEqual(['well-1']);
+    mounted.dispose();
+  });
+
+  it('faces whoever stands or stops by the open way in the world, carried through the crowd\'s own frame', () => {
+    // A wall 0.2 m thick whose south face is at z 2 m, and a crowd's root turned a quarter about up.
+    const wall = [[-3000, 1800], [3000, 1800], [3000, 2000], [-3000, 2000]] as const;
+    const sight = planSight([wall], 500);
+    const data = [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1];
+    const facing = crowdFacing({ sight: () => sight, society: () => ({ root: { getWorldTransform: () => ({ data }) } }) as never });
+    // The root's east 2.4 m back is the world's 0.4 m south of the wall: world x = south, z = -east.
+    const at = { x: 0, z: 2.4 };
+    const turn = Math.PI / 2;
+    const reachAhead = (local: number) => sight.reach([at.x, 1.6, at.z], [-Math.sin(local + turn), 0, -Math.cos(local + turn)]);
+    const person = { id: 'person-0', position_mm: [-2400, 0] } as never;
+    expect(reachAhead(facing.standingFacingAt(person)!)).toBeGreaterThanOrEqual(3);
+    // Walked north into the wall (the world's 0, the root's -a quarter): turned along it.
+    const turned = facing.arrivalFacingAt('person-0', [-2.4, 0], -turn)!;
+    expect(reachAhead(turned)).toBeGreaterThanOrEqual(3);
+    expect(Math.abs(Math.sin(turned + turn))).toBeCloseTo(1, 9);
+    // Walked south, away from it: kept.
+    expect(facing.arrivalFacingAt('person-0', [-2.4, 0], turn)).toBeCloseTo(turn, 9);
+    // No sight or no root yet: nothing says, and the crowd keeps its own facing.
+    expect(crowdFacing({ sight: () => null, society: () => null }).arrivalFacingAt('person-0', [0, 0], 0)).toBeNull();
+  });
+
+  it('turns a society of people only by the open-way facing, through figures that draw nobody', async () => {
+    const { mounted, crowd } = mount(true, { peopleOnly: true });
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(crowd.setSociety).toHaveBeenCalled();
+    // Once, however many minutes: everyone is drawn as the people are, standing and stopping facing open ways.
+    expect(crowd.setFigures).toHaveBeenCalledTimes(1);
+    const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): unknown; standingFacingOf?: unknown; arrivalFacingAt?: unknown };
+    expect(figures.figureFor({ id: 'person-0' })).toBeNull();
+    expect(typeof figures.standingFacingOf).toBe('function');
+    expect(typeof figures.arrivalFacingAt).toBe('function');
     mounted.dispose();
   });
 
