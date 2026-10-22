@@ -120,10 +120,14 @@ A world made from a kind adds one step between the leaf and the family's default
 that take a surface. Its parts name their surfaces in a kind's own words (`ground.sand`,
 `wall.adobe`, `roof.thatched`, `path.desert_track`), and a pack states few of them, so the plain rule
 would draw every ground as the pack's one ground. The surface material catalog
-([`surface-material.v2.json`](../assets/catalogs/world-kinds/surface-material.v2.json); version 1 is kept
-beside it, and version 2 moved six of its colours and nothing a leaf is read by) states
+([`surface-material.v3.json`](../assets/catalogs/world-kinds/surface-material.v3.json); versions 1 and
+2 are kept beside it: version 2 moved six of its colours and nothing a leaf is read by, and version 3
+marks glass as seen through and nothing else) states
 each material a surface may be drawn in: the words that name it, the families that may wear it,
-what it is in plain words, and the colour it is drawn in. A leaf is read by its words, whole and
+what it is in plain words, and the colour it is drawn in. A material the eye sees through
+(`see_through`, glass) stands in no sight line of a made place, so a person behind a glass wall is
+seen, named and clicked, while it stays a wall that nobody is first turned to stand facing
+(`siteSightRings` and `openFacing` in [`sight.ts`](../web/packages/app/src/composition/sight.ts)). A leaf is read by its words, whole and
 then one by one in the order written, among the materials its family may wear
 (`materialOfLeaf`, in
 [`surface-material.ts`](../web/packages/atlas-core/src/surface-material.ts)), so `forest_floor` is

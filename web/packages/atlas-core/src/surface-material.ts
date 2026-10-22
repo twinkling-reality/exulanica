@@ -44,6 +44,11 @@ export interface SurfaceMaterial {
   readonly familyDefault: readonly string[];
   /** The colour it is drawn in where no pack states its own, as a swatch a material is made from. */
   readonly swatch: StylePackSwatch;
+  /**
+   * Whether the eye sees through it (glass, from version 3): it hides nobody behind it, so it stands
+   * in no sight line, whatever a look draws it in. False where the entry does not say.
+   */
+  readonly seeThrough: boolean;
 }
 
 /** The catalog as read: its materials in the file's order, which is the order a word is looked up in. */
@@ -107,6 +112,8 @@ export function readSurfaceMaterials(text: string): SurfaceMaterials {
     const colour = entry['srgb8'];
     if (!Array.isArray(colour) || colour.length !== 3) return refuse(`${key}.srgb8`, 'must be three sRGB bytes');
     const srgb8 = colour.map((channel, index) => whole(channel, `${key}.srgb8[${index}]`, 0, 255)) as unknown as Srgb8;
+    const seen = entry['see_through'];
+    if (seen !== undefined && typeof seen !== 'boolean') return refuse(`${key}.see_through`, 'must be true or false');
     for (const family of worn) families.add(family);
     materials.push(Object.freeze({
       key,
@@ -121,6 +128,7 @@ export function readSurfaceMaterials(text: string): SurfaceMaterials {
         metalness_permille: whole(entry['metalness_permille'], `${key}.metalness_permille`, 0, 1000),
         emission_permille: 0,
       }),
+      seeThrough: seen === true,
     }));
   }
   return Object.freeze({ version, materials: Object.freeze(materials), families });

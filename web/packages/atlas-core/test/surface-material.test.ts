@@ -59,6 +59,26 @@ describe('the surface material catalog', () => {
     expect(moved.sort()).toEqual(['adobe', 'forest_floor', 'sand', 'soil', 'thatch', 'timber']);
   });
 
+  it('is version 3 in the page: version 2 with glass seen through and its reason corrected, nothing else', () => {
+    const third = readSurfaceMaterials(read('catalogs/world-kinds/surface-material.v3.json'));
+    expect(third.version).toBe(3);
+    expect(third.materials.filter((material) => material.seeThrough).map((material) => material.key)).toEqual(['glass']);
+    expect(materials.materials.some((material) => material.seeThrough)).toBe(false);
+    // Everything a leaf is read by and drawn in is version 2's.
+    expect(third.materials.map((material) => ({ ...material, seeThrough: false }))).toEqual(materials.materials);
+    const raw = (name: string) => (JSON.parse(read(`catalogs/world-kinds/${name}`)) as { entries: Record<string, unknown>[] }).entries;
+    const before = raw('surface-material.v2.json');
+    raw('surface-material.v3.json').forEach((entry, index) => {
+      const { see_through: _seen, reason: _why, ...rest } = entry;
+      const { reason: _was, ...was } = before[index]!;
+      expect(rest, String(entry['key'])).toEqual(was);
+      if (entry['key'] !== 'glass') expect(entry['reason']).toBe(before[index]!['reason']);
+    });
+    // A see_through that is not true or false is refused by name.
+    const glass = { key: 'glass', words: ['glass'], plain: 'glass', families: ['wall'], family_default: [], srgb8: [1, 2, 3], roughness_permille: 1, metalness_permille: 0, reason: 'x' };
+    expect(() => readSurfaceMaterials(JSON.stringify({ catalog_id: 'surface-material', catalog_version: 3, entries: [{ ...glass, see_through: 'yes' }] }))).toThrow(/glass\.see_through/);
+  });
+
   it('gives no word to two materials one family may wear, so no entry is unreachable', () => {
     const taken = new Map<string, string>();
     for (const material of materials.materials) {

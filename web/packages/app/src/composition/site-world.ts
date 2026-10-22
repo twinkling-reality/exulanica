@@ -108,6 +108,8 @@ export interface SiteWorld {
   readonly relook: (choice: WorldLookChoice) => Promise<{ readonly mount: GeneratedSiteMount; readonly look: WorldLookState }>;
   /** The volumes a site on a landscape places round it: how many are drawn, or why none are; absent for a site on no landscape. */
   readonly landscape?: { readonly volumes: number; readonly reason: string | null };
+  /** Whether the eye sees through a slot's look role (glass, by the surface material catalog); nothing is, when left out. */
+  readonly seeThrough?: (lookRole: string) => boolean;
 }
 
 /**
@@ -296,7 +298,7 @@ async function siteInLook(
   land: SiteLand | null = null,
   landscape: SiteVolumes | null = null,
 ): Promise<SiteWorld> {
-  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }, { STREET_FURNITURE_FORMS: furnitureForms }] = await Promise.all([
+  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials, seenThrough }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }, { RENDER_BUDGET: renderBudget }, { SURFACE_FINISH: finish }, { STREET_FURNITURE_FORMS: furnitureForms }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('../world-look.js'),
     import('../surface-materials.js'),
@@ -361,6 +363,7 @@ async function siteInLook(
   }
   return {
     mount: leasedMount(mount, terrainLease),
+    seeThrough: seenThrough,
     look: { pack: choice.packId, source: choice.source, drawn: reason === null && choice.packId !== null, reason },
     async relook(asked) {
       const next = await resolved(asked);
@@ -378,7 +381,7 @@ export function switchableSite(
   stated: (look: WorldLookState) => void,
   shell: Element,
   /** How to read the world again and hand on its plan of sight: given, the site can be drawn again while open (`openSite`). */
-  reading?: { readonly read: (entry: SavedWorldEntry) => Promise<SiteWorld | null>; readonly standing: (blockers: readonly SightBlocker[]) => void },
+  reading?: { readonly read: (entry: SavedWorldEntry) => Promise<SiteWorld | null>; readonly standing: (blockers: readonly SightBlocker[], seenThrough?: readonly SightBlocker[]) => void },
 ): GeneratedSiteMount {
   const drawing = swappableDrawing(world.mount, world.relook, (next) => next.mount, (next) => {
     stated({ ...next.look, source: 'redraw' });
@@ -395,7 +398,7 @@ export function switchableSite(
         if (next === null || (next.drawingSha256 !== undefined && next.drawingSha256 === shown.drawingSha256)) return false;
         if (!(await drawing.replace(next))) return false;
         shown = next;
-        reading.standing(sightOf(next));
+        reading.standing(...sightOf(next));
         walk(next.mount.navigationWorld);
         return true;
       });
@@ -427,12 +430,19 @@ export function switchableSite(
   };
 }
 
-/** Every box a site's drawing draws across the eye height a person walks it at: what hides a being there. */
-function sightOf(world: SiteWorld): SightBlocker[] {
+/**
+ * Every box a site's drawing draws across the eye height a person walks it at: those that hide a
+ * being there, and those the eye sees through (glass), which are walls only to stand facing.
+ */
+function sightOf(world: SiteWorld): [readonly SightBlocker[], readonly SightBlocker[]] {
   const drawing = world.mount.drawing;
-  if (isTerrainSiteDrawing(drawing)) return [];
+  if (isTerrainSiteDrawing(drawing)) return [[], []];
   const eyeMm = world.mount.navigationWorld.eyeHeight * 1000;
-  return world.mount.land === undefined ? siteSightRings(drawing, eyeMm) : siteSightRings(drawing, eyeMm, world.mount.land.groundMm);
+  const seen = world.seeThrough ?? (() => false);
+  return [
+    siteSightRings(drawing, eyeMm, world.mount.land?.groundMm, seen),
+    siteSightRings(drawing, eyeMm, world.mount.land?.groundMm, (lookRole) => !seen(lookRole)),
+  ];
 }
 
 /**
@@ -456,7 +466,7 @@ export async function openSiteWorld(
   entry: SavedWorldEntry,
   bound: WorldStylePackBinding | null = null,
   /** Handed the place's plan of what stands in a sight line, once its drawing is read and will be drawn. */
-  standing: (blockers: readonly SightBlocker[]) => void = () => undefined,
+  standing: (blockers: readonly SightBlocker[], seenThrough?: readonly SightBlocker[]) => void = () => undefined,
   currentEntry?: () => SavedWorldEntry | null,
 ): Promise<GeneratedSiteMount | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
@@ -472,7 +482,7 @@ export async function openSiteWorld(
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     if (world === null) return null;
     // Every box the drawing draws across the eye height a person walks it at.
-    if (!isTerrainSiteDrawing(world.mount.drawing)) standing(sightOf(world));
+    if (!isTerrainSiteDrawing(world.mount.drawing)) standing(...sightOf(world));
     const stated = (look: WorldLookState): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(world.look);
     // A site drawn on a plan (not terrain) is drawn again after a person changes one of its made parts.

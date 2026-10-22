@@ -285,8 +285,9 @@ describe('what stands in a sight line in a site world', () => {
     expect(mount).not.toBeNull();
     // The yard's one wall, 4 m long and 20 cm thick about (5000, 8000) north, 2.4 m high: east 3000 to
     // 7000, south -8100 to -7900. The ground under it is a plane and the crate is lower than the eye
-    // a person walks the yard at: neither is part of the plan.
-    expect(standing.mock.calls).toEqual([[[[[3000, -8100], [7000, -8100], [7000, -7900], [3000, -7900]]]]]);
+    // a person walks the yard at: neither is part of the plan. Nothing in it is seen through.
+    const wall = [[3000, -8100], [7000, -8100], [7000, -7900], [3000, -7900]];
+    expect(standing.mock.calls).toEqual([[[wall], []]]);
     // The same yard on a forest's floor has trees beyond it (the scenery catalog names them for that
     // ground). They are scenery and no part of the place: what stands in a sight line is the same wall
     // and nothing more, so no tree hides a person or stops a click.
@@ -298,6 +299,14 @@ describe('what stands in a sight line in a site world', () => {
     expect(forestMount).not.toBeNull();
     expect(mounts.asked.at(-1)).toMatchObject({ scenery: SITE_SCENERY });
     expect(inAWood.mock.calls).toEqual(standing.mock.calls);
+    // The same wall of glass hides nobody: the eye sees through it (the surface material catalog), so it is handed over
+    // only as a wall to stand facing.
+    const glazed = DRAWING.replace('wall.plaster', 'wall.glass');
+    expect(glazed).not.toBe(DRAWING);
+    vi.stubGlobal('fetch', host(200, glazed).fetched);
+    const behindGlass = vi.fn();
+    expect(await openSiteWorld({ shell } as never, access, entry, null, behindGlass)).not.toBeNull();
+    expect(behindGlass.mock.calls).toEqual([[[], [wall]]]);
     // A site that cannot be read hands nothing over (the page says why in words and warns the console).
     vi.stubGlobal('fetch', vi.fn(async () => refused(404, 'unknown_reference')));
     const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -306,7 +315,7 @@ describe('what stands in a sight line in a site world', () => {
     expect(none).not.toHaveBeenCalled();
     expect(warned).toHaveBeenCalledTimes(1);
     warned.mockRestore();
-  });
+  }, 20_000);
 });
 
 describe('redrawing an open site in another pack', () => {

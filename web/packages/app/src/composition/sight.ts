@@ -8,7 +8,8 @@
  *
  * A made place states its plan in its drawing: every box it draws that stands across eye height (a
  * wall piece, a post, a tall thing), turned as it is drawn (`siteSightRings`). Its walls are pieces
- * with a gap where each door is, so a door there is open to the eye.
+ * with a gap where each door is, so a door there is open to the eye, and a wall of glass hides nobody
+ * (the surface material catalog says what the eye sees through).
  *
  * It is the plan's answer and no more. What does not cross eye height in the plan hides nobody: a
  * parked vehicle, a bench, a bin, a canopy, another person. A doorway is not an opening in a town
@@ -29,12 +30,19 @@ export interface Sight {
    * infinity where nothing does (or the ray looks straight up or down). Metres, x east, y up, z south.
    */
   reach(origin: readonly [number, number, number], direction: readonly [number, number, number]): number;
+  /**
+   * How far a ray runs before a wall stands in it, a wall the eye sees through (glass) included: what
+   * a body standing there faces and walks into (`openFacing`). Absent where the plan has no wall the
+   * eye sees through, so `reach` answers it.
+   */
+  wallReach?(origin: readonly [number, number, number], direction: readonly [number, number, number]): number;
 }
 
 /**
  * What a made place puts in a sight line at a height: the plan rectangle, millimetres east and
  * south, of every box its drawing draws whose bottom is at or below `heightMm` and whose top is at
- * or above it. A slot's position is its base's centre in site millimetres (x east, y north), its
+ * or above it, but a box whose look role the eye sees through (`seeThrough`, glass by the surface
+ * material catalog), which hides nobody behind it. A slot's position is its base's centre in site millimetres (x east, y north), its
  * box is its width along its front, its depth and its height, and it is turned by quarter turns;
  * what is drawn as a plane, a ridge or nothing (ground, a roof, a door, a structure's own outline)
  * is no box and is left out. No family or kind of slot is named here. On land, a box's bottom is
@@ -43,11 +51,12 @@ export interface Sight {
  */
 export function siteSightRings(
   drawing: { readonly slots: readonly {
-    readonly primitive: string; readonly positionMm: readonly [number, number, number];
+    readonly primitive: string; readonly lookRole?: string; readonly positionMm: readonly [number, number, number];
     readonly boxMm: readonly [number, number, number]; readonly yawQuarterTurns: number;
   }[] },
   heightMm: number,
   groundMm?: (eastMm: number, northMm: number) => number,
+  seeThrough?: (lookRole: string) => boolean,
 ): SightBlocker[] {
   const rings: SightBlocker[] = [];
   for (const slot of drawing.slots) {
@@ -55,6 +64,7 @@ export function siteSightRings(
     const base = groundMm === undefined ? stated : stated - groundMm(x, y);
     const [width, depth, height] = slot.boxMm;
     if (slot.primitive !== 'box' || base > heightMm || base + height < heightMm) continue;
+    if (slot.lookRole !== undefined && seeThrough?.(slot.lookRole) === true) continue;
     // A quarter turn lays the width along north and south.
     const turned = slot.yawQuarterTurns % 2 !== 0;
     const east = (turned ? depth : width) / 2, north = (turned ? width : depth) / 2;
@@ -141,10 +151,10 @@ function slabEntry(
  */
 export function holdSight(
   session: { worldSight: Sight | null }, marginMm: number,
-): (blockers: readonly SightBlocker[]) => void {
+): (blockers: readonly SightBlocker[], seenThrough?: readonly SightBlocker[]) => void {
   session.worldSight = null;
-  return (blockers) => {
-    session.worldSight = planSight(blockers, marginMm);
+  return (blockers, seenThrough = []) => {
+    session.worldSight = planSight(blockers, marginMm, seenThrough);
   };
 }
 
@@ -160,8 +170,18 @@ const REACH_MM = 2_000_000;
 /**
  * The sight a plan of rings gives. `marginMm` is how near its end a sight line may be crossed and
  * the point still be seen (the town first-view catalog's `sight_margin_mm`, the same fact there).
+ * `seenThrough` are walls the eye sees through (glass): they hide nobody, and stand only in what a
+ * body faces (`wallReach`).
  */
-export function planSight(rings: readonly SightBlocker[], marginMm: number): Sight {
+export function planSight(rings: readonly SightBlocker[], marginMm: number, seenThrough: readonly SightBlocker[] = []): Sight {
+  const sight = ringSight(rings, marginMm);
+  if (seenThrough.length === 0) return sight;
+  const walls = ringSight([...rings, ...seenThrough], marginMm);
+  return { sees: sight.sees, reach: sight.reach, wallReach: walls.reach };
+}
+
+/** The sight every ring in a plan hides by. */
+function ringSight(rings: readonly SightBlocker[], marginMm: number): Sight {
   // Every ring edge, four numbers each (ax, ay, bx, by), and the squares each lies across.
   const edges: number[] = [];
   const cells = new Map<number, number[]>();
@@ -274,7 +294,8 @@ export function openFacing(
   for (let step = 0; step < rule.ways; step += 1) {
     const turn = (((drawn + step) % rule.ways) * 2 * Math.PI) / rule.ways;
     const facing = Math.atan2(Math.sin(turn), Math.cos(turn));
-    const open = sight.reach([at.x, 0, at.z], [-Math.sin(facing), 0, -Math.cos(facing)]) * 1000;
+    // A wall the eye sees through is still a wall to stand facing.
+    const open = (sight.wallReach ?? sight.reach)([at.x, 0, at.z], [-Math.sin(facing), 0, -Math.cos(facing)]) * 1000;
     if (open >= rule.openMm) return facing;
     if (open > mostOpen) [most, mostOpen] = [facing, open];
   }

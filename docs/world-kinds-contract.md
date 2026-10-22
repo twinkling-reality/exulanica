@@ -146,8 +146,8 @@ take each and why, are the [role catalog](../assets/catalogs/world-kinds/kind-ro
 catalog](../assets/catalogs/world-kinds/look-family.v1.json); the leaf is the kind's own word, so
 a pack dresses any leaf of a family it knows and the engine's own primitive draws the rest. A
 surface's leaf (a ground, a path, water, a wall, a roof) is read by its words in the [surface
-material catalog](../assets/catalogs/world-kinds/surface-material.v2.json), so sand is drawn as sand
-and adobe as adobe in any pack ([style pack contract](style-pack-contract.md), section 3).
+material catalog](../assets/catalogs/world-kinds/surface-material.v3.json), so sand is drawn as sand
+and adobe as adobe in any pack, and glass hides nobody behind it ([style pack contract](style-pack-contract.md), section 3).
 
 ## Checks
 

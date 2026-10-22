@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { holdSight, openFacing, planSight, siteSightRings, type Sight } from '../src/composition/sight.js';
+import { seenThrough } from '../src/surface-materials.js';
 import type { SightBlocker } from '../src/composition/arrival-view.js';
 
 /*
@@ -109,6 +110,43 @@ describe('what hides a being, from a plan of what stands at eye height', () => {
     expect(sight.sees({ x: 30.4, z: -14.7 }, { x: 37.4, z: -14.7 })).toBe(false);
     // The crate, 1.2 m high, hides nobody behind it.
     expect(sight.sees({ x: 28, z: -16.5 }, { x: 32, z: -16.5 })).toBe(true);
+  });
+
+  it('leaves out a wall the eye sees through: someone behind a pavilion\'s glass is seen and can be clicked', () => {
+    // A pavilion's glass wall laid north to south (12 m long, 20 cm thick, 4 m high) with a brick wall
+    // beside it, and someone 10 m east of an eye 5 m west of them.
+    const slot = (lookRole: string, positionMm: [number, number, number]) =>
+      ({ primitive: 'box', lookRole, positionMm, yawQuarterTurns: 1, boxMm: [12_000, 200, 4000] as [number, number, number] });
+    const drawing = { slots: [slot('wall.glass', [20_000, 0, 0]), slot('wall.brick', [20_000, 20_000, 0])] };
+    // The catalog in the page says glass is seen through, brick and a family's default are not.
+    expect(['wall.glass', 'wall.brick', 'wall.default'].map(seenThrough)).toEqual([true, false, false]);
+    expect(siteSightRings(drawing, 1600)).toHaveLength(2);
+    const sight = planSight(siteSightRings(drawing, 1600, undefined, seenThrough), 500);
+    expect(sight.sees({ x: 15, z: 0 }, { x: 25, z: 0 })).toBe(true);
+    expect(sight.reach([15, 1.6, 0], [1, 0, 0])).toBe(Number.POSITIVE_INFINITY);
+    // The brick wall still hides the one behind it.
+    expect(sight.sees({ x: 15, z: -20 }, { x: 25, z: -20 })).toBe(false);
+    expect(sight.reach([15, 1.6, -20], [1, 0, 0])).toBeCloseTo(4.9);
+  });
+
+  it('keeps a wall the eye sees through a wall to stand facing: someone by a glass wall faces as by any wall', () => {
+    // A glass wall north to south 1 m east of where someone stands, and the same plan with it as an ordinary wall.
+    const glass: [number, number][][] = [[[1000, -6000], [1200, -6000], [1200, 6000], [1000, 6000]]];
+    const seenThrough = planSight([], 500, glass);
+    const walled = planSight(glass, 500);
+    // The eye and a click pass it; a body faces and stands by it as by a wall.
+    expect(seenThrough.reach([0, 1.6, 0], [1, 0, 0])).toBe(Number.POSITIVE_INFINITY);
+    expect(seenThrough.wallReach!([0, 1.6, 0], [1, 0, 0])).toBeCloseTo(walled.reach([0, 1.6, 0], [1, 0, 0]));
+    expect(seenThrough.sees({ x: 0, z: 0 }, { x: 3, z: 0 })).toBe(true);
+    for (const [x, z] of [[0, 0], [0.5, 2], [0.2, -3], [0.8, 5]] as const) {
+      for (const key of ['a', 'resident-7', 'b']) expect(openFacing(seenThrough, { x, z }, key)).toBe(openFacing(walled, { x, z }, key));
+    }
+    // A plan with nothing seen through answers facing by its own reach.
+    expect(planSight(glass, 500).wallReach).toBeUndefined();
+    // Held on the session, both parts go to the world's sight.
+    const session = { worldSight: null as Sight | null };
+    holdSight(session, 500)([], glass);
+    expect(session.worldSight!.wallReach!([0, 1.6, 0], [1, 0, 0])).toBeCloseTo(1);
   });
 
   it('holds no sight for a world about to be mounted, and the world\'s own once it states its plan', () => {
