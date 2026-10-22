@@ -372,7 +372,13 @@ taken effect, so asking again would repeat the step.
   member: `reason`, `scope`, `detail`, `retry` (`never`, `later` or `after_reauthorization`) and,
   for a workspace's grant or bound, `limit`, `committed` and `requested` as decimal strings. A
   refusal by the authority states no figure of it, since its committed amount is every workspace's
-  spending together. A fuse refusal carries no `spending` member.
+  spending together. A fuse refusal carries no `spending` member. An authority held closed until an
+  operator acts answers `429 spending_suspended` instead, with the same member, so a client can say
+  spending is paused rather than spent: a world's and a kind's draft offer state that code, and a
+  run's control read states it as `model_minds_code` and the models read as `host_refusal` once no
+  provider's model may be asked and none is spent. Both read the authority's stored state, which a
+  lost witness changes at the first attempt that finds it. A comparison's plan keeps
+  `budget_exceeded` and names the reason in its member.
 - `GET /spending` (`operations.read`) states the caller's own workspace's spending by provider: its
   grant and state, what is committed, in flight and unresolved, known usage and reconciled amounts,
   what is left, the authority's state (`active`, `suspended`, `expired`, `revoked`, `exhausted`)

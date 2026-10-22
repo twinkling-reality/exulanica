@@ -415,12 +415,11 @@ def _drafting(
     elif services.model_client is None:
         code = ModelNotConfigured.code
     elif (
-        allowance_refusal(
+        refused := allowance_refusal(
             services.spending_refusals(connection, workspace_id), services.model_client
         )
-        is not None
-    ):
-        code = "budget_exceeded"
+    ) is not None:
+        code = refused.problem_code
     else:
         try:
             WorkspaceKinds(connection, workspace_id).refuse_when_full()
@@ -577,7 +576,8 @@ class KindDraftRefusalView(BaseModel):
     detail: str
     check: str | None = None
     where: str | None = None
-    #: For ``budget_exceeded`` from the durable authority: the problem's ``spending`` member.
+    #: For ``budget_exceeded`` or ``spending_suspended`` from the durable authority: the problem's
+    #: ``spending`` member.
     spending: dict[str, str] | None = None
 
 
@@ -707,8 +707,8 @@ def start_kind_draft(
     people on (``EXULANICA_KINDS_FROM_PEOPLE``), before anything is read;
     503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the
     workspace's allowance for the drafting model admits no attempt (spent, or below what one
-    reserves); 409 ``kind_cap_reached`` when the
-    workspace keeps as many kinds as it may, each before anything is spent; 409
+    reserves; ``spending_suspended`` while the authority is held closed); 409 ``kind_cap_reached``
+    when the workspace keeps as many kinds as it may, each before anything is spent; 409
     ``kind_draft_busy`` while a draft runs in this workspace, with its ``draft_id`` when the caller
     started it; 429 ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many
     drafts this hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when

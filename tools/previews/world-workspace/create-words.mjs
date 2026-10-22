@@ -32,6 +32,8 @@ export const CREATE_WORDS = Object.freeze({
   noModel: 'Making a world from your words needs an AI model, and none is connected here. You can still start from these:',
   /** The budget for AI models is spent (N7, J22, M11). */
   budgetSpent: 'The budget for AI models here is spent. You can still start from these:',
+  /** Spending on AI models is held closed until an operator acts, not spent (N34). */
+  spendingPaused: 'Spending on AI models is paused here, so nothing can be made from your words now. You can still start from these:',
   /** Making from words is not offered here for a reason that is not a missing model (N25). */
   notOffered: 'Making a world from your words isn’t offered here. You can still start from these:',
   offline: NOTE_WORDS.offline,
@@ -60,6 +62,7 @@ export const REFUSAL_WORDS = Object.freeze({
   busy: 'A world is being made already. It waits in Your worlds when it’s done.',
   capacity: 'This computer is busy making other worlds. Try again in a few minutes.',
   budget: 'The budget for AI models here is spent.',
+  paused: 'Spending on AI models is paused here, so nothing was made.',
   tooSlow: 'The AI model took too long, so nothing was made. Try again.',
   interrupted: 'Making stopped part way, so nothing was kept. Try again.',
   /** N25: an offer without a price; said in the plain ink while the offer is read again. */
@@ -86,6 +89,7 @@ export const REFUSAL_BY_CODE = Object.freeze({
   budget_exceeded: 'budget',
   process_budget_spent: 'budget',
   process_share_spent: 'budget',
+  spending_suspended: 'paused',
   world_draft_unanswered: 'tooSlow',
   kind_draft_unanswered: 'tooSlow',
   world_draft_interrupted: 'interrupted',

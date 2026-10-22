@@ -323,6 +323,8 @@ def test_every_code_a_draft_answers_with_is_in_the_closed_list():
     # Codes passed by attribute: the cap and the version's refusals, no model credential, and the
     # permission layer's 404 to a credential without world.read.
     answered |= {KindCapReached.code, KindVersionExists.code, ModelNotConfigured.code}
+    # The authority held closed, said by the refusal's own problem_code.
+    answered |= {"spending_suspended"}
     answered |= {"unknown_reference"}
     # A kind's own refusals are the kind checks' codes, listed apart (KIND_CODES).
     answered -= {code for code, _meaning in KIND_CODES}
@@ -384,3 +386,44 @@ def test_a_draft_s_deadline_is_its_client_s_longest_call_and_ends_it_when_passed
     clock.now += 1
     assert drafts.read(HERE, ACTOR, held.draft_id).state == "refused"
     release.set()
+
+
+def test_an_authority_held_closed_is_said_by_its_own_code_where_a_spent_one_is_the_budget_s():
+    """A page says spending is paused, not spent, where the authority is held closed until an
+    operator acts: the offer of a world's draft and of a kind's, and a draft the authority ended,
+    each say ``spending_suspended``; every other refusal keeps ``budget_exceeded``, and the
+    authority's reason rides in the ``spending`` member either way."""
+    from types import SimpleNamespace
+
+    from exulanica.api.kind_drafts import attempt_floor_usd
+    from exulanica.api.permissions import Permission
+    from exulanica.api.routes.world_kinds import _drafting
+    from exulanica.api.routes.world_making import _unstartable
+    from exulanica.api.world_making import _model_refusal
+    from exulanica.models.spending import SPENDING_REFUSALS, SpendingRefused
+    from exulanica.spending.status import SpendingRefusals
+
+    held = SpendingRefused("spending_suspended", scope="authority", detail="witness_missing")
+    assert held.problem_code == "spending_suspended"
+    assert {
+        SpendingRefused(reason, scope="workspace").problem_code
+        for reason in SPENDING_REFUSALS - {"spending_suspended"}
+    } == {"budget_exceeded"}
+    client = _client()
+    [provider] = attempt_floor_usd(client)
+    spent = SpendingRefused("spending_limit_reached", scope="workspace")
+    for refused, code in ((held, "spending_suspended"), (spent, "budget_exceeded")):
+        services = SimpleNamespace(
+            kinds_from_people=True,
+            model_client=client,
+            spending_refusals=lambda _connection, _workspace, refused=refused: SpendingRefusals(
+                {provider: refused}
+            ),
+        )
+        world = _unstartable(services, None, uuid.uuid4(), guest=False)
+        assert (world.status, world.code, world.raised) == (429, code, refused)
+        permissions = frozenset({Permission.WORLD_WRITE, Permission.MODEL_INVOKE})
+        kind = _drafting(services, permissions, None, uuid.uuid4(), uuid.uuid4(), False)
+        assert (kind.offered, kind.code) == (False, code)
+        ended = _model_refusal(refused)
+        assert (ended["code"], ended["spending"]["reason"]) == (code, refused.reason)

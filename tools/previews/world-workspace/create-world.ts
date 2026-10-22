@@ -141,11 +141,11 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     sentenceId = null;
     if (rawOffer === null) {
       head.push(lightLine(offerOffline ? CREATE_WORDS.offline : CREATE_WORDS.loading, { live: true }));
-    } else if (state.page === 'no-model' || state.page === 'budget' || state.page === 'short' || state.page === 'not-offered') {
-      // No field and no orb (N7, N24, N25, N31): the sentence, which names the cards under it.
+    } else if (state.page === 'no-model' || state.page === 'budget' || state.page === 'paused' || state.page === 'short' || state.page === 'not-offered') {
+      // No field and no orb (N7, N24, N25, N31, N34): the sentence, which names the cards under it.
       const sentence = document.createElement('p'); sentence.className = 'wu-light-sentence';
       sentence.id = sentenceId = 'wu-create-sentence';
-      sentence.textContent = state.page === 'no-model' ? CREATE_WORDS.noModel : state.page === 'budget' ? CREATE_WORDS.budgetSpent
+      sentence.textContent = state.page === 'no-model' ? CREATE_WORDS.noModel : state.page === 'budget' ? CREATE_WORDS.budgetSpent : state.page === 'paused' ? CREATE_WORDS.spendingPaused
         : state.page === 'short' ? budgetShort(state.maximumUsd, state.leftUsd) : CREATE_WORDS.notOffered;
       head.push(sentence);
       field = null; orb = null;

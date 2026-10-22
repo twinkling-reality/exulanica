@@ -34,6 +34,9 @@ HOST_REFUSALS: Final = frozenset(
         "provider_credential_absent",
         "process_budget_spent",
         "process_share_spent",
+        # The durable spending authority held closed until an operator acts, for every provider the
+        # workspace spends with (Services.model_host_refusal): paused, not spent.
+        "spending_suspended",
     }
 )
 
@@ -173,7 +176,8 @@ def host_refusal(
     """Why this process asks no model for ``role`` at all, or None when it may ask them.
 
     A code from ``HOST_REFUSALS`` other than ``models_not_run_here``, which is the host's own
-    listing: no client, or a budget whose remainder, by what is spent, fits no ask of any offered
+    listing, and ``spending_suspended``, the durable authority's (``Services.model_host_refusal``):
+    no client, or a budget whose remainder, by what is spent, fits no ask of any offered
     model the client does not refuse (``smallest_ask_usd``), in the whole budget or once the part
     kept for the process's other work is set aside. Either holds until the process restarts. A
     model on this computer costs nothing, so while its provider is admitted only the call limit

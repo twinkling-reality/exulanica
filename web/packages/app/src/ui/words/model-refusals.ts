@@ -13,6 +13,7 @@ export const HOST_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   provider_credential_absent: 'this server has no key for a model service',
   process_budget_spent: 'this server has spent its model budget until it restarts',
   process_share_spent: 'this server\'s model budget is down to the part kept for its other work, until it restarts',
+  spending_suspended: 'spending on AI models is paused here',
 };
 
 /**

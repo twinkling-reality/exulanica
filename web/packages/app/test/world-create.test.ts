@@ -303,6 +303,16 @@ describe('Create a world as a page', () => {
     expect(document.querySelector('.wu-light-field')).toBeNull();
   });
 
+  it('says spending is paused, not spent, with no field, where the authority is held closed (N34)', async () => {
+    serve(offerOf({ offered: false, code: 'spending_suspended', operation: null }));
+    await mount();
+    const text = document.body.textContent!;
+    expect(text).toContain('Spending on AI models is paused here, so nothing can be made from your words now. You can still start from these:');
+    expect(text).not.toContain('is spent');
+    expect(text).not.toContain('spending_suspended');
+    expect(document.querySelector('.wu-light-field')).toBeNull();
+  });
+
   it('still says a spent budget is spent: a control for N31', async () => {
     serve(offerOf({ offered: false, code: 'budget_exceeded', operation: null }));
     await mount();

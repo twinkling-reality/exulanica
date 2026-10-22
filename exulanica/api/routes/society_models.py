@@ -23,6 +23,7 @@ lists (``exulanica.api.decision_host``).
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import Counter
 from decimal import Decimal
@@ -39,6 +40,7 @@ from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
 from exulanica.models.manifest import Manifest, load_manifest
 from exulanica.models.usage import usd_string
+from exulanica.spending.status import SpendingRefusals
 from exulanica.world.deciders import is_played
 from exulanica.world.decision_measures import by_being, measures, nearest_rank
 from exulanica.world.decision_roles import (
@@ -84,6 +86,22 @@ CHOICE_CONFLICTS: Final = frozenset(
 SUBJECT: Final = "person"
 #: What an outside entry says of its subject's latest decision by the program its grant opens to.
 OUTSIDE_LATEST: Final = ("decision_seq", "base_tick", "consumed_tick", "status", "reason")
+
+
+_LOG = logging.getLogger(__name__)
+
+
+def _spending(services: Services, connection: Any, workspace: uuid.UUID) -> SpendingRefusals | None:
+    """The workspace's spending as the durable authority would answer its next attempts, read once
+    on the request's connection under a savepoint, or None where nothing reads it or the read
+    fails (admission still refuses each attempt)."""
+    try:
+        with connection.transaction():
+            return services.spending_refusals(connection, workspace)
+    except Exception as exc:
+        # Never the exception's text, which may carry a connection string.
+        _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
+        return None
 
 
 def _people_role() -> DecisionRole:
@@ -400,7 +418,10 @@ def society_models_view(
         "engine": snapshot["profile"],
         "takes_model_choices": engine.owner_model_choice,
         "host_refusal": services.model_host_refusal(
-            session.workspace_id, role, snapshot["profile"]
+            session.workspace_id,
+            role,
+            snapshot["profile"],
+            spending=_spending(services, connection, session.workspace_id),
         ),
         "contract": {
             **contract.binding(),

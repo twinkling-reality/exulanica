@@ -195,7 +195,8 @@ class WorldDraftRefusalView(BaseModel):
     detail: str
     check: str | None = None
     where: str | None = None
-    #: For ``budget_exceeded`` from the durable authority: the problem's ``spending`` member.
+    #: For ``budget_exceeded`` or ``spending_suspended`` from the durable authority: the problem's
+    #: ``spending`` member.
     spending: dict[str, str] | None = None
 
 
@@ -338,7 +339,7 @@ def _unstartable(
         services.spending_refusals(connection, workspace_id), services.model_client
     )
     if spent is not None:
-        return _No(429, "budget_exceeded", str(spent), spent)
+        return _No(429, spent.problem_code, str(spent), spent)
     try:
         # Asked again under the workspace's lock when the world is registered, where the answer
         # is the one that holds; asked here so a workspace at its limit pays for no draft.
@@ -475,7 +476,8 @@ def start_world_draft(
 
     403 ``kinds_from_people_not_offered`` on a server whose deployment has not turned kinds from
     people on; 503 without a model credential; 429 ``budget_exceeded`` with its ``spending``
-    member when the workspace's allowance admits no attempt; 409 ``world_limit_reached`` when the
+    member when the workspace's allowance admits no attempt (``spending_suspended`` while the
+    authority is held closed); 409 ``world_limit_reached`` when the
     workspace holds as many generated worlds as it may; 403 ``worlds_read_only`` where the
     database role cannot register a world: each before anything is spent, and each said by
     ``GET /worlds/drafts`` before anything is typed. 409 ``kind_draft_busy`` while a draft runs in

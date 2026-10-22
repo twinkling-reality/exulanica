@@ -19,6 +19,7 @@ assert.equal(CREATE_WORDS.yourWorlds, 'Your worlds');
 assert.equal(CREATE_WORDS.loading, 'Reading what you can make here…');
 assert.equal(CREATE_WORDS.noModel, 'Making a world from your words needs an AI model, and none is connected here. You can still start from these:');
 assert.equal(CREATE_WORDS.budgetSpent, 'The budget for AI models here is spent. You can still start from these:');
+assert.equal(CREATE_WORDS.spendingPaused, 'Spending on AI models is paused here, so nothing can be made from your words now. You can still start from these:');
 assert.equal(CREATE_WORDS.offline, 'Not connected to your world. Trying again.');
 assert.equal(priceLine('1.42270464'), 'An AI model makes it from your words: at most $1.43, and you see what it really spent.');
 assert.equal(countWords(86, 1000), '86 of 1000');
@@ -95,6 +96,7 @@ const sentences = {
   kind_draft_busy: 'A world is being made already. It waits in Your worlds when it’s done.',
   kind_draft_capacity: 'This computer is busy making other worlds. Try again in a few minutes.',
   budget_exceeded: 'The budget for AI models here is spent.',
+  spending_suspended: 'Spending on AI models is paused here, so nothing was made.',
   world_draft_unanswered: 'The AI model took too long, so nothing was made. Try again.',
   world_draft_interrupted: 'Making stopped part way, so nothing was kept. Try again.',
 };

@@ -152,6 +152,7 @@ from exulanica.models.egress import (
 )
 from exulanica.models.errors import ModelError
 from exulanica.models.manifest import MANIFEST_PATH, Manifest, Role, load_manifest
+from exulanica.models.spending import HELD_CLOSED
 from exulanica.references import store as reference_store
 from exulanica.references.adapters import ReferenceAdapter
 from exulanica.references.catalogs import ReferenceSource, web_source
@@ -195,6 +196,7 @@ from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
+    from exulanica.spending.status import SpendingRefusals
 
 __all__ = [
     "DATA_DIR_ENV",
@@ -217,6 +219,21 @@ __all__ = [
 
 
 _LOG = logging.getLogger(__name__)
+
+
+def held_closed(refusals: SpendingRefusals) -> bool:
+    """Whether the durable authority would refuse a workspace's next attempt of every provider it
+    holds a grant of as ``spending_suspended``: held closed until an operator acts, nothing spent.
+    A provider never granted is not the workspace's allowance."""
+    granted = [
+        refused
+        for refused in refusals.by_provider.values()
+        if refused is None or refused.reason != "spending_not_granted"
+    ]
+    return bool(granted) and all(
+        refused is not None and refused.reason == HELD_CLOSED for refused in granted
+    )
+
 
 #: How long one read of the workspaces a host plays and asks models for is used again, in seconds:
 #: a route's refusal and every model ask's check, and the account role answers at most this often.
@@ -825,7 +842,12 @@ class Services(ServiceRefusals, WorkerFactories):
         )
 
     def model_host_refusal(
-        self, workspace_id: uuid.UUID, role: DecisionRole, engine: str | None = None
+        self,
+        workspace_id: uuid.UUID,
+        role: DecisionRole,
+        engine: str | None = None,
+        *,
+        spending: SpendingRefusals | None = None,
     ) -> str | None:
         """Why this host asks no model for a workspace's subjects of ``role``, or None when it
         asks them.
@@ -833,11 +855,18 @@ class Services(ServiceRefusals, WorkerFactories):
         The facts :meth:`decision_host` acts on: the workspaces it asks models for
         (:meth:`asks_models_for`), the process's client, and what is left of its budget and of the
         share the role's decisions may spend, under the contract a society's ``engine`` is asked
-        under (the role's own with none). A code from ``HOST_REFUSALS``.
+        under (the role's own with none), then, where the caller read the workspace's ``spending``
+        (:meth:`spending_refusals`), the durable authority held closed until an operator acts for
+        every provider it holds a grant of (``spending_suspended``, :func:`held_closed`). It reads
+        nothing itself, so a capability read asks for the allowance once. A code from
+        ``HOST_REFUSALS``.
         """
         if not self.asks_models_for(workspace_id):
             return "models_not_run_here"
-        return host_refusal(role, self.decision_client, load_manifest(), _asked(role, engine))
+        refused = host_refusal(role, self.decision_client, load_manifest(), _asked(role, engine))
+        if refused is None and spending is not None and held_closed(spending):
+            return HELD_CLOSED
+        return refused
 
     def smallest_reservation_usd(self) -> dict[str, Decimal]:
         """By provider, the smallest reservation one attempt of any model a person may be given

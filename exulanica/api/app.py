@@ -859,10 +859,13 @@ def create_app(
         extensions = failure_extensions(exc)
         if isinstance(exc, BudgetExceededError):
             # The durable authority's refusal says which allowance refused and whether asking
-            # again can succeed; the process's own fuse carries no such member.
+            # again can succeed; the process's own fuse carries no such member. An authority held
+            # closed is served by its own code, so a page says spending is paused, not spent.
+            code = "budget_exceeded"
             if isinstance(exc, SpendingRefused):
                 extensions = {**extensions, "spending": exc.problem_member()}
-            return _problem(429, "budget_exceeded", str(exc), extensions)
+                code = exc.problem_code
+            return _problem(429, code, str(exc), extensions)
         if isinstance(exc, EgressRefused):
             return _problem(502, "egress_refused", str(exc), extensions)
         if isinstance(exc, TruncatedResponseError):

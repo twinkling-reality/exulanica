@@ -443,6 +443,16 @@ def test_the_playback_digest_names_the_guests_figures_and_nothing_else_moves_it(
         # society's latest receipt says so.
         ({"nebius": None}, "spending_limit_reached", "spending_cap_reached"),
         ({"nebius": None}, "validated_choice", None),
+        # The authority held closed until an operator acts: nothing is spent, and nobody's model
+        # may be asked; a spent cap wins where every provider's allowance is spent or the last
+        # receipt says so, and a provider still open is asked.
+        ({"nebius": ("spending_suspended", "authority")}, None, "spending_suspended"),
+        (
+            {"nebius": ("spending_suspended", "authority")},
+            "spending_limit_reached",
+            "spending_cap_reached",
+        ),
+        ({"nebius": None, "other": ("spending_suspended", "authority")}, None, None),
         # Other refusals are other conditions with their own words, not the cap.
         ({"nebius": ("spending_expired", "authority")}, None, None),
         ({"nebius": ("spending_not_granted", "workspace")}, None, None),
@@ -471,6 +481,28 @@ def test_the_control_read_says_the_cap_is_reached_only_when_an_allowance_is_spen
     assert connection.asked == [uuid.UUID(society)]
     if code is not None:
         assert "keeps playing" in MODEL_MINDS_REASONS[code]
+
+
+def test_a_host_is_held_closed_only_where_every_granted_provider_s_authority_is():
+    from exulanica.api.services import held_closed
+    from exulanica.models.spending import SpendingRefused
+    from exulanica.spending.status import SpendingRefusals
+
+    closed = SpendingRefused("spending_suspended", scope="authority")
+    for by_provider, expected in (
+        ({"nebius": closed}, True),
+        # A provider never granted is not the workspace's allowance.
+        (
+            {"nebius": closed, "other": SpendingRefused("spending_not_granted", scope="workspace")},
+            True,
+        ),
+        ({"nebius": closed, "other": None}, False),
+        ({"nebius": SpendingRefused("spending_revoked", scope="workspace")}, False),
+        ({"nebius": SpendingRefused("spending_limit_reached", scope="workspace")}, False),
+        ({"nebius": SpendingRefused("spending_not_granted", scope="workspace")}, False),
+        ({}, False),
+    ):
+        assert held_closed(SpendingRefusals(by_provider)) is expected, by_provider
 
 
 def test_no_durable_authority_states_no_cap():

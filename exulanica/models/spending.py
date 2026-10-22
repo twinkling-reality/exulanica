@@ -105,6 +105,12 @@ SUSPENSION_DETAILS: Final = frozenset(
     }
 )
 
+#: The code an HTTP refusal of the durable authority is served under: its own reason while the
+#: authority is held closed until an operator acts, so a reader can say spending is paused rather
+#: than spent; the model budget's code for every other refusal (SpendingRefused.problem_code).
+HELD_CLOSED: Final = "spending_suspended"
+BUDGET_EXCEEDED: Final = "budget_exceeded"
+
 RETRY_NEVER: Final = "never"
 RETRY_AFTER_REAUTHORIZATION: Final = "after_reauthorization"
 RETRY_LATER: Final = "later"
@@ -163,6 +169,13 @@ class SpendingRefused(BudgetExceededError):
         if self.reason == "spending_suspended":
             return RETRY_AFTER_REAUTHORIZATION
         return RETRY_NEVER
+
+    @property
+    def problem_code(self) -> str:
+        """The code an HTTP refusal says this under: ``spending_suspended`` while the authority is
+        held closed, ``budget_exceeded`` otherwise (a spent ceiling, no live grant, a revoked or
+        expired one, or an authority that could not be asked)."""
+        return HELD_CLOSED if self.reason == HELD_CLOSED else BUDGET_EXCEEDED
 
     def problem_member(self) -> dict[str, str]:
         """The ``spending`` member of the problem an HTTP refusal carries: codes and decimal

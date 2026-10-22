@@ -183,7 +183,7 @@ class ControlRead(BaseModel):
     )
     #: Why people here who would ask an open model decide by their routines instead, by code, or
     #: null while their models may be asked. The world keeps playing either way.
-    model_minds_code: Literal["spending_cap_reached"] | None
+    model_minds_code: Literal["spending_cap_reached", "spending_suspended"] | None
     #: The sentence for ``model_minds_code``, or null.
     model_minds_reason: str | None
     #: The society's latest living session, or null for one that never had one. Added to this
@@ -196,6 +196,10 @@ MODEL_MINDS_REASONS: Final = {
     "spending_cap_reached": (
         "The allowance for open models on this visit is used up, so people here now follow "
         "their own routines. The world keeps playing."
+    ),
+    "spending_suspended": (
+        "Spending on AI models is paused here, so people follow their own routines. The world "
+        "keeps playing."
     ),
 }
 
@@ -263,7 +267,15 @@ def model_minds_code(
         spent(provider, refused) for provider, refused in granted_providers
     )
     refused_last = latest is not None and _row_value(latest, "reason") == "spending_limit_reached"
-    return "spending_cap_reached" if every_spent or refused_last else None
+    if every_spent or refused_last:
+        return "spending_cap_reached"
+    # The authority held closed until an operator acts, for every provider not spent: nobody's
+    # model may be asked, though nothing is spent.
+    held = [refused for provider, refused in granted_providers if not spent(provider, refused)]
+    closed = bool(held) and all(
+        refused is not None and refused.reason == "spending_suspended" for refused in held
+    )
+    return "spending_suspended" if closed else None
 
 
 def _row_value(row: Any, key: str) -> Any:

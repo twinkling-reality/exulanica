@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 import pytest
@@ -109,6 +109,56 @@ def test_the_status_is_the_callers_workspace_own_with_operations_read(site, benc
     assert neighbour["providers"][0]["grant"]["ceiling_usd"] == "0.00900000"
     refused = site.http.get("/spending", headers=_auth(READER))
     assert (refused.status_code, refused.json()["code"]) == (403, "not_authorised")
+
+
+def test_a_route_asking_a_model_while_the_authority_is_held_closed_says_so_by_code(site, bench):
+    """An authority held closed until an operator acts (its witness lost) is answered by its own
+    code, so a page says spending is paused rather than spent; the status and the member stay."""
+    authority = bench.issue()
+    bench.grant(authority, site.workspace)
+    bench.witness.path(authority).unlink()
+    response = site.http.post(
+        "/selection/plan", headers=_auth(OWNER), json={"question": "where was I?"}
+    )
+    assert response.status_code == 429, response.text
+    body = response.json()
+    assert body["code"] == "spending_suspended"
+    assert (body["spending"]["reason"], body["spending"]["retry"]) == (
+        "spending_suspended",
+        "after_reauthorization",
+    )
+    assert site.transport.requests == [], "a refused request reached the transport"
+
+
+def test_a_host_whose_authority_is_held_closed_says_so_before_any_model_is_asked(site, bench):
+    """The models read's host refusal: none while the workspace's grant is open, and
+    ``spending_suspended`` once the authority is held closed (its witness lost), so a person's
+    Run section says spending is paused rather than that no model is connected."""
+    from exulanica.world.society_decision_contract import person_role
+
+    services = replace(site.http.app.state.services, society_control_workspaces=(site.workspace,))
+    authority = bench.issue()
+    bench.grant(authority, site.workspace)
+
+    def host(workspace):
+        with bench.runtime.session(workspace) as connection:
+            spending = services.spending_refusals(connection, workspace)
+        return services.model_host_refusal(workspace, person_role(), spending=spending)
+
+    assert host(site.workspace) is None
+    bench.witness.path(authority).unlink()
+    # The first attempt finds the witness lost and holds the authority closed; every read after
+    # it says so.
+    site.http.post("/selection/plan", headers=_auth(OWNER), json={"question": "where was I?"})
+    assert host(site.workspace) == "spending_suspended"
+    # The host reads nothing itself: a caller that read no spending is told nothing of it.
+    assert services.model_host_refusal(site.workspace, person_role()) is None
+    # A workspace no grant covers is not held closed: nothing of the authority is its own.
+    assert host(site.neighbour) == "models_not_run_here"
+    elsewhere = replace(services, society_control_workspaces=(site.neighbour,))
+    with bench.runtime.session(site.neighbour) as connection:
+        spending = elsewhere.spending_refusals(connection, site.neighbour)
+    assert elsewhere.model_host_refusal(site.neighbour, person_role(), spending=spending) is None
 
 
 def test_a_route_asking_a_model_without_an_allowance_is_refused_by_name(site, bench):

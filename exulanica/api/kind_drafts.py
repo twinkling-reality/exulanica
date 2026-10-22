@@ -126,6 +126,7 @@ KIND_DRAFT_CODES: Final = (
     ),
     ("provider_credential_absent", "This server holds no model credential to draft with."),
     ("budget_exceeded", "The workspace's allowance for the drafting model is spent."),
+    ("spending_suspended", "Spending on models is held closed here until an operator acts."),
     ("kind_cap_reached", "The workspace already keeps as many kinds of place as it may."),
     ("kind_draft_busy", "The workspace already has a kind of place being drafted."),
     ("kind_draft_limit", "This person has started as many drafts this hour as they may."),
@@ -199,6 +200,20 @@ def allowance_refusal(
                 "spending_limit_reached", scope="workspace", detail="usd", requested=str(floor)
             )
     return None
+
+
+def budget_refusal(spent: BudgetExceededError) -> dict[str, Any]:
+    """A draft the model budget ended, as its refusal: the process's own fuse by its own sentence;
+    the durable authority's by its code (``spending_suspended`` while it is held closed), its own
+    sentence (spent, not granted, revoked, expired, suspended or unavailable) and its ``spending``
+    member, with no other workspace's figures."""
+    refusal: dict[str, Any] = {
+        "code": "budget_exceeded",
+        "detail": "This server's own spending limit for models is reached.",
+    }
+    if isinstance(spent, SpendingRefused):
+        refusal.update(code=spent.problem_code, detail=str(spent), spending=spent.problem_member())
+    return refusal
 
 
 class KindDraftBusy(Exception):
@@ -735,16 +750,7 @@ def drafted_kind(
         )
     except BudgetExceededError as spent:
         # Asked before ModelError, which it is: a spent allowance is not a model's silence.
-        refusal: dict[str, Any] = {
-            "code": "budget_exceeded",
-            "detail": "This server's own spending limit for models is reached.",
-        }
-        if isinstance(spent, SpendingRefused):
-            # The authority's own sentence: spent, not granted, revoked, expired, suspended or
-            # unavailable, with no other workspace's figures.
-            refusal["detail"] = str(spent)
-            refusal["spending"] = spent.problem_member()
-        refused(refusal)
+        refused(budget_refusal(spent))
         return None
     except ModelError as failed:
         if isinstance(failed, TransportError) and (failed.timed_out or failed.deadline_ended):

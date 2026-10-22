@@ -218,11 +218,13 @@ export const HOST_PLAYBACK_WORDS: Readonly<Record<string, string>> = {
  */
 export const MODEL_MINDS_WORDS: Readonly<Record<string, string>> = {
   spending_cap_reached: 'The allowance for open models on this visit is used up, so people here now follow their own routines. The world keeps playing.',
+  spending_suspended: 'Spending on AI models is paused here, so people follow their own routines. The world keeps playing.',
 };
 
 /** The same, as the clause Who decides gives for a chosen model it does not ask now. */
 export const MODEL_MINDS_WHY: Readonly<Record<string, string>> = {
   spending_cap_reached: 'the allowance for open models on this visit is used up',
+  spending_suspended: 'spending on AI models is paused here',
 };
 
 /** The calm line for open models not asked now, or null while they may be. */

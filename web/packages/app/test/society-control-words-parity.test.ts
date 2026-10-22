@@ -39,7 +39,7 @@ describe('the page\'s words for the codes the playback control states', () => {
 
   it('has words for exactly the reasons open models are not asked for the people here', () => {
     const codes = keys('exulanica/api/routes/society_control.py', 'MODEL_MINDS_REASONS: Final = {');
-    expect(codes).toEqual(['spending_cap_reached']);
+    expect(codes).toEqual(['spending_cap_reached', 'spending_suspended']);
     expect(Object.keys(MODEL_MINDS_WORDS).sort()).toEqual([...codes].sort());
     expect(Object.keys(MODEL_MINDS_WHY).sort()).toEqual([...codes].sort());
     expect(literal('exulanica/api/routes/society_control.py', 'model_minds_code').sort()).toEqual([...codes].sort());

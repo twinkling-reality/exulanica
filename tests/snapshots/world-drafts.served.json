@@ -73,6 +73,10 @@
     "meaning": "This server holds no model credential to draft with."
    },
    {
+    "code": "spending_suspended",
+    "meaning": "Spending on models is held closed here until an operator acts."
+   },
+   {
     "code": "tile_budget_reached",
     "meaning": "The workspace's worlds have come to as many tiles as a day allows."
    },
@@ -684,6 +688,10 @@
     "meaning": "This server holds no model credential to draft with."
    },
    {
+    "code": "spending_suspended",
+    "meaning": "Spending on models is held closed here until an operator acts."
+   },
+   {
     "code": "tile_budget_reached",
     "meaning": "The workspace's worlds have come to as many tiles as a day allows."
    },
@@ -841,6 +849,10 @@
    {
     "code": "provider_credential_absent",
     "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "spending_suspended",
+    "meaning": "Spending on models is held closed here until an operator acts."
    },
    {
     "code": "tile_budget_reached",
@@ -1489,6 +1501,10 @@
     "meaning": "This server holds no model credential to draft with."
    },
    {
+    "code": "spending_suspended",
+    "meaning": "Spending on models is held closed here until an operator acts."
+   },
+   {
     "code": "tile_budget_reached",
     "meaning": "The workspace's worlds have come to as many tiles as a day allows."
    },
@@ -2081,6 +2097,10 @@
     "meaning": "This server holds no model credential to draft with."
    },
    {
+    "code": "spending_suspended",
+    "meaning": "Spending on models is held closed here until an operator acts."
+   },
+   {
     "code": "tile_budget_reached",
     "meaning": "The workspace's worlds have come to as many tiles as a day allows."
    },
@@ -2526,6 +2546,10 @@
    {
     "code": "provider_credential_absent",
     "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "spending_suspended",
+    "meaning": "Spending on models is held closed here until an operator acts."
    },
    {
     "code": "tile_budget_reached",

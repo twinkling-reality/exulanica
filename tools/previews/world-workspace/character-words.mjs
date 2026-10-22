@@ -160,6 +160,9 @@ export const BUDGET_SPENT = Object.freeze(['process_budget_spent', 'process_shar
 /** The Run section where the host's budget for models is spent (J22). */
 export const budgetSpent = who => `The budget for AI models here is spent, so ${who.within} follows a routine.`;
 
+/** The Run section where spending on AI models is held closed until an operator acts, not spent (N34). */
+export const spendingPaused = who => `Spending on AI models is paused here, so ${who.within} follows a routine.`;
+
 /** The Run section where the character's chosen model is refused here and others are not (J22). */
 export const modelCannot = (who, assignable) =>
   `This model cannot decide for ${who.within} here, so ${who.within} follows a routine.${assignable ? ' Choose another model to run.' : ''}`;
@@ -168,13 +171,14 @@ export const modelCannot = (who, assignable) =>
  * Why a character's model does not run here, as the page's Run section says it (DESIGN's J2 and
  * J22), or null where it can run. From the models read: the host's own refusal, each offered model's
  * refusal, and the chosen model's (`chosen` false with none chosen). The host's budget spent wins;
- * then nothing that can be asked at all; then a chosen model refused while others can be asked; then
+ * then spending held closed (N34); then nothing that can be asked at all; then a chosen model refused while others can be asked; then
  * no model chosen, with how to run only where [M] is drawn (`assignable`).
  */
 export function runSectionLine(who, { hostRefusal = null, offered = [], chosen = false, chosenRefusal = null, assignable = false }) {
   const refusals = offered.map(model => model.refusal ?? null);
   if (BUDGET_SPENT.includes(hostRefusal) || BUDGET_SPENT.includes(chosenRefusal)
     || (refusals.length > 0 && refusals.every(code => BUDGET_SPENT.includes(code)))) return budgetSpent(who);
+  if (hostRefusal === 'spending_suspended') return spendingPaused(who);
   if (hostRefusal || !refusals.some(code => code === null)) return notConnected(who);
   if (chosen && chosenRefusal) return modelCannot(who, assignable);
   if (!chosen) return assignable ? routineRun(who) : followsRoutine(who);

@@ -77,6 +77,11 @@ for (const spent of [{ hostRefusal: 'process_budget_spent', offered: open }, { o
   { offered: [{ refusal: 'process_budget_spent' }, { refusal: 'process_share_spent' }] }]) {
   assert.equal(runSectionLine(teo, { ...spent, assignable: true }), 'The budget for AI models here is spent, so Teo follows a routine.');
 }
+// N34: spending held closed until an operator acts is paused, not spent and not a missing model.
+assert.equal(runSectionLine(teo, { hostRefusal: 'spending_suspended', offered: open, assignable: true }),
+  'Spending on AI models is paused here, so Teo follows a routine.');
+assert.equal(runSectionLine(teo, { hostRefusal: 'spending_suspended', offered: open, chosen: true, chosenRefusal: 'process_share_spent' }),
+  'The budget for AI models here is spent, so Teo follows a routine.', 'a spent budget wins');
 assert.equal(runSectionLine(teo, { offered: open, chosen: true, chosenRefusal: 'provider_changed', assignable: true }),
   'This model cannot decide for Teo here, so Teo follows a routine. Choose another model to run.');
 assert.equal(runSectionLine(resident, { offered: open, chosen: true, chosenRefusal: 'model_no_longer_offered' }),

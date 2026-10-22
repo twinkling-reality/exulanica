@@ -46,7 +46,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, drafted_kind
+from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, budget_refusal, drafted_kind
 from exulanica.api.world_draft_offer import calls_at_most as counted_calls
 from exulanica.grammar.catalogs import CatalogSchema, load_catalog, text_field
 from exulanica.grammar.landform import LandformRefused
@@ -417,17 +417,9 @@ def _model_refusal(failed: ModelError) -> dict[str, Any]:
     """A model's error as a draft's refusal: a spent allowance, a silence, or a failed provider,
     each said as what it is."""
     from exulanica.models.errors import TransportError
-    from exulanica.models.spending import SpendingRefused
 
     if isinstance(failed, BudgetExceededError):
-        refusal: dict[str, Any] = {
-            "code": "budget_exceeded",
-            "detail": "This server's own spending limit for models is reached.",
-        }
-        if isinstance(failed, SpendingRefused):
-            refusal["detail"] = str(failed)
-            refusal["spending"] = failed.problem_member()
-        return refusal
+        return budget_refusal(failed)
     if isinstance(failed, TransportError) and (failed.timed_out or failed.deadline_ended):
         return {
             "code": "world_draft_unanswered",

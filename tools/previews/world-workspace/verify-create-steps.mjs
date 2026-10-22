@@ -15,6 +15,8 @@ for (const code of ['not_authorised', 'world_draft_spending_not_durable', 'world
   assert.deepEqual(offerState({ offered: false, code }), { page: 'not-offered' }, code);
 }
 for (const code of ['budget_exceeded', 'process_budget_spent', 'process_share_spent']) assert.deepEqual(offerState({ offered: false, code }), { page: 'budget' }, code);
+// N34: spending held closed until an operator acts is paused, not spent, by its served code.
+assert.deepEqual(offerState({ offered: false, code: 'spending_suspended' }), { page: 'paused' });
 // N31: a budget with something left, less than making could cost, by its code and both served figures.
 assert.deepEqual(offerState({ offered: false, code: 'world_draft_bound_exceeds_left', operation: { maximum_usd: '1.4227' }, left_usd: '0.5' }),
   { page: 'short', maximumUsd: '1.4227', leftUsd: '0.5' });
