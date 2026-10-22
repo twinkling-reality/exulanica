@@ -481,13 +481,17 @@ def _landscape_point(
 def _land_and_sea(
     landscape: LandscapeDocument, world_id: str
 ) -> tuple[LandDocument, WorldFrame, int | None]:
-    """The landscape's land, its frame under the world's seed, and its sea's level: dry land is
-    above it; a land with no sea is dry everywhere (None)."""
-    from exulanica.world.site_land import land_seed
+    """The landscape's land, its frame under the seed its ground is drawn under
+    (:func:`~exulanica.world.landscape_drawing.ground_seed`; a world is composed under the newest
+    landscape rules), and its sea's level: dry land is above it; a land with no sea is dry
+    everywhere (None)."""
+    from exulanica.grammar.landscape.rules import LANDSCAPE_RULES_VERSION
+    from exulanica.world.landscape_drawing import ground_seed
 
     land = landscape.land
     width, depth = landscape.extent_mm
-    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(world_id, land.sha256))
+    seed = ground_seed(world_id, land.sha256, LANDSCAPE_RULES_VERSION)
+    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=seed)
     seas = [body.level_mm for body in water_bodies(land, frame) if body.kind == "sea"]
     return land, frame, min(seas) if seas else None
 

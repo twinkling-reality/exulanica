@@ -66,6 +66,12 @@ RULES = {
         },
         "volume_rules": 4,
     },
+    6: {
+        "catalogs": {
+            "landscape-value.v2": "7d49ac01f0a6d2944a7aca1818d9a235e229f200807db4d1bd145c0e7e637b77"
+        },
+        "volume_rules": 4,
+    },
 }
 
 #: A small weathered stack with a level top.
@@ -220,7 +226,7 @@ def test_the_landscape_rules_name_the_catalog_and_the_volume_rules():
     "named",
     [
         None,
-        {**landscape_rules(), "version": 6},
+        {**landscape_rules(), "version": 7},
         {**landscape_rules(), "volume_rules": {"version": 2, "catalogs": {}}},
         {**landscape_rules(2), "volume_rules": volume_rules(1)},
         {**landscape_rules(), "catalogs": {"landscape-value.v1": "0" * 64}},

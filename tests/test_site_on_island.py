@@ -19,7 +19,7 @@ import pytest
 from exulanica.canonical import canonical_json
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SiteStructureRecord
 from exulanica.grammar.islands import make_island_volume, read_island_document
-from exulanica.grammar.landform import RetainingWall, land_rules, read_land_chunk
+from exulanica.grammar.landform import RetainingWall, WorldFrame, land_rules, read_land_chunk
 from exulanica.grammar.landscape import LandscapeRefused, landscape_rules, read_landscape_document
 from exulanica.grammar.volumes import input_sha256, read_volume_sheet
 from exulanica.world import site_on_top
@@ -487,20 +487,67 @@ def test_a_landscape_drawn_again_with_its_top_regraded_realizes_only_the_island(
     assert redrawn["top_sha256"] == regraded["sha256"]
 
 
-def test_two_worlds_on_one_land_each_stand_over_their_own_ground() -> None:
+def test_worlds_made_on_one_landscape_share_its_ground_below_and_those_made_before_keep_theirs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from exulanica.world import landscape_drawing as drawing_module
+    from exulanica.world.site_land import land_seed
 
-    # A swell each world's seed places: another world on the same land, drawn just after this
-    # one, stands over the ground its own seed makes, as it does drawn first.
+    # A swell the seed places, so the seed shows in the ground.
     swell = {"id": "swell", "kind": "undulation", "amplitude_mm": 1500, "wavelength_mm": 80000}
     rolling = read_landscape_document(
         {**LANDSCAPE, "land": {**LANDSCAPE["land"], "features": [swell]}}
     )
-    ours, _ = drawing_module._ground(WORLD, rolling)
-    theirs, _ = drawing_module._ground("world:generated:another", rolling)
+    realized: list[str] = []
+    real_near = drawing_module.realize_near
+
+    def near(land: Any, frame: Any) -> Any:
+        realized.append(frame.seed)
+        return real_near(land, frame)
+
+    monkeypatch.setattr(drawing_module, "realize_near", near)
     drawing_module._grounds.clear()
-    assert theirs == drawing_module._ground("world:generated:another", rolling)[0]
-    assert theirs["chunks"] != ours["chunks"]
+    # Under landscape rules 6 every world on the landscape stands over one ground, realized once.
+    ours, _ = drawing_module._ground(WORLD, rolling, 6)
+    theirs, _ = drawing_module._ground("world:generated:another", rolling, 6)
+    assert theirs == ours and len(realized) == 1
+    # A world made under rules 5 keeps the ground its own seed made, byte for byte as drawn then.
+    before, _ = drawing_module._ground(WORLD, rolling, 5)
+    other_before, _ = drawing_module._ground("world:generated:another", rolling, 5)
+    assert before["chunks"] != other_before["chunks"]
+    assert ours["chunks"] not in (before["chunks"], other_before["chunks"])
+    width, depth = rolling.extent_mm
+    then = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(WORLD, rolling.land.sha256))
+    assert [chunk["sha256"] for chunk in before["chunks"]] == [
+        chunk.sha256 for chunk in real_near(rolling.land, then).chunks()
+    ]
+    # The arrival is composed over the same ground the drawing draws, whichever world.
+    drawn = site_on_top._land_and_sea(rolling, WORLD)[1]
+    assert drawn == site_on_top._land_and_sea(rolling, "world:generated:another")[1]
+    assert drawn.seed == drawing_module.ground_seed(WORLD, rolling.land.sha256, 6)
+
+
+def test_a_landscape_drawing_draws_its_ground_by_the_rules_its_receipt_names(
+    made, landscape_drawn, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from exulanica.world import landscape_drawing as drawing_module
+
+    drawn, _, _ = landscape_drawn
+    asked: list[int] = []
+    real_ground = drawing_module._ground
+
+    def ground(world_id: str, landscape: Any, rules_version: int) -> Any:
+        asked.append(rules_version)
+        return real_ground(world_id, landscape, rules_version)
+
+    monkeypatch.setattr(drawing_module, "_ground", ground)
+    for version in (5, 6):
+        receipt = {**made.receipt, "landscape_rules": landscape_rules(version)}
+        drawing_module.landscape_drawing(
+            WORLD, receipt, made.receipt_sha256, drawn["sha256"], drawn["land"]["top"]
+        )
+    assert asked == [5, 6]
+    assert made.receipt["landscape_rules"]["version"] == 6
 
 
 def test_a_landscape_drawing_without_the_sites_kept_top_or_with_another_is_refused(

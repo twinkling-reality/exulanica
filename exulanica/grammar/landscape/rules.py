@@ -15,7 +15,9 @@ volumes by volume rules 3, whose volumes may state a top land. Version 4 is vers
 landscape catalog version 2, under which a landscape may state a site on a placed volume's top; a
 landscape without one is version 3's. Version 5 is version 4 realizing its volumes by volume
 rules 4, whose top land is graded by land rules 7, so a site on a top eases its banks at their crest
-and toe.
+and toe. Version 6 is version 5 with the ground below a site on a volume's top realized under the
+landscape's own seed, from its land's digest alone, where earlier versions realize it under the
+world's: every world made on one landscape stands over the same ground below, realized once.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from exulanica.grammar.volumes import volume_rules
 
 __all__ = [
     "LANDSCAPE_RULES_VERSION",
+    "OWN_GROUND_SEED_FROM",
     "SERVED_LANDSCAPE_RULES",
     "check_landscape_rules",
     "landscape_rules",
@@ -38,10 +41,13 @@ __all__ = [
 ]
 
 #: The rules new landscapes are made by.
-LANDSCAPE_RULES_VERSION: Final = 5
+LANDSCAPE_RULES_VERSION: Final = 6
 #: Every rules version this code makes landscapes by: the landscape catalog version it reads and
 #: the volume rules version it realizes volumes by.
-SERVED_LANDSCAPE_RULES: Final = {1: (1, 1), 2: (1, 2), 3: (1, 3), 4: (2, 3), 5: (2, 4)}
+SERVED_LANDSCAPE_RULES: Final = {1: (1, 1), 2: (1, 2), 3: (1, 3), 4: (2, 3), 5: (2, 4), 6: (2, 4)}
+#: The first rules version whose ground below a site on a volume's top is realized under the
+#: landscape's own seed rather than its world's.
+OWN_GROUND_SEED_FROM: Final = 6
 
 
 @functools.cache

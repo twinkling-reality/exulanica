@@ -64,13 +64,14 @@ from exulanica.grammar.landscape import (
     volume_bodies,
     volumes_section,
 )
-from exulanica.grammar.landscape.rules import served_landscape_rules
+from exulanica.grammar.landscape.rules import OWN_GROUND_SEED_FROM, served_landscape_rules
 from exulanica.grammar.volumes import TURN_ONE, TopHeights, VolumeField, VolumeRefused, sin_cos
 from exulanica.world.errors import InvalidStructuralData
 
 __all__ = [
     "LANDSCAPE_DRAWING_PROFILE",
     "TOP_LANDSCAPE_DRAWING_PROFILE",
+    "ground_seed",
     "landscape_drawing",
     "landscape_drawing_sha256",
     "landscape_seed",
@@ -83,8 +84,10 @@ LANDSCAPE_DRAWING_PROFILE: Final = "exulanica.landscape-drawing/v1"
 #: The drawing of a landscape whose site stands on one of its volumes' tops.
 TOP_LANDSCAPE_DRAWING_PROFILE: Final = "exulanica.landscape-drawing/v2"
 
-#: The ground the last drawing realized, by its land's digest and frame (whose seed is the world's):
-#: a world's landscape drawn again for a part edit stands over the same ground.
+#: The ground the last drawing realized, by its land's digest and frame (whose seed is the
+#: landscape's own from landscape rules 6, :func:`ground_seed`): a world's landscape drawn again
+#: for a part edit stands over the same ground, and so does every other world made on that
+#: landscape.
 _Ground = tuple[tuple[LandChunk, ...], Backdrop, tuple[WaterBody, ...]]
 _grounds: dict[tuple[str, WorldFrame], _Ground] = {}
 
@@ -226,7 +229,7 @@ def landscape_drawing(
     bodies = volume_bodies(placed)
     if site is None or top is None:
         return drawing, bodies
-    ground, ground_bodies = _ground(world_id, landscape)
+    ground, ground_bodies = _ground(world_id, landscape, receipt["landscape_rules"]["version"])
     drawing["profile"] = TOP_LANDSCAPE_DRAWING_PROFILE
     drawing["top_sha256"] = top["sha256"]
     drawing["site_frame"] = _site_frame(landscape, site)
@@ -271,18 +274,29 @@ def _site_frame(landscape: LandscapeDocument, site: LandscapeSite) -> dict[str, 
     }
 
 
-def _ground(
-    world_id: str, landscape: LandscapeDocument
-) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
-    """The landscape's own land under a volume a site stands on, ungraded, in the landscape's frame
-    (its extent, under the seed a world's land is realized under,
-    :func:`~exulanica.world.site_land.land_seed`): its near land as chunks, its backdrop and its
-    water, and the documents by digest."""
+def ground_seed(world_id: str, land_sha256: str, rules_version: int) -> str:
+    """The seed the ground below a site on a volume's top is realized under, by the landscape rules
+    its receipt names: from version :data:`~exulanica.grammar.landscape.rules.OWN_GROUND_SEED_FROM`
+    the landscape's own, from its land's digest alone, so every world made on one landscape stands
+    over the same ground; before, its world's (:func:`~exulanica.world.site_land.land_seed`), which
+    a world made then keeps."""
     from exulanica.world.site_land import land_seed
 
+    if rules_version >= OWN_GROUND_SEED_FROM:
+        return hashlib.sha256(f"exulanica.landscape-ground:{land_sha256}".encode()).hexdigest()
+    return land_seed(world_id, land_sha256)
+
+
+def _ground(
+    world_id: str, landscape: LandscapeDocument, rules_version: int
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """The landscape's own land under a volume a site stands on, ungraded, in the landscape's frame
+    (its extent, under :func:`ground_seed` for the landscape rules ``rules_version``): its near land
+    as chunks, its backdrop and its water, and the documents by digest."""
     land = landscape.land
     width, depth = landscape.extent_mm
-    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=land_seed(world_id, land.sha256))
+    seed = ground_seed(world_id, land.sha256, rules_version)
+    frame = WorldFrame(width_mm=width, depth_mm=depth, seed=seed)
     key = (land.sha256, frame)
     held = _grounds.get(key)
     if held is None:

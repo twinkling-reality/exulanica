@@ -212,8 +212,9 @@ and tops, and the documents those digests name are kept and served by digest. Th
 by its own realizer under its own rules. The process that composes keeps the volumes its last
 composition realized, by each field's `input_sha256` and the levels, and the ground below a site on a
 volume's top by its land's digest and frame: a world's landscape drawn again after a part edit
-realizes only the volume whose top was regraded, if any. In the kind worker that process is its child,
-which erasing a world ends.
+realizes only the volume whose top was regraded, if any, and from landscape rules 6, whose ground
+below takes the landscape's own seed, every other world made on that landscape stands over the
+ground realized once. In the kind worker that process is its child, which erasing a world ends.
 
 ## Sea stacks
 
@@ -341,6 +342,7 @@ each served version's catalogs, golden field, chunks, tops and composition.
 | 3 | 3 | version 3 | As version 2; a volume may state a top land |
 | 4 | 3 | version 3 | As version 3; the landscape may state a site on a volume's top (landscape catalog version 2) |
 | 5 | 4 | version 3 | As version 4; a site on a top grades its banks eased at their crest and toe (land rules 7) |
+| 6 | 4 | version 3 | As version 5; the ground below a site on a top is realized under the landscape's own seed |
 
 Volume rules 3 also name the land rules a top land is realized by (land rules 3, with their
 catalogs' digests), fixed for that version so a later land rules version never moves a served
@@ -473,7 +475,9 @@ that volume's chunks and tops names it in its `input_sha256`; its land is the to
 receipt's is), `site_frame` (the placement, the site's south-west corner in the landscape's frame,
 `at_mm + R(yaw) (site corner)`, and the placement's turn: a page whose frame is the site's places the
 landscape at its inverse), and `ground`: the landscape's own land, ungraded, in the landscape's
-frame over its extent and one ring of chunks, realized under the seed a world's land is, as 128 m
+frame over its extent and one ring of chunks, realized under the landscape's own seed (from its
+land's digest alone; `ground_seed`) from landscape rules 6, so every world made on one landscape
+stands over the same ground, and under the seed a world's land is before them, as 128 m
 land chunks, a backdrop and the water on it, the ground or sea the volume floats over. Its chunks
 and backdrop are served by digest (`GET /world/versions/{version_id}/landscape/ground?sha256=`). The
 application draws such a world as [readers in the browser](#readers-in-the-browser) says.
