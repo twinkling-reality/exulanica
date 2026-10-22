@@ -176,8 +176,16 @@ describe('History', () => {
     expect(chosen(made.root)).toBe('Marco asked Teo');
     history.key(press('ArrowLeft'));
     expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    // Every change is a stop (GH3); a single change says itself whole on the line, so Enter opens nothing there.
     history.key(press('ArrowLeft'));
-    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    const [moved] = all(made.root, '.wu-hr-change .wu-hr-change-words');
+    expect([chosen(made.root), made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent]).toEqual([undefined, moved]);
+    expect(keys(made.root)).toEqual(['←→Earlier, later', 'GOpen on GitHub', 'EscBack']);
+    history.key(press('Enter'));
+    expect(made.root.querySelector('.wu-hr-moment')).toBeNull();
+    history.key(press('ArrowLeft'));
+    expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(moved);
+    history.key(press('ArrowRight'));
     history.key(press('ArrowRight'));
     history.key(press('Enter'));
     const opened = made.root.querySelector('.wu-hr-moment') as HTMLElement;
@@ -347,9 +355,10 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-path .break')).toBeNull();
     // Its picture is made as the others were: read at its address once.
     await vi.waitFor(() => expect(addresses).toContain('e'.repeat(64)));
+    // With nothing more before, [←] reads nothing further and goes on to the change before the oldest moment (GH3).
     history.key(press('ArrowLeft'));
     expect(before).toHaveLength(1);
-    expect(chosen(made.root)).toBe('Ines left');
+    expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(all(made.root, '.wu-hr-change .wu-hr-change-words')[0]);
   });
 
   it('shows the creation and Now alone with nothing yet, and no arrows with nothing to move to', async () => {
@@ -434,7 +443,8 @@ describe('History', () => {
     history.key(press('KeyG'));
     const card = made.root.querySelector('.wu-hr-keepcard') as HTMLElement;
     expect(card.querySelector('.wu-hr-keep-question')?.textContent).toBe('Keep this world in a new private repository on your GitHub account');
-    expect(keys(made.root)).toEqual(['EnterCreate', 'EscBack']);
+    // Only what works now (GH4): while Create is pale the row offers no Enter.
+    expect(keys(made.root)).toEqual(['EscBack']);
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith('POST', `/world/github-projects/publications?world_id=${encodeURIComponent(WORLD)}`, { project_id: 'project:demo', name: null }));
     // Typing a name is the field's own: the page does not take its keys.
     const field = card.querySelector('.wu-hr-keep-field') as HTMLInputElement;
@@ -445,6 +455,49 @@ describe('History', () => {
     expect(history.isOpen).toBe(true);
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith('DELETE', `/world/github-projects/requests/q1?world_id=${encodeURIComponent(WORLD)}`));
     expect(keys(made.root)).toContain('GKeep on GitHub');
+  });
+
+  it('reads the sign-in again with Enter or when the page has the focus back, its key row as the card stands (GH4)', async () => {
+    const local = { version_id: VERSION, project_id: 'project:demo', link: null, github: null, publications_per_day: 4 };
+    let asked = 0;
+    const refused = (request_id: string) => ({ request_id, project_id: 'project:demo', name: null, review: null, refused: { code: 'not_signed_in', at: at(0) } });
+    const { read } = reads({ '/world/github-projects': { projects: [local], requests: [], get publications() { return [refused(`q${asked}`)]; } } });
+    const write = vi.fn(async (method: string) => {
+      if (method !== 'POST') return { status: 204, body: null };
+      asked += 1;
+      return { status: 202, body: { request_id: `q${asked}`, project_id: 'project:demo', name: null, review: null, refused: null } };
+    });
+    const made = host(read, { write });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    history.key(press('KeyG'));
+    await vi.waitFor(() => expect(keys(made.root)).toEqual(['EnterTry again', 'EscBack']), { timeout: 4000 });
+    expect(made.root.querySelector('.wu-hr-keep-status')?.textContent).toBe('Sign in to GitHub on this computer once (gh auth login), then try again.');
+    history.key(press('Enter'));
+    await vi.waitFor(() => expect(asked).toBe(2));
+    await vi.waitFor(() => expect(keys(made.root)).toEqual(['EnterTry again', 'EscBack']), { timeout: 4000 });
+    window.dispatchEvent(new Event('focus'));
+    await vi.waitFor(() => expect(asked).toBe(3));
+    history.key(press('Escape'));
+  });
+
+  it('opens at the newest end, a change after the last moment chosen with Now in view, and steps back from it (GH3)', async () => {
+    const view = { version_id: VERSION, world_id: WORLD, things: [{ thing_id: 'bench:1', kind: { kind: 'bench' } }, { thing_id: 'market:1', kind: { kind: 'market' } }],
+      edits: [{ edit_id: 'e1', kind: 'move_thing', thing_id: 'bench:1', recorded_at: at(50) }, { edit_id: 'e2', kind: 'move_thing', thing_id: 'bench:1', recorded_at: at(5) }] };
+    const { read } = reads({ [`/world/versions/${VERSION}`]: view });
+    const made = host(read);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    const newest = all(made.root, '.wu-hr-change .wu-hr-change-words').at(-1);
+    expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(newest);
+    expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
+    expect(keys(made.root)).toEqual(['←→Earlier, later', 'GOpen on GitHub', 'EscBack']);
+    history.key(press('ArrowRight'));
+    expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(newest);
+    history.key(press('ArrowLeft'));
+    expect(chosen(made.root)).toBe('Marco asked Teo');
+    history.key(press('ArrowRight'));
+    expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
   });
 
   it('makes missing pictures and portraits one at a time, and stops making them when it closes', async () => {

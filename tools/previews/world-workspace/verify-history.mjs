@@ -172,6 +172,28 @@ assert.equal(pathView(long.items, longPlaced, wide, 1920, 'moment:l5', back.offs
 assert.equal(pathView(long.items, longPlaced, wide, 1920, 'moment:l0', back.offset).offset, 0);
 // A routine's moment has no who line.
 assert.equal(long.items[1].by, null);
+// A change after the last moment (GH3): it takes its place on the line, and chosen (as History opens, or reached
+// with [→]) the view is the newest end with Now in view; the last moment chosen alone leaves both past the edge.
+const tail = historyPath({
+  creation: { at: iso(16, 6, 0), readyWorld: 'Terraces on the bay', picture: null },
+  moments: Array.from({ length: 6 }, (_, index) => ({
+    moment_id: `l${index}`, tick: 400 + index, at: iso(16, 7, index), session_id: null, kind: 'left', subjects: ['ari'],
+    place: null, target: null, with: null, said: [], decider: { kind: 'routine', model: null }, scene: {}, picture: null, branches: [],
+  })),
+  edits: [{ edit_id: 'e9', kind: 'move_thing', thing_id: 'bench:1', recorded_at: iso(16, 7, 9) }],
+}, names, partsOf, clock, now);
+const tailPlaced = pathLayout(tail.items, wide);
+const [lastChange] = tail.items.slice(-1);
+assert.equal(lastChange.kind, 'change');
+const atEnd = pathView(tail.items, tailPlaced, wide, 1920, lastChange.id);
+assert.deepEqual([atEnd.now, atEnd.drawn.has(lastChange.id), atEnd.drawn.has('moment:l5')], [1800, true, true]);
+const fromBack = pathView(tail.items, tailPlaced, wide, 1920, 'moment:l5', pathView(tail.items, tailPlaced, wide, 1920, 'moment:l1').offset);
+assert.deepEqual([fromBack.now, fromBack.drawn.has(lastChange.id)], [null, false]);
+assert.equal(pathView(tail.items, tailPlaced, wide, 1920, lastChange.id, fromBack.offset).now, 1800);
+// The page draws once while it reads, with nothing on the line (offset 0): opening on the newest item still shows
+// the newest end, at 1920 and at 1440.
+assert.equal(pathView(tail.items, tailPlaced, wide, 1920, lastChange.id, 0).now, 1800);
+assert.equal(pathView(tail.items, pathLayout(tail.items, narrow), narrow, 1440, lastChange.id, 0).now, 1320);
 
 // Moments not read yet (H17): the line breaks midway between the oldest moment held and what is drawn before it (a
 // change's dot; a card's picture end); with nothing drawn before it, the line runs to the window's edge; nothing

@@ -26,13 +26,16 @@ export interface KeepKey { readonly keys: readonly string[]; readonly word: stri
 
 export interface KeepCard {
   readonly element: HTMLElement;
-  /** The keys the page's row shows while the card is open: H12's alone. */
+  /** The keys the page's row shows while the card is open: H12's alone, and only what works now (GH4). */
   keys(): readonly KeepKey[];
   /** A key while the card is open; true when the card took it. */
   key(event: KeyboardEvent): boolean;
   /** Takes the card away, withdrawing a request not yet said yes to. */
   close(): void;
 }
+
+/** The refusals the person mends on this computer (installing gh, signing in): Enter reads the sign-in again (GH4). */
+const MENDED_HERE: ReadonlySet<string> = new Set(['gh_missing', 'not_signed_in']);
 
 /** What the card says of the publication request the follower last wrote (pure; the tests read it). */
 export function keepState(publication: Json | null, name: string, creating = false) {
@@ -58,7 +61,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
   return made;
 }
 
-export function openKeepCard(host: KeepHost, project: KeepProject, done: { created(): void; closed(): void }, { pollMs = 1500, settleMs = 600 } = {}): KeepCard {
+export function openKeepCard(host: KeepHost, project: KeepProject, done: { created(): void; closed(): void; changed?(): void }, { pollMs = 1500, settleMs = 600 } = {}): KeepCard {
   const scope = `?world_id=${encodeURIComponent(host.worldId)}`;
   const lifetime = new AbortController();
   let request: Json | null = null;
@@ -69,6 +72,8 @@ export function openKeepCard(host: KeepHost, project: KeepProject, done: { creat
   let failure: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let settle: ReturnType<typeof setTimeout> | null = null;
+  /** The keys the page was last told of, so it is told again only when they change. */
+  let told = '';
 
   const card = element('section', 'wu-hr-keepcard');
   card.setAttribute('aria-label', KEEP_WORDS.keepOnGitHub);
@@ -122,6 +127,30 @@ export function openKeepCard(host: KeepHost, project: KeepProject, done: { creat
     status.textContent = refusal ?? (view.checking || creating ? KEEP_WORDS.checking : '');
     status.dataset.refused = String(refusal !== null);
     orb.disabled = !view.ready || failure !== null;
+    const now = keys().map((key) => key.word).join();
+    if (now !== told) {
+      told = now;
+      done.changed?.();
+    }
+  }
+
+  /** Enter as it works now (GH4): Create once the review is the name in the field, Try again where the person mends
+   * the refusal on this computer, else nothing. */
+  function enter(): KeepKey | null {
+    const view = keepState(publication, name, creating);
+    if (view.ready && failure === null) return { keys: ['Enter'], word: KEEP_WORDS.create, press: () => void create() };
+    if (failure === null && MENDED_HERE.has(view.code ?? '')) return { keys: ['Enter'], word: KEEP_WORDS.tryAgain, press: () => again() };
+    return null;
+  }
+
+  function keys(): KeepKey[] {
+    const now = enter();
+    return [...(now ? [now] : []), { keys: ['Esc'], word: KEEP_WORDS.back, press: () => back() }];
+  }
+
+  /** Reads the sign-in again: a new request, which the follower reviews from the start. */
+  function again() {
+    void ask(edited ? name : null);
   }
 
   /** Asks the follower to review the project under `wanted` (null: the follower proposes the name). */
@@ -240,6 +269,13 @@ export function openKeepCard(host: KeepHost, project: KeepProject, done: { creat
     event.stopPropagation();
   });
   orb.addEventListener('click', () => void create());
+  // A sign-in made in the terminal meanwhile shows when the page has the focus back, without Esc and G (GH4).
+  const mendedMeanwhile = () => {
+    const view = keepState(publication, name, creating);
+    if (!document.hidden && MENDED_HERE.has(view.code ?? '')) again();
+  };
+  window.addEventListener('focus', mendedMeanwhile, { signal: lifetime.signal });
+  document.addEventListener('visibilitychange', mendedMeanwhile, { signal: lifetime.signal });
 
   draw();
   void ask(null);
@@ -247,17 +283,14 @@ export function openKeepCard(host: KeepHost, project: KeepProject, done: { creat
 
   return {
     element: card,
-    keys: () => [
-      { keys: ['Enter'], word: KEEP_WORDS.create, press: () => void create() },
-      { keys: ['Esc'], word: KEEP_WORDS.back, press: () => back() },
-    ],
+    keys,
     key(event) {
       if (event.code === 'Tab') return false;
       if (event.code === 'Enter') {
         // Enter on the field is the field's; on the orb, the orb's own click.
         if ((event.target as Element | null)?.closest?.('.wu-hr-keep-field, .wu-hr-keep-orb')) return false;
         event.preventDefault();
-        void create();
+        enter()?.press();
         return true;
       }
       if (event.code === 'Escape') {

@@ -6,6 +6,7 @@ export const KEEP_WORDS = Object.freeze({
   keepInProject: 'Keep in a project',
   keepOnGitHub: 'Keep on GitHub',
   create: 'Create',
+  tryAgain: 'Try again',
   back: 'Back',
   question: 'Keep this world in a new private repository on your GitHub account',
   account: 'GitHub account',

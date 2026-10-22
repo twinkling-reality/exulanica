@@ -220,7 +220,8 @@ export function mountHistory(host: HistoryHost): History {
     const listing = { creation, edits: view.edits ?? [], models: choices, characters: records, runs, moments: momentList, nowTick };
     held = { compose: () => historyPath(listing, names, (edit: Json, edits: Json[]) => changeParts(edit, edits, (id: string) => thingOf(id), partNameOf), clock, Date.now()) };
     path = held.compose();
-    const newest = [...path.items].reverse().find((item: Json) => item.kind === 'moment');
+    // History opens at its newest end (GH3): on the newest moment or change.
+    const newest = [...path.items].reverse().find((item: Json) => item.kind === 'moment' || item.kind === 'change');
     if (!chosen || !path.items.some((item: Json) => item.id === chosen)) chosen = newest?.id ?? null;
   }
 
@@ -281,8 +282,14 @@ export function mountHistory(host: HistoryHost): History {
   }
 
   /** Where [←] [→] stop: each moment and each grouped changes dot (H15); a single change is passed over. */
+  /** What [←] [→] step through: every moment and every change, so the line's newest end is reached (GH3). */
   function stops(): Json[] {
-    return (path?.items ?? []).filter((item: Json) => item.kind === 'moment' || (item.kind === 'change' && item.changes));
+    return (path?.items ?? []).filter((item: Json) => item.kind === 'moment' || item.kind === 'change');
+  }
+
+  /** Whether Enter opens something on a stop: a moment, or a grouped dot's list; a single change says itself whole. */
+  function opens(item: Json | null | undefined): boolean {
+    return item?.kind === 'moment' || (item?.kind === 'change' && Boolean(item.changes));
   }
 
   /**
@@ -323,7 +330,9 @@ export function mountHistory(host: HistoryHost): History {
   function move(by: number) {
     const list = stops();
     const index = list.findIndex((item) => item.id === chosen);
-    if (by < 0 && index === 0 && momentsMore) {
+    // [←] from the oldest moment held reads the moments before it first, whatever change lies before it on the line.
+    const oldestMoment = list.find((item) => item.kind === 'moment');
+    if (by < 0 && momentsMore && (index === 0 || (oldestMoment !== undefined && chosen === oldestMoment.id))) {
       if (!paging) void moveEarlier();
       return;
     }
@@ -398,6 +407,14 @@ export function mountHistory(host: HistoryHost): History {
         unwatch();
         card = null;
         draw();
+      },
+      // The card's keys change as it learns more (GH4): the key row alone is drawn again, so the name field keeps focus.
+      changed: () => {
+        const row = lasting?.layer.querySelector('.wu-hr-keys');
+        if (!card || !row) return;
+        const fresh = element('div', 'wu-hr-keys');
+        for (const one of card.keys()) fresh.append(keyButton(one.keys, one.word, () => one.press()));
+        row.replaceWith(fresh);
       },
     });
     if (typeof ResizeObserver !== 'undefined') {
@@ -507,15 +524,15 @@ export function mountHistory(host: HistoryHost): History {
       const x = placed.x.get(item.id)!;
       if (item.kind === 'change') {
         svg.append(svgPart('circle', { cx: x, cy: layout.lineY, r: 4 }, 'dot small'));
-        // A grouped dot is a stop: chosen it gains a ring and dark words, and it opens on a click (H15).
+        // Every change is a stop (GH3): chosen it gains a ring and dark words; a grouped dot opens on a click (H15).
         const group = Boolean(item.changes);
         const words = element(group ? 'button' : 'div', 'wu-hr-change');
+        if (item.id === chosen) {
+          svg.append(svgPart('circle', { cx: x, cy: layout.lineY, r: 9 }, 'ring'));
+          words.setAttribute('aria-current', 'true');
+        }
         if (group) {
           const open = () => openMoment(item.id);
-          if (item.id === chosen) {
-            svg.append(svgPart('circle', { cx: x, cy: layout.lineY, r: 9 }, 'ring'));
-            words.setAttribute('aria-current', 'true');
-          }
           const hit = svgPart('circle', { cx: x, cy: layout.lineY, r: 12 }, 'hit');
           hit.addEventListener('click', open);
           svg.append(hit);
@@ -644,7 +661,7 @@ export function mountHistory(host: HistoryHost): History {
       keys.append(keyButton(['Esc'], PATH_WORDS.backToStory, () => closeMoment()));
     } else {
       if (stops().length >= 2 || momentsMore) keys.append(keyButton(['←', '→'], PATH_WORDS.earlierLater, () => move(1)));
-      if (choice) keys.append(keyButton(['Enter'], choice.kind === 'moment' ? PATH_WORDS.openMoment : PATH_WORDS.openChanges, () => openMoment(choice.id)));
+      if (choice && opens(choice)) keys.append(keyButton(['Enter'], choice.kind === 'moment' ? PATH_WORDS.openMoment : PATH_WORDS.openChanges, () => openMoment(choice.id)));
       // One GitHub key at most (sheet section 11): open it once it is there, keep it there, or keep it at all.
       const url = githubUrl();
       if (url) keys.append(keyButton(['G'], PATH_WORDS.openOnGitHub, () => host.open(url)));
@@ -735,7 +752,7 @@ export function mountHistory(host: HistoryHost): History {
   }
 
   function openedChanges(): Json | null {
-    return opened ? stops().find((one) => one.id === opened!.id && one.kind === 'change') ?? null : null;
+    return opened ? stops().find((one) => one.id === opened!.id && one.kind === 'change' && one.changes) ?? null : null;
   }
 
   /** Opens the chosen moment, or a grouped changes dot's list, on the same page. */
@@ -858,7 +875,7 @@ export function mountHistory(host: HistoryHost): History {
       else if (event.code === 'ArrowLeft') move(-1);
       else if (event.code === 'ArrowRight') move(1);
       else if (event.code === 'Enter') {
-        if (chosen && stops().some((one) => one.id === chosen)) openMoment(chosen);
+        if (chosen && opens(stops().find((one) => one.id === chosen))) openMoment(chosen);
       } else if (event.code === 'KeyG' && githubUrl()) host.open(githubUrl() as string);
       else if (event.code === 'KeyG' && offersGitHub()) keepOnGitHub();
       else if (event.code === 'KeyK' && offersKeep()) void keepInProject();
