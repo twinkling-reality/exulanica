@@ -698,6 +698,10 @@ def part_job(
         **placed,
         "part_ids": [part.identity for part in made],
         "label": next((part.label for part in made if part.identity == part_id), ""),
+        # Where the part stood as made (east, north), by which its edit states a turn in place.
+        "made_centre_mm": next(
+            (list(part.centre_mm) for part in made if part.identity == part_id), None
+        ),
     }
 
 

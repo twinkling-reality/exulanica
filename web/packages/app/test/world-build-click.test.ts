@@ -12,8 +12,10 @@ type Vec = readonly [number, number, number];
 type Ray = { readonly origin: Vec; readonly direction: Vec };
 const rays = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('../../atlas-react/src/playcanvas/index.ts', () => ({ pointerRay: (_: unknown, x: number, y: number) => rays.get(`${x},${y}`) ?? null }));
-vi.mock('../src/composition/sight.ts', () => ({ pickSiteSlot: () => null }));
-vi.mock('../src/composition/site-world.ts', () => ({ currentOpenSite: () => null }));
+// A site world's drawing and the slot a ray meets: none, unless a test of a made part sets them.
+const site = vi.hoisted(() => ({ drawing: null as unknown, slot: null as unknown }));
+vi.mock('../src/composition/sight.ts', () => ({ pickSiteSlot: () => site.slot }));
+vi.mock('../src/composition/site-world.ts', () => ({ currentOpenSite: () => (site.drawing ? { drawing: () => site.drawing } : null) }));
 vi.mock('../src/composition/visitor-notices.ts', () => ({ kindDocumentLabel: () => null }));
 
 interface BuildMode {
@@ -355,5 +357,57 @@ describe('a held thing\'s ring shows with its copy, at the height its ground ans
     await answer({ availability: 'ready', landing: { checked: true, rest_y_mm: 150 } });
     // No frame of build mode's own ran here: the ring was laid with the copy, at the answered 150 mm.
     await vi.waitFor(() => expect(laid.at(-1)).toBeCloseTo(0.15, 6));
+  });
+});
+
+describe("the note after a made part is kept turned or moved (W12.7 item 3)", () => {
+  const SITE = { ...entry, generatedSite: { regionId: 'region:site' } };
+  const BARN = { part_id: 'barn-1', label: 'barn', centre_mm: [0, 4000], size_mm: [6000, 4000], quarter_turns: 0 };
+  afterEach(() => { site.drawing = null; site.slot = null; });
+
+  /** What the note says once the barn is chosen, changed by `change` and kept where the server says it may stand. */
+  async function noted(change: (mode: BuildMode) => void): Promise<string | undefined> {
+    site.drawing = { slots: [{ identity: BARN.part_id, positionMm: [0, 4000, 0], yawQuarterTurns: 0, boxMm: [6000, 4000, 5000] }] };
+    site.slot = { identity: BARN.part_id, distance: 4 };
+    rays.set('500,300', towards(0, 2, -4).ray);
+    rays.set('500,400', towards(0, 0, -3).ray);
+    const writes: Write[] = [], waiting: Array<(body: unknown) => void> = [];
+    const root = document.createElement('div'), canvas = document.createElement('canvas');
+    document.body.append(root, canvas);
+    const read = async (path: string): Promise<unknown> => {
+      if (path === '/things/kinds') return { kinds: [] };
+      if (path.startsWith('/world/versions/version-1/parts?')) return { parts: [BARN], changes: [] };
+      if (path.startsWith('/world/versions/version-1?')) return { version_id: 'version-1', world_id: 'world-1', things: [], edits: [] };
+      throw Error(`not read here: ${path}`);
+    };
+    const send = (write: Write): Promise<{ body: unknown }> => {
+      writes.push(write);
+      if (write.actionId.endsWith('.preview')) return new Promise((resolve) => { waiting.push((body) => resolve({ body })); });
+      return Promise.resolve({ body: {} });
+    };
+    const shown: string[] = [];
+    const notes = { show: (words: string) => { shown.push(words); }, clear: () => {}, place: () => {} };
+    const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes };
+    const camera = { getPosition: () => new Point(...EYE), camera: { worldToScreen: (_: unknown, out = new Point()) => out.set(0, 0, -1) } };
+    const regionRoots = new Map([['region:site', { getWorldTransform: () => ({ transformPoint: (p: Point, out: Point) => out.copy(p) }) }]]);
+    const b = { camera, regionRoots, authoredSociety: { root: { getPosition: () => new Point(0, 0, 0) }, groundPoint }, __workspaceThings: () => null, __workspacePick: () => null };
+    const { mountBuildMode } = await build();
+    const mode = mountBuildMode({ b, root, state: { activeWorldEntry: SITE }, entry: SITE, read, send, binding: () => saved, canvas, corners, inspecting: () => false });
+    mounted = mode;
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    change(mode);
+    await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0));
+    waiting.shift()!({ availability: 'ready', landing: { checked: true } });
+    await settled();
+    press(mode, 'Enter');
+    await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'parts.move')).toBe(true));
+    await vi.waitFor(() => expect(shown.length).toBeGreaterThan(0));
+    return shown.at(-1);
+  }
+
+  it('says a barn turned where it stood was turned', async () => {
+    expect(await noted((mode) => { expect(press(mode, 'BracketRight')).toBe(true); })).toBe('You turned the barn');
   });
 });

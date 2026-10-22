@@ -243,9 +243,10 @@ class VersionEditView(BaseModel):
     #: (:func:`rendered_version`), and left out of every other edit, whose bytes are as they were.
     storeys: PartStoreysView | None = Field(default=None, exclude_if=_absent)
     #: True on a ``move_thing`` edit that turned the thing where it stood: its place on the ground
-    #: (``x_mm``, ``z_mm``) kept and its facing changed. A move that turned it too changed its
-    #: place, so it is not one. Stated by the version read alone (:func:`rendered_version`), and
-    #: left out of every other edit, whose bytes are as they were.
+    #: (``x_mm``, ``z_mm``) kept and its facing changed; and on a made part's ``transform_element``
+    #: edit that kept its centre and changed its quarter turns, as the edit states it (0225). A move
+    #: that turned it too changed its place, so it is not one. Stated by the version read alone
+    #: (:func:`rendered_version`), and left out of every other edit, whose bytes are as they were.
     turned_in_place: Literal[True] | None = Field(default=None, exclude_if=_absent)
 
 
@@ -399,8 +400,8 @@ def alternate_version_view(
     """``assets`` is keyed by content digest, which is how an object names one;
     ``workspace_assets`` by object id, for the objects that pin a workspace asset;
     ``part_storeys`` by edit id, for the edits that changed a made building's storeys
-    (:func:`part_storeys_changes`); ``turns_in_place`` the edits that turned a placed thing where
-    it stood (:func:`things_turned_in_place`)."""
+    (:func:`part_storeys_changes`); ``turns_in_place`` the edits that turned a placed thing or a
+    made part where it stood (:func:`turned_in_place_edits`)."""
     pinned = workspace_assets or {}
     storeys = part_storeys or {}
     return AlternateVersionView(
@@ -539,7 +540,7 @@ def rendered_version(
         {asset.content_sha256: asset for asset in repository.reviewed_assets(store)},
         workspace_asset_views(repository, version),
         part_storeys_changes(repository, version.version_id),
-        things_turned_in_place(repository, version.version_id),
+        turned_in_place_edits(repository, version.version_id),
     )
 
 
@@ -562,20 +563,24 @@ def part_storeys_changes(
     return {row["edit_id"]: (row["before"], row["after"]) for row in rows}
 
 
-def things_turned_in_place(
+def turned_in_place_edits(
     repository: WorldObjectRepository, version_id: uuid.UUID
 ) -> frozenset[uuid.UUID]:
-    """The ``move_thing`` edits of the version that turned a placed thing where it stood, by edit
-    id, read from the documents the edit log stores: the same place on the ground (``x_mm`` and
-    ``z_mm``; the height follows the ground) and another facing. A move and a move with a turn
-    changed the place, so they are not here; an undo is read through the edit it takes back."""
+    """The edits of the version that turned a placed thing or a made part where it stood, by edit
+    id. A ``move_thing`` edit is read from the documents the edit log stores: the same place on the
+    ground (``x_mm`` and ``z_mm``; the height follows the ground) and another facing. A made part's
+    first change stores no pose before, so its ``transform_element`` edit states the turn itself
+    (``turned_in_place``, written by the parts route from the made pose). A move and a move with a
+    turn changed the place, so they are not here; an undo is read through the edit it takes back."""
     rows = repository.connection.execute(
         "select edit_id from world_alternate_version_edit "
-        "where workspace_id=%s and world_id=%s and version_id=%s and kind='move_thing' "
+        "where workspace_id=%s and world_id=%s and version_id=%s and (("
+        "kind='move_thing' "
         "and (before_document->'transform'->'x_mm') = (after_document->'transform'->'x_mm') "
         "and (before_document->'transform'->'z_mm') = (after_document->'transform'->'z_mm') "
         "and (before_document->'transform'->'yaw_microradians') "
-        "is distinct from (after_document->'transform'->'yaw_microradians')",
+        "is distinct from (after_document->'transform'->'yaw_microradians')"
+        ") or (kind='transform_element' and turned_in_place))",
         (repository.workspace_id, repository.world_id, version_id),
     ).fetchall()
     return frozenset(row["edit_id"] for row in rows)

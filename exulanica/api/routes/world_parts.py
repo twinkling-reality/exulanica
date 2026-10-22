@@ -563,6 +563,10 @@ def _kept(
             base_state_sha256=body.base_state_sha256,
             actor=actor,
             part_ids=frozenset(answer["part_ids"]),
+            # A site's check answers where the part stood as made; a town's building never turns.
+            made_centre_mm=(
+                tuple(answer["made_centre_mm"]) if answer.get("made_centre_mm") else None
+            ),
         )
         if isinstance(world, _Town):
             world.queue()

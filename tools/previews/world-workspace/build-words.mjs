@@ -159,9 +159,10 @@ const partCalled = (partId, partNameOf) => {
  * What an undo or a redo will do, from its preview's `would_change`, as History's parts (changeParts reads it as
  * the edits it makes, so the note says what History's row will): the undo and the edit it takes back, by that
  * edit's kind and subject; a redo's first edit is read from the documents, since a redo is the undo of an undo.
- * A thing is named as `thingName` names it (with `kindLabel`), a made part by `partNameOf`.
+ * A thing is named as `thingName` names it (with `kindLabel`), a made part by `partNameOf`. A made part's turn in place
+ * is read from the version read's edits (`held`), which state it on the edit (a part's first change has no pose before).
  */
-export function previewParts(change, redo, partNameOf = () => null, kindLabel = () => null) {
+export function previewParts(change, redo, partNameOf = () => null, kindLabel = () => null, held = []) {
   const subject = change?.subject_id;
   const part = typeof subject === 'string' && subject.startsWith('part:');
   const before = change?.before ?? null, after = change?.after ?? null;
@@ -169,18 +170,20 @@ export function previewParts(change, redo, partNameOf = () => null, kindLabel = 
   const of = part ? { element_id: subject } : { thing_id: typeof subject === 'string' && subject ? subject : 'thing' };
   const was = storeysOf(before), now = storeysOf(after);
   const edit = (kind, more = {}) => ({ edit_id: 'done', kind, ...of, ...more });
-  // A thing's move that only turned it, as the version read states it on the edit.
-  const turn = !part && turnedInPlace(before?.transform, after?.transform) ? { turned_in_place: true } : {};
+  // A thing's move that only turned it, as the version read states it on the edit; a part's, as its edit states it.
+  const stated = (id) => held.find((one) => one.edit_id === id)?.turned_in_place === true;
+  const undone = change?.undoes?.edit_id, original = held.find((one) => one.edit_id === undone)?.undone_edit_id;
+  const turn = (part ? stated(redo ? original : undone) : turnedInPlace(before?.transform, after?.transform)) ? { turned_in_place: true } : {};
   let done = null;
   if (!redo) {
     // The edit an undo takes back, as it was made: a storeys change from what the undo leaves to what stands now.
     const kind = change?.undoes?.kind;
     done = part && kind === 'transform_element' && was !== now ? edit(kind, { storeys: { before: now, after: was } })
-      : typeof kind === 'string' ? edit(kind, kind === 'move_thing' ? turn : {}) : null;
+      : typeof kind === 'string' ? edit(kind, kind === 'move_thing' || kind === 'transform_element' ? turn : {}) : null;
   } else if (part) {
     if (now !== null && was !== now) done = edit('transform_element', { storeys: { before: was, after: now } });
     else if (after?.suppressed === true && before?.suppressed !== true) done = edit('suppress_element');
-    else if (JSON.stringify(before?.transform ?? null) !== JSON.stringify(after?.transform ?? null)) done = edit('transform_element');
+    else if (JSON.stringify(before?.transform ?? null) !== JSON.stringify(after?.transform ?? null)) done = edit('transform_element', turn);
   } else {
     const a = before?.transform, b = after?.transform;
     if (before !== null && after !== null && !before.removed && after.removed) done = edit('remove_thing');
@@ -219,7 +222,7 @@ export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
       if (one.kind === 'transform_element' && storeys(one) !== null) {
         return storeysDone(called(one), storeys(one).before ?? null, storeys(one).after);
       }
-      if (one.kind === 'transform_element') return `Moved ${called(one)}`;
+      if (one.kind === 'transform_element') return one.turned_in_place === true ? `Turned ${called(one)}` : `Moved ${called(one)}`;
     }
     const thing = called(one);
     if (one.kind === 'add_thing') return `Placed ${thing}`;
@@ -236,7 +239,7 @@ export function changeWords(edit, edits, nameOf, partNameOf = () => null) {
     return again ? `${plain(again)} again` : 'Did a change again';
   }
   const back = isPart(undone) && storeys(undone) !== null ? storeys(undone).before ?? null : undefined;
-  if (undone.kind === 'move_thing' && undone.turned_in_place === true) return `Turned ${called(undone)} back`;
+  if (['move_thing', 'transform_element'].includes(undone.kind) && undone.turned_in_place === true) return `Turned ${called(undone)} back`;
   return undoneWords(undone.kind, called(undone), back);
 }
 
@@ -431,8 +434,8 @@ export function keyAction(state, event) {
  * `nameOf(thingId)` or the made part by `partNameOf(partId)`, an undo by what it took back, a redo, an undo of an
  * undo, as `{ form: 'again', again }`). Forms: placed, moved, turned, removed, storeys_set, storeys_raised,
  * storeys_lowered, placed_object, moved_object, removed_object, changed_object, changed_world, undid, did_again,
- * brought_back, back_where_it_was, turned_back, took_away, back_to_made_storeys, back_to_storeys. A thing's move that
- * only turned it (`turned_in_place` on the edit) is turned, and its undo turned_back (ruling W12.7).
+ * brought_back, back_where_it_was, turned_back, took_away, back_to_made_storeys, back_to_storeys. A thing's move or a
+ * made part's change that only turned it (`turned_in_place` on the edit) is turned, its undo turned_back (W12.7).
  */
 export function changeParts(edit, edits, nameOf, partNameOf = () => null) {
   const byId = new Map(edits.map(each => [each.edit_id, each]));
@@ -451,7 +454,7 @@ export function changeParts(edit, edits, nameOf, partNameOf = () => null) {
         if (before === null) return { form: 'storeys_set', what: called(one), after };
         return { form: after > before ? 'storeys_raised' : 'storeys_lowered', what: called(one), before, after };
       }
-      if (one.kind === 'transform_element') return { form: 'moved', what: called(one) };
+      if (one.kind === 'transform_element') return { form: one.turned_in_place === true ? 'turned' : 'moved', what: called(one) };
     }
     const what = called(one);
     if (one.kind === 'add_thing') return { form: 'placed', what };
@@ -474,7 +477,7 @@ export function changeParts(edit, edits, nameOf, partNameOf = () => null) {
     const back = storeys(undone).before ?? null;
     return back === null ? { form: 'back_to_made_storeys', what } : { form: 'back_to_storeys', what, before: back };
   }
-  if (undone.kind === 'move_thing' && undone.turned_in_place === true) return { form: 'turned_back', what };
+  if (['move_thing', 'transform_element'].includes(undone.kind) && undone.turned_in_place === true) return { form: 'turned_back', what };
   if (undone.kind === 'remove_thing' || undone.kind === 'suppress_element') return { form: 'brought_back', what };
   if (undone.kind === 'move_thing' || undone.kind === 'transform_element') return { form: 'back_where_it_was', what };
   if (undone.kind === 'add_thing') return { form: 'took_away', what };

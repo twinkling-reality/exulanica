@@ -1089,7 +1089,10 @@ naming the thing in the log's `thing_id`, and undo restores the stored document;
 is a retained, removed row, and the same id may be placed again. A turn and a move are both
 `move_thing` edits; the version read (`GET /world/versions/{version_id}`) states
 `turned_in_place: true` on one that kept the thing's place on the ground (`x_mm`, `z_mm`) and
-changed its facing, and states it on no other edit. A same-source branch keeps
+changed its facing; a made part's first change has no pose before, so its `transform_element` edit
+states the turn itself, written by the parts route from where the part stood as made (the edit
+log's nullable `turned_in_place`, migration 0225), and the read says it there too; no other edit
+states it. A same-source branch keeps
 its placed things as they are; a support-bound thing cannot carry to a different source without
 explicit revalidation. A shipped kind's version never changes, and a copied thing keeps its
 placing edit's time, so a workspace kind erased after that leaves the copy gone as well.

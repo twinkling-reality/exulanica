@@ -267,6 +267,23 @@ class UndoCandidate:
     restores: Mapping[str, Any] | None
 
 
+def part_turned_in_place(
+    before: Mapping[str, Any] | None,
+    after: Mapping[str, Any],
+    made_centre_mm: tuple[int, int] | None,
+) -> bool:
+    """Whether a made part's change turned it where it stood: the same centre (east, north) and
+    other quarter turns. ``before`` and ``after`` are the change's override documents; a part with
+    no pose of its own before stood as made, at ``made_centre_mm`` with no turn. Where that cannot
+    be known it is no turn, so the version read says "moved" and never guesses one."""
+    pose, was = after.get("transform"), (before or {}).get("transform")
+    if pose is None or (was is None and made_centre_mm is None):
+        return False
+    centre = tuple(made_centre_mm) if was is None else (was["x_mm"], -was["z_mm"])
+    turns = 0 if was is None else was["yaw_microradians"]
+    return centre == (pose["x_mm"], -pose["z_mm"]) and turns != pose["yaw_microradians"]
+
+
 class WorldObjectRepository:
     """One workspace and world's alternate versions, their objects, and the reviewed catalogs."""
 
@@ -697,7 +714,7 @@ class WorldObjectRepository:
         """Copy the change list, in order, under new edit ids; returns old id to new id."""
         rows = self.connection.execute(
             f"select edit_id,edit_seq,kind,{_SUBJECT_COLUMNS},undone_edit_id,base_state_sha256,"
-            "result_state_sha256,before_document,after_document,actor,recorded_at "
+            "result_state_sha256,before_document,after_document,actor,recorded_at,turned_in_place "
             "from world_alternate_version_edit "
             "where workspace_id=%s and world_id=%s and version_id=%s order by edit_seq",
             (self.workspace_id, self.world_id, from_version_id),
@@ -706,7 +723,7 @@ class WorldObjectRepository:
         statement = (
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
             f"edit_seq,kind,{_SUBJECT_COLUMNS},undone_edit_id,base_state_sha256,"
-            "result_state_sha256,before_document,after_document,actor,recorded_at)"
+            "result_state_sha256,before_document,after_document,actor,recorded_at,turned_in_place)"
         )
         # The placeholders and the order of the values both come from the statement's own list.
         columns = statement[statement.index("(") + 1 : -1].split(",")
@@ -732,6 +749,7 @@ class WorldObjectRepository:
                 else Jsonb(row["after_document"]),
                 "actor": row["actor"],
                 "recorded_at": row["recorded_at"],
+                "turned_in_place": row["turned_in_place"],
             }
             self.connection.execute(
                 f"{statement} values ({','.join(['%s'] * len(columns))})",
@@ -1578,13 +1596,15 @@ class WorldObjectRepository:
         base_state_sha256: str,
         actor: uuid.UUID,
         part_ids: frozenset[str],
+        made_centre_mm: tuple[int, int] | None = None,
     ) -> AlternateVersion:
         """Move, turn or remove a made part of the version's site world, as an element override
         whose id names the part (``part:<identity>``), with the edit kinds, log and undo every
         element override has. ``part_ids`` are the parts of the world's records a person may
         change, read by the caller from the kind worker, which alone generates a site's records;
         whether the part may stand where the change leaves it is the caller's check, made from the
-        same records before this is called."""
+        same records before this is called. ``made_centre_mm``, from the same records, is where the
+        part stood as made: the edit states a turn in place by it (:func:`part_turned_in_place`)."""
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
             before, after = self._checked_part_change(version_id, override, part_ids)
@@ -1599,6 +1619,7 @@ class WorldObjectRepository:
                 before=before,
                 after=after,
                 actor=actor,
+                turned_in_place=part_turned_in_place(before, after, made_centre_mm),
             )
         return self._written(version_id)
 
@@ -1790,15 +1811,18 @@ class WorldObjectRepository:
         point_map_instance_id: str | None = None,
         thing_id: str | None = None,
         undone_edit_id: uuid.UUID | None = None,
+        turned_in_place: bool = False,
     ) -> None:
         version_id = row["version_id"]
         result = delta_sha256(**self._delta(version_id))
+        # A turn in place is stated true on the edit that made it; every other edit leaves it null.
+        turn = ",turned_in_place" if turned_in_place else ""
         self.connection.execute(
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
             "edit_seq,kind,object_id,element_id,environment_instance_id,point_map_instance_id,"
             "thing_id,undone_edit_id,base_state_sha256,"
-            "result_state_sha256,before_document,after_document,actor) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            f"result_state_sha256,before_document,after_document,actor{turn}) "
+            f"values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s{',true' if turn else ''})",
             (
                 edit_id,
                 self.workspace_id,

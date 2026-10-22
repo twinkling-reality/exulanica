@@ -128,8 +128,21 @@ assert.deepEqual(partLog.map(edit => changeWords(edit, partLog, () => null, part
 // A made part's change, and an undone one, read the same in the note and in History's row (ruling W2).
 assert.equal(did({ kind: 'transform_element', element_id: 'part:barn-id' }, 'part', partName), 'You moved the barn');
 assert.equal(did({ kind: 'suppress_element', element_id: 'part:pond-id' }, 'part', partName), 'You took out the pond');
-// A made part's turn stays moved: a part's first change stores no pose of its own to tell a turn from.
-assert.equal(did({ kind: 'transform_element', element_id: 'part:barn-id', turned_in_place: true }, 'part', partName), 'You moved the barn');
+// A made part turned where it stood (W12.7 item 3), as its edit states it (0225): turned in the note and History's row,
+// its undo turned back and a redo turned again, read from the version's edits by id since a part's first change has no
+// pose before; a change the edits do not state is moved, never a guessed turn.
+assert.equal(did({ kind: 'transform_element', element_id: 'part:barn-id', turned_in_place: true }, 'part', partName), 'You turned the barn');
+const barnTurn = [
+  { edit_id: 'b1', kind: 'transform_element', element_id: 'part:barn-id', turned_in_place: true },
+  { edit_id: 'b2', kind: 'undo', undone_edit_id: 'b1' },
+  { edit_id: 'b3', kind: 'undo', undone_edit_id: 'b2' },
+];
+assert.deepEqual(barnTurn.map(edit => changeWords(edit, barnTurn, () => null, partName)), ['Turned the barn', 'Turned the barn back', 'Turned the barn again']);
+const barnAt = (turns) => ({ element_id: 'part:barn-id', suppressed: false, transform: turns === null ? null : { x_mm: 5000, y_mm: 0, z_mm: -7000, yaw_microradians: [0, 1_570_796, 3_141_593, 4_712_389][turns] } });
+assert.equal(undone({ subject_id: 'part:barn-id', before: barnAt(2), after: null, undoes: { edit_id: 'b1', kind: 'transform_element' } }, partName, () => null, barnTurn.slice(0, 1)), 'You turned the barn back');
+assert.equal(redone({ subject_id: 'part:barn-id', before: null, after: barnAt(2), undoes: { edit_id: 'b2', kind: 'undo' } }, partName, () => null, barnTurn.slice(0, 2)), 'You turned the barn again');
+assert.equal(undone({ subject_id: 'part:barn-id', before: barnAt(2), after: null, undoes: { edit_id: 'b9', kind: 'transform_element' } }, partName, () => null, barnTurn), 'You put the barn back where it was');
+assert.equal(redone({ subject_id: 'part:barn-id', before: null, after: barnAt(2), undoes: { edit_id: 'b9', kind: 'undo' } }, partName, () => null, barnTurn), 'You moved the barn again');
 assert.equal(undone({ subject_id: 'part:pond-id', undoes: { kind: 'suppress_element' } }, partName), 'You brought back the pond');
 assert.equal(undone({ subject_id: 'part:barn-id', undoes: { kind: 'transform_element' } }, partName), 'You put the barn back where it was');
 assert.equal(undone({ subject_id: 'part:gone', undoes: { kind: 'suppress_element' } }), 'You brought back a part of the world');

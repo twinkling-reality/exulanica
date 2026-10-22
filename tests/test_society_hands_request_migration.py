@@ -178,10 +178,15 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
             # exists; every thing here is a shipped kind, none was erased and nobody wrote a
             # character, so a 'shipped' column and two empty views are facts. A minute played here
             # writes its moments and reads the earlier ones (0221), so an empty table of the same
-            # columns stands for them. All four are dropped before the later migrations add them.
+            # columns stands for them. The version read asks whether a part edit turned a part
+            # where it stood (0225); no part is changed here, so a column of nulls is a fact. All
+            # five are dropped before the later migrations add them.
             admin.execute(
                 "alter table world_alternate_thing "
                 "add column kind_source text not null default 'shipped'"
+            )
+            admin.execute(
+                "alter table world_alternate_version_edit add column turned_in_place boolean"
             )
             admin.execute(
                 "create view thing_erasure as select null::uuid as workspace_id,"
@@ -300,6 +305,9 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                 admin.execute("drop view world_thing_character")
                 admin.execute("drop table world_society_moment")
                 admin.execute("alter table world_alternate_thing drop column kind_source")
+                admin.execute(
+                    "alter table world_alternate_version_edit drop column turned_in_place"
+                )
                 for later in everything:
                     if later.version > hands.version:
                         admin.execute(later.sql)

@@ -109,7 +109,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
    * how it ended.
    */
   let placing = null;
-  let records = new Map(), pointer = null, lastPick = 0, lastNames = 0;
+  let records = new Map(), edits = [], pointer = null, lastPick = 0, lastNames = 0;
   /** A site world's made parts as the parts read gives them, by `part:<id>`; none in any other world. */
   let parts = new Map();
   /**
@@ -178,7 +178,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   async function refreshRecords() {
     const version = await read(versionPath + worldQuery);
     if (version.version_id !== entry.authoredVersionId || version.world_id !== entry.worldId) throw Error('This world changed. Reload it before building.');
-    records = new Map((version.things || []).filter(thing => !thing.removed).map(thing => [thing.thing_id, thing]));
+    records = new Map((version.things || []).filter(thing => !thing.removed).map(thing => [thing.thing_id, thing])); edits = version.edits || [];
     await refreshParts();
   }
 
@@ -742,7 +742,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   /** A made part's name by its id, from the parts read: what an undone part change names. */
   const partNamed = (partId) => parts.get(PART + partId)?.label ?? null;
   /** A change build mode made, in History's words ("You moved the bench"): the edit it made, by its kind and subject (a thing's turn alone on it). */
-  const youDid = (kind, id, name, turn = {}) => youChangeWords(changeParts(isPart(id) ? { kind, element_id: id } : { kind, thing_id: id, ...turn }, [], () => name, partNamed));
+  const youDid = (kind, id, name, turn = {}) => youChangeWords(changeParts(isPart(id) ? { kind, element_id: id, ...turn } : { kind, thing_id: id, ...turn }, [], () => name, partNamed));
 
   /**
    * Does again the last change taken back (Cmd+Shift+Z here and in History). Resolves, once the
@@ -758,7 +758,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = redoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.redo', '/things/redo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = youChangeWords(previewParts(preview.would_change, true, partNamed, kindLabel)), { undoable: true });
+        say(said = youChangeWords(previewParts(preview.would_change, true, partNamed, kindLabel, edits)), { undoable: true });
         again = placedAgain(preview.would_change);
       }
     } catch (error) { say(said = problem(error)); }
@@ -792,7 +792,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (preview.availability !== 'ready') say(said = undoRefusalWords(preview.blocked_reason, preview.blocked_detail));
       else {
         await post('things.undo', '/things/undo', { base_state_sha256: stateBase, saved_entry: savedEntry() });
-        say(said = youChangeWords(previewParts(preview.would_change, false, partNamed, kindLabel)), { redoable: true });
+        say(said = youChangeWords(previewParts(preview.would_change, false, partNamed, kindLabel, edits)), { redoable: true });
       }
     } catch (error) { say(said = problem(error)); }
     busy = false;
