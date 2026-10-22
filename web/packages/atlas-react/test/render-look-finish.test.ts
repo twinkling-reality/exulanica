@@ -185,6 +185,21 @@ describe('a water material', () => {
     expect(glsl.get('opacityPS')).toContain('#ifndef EXU_WATER_TIME');
   });
 
+  it('emits its body, foam and caustics in the share of its look\'s own light a setting gives, all of it by default', () => {
+    const finish = lookOf(FINISHED).water!;
+    expect(finish.light).toBeUndefined();
+    const pack = FINISHED;
+    const dimmer = renderLookOfPreset(pack.light!.presets[pack.light!.default_preset]!, pack.shading!, pack.edge, 1, pack.water, undefined, 0.4).water!;
+    expect(dimmer.light).toBeCloseTo(0.4, 6);
+    expect(renderLookOfPreset(pack.light!.presets[pack.light!.default_preset]!, pack.shading!, pack.edge, 1, pack.water, undefined, 1).water).toEqual(finish);
+    const share = (water: typeof finish) => (normalOf(water).material.getParameter('exuWaterFinish') as { data: Float32Array }).data[2];
+    expect(share(finish)).toBe(1);
+    expect(share(dimmer)).toBeCloseTo(0.4, 6);
+    // The whole emitted body takes it (and with a contact finish too: below).
+    expect(normalOf(finish).glsl.get('opacityPS')).toMatch(/exuWaterBody = exuWaterFinish\.z \* \(body \*/);
+    expect(() => validateRenderLook({ ...lookOf(FINISHED), water: { ...finish, light: 1.2 } })).toThrow(/water\.light/);
+  });
+
   it('on a WebGPU device keeps its ripples alone', () => {
     const material = new pc.StandardMaterial();
     const gpu = { on() {}, off() {}, graphicsDevice: { isWebGPU: true } } as unknown as pc.AppBase;
@@ -305,6 +320,7 @@ describe('a water meeting what stands in it and lies under it', () => {
     expect(chunk).toContain('exp(-depth / exuWaterFinish.x) * mix(1.0, facingUp, exuWaterContact.w)');
     expect(chunk).toContain(`for (int i = 0; i < ${WATER_CONTACT_TAPS}; i++)`);
     expect(chunk).toContain('gathered * shown * (1.0 - foam)');
+    expect(chunk).toMatch(/exuWaterBody = exuWaterFinish\.z \* \(body \*/);
     expect(chunk).not.toContain('dAlpha = 1.0 - through * (1.0 - foam);');
     const [wet, down, reach, facing] = contactOf(sea);
     expect([wet, down, reach, facing].map((n) => Math.round(n! * 1000) / 1000)).toEqual([0.6, 0.5, 2.5, 1]);

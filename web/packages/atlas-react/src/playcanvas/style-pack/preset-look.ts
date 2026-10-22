@@ -11,7 +11,8 @@ import { RENDER_LOOK_ID, TILE_LOOK_V1, validateRenderLook, type RenderLook, type
  * choose stays the engine's: shadow maps of 4096 texels in four cascades to 140 m, a 512-texel probe
  * prefiltered from 64-texel faces, sixteen occlusion samples, and the tile look's surface and
  * unavailable rules. The result is validated like any render look, so a pack can never reach the
- * renderer with a value the render look refuses.
+ * renderer with a value the render look refuses. `waterLight`, the share of its look's own light a
+ * world's setting gives (`world-look.ts`), is carried on the water when it is below 1.
  */
 
 const linear = (byte: number): number => {
@@ -39,6 +40,7 @@ export function renderLookOfPreset(
   version = 1,
   water?: StylePackManifest['water'],
   fallingWater?: StylePackManifest['falling_water'],
+  waterLight = 1,
 ): RenderLook {
   const sky = preset.sky;
   const haze = preset.haze;
@@ -200,6 +202,7 @@ export function renderLookOfPreset(
             foamReachM: Object.fromEntries(Object.entries(water.contact.foam_reach_mm).map(([role, mm]) => [role, mm / 1000])),
           },
         }),
+        ...(waterLight >= 1 ? {} : { light: waterLight }),
       },
     }),
     ...(fallingWater === undefined ? {} : {

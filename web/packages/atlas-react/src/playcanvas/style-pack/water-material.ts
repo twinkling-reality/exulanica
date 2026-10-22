@@ -78,6 +78,9 @@ fn exuRippleSlope(q: vec2f) -> vec2f {
  * behind the surface (the camera frame's depth map, written by the contact-shadow prepass) minus
  * the surface's own depth. Light through it is absorbed per channel; what lies under shallow water
  * shows through; deep water turns to its body colour; a thin edge against a wall or a stone foams.
+ * The body, its foam and its caustics are emitted in the light the look's colours were chosen in, by
+ * the share of it the world's light gives (`RenderWater.light`), so a darker sky dims them as it dims
+ * the land; the surface's reflection reads the scene's own sky.
  * The surface is blended over the drawn scene with one transmittance (the mean of the three
  * channels), so no copy of the scene's colour is needed: with multisampling on a tile GPU that copy
  * alone cost 4 to 6 ms in the graphics lab. Reflection is the material's own environment specular.
@@ -89,7 +92,7 @@ ${WATER_TIME_GLSL}
 uniform vec3 exuWaterShallow;
 uniform vec3 exuWaterDeep;
 uniform vec3 exuWaterAbsorb;
-uniform vec4 exuWaterFinish; // x depth scale m, y foam width m
+uniform vec4 exuWaterFinish; // x depth scale m, y foam width m, z the share of its look's own light the body is drawn in
 uniform vec4 exuWaterCaustics; // x strength, y cells a metre, z pace in radians a second, w reach m
 uniform vec2 exuWaterCausticFade; // the cells a pixel over which the caustics fade, as the ripple's
 vec3 exuWaterBody;
@@ -122,7 +125,7 @@ void getOpacity() {
         float fine = 1.0 - smoothstep(exuWaterCausticFade.x, exuWaterCausticFade.y, max(fwidth(p.x), fwidth(p.y)));
         gathered = vec3(pow(ridge, 6.0) * exuWaterCaustics.x * fine * (1.0 - smoothstep(0.0, exuWaterCaustics.w, depth)));
     }
-    exuWaterBody = (body * (1.0 - through) * (1.0 - foam) + vec3(0.85, 0.9, 0.9) * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
+    exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + vec3(0.85, 0.9, 0.9) * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
 }
 `;
 
@@ -301,7 +304,7 @@ ${octaveLines(ripple, 'uniform.exuWaterTime', (name) => `let ${name}`, 'vec2f')}
       material.setParameter('exuWaterShallow', new Float32Array(finish.shallow));
       material.setParameter('exuWaterDeep', new Float32Array(finish.deep));
       material.setParameter('exuWaterAbsorb', new Float32Array(finish.absorption));
-      material.setParameter('exuWaterFinish', new Float32Array([finish.depthScaleM, finish.foamWidthM, 0, 0]));
+      material.setParameter('exuWaterFinish', new Float32Array([finish.depthScaleM, finish.foamWidthM, finish.light ?? 1, 0]));
       const caustics = finish.caustics;
       material.setParameter('exuWaterCaustics', new Float32Array(caustics === undefined ? [0, 1, 0, 1] : [caustics.strength, 1 / caustics.cellM, caustics.pace, caustics.reachM]));
       material.setParameter('exuWaterCausticFade', new Float32Array([ripple.fadeFrom, ripple.fadeTo]));

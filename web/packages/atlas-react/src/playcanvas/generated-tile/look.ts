@@ -477,6 +477,12 @@ export interface RenderWater {
   readonly caustics?: RenderCaustics;
   /** Where the water meets what stands in it and lies under it; absent, as it always has. */
   readonly contact?: RenderWaterContact;
+  /**
+   * The share of its look's own light the water's body is drawn in, 0 to 1: its colours are chosen
+   * in its look's own light, and a world's setting that gives less light dims it as it dims the land.
+   * Absent, 1.
+   */
+  readonly light?: number;
 }
 
 /** Where water meets solids: what a surface under it keeps, the light's way down, the shallow colour's need of a face turned up, and foam by water look role. */
@@ -744,6 +750,7 @@ const RENDER_SHAPE: Shape = obj({
   litWindows: optional(num(0, 1)),
   water: optional(obj({
     shallow: rgb, deep: rgb, absorption: { kind: 'triple', min: 0, max: 5 }, depthScaleM: num(0.5, 50), foamWidthM: num(0, 2), reflection: num(0, 2),
+    light: optional(num(0, 1)),
     ripples: optional(obj({
       octaves: { kind: 'list', min: 1, max: 4, shape: obj({ angle: num(0, 2 * Math.PI), cellM: num(0.1, 20), tilt: num(0, 0.2), drift: { kind: 'list', min: 2, max: 2, shape: num(-5, 5) } }) },
       fadeFrom: num(0.01, 2),

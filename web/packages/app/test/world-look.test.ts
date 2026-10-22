@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
-import { canonicalJson } from '@exulanica/atlas-core';
+import { canonicalJson, openLight, readWorldSettingRules, type StylePackLightPreset } from '@exulanica/atlas-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Credentials } from '../src/config.js';
 import {
@@ -14,6 +14,7 @@ import {
   listedSettings,
   listedVersion,
   prepareWorldLook,
+  waterLightShare,
   worldLookChoice,
   type ListedStylePack,
 } from '../src/world-look.js';
@@ -452,6 +453,24 @@ describe('a world\'s own setting', () => {
     expect('swatch' in ground && prepared.pack.swatches.get(ground.swatch)!.srgb8).toEqual([228, 208, 164]);
     // The pieces are the pack's own: a setting states none.
     expect(prepared.pieces.pieces.size).toBe(plain.pieces.pieces.size);
+  });
+
+  it('gives the look\'s water the share of its own light the setting gives, the exposure aside, and never more', () => {
+    const rules = readWorldSettingRules(
+      JSON.parse(readFileSync('../assets/style-packs/settings/setting-rules.v1.json', 'utf8')),
+      JSON.parse(readFileSync('../assets/colour/srgb8-linear16.v1.json', 'utf8')),
+    );
+    const presets = (cozy as unknown as { light: { presets: Record<string, StylePackLightPreset> } }).light.presets;
+    const day = presets['day']!, evening = presets['evening']!;
+    const light = (preset: StylePackLightPreset): number => openLight(preset, rules);
+    expect(waterLightShare(day, day, light)).toBe(1);
+    // Cozy town's evening gives less light than its day: the water dims by the same share.
+    const share = waterLightShare(day, evening, light);
+    expect(share).toBeLessThan(1);
+    expect(share).toBeCloseTo((light(evening) / evening.exposure_permille) / (light(day) / day.exposure_permille), 9);
+    // The exposure is the picture's, not the light's; and more light than its own day leaves it whole.
+    expect(waterLightShare(day, { ...day, exposure_permille: day.exposure_permille * 2 }, light)).toBeCloseTo(1, 9);
+    expect(waterLightShare(day, { ...day, sun: { ...day.sun, intensity_permille: day.sun.intensity_permille * 2 } }, light)).toBe(1);
   });
 
   it('is never stood in for: one the pack cannot be drawn in leaves the world as its pack states, and says why', async () => {

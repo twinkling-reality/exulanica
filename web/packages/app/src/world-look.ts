@@ -30,7 +30,7 @@
  * the page reads the chain down to the pack that names no base, at most four manifests.
  */
 
-import type { LookFamily, ResolvedStylePack, StylePackFile } from '@exulanica/atlas-core';
+import type { LookFamily, ResolvedStylePack, StylePackFile, StylePackLightPreset } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile, RenderLook } from '@exulanica/atlas-react/generated-tile';
 import type { FetchedPieces, OpeningSlot, PackVehicleBodies, TownLookRoles } from '@exulanica/atlas-react/style-pack';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
@@ -336,6 +336,16 @@ export async function ownLookContent(access: Credentials, manifestSha256: string
 }
 
 /**
+ * The share of its look's own light a world's setting gives the look's water, 0 to 1. The water's
+ * body is drawn in the light its colours were chosen in; a setting giving less dims it as it dims the
+ * land, by the readers' open light with each preset's exposure divided out, and never more than all.
+ */
+export function waterLightShare(own: StylePackLightPreset, set: StylePackLightPreset, openLight: (preset: StylePackLightPreset) => number): number {
+  const lit = (preset: StylePackLightPreset): number => (openLight(preset) * 1000) / preset.exposure_permille;
+  return Math.min(1, lit(set) / Math.max(lit(own), 1));
+}
+
+/**
  * Read the host's pack `packId` against the texture library the world is drawn with, fetch and
  * check its pieces, and find the windows of the world's tile `containers`. `manifestSha256` names
  * the exact manifest a world's appearance names; without it the host's list names the current one.
@@ -366,7 +376,7 @@ export async function prepareWorldLook(
     ownBase === null ? Promise.resolve(null) : stylePackContent(access, ownBase.manifestSha256, `${ownBase.packId} manifest`).then(bytes => JSON.parse(new TextDecoder().decode(bytes)) as unknown),
   ]);
   const [style, { attachTileInk }, {
-    canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack, stylePackFamilies, applyWorldSetting, readWorldSetting, readWorldSettingRules,
+    canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack, stylePackFamilies, applyWorldSetting, readWorldSetting, readWorldSettingRules, openLight,
   }] = await Promise.all([
     import('@exulanica/atlas-react/style-pack'),
     import('@exulanica/atlas-react/generated-tile'),
@@ -406,16 +416,19 @@ export async function prepareWorldLook(
   }
   let pack = resolveStylePack(chain);
   let drawnSetting: PreparedWorldLook['setting'] = null;
+  let waterLight = 1;
   if (setting !== null && setting !== undefined) {
     try {
       const rules = readWorldSettingRules(JSON.parse(settingRulesText), JSON.parse(colourTableText));
+      const own = pack.light.presets[pack.light.default_preset]!;
       pack = applyWorldSetting(pack, readWorldSetting(setting, rules), families, rules);
+      waterLight = waterLightShare(own, pack.light.presets[pack.light.default_preset]!, (preset) => openLight(preset, rules));
       drawnSetting = { drawn: true, reason: null };
     } catch (error) {
       drawnSetting = { drawn: false, reason: error instanceof Error ? error.message : String(error) };
     }
   }
-  const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge, 1, pack.water, pack.falling_water);
+  const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge, 1, pack.water, pack.falling_water, waterLight);
   const table = (JSON.parse(colourTableText) as { values: number[] }).values;
   const own = new Set(isOwn ? read.files.map((file) => file.sha256) : []);
   const packFile = (file: StylePackFile): Promise<Uint8Array<ArrayBuffer>> => (
