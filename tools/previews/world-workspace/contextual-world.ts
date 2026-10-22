@@ -262,8 +262,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const calledWithin = (id) => calledAs(id).within;
   /** A person as the tag and card call them (J20), by society id: from their offer, else their society name, else "the" and their kind. */
   function whoOf(id) {
-    const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null;
-    return knownWho(row ? subjectWho(row, offers.get(row.key)?.offer ?? null, kind) : called({ name: null, kind }), personName(id));
+    const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null, offer = row ? offers.get(row.key)?.offer ?? null : null;
+    return knownWho(row ? subjectWho(row, offer, kind) : called({ name: null, kind }), personName(id), offer?.subject?.kind?.body?.name);
   }
   const popScale = () => Number.parseFloat(root.style.getPropertyValue('--ui-scale')) || 1;
   /**
@@ -713,6 +713,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       const facts = characterFacts(subjectReads.society, showing.row.scene.id);
       Object.assign(showing, { events, didNext: next, didWant: want });
       await records.readMoments(showing);
+      // The people its rows name (a line heard, a line said to someone), named as History names them: offers read first.
+      await Promise.all([...new Set(events.filter(event => event.event_kind === 'said').map(event => event.subject_id === showing.row.scene.id ? event.document?.thing?.to : event.document?.thing?.heard_by?.includes(showing.row.scene.id) ? event.subject_id : null).map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
       if (showing !== pageView) return;
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
         options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row), limit: want,

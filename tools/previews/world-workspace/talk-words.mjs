@@ -12,9 +12,18 @@ const quote = line => `\u201c${plain(line) ?? ''}\u201d`;
 /**
  * Who a line, a name over someone or the talking scene calls a person: `who` as the tag calls them (J20), unless it
  * calls them by their kind and `name` (their name in the society read) is known, so nobody is "the cook" while
- * their offer is still being read or gives no name of its own.
+ * their offer is still being read or gives no name of its own. A society name that is only their `body`'s label
+ * (a placed creature's, numbered from the second: "Eight legged finned creature", "... 2") is no name, as the tag
+ * holds it: they keep the tag's words ("the canopy strider").
  */
-export const knownWho = (who, name) => who.named || !plain(name) ? who : called({ name });
+export const knownWho = (who, name, body = null) => who.named || !plain(name) || labelOnly(name, body) ? who : called({ name });
+
+/** Whether a society name is a body's label alone, as written or numbered. */
+function labelOnly(name, body) {
+  const label = plain(body)?.toLowerCase(), said = plain(name).toLowerCase();
+  if (!label || !said.startsWith(label)) return false;
+  return said.length === label.length || /^ \d+$/u.test(said.slice(label.length));
+}
 
 /** A said line's pop: the line in quotes (T1). */
 export const saidPop = line => quote(line);

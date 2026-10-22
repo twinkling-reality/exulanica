@@ -11,6 +11,16 @@ assert.equal(knownWho(called({ kind: 'cook' }), 'Ines').named, true);
 assert.equal(knownWho(ines, 'Teo').start, 'Ines');
 assert.equal(knownWho(resident, null).within, 'the resident');
 assert.equal(knownWho(resident, '  ').within, 'the resident');
+// A placed creature's society name is its body's label, numbered from the second: no name of its own, as its tag holds
+// it, so it keeps the tag's words; a knight (no body), a name that only holds the label and a resident keep theirs.
+const strider = called({ kind: 'canopy strider' }), body = 'eight legged finned creature';
+assert.equal(knownWho(strider, 'Eight legged finned creature', body).within, 'the canopy strider');
+assert.equal(knownWho(strider, 'Eight legged finned creature 2', body).within, 'the canopy strider');
+assert.equal(knownWho(strider, 'Eight legged finned creature', null).start, 'Eight legged finned creature', 'before its offer is read, as before');
+assert.equal(knownWho(strider, 'Eight legged finned creature Nell', body).start, 'Eight legged finned creature Nell');
+assert.equal(knownWho(strider, 'Eight legged finned creatures', body).start, 'Eight legged finned creatures');
+assert.equal(knownWho(called({ kind: 'knight' }), 'Knight', null).start, 'Knight');
+assert.equal(knownWho(called({ kind: 'barista' }), 'Hugo Kerr', null).start, 'Hugo Kerr');
 
 // A pop (T1): a line in quotes, an action with a capital.
 assert.equal(saidPop(' Morning, Teo. '), '\u201cMorning, Teo.\u201d');
