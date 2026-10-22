@@ -325,6 +325,9 @@ assert.deepEqual([
   'You placed the bench', 'You moved the bench', 'You took out the bench', 'You took out the pond', 'You raised the tea house to 4 storeys',
   'You put the bench back where it was', 'You brought back the pond', 'You took out the pond again',
 ]);
+// A thing turned where it stood (ruling W12.7), as the version read states it on the move: turned, back, again.
+const turnLog = [{ edit_id: 't', kind: 'move_thing', thing_id: 'bench:1', turned_in_place: true }, { edit_id: 'tu', kind: 'undo', undone_edit_id: 't' }, { edit_id: 'tr', kind: 'undo', undone_edit_id: 'tu' }];
+assert.deepEqual(turnLog.map(edit => you(edit, turnLog)), ['You turned the bench', 'You turned the bench back', 'You turned the bench again']);
 // changeParts reads every edit as changeWords does: an edit build mode words is never a change History cannot word.
 const fixtures = [
   { edit_id: 'a', kind: 'add_thing', thing_id: 'bench:1' }, { edit_id: 'b', kind: 'move_thing', thing_id: 'bench:1' },
@@ -333,6 +336,7 @@ const fixtures = [
   { edit_id: 'f', kind: 'transform_element', element_id: 'part:tea-house' }, { edit_id: 'g', kind: 'add_object' },
   { edit_id: 'h', kind: 'retint_object' }, { edit_id: 'i', kind: 'undo', undone_edit_id: 'e' }, { edit_id: 'j', kind: 'undo', undone_edit_id: 'c' },
   { edit_id: 'k', kind: 'undo', undone_edit_id: 'a' }, { edit_id: 'l', kind: 'undo', undone_edit_id: 'j' }, { edit_id: 'm', kind: 'undo', undone_edit_id: 'missing' },
+  { edit_id: 'n', kind: 'move_thing', thing_id: 'bench:1', turned_in_place: true }, { edit_id: 'o', kind: 'undo', undone_edit_id: 'n' },
 ];
 for (const edit of fixtures) {
   const said = changeWords(edit, fixtures, (id) => things[id] ?? null, (id) => parts[id] ?? null);

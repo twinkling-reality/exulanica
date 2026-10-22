@@ -11,7 +11,8 @@ reviewed mesh it may draw from one whose bytes are gone.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
@@ -241,6 +242,11 @@ class VersionEditView(BaseModel):
     #: and a move are both ``transform_element`` edits. Stated by the version read alone
     #: (:func:`rendered_version`), and left out of every other edit, whose bytes are as they were.
     storeys: PartStoreysView | None = Field(default=None, exclude_if=_absent)
+    #: True on a ``move_thing`` edit that turned the thing where it stood: its place on the ground
+    #: (``x_mm``, ``z_mm``) kept and its facing changed. A move that turned it too changed its
+    #: place, so it is not one. Stated by the version read alone (:func:`rendered_version`), and
+    #: left out of every other edit, whose bytes are as they were.
+    turned_in_place: Literal[True] | None = Field(default=None, exclude_if=_absent)
 
 
 class AlternateVersionView(BaseModel):
@@ -388,11 +394,13 @@ def alternate_version_view(
     assets: dict[str, ReviewedAssetRow],
     workspace_assets: Mapping[str, WorkspaceAssetObjectView] | None = None,
     part_storeys: Mapping[uuid.UUID, tuple[int | None, int | None]] | None = None,
+    turns_in_place: Collection[uuid.UUID] = frozenset(),
 ) -> AlternateVersionView:
     """``assets`` is keyed by content digest, which is how an object names one;
     ``workspace_assets`` by object id, for the objects that pin a workspace asset;
     ``part_storeys`` by edit id, for the edits that changed a made building's storeys
-    (:func:`part_storeys_changes`)."""
+    (:func:`part_storeys_changes`); ``turns_in_place`` the edits that turned a placed thing where
+    it stood (:func:`things_turned_in_place`)."""
     pinned = workspace_assets or {}
     storeys = part_storeys or {}
     return AlternateVersionView(
@@ -508,6 +516,7 @@ def alternate_version_view(
                         before=storeys[edit.edit_id][0], after=storeys[edit.edit_id][1]
                     )
                 ),
+                turned_in_place=True if edit.edit_id in turns_in_place else None,
             )
             for edit in version.edits
         ],
@@ -530,6 +539,7 @@ def rendered_version(
         {asset.content_sha256: asset for asset in repository.reviewed_assets(store)},
         workspace_asset_views(repository, version),
         part_storeys_changes(repository, version.version_id),
+        things_turned_in_place(repository, version.version_id),
     )
 
 
@@ -550,3 +560,22 @@ def part_storeys_changes(
         (repository.workspace_id, repository.world_id, version_id, f"{PART_PREFIX}%"),
     ).fetchall()
     return {row["edit_id"]: (row["before"], row["after"]) for row in rows}
+
+
+def things_turned_in_place(
+    repository: WorldObjectRepository, version_id: uuid.UUID
+) -> frozenset[uuid.UUID]:
+    """The ``move_thing`` edits of the version that turned a placed thing where it stood, by edit
+    id, read from the documents the edit log stores: the same place on the ground (``x_mm`` and
+    ``z_mm``; the height follows the ground) and another facing. A move and a move with a turn
+    changed the place, so they are not here; an undo is read through the edit it takes back."""
+    rows = repository.connection.execute(
+        "select edit_id from world_alternate_version_edit "
+        "where workspace_id=%s and world_id=%s and version_id=%s and kind='move_thing' "
+        "and (before_document->'transform'->'x_mm') = (after_document->'transform'->'x_mm') "
+        "and (before_document->'transform'->'z_mm') = (after_document->'transform'->'z_mm') "
+        "and (before_document->'transform'->'yaw_microradians') "
+        "is distinct from (after_document->'transform'->'yaw_microradians')",
+        (repository.workspace_id, repository.world_id, version_id),
+    ).fetchall()
+    return frozenset(row["edit_id"] for row in rows)

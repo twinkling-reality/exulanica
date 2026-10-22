@@ -320,6 +320,7 @@ const storeysWords = (count) => `${count} ${count === 1 ? 'storey' : 'storeys'}`
 const YOU_FORMS = Object.freeze({
   placed: ({ what }) => `You placed ${what}`,
   moved: ({ what }) => `You moved ${what}`,
+  turned: ({ what }) => `You turned ${what}`,
   removed: ({ what }) => `You took out ${what}`,
   storeys_set: ({ what, after }) => `You set ${what} to ${storeysWords(after)}`,
   storeys_raised: ({ what, after }) => `You raised ${what} to ${storeysWords(after)}`,
@@ -333,6 +334,7 @@ const YOU_FORMS = Object.freeze({
   did_again: () => 'You did a change again',
   brought_back: ({ what }) => `You brought back ${what}`,
   back_where_it_was: ({ what }) => `You put ${what} back where it was`,
+  turned_back: ({ what }) => `You turned ${what} back`,
   took_away: ({ what }) => `You took away ${what} you had placed`,
   back_to_made_storeys: ({ what }) => `You put ${what} back to the storeys it was made with`,
   back_to_storeys: ({ what, before }) => `You put ${what} back to ${storeysWords(before)}`,

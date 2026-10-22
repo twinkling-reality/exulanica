@@ -280,3 +280,35 @@ describe('a chosen thing\'s marks up close (W12.5)', () => {
     expect(outline?.querySelector('path')?.getAttribute('d')).toBeTruthy();
   });
 });
+
+describe('the note after a chosen thing is kept turned or moved (W12.7)', () => {
+  // The bench stands 4 m ahead; the press meets its back 0.8 m above the ground, and a drag carries it to 1.5 m ahead.
+  const back = towards(0, 0.8, -4), down = towards(0, 0, -3);
+  /** What the note says once the bench is chosen, changed by `change` and kept where the server says it may stand. */
+  const noted = async (change: (mode: BuildMode) => void): Promise<string | undefined> => {
+    rays.set('500,300', back.ray);
+    rays.set('500,400', down.ray);
+    const { mode, writes, answer, shown } = await mount({ direction: back.ray.direction, distance: back.distance });
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    change(mode);
+    await answer();
+    press(mode, 'Enter');
+    await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.move')).toBe(true));
+    await vi.waitFor(() => expect(shown.at(-1)?.prompt).toContain('Undo'));
+    return shown.at(-1)?.words;
+  };
+
+  it('says a bench carried to another place was moved: a positive control', async () => {
+    expect(await noted((mode) => {
+      expect(mode.pointerDown(new MouseEvent('mousedown', { button: 0, clientX: 500, clientY: 300 }))).toBe(true);
+      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 500, clientY: 400 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { clientX: 500, clientY: 400 }));
+    })).toBe('You moved the bench');
+  });
+
+  it('says a bench turned where it stood was turned', async () => {
+    expect(await noted((mode) => { expect(press(mode, 'BracketRight')).toBe(true); })).toBe('You turned the bench');
+  });
+});

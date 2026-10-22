@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MAX_YAW, TRAY, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, undoRefusalWords } from './build-words.mjs';
+import { BUSY, HISTORY, MAX_YAW, TRAY, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 
 // What build mode's note says: History's sentence for a change build mode made, or for an undo's or a redo's preview.
@@ -74,10 +74,28 @@ assert.equal(undone({ undoes: { kind: 'add_thing' }, before: well, after: null }
 assert.equal(undone({ undoes: { kind: 'add_object' } }), 'You undid a change');
 assert.equal(undoRefusalWords('invalid_object_state', 'nothing to undo'), 'Nothing left to undo.');
 
-// What build mode did, said as History says it, by the edit it made: a turn is a move.
+// What build mode did, said as History says it, by the edit it made.
 assert.equal(did({ kind: 'add_thing', thing_id: 'bench:1' }, 'bench'), 'You placed the bench');
 assert.equal(did({ kind: 'move_thing', thing_id: 'bench:1' }, 'bench'), 'You moved the bench');
 assert.equal(did({ kind: 'remove_thing', thing_id: 'bench:1' }, 'bench'), 'You took out the bench');
+// A thing turned where it stood (ruling W12.7) is turned, its undo turned back, in the note (build mode's pose before
+// and after; an undo's or a redo's documents) as in History's row (the version read's turned_in_place); a move, with
+// or without a turn, stays moved. The place is on the ground: the height follows the ground under the turned footprint.
+const pose = (x_mm, z_mm, yaw_microradians, y_mm = 0) => ({ x_mm, y_mm, z_mm, yaw_microradians });
+assert.deepEqual([
+  turnedInPlace(pose(0, 0, 0), pose(0, 0, 261_799)), turnedInPlace(pose(0, 0, 0), pose(0, 0, 261_799, 40)),
+  turnedInPlace(pose(0, 0, 0), pose(500, 0, 261_799)), turnedInPlace(pose(0, 0, 0), pose(0, 500, 261_799)),
+  turnedInPlace(pose(0, 0, 0), pose(500, 0, 0)), turnedInPlace(pose(0, 0, 0), pose(0, 0, 0, 40)), turnedInPlace(undefined, pose(0, 0, 0)),
+], [true, true, false, false, false, false, false]);
+assert.equal(did({ kind: 'move_thing', thing_id: 'bench:1', turned_in_place: true }, 'bench'), 'You turned the bench');
+assert.equal(did({ kind: 'move_thing', thing_id: 'bench:1', turned_in_place: false }, 'bench'), 'You moved the bench');
+const wellAt = (...at) => ({ ...well, removed: false, transform: pose(...at) });
+assert.equal(undone({ undoes: { kind: 'move_thing' }, before: wellAt(0, 0, 261_799), after: wellAt(0, 0, 0) }), 'You turned the well back');
+assert.equal(undone({ undoes: { kind: 'move_thing' }, before: wellAt(500, 0, 261_799), after: wellAt(0, 0, 0) }), 'You put the well back where it was');
+assert.equal(redone({ subject_id: 'well:1', before: wellAt(0, 0, 0), after: wellAt(0, 0, 261_799) }), 'You turned the well again');
+assert.equal(redone({ subject_id: 'well:1', before: wellAt(0, 0, 0), after: wellAt(0, 500, 261_799) }), 'You moved the well again');
+const turnLog = [{ edit_id: 'n1', kind: 'move_thing', thing_id: 'bench:1', turned_in_place: true }, { edit_id: 'n2', kind: 'undo', undone_edit_id: 'n1' }, { edit_id: 'n3', kind: 'undo', undone_edit_id: 'n2' }];
+assert.deepEqual(turnLog.map(edit => changeWords(edit, turnLog, () => 'bench')), ['Turned the bench', 'Turned the bench back', 'Turned the bench again']);
 // The card's line for a placed thing, which the chosen card outside build mode reads too.
 assert.equal(placedLine(), 'Placed in this world');
 // A change the server could not take up yet says so, in DESIGN's words (W11), whichever wait it is.
@@ -110,6 +128,8 @@ assert.deepEqual(partLog.map(edit => changeWords(edit, partLog, () => null, part
 // A made part's change, and an undone one, read the same in the note and in History's row (ruling W2).
 assert.equal(did({ kind: 'transform_element', element_id: 'part:barn-id' }, 'part', partName), 'You moved the barn');
 assert.equal(did({ kind: 'suppress_element', element_id: 'part:pond-id' }, 'part', partName), 'You took out the pond');
+// A made part's turn stays moved: a part's first change stores no pose of its own to tell a turn from.
+assert.equal(did({ kind: 'transform_element', element_id: 'part:barn-id', turned_in_place: true }, 'part', partName), 'You moved the barn');
 assert.equal(undone({ subject_id: 'part:pond-id', undoes: { kind: 'suppress_element' } }, partName), 'You brought back the pond');
 assert.equal(undone({ subject_id: 'part:barn-id', undoes: { kind: 'transform_element' } }, partName), 'You put the barn back where it was');
 assert.equal(undone({ subject_id: 'part:gone', undoes: { kind: 'suppress_element' } }), 'You brought back a part of the world');

@@ -3929,6 +3929,18 @@ export const API_SCHEMA: ApiSpec = {
               "type": "null"
             }
           ]
+        },
+        "turned_in_place": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "const": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Turned In Place"
         }
       },
       "additionalProperties": false,

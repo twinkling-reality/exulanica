@@ -24,7 +24,7 @@ import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/ind
 import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts';
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
-import { BUSY, REDO_KEY, TRAY, UNDO_KEY, buildKeys, changeParts, createKindLabels, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, undoRefusalWords } from './build-words.mjs';
+import { BUSY, REDO_KEY, TRAY, UNDO_KEY, buildKeys, changeParts, createKindLabels, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -679,7 +679,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const to = verdict.to;
       await post(actionOf(move.placedId, 'move'), routeOf(move.placedId) + '/move',
         { base_state_sha256: verdict.base, pose: poseOf(move.placedId, to), saved_entry: savedEntry() });
-      busy = false; dropMove(); render(); say(youDid(isPart(move.placedId) ? 'transform_element' : 'move_thing', move.placedId, name), { undoable: true });
+      busy = false; dropMove(); render(); say(youDid(isPart(move.placedId) ? 'transform_element' : 'move_thing', move.placedId, name, { turned_in_place: turnedInPlace(poseOf(move.placedId, move.from), poseOf(move.placedId, to)) }), { undoable: true });
     } catch (error) {
       busy = false;
       if (moving === move) move.verdict = { state: 'refused', words: problem(error) };
@@ -724,8 +724,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   /** A made part's name by its id, from the parts read: what an undone part change names. */
   const partNamed = (partId) => parts.get(PART + partId)?.label ?? null;
-  /** A change build mode made, in History's words ("You moved the bench"): the edit it made, by its kind and subject. */
-  const youDid = (kind, id, name) => youChangeWords(changeParts(isPart(id) ? { kind, element_id: id } : { kind, thing_id: id }, [], () => name, partNamed));
+  /** A change build mode made, in History's words ("You moved the bench"): the edit it made, by its kind and subject (a thing's turn alone on it). */
+  const youDid = (kind, id, name, turn = {}) => youChangeWords(changeParts(isPart(id) ? { kind, element_id: id } : { kind, thing_id: id, ...turn }, [], () => name, partNamed));
 
   /**
    * Does again the last change taken back (Cmd+Shift+Z here and in History). Resolves, once the

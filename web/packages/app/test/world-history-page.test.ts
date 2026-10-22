@@ -204,6 +204,25 @@ describe('History', () => {
     expect(chosen(made.root)).toBe('Marco asked Teo');
   });
 
+  it('says a thing turned where it stood as turned, and its undo as turned back (W12.7)', async () => {
+    const { read } = reads({
+      [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [{ thing_id: 'bench:1', kind: { kind: 'bench' } }],
+        edits: [
+          // The version read states turned_in_place on a move that kept the bench's place and changed its facing.
+          { edit_id: 'e1', kind: 'move_thing', thing_id: 'bench:1', turned_in_place: true, recorded_at: at(50) },
+          { edit_id: 'e2', kind: 'undo', undone_edit_id: 'e1', recorded_at: at(48) },
+          { edit_id: 'e3', kind: 'move_thing', thing_id: 'bench:1', recorded_at: at(46) },
+        ] },
+    });
+    const made = host(read);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    for (let step = 0; step < 3; step += 1) history.key(press('ArrowLeft'));
+    history.key(press('Enter'));
+    const list = made.root.querySelector('.wu-hr-changes') as HTMLElement;
+    expect(all(list, '.wu-hr-row-words')).toEqual(['You turned the bench', 'You turned the bench back', 'You moved the bench']);
+  });
+
   it('stops the arrows on a grouped changes dot and opens every change on the same page, oldest first (H15)', async () => {
     const { read } = reads({
       [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [{ thing_id: 'bench:1', kind: { kind: 'bench' } }, { thing_id: 'market:1', kind: { kind: 'market' } }],
