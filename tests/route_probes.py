@@ -722,6 +722,10 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "base_state_sha256": _ZERO_DIGEST,
         },
     },
+    # The point is required: without one the request would stop at validation, short of the lookup.
+    "GET /world/versions/{version_id}/society/stand": {
+        "params": {**_IN_WORLD["params"], "x_mm": "0", "z_mm": "0"}
+    },
     "POST /world/versions/{version_id}/society/steps": {
         **_IN_WORLD,
         "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST},

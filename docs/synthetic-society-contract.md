@@ -1664,6 +1664,19 @@ step consumes it, so `authored_state` names the newest edit the current state ha
 reader comparing it with the version's edit log knows which placed things the state has not seen
 since. Without the parameter the read is unchanged.
 
+`GET /world/versions/{id}/society/stand?x_mm=&z_mm=` (`exulanica.society-stand/v1`) says where a
+being put down at a point of the region's frame would stand: the walking node of the society's
+latest input it would be taken in at now, by the rules a placed being is taken in by (the nearest
+node by distance and then id that is no activity's place, has an edge and that nobody stands at or
+is headed to, first among those nobody waiting would be in the way at), as `stand`
+`{node_id, position_mm}`, or null where none is open. A walking node holds a position on the ground
+plane and no height, so a page sets the stand on the ground it draws there. The read writes nothing
+and answers the moment it is asked: a being that walks to the node before anything is placed there
+takes it, and the society then takes the newcomer in at the next. Its inputs are authorized as the
+state's are, so it is refused as the state read is; a version with no society answers
+`404 unknown_reference` as that read does, a society that reads no input answers
+`424 unavailable_society_input`, and a point outside the 32-bit range or none at all answers `422`.
+
 The application supplies `society_initial_input(connection, session, version_id, place_id, region_id,
 engine)`, where `engine` is the engine the society is created with and says how a town's walking
 surfaces are composed for it, and `society_input_authorizer(connection, session, document)` on

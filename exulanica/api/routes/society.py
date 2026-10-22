@@ -45,6 +45,7 @@ from exulanica.world.society_repository import (
     EVENTS_READ_MAXIMUM,
     SocietyRepository,
 )
+from exulanica.world.society_stand import STAND_PROFILE, stand_near
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
@@ -207,6 +208,33 @@ def society(
         ),
         invalid_status=409,
     )
+
+
+#: The farthest a point the stand read is asked about lies from the region's origin, either way.
+STAND_POINT_MM: Final = 2**31 - 1
+
+
+@router.get("/versions/{version_id}/society/stand")
+def society_stand(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+    x_mm: Annotated[int, Query(ge=-STAND_POINT_MM, le=STAND_POINT_MM)],
+    z_mm: Annotated[int, Query(ge=-STAND_POINT_MM, le=STAND_POINT_MM)],
+) -> Any:
+    """Where a being put down at a point of the region's frame would stand: the walking node of the
+    society's latest input it would be taken in at now, with its position, or null where none is
+    open there. Its rights are asked as the state's are."""
+
+    def stand() -> dict[str, Any]:
+        document, people = _repository(connection, session, request, world_id).stand_input(
+            version_id
+        )
+        return {"profile": STAND_PROFILE, "stand": stand_near(document, people, (x_mm, z_mm))}
+
+    return _call(stand, invalid_status=409)
 
 
 @router.delete("/versions/{version_id}/society", status_code=204)

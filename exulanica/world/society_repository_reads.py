@@ -185,6 +185,26 @@ class SocietyReads:
         be read at all."""
         return self._read(version_id, lines_of=subject_id, limit=limit)
 
+    def stand_input(self, version_id: uuid.UUID) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """The society's latest input and everybody it holds now, for the read that asks where a
+        being put down at a point would stand (:mod:`exulanica.world.society_stand`): a being
+        placed now is taken in on that input. Its inputs are authorized as :meth:`snapshot`
+        authorizes the state's, so the read is refused as the state's is; a society that walks no
+        input's ground has nowhere to stand (:class:`UnavailableSocietyInput`)."""
+        self._lock()
+        row = self._row(version_id)
+        if row is None:
+            raise UnknownSociety("society is unavailable")
+        if row["engine_version"] not in INPUT_PROFILES:
+            raise UnavailableSocietyInput("this society walks no input's ground")
+        consumed, latest = row["state"]["input_seq"], self._chain(row)
+        documents = self._inputs(row, [consumed, latest])
+        with inputs_ahead(self.connection, documents.values()):
+            self._authorize(documents[consumed])
+            if latest != consumed:
+                self._authorize(documents[latest])
+        return dict(documents[latest]), list(row["state"]["inhabitants"])
+
     def _read(
         self,
         version_id: uuid.UUID,

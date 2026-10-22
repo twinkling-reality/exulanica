@@ -1775,6 +1775,99 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/stand": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Society Stand",
+    "description": "Where a being put down at a point of the region's frame would stand: the walking node of the\nsociety's latest input it would be taken in at now, with its position, or null where none is\nopen there. Its rights are asked as the state's are.",
+    "operationId": "society_stand_world_versions__version_id__society_stand_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "x_mm",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "maximum": 2147483647,
+       "minimum": -2147483647,
+       "title": "X Mm"
+      }
+     },
+     {
+      "name": "z_mm",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "maximum": 2147483647,
+       "minimum": -2147483647,
+       "title": "Z Mm"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Society Stand World Versions  Version Id  Society Stand Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/take-in": {
    "post": {
     "tags": [
