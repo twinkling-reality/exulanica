@@ -574,6 +574,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       day: dayWord(speaker),
       stopFollowing: SCENE_WORDS.stopFollowing,
       dot: head ? { x: head.x, y: head.y - SPEAKING_ABOVE * popScale() } : null,
+      told: held ? records.told(held.scene.id, scened.now.speaker === held.scene.id ? scened.now.to : scened.now.speaker, scened.now.words) : [],
     });
   }
   let talkSeen = null, talkReading = false;

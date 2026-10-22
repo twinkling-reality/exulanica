@@ -56,6 +56,11 @@
 .wu-scene-dot { position: absolute; left: 0; top: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff;
   box-shadow: 0 0 0 1px rgba(6, 12, 16, .35), 0 0 0 4px rgba(255, 255, 255, .22), 0 0 14px rgba(255, 255, 255, .9); }
 .wu-scene-dot[hidden] { display: none; }
+/* What they did, top right (T9): one shade, the moment's title and the going on from it, at most two lines. */
+.wu-shade.wu-scene-told { right: calc(120 * var(--u)); top: calc(128 * var(--u)); max-width: calc(720 * var(--u)); text-align: right; color: var(--ink);
+  font: 400 max(19px, calc(19 * var(--u)))/max(32px, calc(32 * var(--u))) var(--font-sans); pointer-events: none; }
+.wu-shade.wu-scene-told p { margin: 0; }
+.wu-shade.wu-scene-told[hidden] { display: none; }
 /* The world view's chrome hides under the bars while the scene shows (T9: the rail, the pill and the clock;
    the hint and the keys button too, which the lower bar would cut), and comes back after. The older corner
    parts and the Running strip are named as well, for a page that still draws them (r09 carries a run in the

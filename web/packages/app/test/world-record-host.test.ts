@@ -361,3 +361,70 @@ describe("a world's pictures", () => {
     people.served = false;
   });
 });
+
+describe("the talking scene's top line (T9)", () => {
+  // Ines met Teo, then Teo left: the conversation's moment and the going on from it.
+  const TALK = [
+    { moment_id: 't1', request_id: 'q1', subjects: ['ines', 'teo'], kind: 'met', tick: 5, said: [] },
+    { moment_id: 't2', request_id: 'q2', subjects: ['teo'], kind: 'left', tick: 9, said: [] },
+  ];
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const momentReads = (read: { mock: { calls: unknown[][] } }) => read.mock.calls.filter(([path]) => String(path).includes('/history/moments')).length;
+
+  it('titles the conversation and the going on from it once read, again on a new line, never twice within its wait', async () => {
+    const { recordStates, SCENE_MOMENTS } = await recordHost();
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const read = vi.fn(async (path: string) => (path.includes('/history/moments') ? { moments: TALK } : { things: [] }));
+    const records = recordStates(host({ read }).host);
+    // Left out until the moments read serves it (the sheet's section 2).
+    expect(records.told('teo', 'ines', 'Morning, Ines.')).toEqual([]);
+    await settle();
+    expect(read).toHaveBeenCalledWith(`/world/versions/v1/history/moments?world_id=w1&limit=${SCENE_MOMENTS.limit}`);
+    expect(records.told('teo', 'ines', 'Morning, Ines.')).toEqual(['Ines met Teo', 'Teo left']);
+    await settle();
+    expect(momentReads(read)).toBe(1);
+    now += SCENE_MOMENTS.againMs - 1;
+    records.told('teo', 'ines', 'Morning, Ines.');
+    await settle();
+    expect(momentReads(read)).toBe(1);
+    // A new line said reads again at once; the same line, once the wait is over.
+    records.told('teo', 'ines', 'Calm water today.');
+    await settle();
+    expect(momentReads(read)).toBe(2);
+    now += SCENE_MOMENTS.againMs;
+    records.told('teo', 'ines', 'Calm water today.');
+    await settle();
+    expect(momentReads(read)).toBe(3);
+  });
+
+  it('holds back after a failed read as the page does, and keeps no read made for another conversation', async () => {
+    const { recordStates } = await recordHost();
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const failing = vi.fn(async (path: string) => { if (path.includes('/history/moments')) throw new Error('unreachable'); return { things: [] }; });
+    const records = recordStates(host({ read: failing }).host);
+    records.told('teo', 'ines', 'a');
+    await settle();
+    records.told('teo', 'ines', 'b');
+    await settle();
+    expect(momentReads(failing)).toBe(1);
+    now += 1000;
+    records.told('teo', 'ines', 'b');
+    await settle();
+    expect(momentReads(failing)).toBe(2);
+
+    // Teo spoke up to everyone near: a line that would title Teo's talk with anyone, so a kept read would show.
+    let release: () => void = () => {};
+    const held = vi.fn((path: string) => (path.includes('/history/moments')
+      ? new Promise((resolve) => { release = () => resolve({ moments: [{ moment_id: 's', subjects: ['teo'], kind: 'spoke_to_all', tick: 3, said: [] }] }); })
+      : Promise.resolve({ things: [] })));
+    const switching = recordStates(host({ read: held }).host);
+    switching.told('teo', 'ines', 'a');
+    expect(switching.told('teo', 'marco', 'b')).toEqual([]);
+    release();
+    await settle();
+    expect(switching.told('teo', 'marco', 'b')).toEqual([]);
+    expect(switching.told('teo', 'ines', 'a')).toEqual([]);
+  });
+});

@@ -129,6 +129,8 @@ export interface SceneShown {
   readonly stopFollowing: string;
   /** Over the speaker's head on screen, or null when they are not seen. */
   readonly dot: { readonly x: number; readonly y: number } | null;
+  /** What they did, top right: the conversation's moment title, then the going on from it; none until it is read. */
+  readonly told: readonly string[];
 }
 
 export interface TalkScene {
@@ -160,8 +162,10 @@ export function talkScene({ onStop, onDay }: { readonly onStop: () => void; read
   plate.append(orb, name, to);
   lines.append(before, now, plate);
   const choices = element('div', 'wu-scene-choices');
-  root.append(fade, top, bottom, dot, lines, choices);
-  let drawnNow = '', drawnChoices = '', portrait = '';
+  const told = shade();
+  told.classList.add('wu-scene-told');
+  root.append(fade, top, bottom, dot, lines, choices, told);
+  let drawnNow = '', drawnChoices = '', drawnTold = '', portrait = '';
   return {
     root,
     open(open) { put(root, open ? 'true' : null, 'data-open'); },
@@ -196,6 +200,11 @@ export function talkScene({ onStop, onDay }: { readonly onStop: () => void; read
         ], { glyph: 'max(32px, calc(32 * var(--u)))', rowGap: 'max(16px, calc(16 * var(--u)))', colGap: 'max(16px, calc(16 * var(--u)))',
           word: 'max(18px, calc(18 * var(--u)))', nudge: 1, bars: true }));
       }
+      if (shown.told.join('\n') !== drawnTold) {
+        drawnTold = shown.told.join('\n');
+        told.replaceChildren(...shown.told.map(line => element('p', '', line)));
+      }
+      told.hidden = !shown.told.length;
       dot.hidden = !shown.dot;
       if (shown.dot) dot.style.transform = `translate3d(${shown.dot.x.toFixed(1)}px,${shown.dot.y.toFixed(1)}px,0)`;
     },

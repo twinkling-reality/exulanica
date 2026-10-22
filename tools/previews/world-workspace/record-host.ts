@@ -11,6 +11,8 @@ import { thingName } from './build-words.mjs';
 import { momentTitle, targetObject } from './history-rows.mjs';
 import { didWords, momentWords, saidWords, worldWhen } from './history-words.mjs';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
+import { createReadBackoff } from './read-backoff.mjs';
+import { toldMoments } from './talk-scene.mjs';
 import { timeLeft } from './run-words.mjs';
 import { worldTime } from './world-clock.mjs';
 import { choiceAccount, parseDecisionEvents } from '../../../web/packages/app/src/decision-record.ts';
@@ -20,6 +22,9 @@ type Json = Record<string, any>;
 
 /** How many of the version's newest moments a page reads to find its rows' and decisions' moments in. */
 export const MOMENTS_READ = 200;
+
+/** The talking scene's read for its top line (T9): how many of the newest moments, and how soon it reads them again. */
+export const SCENE_MOMENTS = Object.freeze({ limit: 20, againMs: 5000 });
 
 /** What the world view lends the record pages: its reader, its pictures and what it knows of each character. */
 export interface RecordHost {
@@ -119,8 +124,42 @@ export function recordStates(host: RecordHost) {
     return typeof said?.line === 'string' ? { line: said.line, to: (moment!.subjects ?? []).find((id: string) => id !== subjectId) ?? null } : null;
   }
 
+  // The talking scene's own light read (T9): the newest moments and the version's things, read while the scene shows,
+  // again when a line is said or after SCENE_MOMENTS.againMs, one read at a time, held back after a failed read as the
+  // page's other reads are (read-backoff.mjs). A read for another conversation is not kept.
+  const scene: Json = { who: null, moments: null, things: null, key: null, at: -Infinity, reading: false };
+  const sceneBackoff = createReadBackoff();
+  async function readScene(who: string): Promise<void> {
+    scene.reading = true;
+    try {
+      const [moments, version] = await Promise.all([
+        host.read(`${host.versionPath}/history/moments${host.scope}&limit=${SCENE_MOMENTS.limit}`),
+        scene.things ? null : host.read(`${host.versionPath}${host.scope}`).catch(() => null),
+      ]);
+      sceneBackoff.succeeded('scene');
+      if (version && !scene.things) scene.things = new Map((version.things ?? []).map((thing: Json) => [thing.thing_id, thing]));
+      if (scene.who === who) scene.moments = moments?.moments ?? [];
+    } catch { sceneBackoff.failed('scene', performance.now()); } finally { scene.reading = false; }
+  }
+
   return {
     readMoments,
+
+    /**
+     * The talking scene's top line (T9, the sheet's section 2): the title of the conversation's moment between
+     * `followed` and `other` and, once they set off, of the going on from it, in the moment words, oldest first; none
+     * until the moments read serves the conversation's moment. Asked only while the scene shows, so no read goes on
+     * once it closes; `key` is the line said now, and a new one reads again.
+     */
+    told(followed: string, other: string | null, key: string): string[] {
+      const who = `${followed} ${other ?? ''}`, now = performance.now();
+      if (who !== scene.who) Object.assign(scene, { who, moments: null, key: null, at: -Infinity });
+      if (!scene.reading && (key !== scene.key || now - scene.at >= SCENE_MOMENTS.againMs) && sceneBackoff.ready('scene', now)) {
+        Object.assign(scene, { key, at: now });
+        void readScene(who);
+      }
+      return toldMoments(scene.moments, followed, other).map((moment: Json) => sentenceCase(momentTitle(moment, names(scene))) as string);
+    },
 
     /** Whether a row of What Teo did may fold with the same choice beside it (R5e): its decision made no moment of
      * Teo's own in the moments read, and is not older than what that read covers. Nothing folds before it answers. */
