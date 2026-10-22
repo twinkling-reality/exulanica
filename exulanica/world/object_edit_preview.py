@@ -44,7 +44,7 @@ from exulanica.world.errors import (
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import ElementOverride, Transform, object_document
-from exulanica.world.placed_things import ThingPlacement, placed_thing_document
+from exulanica.world.placed_things import PlacedThing, ThingPlacement, placed_thing_document
 from exulanica.world.site_parts import PART_CODES, PartChangeRefused
 from exulanica.world.thing_landing import LANDING_CODES, LandingGround
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
@@ -204,12 +204,12 @@ def preview_object_removal(
         )
 
 
-def _rests_at(landing: LandingGround | None, transform: Transform) -> dict[str, int]:
-    """The height a thing posed by ``transform`` rests at (``rest_y_mm``), where its ``landing``
-    states one, so the page stands it there and keeps that pose; nothing where it does not."""
-    if landing is None or landing.rest_height is None:
-        return {}
-    return {"rest_y_mm": landing.rest_height((transform.x_mm, transform.z_mm))}
+def _rests_at(landing: LandingGround | None, thing: PlacedThing) -> dict[str, int]:
+    """The height ``thing`` rests at where it is posed (``rest_y_mm``), where its ``landing`` states
+    one (:meth:`LandingGround.resting_y`), so the page stands it there and keeps that pose; nothing
+    where it does not."""
+    rest = None if landing is None else landing.resting_y(thing)
+    return {} if rest is None else {"rest_y_mm": rest}
 
 
 def preview_thing_move(
@@ -258,7 +258,7 @@ def preview_thing_move(
             placed_thing_document(current),
             placed_thing_document(moved),
             None,
-            {**checked, **_rests_at(landing, moved.transform)},
+            {**checked, **_rests_at(landing, moved)},
         )
 
 
@@ -297,7 +297,7 @@ def preview_thing_add(
             None,
             placed_thing_document(placed),
             None,
-            {**checked, **_rests_at(landing, placed.transform)},
+            {**checked, **_rests_at(landing, placed)},
         )
 
 

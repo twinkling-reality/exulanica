@@ -47,8 +47,11 @@ __all__ = [
     "LandingGround",
     "blocking_things",
     "footprint_half_extents",
+    "footprint_points",
     "landing_refusal",
     "plane_height",
+    "resting_height",
+    "rests_on_footprint",
     "rests_on_plane",
 ]
 
@@ -114,6 +117,18 @@ class LandingGround:
     height_above: Callable[[PlacedThing], int | None]
     parts: tuple[BlockedPart, ...]
     rest_height: Callable[[tuple[int, int]], int] | None = None
+    #: Where a thing rests on the highest of ``rest_height`` under its footprint (a town's surface,
+    #: whose kerbs are steps), not at its centre alone.
+    rests_on_footprint: bool = False
+
+    def resting_y(self, thing: PlacedThing) -> int | None:
+        """The height ``thing`` rests at where it is posed, where the ground states one: under its
+        footprint (:func:`resting_height`) where the ground rests things so, else at its centre."""
+        if self.rest_height is None:
+            return None
+        if self.rests_on_footprint:
+            return resting_height(self.rest_height, thing)
+        return self.rest_height((thing.transform.x_mm, thing.transform.z_mm))
 
 
 def rests_on_plane(elevation_mm: int) -> Callable[[PlacedThing], int | None]:
@@ -298,6 +313,38 @@ def footprint_half_extents(thing: PlacedThing) -> tuple[int, int] | None:
         return None
     box = semantics["body"]["box_mm"]
     return (-(-box["width"] // 2), -(-box["depth"] // 2))
+
+
+def footprint_points(thing: PlacedThing) -> tuple[tuple[int, int], ...]:
+    """Where a placed thing meets its ground (east and south, millimetres): its centre and, for an
+    object, its kind box's four corners turned with it (:func:`footprint_half_extents`); a being,
+    or a kind its workspace keeps, by its centre alone."""
+    centre = (thing.transform.x_mm, thing.transform.z_mm)
+    half = footprint_half_extents(thing)
+    if half is None:
+        return (centre,)
+    corners = footprint_ring(centre, half, thing.transform.yaw_microradians)[:-1]
+    return (centre, *((int(x), int(z)) for x, z in corners))
+
+
+def resting_height(rest: Callable[[tuple[int, int]], int], thing: PlacedThing) -> int:
+    """The height ``thing`` rests at on a ground whose height at a point is ``rest``: the highest
+    under its footprint (:func:`footprint_points`), so no foot of it sinks into a step under it;
+    an end over a lower surface stands clear of it, as a bench across a kerb does."""
+    return max(rest(point) for point in footprint_points(thing))
+
+
+def rests_on_footprint(
+    rest: Callable[[tuple[int, int]], int], within_mm: int
+) -> Callable[[PlacedThing], int | None]:
+    """How high a placed thing stands above the highest of ``rest`` under its footprint
+    (:func:`resting_height`), or None where it rests there, within ``within_mm``."""
+
+    def height_above(thing: PlacedThing) -> int | None:
+        above = thing.transform.y_mm - resting_height(rest, thing)
+        return None if abs(above) <= within_mm else above
+
+    return height_above
 
 
 def blocking_things(things: Sequence[PlacedThing], moving: str) -> tuple[BlockedPart, ...]:

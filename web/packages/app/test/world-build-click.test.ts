@@ -75,7 +75,9 @@ const post = {
  * preview only when the test calls `answer` (ready, or a refusal), and keeps every write and every note. With `view`
  * the eye looks that way and the chosen thing is drawn as `post`.
  */
-async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null) {
+/** A ground ring that keeps where it was laid, for a test of the held thing's ring. */
+interface Ring { place(at: { x: number; y: number; z: number }, radius: number): void; hide(): void; dispose(): void }
+async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null) {
   const writes: Write[] = [], waiting: Array<(body: unknown) => void> = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -101,13 +103,17 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
   };
   const forward = view === null ? undefined : new Point(...view.forward);
   const camera = { getPosition: () => new Point(...EYE), forward, camera: { worldToScreen: project } };
-  const layer = { figureOf: (id: string) => (view !== null && id === 'bench:1' ? post : null), drawn: [{ placedId: 'bench:1' }], setGhost: () => {}, setBoxGhost: () => {}, setKindGhost: async () => false };
+  const layer = { figureOf: (id: string) => (view !== null && id === 'bench:1' ? post : null), drawn: [{ placedId: 'bench:1' }], setGhost: () => {}, setBoxGhost: () => {}, setKindGhost: async () => false,
+    // With a ring, a kind's box (1.5 m across and 0.5 m deep) for the ring under a held copy.
+    ...(ring === null ? {} : { maker: { library: { list: { kinds: [] }, kindDocument: async () => ({ body: { box_mm: { width: 1500, depth: 500 } } }) } } }) };
   const authoredSociety = { root: { getPosition: () => new Point(0, 0, 0) }, groundPoint };
   const pick = (_: unknown, direction: unknown) => picked !== null && direction === picked.direction
     ? { thing: { pick: { placedId: 'bench:1' }, distance: picked.distance } } : null;
-  const b = { camera, regionRoots: new Map(), authoredSociety, __workspaceThings: () => (view === null ? null : { layer }), __workspacePick: pick };
+  // The generated region's root at the world's origin: a point of the region is the same point of the world.
+  const regionRoots = new Map(ring === null ? [] : [['region:generated', { getWorldTransform: () => ({ transformPoint: (p: Point, out: Point) => out.set(p.x, p.y, p.z) }) }]]);
+  const b = { camera, regionRoots, authoredSociety, __workspaceThings: () => (view === null ? null : { layer }), __workspacePick: pick };
   const { mountBuildMode } = await build();
-  mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false });
+  mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false, groundRing: ring });
   /** The oldest preview still waiting is answered. */
   const answer = async (body: unknown = { availability: 'ready', landing: { checked: true } }): Promise<void> => {
     await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0));
@@ -337,5 +343,17 @@ describe('a held thing stands at the height its ground says it rests at (W12.6)'
     expect(press(mode, 'Enter')).toBe(true);
     await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.move')).toBe(true));
     expect(writes.find((write) => write.actionId === 'things.move')!.body.pose).toMatchObject({ y_mm: 120, z_mm: -4000 });
+  });
+});
+
+describe('a held thing\'s ring shows with its copy, at the height its ground answers (W12.6b)', () => {
+  it('lays the ring where the copy stands as soon as the answer comes, not at the next frame', async () => {
+    const laid: number[] = [];
+    const ring: Ring = { place: (at) => { laid.push(at.y); }, hide: () => {}, dispose: () => {} };
+    const { mode, answer } = await mount(null, LEVEL, ring);
+    void mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 2000, zMm: -6000 });
+    await answer({ availability: 'ready', landing: { checked: true, rest_y_mm: 150 } });
+    // No frame of build mode's own ran here: the ring was laid with the copy, at the answered 150 mm.
+    await vi.waitFor(() => expect(laid.at(-1)).toBeCloseTo(0.15, 6));
   });
 });

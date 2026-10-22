@@ -28,7 +28,8 @@ from exulanica.world import saved_entries, thing_landing_source
 from exulanica.world.composers import composer_module
 from exulanica.world.generated_worlds import town_records
 from exulanica.world.object_repository import WorldObjectRepository
-from exulanica.world.objects import ElementOverride
+from exulanica.world.objects import ElementOverride, ObjectOrigin, Transform
+from exulanica.world.placed_things import PlacedThing, named_kind
 from exulanica.world.society_authored_ground import read_authored_ground
 from exulanica.world.society_authored_ground_area import ground_place_id
 from exulanica.world.society_city_place import city_blocked_parts
@@ -38,6 +39,7 @@ from exulanica.world.society_walking_surfaces import (
     town_head_count,
     walking_surfaces_place,
 )
+from exulanica.world.thing_landing import footprint_points
 from exulanica.world.thing_landing_source import prepare_landing_in_region
 from exulanica.world.town_parts import town_buildings
 from exulanica.world.town_people import people_frame
@@ -367,7 +369,60 @@ def test_a_thing_rests_on_the_town_s_own_surface_above_its_arrival(town):
         },
     )
     assert answered.status_code == 200, answered.text
-    assert answered.json()["landing"] == {"checked": True, "rest_y_mm": rests[0]}
+    # A well rests on the highest of the surface under its footprint (the footway's far side).
+    well = _well(east, south)
+    assert answered.json()["landing"] == {
+        "checked": True,
+        "rest_y_mm": max(landing.rest_height(point) for point in footprint_points(well)),
+    }
+    assert answered.json()["landing"]["rest_y_mm"] >= rests[0]
+
+
+def _well(east: int, south: int, y: int = 0) -> PlacedThing:
+    return PlacedThing(
+        "well",
+        named_kind("well", 2),
+        "region:generated",
+        Transform(east, y, south, 0, 1000),
+        ObjectOrigin("authored", "fictional"),
+    )
+
+
+def test_a_thing_across_a_kerb_rests_on_the_footway_under_it_and_its_feet_sink_nowhere(town):
+    # Its centre on the road 200 mm out from the kerb line: its footprint (1.6 m across) reaches
+    # over the kerb onto the footway, a kerb higher than the road under its centre, and it rests on
+    # the higher, so no foot sinks into the step.
+    curb = _curb(town)
+    at = _beside(curb, -200)
+    across = _well(*at)
+    landing = _landing(town)
+    under = [landing.rest_height(point) for point in footprint_points(across)]
+    centre = landing.rest_height(at)
+    assert max(under) - centre >= curb.kerb_height_mm // 2  # A step under it.
+    assert landing.resting_y(across) == max(under)
+    # Posed there it rests; 300 mm over it, it stands 300 mm above the footway, not the road.
+    assert landing.height_above(_well(*at, y=max(under))) is None
+    assert landing.height_above(_well(*at, y=max(under) + 300)) == 300
+
+
+def test_a_town_on_land_rests_a_thing_at_the_city_surface_with_no_arrival_height(town, monkeypatch):
+    # A town on land hangs its region at the city's datum, so its arrival's height is not taken
+    # off: the receipt naming its land is all that tells it apart (AUDIT's L1 on W12.6).
+    receipt = thing_landing_source.generation_receipt
+
+    def on_land(*scope):
+        digest, read = receipt(*scope)
+        return digest, {**read, "land_sha256": "0" * 64}
+
+    monkeypatch.setattr(thing_landing_source, "generation_receipt", on_land)
+    curb = _curb(town)
+    footway = _beside(curb, curb.kerb_width_mm + curb.footway_width_mm // 2)
+    surface = city_surface_z_at(town.made.records)
+    arrival = town.entry["generated_ground"]["arrival_mm"][1]
+    assert arrival != 0  # So the two rules differ here.
+    rest = _landing(town).rest_height
+    assert rest is not None
+    assert rest(footway) == surface((footway[0], -footway[1]))
 
 
 def test_a_bench_resting_where_the_landing_rests_it_offers_itself_to_the_town_s_people(

@@ -45,11 +45,18 @@ from exulanica.world.site_parts import changes_document, changes_sha256
 from exulanica.world.society_authored_ground import SocietyGround, read_authored_ground
 from exulanica.world.society_city_place import city_blocked_parts
 from exulanica.world.society_walking_surfaces import (
+    RESTS_ON_SURFACE_MM,
     rests_on_surface,
     surface_height_at,
     walking_surfaces_place,
 )
-from exulanica.world.thing_landing import BlockedPart, LandingGround, plane_height, rests_on_plane
+from exulanica.world.thing_landing import (
+    BlockedPart,
+    LandingGround,
+    plane_height,
+    rests_on_footprint,
+    rests_on_plane,
+)
 from exulanica.world.version_town import town_key, version_town_records
 
 if TYPE_CHECKING:
@@ -115,22 +122,29 @@ def prepare_landing_in_region(
             return None
         place, parts = answer
         rest = surface_height_at(place, ground)
-    else:
-        scope = (repository.workspace_id, repository.world_id, ground.snapshot_id)
-        key, changes = town_key(connection, *scope, version_id)
-        if key is None:
-            return None  # A change the town does not take: its ground cannot be read.
-        try:
-            generated = version_town_records(connection, *scope, changes)
-        except InvalidStructuralData:
-            return None
-        place = walking_surfaces_place(ground.place_id, generated.records)
-        rest = town_surface(connection, *scope, generated.records, surface_height_at(place, ground))
-        parts = tuple(
+        return LandingGround(ground.region_id, ground.area, rests_on_surface(rest), parts, rest)
+    scope = (repository.workspace_id, repository.world_id, ground.snapshot_id)
+    key, changes = town_key(connection, *scope, version_id)
+    if key is None:
+        return None  # A change the town does not take: its ground cannot be read.
+    try:
+        generated = version_town_records(connection, *scope, changes)
+    except InvalidStructuralData:
+        return None
+    place = walking_surfaces_place(ground.place_id, generated.records)
+    rest = town_surface(connection, *scope, generated.records, surface_height_at(place, ground))
+    # A town's kerbs are steps: a thing rests on the highest of its surface under its footprint.
+    return LandingGround(
+        ground.region_id,
+        ground.area,
+        rests_on_footprint(rest, RESTS_ON_SURFACE_MM),
+        tuple(
             BlockedPart(kind, label, tuple((x, -y) for x, y in ring))
             for kind, label, ring in city_blocked_parts(generated.records)
-        )
-    return LandingGround(ground.region_id, ground.area, rests_on_surface(rest), parts, rest)
+        ),
+        rest,
+        rests_on_footprint=True,
+    )
 
 
 def town_surface(

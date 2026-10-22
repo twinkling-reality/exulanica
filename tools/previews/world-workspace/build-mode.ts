@@ -368,7 +368,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const name = tile.kind.source === 'workspace' ? thingName({ kind: tile.kind }, () => creatures?.find(made => made.sha256 === tile.kind.sha256)?.label ?? null) : thingName({ kind: tile.kind });
     placing = { tileId: tile.id, kind: tile.kind, name, regionId, thingId: newThingId(tile.kind), to: null, box: null, verdict: { state: 'checking', words: '' }, letGo: false };
     const held = placing;
-    void kindBox(tile.kind).then(box => { held.box = box; });
+    void kindBox(tile.kind).then(box => { held.box = box; if (placing === held && groupShows()) layHeldRing(); });
     const pointed = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
     const ground = at ?? groundAt(pointed.x, pointed.y);
     if (ground !== null) placeTo(ground, false);
@@ -445,6 +445,15 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   function showKindCopy(held, refused) {
     const to = held.to; if (to === null) return;
     void things()?.layer?.setKindGhost?.({ kind: held.kind, regionId: held.regionId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused });
+    // The ring is laid with the copy, so the two show together at the height answered (W11, W12.6b).
+    if (held === placing && groupShows()) layHeldRing();
+  }
+  /** The ring under the new thing's copy, where the copy stands, a little wider than its footprint's half diagonal. */
+  function layHeldRing() {
+    if (placing === null || groundRing === null) return;
+    const at = placing.box === null ? null : heldInWorld();
+    if (at === null) groundRing.hide();
+    else groundRing.place({ x: at.x, y: at.y, z: at.z }, Math.hypot(placing.box.width, placing.box.depth) / 2000 * RING_MARGIN);
   }
   /** Place the new thing where the server said it may stand: the placing's own base and pose. */
   async function placeNew() {
@@ -1081,11 +1090,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       else {
         if (now - lastNames >= NAMES_EVERY_MS || moving !== null || placing !== null) { lastNames = now; placeNames(); }
         if (placing !== null) {
-          // The ring follows the new thing's copy, a little wider than its footprint's half diagonal.
           chosen.hide(); copy.hide(); origin.hide(); trail.hide();
-          const at = placing.box === null ? null : heldInWorld();
-          if (at === null || groundRing === null) groundRing?.hide();
-          else groundRing.place({ x: at.x, y: at.y, z: at.z }, Math.hypot(placing.box.width, placing.box.depth) / 2000 * RING_MARGIN);
+          layHeldRing();
         }
         else {
           // Out of view is not let go: what is chosen stays chosen and its marks show again in view.

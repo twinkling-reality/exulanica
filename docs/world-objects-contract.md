@@ -625,7 +625,10 @@ stands, so the page places the thing at that height rather than at the one it as
 town the city's own street surface there (kerb top, footway or carriageway, the surface its tiles
 draw and its walkers walk on), elsewhere the walking line nearest it, measured from the town's
 arrival height, where its region hangs, or from the city's datum for a town on land; on a site the
-walking surface's height; on a plane its elevation. The base is checked before the object is
+walking surface's height; on a plane its elevation. In a town it is the highest of that surface
+under the thing's footprint (its centre and its kind box's corners, turned with it), so no foot
+sinks into a kerb: an end over the road stands clear of it, and the landing holds a thing to the
+same height. The base is checked before the object is
 looked up, as the write checks it, and an unknown or foreign version or object answers the write's
 `404 unknown_reference`. A preview does not compose the society input a purposeful society takes
 from every accepted edit, so a write whose preview was ready can still answer

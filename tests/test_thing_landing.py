@@ -27,8 +27,11 @@ from exulanica.world.thing_landing import (
     LandingGround,
     blocking_things,
     footprint_half_extents,
+    footprint_points,
     landing_refusal,
     plane_height,
+    resting_height,
+    rests_on_footprint,
     rests_on_plane,
 )
 from exulanica.world.world_recipes import town_recipe
@@ -262,3 +265,32 @@ def test_a_thing_rests_at_the_walking_surface_s_own_height_where_it_stands():
 def test_a_plane_ground_rests_a_thing_at_its_elevation_everywhere():
     assert [plane_height(250)(point) for point in ((0, 0), (40_000, -9_000))] == [250, 250]
     assert rests_on_plane(250)(_thing(40_000, -9_000, y=250)) is None
+
+
+def _step(point: tuple[int, int]) -> int:
+    """A kerb along east-west at 1 m south: the road at 0 to its north, the paving 150 mm up to its
+    south (south is the region's z)."""
+    return 150 if point[1] > 1_000 else 0
+
+
+def test_a_well_across_a_kerb_rests_on_the_paving_under_it_not_on_the_road():
+    half = footprint_half_extents(_thing(0, 1_000))
+    assert half is not None
+    # Its centre on the kerb line: one side of its footprint is over the paving, so it rests there.
+    across = _thing(0, 1_000)
+    assert resting_height(_step, across) == 150
+    assert _step((0, 1_000)) == 0
+    # Wholly over the road it rests on the road, and the centre is one of its points.
+    road = _thing(0, -2_000)
+    assert resting_height(_step, road) == 0
+    assert (0, -2_000) in footprint_points(road)
+    # Turned a quarter, its corners turn with it.
+    assert len(footprint_points(_thing(0, 0, yaw=1_570_796))) == 5
+    # Posed at that height it rests; at the road's, it stands under the paving's edge.
+    above = rests_on_footprint(_step, 0)
+    assert above(_thing(0, 1_000, y=150)) is None
+    assert above(_thing(0, 1_000, y=0)) == -150
+    ground = LandingGround("region:generated", None, above, (), _step, rests_on_footprint=True)
+    assert ground.resting_y(across) == 150
+    centred = LandingGround("region:generated", None, above, (), _step)
+    assert centred.resting_y(across) == 0
