@@ -517,8 +517,10 @@ that asks a height, a dry point or its water, with no chunks and no backdrop
 drawn as one mesh of the cells its drawing lists in `rock_cells`, 3 mm over the island's rock,
 worn in the site's base ground with the land's slope bands. Its rim follows the rock, not the grid:
 a cell beside the listed ones draws, as marching squares do, the part of it round its corners on
-rock out to the middles of its edges that lead off the rock (a middle at the height rule's value
-there), so the edge runs through the cells' half points and takes no square bites.
+rock out to points on its edges that lead off the rock, so the edge takes no square bites. Each
+point lies where the share of rock round the edge's two ends (each end and its eight neighbours)
+crosses one half, between a quarter and three quarters along it, at the height rule's value there,
+so a stair of cells draws one sloping edge, not a stair of half points.
 Under those cells the island's own upward faces are not drawn, and its rock there is drawn at least
 5 cm under the graded top, so its coarser mesh never shows through the land; its faces beyond them that lie within 0.5 m of the graded top, above or below,
 inside the top's square, whichever way they face, are drawn with the top in its ground (the same

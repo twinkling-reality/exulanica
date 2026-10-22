@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
   canonicalJson, landscapeToSiteMm, readLandSurfaces, readLandscapeDrawing, readSurfaceMaterials, siteTopHeightMm,
-  type LandscapeDrawing,
+  type LandscapeDrawing, type SiteTopRun,
 } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
@@ -206,7 +206,7 @@ describe("a volume's graded top as a site's land", () => {
     expect(() => readSiteTopLand(parseStructuredSiteDrawing(level), structuredClone(FIXTURE.top), sha256)).toThrow("stands on no volume's top");
   });
 
-  it('draws two triangles for each cell with rock under it and, round the rim, the part of each cell beside the rock out to its edges\' middles, with no backdrop', () => {
+  it('draws two triangles for each cell with rock under it and, round the rim, the part of each cell beside the rock out to its edges, with no backdrop', () => {
     const { app } = nullApp();
     const land = topLand();
     const drawn = drawSiteLand(app.graphicsDevice, land, new pc.StandardMaterial(), [0.4, 0.5, 0.3]);
@@ -258,6 +258,33 @@ describe("a volume's graded top as a site's land", () => {
     mesh.getNormals(normals);
     expect(normals.filter((_, k) => k % 3 === 1).every((up) => up > 0)).toBe(true);
     expect(drawn.reachM).toBeGreaterThan(Math.hypot(33, 33));
+    drawn.destroy();
+  });
+
+  it('draws a stair of rock cells as one sloping edge, not a stair of half points', () => {
+    const { app } = nullApp();
+    const land = topLand();
+    // Rows 2 to 21 held from column 2 to a column one further east every second row: the rock's
+    // east edge goes one cell across for every two up.
+    const stair: SiteTopRun[] = Array.from({ length: 20 }, (_, r) => [2 + r, 2, 6 + Math.floor(r / 2)] as const);
+    const drawn = drawSiteLand(app.graphicsDevice, { ...land, section: { ...land.section, rockCells: stair } }, new pc.StandardMaterial(), [0.4, 0.5, 0.3]);
+    const positions: number[] = [];
+    drawn.ground[0]!.mesh.getPositions(positions);
+    const [x0, y0] = land.top.originMm;
+    // The rim's points off the lattice along that edge, away from its two ends.
+    const points: [number, number][] = [];
+    for (let v = land.top.columns * land.top.rows; v < positions.length / 3; v += 1) {
+      const east = Math.round(positions[3 * v]! * 1000) - x0, north = Math.round(-positions[3 * v + 2]! * 1000) - y0;
+      if (east > 5000 && north >= 6000 && north <= 18_000) points.push([east, north]);
+    }
+    points.sort((one, two) => one[1] - two[1]);
+    expect(points.length).toBeGreaterThan(15);
+    // On one line to the millimetre; at the half points they would swing a quarter of a cell either side of it.
+    const [east0, north0] = points[0]!, [east1, north1] = points.at(-1)!;
+    for (const [east, north] of points) {
+      expect(Math.abs(east - (east0 + ((east1 - east0) * (north - north0)) / (north1 - north0)))).toBeLessThanOrEqual(1);
+    }
+    expect((east1 - east0) / (north1 - north0)).toBeCloseTo(0.5, 2);
     drawn.destroy();
   });
 

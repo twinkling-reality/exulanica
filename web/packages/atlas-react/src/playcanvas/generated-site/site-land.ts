@@ -523,11 +523,12 @@ function wallFaces(walls: readonly SiteLandWall[], groundMm: (eastMm: number, no
  * the normals of the whole lattice, and triangles for the cells in `runs`, each split as a near
  * chunk's cells are (and as the height rule splits them), from its south-west corner to its
  * north-east. Its rim follows the rock, not the grid: a cell outside the runs draws the part of it
- * round its corners on rock (corners of a cell in the runs) out to the middles of its edges that
- * lead off the rock, as marching squares do, so the top's edge runs through the cells' half points
- * and never takes a square bite; a cell with only two opposite corners on rock draws a corner at
- * each. A middle stands at the height the rule gives it, its two ends' mean floored. None where
- * the runs hold no cell.
+ * round its corners on rock (corners of a cell in the runs) out to the points on its edges that
+ * lead off the rock, as marching squares do, so the top's edge never takes a square bite; a cell
+ * with only two opposite corners on rock draws a corner at each. An edge's point lies where the
+ * share of rock round its two ends (each end and its eight neighbours) crosses one half, between a
+ * quarter and three quarters along it, so a stair of cells draws one sloping edge, not a stair of
+ * half points. It stands at the height the rule gives it there. None where the runs hold no cell.
  */
 function topMesh(top: SiteTop, runs: readonly SiteTopRun[]): {
   readonly positions: number[]; readonly normals: number[]; readonly surfaceMm: number[]; readonly indices: number[]; readonly reachM: number;
@@ -547,18 +548,37 @@ function topMesh(top: SiteTop, runs: readonly SiteTopRun[]): {
   for (const [row, first, last] of runs) {
     for (let i = first; i <= last; i += 1) for (const at of [row * columns + i, row * columns + i + 1, (row + 1) * columns + i, (row + 1) * columns + i + 1]) rock.add(at);
   }
-  // Each edge's middle, made once and shared by the two cells that edge bounds.
+  // A lattice point's share of rock: of it and its eight neighbours, those on rock.
   const lattice = positions.length / 3;
+  const shares = new Map<number, number>();
+  const share = (at: number): number => {
+    const known = shares.get(at);
+    if (known !== undefined) return known;
+    const i = at % columns, j = Math.floor(at / columns);
+    let on = 0;
+    for (let dj = -1; dj <= 1; dj += 1) for (let di = -1; di <= 1; di += 1) {
+      const ni = i + di, nj = j + dj;
+      if (ni >= 0 && ni < columns && nj >= 0 && nj < rows && rock.has(nj * columns + ni)) on += 1;
+    }
+    shares.set(at, on / 9);
+    return on / 9;
+  };
+  // Each edge's point off the rock, made once and shared by the two cells that edge bounds.
   const middles = new Map<number, readonly [number, number]>();
   const middle = (a: number, b: number): number => {
     const key = Math.min(a, b) * lattice + Math.max(a, b);
     const known = middles.get(key);
     if (known !== undefined) return known[0];
     const at = positions.length / 3;
-    // The height rule's own value there: its two ends' mean, floored, as the server's place stands it.
-    const height = Math.floor((heightMm[a]! + heightMm[b]!) / 2);
-    positions.push((positions[3 * a]! + positions[3 * b]!) / 2, (height + TOP_LIFT_MM) / 1000, (positions[3 * a + 2]! + positions[3 * b + 2]!) / 2);
-    surfaceMm.push((surfaceMm[2 * a]! + surfaceMm[2 * b]!) / 2, (surfaceMm[2 * a + 1]! + surfaceMm[2 * b + 1]!) / 2);
+    const [from, to] = rock.has(a) ? [a, b] : [b, a];
+    const inside = share(from), outside = share(to);
+    const along = inside > outside ? Math.min(0.75, Math.max(0.25, (inside - 0.5) / (inside - outside))) : 0.5;
+    const east = Math.round(surfaceMm[2 * from]! + along * (surfaceMm[2 * to]! - surfaceMm[2 * from]!));
+    const south = Math.round(surfaceMm[2 * from + 1]! + along * (surfaceMm[2 * to + 1]! - surfaceMm[2 * from + 1]!));
+    // The height rule's own value there, as the server's place stands it.
+    const height = siteTopHeightMm(top, east, -south);
+    positions.push(east / 1000, (height + TOP_LIFT_MM) / 1000, south / 1000);
+    surfaceMm.push(east, south);
     middles.set(key, [at, a * lattice + b]);
     return at;
   };
