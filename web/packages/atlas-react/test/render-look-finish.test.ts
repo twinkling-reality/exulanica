@@ -200,6 +200,17 @@ describe('a water material', () => {
     expect(() => validateRenderLook({ ...lookOf(FINISHED), water: { ...finish, light: 1.2 } })).toThrow(/water\.light/);
   });
 
+  it('dulls its body\'s colour and its foam\'s white by the share it dims, toward a neutral grey of the body\'s brightness', () => {
+    const chunk = normalOf(lookOf(FINISHED).water!).glsl.get('opacityPS') as string;
+    // A neutral grey, so the body only dulls and never turns another hue; at a share of 1 the mix is the colour itself.
+    const grey = chunk.indexOf('vec3 grey = vec3(dot(body, vec3(0.2126, 0.7152, 0.0722)));');
+    const body = chunk.indexOf('body = mix(grey, body, exuWaterFinish.z);');
+    const white = chunk.indexOf('vec3 white = mix(grey, vec3(0.85, 0.9, 0.9), exuWaterFinish.z);');
+    const emitted = chunk.indexOf('exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + white * foam');
+    expect([grey, body, white].every((at) => at > 0 && at < emitted)).toBe(true);
+    expect(grey).toBeLessThan(body);
+  });
+
   it('on a WebGPU device keeps its ripples alone', () => {
     const material = new pc.StandardMaterial();
     const gpu = { on() {}, off() {}, graphicsDevice: { isWebGPU: true } } as unknown as pc.AppBase;
@@ -321,6 +332,7 @@ describe('a water meeting what stands in it and lies under it', () => {
     expect(chunk).toContain(`for (int i = 0; i < ${WATER_CONTACT_TAPS}; i++)`);
     expect(chunk).toContain('gathered * shown * (1.0 - foam)');
     expect(chunk).toMatch(/exuWaterBody = exuWaterFinish\.z \* \(body \*/);
+    expect(chunk).toContain('+ white * foam + gathered * shown * (1.0 - foam)');
     expect(chunk).not.toContain('dAlpha = 1.0 - through * (1.0 - foam);');
     const [wet, down, reach, facing] = contactOf(sea);
     expect([wet, down, reach, facing].map((n) => Math.round(n! * 1000) / 1000)).toEqual([0.6, 0.5, 2.5, 1]);

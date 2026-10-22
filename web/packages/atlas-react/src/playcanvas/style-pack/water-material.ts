@@ -80,7 +80,8 @@ fn exuRippleSlope(q: vec2f) -> vec2f {
  * shows through; deep water turns to its body colour; a thin edge against a wall or a stone foams.
  * The body, its foam and its caustics are emitted in the light the look's colours were chosen in, by
  * the share of it the world's light gives (`RenderWater.light`), so a darker sky dims them as it dims
- * the land; the surface's reflection reads the scene's own sky.
+ * the land, and the body's colour and the foam's white fall by the same share toward a neutral grey of
+ * the body's brightness, duller and never another hue; the surface's reflection reads the scene's own sky.
  * The surface is blended over the drawn scene with one transmittance (the mean of the three
  * channels), so no copy of the scene's colour is needed: with multisampling on a tile GPU that copy
  * alone cost 4 to 6 ms in the graphics lab. Reflection is the material's own environment specular.
@@ -125,7 +126,12 @@ void getOpacity() {
         float fine = 1.0 - smoothstep(exuWaterCausticFade.x, exuWaterCausticFade.y, max(fwidth(p.x), fwidth(p.y)));
         gathered = vec3(pow(ridge, 6.0) * exuWaterCaustics.x * fine * (1.0 - smoothstep(0.0, exuWaterCaustics.w, depth)));
     }
-    exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + vec3(0.85, 0.9, 0.9) * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
+    // Under less light than its look's own, the body's colour and the foam's white fall by the same share
+    // toward a neutral grey of the body's own brightness: duller, never another hue.
+    vec3 grey = vec3(dot(body, vec3(0.2126, 0.7152, 0.0722)));
+    body = mix(grey, body, exuWaterFinish.z);
+    vec3 white = mix(grey, vec3(0.85, 0.9, 0.9), exuWaterFinish.z);
+    exuWaterBody = exuWaterFinish.z * (body * (1.0 - through) * (1.0 - foam) + white * foam + gathered * through * (1.0 - foam)) / max(dAlpha, 1e-3);
 }
 `;
 
