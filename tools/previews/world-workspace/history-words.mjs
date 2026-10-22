@@ -24,6 +24,8 @@ export const PATH_WORDS = Object.freeze({
   backToStory: 'Back to the story',
   askedAgain: 'Asked again',
   nothingYet: 'Nothing has happened here yet.',
+  // Where the town has lived but nothing on the line is this person's story yet (H18 item 4).
+  nothingDrawn: 'When you change this world or give someone an AI model, it shows here.',
   momentsFailed: "The world's moments could not be read. Try again.",
 });
 

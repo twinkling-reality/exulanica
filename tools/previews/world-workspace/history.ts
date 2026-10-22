@@ -114,6 +114,8 @@ export function mountHistory(host: HistoryHost): History {
   let project: Json | null | undefined;
   let request: Json | null = null;
   let momentsFailed = false;
+  /** Whether the town has lived: its society has played a minute, though its line may hold none of it (H18). */
+  let lived = false;
   /** Moments read back on demand, older than the newest page (oldest first), and whether the read has more before. */
   let earlier: Json[] = [];
   let momentsMore = false;
@@ -156,9 +158,12 @@ export function mountHistory(host: HistoryHost): History {
       optional(`${version}/society/control/sessions${scope}`),
       optional(`/world/github-projects${scope}`),
       generated ? optional(`/worlds/drafts/${encodeURIComponent(host.worldId.slice(GENERATED.length))}`) : null,
-      optional(`${version}/history/moments${scope}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`),
+      // The line's story alone (H18): moments a model, a person playing or an outside program decided, and a routine's
+      // with someone this person touched; the town's other meetings stay on each person's day.
+      optional(`${version}/history/moments${scope}&story=true&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`),
     ]);
     momentsFailed = moments === null;
+    lived = Number.isSafeInteger(moments?.now?.tick) && moments.now.tick > 0;
     // Placed things and made parts named as build mode names them: by kind (a made creature by its label, J20),
     // by the parts read's label; a building's storeys change is build mode's too (W6).
     const things = new Map<string, Json>((view.things ?? []).map((thing: Json) => [thing.thing_id, thing]));
@@ -291,7 +296,7 @@ export function mountHistory(host: HistoryHost): History {
     if (!ticks.length) return false;
     const oldest = Math.min(...ticks);
     const limit = Math.min(MOMENTS_MOST, MOMENTS_PAGE + ticks.filter((tick: number) => tick === oldest).length);
-    const page = await optional(`${version}/history/moments${scope}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}&before=${oldest + 1}&limit=${limit}`);
+    const page = await optional(`${version}/history/moments${scope}&story=true&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}&before=${oldest + 1}&limit=${limit}`);
     if (!page || !made) return false;
     const holding = new Set(held.map((item: Json) => item.moment_id));
     const fresh = (page.moments ?? []).filter((one: Json) => !holding.has(one.moment_id));
@@ -590,7 +595,7 @@ export function mountHistory(host: HistoryHost): History {
     const note = state === 'offline' || (state === 'ready' && momentsFailed)
       ? { words: PATH_WORDS.momentsFailed, refused: true }
       : state === 'ready' && !items.some((item) => item.kind === 'moment' || item.kind === 'change')
-        ? { words: PATH_WORDS.nothingYet, refused: false }
+        ? { words: lived ? PATH_WORDS.nothingDrawn : PATH_WORDS.nothingYet, refused: false }
         : null;
     if (note) {
       // Centred between the creation card's right edge and Now, 40px under the line (sheet "States").

@@ -85,8 +85,8 @@ function reads(overrides: Record<string, unknown> = {}) {
     asked.push(path);
     const [route, query] = path.split('?');
     const scoped = `world_id=${encodeURIComponent(WORLD)}`;
-    // The moments read also names the recipe each moment's kept picture is asked by.
-    const asks = route!.endsWith('/history/moments') ? `${scoped}&recipe=${encodeURIComponent(await recipe())}` : scoped;
+    // The moments read asks for the line's story alone (H18) and names the recipe each moment's kept picture is asked by.
+    const asks = route!.endsWith('/history/moments') ? `${scoped}&story=true&recipe=${encodeURIComponent(await recipe())}` : scoped;
     if (route!.startsWith('/world/') && query !== asks) throw Error('unscoped');
     const answer = answers[route!];
     if (answer === undefined || answer instanceof Error) throw answer ?? Error('404');
@@ -141,7 +141,7 @@ describe('History', () => {
     // It opens with the focus on its title, so a reader announces it (L18).
     expect(document.activeElement?.textContent).toBe('Terraces on the bay');
     expect(asked.filter((path) => path.startsWith('/world/')).every((path) => path.includes(`?world_id=${encodeURIComponent(WORLD)}`))).toBe(true);
-    expect(asked).toContain(`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&recipe=${encodeURIComponent(await recipe())}`);
+    expect(asked).toContain(`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&story=true&recipe=${encodeURIComponent(await recipe())}`);
     // Only the characters the moments name are asked for, to be named as the tag and card name them (J20).
     expect(made.names).toHaveBeenCalledWith({ subjects: ['teo', 'ines', 'marco'], placed: [] });
     expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept on GitHub in terraces-on-the-bay, private · up to date');
@@ -340,7 +340,7 @@ describe('History', () => {
     // At the oldest moment held, with more before it: the earlier page is read, and the choice moves on to it.
     history.key(press('ArrowLeft'));
     await vi.waitFor(() => expect(chosen(made.root)).toBe('Ines left'));
-    expect(before).toEqual([`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&recipe=${encodeURIComponent(await recipe())}&before=413&limit=51`]);
+    expect(before).toEqual([`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&story=true&recipe=${encodeURIComponent(await recipe())}&before=413&limit=51`]);
     // Each moment once, oldest first; with no more before, [←] reads nothing further.
     expect(all(made.root, '.wu-hr-card .wu-hr-words').filter((words) => words !== 'Made from your words')).toEqual(['Ines left', 'Teo met Ines at the bench', 'Marco asked Teo']);
     // Nothing more lies before: the break goes.
@@ -363,6 +363,20 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-note')?.getAttribute('data-refused')).toBe('false');
     expect(made.root.querySelector('.wu-hr-path .now')).not.toBeNull();
     expect(keys(made.root)).toEqual(['GOpen on GitHub', 'EscBack']);
+  });
+
+  it("asks for the line's story alone and, where the town has lived with none of it drawn, says how it fills (H18)", async () => {
+    const asked: string[] = [];
+    const { read } = reads({
+      [`/world/versions/${VERSION}`]: { version_id: VERSION, world_id: WORLD, things: [], edits: [] },
+      // The town played 49 minutes; its meetings between people nobody touched are left out of the story read.
+      [`/world/versions/${VERSION}/history/moments`]: { now: { tick: 49 }, moments: [], more: false },
+    });
+    const made = host(async (path: string) => { asked.push(path); return read(path); });
+    await (await module()).mountHistory(made).open();
+    expect(asked.filter((path) => path.includes('/history/moments')).every((path) => path.includes('&story=true'))).toBe(true);
+    expect(made.root.querySelector('.wu-hr-note')?.textContent).toBe('When you change this world or give someone an AI model, it shows here.');
+    expect(made.root.querySelector('.wu-hr-note')?.getAttribute('data-refused')).toBe('false');
   });
 
   it('says the moments could not be read in the refusal ink, keeps the rest of the page and Now on the live clock', async () => {
