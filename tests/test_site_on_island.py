@@ -84,9 +84,9 @@ def ground_of(world: Any) -> TopWorld:
 def test_a_hamlet_is_made_on_the_islands_top_and_its_receipt_reads_back(made) -> None:
     receipt = made.receipt
     assert receipt["composer"] == {"key": "site-plan", "version": site_plan.TOP_COMPOSER_VERSION}
-    # Its land is the island's top land, under the land rules volume rules 3 name for a top.
+    # Its land is the island's top land, under the land rules volume rules 4 name for a top.
     assert receipt["land"] == ISLAND["top_land"]["land"]
-    assert receipt["land_rules"] == land_rules(3)
+    assert receipt["land_rules"] == land_rules(7)
     assert receipt["landscape_rules"] == landscape_rules()
     assert receipt["landscape"]["site"] == {"on": "isle", "at_mm": [-11000, -11000],
                                            "cut_fill_mm": 2000}  # fmt: skip

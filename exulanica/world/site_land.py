@@ -22,9 +22,10 @@ cost:
   moving no height; under land rules before :data:`RETAINING_WALLS` it lists none, and the
   drawing's land section has no ``walls``;
 * the banks are graded by the figures the land rules' grading catalog states, where they name one
-  (``landform-grading.v1.json`` from version 6), and by the grading module's own before; under a
-  catalog a zone whose bank would cut or fill past the deepest it may stands in a retaining wall,
-  up to the most the catalog says a wall holds, rather than being refused;
+  (``landform-grading.v1.json`` from version 6, ``v2`` from version 7), and by the grading module's
+  own before; under a catalog a zone whose bank would cut or fill past the deepest it may stands in
+  a retaining wall, up to the most the catalog says a wall holds, rather than being refused; from
+  version 7 a bank eases to the catalog's ease grade at its crest and its toe;
 * the **entry** is where the first path meets the site's south edge; a path that ends within a
   lattice cell of the site's edge is graded to the edge, where the society's entry stands.
 
@@ -232,6 +233,7 @@ def site_grading(records: Sequence[object], station_mm: int, *, rules_version: i
         bank_grade_permille=figures.bank_grade_permille,
         cut_fill_most_mm=figures.cut_fill_most_mm,
         held_most_mm=figures.held_most_mm,
+        bank_ease_permille=figures.bank_ease_permille,
     )
 
 

@@ -24,11 +24,15 @@ one cell, in its grading and in what its drawing states, and moves no height eit
 grades by the figures ``landform-grading.v1.json`` states, today's bank grade and deepest cut and
 fill among them, and lets a terrace stand in a retaining wall where its bank would cut or fill past
 the deepest it may: a layout that grades within the bound grades the same land as under version 5,
-and one that earlier versions refused may grade. So a site's grading plan takes the rules version
-its receipt names, and such a change applies from its version on. A receipt's land is read against
-the catalog version its rules name, and the tests pin each served version's golden site, so a change
-that would move an earlier version's land or what its drawing states fails until that version is no
-longer served. New worlds name :data:`LAND_RULES_VERSION`.
+and one that earlier versions refused may grade. Version 7 grades by ``landform-grading.v2.json``,
+which adds a bank's ease grade: a bank's first cell off its level ground and the land's first cell
+past it step no steeper than the ease, so a bank rounds into the ground above and below it; the
+bank grade's cones still bound every cell, so no wall stands where version 6 has none, and cells
+more than two cells beyond a bank keep version 6's heights. So a site's grading plan takes the rules
+version its receipt names, and such a change applies from its version on. A receipt's land is read
+against the catalog version its rules name, and the tests pin each served version's golden site, so
+a change that would move an earlier version's land or what its drawing states fails until that
+version is no longer served. New worlds name :data:`LAND_RULES_VERSION`.
 """
 
 from __future__ import annotations
@@ -56,13 +60,13 @@ __all__ = [
 
 #: The rules new land is made by. A change to the realizer, its grading or a site's grading plan
 #: that moves land, or what a site's drawing states of it, is a new version.
-LAND_RULES_VERSION: Final = 6
+LAND_RULES_VERSION: Final = 7
 #: Every rules version this code makes land by, and the landform catalog version each reads.
-#: Versions 4 to 6 change no feature or value catalog, so they read version 3's.
-SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3, 4: 3, 5: 3, 6: 3}
+#: Versions 4 to 7 change no feature or value catalog, so they read version 3's.
+SERVED_LAND_RULES: Final = {1: 1, 2: 2, 3: 3, 4: 3, 5: 3, 6: 3, 7: 3}
 #: The rules versions that grade by a grading catalog, and its version. Earlier versions grade by
 #: the figures the grading module states, which version 1 of the catalog repeats.
-GRADING_OF_LAND_RULES: Final = {6: 1}
+GRADING_OF_LAND_RULES: Final = {6: 1, 7: 2}
 
 
 @functools.cache

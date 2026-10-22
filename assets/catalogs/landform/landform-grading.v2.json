@@ -1,0 +1,63 @@
+{
+ "schema_version": 1,
+ "catalog_id": "landform-grading",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "bank_grade_permille",
+   "minimum": 100,
+   "maximum": 1000,
+   "value": 500,
+   "reason": "Authored: the steepest a bank between a layout's level ground and the land around it is graded, 1 in 2, a slope grass holds and a person sees as a bank rather than a face.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "bank_ease_permille",
+   "minimum": 0,
+   "maximum": 1000,
+   "value": 250,
+   "reason": "Authored: the steepest a bank's first cell off the level ground it leaves and the land's first cell past it step, 1 in 4, half the bank's grade, so a bank rounds into the ground above and below it and reads as a slope rather than a face cut straight off a terrace's edge.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "cut_fill_most_mm",
+   "minimum": 1000,
+   "maximum": 20000,
+   "value": 8000,
+   "reason": "Authored: the deepest a terrace, a path or a bank may cut into the land or fill above it; past it the layout is refused rather than the land carved into a quarry.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  },
+  {
+   "key": "held_most_mm",
+   "minimum": 0,
+   "maximum": 6000,
+   "value": 3000,
+   "reason": "Authored: the most a retaining wall round a terrace holds where the terrace's bank would cut or fill past the deepest it may, about a storey; the land behind the wall keeps that much more of its own shape.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica landforms; see the entry reasons"
+   }
+  }
+ ]
+}

@@ -20,6 +20,9 @@ world made by version 1 is realized by version 1 and names it in every chunk and
 reads the version 3 catalogs, whose volumes may state a top land, and realizes a top land by the
 land rules it names (:func:`~exulanica.grammar.landform.land_rules`), so a change to the land's
 realizer is a new version here too; a version 3 volume with no top land is version 2's rock.
+Version 4 reads the version 3 catalogs and is version 3's rock; it realizes a top land by land rules
+7, whose banks ease at their crest and toe, so a site on a version 4 top grades its banks so and a
+world made under version 3 keeps its top.
 """
 
 from __future__ import annotations
@@ -44,12 +47,12 @@ __all__ = [
 ]
 
 #: The rules new volumes are made by. A change to the field that moves a value is a new version.
-VOLUME_RULES_VERSION: Final = 3
+VOLUME_RULES_VERSION: Final = 4
 #: Every rules version this code makes volumes by, and the volume catalog version each reads.
-SERVED_VOLUME_RULES: Final = {1: 1, 2: 2, 3: 3}
+SERVED_VOLUME_RULES: Final = {1: 1, 2: 2, 3: 3, 4: 3}
 #: Each rules version whose volumes may state a top land, and the land rules that realize it, named
 #: here and not taken as the newest land rules so a later land version never moves a served one.
-TOP_LAND_RULES: Final = {3: 3}
+TOP_LAND_RULES: Final = {3: 3, 4: 7}
 
 
 @functools.cache

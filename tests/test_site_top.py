@@ -92,7 +92,9 @@ def test_every_zone_is_a_level_pad_and_every_walking_edge_stays_within_a_step(to
         }
         assert len(heights) == 1, (zone.zone_key, sorted(heights))
     heights = {n["node_id"]: n["support_z_mm"] for n in world.place["nodes"]}
-    assert max(heights.values()) - min(heights.values()) > 250, "the site follows its top"
+    # Eased banks (land rules 7) round a zone's edge, so the nodes there stand nearer its level: the
+    # swell's spread is 294 mm under land rules 3 and 236 under 7.
+    assert max(heights.values()) - min(heights.values()) > 200, "the site follows its top"
     for edge in world.place["edges"]:
         if edge["kind"] in ("crossing", "premises_access"):
             continue
@@ -194,11 +196,26 @@ def test_the_graded_top_document_is_pinned(top_world) -> None:
     )
     assert len(document["height_mm"]) == document["columns"] * document["rows"]
     name = "swell" if on.top.land.features[0].kind == "undulation" else "tilt"
-    assert graded.sha256 == GOLDEN[name], (name, graded.sha256)
+    assert graded.sha256 == GOLDEN[TOP_RULES][name], (name, graded.sha256)
 
 
-#: Each graded top's document digest, for the cafe's first preset on WORLD.
+@pytest.mark.parametrize("name", ["swell", "tilt"])
+def test_a_top_graded_by_land_rules_3_is_the_same_top(name: str) -> None:
+    """A world made under volume rules 3 keeps the top land rules 3 graded for it."""
+    on = dataclasses.replace(on_top({"swell": SWELL, "tilt": TILT}[name]), rules_version=3)
+    world = composed(on)
+    assert site_top(on, world.records, STATION_MM).sha256 == GOLDEN[3][name]
+
+
+#: Each graded top's document digest under the land rules a volume rules version names for a top,
+#: for the cafe's first preset on WORLD.
 GOLDEN = {
-    "swell": "035d388b804e111166d525072620ff19c6f6dcd6f3522d7d913120d992f5ebe3",
-    "tilt": "385bbdda0fb917c6bdd98707227431ba335e633601dc1edc9b38a9c421ddbce1",
+    3: {
+        "swell": "035d388b804e111166d525072620ff19c6f6dcd6f3522d7d913120d992f5ebe3",
+        "tilt": "385bbdda0fb917c6bdd98707227431ba335e633601dc1edc9b38a9c421ddbce1",
+    },
+    7: {
+        "swell": "3f23aa49892261752a61cf36949c873dd1f0a0b0ccf83f70539b76236e1b6d00",
+        "tilt": "15a504f2ded689fe890ccde5e38f0cef5c4fb4acee5fc62271712f6bd7fb5e32",
+    },
 }

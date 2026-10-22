@@ -72,9 +72,11 @@ CATALOG_DIRECTORY: Final = (
 CATALOG_VERSIONS: Final = (1, 2, 3)
 CATALOG_VERSION: Final = 3
 #: Every version of the grading figures' catalog this code reads.
-GRADING_CATALOG_VERSIONS: Final = (1,)
-#: The figures a grading catalog states, every version.
+GRADING_CATALOG_VERSIONS: Final = (1, 2)
+#: The figures a grading catalog states, every version: version 2 adds a bank's ease grade.
 GRADING_FIGURES: Final = ("bank_grade_permille", "cut_fill_most_mm", "held_most_mm")
+#: The figures each version states beyond :data:`GRADING_FIGURES`.
+GRADING_FIGURES_ADDED: Final = {1: (), 2: ("bank_ease_permille",)}
 DOMAINS: Final = ("near_and_far", "far")
 COMPOSITIONS: Final = ("additive", "shaping")
 #: Wider than any bound a value states, so the file, not this schema, says what a value may be.
@@ -104,12 +106,20 @@ class ValueBound:
 @dataclass(frozen=True, slots=True)
 class GradingFigures:
     """The figures a layout's grading of its land is held to: the bank grade, the deepest a cell
-    may be cut or filled, and the most a terrace's retaining wall holds where its bank would pass
-    that."""
+    may be cut or filled, the most a terrace's retaining wall holds where its bank would pass
+    that, and from version 2 the grade a bank eases to at its crest and toe (0 before)."""
 
     bank_grade_permille: int
     cut_fill_most_mm: int
     held_most_mm: int
+    bank_ease_permille: int = 0
+
+    def __post_init__(self) -> None:
+        if self.bank_ease_permille > self.bank_grade_permille:
+            raise CatalogError(
+                f"a bank eases at {self.bank_ease_permille} per mille, steeper than its grade of "
+                f"{self.bank_grade_permille}: its crest and toe would stand steeper than the bank"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,7 +249,8 @@ def grading_schema(version: int) -> CatalogSchema:
 @functools.cache
 def grading_figures(version: int) -> GradingFigures:
     """The grading figures the shipped catalog states at ``version``, read once per process; a
-    catalog that states other figures than :data:`GRADING_FIGURES` is refused."""
+    catalog that states other figures than :data:`GRADING_FIGURES` and those its version adds is
+    refused."""
     if version not in GRADING_CATALOG_VERSIONS:
         raise CatalogError(
             f"landform grading catalogs are versions {GRADING_CATALOG_VERSIONS}, not {version}"
@@ -248,10 +259,9 @@ def grading_figures(version: int) -> GradingFigures:
         CATALOG_DIRECTORY.joinpath(f"landform-grading.v{version}.json"), grading_schema(version)
     )
     stated = {entry.key: int(dict(entry.values)["value"]) for entry in catalog.entries}  # type: ignore[arg-type]
-    if sorted(stated) != sorted(GRADING_FIGURES):
-        raise CatalogError(
-            f"landform-grading v{version} states {sorted(stated)}, not {sorted(GRADING_FIGURES)}"
-        )
+    figures = sorted((*GRADING_FIGURES, *GRADING_FIGURES_ADDED[version]))
+    if sorted(stated) != figures:
+        raise CatalogError(f"landform-grading v{version} states {sorted(stated)}, not {figures}")
     return GradingFigures(**stated)
 
 

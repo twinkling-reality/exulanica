@@ -340,10 +340,13 @@ each served version's catalogs, golden field, chunks, tops and composition.
 | 2 | 2 | version 2 | Level and even unless the strata vary them |
 | 3 | 3 | version 3 | As version 2; a volume may state a top land |
 | 4 | 3 | version 3 | As version 3; the landscape may state a site on a volume's top (landscape catalog version 2) |
+| 5 | 4 | version 3 | As version 4; a site on a top grades its banks eased at their crest and toe (land rules 7) |
 
 Volume rules 3 also name the land rules a top land is realized by (land rules 3, with their
 catalogs' digests), fixed for that version so a later land rules version never moves a served
-volume. A version 3 volume with no top land is the same rock under volume rules 2 and 3.
+volume; volume rules 4 name land rules 7, whose banks ease at their crest and toe, and are volume
+rules 3's rock vertex for vertex, their chunks and tops naming 4. A version 3 volume with no top
+land is the same rock under volume rules 2, 3 and 4.
 
 New worlds are made by the newest rules. A receipt is read back under the rules it names: its
 volumes against the catalogs those name and realized by them, so a world made by landscape rules 1
@@ -391,8 +394,8 @@ altitude. The natural top is the same realization the field caps the rock by
 it with the land's grader over the whole square, so banks run out to the rim, every zone is a level
 pad and every walking edge stays within one step, as on land; the deepest cut or fill is the bound
 the site states. A top is graded under the land rules the volume rules name for a top land (land
-rules 3 under volume rules 3), never the newest land rules, so a later land version never moves a
-graded top. `compose_site` takes the top in place of land. Heights between lattice points
+rules 3 under volume rules 3, land rules 7 under volume rules 4), never the newest land rules, so a
+later land version never moves a graded top. `compose_site` takes the top in place of land. Heights between lattice points
 follow the graded land's triangle rule. The graded top is a document, `exulanica.site-top/v1`: the
 graded heights from the south-west corner, rows from the south, and the water standing on them.
 

@@ -60,6 +60,12 @@ RULES = {
         },
         "volume_rules": 3,
     },
+    5: {
+        "catalogs": {
+            "landscape-value.v2": "7d49ac01f0a6d2944a7aca1818d9a235e229f200807db4d1bd145c0e7e637b77"
+        },
+        "volume_rules": 4,
+    },
 }
 
 #: A small weathered stack with a level top.
@@ -89,6 +95,7 @@ BAY_SHA256 = {
     1: "4dfd005deec4499e5319b72eb42e22ca58ca4dd1698c118bfa2c47ded070fc53",
     2: "bc85ddd9d55a8a6b3286b624bafda7d906468155fcd93b756844dc5e8187fd52",
     3: "bc85ddd9d55a8a6b3286b624bafda7d906468155fcd93b756844dc5e8187fd52",
+    4: "bc85ddd9d55a8a6b3286b624bafda7d906468155fcd93b756844dc5e8187fd52",
 }
 
 
@@ -213,7 +220,7 @@ def test_the_landscape_rules_name_the_catalog_and_the_volume_rules():
     "named",
     [
         None,
-        {**landscape_rules(), "version": 5},
+        {**landscape_rules(), "version": 6},
         {**landscape_rules(), "volume_rules": {"version": 2, "catalogs": {}}},
         {**landscape_rules(2), "volume_rules": volume_rules(1)},
         {**landscape_rules(), "catalogs": {"landscape-value.v1": "0" * 64}},

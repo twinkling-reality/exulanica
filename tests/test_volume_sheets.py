@@ -53,6 +53,19 @@ GOLDEN_TOPS = {
         ],
     },
 }
+#: Version 3's tops cell for cell; each names version 4.
+GOLDEN_TOPS[4] = {
+    "cells": GOLDEN_TOPS[3]["cells"],
+    "digests": [
+        "d57685e545cca7345641a815c5c751099eeb59bcd349932ccfd2b8d2c585e3d8",
+        "23de1082cc7e7b0d5a20bec80baf89bd13cd6c422729b901a7851ff6b918ce18",
+        "58e00b482ab12465c277fe46a2bafc982f044d9d708f0eb1d5d709a50a8dad0d",
+        "3ff6e3a9309979fd63ff740a893db9293f9ee9deb828e5091fc0dbb074624041",
+        "7c7ed639b036c3ca022722f0dc604c83447e4f618068cbe2b02a7c0a71272e78",
+        "1bfd219983bfb8ad5679e13c5258a55dfec455984a0cd0d1d89882d04d506bbc",
+        "1056f8fe0bca3ba06b711afb0c697b36b9a8f368bb55d22522521c160ff3e783",
+    ],
+}
 
 
 def field_of(*parts: dict, **top: object) -> VolumeField:
@@ -149,7 +162,7 @@ def test_a_sheet_reads_back_only_as_the_sheet_its_digest_names(sheet):
     ("name", "value", "path", "code"),
     [
         ("profile", "exulanica.volume-sheet/v2", "profile", "volume_invalid"),
-        ("rules_version", 4, "rules_version", "volume_rules_changed"),
+        ("rules_version", 5, "rules_version", "volume_rules_changed"),
         ("rules_version", True, "rules_version", "volume_rules_changed"),
         ("surface", "top:01", "surface", "volume_invalid"),
         ("surface", "bottom:0", "surface", "volume_invalid"),

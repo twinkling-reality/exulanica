@@ -65,6 +65,8 @@ GOLDEN = {
         "grid": "98e9aa48cbcde417924f9ae7a745190a513ceb0c8c1c951d931c76871db10fc2",
     },
 }
+#: Version 4 is version 3's rock: only the land rules its top land is graded by differ.
+GOLDEN[4] = GOLDEN[3]
 #: Beds varied every way version 2 states: thickness, relief, a side and a lean.
 VARIED_STRATA = {
     "amplitude_mm": 900,
@@ -121,7 +123,7 @@ def stack_field(*, whole: bool = False) -> VolumeField:
 
 def golden_field(version: int) -> VolumeField:
     """The stack under rules ``version``: as stated under version 1, its beds varied under 2, and
-    its top a land under 3."""
+    its top a land from 3."""
     raw = STACK if version == 1 else {**STACK, "strata": VARIED_STRATA}
     if version >= 3:
         raw = {**raw, "top_land": TOP_LAND}

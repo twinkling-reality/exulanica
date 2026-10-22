@@ -90,9 +90,10 @@ is read against the newest version, and a world's land against the version its
 
 A third catalog, `landform-grading.vN.json`, states the figures a layout's [grading](#grading) is
 held to, one entry each with its bounds and its `value`: `bank_grade_permille` (500, 1 in 2),
-`cut_fill_most_mm` (8,000) and `held_most_mm` (3,000, the most a terrace's retaining wall holds). It
-shapes no land document; land rules from version 6 name it, and earlier versions grade by the same
-first two figures, stated in the grading module, and hold no wall.
+`cut_fill_most_mm` (8,000) and `held_most_mm` (3,000, the most a terrace's retaining wall holds);
+version 2 adds `bank_ease_permille` (250, 1 in 4, the steepest a bank's crest and toe step). It
+shapes no land document; land rules 6 name version 1 and land rules 7 version 2, and earlier versions
+grade by the same first two figures, stated in the grading module, and hold no wall.
 
 | Kind | What it makes |
 | --- | --- |
@@ -220,7 +221,16 @@ backdrop and a site's drawing list them with the land's other water.
    at levels a bank cannot join. Edges along one lattice line rising toward the same side join
    into one run, from one lattice point to another on the line of the low side, rising one cell
    toward a main side; a single edge makes no run. Runs are listed by axis (runs along `x`
-   first), line and start. Listing them moves no height.
+   first), line and start. Listing them moves no height. Under a plan with an ease grade
+   (`bank_ease_permille`, from land rules 7), a bank's first sample off the level ground it leaves
+   (its crest) steps no steeper than the ease, the bank grade holds between, and the land's first
+   two rings of samples past the bank (its toe), on the bank's side only, ease into it the same
+   way: a lot 1.44 m above level land drops 1440, 1190, 690, 190, 0 rather than 1440, 940, 440, 0,
+   so under a faceted look its bank reads as a slope rather than one face. Round a bank's corners,
+   where the bank grade's cones alone lean a lattice triangle up to 707 per mille, the bank cell at
+   a triangle's high corner comes down until no triangle leans past the bank grade (within a
+   hundredth). The bank grade's cones still bound every sample, so no wall stands where none did,
+   and land beyond the toe keeps its own shape.
 5. Ponds are carved as the ellipse inscribed in their rectangle, below a level that is the lowest
    ground on the 2 m ring outside them less a freeboard.
 
@@ -407,9 +417,9 @@ as other land, and its saved entry is listed unavailable by the same name
 ([saved world entry](saved-world-entry.md)). A level world's receipt names no land rules, and one
 that does is refused the same way.
 
-Every rules version this code makes the same land by is served: versions 1 to 6, each reading the
-catalog version `SERVED_LAND_RULES` names (versions 1 to 3 their own, versions 4 to 6 version 3's,
-since they change no feature or value catalog), and version 6 the grading catalog
+Every rules version this code makes the same land by is served: versions 1 to 7, each reading the
+catalog version `SERVED_LAND_RULES` names (versions 1 to 3 their own, versions 4 to 7 version 3's,
+since they change no feature or value catalog), and versions 6 and 7 the grading catalog
 `GRADING_OF_LAND_RULES` names as well. The realizer and grading are one code for all; version 2 only adds the
 `cascade` and version 3 its `follow` course, so land an earlier version admits is the same land
 under a later one. Version 4 moves no height and changes what a site's drawing states: a site's
@@ -421,7 +431,12 @@ grading catalog's figures and lets a terrace stand in a retaining wall where its
 fill past the bound: a layout whose banks stay within the bound grades the same land as under
 version 5, and one that version 5 refuses there may grade. The grading plan takes the rules
 version the receipt names, so a world made under an earlier version regenerates byte for byte, its
-ponds named and its walls unlisted as they were. New worlds name version 6. The
+ponds named and its walls unlisted as they were. Version 7 grades by the grading catalog's version
+2, whose banks ease at their crest and toe: cells more than two cells beyond a bank keep version 6's
+heights, and no wall stands where version 6 has none. New worlds name version 7, a town on land
+among them: a town's land is graded by the city grammar's own plan, which states no ease, so its
+ground is version 6's, but the rules a receipt names are part of what makes the town, so the same
+words make another town under version 7 than under version 6, every record's identity new. The
 tests pin every shipped landform catalog byte for byte, and each served version with the catalogs
 it names and the graded land of its own golden site, its water's ids and its walls among it
 ([`test_landform_rules.py`](../tests/test_landform_rules.py)), so a change that would move a served

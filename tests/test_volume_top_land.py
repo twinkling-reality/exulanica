@@ -214,11 +214,37 @@ def test_culling_never_changes_a_value_near_the_surface_or_any_sign_under_a_top_
 def test_a_version_3_volume_with_no_top_land_is_version_2_rock():
     raw = {**STACK, "strata": VARIED_STRATA}
     older = VolumeField(read_volume_document(raw, volume_catalog(2)), SEED)
-    newer = VolumeField(read_volume_document(raw), SEED)
-    assert (older.rules, newer.rules) == (2, 3)
+    newer = VolumeField(read_volume_document(raw), SEED, rules=3)
+    # Version 4 reads the same catalogs and is version 3's rock.
+    newest = VolumeField(read_volume_document(raw), SEED)
+    assert (older.rules, newer.rules, newest.rules) == (2, 3, 4)
     assert newer.document.canonical_bytes == older.document.canonical_bytes
     assert sha256_of_canonical(newer.grid(*GRID)) == sha256_of_canonical(older.grid(*GRID))
-    assert newer.extent == older.extent
+    assert sha256_of_canonical(newest.grid(*GRID)) == sha256_of_canonical(older.grid(*GRID))
+    assert newer.extent == older.extent == newest.extent
+
+
+def test_a_version_4_volume_with_a_top_land_is_version_3_rock_naming_4():
+    """Volume rules 4 grade a site on a top by later land rules; the rock and its tops, the natural
+    top land's realization included, are version 3's vertex for vertex."""
+    document = read_volume_document(mesa(GENTLE))
+    older, newer = VolumeField(document, SEED, rules=3), VolumeField(document, SEED)
+    assert (older.rules, newer.rules) == (3, 4)
+    was, now = realize_volume(older, 4000), realize_volume(newer, 4000)
+    assert len(was) == len(now) > 0
+    for before, after in zip(was, now, strict=True):
+        assert (after.chunk, after.positions_mm, after.normals) == (
+            before.chunk,
+            before.positions_mm,
+            before.normals,
+        )
+        assert (after.looks, after.vertex_looks, after.triangles) == (
+            before.looks,
+            before.vertex_looks,
+            before.triangles,
+        )
+        assert (before.rules_version, after.rules_version) == (3, 4)
+    assert [top.cells for top in volume_tops(newer)] == [top.cells for top in volume_tops(older)]
 
 
 def test_the_top_land_is_written_into_the_canonical_document_with_its_defaults():
@@ -349,7 +375,7 @@ def test_given_heights_are_named_by_every_chunk_and_sheet_and_a_field_given_none
         input_sha256(natural)
         == hashlib.sha256(
             canonical_json(
-                {"volume_sha256": document.sha256, "seed": SEED.hex(), "volume_rules": 3}
+                {"volume_sha256": document.sha256, "seed": SEED.hex(), "volume_rules": 4}
             )
         ).hexdigest()
     )

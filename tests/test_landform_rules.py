@@ -35,6 +35,7 @@ SHIPPED = {
     "landform-feature.v2.json": "1cc522bbccff9650e92d7f5fd46fc7d2300318c3da5496ab4cc3eb64bb385110",
     "landform-feature.v3.json": "e320f5e8642aa57b5dfedbe3f2a24a7d8691321017a3776c9e95bfbfd58e131f",
     "landform-grading.v1.json": "dd66a572d6acf6c7477bd09cb515cc99d656200c25d9bcd79bc99ad2482bce53",
+    "landform-grading.v2.json": "a42b2ede862b5dd9d12a8257aa08920f87c4301c2abda52d0bfbec798437f21d",
     "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
     "landform-recipe.v2.json": "8e805cc75d229af096aa458d34b4d98e2db2e8e08ee62972dd55eecb483ffb97",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
@@ -106,6 +107,20 @@ RULES = {
         },
         "golden_site": "7885742eef2d4ad7547a4e74bdd911c4e42a1bf50b7e773b9fa8b0f5de06aa7c",
     },
+    # Version 7 grades by the grading catalog's version 2, whose banks ease at their crest and toe:
+    # the same golden site as version 6, its banks rounded.
+    7: {
+        "catalogs": {
+            "landform-feature.v3": (
+                "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08"
+            ),
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+            "landform-grading.v2": (
+                "8d226984ab3884fcecd47ed0691b2fb485312839ca94e89ca4a45775b895e3f3"
+            ),
+        },
+        "golden_site": "bfbdaf80198ec923e3f62d8f6043ee56713a4aaaeac0d34890745c8f78bb49b4",
+    },
 }
 
 #: Every feature kind once, a valley and a filled basin beside a terraced hill above a shore.
@@ -161,7 +176,7 @@ GOLDEN_SITES[5] = (
     SiteZoneRecord("site:zone:2", 2, "orchard", 4000, 24000, 20000, 40000, "east", "open",
                    "ground", "grass", 20000, 38000),
 )  # fmt: skip
-GOLDEN_SITES[6] = GOLDEN_SITES[5]
+GOLDEN_SITES[6] = GOLDEN_SITES[7] = GOLDEN_SITES[5]
 
 
 def test_no_shipped_landform_catalog_is_edited() -> None:
@@ -227,7 +242,7 @@ GOLDEN_LANDS = {
         ],
     },
 }  # fmt: skip
-GOLDEN_LANDS[4] = GOLDEN_LANDS[5] = GOLDEN_LANDS[6] = GOLDEN_LANDS[3]
+GOLDEN_LANDS[4] = GOLDEN_LANDS[5] = GOLDEN_LANDS[6] = GOLDEN_LANDS[7] = GOLDEN_LANDS[3]
 WATER = {
     1: {"sea", "lake", "pond"},
     2: {"sea", "lake", "pond", "pool", "fall"},
@@ -235,6 +250,7 @@ WATER = {
     4: {"sea", "lake", "pond", "pool", "fall"},
     5: {"sea", "lake", "pond", "pool", "fall"},
     6: {"sea", "lake", "pond", "pool", "fall"},
+    7: {"sea", "lake", "pond", "pool", "fall"},
 }
 #: Each served version's pond ids, in the golden site's drawing: by the area's number in its zone
 #: alone, and from version 4 by its zone and that number.
@@ -245,6 +261,7 @@ PONDS = {
     4: ["zone 1 pond 0", "zone 0 pond 0"],
     5: ["zone 1 pond 0", "zone 0 pond 0"],
     6: ["zone 1 pond 0", "zone 0 pond 0"],
+    7: ["zone 1 pond 0", "zone 0 pond 0"],
 }
 #: Each served version's retaining walls, in the golden site's drawing: none listed before version
 #: 5 (no ``walls`` at all), and from version 5 one along the yard's north edge, where the orchard
@@ -256,6 +273,7 @@ WALLS = {
     4: None,
     5: [{"from_mm": [4000, 24000], "to_mm": [20000, 24000], "high": "north"}],
     6: [{"from_mm": [4000, 24000], "to_mm": [20000, 24000], "high": "north"}],
+    7: [{"from_mm": [4000, 24000], "to_mm": [20000, 24000], "high": "north"}],
 }
 
 

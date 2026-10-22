@@ -16,6 +16,11 @@ realized near land, in a fixed order:
 4. **Banks**: every cell not fixed above is held between the cones of the fixed cells at the bank
    grade, so no bank is steeper. Where two fixed cells are closer than their difference allows, the
    cones cross and a retaining wall takes the difference; walls are listed with their height.
+   Under a plan with an **ease** grade, a bank's first cell off the level ground it leaves (its
+   crest) and the land's first cell past it (its toe) step no steeper than the ease, the bank
+   grade between them, so a bank reads as a slope rounding into the ground above and below it
+   rather than a face cut straight off the edge; the bank grade's cones still bound every cell, so
+   no wall stands where none did, and land more than two cells beyond the bank keeps its shape.
    Where the plan asks for them, every lattice edge whose samples differ by more than the bank
    grade over one cell, one of them fixed, is a retaining wall's: a seam where two pads, or a pad
    and a corridor, meet at levels a bank cannot join. Edges along one lattice line rising to the
@@ -147,6 +152,9 @@ class GradingPlan:
     basins: tuple[Basin, ...] = ()
     entry_mm: tuple[int, int] = (0, 0)
     bank_grade_permille: int = BANK_GRADE_PERMILLE
+    #: The steepest a bank's first cell off its level ground and the land's first cell past it step;
+    #: 0 eases none, and the bank stands straight at its grade from edge to land, as it always did.
+    bank_ease_permille: int = 0
     cut_fill_most_mm: int = CUT_FILL_MOST_MM
     walk_grade_permille: int = WALK_GRADE_PERMILLE
     retaining_walls: bool = False
@@ -290,36 +298,67 @@ def _conflict(pins: list[tuple[int, int, str]], step: int) -> tuple:
     return worst[1], worst[2]
 
 
-def _banks(work: _Work, grade: int, held: Mapping[str, int] | None = None) -> list[Wall]:
+def _cones(
+    work: _Work, held: Mapping[str, int], step: int, first: int, *, settle: bool
+) -> tuple[list[int], list[int], list[str], list[str]]:
+    """The lowest and highest each free cell may stand, and the fixed cell that sets each: cones
+    down and up from every fixed cell, ``first`` (with its diagonal) for the step off the fixed cell
+    and ``step`` for every step after. One forward and one backward sweep holds a cone of one grade;
+    ``settle`` sweeps again until nothing moves, for a cone whose first step differs."""
     n = work.near
     nx, ny = n.nx, n.ny
-    step = grade * CELL_MM // 1000
-    diagonal = step * 1414 // 1000
     size = len(work.h)
-    held = held or {}
     low = [work.h[i] - held.get(work.owner[i], 0) if work.locked[i] else -_FAR for i in range(size)]
     high = [work.h[i] + held.get(work.owner[i], 0) if work.locked[i] else _FAR for i in range(size)]
     low_owner = list(work.owner)
     high_owner = list(work.owner)
-    forward = ((0, -1, step), (-1, -1, diagonal), (-1, 0, step), (-1, 1, diagonal))
-    backward = ((0, 1, step), (1, 1, diagonal), (1, 0, step), (1, -1, diagonal))
-    for neighbours, rows in ((forward, range(ny)), (backward, range(ny - 1, -1, -1))):
-        columns = range(nx) if neighbours is forward else range(nx - 1, -1, -1)
-        for r in rows:
-            for c in columns:
-                i = r * nx + c
-                if work.locked[i]:
-                    continue
-                for dr, dc, cost in neighbours:
-                    rr, cc = r + dr, c + dc
-                    if 0 <= rr < ny and 0 <= cc < nx:
-                        k = rr * nx + cc
-                        if low[k] - cost > low[i]:
-                            low[i], low_owner[i] = low[k] - cost, low_owner[k]
-                        if high[k] + cost < high[i]:
-                            high[i], high_owner[i] = high[k] + cost, high_owner[k]
+    diagonal, first_diagonal = step * 1414 // 1000, first * 1414 // 1000
+    forward = ((0, -1, False), (-1, -1, True), (-1, 0, False), (-1, 1, True))
+    backward = ((0, 1, False), (1, 1, True), (1, 0, False), (1, -1, True))
+    moved = True
+    while moved:
+        moved = False
+        for neighbours, rows in ((forward, range(ny)), (backward, range(ny - 1, -1, -1))):
+            columns = range(nx) if neighbours is forward else range(nx - 1, -1, -1)
+            for r in rows:
+                for c in columns:
+                    i = r * nx + c
+                    if work.locked[i]:
+                        continue
+                    for dr, dc, across in neighbours:
+                        rr, cc = r + dr, c + dc
+                        if 0 <= rr < ny and 0 <= cc < nx:
+                            k = rr * nx + cc
+                            if work.locked[k]:
+                                cost = first_diagonal if across else first
+                            else:
+                                cost = diagonal if across else step
+                            if low[k] - cost > low[i]:
+                                low[i], low_owner[i] = low[k] - cost, low_owner[k]
+                                moved = True
+                            if high[k] + cost < high[i]:
+                                high[i], high_owner[i] = high[k] + cost, high_owner[k]
+                                moved = True
+        moved = moved and settle
+    return low, high, low_owner, high_owner
+
+
+def _banks(
+    work: _Work, grade: int, held: Mapping[str, int] | None = None, ease: int = 0
+) -> list[Wall]:
+    """Grade every free cell between the cones of the fixed cells at the bank grade, listing a wall
+    where they cross. With an ``ease`` grade, a bank's first cell off the level ground it leaves and
+    the land's first cell past it step no steeper than the ease: the bank grade's cones still bound
+    every cell, so no wall stands where none did."""
+    step = grade * CELL_MM // 1000
+    held = held or {}
+    low, high, low_owner, high_owner = _cones(work, held, step, step, settle=False)
     walls = []
-    for i in range(size):
+    if ease:
+        eased_low, eased_high, _, _ = _cones(work, held, step, ease * CELL_MM // 1000, settle=True)
+        natural = list(work.h)
+        side = [0] * len(work.h)
+    for i in range(len(work.h)):
         if work.locked[i] or low[i] == -_FAR:
             continue
         if low[i] > high[i]:
@@ -327,12 +366,130 @@ def _banks(work: _Work, grade: int, held: Mapping[str, int] | None = None) -> li
             walls.append(Wall(x, y, low[i] - high[i]))
             work.h[i] = (low[i] + high[i]) // 2
             work.owner[i] = low_owner[i]
+        elif ease and eased_low[i] <= eased_high[i] and natural[i] < eased_low[i]:
+            # A fill bank, its crest eased: up to the eased cone, within the bank grade's cones.
+            work.h[i] = max(low[i], min(high[i], eased_low[i]))
+            work.owner[i] = low_owner[i]
+            side[i] = 1
+        elif ease and eased_low[i] <= eased_high[i] and natural[i] > eased_high[i]:
+            work.h[i] = min(high[i], max(low[i], eased_high[i]))
+            work.owner[i] = high_owner[i]
+            side[i] = -1
         else:
             clamped = max(low[i], min(high[i], work.h[i]))
             if clamped != work.h[i]:
                 work.owner[i] = low_owner[i] if clamped == low[i] else high_owner[i]
             work.h[i] = clamped
+    if ease:
+        _toe(work, side, low, high, ease * CELL_MM // 1000)
+        _corners(work, side, low, high, step)
     return walls
+
+
+def _toe(work: _Work, side: list[int], low: list[int], high: list[int], ease: int) -> None:
+    """The land's first two rings of cells past an eased bank, on the bank's side only (raised
+    beside a fill, lowered beside a cut), each brought within the ease step of the bank or ring
+    cells beside it, never past the lowest fill (or highest cut) cell beside it, and within the bank
+    grade's cones. Two rings, since round a corner of the
+    bank's octagon a cell one ring out still meets the land a step too steep. Land further out
+    keeps its own shape."""
+    n = work.near
+    nx, ny = n.nx, n.ny
+    across = ease * 1414 // 1000
+    for _ring in range(2):
+        settled = list(work.h)
+        moved: list[tuple[int, int, str, int]] = []
+        for r in range(ny):
+            for c in range(nx):
+                i = r * nx + c
+                if work.locked[i] or side[i] or low[i] > high[i]:
+                    continue
+                want, owner, way = settled[i], work.owner[i], 0
+                # Never above a fill cell beside it nor below a cut cell: it meets the bank's foot.
+                under, over = _FAR, -_FAR
+                for dr in (-1, 0, 1):
+                    for dc in (-1, 0, 1):
+                        rr, cc = r + dr, c + dc
+                        if (dr or dc) and 0 <= rr < ny and 0 <= cc < nx:
+                            k = rr * nx + cc
+                            cost = across if dr and dc else ease
+                            if side[k] == 1:
+                                under = min(under, settled[k])
+                                if settled[k] - cost > want:
+                                    want, owner, way = settled[k] - cost, work.owner[k], 1
+                            elif side[k] == -1:
+                                over = max(over, settled[k])
+                                if settled[k] + cost < want:
+                                    want, owner, way = settled[k] + cost, work.owner[k], -1
+                if way == 1:
+                    want = max(settled[i], min(want, under))
+                elif way == -1:
+                    want = min(settled[i], max(want, over))
+                want = max(low[i], min(high[i], want))
+                if want != work.h[i]:
+                    moved.append((i, want, owner, way))
+        for i, want, owner, way in moved:
+            work.h[i], work.owner[i], side[i] = want, owner, way
+
+
+def _corners(work: _Work, side: list[int], low: list[int], high: list[int], step: int) -> None:
+    """A bank's corners eased like its edges: where a lattice triangle leans past the bank grade
+    and its highest corner is a fill bank cell (its lowest a cut bank cell), that cell comes down
+    (or up) until the triangle leans no steeper, never past the bank grade's cones. Round a bank's
+    corner the bank grade's cones step a cell's two sides at once, so a triangle there leans up to
+    half as steep again as the bank. Each lattice cell is split along its south-west to north-east
+    diagonal, so a triangle's right angle is its south-east or north-west corner. A triangle within
+    a hundredth of the grade is left: whole millimetres put a bank's own edge a hair past it, and
+    easing those would shave every cell along it."""
+    n = work.near
+    nx, ny = n.nx, n.ny
+    h = work.h
+    limit = step * step
+    past = (step * 101 // 100) ** 2
+    # Each cell's two triangles: the right angle, then its legs' ends, as (row, column) steps.
+    shapes = (((0, 1), (0, 0), (1, 1)), ((1, 0), (0, 0), (1, 1)))
+    # Each pass only lowers fill cells and raises cut cells, in whole millimetres within their
+    # cones, so the passes end.
+    moved = True
+    while moved:
+        moved = False
+        for r in range(ny - 1):
+            for c in range(nx - 1):
+                for shape in shapes:
+                    v, a, b = ((r + dr) * nx + c + dc for dr, dc in shape)
+                    if (h[a] - h[v]) ** 2 + (h[b] - h[v]) ** 2 <= past:
+                        continue
+                    for way in (1, -1):
+                        # The corner farthest out on the bank's side, if a bank cell of that side.
+                        t = max((v, a, b), key=lambda k: way * h[k])
+                        if work.locked[t] or side[t] != way:
+                            continue
+                        eased = _eased_corner(h, v, a, b, t, limit, way)
+                        if eased is None:
+                            continue
+                        eased = max(low[t], eased) if way == 1 else min(high[t], eased)
+                        if eased != h[t]:
+                            h[t] = eased
+                            moved = True
+                        break
+
+
+def _eased_corner(h: list[int], v: int, a: int, b: int, t: int, limit: int, way: int) -> int | None:
+    """The height of corner ``t`` of the right triangle ``v`` (its right angle), ``a``, ``b`` at
+    which the triangle leans exactly the bank grade (``limit`` its step squared), on the side
+    ``way`` of the other two; None where moving ``t`` alone cannot bring it within the grade."""
+    if t == v:
+        p, q = h[a], h[b]
+        root = 2 * limit - (p - q) * (p - q)
+        if root < 0:
+            return None
+        middle = (p + q + way * integer_sqrt(root)) * way
+        return (middle // 2) * way if way == 1 else -(middle // 2)
+    other = b if t == a else a
+    rest = limit - (h[other] - h[v]) ** 2
+    if rest < 0:
+        return None
+    return h[v] + way * integer_sqrt(rest)
 
 
 def _held_banks(work: _Work, plan: GradingPlan) -> list[Wall]:
@@ -345,7 +502,7 @@ def _held_banks(work: _Work, plan: GradingPlan) -> list[Wall]:
     heights, owners = list(work.h), list(work.owner)
     held: dict[str, int] = {}
     while True:
-        walls = _banks(work, plan.bank_grade_permille, held)
+        walls = _banks(work, plan.bank_grade_permille, held, plan.bank_ease_permille)
         over: dict[str, int] = {}
         for index, (graded, natural) in enumerate(zip(work.h, work.near.heights, strict=True)):
             excess = abs(graded - natural) - plan.cut_fill_most_mm

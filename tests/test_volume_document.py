@@ -58,8 +58,10 @@ RULES = {
         "volume-value.v3": "c10eb009d170e772d0646e910dab79422f9d2865adfc58e3d9927bebf07bb1e4",
     },
 }
+#: Version 4 reads version 3's catalogs: the same rock, its top land graded by later land rules.
+RULES[4] = RULES[3]
 #: Each volume rules version whose volumes may state a top land, and the land rules realizing it.
-TOP_LAND_RULES = {3: 3}
+TOP_LAND_RULES = {3: 3, 4: 7}
 
 #: A sea stack: an overhanging column, a shoulder, a leaning spur, a tilted ledge, a sea arch
 #: through its foot and a level top, weathered and bedded.

@@ -28,6 +28,8 @@ GOLDEN_SECTION = {
     3: "87d987d818a018a1fc1099a61607e733d699680e580b1d9f620213d907b5f167",
     # Version 4 reads a site on a volume's top beside version 3's volumes: the bay states none.
     4: "87d987d818a018a1fc1099a61607e733d699680e580b1d9f620213d907b5f167",
+    # Version 5 realizes version 4's volumes by volume rules 4: version 3's rock, naming 4.
+    5: "a93e4275d086e7caad9958b44833e3ea8a71d064a35a5c18f00c2055c0f39c3f",
 }
 
 

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 
 import pytest
+from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.landform import (
     CELL_MM,
     PROFILE,
@@ -21,6 +23,7 @@ from exulanica.grammar.landform import (
     realize_region,
     water_bodies,
 )
+from exulanica.grammar.landform.catalog import GradingFigures, grading_figures
 
 FRAME = WorldFrame(width_mm=60_000, depth_mm=60_000, seed="e" * 64)
 
@@ -333,3 +336,119 @@ def test_a_plan_within_the_bound_grades_the_same_land_whether_or_not_a_wall_coul
     near = _hill(700) if which == "hill" else region()
     asked = _terrace(0) if which == "hill" else plan(pads=(yard,), retaining_walls=True)
     assert grade_land(near, asked) == grade_land(near, replace(asked, held_most_mm=3000))
+
+
+def _flat_then_rising(rise_permille: int) -> NearLand:
+    """Level ground at 0 west of x = 30 m and east of it a rise at ``rise_permille``: land a raised
+    lot's eased bank comes down onto, with natural ground beyond it to keep."""
+    xs, ys = range(0, 50_001, CELL_MM), range(0, 40_001, CELL_MM)
+    heights = tuple(max(0, x - 30_000) * rise_permille // 1000 for _y in ys for x in xs)
+    return NearLand(0, 0, len(xs), len(ys), heights)
+
+
+def _lot(level_mm: int) -> GradingPlan:
+    """A 10 m lot standing ``level_mm`` above the land, as an island hamlet's lot stands."""
+    lot = Pad(id="lot", rect_mm=(15_000, 15_000, 25_000, 25_000), level_mm=level_mm)
+    return GradingPlan(pads=(lot,), entry_mm=(20_000, 20_000))
+
+
+@pytest.mark.parametrize(
+    ("level_mm", "straight", "eased"),
+    [
+        # Under the bank grade alone the lot drops off its edge a whole bank step at once and meets
+        # the land at a kink; eased, its first step and the land's are no steeper than 1 in 4.
+        (1440, [1440, 940, 440, 0, 0, 0], [1440, 1190, 690, 190, 0, 0]),
+        (1690, [1690, 1190, 690, 190, 0, 0], [1690, 1440, 940, 440, 190, 0]),
+    ],
+)
+def test_a_bank_eases_off_its_level_ground_and_into_the_land_and_keeps_its_grade_between(
+    level_mm: int, straight: list[int], eased: list[int]
+):
+    near = _flat_then_rising(400)
+    plain = grade_land(near, _lot(level_mm))
+    rounded = grade_land(near, replace(_lot(level_mm), bank_ease_permille=250))
+    # East from the lot's edge at x = 25 m along its middle, a sample a metre.
+    assert [plain.near.at(x, 20_000) for x in range(25_000, 30_001, CELL_MM)] == straight
+    assert [rounded.near.at(x, 20_000) for x in range(25_000, 30_001, CELL_MM)] == eased
+    h = rounded.near.heights
+    nx, ny = rounded.near.nx, rounded.near.ny
+    lot = {(i, j) for i in range(15, 26) for j in range(15, 26)}
+    untouched = {k for k, (a, b) in enumerate(zip(h, near.heights, strict=True)) if a == b}
+    for j in range(ny):
+        for i in range(nx):
+            for di, dj in ((1, 0), (0, 1)):
+                if i + di >= nx or j + dj >= ny:
+                    continue
+                a, b = j * nx + i, (j + dj) * nx + i + di
+                step = abs(h[a] - h[b])
+                assert step <= 500, ((i, j), step)
+                # Off the lot's straight edges: within two cells of a corner, the corner is eased.
+                straight = 17 <= i <= 23 or 17 <= j <= 23
+                edge = ((i, j) in lot) != ((i + di, j + dj) in lot) and straight
+                level = near.heights[a] == near.heights[b] == 0
+                toe = (a in untouched) != (b in untouched) and level
+                if edge or toe:
+                    assert step <= 250, ((i, j), (i + di, j + dj), step)
+
+    # Going out from the lot the ground never climbs again before the rise: no toe cell stands above
+    # the bank cells it meets, round the corners as along the sides.
+    def out(i: int, j: int) -> int:
+        return max(15 - i, i - 25, 15 - j, j - 25, 0)
+
+    for j in range(ny):
+        for i in range(30):
+            if out(i, j) < 1:
+                continue
+            nearer = [
+                h[(j + dj) * nx + i + di]
+                for di in (-1, 0, 1)
+                for dj in (-1, 0, 1)
+                if 0 <= i + di < nx and 0 <= j + dj < ny and out(i + di, j + dj) < out(i, j)
+            ]
+            assert h[j * nx + i] <= max(nearer), (i, j)
+
+    # No land triangle leans past the bank grade (within the hundredth whole millimetres leave), its
+    # corners eased as its edges are: a cell is split along its south-west to north-east diagonal,
+    # a triangle's right angle at its south-east or north-west corner. The bank grade's cones alone
+    # lean the triangle at each corner of the lot 707 per mille.
+    def lean(i: int, j: int, legs: tuple[tuple[int, int], tuple[int, int]]) -> float:
+        v = h[j * nx + i]
+        (ai, aj), (bi, bj) = legs
+        return math.hypot(h[(j + aj) * nx + i + ai] - v, h[(j + bj) * nx + i + bi] - v)
+
+    for j in range(1, ny - 1):
+        for i in range(1, nx - 1):
+            if i >= 30:
+                continue
+            for legs in (((-1, 0), (0, 1)), ((0, -1), (1, 0))):
+                assert lean(i, j, legs) <= 505, ((i, j), legs, lean(i, j, legs))
+    corner = [plain.near.heights[j * nx + i] for i, j in ((26, 14), (26, 13), (27, 14))]
+    assert math.hypot(corner[1] - corner[0], corner[2] - corner[0]) > 700
+    # The rise beyond the toe keeps its own shape: easing never cuts or fills natural ground there.
+    for j in range(ny):
+        for i in range(31, nx):
+            assert h[j * nx + i] == near.heights[j * nx + i], (i, j)
+    assert rounded.walls == plain.walls == ()
+
+
+def test_an_eased_bank_parts_two_close_pads_with_the_same_walls_as_the_bank_grade_alone():
+    low = Pad(id="low", rect_mm=(10_000, 10_000, 20_000, 20_000), level_mm=6000)
+    high = Pad(id="high", rect_mm=(22_000, 10_000, 26_000, 20_000), level_mm=9000)
+    asked = plan(pads=(low, high), corridors=(), entry_mm=(15_000, 15_000))
+    plain = grade_land(region(), asked)
+    eased = grade_land(region(), replace(asked, bank_ease_permille=250))
+    assert plain.walls and eased.walls == plain.walls
+
+
+def test_a_bank_never_eases_steeper_than_its_grade():
+    """An ease steeper than the bank would stand a bank's crest and toe steeper than the bank."""
+    with pytest.raises(CatalogError, match="steeper than its grade"):
+        GradingFigures(
+            bank_grade_permille=500,
+            cut_fill_most_mm=8000,
+            held_most_mm=3000,
+            bank_ease_permille=600,
+        )
+    shipped = grading_figures(2)
+    assert 0 < shipped.bank_ease_permille <= shipped.bank_grade_permille
+    assert grading_figures(1).bank_ease_permille == 0

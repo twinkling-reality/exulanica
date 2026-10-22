@@ -135,15 +135,17 @@ def test_a_world_on_land_names_the_land_rules_that_made_it_and_other_rules_are_r
 
 def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> None:
     """Land made before the cascade (rules version 1) is still served: the same receipt naming
-    version 1 regenerates the same records, the same drawing and the same land, the drawing listing
-    no retaining walls where the newest rules list them."""
+    version 1 regenerates the same records, the same drawing and the same land as version 6, the
+    drawing listing no retaining walls where version 6 lists them (version 7 eases the banks)."""
     world = made("site")
     first = copy.deepcopy(world.receipt)
     first["land_rules"] = land_rules(1)
+    sixth = copy.deepcopy(world.receipt)
+    sixth["land_rules"] = land_rules(6)
     assert first["land_rules"]["catalogs"] != world.receipt["land_rules"]["catalogs"]
     records = site_plan.records(first)
-    assert records == world.records
-    before, after = site_land_of(world.receipt, records, 4000), site_land_of(first, records, 4000)
+    assert records == world.records == site_plan.records(sixth)
+    before, after = site_land_of(sixth, records, 4000), site_land_of(first, records, 4000)
     now = before.drawing_section()
     assert now.pop("walls"), "the site's terraces meet at levels a bank cannot join"
     assert after.drawing_section() == now
@@ -151,11 +153,11 @@ def test_a_world_named_by_land_rules_version_1_regenerates_byte_for_byte() -> No
     drawing = site_drawing(
         world_id=first["world_id"], receipt=first, receipt_sha256="b" * 64, records=records
     )
-    named_now = site_drawing(
-        world_id=first["world_id"], receipt=world.receipt, receipt_sha256="b" * 64, records=records
+    named_sixth = site_drawing(
+        world_id=first["world_id"], receipt=sixth, receipt_sha256="b" * 64, records=records
     )
-    del named_now["land"]["walls"]
-    assert site_drawing_sha256(drawing) == site_drawing_sha256(named_now)
+    del named_sixth["land"]["walls"]
+    assert site_drawing_sha256(drawing) == site_drawing_sha256(named_sixth)
 
 
 #: Two zones, each with one pond, the first water area of its zone.
