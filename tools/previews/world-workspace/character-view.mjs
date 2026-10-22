@@ -190,7 +190,11 @@ export function runQuestion({ who, model, limits, refusal = null, busy = false }
  * The rows of What Teo did (frame 06), newest first, at most `limit`: from the society's events for
  * the character, newest first as the events read serves them. A line said is one row ("Said to Ines:
  * “…”", T6); a model's applied choice is one row; a goal the routine set is one row. A goal a model's
- * choice set is the choice's row already. A line said to the character, or to everyone near while the
+ * choice set is the choice's row already. A goal the routine set that repeats the character's goal just
+ * before it, the same kind toward the same place, thing or person (a stand after a stand), is no row of
+ * its own (R5h): nothing new was done, and the earlier goal's row says it, spanning to the repeat's time
+ * where no row lies between. A goal the routine set that changes what the character does stays a row,
+ * in the minute of a line or not. A line said to the character, or to everyone near while the
  * character heard it, is a `heard` row ("Heard Ines: “…”") with no sub-line and no decision; a line
  * overheard, said to someone else, is none. `wordGoal(document)` says a goal in the catalog's words;
  * `modelName` names a model by its provider and id; `options(requestId)` is a decision's number of
@@ -206,30 +210,52 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
     .sort((a, b) => b.event.tick - a.event.tick || b.index - a.index).map(({ event }) => event);
   // A said event keeps its request under `thing` (society_things.py); a decision_applied event at the top.
   const said = new Set(mine.filter(event => event.event_kind === 'said').map(event => event.document?.thing?.request_id).filter(Boolean));
+  // Each of the character's goals with the goal just before it, which a routine's repeat is no row beside.
+  const goals = mine.filter(event => event.subject_id === subjectId && event.event_kind === 'goal_selected');
+  const earlier = new Map(goals.slice(0, -1).map((event, at) => [event, goals[at + 1]]));
   const rows = [];
+  // The newest repeat since the last row, and the goal whose row then spans to its time.
+  let span = null;
+  const push = (row) => { rows.push(row); span = null; };
   for (const event of mine) {
     const document = event.document || {};
     // Every row carries its time (R5e): the world's clock time, else the society's minute (J35's "Minute 8").
     const time = worldTime(event.tick, startMinute)?.hhmm ?? (Number.isSafeInteger(event.tick) ? `Minute ${event.tick}` : '');
     if (event.subject_id !== subjectId) {
-      rows.push({ time, what: heardRow(who(event.subject_id), document.thing.line), sub: '', requestId: null, model: null, heard: true });
+      push({ time, what: heardRow(who(event.subject_id), document.thing.line), sub: '', requestId: null, model: null, heard: true });
     } else if (event.event_kind === 'said' && typeof document.thing?.line === 'string') {
       const model = document.thing.model ? modelName(document.thing.model) : null;
       const to = typeof document.thing.to === 'string' ? who(document.thing.to) : null;
-      rows.push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model,
+      push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model,
         decider: document.thing.decider ?? null });
     } else if (event.event_kind === 'decision_applied' && !said.has(document.request_id)) {
       const what = typeof document.chose === 'string' && document.chose ? document.chose.charAt(0).toUpperCase() + document.chose.slice(1) : wordGoal(document);
       if (!what) continue;
       const model = document.model ? modelName(document.model) : null;
-      rows.push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model,
+      push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model,
         decider: document.origin ?? null, did: event.did ?? null, chose: typeof document.chose === 'string' ? document.chose : null, tick: event.tick });
     } else if (event.event_kind === 'goal_selected' && document.reason !== 'chosen_by_their_model') {
+      const before = earlier.get(event);
+      if (sameGoal(document.goal, before?.document?.goal)) {
+        span = { time: span?.time ?? time, goal: before };
+        continue;
+      }
       const what = wordGoal(document);
-      if (what) rows.push({ time, what, sub: rowSub(null), requestId: null, model: null });
+      if (what) push({ time: span?.goal === event ? timeRange(time, span.time) : time, what, sub: rowSub(null), requestId: null, model: null });
+      else span = null;
     }
   }
   return foldRows(rows, foldable).slice(0, limit);
+}
+
+/**
+ * The same goal (R5h): the same kind toward the same place, thing or person, as a purposeful society's goal says it
+ * (kind, target, partner) or a living one's (activity, destination, spot, node). Neither goal known is never the same.
+ */
+function sameGoal(a, b) {
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const where = goal => [goal.kind ?? goal.activity, goal.target_id, goal.partner_id, goal.destination_id, goal.spot_id, goal.node_id].map(part => part ?? null);
+  return JSON.stringify(where(a)) === JSON.stringify(where(b));
 }
 
 /**

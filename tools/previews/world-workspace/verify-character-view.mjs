@@ -77,6 +77,38 @@ assert.deepEqual(did.map(row => [row.time, row.what, row.sub]), [
   ['06:00', 'Leaving home', 'Routine'],
 ]);
 assert.equal(didRows({ events, subjectId: 't', wordGoal: () => null, modelName: () => null, limit: 1 }).length, 1);
+// R5h: a goal the routine set that repeats Teo's goal just before it (a stand after a stand) is no row of its own; the
+// earlier goal's row spans to it where no row lies between, and keeps its own time where Teo's lines do. A routine goal
+// that changes what he does stays a row, in a line's minute too; a repeat of his model's stand hides behind its row.
+const stand = { kind: 'stand', target_id: null, reason: 'stopping_a_while' };
+const aim = (tick, goal, reason = 'stopping_a_while') => ({ subject_id: 't', tick, event_kind: 'goal_selected', document: { reason, goal } });
+const nemo = { provider: 'p', model_id: 'super' };
+const spoke = (tick) => [
+  { subject_id: 't', tick, event_kind: 'decision_applied', document: { request_id: `s${tick}`, chose: 'say something', model: nemo } },
+  { subject_id: 't', tick, event_kind: 'said', document: { thing: { request_id: `s${tick}`, line: 'Morning.', heard_by: [], model: nemo } } },
+];
+// As the events read serves them: newest minute first, and in a minute as recorded (the goal, the choice, the line).
+const served = (minutes) => minutes.reverse().flat();
+const stood = served([
+  [aim(1, stand)], [aim(2, stand)], [aim(3, stand), ...spoke(3)], [aim(5, stand), ...spoke(5)],
+  [aim(8, stand, 'chosen_by_their_model'), { subject_id: 't', tick: 8, event_kind: 'decision_applied', document: { request_id: 'c8', chose: 'stand here a while', model: nemo } }],
+  [aim(10, stand)], [aim(12, { kind: 'rest', target_id: 'bench', reason: 'resting' }), ...spoke(12)],
+]);
+const goalWords = (document) => ({ stand: 'Went to stand a while', rest: 'Went to rest', eat: 'Went to eat' })[document.goal?.kind ?? document.goal?.activity] ?? null;
+assert.deepEqual(didRows({ events: stood, subjectId: 't', startMinute: 360, wordGoal: goalWords, modelName: () => 'Nemotron 3 Super 120B', options: () => 8 })
+  .map(row => [row.time, row.what, row.sub]), [
+  ['06:12', 'Said: \u201cMorning.\u201d', 'Nemotron 3 Super 120B · 8 choices'],
+  ['06:12', 'Went to rest', 'Routine'],
+  ['06:08', 'Stand here a while', 'Nemotron 3 Super 120B · 8 choices'],
+  ['06:05', 'Said: \u201cMorning.\u201d', 'Nemotron 3 Super 120B · 8 choices'],
+  ['06:03', 'Said: \u201cMorning.\u201d', 'Nemotron 3 Super 120B · 8 choices'],
+  ['06:01 to 06:03', 'Went to stand a while', 'Routine'],
+]);
+// A living society's goal names its spot: the same activity at another spot is somewhere new, and another activity at
+// the same spot is something new.
+const eat = (tick, spot, activity = 'eat') => aim(tick, { activity, destination_id: 'home', spot_id: spot, node_id: null, reason: 'most_pressing_need' }, 'most_pressing_need');
+assert.deepEqual(didRows({ events: served([[eat(1, 'a')], [eat(2, 'a')], [eat(4, 'b')], [eat(6, 'b', 'rest')]]), subjectId: 't', startMinute: 360, wordGoal: goalWords, modelName: () => null })
+  .map(row => [row.time, row.what]), [['06:06', 'Went to rest'], ['06:04', 'Went to eat'], ['06:01 to 06:02', 'Went to eat']]);
 // Every row carries its time (R5e): where the society keeps no clock, the minute in J35's form.
 assert.deepEqual(didRows({ events, subjectId: 't', wordGoal: () => 'Leaving home', modelName: () => null }).map(row => row.time), ['Minute 52', 'Minute 44', 'Minute 0']);
 // The same choice made several times in a row, each with no moment of its own, is one row (R5e item 3): its time

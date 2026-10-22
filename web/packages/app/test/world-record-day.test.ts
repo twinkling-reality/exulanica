@@ -424,6 +424,39 @@ describe("Teo's day keeps the world's clock", () => {
   });
 });
 
+describe("Teo's day shows a stand the routine repeats once (R5h)", () => {
+  type Rows = { didRows(read: Record<string, unknown>): Array<{ time: string; what: string; sub: string }> };
+  const view = async (): Promise<Rows> =>
+    import('../../../../tools/previews/world-workspace/' + 'character-view.mjs') as Promise<Rows>;
+  const nano = { provider: 'nebius', model_id: 'nano' };
+  // A minute as the events read serves it: the goal the routine set, then the choice of a line, then the line.
+  const minute = (tick: number, goal: Record<string, unknown>, to: string | null) => [
+    { subject_id: 'teo', tick, event_kind: 'goal_selected', document: { reason: 'stopping_a_while', goal } },
+    { subject_id: 'teo', tick, event_kind: 'decision_applied', document: { request_id: `r${tick}`, chose: 'say something', model: nano } },
+    { subject_id: 'teo', tick, event_kind: 'said', document: { thing: { request_id: `r${tick}`, line: 'Morning.', to, heard_by: ['ines'], model: nano } } },
+  ];
+  const stand = { kind: 'stand', target_id: null };
+
+  it("keeps his lines and the first stand, and a walk the routine starts in a line's minute", async () => {
+    const { didRows } = await view();
+    // Newest minute first: a walk to the bench at 06:07, stands at 06:05 and 06:03 that repeat the stand at 06:01.
+    const events = [
+      ...minute(7, { kind: 'rest', target_id: 'bench' }, null), ...minute(5, stand, 'ines'), ...minute(3, stand, null),
+      { subject_id: 'teo', tick: 1, event_kind: 'goal_selected', document: { reason: 'stopping_a_while', goal: stand } },
+    ];
+    const wordGoal = (document: { goal: { kind: string } }) => (document.goal.kind === 'rest' ? 'Went to rest' : 'Went to stand a while');
+    const rows = didRows({ events, subjectId: 'teo', startMinute: 360, wordGoal, modelName: () => NEMOTRON, options: () => 8, who: () => ({ start: 'Ines', within: 'Ines' }) });
+    expect(rows.map((row) => [row.time, row.what, row.sub])).toEqual([
+      ['06:07', 'Said: “Morning.”', `${NEMOTRON} · 8 choices`],
+      ['06:07', 'Went to rest', 'Routine'],
+      ['06:05', 'Said to Ines: “Morning.”', `${NEMOTRON} · 8 choices`],
+      ['06:03', 'Said: “Morning.”', `${NEMOTRON} · 8 choices`],
+      // The stand at 06:03 came before that minute's line, so nothing lies between it and the first.
+      ['06:01 to 06:03', 'Went to stand a while', 'Routine'],
+    ]);
+  });
+});
+
 describe("Teo's day names a run only where Teo was in it (R5g)", () => {
   type Ran = { ranIn(events: readonly unknown[], subjectId: string, run: unknown): boolean };
   const view = async (): Promise<Ran> =>
