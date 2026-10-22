@@ -424,6 +424,28 @@ describe("Teo's day keeps the world's clock", () => {
   });
 });
 
+describe("Teo's day names a run only where Teo was in it (R5g)", () => {
+  type Ran = { ranIn(events: readonly unknown[], subjectId: string, run: unknown): boolean };
+  const view = async (): Promise<Ran> =>
+    import('../../../../tools/previews/world-workspace/' + 'character-view.mjs') as Promise<Ran>;
+  const run = { startTick: 1, endTick: 50 };
+  const chose = (subject: string, tick: number, model: unknown) => ({ subject_id: subject, tick, event_kind: 'decision_applied', document: { model } });
+  const said = (subject: string, tick: number, model: unknown) => ({ subject_id: subject, tick, event_kind: 'said', document: { thing: { model, line: 'Morning.' } } });
+  const nano = { provider: 'nebius', model_id: 'nano' };
+
+  it("takes a choice or a line Teo's model made inside the run, and nothing else", async () => {
+    const { ranIn } = await view();
+    expect(ranIn([chose('teo', 7, nano)], 'teo', run)).toBe(true);
+    expect(ranIn([said('teo', 16, nano)], 'teo', run)).toBe(true);
+    // Willa's model chose in the run; Teo followed his routine through it, and chose by a model after it.
+    expect(ranIn([chose('willa', 7, nano), chose('teo', 9, null), said('teo', 12, null), chose('teo', 51, nano)], 'teo', run)).toBe(false);
+    // A run with no end yet, or none, names nobody here.
+    expect(ranIn([chose('teo', 7, nano)], 'teo', { startTick: 1, endTick: null })).toBe(false);
+    expect(ranIn([chose('teo', 0, nano)], 'teo', { startTick: 0, endTick: null })).toBe(false);
+    expect(ranIn([chose('teo', 7, nano)], 'teo', null)).toBe(false);
+  });
+});
+
 describe("Teo's day at 1440 by 900", () => {
   it("takes History's 1440 rules: margins 80, the title 60, pictures 0.86, and keeps the chosen card in view", async () => {
     const { root, page } = await open(1440, 900);

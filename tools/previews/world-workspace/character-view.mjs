@@ -18,6 +18,18 @@ export function dayStartMinute(state) {
   return Number.isSafeInteger(start) ? start : null;
 }
 
+/**
+ * Whether a person was in a run, so their day page may name it (R5g): a decision their model made (a choice applied
+ * or a line said, each with a model) between the run's first and last minute, among the events the page holds. A run
+ * records nobody by name, so where the events held do not reach it, the answer is no: never another person's run.
+ */
+export function ranIn(events, subjectId, run) {
+  if (!run || !Number.isSafeInteger(run.startTick) || !Number.isSafeInteger(run.endTick)) return false;
+  return events.some((event) => event.subject_id === subjectId && event.tick >= run.startTick && event.tick <= run.endTick
+    && ((event.event_kind === 'decision_applied' && Boolean(event.document?.model))
+      || (event.event_kind === 'said' && Boolean(event.document?.thing?.model))));
+}
+
 const plain = value => typeof value === 'string' && value.trim() ? value.trim() : null;
 
 /**
