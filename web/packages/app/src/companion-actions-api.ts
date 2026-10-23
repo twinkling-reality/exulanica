@@ -111,8 +111,13 @@ export interface BudgetSheet {
   readonly hourSoFar: { readonly decisions: number; readonly usd: string };
   readonly beings: number | null;
   readonly minded: number;
-  /** The models that decide for beings here now; one name is said, several are never set side by side. */
-  readonly models: readonly { readonly name: string; readonly beings: number; readonly typical: boolean }[];
+  /**
+   * The models that decide for beings here now; one name is said, several are never set side by side.
+   * `free` where the most one of its answers can cost is nothing (a model on this computer).
+   */
+  readonly models: readonly {
+    readonly name: string; readonly beings: number; readonly typical: boolean; readonly free: boolean;
+  }[];
   readonly answersForUsd: AtBothPrices<number>;
   readonly binds: AtBothPrices<'usd' | 'decisions'>;
   readonly demand: {
@@ -416,8 +421,12 @@ function budgetSheet(value: unknown): BudgetSheet | null {
     minded: whole(row['minded']) ?? 0,
     models: Object.freeze((Array.isArray(row['models']) ? row['models'] : []).flatMap((model) => {
       const found = part(model); const beings = whole(found['beings']);
+      const most = dollars(found['usd_per_answer_at_most']);
       return typeof found['name'] === 'string' && beings !== null
-        ? [Object.freeze({ name: found['name'], beings, typical: dollars(found['usd_per_answer_typical']) !== null })] : [];
+        ? [Object.freeze({
+          name: found['name'], beings, typical: dollars(found['usd_per_answer_typical']) !== null,
+          free: most !== null && Number(most) === 0,
+        })] : [];
     })),
     answersForUsd: bothPrices(row['answers_for_usd'], whole),
     binds: bothPrices(row['binds'], binding),

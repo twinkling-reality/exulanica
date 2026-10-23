@@ -159,11 +159,53 @@ describe('what the sheet says of a budget before the yes', () => {
   it('never sets one model’s figures beside another’s', () => {
     const sheet = sheetOf('budget-plan');
     const several = budgetSheetWords({
-      ...sheet, models: [...sheet.models, { name: 'Ultra', beings: 1, typical: true }],
+      ...sheet, models: [...sheet.models, { name: 'Ultra', beings: 1, typical: true, free: false }],
     }).join(' ');
     expect(several).toContain('Several AI models decide here; by the dearest of them:');
     expect(several).not.toContain('Nano');
     expect(several).not.toContain('Ultra');
+  });
+
+  it('says only the decisions run out where every model here answers for nothing, even with no money', () => {
+    // The server's own sheet for a model whose answer costs at most nothing (a model on this computer).
+    const json = read('web/packages/app/test/companion-plans/budget-plan.json')
+      .replace('"usd_per_answer_at_most": "0.00310000"', '"usd_per_answer_at_most": "0.00000000"');
+    const parsed = parseActionPlan(JSON.parse(json)).steps[0]!.budget!;
+    expect(parsed.models.map((model) => model.free)).toEqual([true]);
+    expect(sheetOf('budget-plan').models.map((model) => model.free)).toEqual([false]);
+    const free: BudgetSheet = {
+      ...parsed, models: [{ ...parsed.models[0]!, name: 'Qwen3 4B Instruct', typical: false }], demand: null,
+      answersForUsd: { atMostPrice: null, atTypicalPrice: null }, binds: { atMostPrice: 'decisions', atTypicalPrice: 'decisions' },
+    };
+    const line = 'With Qwen3 4B Instruct deciding here: its answers cost nothing, so the money never runs out; only the 600 decisions can.';
+    expect(budgetSheetWords(free)[2]).toBe(line);
+    expect(budgetSheetWords({ ...free, models: [...free.models, { name: 'Mini', beings: 1, typical: false, free: true }] })[2])
+      .toBe('The AI models deciding here cost nothing to answer, so the money never runs out; only the 600 decisions can.');
+    // No money and decisions above none: they are still asked, and a used-up hour is still said.
+    const noMoney = budgetSheetWords({
+      ...free, asked: { usdPerHour: '0.000000', decisionsPerHour: 600 }, refusedNow: 'world_hour_decisions_spent',
+    });
+    expect(noMoney[2]).toBe(line);
+    expect(noMoney.join(' ')).toContain('Even under this budget no AI model is asked right now: the last hour’s decisions already reach it.');
+    expect(noMoney.join(' ')).not.toContain('With nothing to spend');
+    // No decisions: nobody is asked, whatever an answer costs.
+    expect(budgetSheetWords({ ...free, asked: { usdPerHour: '0.500000', decisionsPerHour: 0 } })[2])
+      .toBe('With nothing to spend, no AI model is asked: everyone follows their own routine. The models you chose are kept.');
+    // Beside a priced model, the dearest decides, as before.
+    const sheet = sheetOf('budget-plan');
+    const mixed: BudgetSheet = { ...sheet, models: [...sheet.models, { name: 'Mini', beings: 1, typical: false, free: true }] };
+    expect(budgetSheetWords(mixed)[2]).toContain('Several AI models decide here; by the dearest of them:');
+    // With no money only the free ones are asked: the dearest's refusal of the hour and its rates are not said.
+    const mixedNoMoney = budgetSheetWords({
+      ...mixed, asked: { usdPerHour: '0.000000', decisionsPerHour: 600 }, refusedNow: 'world_hour_spend_spent',
+      answersForUsd: { atMostPrice: 0, atTypicalPrice: 0 },
+    });
+    expect(mixedNoMoney[2]).toBe('With no money to spend, only the AI models that cost nothing are asked; people with a priced model follow their own routine. The models you chose are kept.');
+    expect(mixedNoMoney[3]).toBe('This world has 5 beings; an AI model decides for 2.');
+    expect(mixedNoMoney.join(' ')).not.toContain('Even under this budget');
+    // No decisions: nobody is asked, free or priced.
+    expect(budgetSheetWords({ ...mixed, asked: { usdPerHour: '0.000000', decisionsPerHour: 0 } })[2])
+      .toBe('With nothing to spend, no AI model is asked: everyone follows their own routine. The models you chose are kept.');
   });
 
   it('says a budget of nothing asks nobody, and that nothing is asked where no model is chosen', () => {

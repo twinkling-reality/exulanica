@@ -295,10 +295,24 @@ export function budgetSheetWords(sheet: BudgetSheet): string[] {
   const money = atMostDollarsWords(sheet.asked.usdPerHour);
   const decisions = count(sheet.asked.decisionsPerHour, 'decision');
   const most = sheet.answersForUsd.atMostPrice; const typical = sheet.answersForUsd.atTypicalPrice;
-  if (sheet.asked.decisionsPerHour === 0 || Number(sheet.asked.usdPerHour) === 0) {
+  // A model that answers for nothing is asked under a budget of no money too: only the decisions
+  // bound it. Where every model here is one, the money never runs out; where only some are, no money
+  // asks those alone.
+  const free = sheet.models.length > 0 && sheet.models.every((model) => model.free);
+  const noMoney = Number(sheet.asked.usdPerHour) === 0;
+  const nothing = sheet.asked.decisionsPerHour === 0 || (noMoney && !sheet.models.some((model) => model.free));
+  // No priced model is asked: how often they would ask, and the hour's refusal by the dearest, are not said.
+  const unpriced = nothing || (noMoney && !free);
+  if (nothing) {
     lines.push('With nothing to spend, no AI model is asked: everyone follows their own routine. The models you chose are kept.');
   } else if (sheet.minded === 0) {
     lines.push('No being here has an AI model yet, so nothing is asked whatever the budget. Which of the two runs out first depends on the model you choose.');
+  } else if (free) {
+    lines.push(sheet.models.length === 1
+      ? `With ${sheet.models[0]!.name} deciding here: its answers cost nothing, so the money never runs out; only the ${decisions} can.`
+      : `The AI models deciding here cost nothing to answer, so the money never runs out; only the ${decisions} can.`);
+  } else if (noMoney) {
+    lines.push('With no money to spend, only the AI models that cost nothing are asked; people with a priced model follow their own routine. The models you chose are kept.');
   } else if (sheet.models.length === 0 || most === null) {
     lines.push('This server cannot price an answer of the AI model chosen here right now, so which of the two runs out first cannot be said.');
   } else {
@@ -315,10 +329,9 @@ export function budgetSheetWords(sheet: BudgetSheet): string[] {
   }
   if (sheet.beings !== null) {
     const here = `This world has ${count(sheet.beings, 'being')}; an AI model decides for ${sheet.minded === 0 ? 'none of them' : sheet.minded}.`;
-    // Under a budget of nothing the line above has said nobody is asked: how often they would ask
-    // and how soon nothing runs out is not said again.
-    const nothing = sheet.asked.decisionsPerHour === 0 || Number(sheet.asked.usdPerHour) === 0;
-    if (sheet.demand === null || nothing) lines.push(here);
+    // Under a budget that asks no priced model the line above has said who is asked: how often they
+    // would ask and how soon nothing runs out is not said again.
+    if (sheet.demand === null || unpriced) lines.push(here);
     else {
       const all = sheet.demand.everyone !== null && sheet.demand.everyone.beings !== sheet.demand.minded.beings
         ? ` With that model for all ${sheet.demand.everyone.beings}: ${demandWords(sheet.demand.everyone, sheet.demand.estimate)}.` : '';
@@ -328,7 +341,7 @@ export function budgetSheetWords(sheet: BudgetSheet): string[] {
   if (sheet.hourSoFar.decisions > 0) {
     lines.push(`In the last hour this world asked AI models ${count(sheet.hourSoFar.decisions, 'time')}, for ${smallDollarsWords(sheet.hourSoFar.usd)}.`);
   }
-  if (sheet.refusedNow !== null && sheet.asked.decisionsPerHour > 0 && Number(sheet.asked.usdPerHour) > 0) {
+  if (sheet.refusedNow !== null && !unpriced) {
     lines.push(`Even under this budget no AI model is asked right now: ${sheet.refusedNow === 'world_hour_spend_spent' ? 'the last hour’s spending already reaches it' : 'the last hour’s decisions already reach it'}. Asking starts again as the hour moves on.`);
   }
   lines.push(sheet.hostRefusal !== null ? 'This server does not ask AI models in this world right now, whatever the budget.'

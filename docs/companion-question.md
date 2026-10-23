@@ -1131,21 +1131,23 @@ leaves of it; how many beings the society holds, by its own state, and how many 
 for each model that decides here, the most one answer can cost and what one typically cost where
 that was measured; what the dollars pay for and which of the two ceilings runs out first, stated
 twice, at the most an answer can cost and at the typical price, because the host weighs each ask at
-its bound before it is made and the two can differ; how often those beings typically ask in a real
-hour at the speed the world's control holds, for the beings a model decides for and for everyone
-here, and how many minutes of the hour the budget covers, a figure projected from the measured rate
-and this world's head count and speed, never called measured for this world; what the host would
-answer the next ask under the asked budget (`refused_now`); and above the budget, why this host asks
-no model here if so, and under the durable spending authority what the workspace's allowance has
-left. A typical figure is served only for an engine and model that were measured, with its class;
-nothing is carried from one model to another. Setting a budget asks no model and spends nothing. The
-budget the world already has is `blocked` with `no_change`. A budget after another step of the same
-plan states the same on the plan, and its figures are its typed action's, so preparing it again
-cannot change them. The request's key follows the world's newest budget, the two figures and the
-account that asks. The step reads back as the budget its answer names (`budget_seq`), recorded by
-the caller under the step's key with the figures it named, `superseded` once a later budget is the
-world's. The page sends a budget only where its plan showed this sheet: a step confirmed with none
-is not sent (`budget_unshown`).
+its bound before it is made and the two can differ (where every model deciding here answers for
+nothing, as a model on this computer does, the dollars bound no number of answers, even a budget of
+none: `answers_for_usd` is null at both prices and the decisions are what runs out); how often those
+beings typically ask in a real hour at the speed the world's control holds, for the beings a model
+decides for and for everyone here, and how many minutes of the hour the budget covers, a figure
+projected from the measured rate and this world's head count and speed, never called measured for
+this world; what the host would answer the next ask under the asked budget (`refused_now`); and
+above the budget, why this host asks no model here if so, and under the durable spending authority
+what the workspace's allowance has left. A typical figure is served only for an engine and model
+that were measured, with its class; nothing is carried from one model to another. Setting a budget
+asks no model and spends nothing. The budget the world already has is `blocked` with `no_change`. A
+budget after another step of the same plan states the same on the plan, and its figures are its
+typed action's, so preparing it again cannot change them. The request's key follows the world's
+newest budget, the two figures and the account that asks. The step reads back as the budget its
+answer names (`budget_seq`), recorded by the caller under the step's key with the figures it named,
+`superseded` once a later budget is the world's. The page sends a budget only where its plan showed
+this sheet: a step confirmed with none is not sent (`budget_unshown`).
 
 **A living town taking its newcomers in.** A simulation request may ask `take_in`, the one request
 `POST .../society/take-in` takes, which has no body ([synthetic society

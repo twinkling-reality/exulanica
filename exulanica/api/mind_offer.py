@@ -58,12 +58,15 @@ def _whole(value: Decimal, rounding: str = ROUND_FLOOR) -> int:
     return int(value.to_integral_value(rounding))
 
 
-def _answers_for(usd: Decimal, bound: Decimal, price: Decimal) -> int:
+def _answers_for(usd: Decimal, bound: Decimal, price: Decimal) -> int | None:
     """How many asks ``usd`` admits in one hour when each is weighed at ``bound`` before it is
     made and then costs ``price``: the host admits an ask while what the hour has cost plus the
-    ask's bound stays within the dollars (``hour_refusal``)."""
+    ask's bound stays within the dollars (``hour_refusal``). None where an answer costs nothing
+    (a model on this computer): the dollars then bound no number of answers."""
     if usd < bound:
         return 0
+    if price == 0:
+        return None
     return _whole((usd - bound) / price) + 1
 
 
@@ -309,7 +312,9 @@ class WorldMinds:
         can cost and what one typically cost where that was measured. ``answers_for_usd`` and
         ``binds`` are stated twice, at the most an answer can cost and at the typical price,
         because the host weighs each ask at its bound before it is made: the dearest model here
-        decides both, so neither is said better than it is. ``demand`` is how often these beings
+        decides both, so neither is said better than it is. Where every model here answers for
+        nothing, the dollars bound no number of answers: ``answers_for_usd`` is None at both prices
+        and the decisions are what runs out. ``demand`` is how often these beings
         typically ask in an hour of real time at the speed the world's control holds, and how
         many minutes of the hour the budget covers; it is None where a model here has no measured
         rate. ``refused_now`` is what the host would answer the next ask under this budget.
@@ -362,6 +367,8 @@ class WorldMinds:
         measured = [typical for typical in typicals if typical is not None]
         every_typical = bool(models) and len(measured) == len(models)
         dearest = max(bounds) if priced else None
+        # Every model deciding here answers for nothing: only the decisions can run out.
+        free = dearest == 0
         at_most = None if dearest is None else _answers_for(usd, dearest, dearest)
         typically = (
             None
@@ -370,13 +377,15 @@ class WorldMinds:
         )
 
         def binds(answers: int | None) -> str | None:
+            if free:
+                return "decisions"
             if answers is None:
                 return None
             return "usd" if answers < decisions_per_hour else "decisions"
 
         minutes = self._minutes_a_real_hour()
         demand: dict[str, Any] | None = None
-        if every_typical and minutes is not None and typically is not None:
+        if every_typical and minutes is not None and (typically is not None or free):
             rate = sum(
                 (
                     entry.asks_per_being_minute * count
@@ -384,7 +393,9 @@ class WorldMinds:
                 ),
                 Decimal(0),
             )
-            capacity = min(decisions_per_hour, typically)
+            capacity = (
+                decisions_per_hour if typically is None else min(decisions_per_hour, typically)
+            )
 
             def lasts(asks: Decimal) -> int:
                 if asks <= capacity:
