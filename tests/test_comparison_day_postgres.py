@@ -39,6 +39,7 @@ import multiprocessing
 import os
 import signal
 import threading
+import time
 import uuid
 from decimal import Decimal
 from pathlib import Path
@@ -550,16 +551,27 @@ def test_a_host_killed_inside_a_minute_stores_none_of_it_and_the_next_asks_from_
 
 
 def _take_over(town, comparison_id: str) -> Any:
-    """The host's lease runs out and another claim takes the start: what that claim is."""
+    """The host's lease runs out and another claim takes the start: what that claim is.
+
+    A claim skips a start another of the host's runs holds locked for a moment, as it should, so
+    the lease is run out and the start claimed again until a claim takes it, as a later claim
+    would (OBSERVED 2026-10-23: in CI run 40031002936 one claim at the model's first answer
+    returned nothing).
+    """
     services = town["api"].client.app.state.services
-    with services.database.session(town["workspace"]) as connection, connection.transaction():
-        connection.execute(
-            "update society_comparison_start set lease_expires_at=clock_timestamp() "
-            "where comparison_id=%s",
-            (uuid.UUID(comparison_id),),
-        )
-    with services.database.session(town["workspace"]) as connection:
-        return SocietyComparisonStarts(connection, town["workspace"]).claim()
+    for _ in range(100):
+        with services.database.session(town["workspace"]) as connection, connection.transaction():
+            connection.execute(
+                "update society_comparison_start set lease_expires_at=clock_timestamp() "
+                "where comparison_id=%s",
+                (uuid.UUID(comparison_id),),
+            )
+        with services.database.session(town["workspace"]) as connection:
+            claim = SocietyComparisonStarts(connection, town["workspace"]).claim()
+        if claim is not None:
+            return claim
+        time.sleep(0.05)
+    return None
 
 
 def _model_rows(town, comparison_id: str) -> tuple[int, int, int]:
