@@ -5,9 +5,11 @@
 # catalogs, character sources, the owned district and the texture set from `assets/`, and the
 # interaction policy registry from `exulanica/world/`, by relative imports that leave `web/`
 # (MEASURED 2026-09-29: a `web/` context fails `vite build` with "Could not resolve
-# ../../../../assets/owned-world/..."). The repository layout is kept under /src, so those
-# imports resolve unchanged. The server configuration is a heredoc so the image needs no file
-# of its own.
+# ../../../../assets/owned-world/..."). The build also loads the world workspace from
+# `tools/previews/world-workspace` by path (`src/dev/world-workspace-build.ts`) and patches it into
+# the app, so a context without that folder fails `vite build` with "Cannot find module
+# .../seams.mjs". The repository layout is kept under /src, so those imports resolve unchanged.
+# The server configuration is a heredoc so the image needs no file of its own.
 #
 # TWO THINGS HERE ARE LOAD BEARING and both are about the single origin:
 #
@@ -52,9 +54,11 @@ RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile
 # VITE_EXULANICA_TOKEN is deliberately NOT set. Baking it would publish the bearer token as a
 # string literal inside the JavaScript, readable by anyone who can fetch the file. Left unset,
 # the app renders its own token gate and the judge pastes the credential once.
-# What the bundle imports from outside `web/`, at the paths its relative imports name.
+# What the bundle imports from outside `web/`, at the paths its relative imports name, and the
+# world workspace the build loads by path and patches into the app.
 COPY assets /src/assets
 COPY exulanica/world/interaction-policy-registry.v1.json /src/exulanica/world/
+COPY tools/previews/world-workspace /src/tools/previews/world-workspace
 RUN pnpm --filter @exulanica/app build
 
 FROM nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de AS runtime
