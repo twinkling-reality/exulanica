@@ -239,11 +239,20 @@ export function jpegWithoutMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<
   return out;
 }
 
-/** A frame as the JPEG the server keeps: encoded at `quality`, with no metadata (null where the browser makes none). */
+/**
+ * A frame as the JPEG the server keeps: encoded at `quality`, with no metadata (null where the browser makes none).
+ * Encoded at once (toDataURL, the same encoder): toBlob, and an offscreen canvas's convertToBlob, wait for the page's
+ * idle time, which a page drawing a world every frame rarely has, so each picture waited about a second for it.
+ */
 export async function frameJpeg(frame: HTMLCanvasElement, quality = QUALITY): Promise<Blob | null> {
-  const encoded = await new Promise<Blob | null>((resolve) => frame.toBlob(resolve, 'image/jpeg', quality));
-  if (encoded === null) return null;
-  return new Blob([jpegWithoutMetadata(new Uint8Array(await encoded.arrayBuffer()))], { type: 'image/jpeg' });
+  const address = frame.toDataURL('image/jpeg', quality);
+  const comma = address.indexOf(',');
+  // A canvas with nothing to encode answers "data:,", and a browser that cannot write a JPEG answers another type.
+  if (!address.startsWith('data:image/jpeg;base64,') || comma === address.length - 1) return null;
+  const text = atob(address.slice(comma + 1));
+  const bytes = new Uint8Array(text.length);
+  for (let at = 0; at < text.length; at += 1) bytes[at] = text.charCodeAt(at);
+  return new Blob([jpegWithoutMetadata(bytes)], { type: 'image/jpeg' });
 }
 
 /** The first views this page has put, by entry and what they show, so one is put once. */

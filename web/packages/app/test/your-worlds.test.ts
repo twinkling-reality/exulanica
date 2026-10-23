@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildYourWorlds, onlyUntouchedStarter } from '../src/composition/world-entry.js';
 import {
-  FIRST_VIEW_WAIT, holdsWorld, jpegWithoutMetadata, keepFirstViewPicture, mayPutPicture, readServedPictures, worldPicture, type PictureSource,
+  FIRST_VIEW_WAIT, frameJpeg, holdsWorld, jpegWithoutMetadata, keepFirstViewPicture, mayPutPicture, readServedPictures, worldPicture, type PictureSource,
 } from '../src/composition/world-pictures.js';
 import type { SavedWorldEntry, SavedWorldEntryPicture } from '../src/world-entry-api.js';
 
@@ -231,7 +231,6 @@ describe('the pictures the server keeps', () => {
       drawImage: () => undefined, getImageData: () => ({ data }),
     } as never);
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,BBBB');
-    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((done) => done(jpeg(3, 1, 4)));
     const canvas = document.createElement('canvas');
     canvas.width = 1600;
     canvas.height = 900;
@@ -272,6 +271,28 @@ describe('the pictures the server keeps', () => {
     const stale = world({ picture: kept('e'.repeat(64), { current: false }) });
     await keepFirstViewPicture(renderer(), stale, put);
     expect(put.putPicture).toHaveBeenCalledTimes(3);
+  });
+
+  it('encodes a frame at once, without waiting on the idle time toBlob waits for, its metadata taken out', async () => {
+    const segment = (marker: number, body: number[]): number[] => [0xff, marker, ((body.length + 2) >> 8) & 0xff, (body.length + 2) & 0xff, ...body];
+    const app0 = segment(0xe0, [0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0]);
+    const scan = [...segment(0xda, [1, 1, 0, 0, 63, 0]), 0x12, 0x34, 0xff, 0xd9];
+    const bare = [0xff, 0xd8, ...app0, ...scan];
+    const written = [0xff, 0xd8, ...app0, ...segment(0xe1, [0x45, 0x78, 0x69, 0x66, 0, 0]), ...scan];
+    const address = (bytes: number[]) => `data:image/jpeg;base64,${btoa(String.fromCharCode(...bytes))}`;
+    const encode = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(address(written));
+    const waits = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob');
+    const frame = document.createElement('canvas');
+    const picture = await frameJpeg(frame, 0.72);
+    expect(encode).toHaveBeenCalledWith('image/jpeg', 0.72);
+    expect(waits).not.toHaveBeenCalled();
+    expect(picture?.type).toBe('image/jpeg');
+    expect([...new Uint8Array(await picture!.arrayBuffer())]).toEqual(bare);
+    // Nothing to encode (an empty canvas), or a browser that writes no JPEG: no picture.
+    encode.mockReturnValue('data:,');
+    expect(await frameJpeg(frame)).toBeNull();
+    encode.mockReturnValue('data:image/png;base64,iVBORw0KGgo=');
+    expect(await frameJpeg(frame)).toBeNull();
   });
 
   it('sends a JPEG without the metadata a browser writes, which the server refuses, and its scan unchanged', () => {

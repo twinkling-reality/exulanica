@@ -1,8 +1,8 @@
 import { isScenePreview, scenePreviewAddress } from './front-door-routes.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
 import { MOMENT_ASK_MESSAGE, MOMENT_FRAMING, MOMENT_PICTURE_MESSAGE, MOMENT_SCENE_KEY, foregroundShare, framingInSight, momentSociety, overviewDistance, reframe } from './moment-framing.mjs';
-import { frameJpeg, takeFrame } from '/src/composition/world-pictures.ts';
-import type { SavedWorldEntry } from '/src/world-entry-api.ts';
+import { frameJpeg, takeFrame } from '../../../web/packages/app/src/composition/world-pictures.ts';
+import type { SavedWorldEntry } from '../../../web/packages/app/src/world-entry-api.ts';
 
 // The front door's live background: the app drawing the chosen saved world in an inert frame, its
 // camera turning gently. The camera moves; the world's own time does not.
@@ -69,11 +69,80 @@ function useLens(binding: any, fovDeg: number): void {
 }
 
 /**
- * How little the moment's subjects may move and turn between two looks half a second apart to stand settled, and
- * the longest a fresh crowd is given to settle: about what a new preview's crowd has between its society read and
- * its first look at its people (1.5 to 3 s in the traced previews).
+ * How little the moment's subjects may move, grow and turn between two looks to stand settled; how far apart those
+ * looks are for a crowd drawn afresh (`freshGapMs`) and for near forms just made (`nearGapMs`, long enough that a
+ * figure still turning into place moves more than that between them); and the longest a fresh crowd is given to
+ * settle (`mostMs`): about what a new preview's crowd has between its society read and its first look at its people
+ * (1.5 to 3 s in the traced previews).
  */
-const SETTLED = Object.freeze({ metres: 0.01, radians: 0.01, mostMs: 3_000 });
+const SETTLED = Object.freeze({ metres: 0.01, radians: 0.01, mostMs: 3_000, freshGapMs: 500, nearGapMs: 150 });
+
+/**
+ * Resolves once `count` frames have been asked for and drawn: each on the next animation frame, or after the
+ * recipe's retry where none comes first (a browser draws no frame for a page in a background tab, and the old
+ * fixed waits kept their pace there).
+ */
+export function framesDrawn(binding: any, count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (left: number): void => {
+      if (left <= 0) { resolve(); return; }
+      binding.invalidate();
+      let taken = false;
+      const next = (): void => {
+        if (taken) return;
+        taken = true;
+        cancelAnimationFrame(frame);
+        window.clearTimeout(timer);
+        step(left - 1);
+      };
+      const frame = requestAnimationFrame(next);
+      const timer = window.setTimeout(next, MOMENT_FRAMING.wait_ms.retry);
+    };
+    step(count);
+  });
+}
+
+/**
+ * After the camera moves: the frames that draw who is near it now. With temporal antialiasing on (the camera
+ * jitters), the recipe's whole retry, so the frame's history holds the new view alone.
+ */
+async function afterMove(binding: any): Promise<void> {
+  if ((binding.camera?.camera?.jitter ?? 0) > 0) {
+    binding.invalidate();
+    await new Promise((resolve) => setTimeout(resolve, MOMENT_FRAMING.wait_ms.retry));
+    return;
+  }
+  await framesDrawn(binding, 2);
+}
+
+/**
+ * Looked at every frame until the moment's `subjects` stand and face as they did `gapMs` before (and `ready` says
+ * yes), at most `mostMs`: a crowd drawn afresh, or a near form just made, turns its people into place over its
+ * first frames.
+ */
+async function standStill(binding: any, society: any, subjects: readonly string[], { gapMs, mostMs, ready = () => true }: {
+  readonly gapMs: number; readonly mostMs: number; readonly ready?: () => boolean;
+}): Promise<void> {
+  const at = { x: 0, y: 0, z: 0, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; } };
+  const pose = () => subjects.map((id) => (society.groundOf(id, at)
+    ? [at.x, at.z, society.headingOf?.(id) ?? NaN, society.heightOf?.(id) ?? NaN] : null));
+  const holds = (a: (number[] | null)[], b: (number[] | null)[]) => a.every((one, i) => {
+    const other = b[i];
+    if (!one || !other) return false;
+    const turn = Math.abs(Math.atan2(Math.sin(one[2]! - other[2]!), Math.cos(one[2]! - other[2]!)));
+    const grew = Number.isFinite(one[3]!) && Number.isFinite(other[3]!) ? Math.abs(one[3]! - other[3]!) : 0;
+    return Math.hypot(one[0]! - other[0]!, one[1]! - other[1]!) < SETTLED.metres && grew < SETTLED.metres && turn < SETTLED.radians;
+  });
+  const start = performance.now();
+  let last = { at: start, pose: pose() };
+  while (performance.now() - start < mostMs) {
+    await framesDrawn(binding, 1);
+    if (performance.now() - last.at < gapMs) continue;
+    const now = pose();
+    if (ready() && holds(now, last.pose)) return;
+    last = { at: performance.now(), pose: now };
+  }
+}
 
 /** Where the preview's camera stood and how it saw as the world opened, before its first picture moved it. */
 let opening: { readonly pose: Record<string, number>; readonly fov: number | null; readonly horizontalFov: boolean | null } | null = null;
@@ -164,12 +233,12 @@ async function drawMoment(renderer: any, key: string): Promise<void> {
   useLens(binding, MOMENT_FRAMING.fov_deg);
   binding.controls.setView({ ...sighted, x: sighted.x + offset.x, y: sighted.y + offset.y, z: sighted.z + offset.z }, 'altitude');
   // A person's far form, drawn while their look loads, has no face: each subject the crowd now draws near
-  // is waited for until it is drawn in full, at most the recipe's `wait_ms.near`.
-  for (let waited = 0; waited < wait.near; waited += wait.retry) {
-    binding.invalidate();
-    await sleep(wait.retry);
-    if (subjects.every((id) => society.inhabitantDetail?.(id) !== 'near' || society.inhabitantDrawnInFull?.(id) !== false)) break;
-  }
+  // is waited for until it is drawn in full and stands as drawn, at most the recipe's `wait_ms.near`.
+  await afterMove(binding);
+  await standStill(binding, society, subjects, {
+    gapMs: SETTLED.nearGapMs, mostMs: wait.near,
+    ready: () => subjects.every((id) => society.inhabitantDetail?.(id) !== 'near' || society.inhabitantDrawnInFull?.(id) !== false),
+  });
   // The same framing again from where they stand and how tall they are drawn now (reframe).
   const now = anchors().map((one, at) => (one === null ? null : {
     ...one, height: society.heightOf?.(subjects[at]!) ?? NaN, heading: society.headingOf?.(subjects[at]!) ?? NaN,
@@ -177,8 +246,7 @@ async function drawMoment(renderer: any, key: string): Promise<void> {
   const framed = reframe(sighted, now, MOMENT_FRAMING);
   if (framed !== sighted) {
     binding.controls.setView({ ...framed, x: framed.x + offset.x, y: framed.y + offset.y, z: framed.z + offset.z }, 'altitude');
-    binding.invalidate();
-    await sleep(wait.retry);
+    await afterMove(binding);
   }
   const [width, height] = MOMENT_FRAMING.size_px;
   for (let waited = 0; waited < wait.frame; waited += wait.retry) {
@@ -255,23 +323,7 @@ async function settled(binding: any, held: MomentAsk): Promise<void> {
   const society = binding?.authoredSociety ?? null;
   if (!binding || !society) return;
   const subjects = ((held.scene as { people?: { id: string }[] } | null)?.people ?? []).slice(0, 2).map((one) => one.id);
-  const wait = MOMENT_FRAMING.wait_ms;
-  const at = { x: 0, y: 0, z: 0, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; } };
-  const pose = () => subjects.map((id) => (society.groundOf(id, at) ? [at.x, at.z, society.headingOf?.(id) ?? NaN] : null));
-  const holds = (a: (number[] | null)[], b: (number[] | null)[]) => a.every((one, i) => {
-    const other = b[i];
-    if (!one || !other) return false;
-    const turn = Math.abs(Math.atan2(Math.sin(one[2]! - other[2]!), Math.cos(one[2]! - other[2]!)));
-    return Math.hypot(one[0]! - other[0]!, one[1]! - other[1]!) < SETTLED.metres && turn < SETTLED.radians;
-  });
-  let last = pose();
-  for (let waited = 0; waited < SETTLED.mostMs; waited += wait.retry) {
-    binding.invalidate();
-    await new Promise((resolve) => setTimeout(resolve, wait.retry));
-    const now = pose();
-    if (holds(now, last)) return;
-    last = now;
-  }
+  await standStill(binding, society, subjects, { gapMs: SETTLED.freshGapMs, mostMs: SETTLED.mostMs });
 }
 
 /** Camera motion in the preview's own renderer, held to the saved world it was asked for. */
