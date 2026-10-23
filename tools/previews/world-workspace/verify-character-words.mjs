@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, orderedModels, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
+import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -48,10 +48,6 @@ assert.equal(modelLine({ price: { input: '0.06', output: '0.24' } }), '$0.06 in 
 assert.equal(modelLine(null), 'No AI model · Free');
 assert.equal(routineRow(), 'No AI model · Free');
 
-// The model list: NVIDIA's models first, cheapest first; the rest as served.
-const model = (modelId, input) => ({ modelId, price: input === null ? null : { input, output: '1' } });
-assert.deepEqual(orderedModels([model('Qwen/Qwen3-235B', '0.2'), model('nvidia/Ultra', '1.0'), model('deepseek/flash', '0.14'), model('nvidia/Nano', '0.06'), model('nvidia/Super', '0.3')]).map(one => one.modelId),
-  ['nvidia/Nano', 'nvidia/Super', 'nvidia/Ultra', 'Qwen/Qwen3-235B', 'deepseek/flash']);
 assert.equal(modelRefusalWords('stale', teo), 'Teo changed a moment ago. Look again and choose once more.');
 assert.equal(modelRefusalWords('choice_key_reused', teo), 'Teo changed a moment ago. Look again and choose once more.');
 assert.equal(modelRefusalWords('person_not_in_this_world', teo), 'Teo is no longer in this world.');

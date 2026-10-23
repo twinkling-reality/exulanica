@@ -375,6 +375,17 @@ describe("Teo's day keys", () => {
     expect(one(root, '.wu-day-decides')).toBe('A person is playing Teo');
   });
 
+  it('is styled by its own sheet: the model list, Compare and Ask in the right column', () => {
+    // The rules for these went with the run strip's sheet once (batch 42), and the list drew as bare bullets.
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../tools/previews/world-workspace/character-page.css'), 'utf8');
+    const page = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../tools/previews/world-workspace/character-page.ts'), 'utf8');
+    expect(page).toContain("import './character-page.css';");
+    for (const rule of ['.wu-model-rows {', '.wu-model-row {', '.wu-model-name {', '.wu-model-price {', '.wu-model-current {', '.wu-model-head {', '.wu-model-intro {', '.wu-char-note {', '.wu-orb-row {', '.wu-ask-line {', '.wu-cmp-explain {', '.wu-model-row > .wu-key {']) {
+      expect(css).toContain(rule);
+    }
+    expect(css).toMatch(/\.wu-model-rows \{[^}]*list-style: none/u);
+  });
+
   it("keeps choosing a model, Compare's question and Ask in the right column with their own keys", async () => {
     const { root, act, page } = await open();
     const choices = [
@@ -384,6 +395,8 @@ describe("Teo's day keys", () => {
     page.draw(teoState({ choosing: { choices, focus: 0, refusal: null, busy: false } }));
     expect(root.querySelector('.wu-day-did')).toBeNull();
     expect(all(root, '.wu-day-side .wu-model-name')).toEqual([`${NEMOTRON}Current`, 'Routine']);
+    // The same chooser as the card's (r07, F11): each of the first nine rows carries its number key.
+    expect([...root.querySelectorAll('.wu-model-row')].map((row) => [row.querySelector('.wu-key')?.textContent, row.getAttribute('aria-keyshortcuts')])).toEqual([['1', '1'], ['2', '2']]);
     expect(keys(root)).toEqual(['↑↓Choose', 'EnterUse this model', 'EscBack']);
     (root.querySelectorAll('.wu-model-row')[1] as HTMLElement).click();
     expect(act).toHaveBeenLastCalledWith('choose', 1);
@@ -391,6 +404,8 @@ describe("Teo's day keys", () => {
     expect(act).toHaveBeenLastCalledWith('use');
     page.draw(teoState({ compare: { nothing: null, big: 'Ask another model', explain: 'The same moments.', choices: [choices[0]], focus: 0, figure: 'Asking 5 of 24 · $0.0008 of $0.01', asking: true, note: null, canStart: false } }));
     expect(keys(root)).toEqual(['EscStop']);
+    // Compare's list is chosen with the arrows alone: no number keys there.
+    expect(root.querySelector('.wu-model-row .wu-key')).toBeNull();
     page.draw(teoState({ ask: { questions: ['What is Teo doing?', 'Why?'], focus: 0, busy: false, asked: null, answer: null, failure: null } }));
     expect(all(root, '.wu-ask-row')).toEqual(['What is Teo doing?', 'Why?']);
     expect(keys(root)).toEqual(['↑↓Choose', 'EnterAsk', 'EscBack']);

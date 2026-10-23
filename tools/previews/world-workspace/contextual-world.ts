@@ -12,7 +12,7 @@ import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, questionGroup } from './character-group.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
-import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, orderedModels, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
+import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { WATCH_MS, mountRunWatch } from './run-watch.ts';
@@ -670,7 +670,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const to = from ? worldTime(closed.endTick, start) : null;
     const lastRun = from && to && ranIn(pageView.events ?? [], pageView.row.scene.id, closed) ? lastRunLine({ from: from.hhmm, to: to.hhmm, decisions: closed.used.decisions, spent: closed.used.usd }) : null;
     const choices = pageView.choosing && subjectReads.models
-      ? [...orderedModels(subjectReads.models.models).map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
+      ? [...subjectReads.models.models.map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
       : null;
     const offer = offers.get(pageView.row.key)?.offer;
     const assignable = !readOnly && Boolean(inventory && offers.has(pageView.row.key) && subjectReads.models?.takesModelChoices && assignmentSubject(inventory, pageView.row, offer ?? null));
@@ -759,7 +759,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'draft' && editing) { editing.name = index?.name ?? ''; editing.about = index?.about ?? ''; }
     else if (action === 'save' && editing) void savePersonality();
     else if (action === 'model' && pageState().assignable) {
-      const current = orderedModels(subjectReads.models?.models ?? []).findIndex(item => item.provider === modelOf(pageView.row).model?.provider && item.modelId === modelOf(pageView.row).model?.modelId);
+      const current = (subjectReads.models?.models ?? []).findIndex(item => item.provider === modelOf(pageView.row).model?.provider && item.modelId === modelOf(pageView.row).model?.modelId);
       pageView.choosing = { focus: current < 0 ? (subjectReads.models?.models.length ?? 0) : current, refusal: null, busy: false, key: crypto.randomUUID() };
       drawPage();
     }
@@ -798,7 +798,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   async function useModel(index) {
     const showing = pageView, choosing = showing?.choosing;
     if (!choosing || choosing.busy || !subjectReads.models) return;
-    const list = orderedModels(subjectReads.models.models);
+    const list = subjectReads.models.models;
     const picked = index < list.length ? list[index] : null;
     choosing.busy = true; choosing.refusal = null; drawPage();
     try {
@@ -901,7 +901,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function compareModels(row) {
     if (!subjectReads.models) return null;
     const own = modelOf(row).model;
-    return orderedModels(subjectReads.models.models).filter(item => !item.refusal && !(own && item.provider === own.provider && item.modelId === own.modelId));
+    return subjectReads.models.models.filter(item => !item.refusal && !(own && item.provider === own.provider && item.modelId === own.modelId));
   }
   /** [C] is drawn only where it works (C4, K6): a model to ask beside the character's own, and a decision a model answered. */
   const comparable = (showing) => !readOnly && Boolean(showing && compareModels(showing.row)?.length);
@@ -1237,7 +1237,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         const last = subjectReads.models?.models.length ?? 0;
         pageAct('choose', Math.max(0, Math.min(last, choosing.focus + (event.code === 'ArrowUp' ? -1 : 1))));
       }
-      else if (choosing && event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('use'); }
+      else if (choosing && (event.code === 'Enter' || (/^Digit[1-9]$/u.test(event.code) && Number(event.code.slice(5)) <= (subjectReads.models?.models.length ?? 0) + 1)) && !event.repeat) { event.preventDefault(); pageAct('use', event.code === 'Enter' ? undefined : Number(event.code.slice(5)) - 1); }
       else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
       else if (event.code === 'Enter' && !choosing && !event.repeat) { event.preventDefault(); pageAct('inspect'); }
       else if (event.code === 'Tab') return;

@@ -192,17 +192,6 @@ export const notConnected = who => `No AI model is connected here, so ${who.with
 export const routineRow = () => `${CHARACTER_WORDS.noModel} · ${CHARACTER_WORDS.free}`;
 
 /**
- * The models a person chooses from, as the list shows them: NVIDIA's open models first, cheapest
- * first; then the rest in the order the server serves them. Routine is the list's own last row.
- */
-export function orderedModels(models) {
-  const first = models.filter(model => model.modelId.startsWith('nvidia/'))
-    .map((model, index) => ({ model, index, price: model.price ? Number(model.price.input) : Infinity }))
-    .sort((a, b) => a.price - b.price || a.index - b.index).map(item => item.model);
-  return [...first, ...models.filter(model => !model.modelId.startsWith('nvidia/'))];
-}
-
-/**
  * Why a model could not be chosen, in the place it happened (spec 8.7): `stale` when the character
  * or its offer changed between the read and the choice, else by the server's code.
  */

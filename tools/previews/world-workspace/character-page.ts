@@ -13,6 +13,7 @@ import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsE
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { PATH_WORDS, byParts, plural } from './history-words.mjs';
 import { DAY_LAYOUTS, dayLayout, dayView, stepChoice } from './day-rows.mjs';
+import './character-page.css';
 import './world-ui-record-day.css';
 
 type Who = ReturnType<typeof called>;
@@ -490,7 +491,7 @@ function sideKeys(state: CharacterPageState, act: Act): HTMLElement[] {
 }
 
 /** A model's row in a list: its name (with Current), its price at the right. */
-function modelRows(choices: readonly ModelChoice[], focus: number, labelled: string, onChoose: ((index: number) => void) | null, onUse: ((index: number) => void) | null, current: boolean): HTMLElement {
+function modelRows(choices: readonly ModelChoice[], focus: number, labelled: string, onChoose: ((index: number) => void) | null, onUse: ((index: number) => void) | null, current: boolean, keyed = false): HTMLElement {
   const list = element('ul', 'wu-model-rows');
   list.setAttribute('role', 'listbox');
   list.setAttribute('aria-label', labelled);
@@ -502,6 +503,13 @@ function modelRows(choices: readonly ModelChoice[], focus: number, labelled: str
     if (current) {
       item.dataset['current'] = String(choice.current);
       if (choice.current) name.append(element('span', 'wu-model-current', CHARACTER_WORDS.current));
+    }
+    // Where digits choose (r07, F11), the first nine rows carry their number key as Choose a model's on the card do.
+    if (keyed && index < 9) {
+      const cap = element('span', 'wu-key wu-small', String(index + 1));
+      cap.setAttribute('aria-hidden', 'true');
+      item.setAttribute('aria-keyshortcuts', String(index + 1));
+      item.append(cap);
     }
     item.append(name, element('span', 'wu-model-price', choice.model ? priceWords(choice.model) ?? '' : routineRow()));
     if (onChoose) item.addEventListener('click', () => onChoose(index));
@@ -561,7 +569,7 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
     side.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.pickingSpendsNothing));
     if (!choosing.choices) side.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
     else side.append(element('div', 'wu-model-head wu-small-text wu-faint', CHARACTER_WORDS.perMillion),
-      modelRows(choosing.choices, choosing.focus, CHARACTER_WORDS.chooseModel, (index) => act('choose', index), (index) => act('use', index), true));
+      modelRows(choosing.choices, choosing.focus, CHARACTER_WORDS.chooseModel, (index) => act('choose', index), (index) => act('use', index), true, true));
     if (choosing.refusal) side.append(refusalLine(choosing.refusal));
     return side;
   }
