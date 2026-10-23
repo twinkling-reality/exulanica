@@ -289,7 +289,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const being = row.scene.type === 'being';
     if (!being) return { being, who: subjectWho(row, offer), offer, reading: !offers.has(row.key), thingLine: placedLine() };
     const choice = subjectReads.models?.choices.find(item => item.subjectId === row.scene.id) ?? null;
-    const facts = characterFacts(subjectReads.society, row.scene.id, choice?.played !== undefined);
+    const facts = characterFacts(subjectReads.society, row.scene.id, choice?.played !== undefined, personName);
     const made = madeName(row.scene.id), who = made ? called({ name: null, kind: made }) : subjectWho(row, offer, facts?.kind ?? null);
     const latest = subjectReads.models?.latest.find(item => item.subjectId === row.scene.id) ?? null;
     const decision = facts ? chosenDecision({ person: facts.person, latest, living: facts.living, startMinute: facts.startMinute,
@@ -715,7 +715,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       const { events, next } = since ? { events: since.events, next: showing.didNext } : await readDayEvents({ want, pages: DID_PAGES, held: earlier ? held : [], next: earlier ? showing.didNext : '',
         readPage: (before) => read(eventsPath(DAY_KINDS, '&limit=256' + (before ? '&before=' + encodeURIComponent(before) : ''))),
         rowsOf: (held) => didRows({ events: held, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null, foldable: () => true, limit: want }).length });
-      const facts = characterFacts(subjectReads.society, showing.row.scene.id);
+      const facts = characterFacts(subjectReads.society, showing.row.scene.id, false, personName);
       Object.assign(showing, { events, didNext: next, didWant: want });
       await records.readMoments(showing);
       // The people its rows name (a line heard, a line said to someone), named as History names them: offers read first.
@@ -726,7 +726,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         wordGoal: (document) => {
           if (!facts) return null;
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };
-          return doingLine(characterFacts(shown, showing.row.scene.id)?.done ?? null);
+          return doingLine(characterFacts(shown, showing.row.scene.id, false, personName)?.done ?? null);
         } });
       // The chosen row follows the newest until the person moves it, then stays that row (dayFocus, F12b).
       showing.didMoved ||= earlier; showing.didFocus = dayFocus({ rows: showing.did, focus: showing.didFocus, earlier, before: newer ? was : null, moved: showing.didMoved }); if (newer) showing.didWant = Math.max(DID_ROWS, showing.did.length);

@@ -86,6 +86,20 @@ describe('what the inspector says of each new behaviour', () => {
     expect(words([person('a', 'Ada', talk('b', {
       action: { kind: 'talk', status: 'completed', target_id: null, remaining_ticks: 3, reason: 'partner_left' },
     })), person('b', 'Bo')])).toBe('Standing, deciding where to go. Because Bo left while they were talking.');
+    // Named as the page names them where it says so: a made creature by its own name inside the sentence.
+    const made = read([person('a', 'Ada', talk('b')), person('b', 'Winged two legged creature 2', talk('a'))]);
+    const asPage = (id: string) => (id === 'b' ? 'the round duck' : null);
+    const people = made.state.inhabitants;
+    expect(inhabitantWords(people[0]!, [], people, null, false, null, null, false, { partner: asPage }).doing)
+      .toBe('Talking with the round duck, 3 more minutes.');
+    const finished = read([person('a', 'Ada', talk('b', {
+      action: { kind: 'talk', status: 'completed', target_id: null, remaining_ticks: 0, reason: 'reviewed_duration_elapsed' },
+    })), person('b', 'Winged two legged creature 2', talk('a'))]).state.inhabitants;
+    expect(inhabitantWords(finished[0]!, [], finished, null, false, null, null, false, { partner: asPage }).why)
+      .toBe('Because they finished talking with the round duck.');
+    // Where the page names nobody, the society's own name stands.
+    expect(inhabitantWords(people[0]!, [], people, null, false, null, null, false, { partner: () => null }).doing)
+      .toBe('Talking with Winged two legged creature 2, 3 more minutes.');
     // Without the people to name them from, the other person is somebody nearby, never guessed.
     const snapshot = read([person('a', 'Ada', talk('b')), person('b', 'Bo', talk('a'))]);
     expect(inhabitantWords(snapshot.state.inhabitants[0]!, []).doing).toBe('Talking with someone nearby, 3 more minutes.');

@@ -373,15 +373,18 @@ export function inhabitantWords(
   listed: ReadonlyMap<string, SocietyPlaceName | null> | null = null,
   /** Set where a person plays this being (`inhabitantWordsFrom`). */
   playedByPerson = false,
-  /** `still: false` for a surface in the world, which says the activity alone (`inhabitantWordsFrom`). */
-  options: { readonly still?: boolean } = {},
+  /**
+   * `still: false` for a surface in the world, which says the activity alone (`inhabitantWordsFrom`);
+   * `partner` names another being as the page does (a made creature by its own name), else its display name.
+   */
+  { partner, ...options }: { readonly still?: boolean; readonly partner?: ((id: string) => string | null) | undefined } = {},
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
   return inhabitantWordsFrom(
     person,
     (targetId) => named.get(targetId) ?? (listed?.has(targetId) === true ? listedPlaceWords(listed.get(targetId) ?? null) : null),
-    (id) => people.find((other) => other.id === id)?.display_name ?? null,
+    (id) => partner?.(id) ?? people.find((other) => other.id === id)?.display_name ?? null,
     profile,
     null,
     decidedFromOutside,

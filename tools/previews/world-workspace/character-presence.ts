@@ -156,8 +156,9 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
  * What the society read says of one character: the catalog's sentence for what they are doing (as
  * the Companion words it) and the same said in the past (a row of their day), whether the society is a living one, and
  * its clock's first minute (null where the society keeps no clock). Null when the read does not hold the character.
+ * `partner` names whom they are with as the page does (a made creature by its own name, DESIGN 13:41).
  */
-export function characterFacts(snapshot: SocietySnapshot | null, subjectId: string, playedByPerson = false): CharacterFacts | null {
+export function characterFacts(snapshot: SocietySnapshot | null, subjectId: string, playedByPerson = false, partner?: (id: string) => string | null): CharacterFacts | null {
   const inhabitants = snapshot?.state.inhabitants ?? [];
   const ordinal = inhabitants.findIndex(item => item.id === subjectId);
   if (!snapshot || ordinal < 0) return null;
@@ -174,7 +175,7 @@ export function characterFacts(snapshot: SocietySnapshot | null, subjectId: stri
     } else {
       const listed = new Map((snapshot.places?.targets ?? []).filter(target => target.enabled).map(target => [target.targetId, target.place ?? null] as const));
       // In the world the activity is said alone, never how many minutes it has left.
-      ({ doing, done } = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson, { still: false }));
+      ({ doing, done } = inhabitantWords(person, [], inhabitants, profile, false, null, listed, playedByPerson, { still: false, partner }));
     }
   } catch { doing = null; done = null; }
   return { person, kind: role, doing, done, living, startMinute: dayStartMinute(snapshot.state) };
