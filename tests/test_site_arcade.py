@@ -263,20 +263,23 @@ def test_a_moved_or_removed_arcaded_building_takes_its_covered_walk_with_it(
 #: The arcaded farm's plan, output, walking place and drawing digests, level and on the pinned
 #: land, as an arcade of bays and depth alone makes them. A change meant to leave such an arcade
 #: as it was leaves these as they are.
+# Every place and drawing below moved when doors came to stand clear (society-policy v5): a new
+# world's door stands 340 mm before its threshold, which moves the walking place, and the drawing
+# names the receipt, which names the policy. No plan or output moved.
 PINNED: dict[str, dict[str, str]] = {
     "level": {
         "plan": "ba01fce05eed5c5c2ba86f5672f25980cb4edaa85fc1f9874c3212d8ed8e2e34",
         "output": "b448e0a70e4b6bf7c6ccff8531ed0798a89adbaec6580521cf949434964645bb",
-        "place": "47731e2d0fb2c9db7435bb3e09243a0f0cffed896269062fb25619535660e12c",
-        "drawing": "4421682ce66d0496282ed371441207d2b40ca1a5a9627884de038e4754b7227a",
+        "place": "5afff9f6b4c2ba45ab428dcdef26d7078fde49b21d7cb460cc943d97105f5bd1",
+        "drawing": "3e64a74fb624885f0de6a3de11bc237a45466cf20fa54909bfd52e9e0b0a10ca",
     },
     "land": {
         "plan": "ba01fce05eed5c5c2ba86f5672f25980cb4edaa85fc1f9874c3212d8ed8e2e34",
         "output": "060c77f88889a93e9bfe5e3060d675b08c9a3a54832dc915807f2bfb90f712f8",
-        "place": "ab9923ddc1feae298db3515733b361f69a31b29f2ef6b79047751b3d900196c5",
+        "place": "508ecaa0346ce286abe1f727cbeceb306385f0b445e127d821251cd7c0f578fc",
         # Moved when new worlds came to name land rules 6: the drawing names the receipt, which
         # names the rules; no land moved.
-        "drawing": "70bc492a06821c8f449b7c436f9800d2bc57b55f82bbde92aae2914010e0144e",
+        "drawing": "232c972115bba619bfbeef604352ca3675e110a914f4c76e55481bc43323b9da",
     },
 }
 
