@@ -675,6 +675,10 @@ class StubAccounts:
             raise _NotAccepted("browser session was not accepted")
         return AccountSession(uuid.uuid4(), self.session, "c" * 43, None, self.role)  # type: ignore[arg-type]
 
+    def watched_workspaces(self) -> frozenset[uuid.UUID]:
+        """What the draft workers read through the services: no account discovery here."""
+        return frozenset()
+
 
 @dataclass
 class Floor:

@@ -686,6 +686,9 @@ class _OwnerAccounts:
     def recent_workspaces(self, _seconds):
         return ()
 
+    def watched_workspaces(self):
+        return frozenset()
+
     def owned_workspace_active(self, _workspace_id) -> bool:
         return True
 

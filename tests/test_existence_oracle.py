@@ -351,6 +351,10 @@ def existence(tmp_path, photo_dir, repository, spine_schema, request):
         def owned_workspace_active(self, workspace):
             return workspace in {repository.workspace_id, stranger}
 
+        def watched_workspaces(self):
+            # What the draft workers read through the services: no account discovery here.
+            return frozenset()
+
     services = replace(services, accounts=BrowserAccounts())
     app = create_app(services, verify=False)
     # A 500 is an answer to compare, not an exception to stop at: a foreign id that makes the

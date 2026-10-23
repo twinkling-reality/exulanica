@@ -504,7 +504,15 @@ class WorldDraftWorker:
         while not stop.is_set():
             with self._lock:
                 watched = set(self._watched)
-            for workspace in sorted(set(self.workspaces()) | watched, key=str):
+            # A listing that fails costs this pass the workspaces it lists, never the worker.
+            try:
+                listed = set(self.workspaces())
+            except Exception as failure:
+                _LOG.warning(
+                    "World draft worker could not list workspaces: %s", type(failure).__name__
+                )
+                listed = set()
+            for workspace in sorted(listed | watched, key=str):
                 if stop.is_set():
                     break
                 try:

@@ -240,8 +240,16 @@ class KindDraftWorker:
 
     def run(self, stop: threading.Event) -> None:
         while not stop.is_set():
+            # A listing that fails costs this pass the workspaces it lists, never the worker.
+            try:
+                listed = set(self.workspaces())
+            except Exception as failure:
+                _LOG.warning(
+                    "a kind draft worker could not list workspaces: %s", type(failure).__name__
+                )
+                listed = set()
             with self._lock:
-                workspaces = set(self.workspaces()) | self._watched
+                workspaces = listed | self._watched
             for workspace in sorted(workspaces):
                 if stop.is_set():
                     break
