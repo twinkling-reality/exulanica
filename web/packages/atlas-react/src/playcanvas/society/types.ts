@@ -146,6 +146,8 @@ export interface SocietyInhabitantSnapshot {
   readonly kind?: ThingKindReference;
   readonly came_by?: 'populated' | 'placed' | 'crossed';
   readonly placed_id?: string | null;
+  /** Where its author put a placed being down, before the society took it in at its nearest open node. */
+  readonly placed_at_mm?: readonly [number, number] | null;
   readonly crossing?: {
     readonly arrival_id: string;
     readonly bridge: string;

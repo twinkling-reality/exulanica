@@ -173,9 +173,10 @@ interface Walker {
    */
   readonly rate: number | null;
   /**
-   * Whether this walk is a visitor's step out of its gate or back into it. It is walked at their own
-   * walking pace as that is known on each frame (`walkSpeedOf`): a visitor is first drawn in the
-   * minute it steps out, and the figure that states its pace may be made while it steps.
+   * Whether this walk is a visitor's step out of its gate or back into it, or a placed being's walk from
+   * where it was put down to where the society took it in. It is walked at their own walking pace as
+   * that is known on each frame (`walkSpeedOf`): a visitor is first drawn in the minute it steps out,
+   * and the figure that states its pace may be made while it steps.
    */
   readonly gateStep: boolean;
   /** When a person standing still starts the walk just read, in the caller's clock. */
@@ -590,10 +591,13 @@ export class SocietyCrowd {
         route = pathful && consecutive && recorded?.length ? recorded : [end];
       } else if (previous === undefined) {
         // Never drawn before: the person appears where the state says they are; a visitor who has
-        // just crossed in beside its gate steps out of the gate to there, unseen until its gate is read.
+        // just crossed in beside its gate steps out of the gate to there, unseen until its gate is read;
+        // a being just placed walks from where it was put down to where the society took it in.
         const gate = later ? this.gateNear(person.id, end) : null;
-        stepping = gate !== null;
-        route = gate === null ? [end] : [gate, end];
+        const put = later && person.came_by === 'placed' && person.placed_at_mm ? [person.placed_at_mm[0] / 1000, person.placed_at_mm[1] / 1000] as const : null;
+        const from = gate ?? (put !== null && apart(put, end) > SAME_POINT_METRES ? put : null);
+        stepping = from !== null;
+        route = from === null ? [end] : [from, end];
         if (later && gate === null && person.came_by === 'crossed' && !this.gates.has(person.id)) {
           this.entering.set(person.id, nowMs + GATE_WAIT_MS);
         }

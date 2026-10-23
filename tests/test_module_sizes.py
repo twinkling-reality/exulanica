@@ -78,9 +78,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "threaded through its context builders",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
-        1_556,
+        1_560,
         "a society's people as drawn near and far: where each stands, faces and sits (two who "
-        "spoke facing each other), and whether one is drawn in full yet",
+        "spoke facing each other, a placed being walking in from where it was put down), and "
+        "whether one is drawn in full yet",
     ),
     "exulanica/selection/kind_brief.py": (1_529, "a kind of world as a model drafts it"),
     "tools/previews/world-workspace/contextual-world.ts": (
