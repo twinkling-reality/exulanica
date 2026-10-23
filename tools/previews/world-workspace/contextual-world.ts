@@ -894,9 +894,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // the bounds are the server's offer; each ask is one D1 ask; nothing is applied.
   const decisionAsks = new DecisionAsksClient(credentials);
   const modelKey = (model) => model ? `${model.provider}/${model.modelId}` : '';
-  /** The models to ask beside the recorded one: every model offered here but the character's own. */
+  /** The models to ask beside the recorded one: every model offered here but the character's own; none where nothing is asked again. */
   function compareModels(row) {
-    if (!subjectReads.models) return null;
+    if (!subjectReads.models || subjectReads.models.asksAgain === false) return null;
     const own = modelOf(row).model;
     return subjectReads.models.models.filter(item => !item.refusal && !(own && item.provider === own.provider && item.modelId === own.modelId));
   }

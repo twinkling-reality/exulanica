@@ -85,6 +85,7 @@ from exulanica.api.instance_settings import (
     SOCIETY_OF_THINGS_ENV,
     SOCIETY_TICK_INTERVAL_MS_ENV,
     SocietySettingRefused,
+    _asks_again,
     _comparison_player,
     _enabled,
     _explicitly_enabled,
@@ -403,6 +404,9 @@ class Services(ServiceRefusals, WorkerFactories):
     #: True when the configuration names a process of its own that plays them
     #: (``EXULANICA_COMPARISON_WORKER=process``). With neither, no start is accepted.
     comparisons_played_elsewhere: bool = False
+    #: Whether a person's recorded decisions are asked again of another model here
+    #: (``EXULANICA_ASK_AGAIN``, on unless set off); on for a hand-constructed Services.
+    asks_again: bool = True
     #: True when this process plays the reference jobs requests queue
     #: (``EXULANICA_REFERENCE_WORKER``, on unless set off); off for a hand-constructed Services, as
     #: the derivative worker is.
@@ -1330,6 +1334,7 @@ def build_services(
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
+        asks_again=_asks_again(env_get("ASK_AGAIN", environ)),
         runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
         reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
         reference_pictures=reads_pictures_here(env_get("REFERENCE_PICTURES", environ)),

@@ -801,6 +801,44 @@ def test_the_api_gets_the_model_and_its_bound_only_with_model():
         assert json.loads(environment["EXULANICA_API_TOKENS"]) == {"token": {"permissions": []}}
 
 
+def test_decisions_are_asked_again_unless_up_says_not_and_a_restart_keeps_it(tmp_path):
+    parser = LAUNCH.build_parser()
+    assert parser.parse_args(["up", "--worktree", "w"]).no_ask_again is False
+    assert parser.parse_args(["up", "--worktree", "w", "--no-ask-again"]).no_ask_again is True
+    # The caller's shell never reaches the API: only the flag turns asking again off.
+    assert "EXULANICA_ASK_AGAIN" not in _api_environment(False, {"EXULANICA_ASK_AGAIN": "off"})
+    exports = {
+        name: "postgresql://role@localhost:19200/exulanica"
+        for name in (
+            "EXULANICA_DATABASE_URL",
+            "EXULANICA_READONLY_DATABASE_URL",
+            "EXULANICA_PURGE_DATABASE_URL",
+        )
+    }
+    asked = LAUNCH.api_environment(
+        exports=exports,
+        grant={},
+        data_dir=Path("run/data"),
+        model=False,
+        derivative_worker=False,
+        society_playback={},
+        ask_again_off=True,
+    )
+    assert asked["EXULANICA_ASK_AGAIN"] == "off"
+    run = tmp_path / "run"
+    (run / "logs").mkdir(parents=True)
+    (run / "logs" / "database-serve.txt").write_text(
+        "".join(f"export {name}={url}\n" for name, url in exports.items())
+        + "owner postgresql://owner@localhost:19200/exulanica\n"
+    )
+    for recorded, setting in (("off", "off"), ("on", None), (None, None)):
+        state = {"data_dir": str(run / "data"), "workspace_id": "w1"}
+        if recorded is not None:
+            state["ask_again"] = recorded
+        restarted = LAUNCH.recorded_api_environment(state, run, {}, model=False)
+        assert restarted.get("EXULANICA_ASK_AGAIN") == setting
+
+
 _SOCIETY_VARIABLES = ("EXULANICA_SOCIETY_CONTROL_WORKSPACES", "EXULANICA_SOCIETY_TICK_INTERVAL_MS")
 
 

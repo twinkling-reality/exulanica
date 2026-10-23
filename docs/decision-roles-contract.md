@@ -1035,6 +1035,11 @@ asked for the person's role here whatever the decision, `refusal` names the choi
 nothing is offered; a model not written `provider/model_id` is 422 `model_unreadable`. It asks and writes nothing. Each ask is then the POST above, bounded by the
 offered `ask_usd`.
 
+An installation set with `EXULANICA_ASK_AGAIN=off` asks nothing again: for a decision the caller may
+read, both the POST and the offer answer 409 `asking_again_off`, and the society models read's
+optional `asks_again` is false, so the page offers no Compare; absent, a read answers as one that
+asks.
+
 ## Model discovery and admission preflight
 
 `GET /models`, with `world.read`, serves `exulanica.model-discovery/v1`: models ordered by

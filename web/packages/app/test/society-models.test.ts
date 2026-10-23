@@ -112,6 +112,13 @@ describe('reading who decides', () => {
     expect(parseSocietyModels(read()).models[0]!.local).toBe(false);
   });
 
+  it('reads whether recorded decisions are asked again here, as a server that does not say does', () => {
+    expect(parseSocietyModels(read()).asksAgain).toBe(true);
+    expect(parseSocietyModels(read({ asks_again: true })).asksAgain).toBe(true);
+    expect(parseSocietyModels(read({ asks_again: false })).asksAgain).toBe(false);
+    expect(() => parseSocietyModels(read({ asks_again: 'off' }))).toThrow();
+  });
+
   it('reads where each choice comes from and each gate\'s traveller mind, and nothing from a server that predates them', () => {
     const view = parseSocietyModels(read({
       choices: [{ ...read().choices[0], from: 'travellers' }, { ...read().choices[0], subject_id: 'bea', model: null, from: 'travellers_over_bound' }],

@@ -417,6 +417,10 @@ def society_models_view(
         "society_id": str(snapshot["society_id"]),
         "engine": snapshot["profile"],
         "takes_model_choices": engine.owner_model_choice,
+        # Whether a person's recorded decisions may be asked again of another model here (an
+        # optional field: a read without it is a server that asks them); a page offers Compare
+        # by it.
+        "asks_again": services.asks_again,
         "host_refusal": services.model_host_refusal(
             session.workspace_id,
             role,

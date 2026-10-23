@@ -31,6 +31,7 @@ from decimal import Decimal
 
 import pytest
 from exulanica.api import decision_asks
+from exulanica.api.instance_settings import SocietySettingRefused, _asks_again
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import load_manifest
@@ -238,6 +239,41 @@ def test_an_ask_is_refused_by_name_and_asks_nothing(app, monkeypatch) -> None:
     monkeypatch.setattr(society_decision_asks, "society_state_sha256", lambda state: "0" * 64)
     changed = _ask(client, society, request_id, owner, scope)
     assert (changed.status_code, changed.json()["code"]) == (409, "decision_not_reproducible")
+    assert transport.requests == []
+    assert _counts(services, world, snapshot["society_id"])["world_society_decision_ask"] == 0
+
+
+def test_asking_again_is_on_unless_set_off_and_a_misspelling_stops_startup() -> None:
+    spelled = (None, "", "on", "ON", "yes", "off", " no ", "0", "false")
+    assert [_asks_again(value) for value in spelled] == [True] * 5 + [False] * 4
+    with pytest.raises(SocietySettingRefused) as refused:
+        _asks_again("sometimes")
+    assert refused.value.code == "ask_again_not_recognised"
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_an_installation_set_not_to_ask_again_says_so_and_asks_nothing(app) -> None:
+    world, client = app
+    transport = _Waiter()
+    services, snapshot, receipt = _recorded(world, client, transport)
+    owner = _callers(client, world, listed=True)["owner"][0]
+    scope, _version, society = routes(world)
+
+    # The models read says whether a person's decisions are asked again here: a page offers Compare
+    # by it.
+    def asks_again():
+        return client.get(f"{society}/models", headers=owner, params=scope).json()["asks_again"]
+
+    assert asks_again() is True
+    client.app.state.services = dataclasses.replace(client.app.state.services, asks_again=False)
+    assert asks_again() is False
+    for answer in (
+        _ask(client, society, receipt["request_id"], owner, scope),
+        _offer(client, society, receipt["subject_id"], owner, scope),
+    ):
+        assert (answer.status_code, answer.json()["code"]) == (409, "asking_again_off")
+    # A decision the caller cannot read is still unknown to them, as when asking is on.
+    assert _ask(client, society, str(uuid.uuid4()), owner, scope).status_code == 404
     assert transport.requests == []
     assert _counts(services, world, snapshot["society_id"])["world_society_decision_ask"] == 0
 

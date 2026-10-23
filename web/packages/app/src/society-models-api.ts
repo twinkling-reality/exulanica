@@ -251,6 +251,8 @@ export interface SocietyModels {
   readonly takesModelChoices: boolean;
   /** Why this host asks no model for this world's people, by code, or null when it asks. */
   readonly hostRefusal: string | null;
+  /** Whether a person's recorded decisions may be asked again of another model here (Compare); absent, they may. */
+  readonly asksAgain?: boolean;
   readonly modelPeopleMaximum: number;
   readonly models: readonly SocietyModel[];
   readonly choices: readonly PersonModelChoice[];
@@ -405,6 +407,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
     societyId: text(row['society_id']),
     takesModelChoices: flag(row['takes_model_choices']),
     hostRefusal: maybe(row['host_refusal'], text),
+    asksAgain: row['asks_again'] === undefined ? true : flag(row['asks_again']),
     modelPeopleMaximum: count(contract['model_people_maximum']),
     models: list(row['models']).map((entry) => {
       const held = object(entry);

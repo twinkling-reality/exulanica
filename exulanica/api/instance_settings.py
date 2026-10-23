@@ -70,6 +70,13 @@ PLAYBACK_WORKERS_ENV: Final = env_name("PLAYBACK_WORKERS")
 #: (``comparisons_not_played``), since a start nothing plays would hold its world until the end.
 COMPARISON_WORKER_ENV: Final = env_name("COMPARISON_WORKER")
 
+#: Whether this installation asks a person's recorded decisions again of another model (Compare on
+#: the day and decision pages). Absent (or an explicit on), it does. ``0``, ``false``, ``off`` or
+#: ``no``, it does not: the asks are refused (``asking_again_off``) and the models read says so,
+#: so no page offers Compare, as an installation recording where no model may be scored against
+#: another needs.
+ASK_AGAIN_ENV: Final = env_name("ASK_AGAIN")
+
 #: The base wait between simulated minutes, in whole milliseconds, within the bounds
 #: ``exulanica.world.society_controls`` declares. Absent means its declared default.
 SOCIETY_TICK_INTERVAL_MS_ENV: Final = env_name("SOCIETY_TICK_INTERVAL_MS")
@@ -102,6 +109,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_opening_not_whole_numbers": "must state whole numbers",
     "society_opening_share_out_of_bounds": "must state a share from 1 to 1000 thousandths",
     "comparison_worker_not_recognised": "must be absent, on, process or off",
+    "ask_again_not_recognised": "must be absent, on or off",
     "playback_worker_not_recognised": "must be absent, on, process or off",
     "playback_workers_out_of_bounds": "must be absent or a whole number from 1 to 8",
     "society_tick_interval_out_of_bounds": (
@@ -185,6 +193,17 @@ def _comparison_player(value: str | None) -> str:
     if normalized in ("0", "false", "off", "no"):
         return "none"
     raise SocietySettingRefused("comparison_worker_not_recognised", COMPARISON_WORKER_ENV)
+
+
+def _asks_again(value: str | None) -> bool:
+    """Whether this installation asks recorded decisions again (``EXULANICA_ASK_AGAIN``): absent or
+    on, it does; off, it does not; anything else a named refusal."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("", "1", "true", "on", "yes"):
+        return True
+    if normalized in ("0", "false", "off", "no"):
+        return False
+    raise SocietySettingRefused("ask_again_not_recognised", ASK_AGAIN_ENV)
 
 
 def _enabled(value: str | None) -> bool:

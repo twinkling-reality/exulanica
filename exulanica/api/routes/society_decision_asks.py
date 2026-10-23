@@ -74,6 +74,14 @@ def _refusal(status: int, code: str, detail: str) -> JSONResponse:
     return JSONResponse({"code": code, "detail": detail}, status_code=status)
 
 
+def _asking_again_off() -> JSONResponse:
+    """An installation set not to ask recorded decisions again (``EXULANICA_ASK_AGAIN``): it says so
+    of a decision the caller may read, and asks nothing."""
+    return _refusal(
+        409, "asking_again_off", "this installation does not ask recorded decisions again"
+    )
+
+
 def _view(held: Any, row: dict[str, Any]) -> dict[str, Any]:
     """One ask as the comparison states it."""
     return comparison(held, [row])["asks"][0]
@@ -102,6 +110,8 @@ def ask_decision_again(
     found = _call(held, invalid_status=409)
     if isinstance(found, JSONResponse):
         return found
+    if not services.asks_again:
+        return _asking_again_off()
     try:
         row = ask_again(
             services,
@@ -189,6 +199,8 @@ def offer_asks_again(
         return _role_refused(refused)
     if isinstance(held, JSONResponse):
         return held
+    if not services.asks_again:
+        return _asking_again_off()
     return ask_again_offer(
         services,
         held,

@@ -481,6 +481,8 @@ python3 scripts/acceptance/launch.py up --worktree . --personal --model --tiles
 - `--model` hands the five settings above to the API, and refuses to start, naming the first one that is missing.
 - `--tiles` lets the install bake the tiles a made town is drawn from.
 - `--creatures`, optional, lets the install draft creatures from words.
+- `--no-ask-again`, optional, asks no person's recorded decisions again of another model, so the pages offer no
+  Compare, for a recording where no model may be scored against another; a restart keeps it.
 - `--slot N` (0 to 6) moves the install to another set of ports when one is taken.
 
 The install keeps everything the person makes in `~/Exulanica`, a folder of theirs that no other account can write:

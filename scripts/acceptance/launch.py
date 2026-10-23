@@ -973,6 +973,7 @@ def api_environment(
     worlds_held: int | None = None,
     projects: Path | None = None,
     personal: bool = False,
+    ask_again_off: bool = False,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     # The stack states the generated worlds its workspaces may hold, as a deployment does: the
@@ -1027,6 +1028,10 @@ def api_environment(
     if creatures:
         # The workspaces creatures are drafted for; the worker runs in the API process by default.
         environment["EXULANICA_CREATURE_WORKSPACES"] = json.dumps(list(creatures))
+    if ask_again_off:
+        # A person's recorded decisions are not asked again of another model here, so the pages
+        # offer no Compare (an install recording where no model may be scored against another).
+        environment["EXULANICA_ASK_AGAIN"] = "off"
     return environment
 
 
@@ -2297,6 +2302,7 @@ def up(arguments: argparse.Namespace) -> None:
         worlds_held=arguments.worlds_held,
         projects=projects,
         personal=arguments.personal,
+        ask_again_off=arguments.no_ask_again,
     )
     environment.update(model_witness_environment(environment, witness))
     plan = None
@@ -2325,6 +2331,7 @@ def up(arguments: argparse.Namespace) -> None:
             "model": bool(arguments.model),
             "worlds_held": arguments.worlds_held,
             "personal": bool(arguments.personal),
+            "ask_again": "off" if arguments.no_ask_again else "on",
             "spending_witness": str(witness / SPENDING_WITNESS_NAME),
             "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
@@ -2679,6 +2686,7 @@ def recorded_api_environment(
         if not isinstance(state.get("project_worker"), Mapping)
         else Path(str(state["project_worker"]["projects"])),
         personal=bool(state.get("personal")),
+        ask_again_off=state.get("ask_again") == "off",
     )
 
 
@@ -3121,6 +3129,13 @@ def build_parser() -> argparse.ArgumentParser:
                 help="let the run's synthetic workspaces draft creatures from words "
                 "(EXULANICA_CREATURE_WORKSPACES), the drafter asked through --model or "
                 "--scripted-model (default: no creatures)",
+            )
+            command.add_argument(
+                "--no-ask-again",
+                action="store_true",
+                help="ask no person's recorded decisions again of another model, so the pages offer "
+                "no Compare (EXULANICA_ASK_AGAIN=off), as a recording that may not score models needs; "
+                "a restart keeps it (default: asked again)",
             )
             command.add_argument(
                 "--society-of-things",
