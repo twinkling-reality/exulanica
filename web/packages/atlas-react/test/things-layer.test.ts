@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
-import type { LookDrawing } from '../src/playcanvas/things/documents.js';
+import { readKindDrawing, type LookDrawing } from '../src/playcanvas/things/documents.js';
 import { ThingLibrary } from '../src/playcanvas/things/library.js';
 import { ThingLayer, type PlacedThingRecord } from '../src/playcanvas/things/thing-layer.js';
 import { servedLibrary, thingsJson } from './things-fixtures.js';
@@ -212,6 +212,29 @@ describe('a version\'s placed things, drawn by their looks', () => {
     expect(well!.root.getPosition().x).toBeCloseTo(12, 6);
     expect(layer.figureOf('gate-1')).toBeNull();
     expect(layer.drawn.map((one) => one.placedId)).toEqual(['well-1']);
+  });
+
+  it('hands the crowd the seats of the things it draws, where they stand now, and none of a thing taken away', async () => {
+    const { layer, served } = setup();
+    await layer.setPlaced([placed(served, 'bench-1', 'bench', at(1000, 0, -2000, 1_570_796)), placed(served, 'gate-1', 'gate', at(3000, 0, 0))]);
+    const use = readKindDrawing(thingsJson('kinds/bench.v1.json')).use;
+    expect(use?.places?.length).toBeGreaterThan(0);
+    expect(layer.seating).toEqual([{ object: { objectId: 'bench-1', assetKey: 'thing:bench-1', ...at(1000, 0, -2000, 1_570_796) }, use }]);
+    await layer.setPlaced([placed(served, 'bench-1', 'bench', at(4000, 0, -2000))]);
+    expect(layer.seating.map((one) => [one.object.objectId, one.object.xMm, one.object.yawMicroradians])).toEqual([['bench-1', 4000, 0]]);
+    await layer.setPlaced([{ ...placed(served, 'bench-1', 'bench'), removed: true }]);
+    expect(layer.seating).toEqual([]);
+  });
+
+  it('hands no seat of a thing stood on a support, which stands in that support\'s frame', async () => {
+    const { layer, served } = setup(() => true);
+    const onDeck = { ...placed(served, 'bench-2', 'bench', at(1000, 3150, 2000)), support: {
+      profile: 'exulanica.support-reference/v1' as const, worldId: 'world', sourceSnapshotId: 'snapshot',
+      receiptSha256: 'a'.repeat(64), networkSha256: 'b'.repeat(64), regionId: 'a', surfaceId: 'deck',
+    } };
+    await layer.setPlaced([onDeck]);
+    expect(layer.figureOf('bench-2')).not.toBeNull();
+    expect(layer.seating).toEqual([]);
   });
 
   it('draws nothing for a thing it cannot draw, and names why', async () => {

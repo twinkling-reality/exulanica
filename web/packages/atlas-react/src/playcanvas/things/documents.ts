@@ -12,6 +12,7 @@
  * Pure: no renderer.
  */
 
+import { KIND_SIDES, type KindPlace, type KindSide, type KindUse } from '../society/seating.js';
 import { CHAIN_ROLES, CHAIN_SIDES, type BodyPlanEntry, type ChainRole, type ChainSide, type PlanBone, type PlanChain, type PlanSocket } from './skeleton.js';
 
 export const THING_LIBRARY_PROFILE = 'exulanica.thing-library/v1';
@@ -108,6 +109,12 @@ export interface KindDrawing {
   readonly extentMm: BodyExtent | null;
   /** How a holdable thing is gripped, or null for a thing nobody holds. */
   readonly grip: Grip | null;
+  /**
+   * Where people use the thing: its one offer that states places (the server's society reads the
+   * same one), each place in the thing's slot frame with the way a person there faces and the seat
+   * a resting person sits on; null for a kind that offers no places.
+   */
+  readonly use: KindUse | null;
   readonly looks: readonly DocumentReference[];
 }
 
@@ -163,6 +170,28 @@ function reader(reason: ThingDocumentRefusal) {
     return Object.freeze({ sha256: text(row['sha256'], `${field}.sha256`, HEX64), bytes: whole(row['bytes'], `${field}.bytes`, 1), media_type: media });
   };
   return { fail, object, list, text, whole, reference, container };
+}
+
+/**
+ * A kind's places as its offer states them (`x_mm`, `y_mm`, `faces` and a `seat` or null, the
+ * thing's slot frame), in the part-frame shape the crowd's seating reads a world object's use in.
+ */
+function readPlaces(r: ReturnType<typeof reader>, value: unknown, field: string): readonly KindPlace[] {
+  const signed = (v: unknown, f: string): number => (typeof v === 'number' && Number.isSafeInteger(v) ? v : r.fail(f, 'is not a whole number'));
+  const side = (v: unknown, f: string): KindSide => ((KIND_SIDES as readonly unknown[]).includes(v) ? v as KindSide : r.fail(f, `is not one of ${KIND_SIDES.join(', ')}`));
+  return Object.freeze(r.list(value, field).map((entry, i): KindPlace => {
+    const at = `${field}[${i}]`;
+    const place = r.object(entry, at);
+    const seatRow = place['seat'] === null ? null : r.object(place['seat'], `${at}.seat`);
+    return Object.freeze({
+      positionMm: Object.freeze([signed(place['x_mm'], `${at}.x_mm`), signed(place['y_mm'], `${at}.y_mm`)] as const),
+      faces: side(place['faces'], `${at}.faces`),
+      seat: seatRow === null ? null : Object.freeze({
+        positionMm: Object.freeze([signed(seatRow['x_mm'], `${at}.seat.x_mm`), signed(seatRow['y_mm'], `${at}.seat.y_mm`), signed(seatRow['z_mm'], `${at}.seat.z_mm`)] as const),
+        faces: side(seatRow['faces'], `${at}.seat.faces`),
+      }),
+    });
+  }));
 }
 
 /** Read the host's library list, or refuse it by name. */
@@ -237,8 +266,14 @@ export function readKindDrawing(value: unknown): KindDrawing {
     });
   })();
   let grip: Grip | null = null;
+  let use: KindUse | null = null;
   for (const [i, offer] of r.list(body['offers'] ?? [], 'offers').entries()) {
     const row = r.object(offer, `offers[${i}]`);
+    const stated = row['parameters'];
+    if (use === null && typeof stated === 'object' && stated !== null && 'places' in stated) {
+      const places = readPlaces(r, r.object(stated, `offers[${i}].parameters`)['places'], `offers[${i}].parameters.places`);
+      use = Object.freeze({ affordance: r.text(row['key'], `offers[${i}].key`), places });
+    }
     if (row['key'] !== 'holdable') continue;
     const parameters = r.object(row['parameters'], `offers[${i}].parameters`);
     const g = r.object(parameters['grip'], `offers[${i}].parameters.grip`);
@@ -264,6 +299,7 @@ export function readKindDrawing(value: unknown): KindDrawing {
     boxMm: box,
     extentMm: extent,
     grip,
+    use,
     looks: Object.freeze(r.list(body['looks'], 'looks').map((look, i) => r.reference(look, `looks[${i}]`, 'look'))),
   });
 }

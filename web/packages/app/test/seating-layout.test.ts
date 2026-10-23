@@ -87,4 +87,17 @@ describe('the seating layout', () => {
     expect('streetFurniture' in seatingLayout(assets, version, places, [])!).toBe(false);
     expect(seatingLayout(assets, null, places, [bench])).toBeNull();
   });
+
+  it('holds each placed thing whose kind states places as an object by its own id, the one its target names', () => {
+    const use = { affordance: 'rest_at', places: [{ positionMm: [0, 1020] as const, faces: '-y' as const, seat: { positionMm: [0, 20, 480] as const, faces: '+y' as const } }] };
+    const placed = { objectId: 'bench-in-the-street', assetKey: 'thing:bench-in-the-street', xMm: 126_000, yMm: 0, zMm: -71_500, yawMicroradians: 1_570_796, scaleMilli: 1000 };
+    const withThing = { targets: [...places.targets, { targetId: 'thing:bench-in-the-street:rest', objectId: 'bench-in-the-street' }] } as unknown as SocietyPlaces;
+    const layout = seatingLayout(assets, version, withThing, [], [], [{ object: placed, use }])!;
+    expect(layout.objects.map((one) => one.objectId)).toEqual(['kept', 'bench-in-the-street']);
+    expect(layout.objects[1]).toEqual(placed);
+    expect(layout.uses.get('thing:bench-in-the-street')).toBe(use);
+    expect(layout.targets.get('thing:bench-in-the-street:rest')).toBe('bench-in-the-street');
+    // With none drawn, the layout is the version's alone.
+    expect(seatingLayout(assets, version, withThing)!.objects.map((one) => one.objectId)).toEqual(['kept']);
+  });
 });

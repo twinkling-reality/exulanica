@@ -10,6 +10,7 @@ import {
   readThingLibrary,
 } from '../src/playcanvas/things/documents.js';
 import { LibraryRefused, ThingLibrary } from '../src/playcanvas/things/library.js';
+import { placeDrawing, type SeatingLayout } from '../src/playcanvas/society/seating.js';
 
 const THINGS = new URL('../../../../assets/catalogs/things/', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, THINGS));
@@ -56,6 +57,49 @@ describe('the shipped things documents, read as the drawing reads them', () => {
     }
   });
 
+  it('reads every shipped kind\'s places, as its one offer stating them says, seats and all', () => {
+    for (const path of files('kinds')) {
+      const doc = json(path);
+      const offer = (doc['offers'] as { key: string; parameters: Record<string, unknown> }[]).find((one) => 'places' in one.parameters);
+      const places = offer?.parameters['places'] as { x_mm: number; y_mm: number; faces: string; seat: { x_mm: number; y_mm: number; z_mm: number; faces: string } | null }[] | undefined;
+      expect(readKindDrawing(doc).use).toEqual(offer === undefined ? null : {
+        affordance: offer.key,
+        places: places!.map((place) => ({
+          positionMm: [place.x_mm, place.y_mm], faces: place.faces,
+          seat: place.seat === null ? null : { positionMm: [place.seat.x_mm, place.seat.y_mm, place.seat.z_mm], faces: place.seat.faces },
+        })),
+      });
+    }
+    expect(readKindDrawing(json('kinds/bench.v2.json')).use?.places?.every((place) => place.seat !== null)).toBe(true);
+    expect(readKindDrawing(json('kinds/sword.v2.json')).use).toBeNull();
+  });
+
+  it('seats a resting person on a placed bench at the place the society recorded, straight or turned', () => {
+    const use = readKindDrawing(json('kinds/bench.v2.json')).use!;
+    // The two benches and the place points their society recorded on a live town (MOTION, 23 October):
+    // one straight, one turned a quarter, their places turned outward to the whole millimetre.
+    const layout: SeatingLayout = {
+      uses: new Map([['thing:straight', use], ['thing:turned', use]]),
+      objects: [
+        { objectId: 'straight', assetKey: 'thing:straight', xMm: 126_000, yMm: 0, zMm: -71_500, yawMicroradians: 0, scaleMilli: 1000 },
+        { objectId: 'turned', assetKey: 'thing:turned', xMm: 121_000, yMm: 0, zMm: -71_500, yawMicroradians: 1_570_796, scaleMilli: 1000 },
+      ],
+      targets: new Map([['thing:straight:rest', 'straight'], ['thing:turned:rest', 'turned']]),
+    };
+    const straight = placeDrawing(layout, 'thing:straight:rest', [126_000, -72_520]);
+    expect(straight.kind).toBe('place');
+    const sat = (straight as Extract<typeof straight, { kind: 'place' }>).drawing;
+    expect(sat.placeIndex).toBe(1);
+    expect(sat.seat!.position.map((v) => Math.round(v * 1000))).toEqual([126_000, 480, -71_520]);
+    const turned = placeDrawing(layout, 'thing:turned:rest', [119_980, -72_203]);
+    expect(turned.kind).toBe('place');
+    const turnedSat = (turned as Extract<typeof turned, { kind: 'place' }>).drawing;
+    expect(turnedSat.placeIndex).toBe(2);
+    expect(turnedSat.seat!.position.map((v) => Math.round(v * 1000))).toEqual([120_980, 480, -72_202]);
+    // Faced from the front the bench is turned to, a quarter turn from the straight one's.
+    expect(Math.abs(Math.abs(turnedSat.seat!.facing - sat.seat!.facing) - Math.PI / 2)).toBeLessThan(1e-5);
+  });
+
   it('reads the body plans catalog: every bone and socket, the parents resolving', () => {
     const doc = json('body-plans.v1.json') as { entries: { key: string; version: number; bones: unknown[]; sockets: unknown[] }[] };
     const plans = readBodyPlans(doc);
@@ -86,6 +130,10 @@ describe('the shipped things documents, read as the drawing reads them', () => {
     const kind = json('kinds/sword.v1.json');
     expect(refused(kind, readKindDrawing)).toBeNull();
     expect(refused({ ...kind, body: { plan: 'rigid' } }, readKindDrawing)).toEqual(['thing_kind_invalid', 'body.plan']);
+    const bench = json('kinds/bench.v2.json') as { offers: { key: string; parameters: { places: Record<string, unknown>[] } }[] };
+    const sideways = JSON.parse(JSON.stringify(bench)) as typeof bench;
+    sideways.offers[0]!.parameters.places[0]!['faces'] = 'up';
+    expect(refused(sideways, readKindDrawing)).toEqual(['thing_kind_invalid', 'offers[0].parameters.places[0].faces']);
     expect(refused({ libraries: [] }, readThingLibrary)).toEqual(['thing_library_invalid', 'kinds']);
   });
 

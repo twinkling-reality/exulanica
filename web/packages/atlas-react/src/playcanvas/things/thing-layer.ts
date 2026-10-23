@@ -30,6 +30,7 @@
  */
 
 import * as pc from 'playcanvas';
+import type { KindUse, SeatingObject } from '../society/seating.js';
 import type { OwnedSocietyState, SocietyThingSnapshot } from '../society/types.js';
 
 /**
@@ -297,6 +298,8 @@ interface Entry {
   generation: number;
   /** How it is held, for a holdable object, once made. */
   grip: Grip | null;
+  /** Where people use it, as its kind states (`KindDrawing.use`), once made. */
+  use: KindUse | null;
   /** The entity it stands in when nobody holds it. */
   parent: pc.Entity | null;
   /** Who holds it now and in which socket, while a society's state says one does. */
@@ -419,7 +422,7 @@ export class ThingLayer {
       } else if (this.placedOnce) this.edited.set(id, []);
       const fresh: Entry = {
         record, key, figure: null, look: null, generation: (entry?.generation ?? 0) + 1,
-        grip: null, parent: null, heldBy: null, heldIn: null,
+        grip: null, use: null, parent: null, heldBy: null, heldIn: null,
       };
       this.entries.set(id, fresh);
       loads.push(this.build(id, fresh));
@@ -630,6 +633,20 @@ export class ThingLayer {
       entry.figure === null || (entry.record.support !== undefined && this.options.supportRoot?.(entry.record) == null) ? [] : [{ placedId, lookKind: entry.figure.lookKind, look: entry.look ?? '' }]);
   }
 
+  /**
+   * Where people use the things drawn on their region's ground, for the crowd's seating: each one
+   * whose kind states places, as an object at its pose (its own id the object and the kind's use
+   * named by it). A thing stood on a support is in that support's frame, not the society's: none.
+   */
+  get seating(): readonly { readonly object: SeatingObject; readonly use: KindUse }[] {
+    return [...this.entries].flatMap(([placedId, entry]) => {
+      // A use is kept with the figure made (`build`): a thing not drawn has none.
+      if (entry.use === null || entry.record.support !== undefined) return [];
+      const { xMm, yMm, zMm, yawMicroradians, scaleMilli } = entry.record.transform;
+      return [{ object: { objectId: placedId, assetKey: `thing:${placedId}`, xMm, yMm, zMm, yawMicroradians, scaleMilli }, use: entry.use }];
+    });
+  }
+
   /** Every placed thing drawn as nothing, and why. */
   get misses(): readonly ThingMiss[] {
     return [...this.missed.values()];
@@ -798,6 +815,7 @@ export class ThingLayer {
       entry.figure = made.figure;
       entry.look = made.look;
       entry.grip = made.kind.grip;
+      entry.use = made.kind.use;
       entry.parent = parent;
       this.missed.delete(id);
       this.poseOne(entry, 0);

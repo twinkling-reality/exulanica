@@ -2576,7 +2576,7 @@ export function mountEnvironmentSelection(
     const kept = current === null && authoredWorldFailure !== null && lastSeating !== null;
     deps.env.canvas.dataset.societySeatingLayout = kept ? 'kept-after-failed-read' : 'current';
     if (kept) return { ...lastSeating!, fixtureSeats: siteSeats(deps.state.activeWorldEntry?.entryId, savedWorld?.versionId) };
-    lastSeating = seatingLayout(worldClient.assets(), current, places, townFurniture(deps.state.activeWorldEntry?.entryId), siteSeats(deps.state.activeWorldEntry?.entryId, current?.versionId));
+    lastSeating = seatingLayout(worldClient.assets(), current, places, townFurniture(deps.state.activeWorldEntry?.entryId), siteSeats(deps.state.activeWorldEntry?.entryId, current?.versionId), things?.layer.seating);
     return lastSeating;
   }
 
@@ -2779,6 +2779,8 @@ export function mountEnvironmentSelection(
         if (thing.gone === true && thing.kind.source === 'workspace') documentLabels.set(kindKey({ source: 'workspace', sha256: thing.kind.sha256 }), null);
       }
       await things.setPlaced(placed, current?.edits);
+      // A placed thing's seats are the layer's once it is drawn: a person resting there sits on one.
+      refreshSeatingLayout();
       if (deps.env.canvas) deps.env.canvas.dataset['thingsDrawn'] = String(things.layer.drawn.length);
       if (deps.env.canvas) deps.env.canvas.dataset['thingsMissed'] = String(things.misses.length);
     } catch (error) {

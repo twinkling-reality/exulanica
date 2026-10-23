@@ -39,9 +39,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "buildings' storeys among them",
     ),
     "web/packages/app/src/composition/environment-selection.ts": (
-        3_345,
+        3_347,
         "the people, picking and society views of a mounted world, in one closure, with the "
-        "world's clock and population",
+        "world's clock and population, and the seats its placed things give",
     ),
     "web/packages/atlas-react/src/playcanvas/atlas-binding.ts": (
         3_282,
