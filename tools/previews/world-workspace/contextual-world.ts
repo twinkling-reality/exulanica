@@ -10,7 +10,7 @@ import { keepWorldPicture } from '/src/composition/world-pictures.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { SAID_READ, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, questionGroup } from './character-group.mjs';
+import { SAID_READ, choosableModels, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, offersModels, openWhileOffered, questionGroup } from './character-group.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
@@ -511,14 +511,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function chosenGroup(row, now) {
     const view = subjectView(row), { connected } = modelOf(row);
     const offer = offers.get(row.key)?.offer ?? null;
-    const assignable = !readOnly && Boolean(inventory && offer && subjectReads.models?.takesModelChoices && assignmentSubject(inventory, row, offer));
+    const assignable = !readOnly && Boolean(inventory && offer && offersModels(subjectReads.models) && assignmentSubject(inventory, row, offer));
     const picking = picker.of(row);
-    if (picking) return modelGroup({ who: view.who, models: subjectReads.models?.models ?? [], current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy });
+    if (picking) return modelGroup({ who: view.who, models: choosableModels(subjectReads.models), current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy });
     if (asking) {
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
       return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : whoOf(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
-        models: askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model?.name), limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && (subjectReads.models?.models.length ?? 0) > 1 });
+        models: askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model?.name), limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && choosableModels(subjectReads.models).length > 1 });
     }
     const said = saidLines.of(row.scene.id, now);
     return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,
@@ -527,7 +527,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   let groupActions = new Set(), groupFirst = 0;
   // Choose a model in the group (r07, character-group.mjs): the page's own write; the Run question then asks again.
-  const picker = modelPicker({ models: () => subjectReads.models?.models ?? [], currentOf: (row) => modelOf(row).model,
+  const picker = modelPicker({ models: () => choosableModels(subjectReads.models), currentOf: (row) => modelOf(row).model,
     write: async (row, selected, key) => (await recordEntityModel({ entry, subjectId: row.scene.id, selected, key, refresh: () => refreshSubject(row),
       client: modelsClient, current: () => picker.of(row) !== null && held === row && current() })).verified,
     refusal: (error, row) => modelRefusalWords(error.code ?? 'stale', subjectView(row).who),
@@ -671,11 +671,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const from = closed?.state === 'closed' && closed.endTick !== null ? worldTime(closed.startTick, start ?? -1) : null;
     const to = from ? worldTime(closed.endTick, start) : null;
     const lastRun = from && to && ranIn(pageView.events ?? [], pageView.row.scene.id, closed) ? lastRunLine({ from: from.hhmm, to: to.hhmm, decisions: closed.used.decisions, spent: closed.used.usd }) : null;
-    const choices = pageView.choosing && subjectReads.models
-      ? [...subjectReads.models.models.map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
+    const choices = (pageView.choosing = openWhileOffered(pageView.choosing, subjectReads.models))
+      ? [...choosableModels(subjectReads.models).map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
       : null;
     const offer = offers.get(pageView.row.key)?.offer;
-    const assignable = !readOnly && Boolean(inventory && offers.has(pageView.row.key) && subjectReads.models?.takesModelChoices && assignmentSubject(inventory, pageView.row, offer ?? null));
+    const assignable = !readOnly && Boolean(inventory && offers.has(pageView.row.key) && offersModels(subjectReads.models) && assignmentSubject(inventory, pageView.row, offer ?? null));
     return {
       who: view.who, sub: pageSub(view.who.named ? view.facts?.kind ?? null : null, entry.title), assignable,
       model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null, local: served?.local === true } : null) : undefined,
@@ -759,8 +759,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'draft' && editing) { editing.name = index?.name ?? ''; editing.about = index?.about ?? ''; }
     else if (action === 'save' && editing) void savePersonality();
     else if (action === 'model' && pageState().assignable) {
-      const current = (subjectReads.models?.models ?? []).findIndex(item => item.provider === modelOf(pageView.row).model?.provider && item.modelId === modelOf(pageView.row).model?.modelId);
-      pageView.choosing = { focus: current < 0 ? (subjectReads.models?.models.length ?? 0) : current, refusal: null, busy: false, key: crypto.randomUUID() };
+      const current = choosableModels(subjectReads.models).findIndex(item => item.provider === modelOf(pageView.row).model?.provider && item.modelId === modelOf(pageView.row).model?.modelId);
+      pageView.choosing = { focus: current < 0 ? choosableModels(subjectReads.models).length : current, refusal: null, busy: false, key: crypto.randomUUID() };
       drawPage();
     }
     else if (action === 'choose' && choosing) { choosing.focus = index; choosing.refusal = null; drawPage(); }
@@ -798,7 +798,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   async function useModel(index) {
     const showing = pageView, choosing = showing?.choosing;
     if (!choosing || choosing.busy || !subjectReads.models) return;
-    const list = subjectReads.models.models;
+    const list = choosableModels(subjectReads.models);
     const picked = index < list.length ? list[index] : null;
     choosing.busy = true; choosing.refusal = null; drawPage();
     try {
@@ -1234,10 +1234,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       }
       else if (choosing && ['ArrowUp', 'ArrowDown'].includes(event.code)) {
         event.preventDefault();
-        const last = subjectReads.models?.models.length ?? 0;
+        const last = choosableModels(subjectReads.models).length;
         pageAct('choose', Math.max(0, Math.min(last, choosing.focus + (event.code === 'ArrowUp' ? -1 : 1))));
       }
-      else if (choosing && (event.code === 'Enter' || (/^Digit[1-9]$/u.test(event.code) && Number(event.code.slice(5)) <= (subjectReads.models?.models.length ?? 0) + 1)) && !event.repeat) { event.preventDefault(); pageAct('use', event.code === 'Enter' ? undefined : Number(event.code.slice(5)) - 1); }
+      else if (choosing && (event.code === 'Enter' || (/^Digit[1-9]$/u.test(event.code) && Number(event.code.slice(5)) <= choosableModels(subjectReads.models).length + 1)) && !event.repeat) { event.preventDefault(); pageAct('use', event.code === 'Enter' ? undefined : Number(event.code.slice(5)) - 1); }
       else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
       else if (event.code === 'Enter' && !choosing && !event.repeat) { event.preventDefault(); pageAct('inspect'); }
       else if (event.code === 'Tab') return;

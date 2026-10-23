@@ -188,6 +188,25 @@ const sameModel = (model, current) => model === null || current === null ? model
   : model.provider === current.provider && (model.modelId ?? model.model_id) === (current.modelId ?? current.model_id);
 
 /**
+ * The models a person may choose here (F5), from the models read: the ones it says this install can ask, so a
+ * model refused here (a server on this computer the install does not reach, a provider it holds no key for)
+ * is never offered, "On this computer · Free" least of all. Both choosers, their number keys too, take this list.
+ */
+export function choosableModels(read) {
+  return (read?.models ?? []).filter(model => !model.refusal);
+}
+
+/** Whether [M] is offered (F5): the models read takes choices and offers a model this install can ask. */
+export function offersModels(read) {
+  return Boolean(read?.takesModelChoices) && choosableModels(read).length > 0;
+}
+
+/** An open chooser while the models read offers a model to choose (F5): with none, it closes. */
+export function openWhileOffered(choosing, read) {
+  return choosableModels(read).length ? choosing : null;
+}
+
+/**
  * Choose a model (r07, R-RUN-BUILD-SHEET section 3): M turns the same group, in place, into the list of the models the
  * server offers, in its order, with Routine last. Top to bottom: the name, "Choose a model", that picking spends nothing,
  * "Per million tokens" over the price column, one row per model (its number key, its name with "Current" after the
@@ -226,15 +245,18 @@ const MOVING_KEYS = Object.freeze(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 
 /**
  * Choosing a model in the group (r07): the list's state for the chosen character and its keys. M opens it on their
  * current model (Routine, after the served models, where they have none); the arrows move; a number (on the window
- * modelGroup shows) or Enter gives that model; Esc closes it unchanged. `models()` is the models read's served list,
- * `currentOf(row)` the character's model; `write(row, selected, key)` makes the page's own write (selected null for
+ * modelGroup shows) or Enter gives that model; Esc closes it unchanged, and it closes when none is left to choose.
+ * `models()` is the models a person may choose here (choosableModels), `currentOf(row)` the character's model; `write(row, selected, key)` makes the page's own write (selected null for
  * Routine) and answers the models read it verified, or throws the refusal; `refusal(error, row)` words a refusal;
  * `onUsed(verified)` runs after a write. A write keeps its idempotency key until it is refused.
  */
 export function modelPicker({ models, currentOf, write, refusal, onUsed = (verified) => verified, newKey = () => crypto.randomUUID() }) {
   let picking = null;
   const picker = {
-    of: (row) => picking !== null && picking.row === row ? picking : null,
+    of(row) {
+      if (!models().length) picking = null;
+      return picking !== null && picking.row === row ? picking : null;
+    },
     open(row) {
       const list = models(), current = currentOf(row) ?? null;
       const at = list.findIndex(model => sameModel(model, current));

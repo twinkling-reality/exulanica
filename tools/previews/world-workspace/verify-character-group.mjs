@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, deciderOf, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, questionGroup, readLastSaid } from './character-group.mjs';
+import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, questionGroup, readLastSaid } from './character-group.mjs';
 import { GROUP_WORDS, called, decidesPrint, modelsDecide, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
@@ -194,6 +194,44 @@ assert.equal(listed.print, null);
 assert.equal(modelGroup({ who: teo, models: served, current: null, focus: 3 }).list.rows[3].current, true, 'no model: Routine is theirs');
 assert.equal(modelGroup({ who: teo, models: [], current: null }).list.rows.length, 1, 'nothing served: Routine alone');
 assert.equal(modelGroup({ who: teo, models: served, focus: 99 }).list.rows.at(-1).on, true, 'focus held to the list');
+// F5: only a model this install can ask is offered. A server on this computer the install does not reach, or a hosted
+// provider it holds no key for, is refused in the models read and left out of both choosers.
+const refusedHere = [
+  served[0],
+  { ...served[1], refusal: 'provider_credential_absent' },
+  { ...served[2], refusal: 'provider_not_admitted' },
+];
+assert.deepEqual(choosableModels({ models: refusedHere }).map(model => model.name), ['Nemotron 3 Nano 30B']);
+assert.deepEqual(modelGroup({ who: teo, models: choosableModels({ models: refusedHere }) }).list.rows.map(row => [row.word, row.price]), [
+  ['Nemotron 3 Nano 30B', '$0.06 in · $0.24 out'],
+  ['Routine', 'No AI model · Free'],
+]);
+assert.deepEqual(choosableModels({ models: served }), served, 'nothing refused: every served model is offered');
+assert.deepEqual(choosableModels(null), [], 'no models read yet: nothing offered');
+// Every model refused (DESIGN, "F5 A"): nothing to choose, so neither the card nor the page offers [M] for a person on
+// their routine, and a chooser left open closes; the Run line says why by its code.
+const allRefused = refusedHere.map(model => ({ ...model, refusal: model.refusal ?? 'provider_credential_absent' }));
+assert.equal(choosableModels({ models: allRefused }).length, 0);
+assert.equal(offersModels({ takesModelChoices: true, models: allRefused }), false, 'every model refused: no [M]');
+assert.equal(offersModels({ takesModelChoices: true, models: refusedHere }), true);
+assert.equal(offersModels({ takesModelChoices: false, models: served }), false, 'choices not taken: no [M]');
+const nothingToChoose = groupContent({ who: teo, doing: null, decider: 'routine', assignable: offersModels({ takesModelChoices: true, models: allRefused }) });
+assert.equal(nothingToChoose.rows.some(row => row.action === 'model'), false);
+assert.equal(groupContent({ who: teo, doing: null, decider: 'routine', assignable: offersModels({ takesModelChoices: true, models: refusedHere }) }).rows.some(row => row.action === 'model'), true);
+const open = { focus: 1 };
+assert.equal(openWhileOffered(open, { models: refusedHere }), open, 'a model to choose: the chooser stays open');
+assert.equal(openWhileOffered(open, { models: allRefused }), null, 'none left to choose: the chooser closes');
+{
+  let offered = served;
+  const picker = modelPicker({ models: () => offered, currentOf: () => null, write: async () => 'verified', refusal: () => '' });
+  const row = { key: 'teo' };
+  picker.open(row);
+  assert.equal(picker.of(row)?.focus, served.length, 'opens on Routine');
+  offered = [];
+  assert.equal(picker.of(row), null, 'every model refused while the card\'s list is open: it closes');
+  offered = served;
+  assert.equal(picker.of(row), null, 'closed stays closed');
+}
 const refusedChoice = modelGroup({ who: teo, models: served, refusal: 'This model cannot decide for Teo here.' });
 assert.equal(refusedChoice.print, 'This model cannot decide for Teo here.');
 assert.equal(refusedChoice.refused, true);
