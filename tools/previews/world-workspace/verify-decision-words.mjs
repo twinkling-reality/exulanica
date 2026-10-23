@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  DECISION_FLOW_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, decisionTitle,
+  DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, decisionNotes, decisionTitle,
   needLine, overLabel, resultLines, toldLabel, toldSections,
 } from './decision-words.mjs';
 import { called } from './character-words.mjs';
@@ -45,6 +45,20 @@ assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done,
 // The record page's words (r10): the column's label, the ring's count, the card's label and the head's small print,
 // who decided first (T7's words where no model did), then the answer's time and cost as resultLines says them.
 assert.equal(choicesOver(teo), "Teo's choices");
+// A newcomer's notes (A7): a model's decision names the model's parts; a person playing's, What happened's alone; Compare's
+// only where C shows; an unnamed being inside the sentence.
+const noted = decisionNotes({ who: teo, decider: 'model', canCompare: true });
+assert.equal(noted.by, 'The open model that chose for Teo, how long it took to answer, and what this one choice cost.');
+assert.equal(noted.told, "The prompt Teo's model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.");
+assert.equal(noted.choices, 'The actions the world allowed Teo there. The model picked one, and the world checked it before it happened.');
+assert.equal(noted.happened, 'What the choice did in the world, at that minute.');
+assert.equal(noted.compare, 'Compare asks another open model the same moment, to see what it would choose.');
+assert.equal(decisionNotes({ who: teo, decider: 'model' }).compare, null);
+assert.deepEqual({ ...decisionNotes({ who: teo, decider: 'person', canCompare: true }) },
+  { by: null, told: null, choices: null, happened: 'What the choice did in the world, at that minute.', compare: null });
+assert.equal(decisionNotes({ who: teo, decider: 'external' }).by, null);
+assert.match(decisionNotes({ who: resident, decider: 'model' }).told, /^The prompt the resident's model was given/);
+assert.deepEqual({ ...DECISION_NOTE_WORDS }, { hide: 'Hide notes', show: 'Notes' });
 assert.equal(choicesOver(resident), "The resident's choices");
 assert.equal(choseOneOf(9), 'chose 1 of 9');
 assert.equal(DECISION_FLOW_WORDS.whatHappened, 'What happened');

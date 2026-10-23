@@ -68,3 +68,13 @@
 /* [J]: the stored record as it is, in place of the flow. */
 .wu-record-decision .wu-rd-record { position: absolute; margin: 0; overflow: auto; font: 400 14px/1.5 var(--font-mono); color: var(--hr-quiet); white-space: pre-wrap; overflow-wrap: anywhere; }
 .wu-record-decision .wu-rd-record:focus { outline: none; }
+
+/* A newcomer's notes (A7): one line in the faint ink under a part's label, the parts after it moving down by that line;
+   the choices' note stands where their label stood (decision-page.ts raises the label), and Compare's sits in the key
+   row before its key. N hides them. */
+.wu-record-decision .wu-rd-hint { margin: 6px 0 0; font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); opacity: .78; text-wrap: pretty; }
+.wu-record-decision .wu-rd-head .wu-rd-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wu-record-decision .wu-rd-told > .wu-rd-label + .wu-rd-hint { margin: -14px 0 14px; }
+.wu-record-decision .wu-rd-over-hint { position: absolute; margin: 0; }
+.wu-record-decision .wu-rd-text > .wu-rd-label + .wu-rd-hint { margin: 6px 0 4px; }
+.wu-record .wu-hr-keys .wu-rd-key-hint { margin: 0 -18px 0 0; max-width: 380px; white-space: normal; }

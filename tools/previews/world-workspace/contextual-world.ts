@@ -1153,6 +1153,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // A decision over History: Esc back (from the record to the decision, then to History), J the record.
       if (event.code === 'Escape' && !event.repeat) historyDecisionAct('back');
       else if (event.code === 'KeyJ' && !event.repeat) historyDecisionAct('record');
+      else if (event.code === 'KeyN' && !event.repeat) historyDecision.page.notes();
       if (event.code !== 'Tab' && !(historyDecision?.decision.record && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(event.code))) event.preventDefault();
       event.stopImmediatePropagation(); return;
     }
@@ -1196,6 +1197,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) decisionAct('back'); }
         else if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') { event.preventDefault(); if (!event.repeat) decisionAct(event.code === 'ArrowLeft' ? 'earlier' : 'later'); }
         else if (event.code === 'KeyJ' && !event.repeat) { event.preventDefault(); decisionAct('record'); }
+        else if (event.code === 'KeyN' && !event.repeat) { event.preventDefault(); decision.page.notes(); }
         else if (event.code === 'KeyC' && !event.repeat) { event.preventDefault(); decisionAct('compare'); }
         else if (decision.record && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(event.code)) return;
         else if (event.code === 'Tab') return;

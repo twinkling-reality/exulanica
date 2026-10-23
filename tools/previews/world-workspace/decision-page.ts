@@ -9,7 +9,7 @@
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { FLOW_LAYOUTS, choiceEnd, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
-import { DECISION_FLOW_WORDS, DECISION_WORDS, choseOneOf, decidedByParts } from './decision-words.mjs';
+import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, choseOneOf, decidedByParts } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import './world-ui-record-decision.css';
@@ -63,6 +63,10 @@ export interface DecisionPageState {
   /** The personality as written (the context's character): its name and its words, so the page keeps them apart.
    * Absent: read from the Personality section's lines, name then words. */
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
+  /** What each part is, for a newcomer (A7): a line under the small print, what was told, the choices and What
+   * happened, and the Compare key's; null where a part has none. Absent: no notes. */
+  readonly notes?: { readonly by: string | null; readonly told: string | null; readonly choices: string | null;
+    readonly happened: string | null; readonly compare: string | null } | null;
 }
 
 export interface DecisionPage {
@@ -70,6 +74,9 @@ export interface DecisionPage {
   close(): void;
   /** Hides the page while another stands over it, keeping what it shows. */
   hide(hidden: boolean): void;
+  /** Hides the newcomer's notes or brings them back (A7, N): the host hears the key, as it hears every key but the
+   * arrows. */
+  notes(): void;
 }
 
 /** The parts of decision-flow.mjs's sizes the page reads. */
@@ -106,6 +113,12 @@ type Written = NonNullable<DecisionPageState['personality']>;
 interface Block { readonly words: string; readonly quote: boolean }
 
 const SVG = 'http://www.w3.org/2000/svg';
+/** Where the person's choice to hide the newcomer's notes is kept on this computer (A7): a convenience, so where it
+ * cannot be read the notes show. */
+export const NOTES_HIDDEN_KEY = 'exulanica.decision-notes';
+const notesHiddenNow = (): boolean => { try { return localStorage.getItem(NOTES_HIDDEN_KEY) === 'hidden'; } catch { return false; } };
+/** The gap between the choices' label and its note, and between the note and the first choice's line. */
+const NOTE_GAP = 8;
 const kept = (words: string | null | undefined): string | null => words?.trim() || null;
 
 /**
@@ -184,6 +197,12 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   // choices it belongs to; another decision's choices start again from their own window.
   let offset: number | null = null;
   let listed = '';
+  let notesHidden = notesHiddenNow();
+  const toggleNotes = (): void => {
+    notesHidden = !notesHidden;
+    try { if (notesHidden) localStorage.setItem(NOTES_HIDDEN_KEY, 'hidden'); else localStorage.removeItem(NOTES_HIDDEN_KEY); } catch { /* For this page only. */ }
+    if (last) render(last);
+  };
   const windowOf = () => {
     const layout: Size = flowSize(host.clientWidth || innerWidth);
     const height = host.clientHeight || innerHeight;
@@ -214,6 +233,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     }
     const blocks = sections.map((section) => blocksOf(section, state.personality ?? null));
     const by = smallPrint(state);
+    const notes = read && state.notes && !notesHidden ? state.notes : null;
     // Where the page cannot measure (before layout, or without one), the head, the told column and the taken row's
     // words are estimated; laid out, they are measured below and the places follow.
     const estimate = {
@@ -236,9 +256,11 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     title.tabIndex = -1;
     head.append(title);
     if (by.length) head.append(sentence('p', 'wu-rd-by', by));
+    if (notes?.by && by.length) head.append(element('p', 'wu-rd-hint', notes.by));
     nodes.push(head);
 
     let told: HTMLElement | null = null, record: HTMLElement | null = null, takenRow: HTMLElement | null = null, lines: SVGSVGElement | null = null;
+    let over: HTMLElement | null = null, choiceNote: HTMLElement | null = null;
     if (state.record !== null) {
       record = element('pre', 'wu-rd-record', state.record);
       record.tabIndex = 0;
@@ -251,6 +273,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         told = element('section', 'wu-rd-told');
         placeTold(told, drawn.told);
         told.append(element('p', 'wu-rd-label', state.toldLabel));
+        if (notes?.told) told.append(element('p', 'wu-rd-hint', notes.told));
         if (state.failure) {
           const note = element('p', 'wu-rd-note', state.failure);
           note.dataset['refused'] = 'true';
@@ -287,9 +310,17 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         if (choices.length) {
           const columnLabel = state.choicesHeading || state.choicesLabel;
           const column = element('div', 'wu-rd-choices');
-          const over = element('div', 'wu-rd-over');
+          over = element('div', 'wu-rd-over');
           px(over, drawn.over.x, drawn.over.y);
           over.append(element('p', 'wu-rd-label', columnLabel));
+          // The note stands where the label stood, the label one note higher (placed once measured, below), so the
+          // rows and the lines into them never move.
+          if (notes?.choices) {
+            choiceNote = element('p', 'wu-rd-hint wu-rd-over-hint', notes.choices);
+            px(choiceNote, drawn.over.x, drawn.over.y);
+            choiceNote.style.maxWidth = `${rowMost(layout)}px`;
+            column.append(choiceNote);
+          }
           if (drawn.above) over.append(moreButton('↑', () => scroll(-1)));
           const list = element('ol', 'wu-rd-rows');
           list.setAttribute('aria-label', columnLabel);
@@ -325,6 +356,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         if (people.length) picture.append(orbs(people.map((_, at) => String(at)), drawn.card.orb, (id) => people[Number(id)]?.url ?? null, (id) => people[Number(id)]?.name ?? ''));
         const text = element('div', people.length ? 'wu-rd-text' : 'wu-rd-text wu-rd-bare');
         text.append(element('div', 'wu-rd-label', DECISION_FLOW_WORDS.whatHappened));
+        if (notes?.happened) text.append(element('p', 'wu-rd-hint', notes.happened));
         if (state.said) text.append(element('div', 'wu-hr-said wu-rd-said', state.said));
         else if (state.action || state.title) text.append(element('div', 'wu-rd-action', state.action || state.title));
         if (state.verdict) text.append(element('p', 'wu-rd-verdict', state.verdict));
@@ -338,8 +370,13 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     if (state.earlier || state.later) keys.push(shortcut(keyButton(['←', '→'], DECISION_WORDS.earlierLater, () => act(state.later ? 'later' : 'earlier')), 'ArrowLeft ArrowRight'));
     if (state.title) keys.push(shortcut(keyButton(['J'], DECISION_WORDS.fullRecord, () => act('record')), 'J'));
     if (state.title && state.canCompare && state.record === null) keys.push(shortcut(keyButton(['C'], COMPARE_WORDS.compareThisMoment, () => act('compare')), 'C'));
+    if (read && state.notes) keys.push(shortcut(keyButton(['N'], notesHidden ? DECISION_NOTE_WORDS.show : DECISION_NOTE_WORDS.hide, toggleNotes), 'N'));
     keys.push(shortcut(keyButton(['Esc'], CHARACTER_WORDS.back, () => act('back')), 'Escape'));
-    nodes.push(keyRow(keys));
+    const row = keyRow(keys);
+    // Compare's note stands just before the key row's Compare, in the row (A7).
+    const compareKey = keys.find((key) => key.getAttribute('aria-keyshortcuts') === 'C');
+    if (notes?.compare && compareKey) compareKey.before(element('span', 'wu-rd-hint wu-rd-key-hint', notes.compare));
+    nodes.push(row);
     sheet.content.replaceChildren(...nodes);
 
     // Laid out: where the head ends places what was told and the record under it; then the told column's height and
@@ -356,6 +393,14 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         flow = lay(headEnd, blocks.length ? toldHigh || estimate.told : null, takenEnd || estimate.end);
         lines.innerHTML = flowMarkup(flow);
       }
+    }
+
+    // The choices' note measured: it stands where the label stood and the label rises above it, so neither touches a row.
+    if (over && choiceNote && choiceNote.offsetHeight > 0) {
+      const placed = flow ?? drawn;
+      const noteTop = placed.over.y + over.offsetHeight - choiceNote.offsetHeight;
+      px(choiceNote, placed.over.x, noteTop);
+      px(over, placed.over.x, noteTop - NOTE_GAP - over.offsetHeight);
     }
 
     // The record takes focus while it shows, so the arrows and Space scroll it.
@@ -392,5 +437,6 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
       flow = null;
     },
     hide(hidden) { sheet.root.hidden = hidden; },
+    notes() { if (last?.notes && last.record === null) toggleNotes(); },
   };
 }

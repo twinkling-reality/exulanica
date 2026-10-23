@@ -32,8 +32,10 @@ interface DecisionPageState {
   readonly portraits?: readonly { readonly name: string; readonly url: string | null }[];
   readonly ground?: string | null;
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
+  readonly notes?: { readonly by: string | null; readonly told: string | null; readonly choices: string | null;
+    readonly happened: string | null; readonly compare: string | null } | null;
 }
-interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void }
+interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void; notes(): void }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
 // module (outside this package) out of the program.
 const module = async (): Promise<{ openDecisionPage(host: HTMLElement, act: (action: string) => void): DecisionPage }> =>
@@ -361,5 +363,55 @@ describe('A decision (r10)', () => {
     expect(root.querySelector('[role="dialog"]')).toBeNull();
     for (const code of ['ArrowDown', 'ArrowUp', 'ArrowDown']) expect(press(code).defaultPrevented).toBe(false);
     expect(act).not.toHaveBeenCalled();
+  });
+});
+
+describe('A decision explains itself to a newcomer (A7)', () => {
+  afterEach(() => { localStorage.clear(); });
+  const NOTES = {
+    by: 'The open model that chose for Teo, how long it took to answer, and what this one choice cost.',
+    told: "The prompt Teo's model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.",
+    choices: 'The actions the world allowed Teo there. The model picked one, and the world checked it before it happened.',
+    happened: 'What the choice did in the world, at that minute.',
+    compare: 'Compare asks another open model the same moment, to see what it would choose.',
+  };
+
+  it('notes the four parts under their labels and Compare in the key row, and N hides them on every later decision', async () => {
+    const { root, page } = await open(teo({ notes: NOTES }));
+    expect(all(root, '.wu-rd-head .wu-rd-hint')).toEqual([NOTES.by]);
+    expect(all(root, '.wu-rd-told .wu-rd-hint')).toEqual([NOTES.told]);
+    expect(all(root, '.wu-rd-over-hint')).toEqual([NOTES.choices]);
+    expect(all(root, '.wu-rd-text .wu-rd-hint')).toEqual([NOTES.happened]);
+    expect(all(root, '.wu-hr-keys .wu-rd-key-hint')).toEqual([NOTES.compare]);
+    expect(keys(root)).toEqual(['←→Earlier, later', 'JFull record', 'CCompare this moment', 'NHide notes', 'EscBack']);
+    // Each note is under its own label, never over the rows: the choices' note stands above the first row.
+    const note = root.querySelector('.wu-rd-over-hint') as HTMLElement;
+    const firstRow = root.querySelector('.wu-rd-choice') as HTMLElement;
+    expect(Number.parseFloat(note.style.top)).toBeLessThan(Number.parseFloat(firstRow.style.top));
+    // N (the host hears the key and asks the page) hides them and keeps it so for this person on this computer.
+    page.notes();
+    expect(root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
+    expect(keys(root)).toContain('NNotes');
+    page.close();
+    const later = await open(teo({ notes: NOTES }));
+    expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
+    // Its key in the row brings them back.
+    (later.root.querySelector('[aria-keyshortcuts="N"]') as HTMLButtonElement).click();
+    expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(5);
+    expect(keys(later.root)).toContain('NHide notes');
+  });
+
+  it("notes a person playing's decision with What happened's line alone, and Compare only where C shows", async () => {
+    const played = { by: null, told: null, choices: null, happened: NOTES.happened, compare: null };
+    const { root } = await open(teo({ notes: played, decider: 'person', model: null, answered: null, toldLabel: 'What the person playing Teo was shown', canCompare: false }));
+    expect(all(root, '.wu-rd-hint')).toEqual([NOTES.happened]);
+    document.body.replaceChildren();
+    const quiet = await open(teo({ notes: NOTES, canCompare: false }));
+    expect(all(quiet.root, '.wu-rd-key-hint')).toEqual([]);
+    // Without notes from the host, the page draws none and offers no N.
+    document.body.replaceChildren();
+    const none = await open(teo());
+    expect(none.root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
+    expect(keys(none.root)).not.toContain('NHide notes');
   });
 });
