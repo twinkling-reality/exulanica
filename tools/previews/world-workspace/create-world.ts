@@ -14,7 +14,10 @@ import {
   createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, quietCommand, sentenceField, sentenceRow, setOrbReady,
   type FilmStrip, type LightPage, type SentenceField,
 } from './world-ui-create.ts';
-import { CREATE_WORDS, budgetShort, ceilingAmount, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
+import {
+  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
+  stepTime,
+} from './create-words.mjs';
 import {
   MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards, writeMade,
 } from './create-steps.mjs';
@@ -428,11 +431,41 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     await openMadeWorld(draft.entry);
   };
 
+  /**
+   * Frame 21 for a served starter card, drawn the moment it is pressed, since making it takes seconds (WORDS.md "The
+   * first view, GRAPHICS's notes sorted"): the card's name under Create's label, and its one live step with
+   * its time from the press, until the world opens or the start is refused. A card has no draft to read, so its step
+   * is the making itself. Returns what stops the step's clock.
+   */
+  const makingFrom = (name: string): (() => void) => {
+    form = 'creating';
+    page.form('creating');
+    const heading = document.createElement('p');
+    heading.className = 'wu-light-quote'; heading.id = 'wu-create-title';
+    heading.textContent = name;
+    page.head.replaceChildren(lightLabel(CREATE_WORDS.creating), heading);
+    const steps = lightSteps();
+    page.lower.replaceChildren(steps.root, lightLine(CREATE_WORDS.leave));
+    strip = null; field = null; orb = null;
+    sizeQuote(heading);
+    keys();
+    page.root.focus({ preventScroll: true });
+    const pressed = performance.now();
+    const tick = (): void => steps.set([{ words: STEP_WORDS.making, state: 'now', time: stepTime((performance.now() - pressed) / 1000) }]);
+    tick();
+    const clock = window.setInterval(tick, 1000);
+    const stop = (): void => window.clearInterval(clock);
+    signal.addEventListener('abort', stop);
+    return stop;
+  };
+
   /** A card: a recipe or a kind starts at once and opens through its opening; Blank opens in build mode (N4). */
   const startFrom = async (key: string): Promise<void> => {
     const card = cards.find((one) => one.key === key);
     if (!card || busy) return;
     busy = true;
+    // Blank opens at once; a served card is made first, and says so from its press.
+    const stop = key === 'blank' ? null : makingFrom(cardWords.get(key)?.name ?? '');
     try {
       const entry = await card.start();
       if (signal.aborted) return;
@@ -443,6 +476,8 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     } catch (error) {
       busy = false;
       if (!signal.aborted) refused(codeOf(error) ?? 'world_draft_failed', null);
+    } finally {
+      stop?.();
     }
   };
 

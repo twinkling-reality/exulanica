@@ -371,6 +371,52 @@ describe('Create a world as a page', () => {
     expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('A quiet valley');
   });
 
+  it('answers a starter card\'s press at once with its making steps, starts nothing else meanwhile, and gives the cards back on a refusal', async () => {
+    serve(offerOf());
+    const made: string[] = [];
+    let answer: { reject: (error: unknown) => void } | null = null;
+    let now = 1_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const root = document.createElement('div'); document.body.append(root);
+    (await page()).mountCreateWorld({ root, credentials: {}, onClose: () => {}, entries: {
+      ensureStarter: async () => { made.push('blank'); return { entryId: 'starter' }; },
+      entries: async () => [],
+      makeGenerated: (key: string) => { made.push(key); return new Promise((_resolve, reject) => { answer = { reject }; }); },
+    } });
+    await settle();
+    const live = (): Element => document.querySelector('.wu-light-steps [aria-current="step"]')!;
+    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour');
+    const card = document.querySelector<HTMLButtonElement>('.wu-film-card[data-key="recipe:town"]')!;
+    card.click();
+    // At once, the start not yet answered: frame 21, its head, and its one live step timed from the press.
+    expect(document.querySelector('.wu-light-quote')!.textContent).toBe('Small town');
+    expect(document.querySelector('.wu-light-label')!.textContent).toBe('Creating your world');
+    expect(live().querySelector('.wu-step-words')!.textContent).toBe('Building it');
+    expect(live().querySelector('.wu-step-time')!.textContent).toBe('0 s');
+    expect(document.body.textContent).toContain('You can leave this page. It carries on, and it waits in Your worlds.');
+    now += 7_400;
+    vi.advanceTimersByTime(1_000);
+    expect(live().querySelector('.wu-step-time')!.textContent).toBe('7 s');
+    // No card, field or Create is left to press; Enter, and the pressed card again, start nothing.
+    expect(document.querySelector('.wu-film-card, .wu-light-field, .wu-light-orb')).toBeNull();
+    key(document.querySelector('section.wu-light')!, 'Enter');
+    card.click();
+    await settle();
+    expect(made).toEqual(['town']);
+    expect(starts).toEqual([]);
+    // Refused: frame 20 again with the refusal said, every card pressable, and the step's clock stopped.
+    answer!.reject(Object.assign(new Error('refused'), { code: 'world_draft_failed' }));
+    await settle();
+    expect(document.querySelector('.wu-light-steps')).toBeNull();
+    expect(document.body.textContent).toContain('Something went wrong while making it, so nothing was made. Try again.');
+    expect(vi.getTimerCount()).toBe(0);
+    document.querySelector<HTMLButtonElement>('.wu-film-card[data-key="blank"]')!.click();
+    await settle();
+    expect(made).toEqual(['town', 'blank']);
+    vi.restoreAllMocks();
+  });
+
   it('follows a draft by its served steps and comes back with the words, the refusal and what was spent', async () => {
     serve(offerOf(), [
       { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
