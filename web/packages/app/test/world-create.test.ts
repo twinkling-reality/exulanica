@@ -264,7 +264,7 @@ const offerOf = (extra: Record<string, unknown> = {}) => {
 /** Answers the workspace's reads: the offer, then each draft read in turn. */
 function serve(offer: Record<string, unknown>, reads: Record<string, unknown>[] = []): void {
   vi.stubGlobal('fetch', vi.fn(async (address: string) => {
-    const body = address === '/review-api/worlds/drafts' ? offer : reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+    const body = address.endsWith('/worlds/drafts') ? offer : reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
     return { ok: true, status: 200, json: async () => body };
   }));
 }
@@ -364,7 +364,7 @@ describe('Create a world as a page', () => {
     vi.stubGlobal('fetch', vi.fn(async (address: string) => {
       const body = address === '/card-pictures/card-pictures.v1.json'
         ? { profile: 'exulanica.card-pictures/v1', entries: [{ card: 'recipe:town', reference: { values: {} }, picture: 'recipe-town.jpg' }], held: [] }
-        : address === '/review-api/worlds/drafts' ? offer : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        : address.endsWith('/worlds/drafts') ? offer : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
       return { ok: true, status: 200, json: async () => body };
     }));
     await mount();
@@ -477,7 +477,7 @@ describe('Create a world as a page', () => {
     const pressedWith = async (next: string): Promise<void> => {
       const offers = [quoted('1.4227'), quoted(next)];
       vi.stubGlobal('fetch', vi.fn(async (address: string) => {
-        const body = address === '/review-api/worlds/drafts' ? (offers.length > 1 ? offers.shift() : offers[0]) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        const body = address.endsWith('/worlds/drafts') ? (offers.length > 1 ? offers.shift() : offers[0]) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
         return { ok: true, status: 200, json: async () => body };
       }));
       let answers = 0;
@@ -517,7 +517,7 @@ describe('Create a world as a page', () => {
       const unreadable = offerOf({ offered: false, code: 'world_draft_price_unavailable', operation: null });
       const offers = [quoted('1.4227'), unreadable, quoted('1.4227')];
       vi.stubGlobal('fetch', vi.fn(async (address: string) => {
-        const body = address === '/review-api/worlds/drafts' ? (offers.length > 1 ? offers.shift() : offers[0]) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        const body = address.endsWith('/worlds/drafts') ? (offers.length > 1 ? offers.shift() : offers[0]) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
         return { ok: true, status: 200, json: async () => body };
       }));
       let answers = 0;
@@ -541,7 +541,7 @@ describe('Create a world as a page', () => {
     it('says the price cannot be read in the plain ink where the read again fails, not that it changed', async () => {
       let reads = 0;
       vi.stubGlobal('fetch', vi.fn(async (address: string) => {
-        if (address !== '/review-api/worlds/drafts') return { ok: true, status: 200, json: async () => ({ state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 }) };
+        if (!address.endsWith('/worlds/drafts')) return { ok: true, status: 200, json: async () => ({ state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 }) };
         // The offer reads once, then every read again fails.
         return reads++ === 0 ? { ok: true, status: 200, json: async () => quoted('1.4227') } : { ok: false, status: 503, json: async () => ({}) };
       }));

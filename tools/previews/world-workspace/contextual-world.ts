@@ -7,6 +7,7 @@ import { DISCOVERY, clickReach, inspectionReach } from './discovery-policy.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
 import { keepWorldInAddress, returnToFrontDoor } from './front-door.ts';
 import { keepWorldPicture } from '/src/composition/world-pictures.ts';
+import { accessHeaders } from '/src/config.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
@@ -176,7 +177,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
 
   const current = () => state.activeWorldEntry?.worldId === entry.worldId && state.activeWorldEntry?.authoredVersionId === entry.authoredVersionId;
   const read = async (path) => {
-    const response = await fetch('/review-api' + path, { cache: 'no-store', signal: lifetime.signal });
+    const response = await fetch(state.credentials.baseUrl + path, { headers: { ...accessHeaders(state.credentials), Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store', signal: lifetime.signal });
     if (!response.ok) throw Error(response.status === 424 ? 'This source is no longer available.' : 'This world could not be read. Try again.');
     return response.json();
   };

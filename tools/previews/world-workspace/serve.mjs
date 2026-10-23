@@ -46,16 +46,6 @@ const plugin = {
     server.middlewares.use(scenePreviewWriteGuard);
     if (observerOnly) server.middlewares.use('/api', observerRequestGuard);
     server.middlewares.use(CAPTURE_ROUTE.slice(0, -1), capturePictures(captures, previewDirectory));
-    server.middlewares.use('/review-api', async (req, res) => {
-      res.setHeader('Cache-Control', 'no-store');
-      res.setHeader('Content-Type', 'application/json');
-      if (req.method !== 'GET') { res.statusCode = 405; res.end(JSON.stringify({ detail: 'Use the native controls for changes.' })); return; }
-      try {
-        const response = await fetch(api + (req.url || '/'), { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(15000) });
-        res.statusCode = response.status;
-        res.end(await response.text());
-      } catch { res.statusCode = 502; res.end(JSON.stringify({ detail: 'The saved world could not be reached. Try again.' })); }
-    });
   },
 };
 const server = await createServer({

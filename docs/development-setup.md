@@ -543,7 +543,10 @@ install serves: `--personal` starts it on its slot's app port ([running your own
 The product preview ([`tools/previews/product-uiux`](../tools/previews/product-uiux/)) is a preview of a landing page
 and a chooser. Both are source adapters: they transform the native application's source and use authenticated world
 reads, rather than replace the production application's entry point, and their source transformations refuse changed
-bootstrap seams. `?preview=1` is the read-only fixture [above](#what-runs), separate from both.
+bootstrap seams. The app's production build makes the world workspace's transformations too
+(`web/packages/app/src/dev/world-workspace-build.ts`), so a hosted deployment's client serves the workspace; its reads
+go through `/api` with the page's own credentials (a personal install's bearer, a guest's session). `?preview=1` is the
+read-only fixture [above](#what-runs), separate from both.
 
 Run by hand against an existing runtime, both launchers require `EXULANICA_REVIEW_RUNTIME_STATE_FILE`, the path to a private JSON descriptor
 with `ports.api` and an absolute `token_file` path. The descriptor and bearer file must stay outside
@@ -564,10 +567,10 @@ the acceptance launcher's `--personal` sets to its slot's app port. Its start pa
 drawn live behind its title, a filmstrip of saved worlds, Details (the world's kind, size and look) and
 Open, which goes to the workspace's world view of that world at `?entry=<entry-id>`; Esc in the world
 returns to the front door with that world still chosen. The live background is the same saved world in
-an inert frame that only reads; the page and the server refuse its other requests. An optional private
-`EXULANICA_REVIEW_PREVIEWS_DIRECTORY` supplies captures for the filmstrip, bound to matching entry,
-version, style and state identities; without one each card shows the picture this browser kept of its
-world. The world view shows center aiming,
+an inert frame that only reads; the page refuses its other requests, and the development server refuses them too. An
+optional private `EXULANICA_REVIEW_PREVIEWS_DIRECTORY` supplies captures for the filmstrip on the development server,
+bound to matching entry, version, style and state identities; without one, and in a build, each card shows the picture
+this browser kept of its world. The world view shows center aiming,
 limited object-relative discovery, proximity-gated Inspect, declared entity data, and separate
 behavior/activity and selected-record Companion flows. Model offers come from the server's role
 catalog; an assigned model does not prove a connected provider or a recorded decision. These

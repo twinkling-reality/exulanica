@@ -1,4 +1,5 @@
 import { canonicalJson } from '../../../web/packages/atlas-core/src/style-pack.ts';
+import { accessHeaders, type Credentials } from '/src/config.ts';
 import { say } from '/src/ui/copy.ts';
 import { icon } from '/src/ui/system/icon.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
@@ -9,7 +10,7 @@ import type { ListedStylePack } from '/src/world-look.ts';
 function node(tag: string, text = '', className = '') { const n = document.createElement(tag); n.textContent = text; n.className = className; return n; }
 const metres = (value: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value / 1000) + ' m';
 
-export function showWorldDetails(entry: SavedWorldEntry): void {
+export function showWorldDetails(entry: SavedWorldEntry, credentials: Credentials): void {
   const dialog = document.createElement('dialog'); dialog.className = 'ux-entry-details ux-noveuis'; dialog.setAttribute('aria-labelledby', 'ux-entry-details-title');
   const previous = document.activeElement as HTMLElement | null;
   const header = node('header'); const heading = node('h2', entry.title); heading.id = 'ux-entry-details-title';
@@ -19,7 +20,7 @@ export function showWorldDetails(entry: SavedWorldEntry): void {
   const abort = new AbortController();
   const dismiss = () => { abort.abort(); dialog.close(); dialog.remove(); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   close.onclick = dismiss; dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
-  const read = async (path: string) => { const r = await fetch('/review-api' + path, { signal: abort.signal, cache: 'no-store' }); if (!r.ok) throw Error('World details could not be read.'); return r.json(); };
+  const read = async (path: string) => { const r = await fetch(credentials.baseUrl + path, { headers: { ...accessHeaders(credentials), Accept: 'application/json' }, credentials: 'same-origin', signal: abort.signal, cache: 'no-store' }); if (!r.ok) throw Error('World details could not be read.'); return r.json(); };
   const fact = (parent: HTMLElement, label: string, value: string) => { const row = node('div', '', 'ux-details-fact'); row.append(node('dt', label), node('dd', value)); parent.append(row); };
   const section = (title: string) => { const s = node('section'); s.append(node('h3', title)); body.append(s); return s; };
   const load = async () => {

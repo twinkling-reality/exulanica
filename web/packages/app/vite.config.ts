@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { previewApiResponse } from './src/dev/preview-api.js';
 import { societyRecordingPlugin } from './src/dev/society-recording.js';
+import { worldWorkspaceBuild } from './src/dev/world-workspace-build.js';
 
 const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
 const NYC_ADMISSION_ID = '9d152259-13d1-5025-8f72-8bcb639a6438';
@@ -271,7 +272,9 @@ const paintedLab: Plugin = {
  */
 export default defineConfig({
   build: { target: 'es2022' },
-  plugins: [societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi, paintedLab],
+  // A build carries the world workspace (src/dev/world-workspace-build.ts); the development server is the app's own, and
+  // the workspace's preview server (tools/previews/world-workspace/serve.mjs) applies the workspace itself.
+  plugins: [worldWorkspaceBuild(resolve(APP_ROOT, '../../..')), societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi, paintedLab],
   server: {
     // A recorded take (scripts/demo/take_run.sh) must not be reloaded part way: with
     // TAKE_APP_WATCHES_NOTHING set the development server watches no file, so no change, real or

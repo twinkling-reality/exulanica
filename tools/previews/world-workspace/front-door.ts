@@ -7,6 +7,7 @@ import { showBeingMade } from './create-world.ts';
 import { capturedPicture, frontDoorAddress, leadsWithCreate, openWorldAddress, worldAddress } from './front-door-routes.mjs';
 import { worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
+import type { Credentials } from '/src/config.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
 
 // The workspace's front door: the chosen world large behind its title, a filmstrip of the saved
@@ -71,7 +72,7 @@ export function keepWorldInAddress(entryId: string, signal: AbortSignal): void {
 }
 
 /** Rearrange Your worlds into the front door without replacing its actions or availability rules. */
-export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: readonly SavedWorldEntry[] }): void {
+export function mountFrontDoor({ root, entries, credentials }: { root: HTMLElement; entries: readonly SavedWorldEntry[]; credentials: Credentials | null }): void {
   // A preview is one world drawn alone; it never holds a front door, or a live preview of its own.
   if (scenePreviewPage()) return;
   // A world that did not open lands here: its opening gives way to the front door.
@@ -115,7 +116,7 @@ export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: 
   root.insertBefore(arrows, strip);
   let selected: SavedWorldEntry | null = null;
   const details = document.createElement('button'); details.type = 'button'; details.className = 'entry-command ux-entry-details-open'; details.textContent = 'Details';
-  details.onclick = () => { if (selected) showWorldDetails(selected); };
+  details.onclick = () => { if (selected && credentials) showWorldDetails(selected, credentials); };
   actions.append(details);
 
   // A card without a capture shows the picture this browser keeps of its world. The live preview
@@ -171,5 +172,5 @@ export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: 
   // A first run with only the untouched starter lands on Create a world, as its own button opens it (aha item 3).
   if (leadsWithCreate(entries, { remembered, pictured: (entry: SavedWorldEntry) => (frontDoorPicture(entry) ?? worldPicture(entry)) !== null })) root.querySelector<HTMLElement>('.your-worlds-create')?.click();
   // A world this person is having made still runs: its card waits here (N12).
-  void showBeingMade(root);
+  if (credentials) void showBeingMade(root, credentials);
 }

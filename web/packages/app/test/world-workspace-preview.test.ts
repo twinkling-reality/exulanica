@@ -2,10 +2,13 @@
 // environment-selection.ts as Vite serves them (seams.mjs). Each edit needs its target to occur once
 // and the code it inserts to still compile where it lands: a renamed variable or a lost `async`
 // would otherwise break the preview with no test noticing. Each patched file is type-checked alone
-// against the same file unpatched, and only what the edit introduces counts. The preview's own
-// TypeScript modules, which this app's build leaves out, are type-checked here, and its own checks
-// (verify-*.mjs) run here too, unchanged.
-import { readdirSync, readFileSync } from 'node:fs';
+// against the same file unpatched, and only what the edit introduces counts. The app's production
+// build makes the same edits (src/dev/world-workspace-build.ts), so the built bundle carries the workspace;
+// the preview's own TypeScript modules are type-checked here, and its own checks (verify-*.mjs) run
+// here too, unchanged.
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -257,4 +260,35 @@ describe('the world workspace preview\'s own checks', () => {
   it.each(['verify-discovery.mjs', 'verify-observer-requests.mjs', 'verify-decision-words.mjs', 'verify-compare-words.mjs', 'verify-personality-words.mjs', 'verify-read-backoff.mjs', 'verify-entity-activity.mjs', 'verify-front-door.mjs', 'verify-build-words.mjs', 'verify-world-ui.mjs', 'verify-world-corners.mjs', 'verify-character-words.mjs', 'verify-character-view.mjs', 'verify-run-words.mjs', 'verify-entity-run.mjs', 'verify-entity-assignment.mjs', 'verify-world-opening.mjs', 'verify-history.mjs', 'verify-world-screen.mjs', 'verify-create-words.mjs', 'verify-create-steps.mjs', 'verify-talk-words.mjs', 'verify-talk-pops.mjs', 'verify-talk-scene.mjs', 'verify-moment-framing.mjs', 'verify-character-group.mjs', 'verify-day-rows.mjs', 'verify-decision-flow.mjs', 'verify-compare-line.mjs'])('%s passes', async (script) => {
     await expect(preview(script)).resolves.toBeDefined();
   });
+});
+
+describe('the app\'s production build', () => {
+  /** A sentence only the workspace says (build mode's refusal in a world with nowhere to place a thing). */
+  const WORKSPACE_WORDS = 'Nothing can be placed in this world.';
+
+  it('carries none of the workspace\'s words in the app\'s own sources: a positive control', () => {
+    const sources = (directory: URL): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((one) =>
+      one.isDirectory() ? sources(new URL(one.name + '/', directory)) : one.name.endsWith('.ts') ? [readFileSync(new URL(one.name, directory), 'utf8')] : []);
+    expect(sources(new URL('web/packages/app/src/', REPOSITORY)).some((text) => text.includes(WORKSPACE_WORDS))).toBe(false);
+  });
+
+  it('carries the world workspace, reading through the app\'s own /api, with no development path in it', async () => {
+    const { build } = await import('vite');
+    const out = mkdtempSync(join(tmpdir(), 'workspace-build-'));
+    try {
+      await build({
+        configFile: fileURLToPath(new URL('web/packages/app/vite.config.ts', REPOSITORY)),
+        root: fileURLToPath(new URL('web/packages/app/', REPOSITORY)),
+        logLevel: 'silent',
+        build: { outDir: out, emptyOutDir: true },
+      });
+      const assets = join(out, 'assets');
+      const bundle = readdirSync(assets).filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(assets, name), 'utf8')).join('\n');
+      expect(bundle).toContain(WORKSPACE_WORDS);
+      expect(bundle).not.toContain('/review-api');
+      expect(bundle).not.toContain(fileURLToPath(REPOSITORY).replace(/\/$/u, ''));
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

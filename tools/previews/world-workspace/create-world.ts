@@ -9,7 +9,7 @@ import { WorldMakingClient, parseWorldDraftOffer, parseWorldMakingDraft, type Wo
 import { WorldKindsClient, type WorldKind } from '../../../web/packages/app/src/world-kinds-api.ts';
 import { WorldSpecificationClient, type SpecificationPreset } from '../../../web/packages/app/src/world-specification.ts';
 import { cardPicture, readCardPictures } from '../../../web/packages/app/src/ui/card-pictures.ts';
-import type { Credentials } from '../../../web/packages/app/src/config.ts';
+import { accessHeaders, type Credentials } from '../../../web/packages/app/src/config.ts';
 import type { SavedWorldEntry, WorldEntryClient } from '../../../web/packages/app/src/world-entry-api.ts';
 import {
   createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, quietCommand, sentenceField, sentenceRow, setOrbReady,
@@ -49,9 +49,9 @@ let keptWords = '';
 /** A served draft read, raw: what draftSteps and spentOf read, and the parsed draft for its entry. */
 type RawDraft = Readonly<Record<string, unknown>>;
 
-/** A read through the workspace's own server (GET only), which keeps the token. */
-async function readRaw(path: string, signal: AbortSignal): Promise<RawDraft> {
-  const response = await fetch('/review-api' + path, { cache: 'no-store', signal });
+/** A read with the page's own credentials: its bearer on a person's own install, its session's cookie for a guest. */
+async function readRaw(access: Credentials, path: string, signal: AbortSignal): Promise<RawDraft> {
+  const response = await fetch(access.baseUrl + path, { headers: { ...accessHeaders(access), Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store', signal });
   if (!response.ok) throw Object.assign(new Error('read'), { status: response.status });
   return response.json() as Promise<RawDraft>;
 }
@@ -99,7 +99,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     lifetime.abort();
     host.remove();
     // Left while a draft runs: it carries on, and its card waits in Your worlds (N12).
-    if (form === 'creating') void showBeingMade(root);
+    if (form === 'creating') void showBeingMade(root, credentials);
     onClose();
   };
   page.quiet.append(quietCommand({ onPress: close }));
@@ -253,7 +253,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   /** Reads the offer (raw for its codes, parsed for its sealed quote), quietly again on failure (L14). */
   const readOffer = async (): Promise<void> => {
     try {
-      const raw = await readRaw('/worlds/drafts', signal);
+      const raw = await readRaw(credentials, '/worlds/drafts', signal);
       offer = parseWorldDraftOffer(raw);
       rawOffer = raw;
       offerFailures = 0; offerOffline = false;
@@ -333,7 +333,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   const requote = async (code: string, spent: string | null, agreed: string | null, failures: number): Promise<void> => {
     let most: string | null = null;
     try {
-      const raw = await readRaw('/worlds/drafts', signal);
+      const raw = await readRaw(credentials, '/worlds/drafts', signal);
       offer = parseWorldDraftOffer(raw);
       rawOffer = raw;
       most = offer.operation?.maximumUsd ?? null;
@@ -376,7 +376,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       if (signal.aborted) return;
       let raw: RawDraft;
       try {
-        raw = await readRaw(`/worlds/drafts/${encodeURIComponent(draftId)}`, signal);
+        raw = await readRaw(credentials, `/worlds/drafts/${encodeURIComponent(draftId)}`, signal);
       } catch {
         if (signal.aborted) return;
         const next = afterRead(failed, false, 0);
@@ -518,9 +518,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
  * The "Being made…" card on the front door (N12): where this person's draft still runs, a card
  * first in the strip that opens Create a world, which follows it on frame 21. Read once, quietly.
  */
-export async function showBeingMade(root: HTMLElement, signal?: AbortSignal): Promise<void> {
+export async function showBeingMade(root: HTMLElement, credentials: Credentials, signal?: AbortSignal): Promise<void> {
   let raw: RawDraft;
-  try { raw = await readRaw('/worlds/drafts', signal ?? new AbortController().signal); } catch { return; }
+  try { raw = await readRaw(credentials, '/worlds/drafts', signal ?? new AbortController().signal); } catch { return; }
   if (offerState(raw).page !== 'following' || !root.isConnected) return;
   const list = root.querySelector<HTMLElement>('.your-worlds-strip .world-entry-item')?.parentElement;
   if (!list || list.querySelector('.ux-being-made')) return;

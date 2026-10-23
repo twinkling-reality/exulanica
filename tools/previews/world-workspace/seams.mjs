@@ -1,5 +1,6 @@
 // The places the world workspace preview edits the app's own sources as Vite serves them, and the
-// edit itself. serve.mjs applies it; web/packages/app/test/world-workspace-preview.test.ts checks
+// edit itself. serve.mjs applies it to its development server and the app's build applies it too
+// (web/packages/app/src/dev/world-workspace-build.ts); web/packages/app/test/world-workspace-preview.test.ts checks
 // it against the real sources, so a change to one of these lines fails a test instead of the
 // preview's start-up.
 
@@ -131,6 +132,6 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
     if (entry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) await state.worldEntries?.askForBakesAgain(entry).catch(() => 0);
     return openFromFrontDoor(entry.entryId);
   };`)
-    .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries });')
+    .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries, credentials: state.credentials });')
     .replace(seam('Your worlds create'), '        creating = mountCreateWorld({ root: yourWorlds.root, credentials: state.credentials, entries: state.worldEntries, onClose: closeCreate });');
 }

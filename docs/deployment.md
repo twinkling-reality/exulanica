@@ -861,6 +861,11 @@ its own role. The [local database](local-database.md) guide owns its steps.
 | `EXULANICA_API_URL` | the Vite development and preview servers | Where `/api` is proxied; default `http://127.0.0.1:8000` |
 | `EXULANICA_CHARACTER_BUILDER_URL` | the Vite development server | Where `/__character` is proxied for the character builder; default `http://127.0.0.1:5196` |
 
+A production build of `web/packages/app` carries the world workspace: `src/dev/world-workspace-build.ts` makes the edits
+`tools/previews/world-workspace/seams.mjs` names, as the workspace's development server does, so the client a deployment
+serves opens on the workspace's front door and world view. Its reads go through `/api` with the page's own credentials,
+and it holds no front-door captures.
+
 #### 5.2.12 Other commands and settings
 
 - `exulanica-eval` reads `EXULANICA_EVALUATION_OWNER_DATABASE_URL`; the
