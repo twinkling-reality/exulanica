@@ -200,7 +200,7 @@ SESSION_CLOSED_WORDS: Final[Mapping[str, str]] = {
     "session_minutes": "The run played all its minutes.",
     "session_decisions": "The run reached its decision limit.",
     "session_spending_limit": "The run reached its spending limit.",
-    "session_liability_unknown": "The run stopped because a model's cost is not known yet.",
+    "session_liability_unknown": "The run stopped because a decision's cost is not known yet.",
     "lease_recovery_limit": "The run stopped because it kept being interrupted.",
     "source_unavailable": "The run stopped because the world could not be read.",
     "invalid_society_state": "The run stopped because the world's state could not be used.",

@@ -16,7 +16,7 @@ import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefu
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { WATCH_MS, mountRunWatch } from './run-watch.ts';
-import { runLength, runRefusalWords, runningLine, timeLeft, whoDecides } from './run-words.mjs';
+import { runLength, runRefusalWords, runStopWords, runningLine, timeLeft, whoDecides } from './run-words.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
 import { assignmentSubject } from './entity-properties.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -670,7 +670,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const start = view.facts?.startMinute;
     const from = closed?.state === 'closed' && closed.endTick !== null ? worldTime(closed.startTick, start ?? -1) : null;
     const to = from ? worldTime(closed.endTick, start) : null;
-    const lastRun = from && to && ranIn(pageView.events ?? [], pageView.row.scene.id, closed) ? lastRunLine({ from: from.hhmm, to: to.hhmm, decisions: closed.used.decisions, spent: closed.used.usd }) : null;
+    const lastRun = from && to && ranIn(pageView.events ?? [], pageView.row.scene.id, closed) ? lastRunLine({ from: from.hhmm, to: to.hhmm, decisions: closed.used.decisions, spent: closed.used.usd }) : null, lastRunWhy = lastRun ? runStopWords(closed) : null;
     const choices = (pageView.choosing = openWhileOffered(pageView.choosing, subjectReads.models))
       ? [...choosableModels(subjectReads.models).map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
       : null;
@@ -685,7 +685,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null }), ...records.dayRow(pageView, row) })) : null,
-      didFocus: pageView.didFocus, lastRun, canAsk: !readOnly,
+      didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,

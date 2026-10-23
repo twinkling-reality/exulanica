@@ -92,6 +92,8 @@ export interface CharacterPageState {
   } | null;
   /** "Last run 06:00 to 07:15 · 12 decisions · spent $0.0042", or null. */
   readonly lastRun: string | null;
+  /** Why that run stopped, its own line under it, where it stopped for a reason of its own (runStopWords). */
+  readonly lastRunWhy?: string | null;
   /**
    * The personality its owner wrote for a being they placed ({ character, shown }), or null for
    * anything else, whose page has no personality and no [N] (spec 8.6).
@@ -339,7 +341,7 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
   if (state.model) lines.push(modelLine(state.model) ?? '');
   const running = !state.run.open ? null : state.running !== undefined ? state.running : offered ? state.run.big : null;
   if (running) lines.push(running);
-  else if (state.lastRun) lines.push(state.lastRun);
+  else if (state.lastRun) lines.push(state.lastRun, ...(state.lastRunWhy ? [state.lastRunWhy] : []));
   if (offered && !state.run.open) {
     // The run's figures wrap only between their parts, never inside a figure (J9).
     const figures = element('span');

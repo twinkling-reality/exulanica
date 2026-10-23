@@ -119,3 +119,16 @@ export function spentWords(run) {
 export function endedNote(run) {
   return `${run.closedReasonWords} Spent ${spentWords(run)}.`;
 }
+
+/** How a run ends on its own time or by the person's own hand: a day page says nothing more of these. */
+export const OWN_ENDS = Object.freeze(['session_deadline', 'session_minutes', 'stopped_by_person', 'paused_by_person']);
+
+/**
+ * Why a run that ended stopped, for a person's day page under "Last run ...": the server's sentence
+ * (SESSION_CLOSED_WORDS), "The run stopped because a decision's cost is not known yet."; null for a run that ran
+ * its time or that the person stopped or paused, and for one still on, which has no such sentence yet.
+ */
+export function runStopWords(run) {
+  if (!run || OWN_ENDS.includes(run.closedReason)) return null;
+  return run.closedReasonWords ?? null;
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RUN, NOT_CONNECTED, PAUSE_FIRST, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, runFor, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
+import { DEFAULT_RUN, NOT_CONNECTED, PAUSE_FIRST, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
 import { called } from './character-words.mjs';
 
 const python = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -73,5 +73,21 @@ assert.equal(decidingWords([]), 'Running');
 assert.equal(spentWords({ used: { usd: '0.00120000', unresolved: { count: 1, usd: '0.00060000' } } }), '$0.0012, and up to $0.0006 not known yet');
 assert.equal(endedNote({ closedReasonWords: 'The run played all its minutes.', used: { usd: '0.00420000', unresolved: { count: 0, usd: '0' } } }), 'The run played all its minutes. Spent $0.0042.');
 assert.equal(endedNote({ closedReasonWords: 'The run was stopped.', used: { usd: '0', unresolved: { count: 0, usd: '0' } } }), 'The run was stopped. Spent $0.');
+
+// Why a run stopped, on the day page: the server's sentence, except for its own time or the person's own Stop or pause.
+const closedWords = Object.fromEntries([...python('exulanica/world/society_sessions.py')
+  .split('SESSION_CLOSED_WORDS: Final[Mapping[str, str]] = {')[1].split('\n}')[0]
+  .matchAll(/"([a-z_]+)": "([^"]+)"/g)].map(match => [match[1], match[2]]));
+// DESIGN: its time (the wall clock or its minutes) and the person's own Stop or pause.
+assert.deepEqual([...OWN_ENDS].sort(), ['paused_by_person', 'session_deadline', 'session_minutes', 'stopped_by_person']);
+assert.ok(OWN_ENDS.every(reason => reason in closedWords), 'every own end is a reason the server can close with');
+for (const [reason, words] of Object.entries(closedWords)) {
+  const run = { state: 'closed', closedReason: reason, closedReasonWords: words };
+  assert.equal(runStopWords(run), OWN_ENDS.includes(reason) ? null : words, reason);
+}
+assert.equal(runStopWords({ state: 'closed', closedReason: 'session_liability_unknown', closedReasonWords: closedWords.session_liability_unknown }),
+  "The run stopped because a decision's cost is not known yet.");
+assert.equal(runStopWords({ state: 'open', closedReason: null, closedReasonWords: null }), null);
+assert.equal(runStopWords(null), null);
 
 console.log('Run words checks passed: every refusal worded, one noun, the default run and the frames\' words.');
