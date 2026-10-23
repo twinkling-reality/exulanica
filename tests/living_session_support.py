@@ -38,8 +38,8 @@ def open_living_session(
     """Open a living session over the society of ``version_id`` and answer it, or answer the one
     already open.
 
-    A society the test left playing is paused first, as a session opens only on a paused one, and
-    plays again at its speed once the session opens it.
+    A society the test left playing is paused first, so the session opens at the tick the test
+    read, and plays again at its speed once the session opens it.
     """
     with database.session(workspace_id) as connection:
         controls = SocietyControlRepository(

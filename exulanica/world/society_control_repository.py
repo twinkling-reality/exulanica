@@ -591,13 +591,16 @@ class SocietyControlRepository:
         base_clock_revision: int | None = None,
         reason: str = "opened_by_person",
     ) -> dict:
-        """Open a living session on a paused society and play it, in one transaction.
+        """Open a living session on the society and play it, in one transaction.
 
-        The caller states the control revision, tick and state digest it read; another is refused
-        as stale. The same ``request_id`` answers the session it opened, whatever has happened
-        since; with other limits it is refused ``session_request_reused``. While a session is open
-        another is refused ``session_already_open``, and a society playing without one is refused
-        ``society_not_paused``. Opening writes a ``configured`` receipt (playing) and then a
+        The caller states the control revision it read, and another is refused as stale. A paused
+        society opens at the tick and state digest the caller read, and another is refused as
+        stale; a society playing without a session opens at the minute it is at, recorded as the
+        session's start, since its minute moves between a read and a write. Either way no pause is
+        written: the session takes over the world's time. The same ``request_id`` answers the
+        session it opened, whatever has happened since; with other limits it is refused
+        ``session_request_reused``. While a session is open another is refused
+        ``session_already_open``. Opening writes a ``configured`` receipt (playing) and then a
         ``session_opened`` one, which records ``reason``: ``opened_by_person`` for a session
         opened by its route, ``guest_pressed_play`` for one a guest's Play opened
         (:meth:`play_with_session`).
@@ -620,12 +623,17 @@ class SocietyControlRepository:
             if self._open_session(society["society_id"]) is not None:
                 raise SessionRefused("session_already_open", "a session is open; stop it first")
             control = self._control(society["society_id"])
-            if control is not None and control["mode"] != "paused":
-                raise SessionRefused(
-                    "society_not_paused", "a session opens a paused society; pause it first"
-                )
-            if society["current_tick"] != base_tick or society["state_sha256"] != base_state_sha256:
+            playing = control is not None and control["mode"] == "playing"
+            if not playing and (
+                society["current_tick"] != base_tick or society["state_sha256"] != base_state_sha256
+            ):
                 raise StaleSocietyState("society changed; reload before opening a session")
+            # Configuring below cancels a minute in flight, so a playing society starts at this one.
+            start_tick, start_sha256 = (
+                (society["current_tick"], society["state_sha256"])
+                if playing
+                else (base_tick, base_state_sha256)
+            )
             self.configure(
                 version_id,
                 actor=actor,
@@ -645,8 +653,8 @@ class SocietyControlRepository:
                     "reason": reason,
                     "opened_by": str(actor),
                     "limits": stated,
-                    "start_tick": base_tick,
-                    "start_state_sha256": base_state_sha256,
+                    "start_tick": start_tick,
+                    "start_state_sha256": start_sha256,
                     "opened_at": utc(now),
                     "ends_by": utc(now + dt.timedelta(seconds=stated["wall_seconds"])),
                 },

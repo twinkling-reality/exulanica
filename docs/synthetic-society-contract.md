@@ -1528,9 +1528,12 @@ nothing left (`session_spending_limit`); or a call under its bound may have cost
 one minute, so catch-up never plays past its minutes; its asks end by its wall deadline, and a
 minute asks no more models than its decisions have left.
 
-A session opens only on a paused society, at the control revision, tick and state digest its
-caller read, and opening it sets the society playing in the same transaction: a `configured`
-receipt, then `session_opened`. One session is open at a time per society, held under the
+A session opens at the control revision its caller read. A paused society opens at the tick and
+state digest its caller read; a society playing without a session opens at the minute it is at,
+which is the session's recorded start, since its minute moves between a read and a write (the
+configuring cancels a minute in flight). Opening sets the society playing in the same transaction,
+a `configured` receipt, then `session_opened`, and writes no pause on the way: a run started while
+the world plays takes over its time. One session is open at a time per society, held under the
 workspace lock every playback write takes. The same `request_id` answers the session it opened,
 whatever happened since; with other limits it is refused. A session is open until its closing
 receipt, and a closed session is never open again: the next stretch is a new session from the
@@ -1549,8 +1552,9 @@ Under the base route, `/sessions`:
 
 - `POST /sessions` takes `{request_id, base_revision, base_tick, base_state_sha256, limits,
   speed?, base_clock_revision?}` and answers 201 with the session. It needs `world.write` and
-  `model.invoke`. It is refused 409 `session_already_open`, `society_not_paused`,
-  `session_request_reused` or `stale_society_state`, and 422 for limits beyond the maxima.
+  `model.invoke`. It is refused 409 `session_already_open`, `session_request_reused` or
+  `stale_society_state` (another revision, or another tick or digest of a paused society), and 422
+  for limits beyond the maxima.
 - `POST /sessions/{session_id}/stop` stops the session; a session that already closed is answered
   as it closed. It needs `world.write`.
 - `GET /sessions` lists the society's sessions newest first, and `GET /sessions/{session_id}`

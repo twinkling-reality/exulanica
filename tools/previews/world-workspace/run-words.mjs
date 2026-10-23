@@ -11,14 +11,12 @@ export const RUN_WORDS = Object.freeze({
   running: 'Running',
   left: 'left',
   back: 'Back',
-  pause: 'Pause',
   stopsByItself: 'It stops by itself, or when you press Stop.',
 });
 
 /** Why a run could not start or stop, by the server's code (spec 8.8). */
 export const RUN_REFUSALS = Object.freeze({
   session_already_open: 'A run is already on. Stop it first.',
-  society_not_paused: 'The world is playing. Pause it first, then run.',
   stale_society_state: 'The world changed a moment ago. Press Run again.',
   session_request_reused: 'That run already started with other limits. Press Run again.',
   invalid_session_limits: 'These limits are not allowed here.',
@@ -31,9 +29,6 @@ export const NOT_CONNECTED = Object.freeze({
   process_budget_spent: 'The budget for AI models here is spent.',
   process_share_spent: 'The budget for AI models here is spent.',
 });
-
-/** The refusal whose card also offers [P] Pause. */
-export const PAUSE_FIRST = 'society_not_paused';
 
 /** The words for a refused run by its code; any other code says nothing started. */
 export function runRefusalWords(code) {

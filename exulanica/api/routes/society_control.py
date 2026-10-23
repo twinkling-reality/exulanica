@@ -489,12 +489,13 @@ def open_living_session(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    """Open a living session on a paused society and play it: one bounded stretch of playback,
-    stated by its limits, from the tick and state digest the caller read. Refused 409
-    ``session_already_open`` while one is open, ``society_not_paused`` for a society playing without
-    one, ``session_request_reused`` for a key that opened a session with other limits, and
-    ``stale_society_state`` for another revision, tick or digest; 422 for limits beyond the
-    installation's. The same key answers the session it opened."""
+    """Open a living session on the society and play it: one bounded stretch of playback, stated
+    by its limits, from the tick and state digest the caller read where the society is paused, or
+    from the minute it is at where it plays, with no pause written. Refused 409
+    ``session_already_open`` while one is open, ``session_request_reused`` for a key that opened a
+    session with other limits, and ``stale_society_state`` for another revision, or for another
+    tick or digest of a paused society; 422 for limits beyond the installation's. The same key
+    answers the session it opened."""
     fields = body.model_dump()
     return call(
         lambda: repository(connection, session, request, world_id).open_session(

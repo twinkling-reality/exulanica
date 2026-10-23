@@ -2984,7 +2984,7 @@
      "society"
     ],
     "summary": "Open Living Session",
-    "description": "Open a living session on a paused society and play it: one bounded stretch of playback,\nstated by its limits, from the tick and state digest the caller read. Refused 409\n``session_already_open`` while one is open, ``society_not_paused`` for a society playing without\none, ``session_request_reused`` for a key that opened a session with other limits, and\n``stale_society_state`` for another revision, tick or digest; 422 for limits beyond the\ninstallation's. The same key answers the session it opened.",
+    "description": "Open a living session on the society and play it: one bounded stretch of playback, stated\nby its limits, from the tick and state digest the caller read where the society is paused, or\nfrom the minute it is at where it plays, with no pause written. Refused 409\n``session_already_open`` while one is open, ``session_request_reused`` for a key that opened a\nsession with other limits, and ``stale_society_state`` for another revision, or for another\ntick or digest of a paused society; 422 for limits beyond the installation's. The same key\nanswers the session it opened.",
     "operationId": "open_living_session_world_versions__version_id__society_control_sessions_post",
     "parameters": [
      {

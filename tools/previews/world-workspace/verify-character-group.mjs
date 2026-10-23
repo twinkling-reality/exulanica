@@ -157,8 +157,8 @@ assert.equal(asked.refused, false);
 assert.deepEqual(keys(questionGroup({ who: teo, models: ['M'], limits })), ['Enter Run'], 'no other model offered, or this page cannot choose: no M');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, busy: true }).rows[0].disabled, true);
 // A refusal takes the small print's place in its own sentence; Run stays (dimmed), its key still answers.
-const refusedRun = questionGroup({ who: teo, models: ['M'], limits, refusal: 'society_not_paused' });
-assert.equal(refusedRun.print, 'The world is playing. Pause it first, then run.');
+const refusedRun = questionGroup({ who: teo, models: ['M'], limits, refusal: 'stale_society_state' });
+assert.equal(refusedRun.print, 'The world changed a moment ago. Press Run again.');
 assert.equal(refusedRun.after, null);
 assert.equal(refusedRun.refused, true);
 assert.equal(refusedRun.rows[0].disabled, false);

@@ -32,9 +32,10 @@ export function modelAskers(models) {
 
 /**
  * Start a run for the world this character lives in: the same checks as before (the entity, its
- * model, the world's readiness), then one living session with `limits`, opened on the paused read
- * and verified open. A world already in a run answers that run; a world playing without one is
- * refused by the server (`society_not_paused`), never paused here on the person's behalf.
+ * model, the world's readiness), then one living session with `limits`, opened on the control read
+ * and verified open. A world already in a run answers that run. A world playing without one is
+ * opened as it plays: the server starts the run at the minute the world is at, in one write, so
+ * nothing pauses it on the way.
  */
 export async function startRun({ modelsClient, controlClient, entry, subjectId, expectedModel, current, refresh, limitsFor, requestId }) {
   const fresh = await refresh();

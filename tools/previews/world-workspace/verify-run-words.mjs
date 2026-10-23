@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RUN, NOT_CONNECTED, PAUSE_FIRST, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
+import { DEFAULT_RUN, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
 import { called } from './character-words.mjs';
 
 const python = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -15,8 +15,9 @@ for (const code of python('exulanica/api/routes/society_control.py').matchAll(/^
 assert.match(python('exulanica/api/app.py'), /_problem\(409, "stale_society_state"/);
 raised.add('stale_society_state');
 assert.deepEqual([...raised].sort(), Object.keys(RUN_REFUSALS).sort());
-assert.ok(raised.has(PAUSE_FIRST));
-assert.equal(runRefusalWords('society_not_paused'), 'The world is playing. Pause it first, then run.');
+// A playing world opens a run as it plays: no refusal asks the person to pause first.
+assert.ok(!raised.has('society_not_paused'));
+assert.equal(runRefusalWords('stale_society_state'), 'The world changed a moment ago. Press Run again.');
 assert.equal(runRefusalWords('provider_credential_absent'), 'No AI model is connected here.');
 assert.match(python('exulanica/world/decision_roles.py'), /"provider_credential_absent"/);
 // The host's money for models spent (J22); a run's own cap stays its spending limit.

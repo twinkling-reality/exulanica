@@ -62,13 +62,13 @@ assert.deepEqual(ringRadii({ x: 960, y: 760 }, { x: 1064, y: 760 }, { x: 960, y:
 assert.deepEqual(ringRadii({ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 0, y: 1 }), { rx: 18, ry: 5 });
 assert.equal(promptPlace({ x: 960, y: 452 }, { width: 120, height: 44 }, { width: 1920, height: 1080 }).x, 1012);
 assert.equal(promptPlace({ x: 1850, y: 452 }, { width: 120, height: 44 }, { width: 1920, height: 1080 }).x, 1850 - 52 - 120);
-// The question before a run (frame 08), and its refusal with [P] Pause when the world plays.
+// The question before a run (frame 08), and a refusal in its card with the same answers.
 const asked = runQuestion({ who: teo, model: 'Nemotron 3 Nano 30B', limits: defaultRunLimits(60_000, 1) });
 assert.deepEqual([asked.label, asked.title, asked.lines[0], asked.big, asked.small, asked.orbWord], ['Teo', 'Run for 10 minutes', "Teo's model decides. Everyone else keeps their routine.", 'At most $0.05', 'It stops by itself, or when you press Stop.', 'Run']);
 assert.deepEqual(asked.answers.map(item => `${item.keys[0]} ${item.word}`), ['Enter Run', 'Esc Back']);
-const playing = runQuestion({ who: teo, model: 'Nano', limits: defaultRunLimits(60_000, 1), refusal: 'society_not_paused' });
-assert.equal(playing.refusal, 'The world is playing. Pause it first, then run.');
-assert.deepEqual(playing.answers.map(item => item.word), ['Run', 'Pause', 'Back']);
+const changed = runQuestion({ who: teo, model: 'Nano', limits: defaultRunLimits(60_000, 1), refusal: 'stale_society_state' });
+assert.equal(changed.refusal, 'The world changed a moment ago. Press Run again.');
+assert.deepEqual(changed.answers.map(item => item.word), ['Run', 'Back']);
 
 // What Teo did: newest first; a line said is one row; a goal a model chose is the choice's row.
 const events = [

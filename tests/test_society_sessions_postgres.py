@@ -2,8 +2,9 @@
 
 What is shown:
 
-*   a session opens only on a paused society at the tick and state digest its caller read, and
-    opening it sets the society playing in the same transaction, a ``configured`` receipt then a
+*   a session opens a paused society at the tick and state digest its caller read, and a playing
+    one at the minute it is at, with no pause written and a minute in flight cancelled; opening
+    sets the society playing in the same transaction, a ``configured`` receipt then a
     ``session_opened`` one;
 *   one session is open at a time; the same request opens the same session once; a session that
     closed is never open again;
@@ -21,6 +22,7 @@ import uuid
 
 import pytest
 from exulanica.world.society import StaleSocietyState
+from exulanica.world.society_controls import LeaseLost
 from exulanica.world.society_erasure import erase_society
 from exulanica.world.society_sessions import SessionRefused
 from psycopg.errors import CheckViolation
@@ -79,15 +81,57 @@ def test_a_session_opens_a_paused_society_at_its_pins_and_plays_it_in_one_step(r
     assert _kinds(w) == ["configured", "session_opened"]
 
 
-def test_a_playing_society_is_not_opened_and_a_stopped_session_stays_closed(runtime_world):
+def test_a_playing_society_opens_at_the_minute_it_is_at_with_no_pause_written(runtime_world):
     w = runtime_world
     control.create(w)
     control.save(w)  # playing, with no session
-    with pytest.raises(SessionRefused) as refused:
-        _open(w, revision=1)
-    assert refused.value.code == "society_not_paused"
-    control.save(w, revision=1, mode="paused")
-    opened = _open(w, revision=2)
+    repo = control.controls(w)
+    vid = w["binding"].version_id
+    read = repo.read(vid)
+    control.overdue(w)
+    repo.execute(control.take_claim(w))  # a minute plays after the caller's read
+    now = repo.read(vid)
+    assert now["current_tick"] > read["current_tick"]
+    count = len(_kinds(w))
+    # Another revision is a change the person made in between (a pause, a speed): stale.
+    with pytest.raises(StaleSocietyState):
+        _open(w, revision=0)
+    assert len(_kinds(w)) == count
+    # The tick and digest read before that minute open the run at the minute it is at.
+    opened = _open(w, revision=1, tick=read["current_tick"], digest=read["state_sha256"])
+    assert opened["state"] == "open"
+    assert opened["opened"]["start_tick"] == now["current_tick"]
+    assert opened["opened"]["start_state_sha256"] == now["state_sha256"]
+    assert repo.read(vid)["mode"] == "playing"
+    events = repo.events(vid)
+    assert [event["kind"] for event in events[:2][::-1]] == ["configured", "session_opened"]
+    assert events[1]["mode"] == "playing" and len(events) == count + 2
+    assert all(event.get("mode") != "paused" for event in events[:2])
+
+
+def test_opening_a_playing_society_cancels_a_minute_in_flight(runtime_world):
+    w = runtime_world
+    control.create(w)
+    control.save(w)
+    repo = control.controls(w)
+    vid = w["binding"].version_id
+    before = repo.read(vid)
+    control.overdue(w)
+    claim = control.take_claim(w)  # a minute claimed and not yet run
+    assert claim is not None
+    opened = _open(w, revision=1)
+    with pytest.raises(LeaseLost):
+        repo.execute(claim)
+    assert (
+        opened["opened"]["start_tick"] == before["current_tick"] == repo.read(vid)["current_tick"]
+    )
+    assert opened["opened"]["start_state_sha256"] == repo.read(vid)["state_sha256"]
+
+
+def test_a_stopped_session_stays_closed(runtime_world):
+    w = runtime_world
+    control.create(w)
+    opened = _open(w)
     repo = control.controls(w)
     vid = w["binding"].version_id
     stopped = repo.stop_session(

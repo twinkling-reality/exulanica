@@ -385,10 +385,11 @@ export class SocietyControlClient {
   }
 
   /**
-   * Open a living session on the paused society the caller read, within `limits`: the one write
-   * that asks the models chosen for its beings. `requestId` is the caller's key for this opening;
-   * the same key answers the session it opened. Refused by code (`session_already_open`,
-   * `society_not_paused`, `stale_society_state`, `session_request_reused`, `invalid_session_limits`).
+   * Open a living session on the society the caller read, within `limits`: the one write that asks
+   * the models chosen for its beings. A paused society opens at the tick read; a playing one at the
+   * minute it is at, with no pause written. `requestId` is the caller's key for this opening; the
+   * same key answers the session it opened. Refused by code (`session_already_open`,
+   * `stale_society_state`, `session_request_reused`, `invalid_session_limits`).
    */
   async openSession(
     control: SocietyPlaybackControl, limits: LivingSessionLimits, requestId: string,

@@ -20,7 +20,6 @@ import { runLength, runRefusalWords, runStopWords, runningLine, timeLeft, whoDec
 import { recordEntityModel } from './entity-model-actions.mjs';
 import { assignmentSubject } from './entity-properties.mjs';
 import { worldTime } from './world-clock.mjs';
-import { SocietyControlClient } from '/src/society-control-api.ts';
 import { edgeInset, nameOver, speech, talkScene } from './world-ui-talk.ts';
 import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs'; import { createSceneFollow } from './scene-follow.ts';
 import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, sceneBy, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
@@ -638,12 +637,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const code = await runWatch.stop();
     if (code && pageView) { pageView.run.refusal = code; drawPage(); }
   }
-  async function pauseNow() {
-    const controlClient = new SocietyControlClient(credentials);
-    try { const control = await controlClient.read(entry.authoredVersionId); await controlClient.configure(control, 'paused', control.speed); } catch { /* The card keeps its refusal. */ }
-    if (asking) { asking.refusal = null; asking.shown = runWatch.limits(subjectReads.models); drawQuestion(); }
-    await runWatch.refresh();
-  }
   /** A fresh read of a character, its inventory row and offer, for a write that names it. */
   async function refreshSubject(row) {
     await refreshInventory();
@@ -659,7 +652,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'follow' && held.scene.type === 'being') followView.toggle();
     else if (action === 'run') askRun();
     else if (action === 'stop') void stopNow();
-    else if (action === 'pause') void pauseNow();
     else if (action === 'back') { asking = null; drawQuestion(); }
   }
   // The question card's answers come back through act as well.
@@ -1256,10 +1248,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (listed === 'pass') return;
     if (listed) { event.stopImmediatePropagation(); return; }
     if (asking) {
-      // The question before a run keeps its answers together: Enter runs, Esc puts it away, P pauses first.
+      // The question before a run keeps its answers together: Enter runs, Esc puts it away.
       if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); if (!(event.target as Element | null)?.closest?.('.cw-beside button')) questionAct('run'); else return; }
       else if (event.code === 'Escape' && !event.repeat) { event.preventDefault(); questionAct('back'); }
-      else if (event.code === 'KeyP' && asking.refusal === 'society_not_paused' && !event.repeat) { event.preventDefault(); questionAct('pause'); }
       else if (event.code === 'KeyM' && groupActions.has('model') && !event.repeat) { event.preventDefault(); act('model'); }
       else if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Tab'].includes(event.code)) return;
       else event.preventDefault();

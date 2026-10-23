@@ -3,7 +3,8 @@ import { modelAskers, openRun, startRun, stopRun } from './entity-execution.mjs'
 import { defaultRunLimits } from './run-words.mjs';
 
 // Starting and stopping a run, against clients that answer as the routes do: a run is a living
-// session, opened on the paused read with the limits shown, and confirmed open by a fresh read.
+// session, opened on the control read with the limits shown, and confirmed open by a fresh read; a
+// playing world is opened as it plays, never paused on the way.
 const entry = { worldId: 'world', authoredVersionId: 'version' };
 const nano = { provider: 'nebius_token_factory', modelId: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B', name: 'Nemotron 3 Nano 30B' };
 const fresh = { row: { scene: { id: 'duck' }, roleInstances: [] }, inventory: { world_id: 'world', version_id: 'version', roles: [] }, offer: {} };
@@ -18,6 +19,7 @@ function world({ control = paused, choices = [{ subjectId: 'duck', model: nano }
     modelsClient: { read: async () => ({ societyId: 'society', choices, hostRefusal: refusal, latest: [] }) },
     controlClient: {
       read: async () => now,
+      configure: async (read, mode) => { sent.push(['configure', read.revision, mode]); now = { ...read, mode }; return now; },
       openSession: async (read, limits, requestId) => {
         sent.push(['open', read.revision, read.currentTick, limits, requestId]);
         if (refuse) throw Object.assign(Error(refuse + ': refused'), { code: refuse });
@@ -58,9 +60,15 @@ const unplugged = world({ refusal: 'provider_credential_absent' });
 await assert.rejects(start(unplugged), /The AI service is not connected\./);
 assert.deepEqual(unplugged.sent, []);
 
-// Refused by the server: its code comes back for the page to word.
-const playing = world({ control: { ...paused, mode: 'playing' }, refuse: 'society_not_paused' });
-await assert.rejects(start(playing), error => error.code === 'society_not_paused');
+// A playing world: one run opened on the playing read, and nothing else written.
+const playing = world({ control: { ...paused, mode: 'playing' } });
+assert.equal(openRun(await start(playing)).sessionId, 'run-1');
+assert.deepEqual(playing.sent, [['open', 3, 6, { wallSeconds: 600, minutes: 10, decisions: 20, usd: '0.05000000', calls: 40 }, 'key-1']]);
+
+// Refused by the server: its code comes back for the page to word, and nothing else is written.
+const spent = world({ control: { ...paused, mode: 'playing' }, refuse: 'process_budget_spent' });
+await assert.rejects(start(spent), error => error.code === 'process_budget_spent');
+assert.deepEqual(spent.sent.map(item => item[0]), ['open']);
 
 // Two characters with a model: room for both to be asked.
 const pair = world({ choices: [{ subjectId: 'duck', model: nano }, { subjectId: 'knight', model: nano }, { subjectId: 'ari', model: null }] });
@@ -76,4 +84,4 @@ const idle = world();
 await stopRun({ controlClient: idle.controlClient, entry, current: () => true });
 assert.deepEqual(idle.sent, []);
 
-console.log('Entity run checks passed: a run opens once on the paused read with the shown limits, refusals keep their code, and Stop closes it.');
+console.log('Entity run checks passed: a run opens once on the control read with the shown limits (a playing world as it plays), refusals keep their code, and Stop closes it.');
