@@ -87,7 +87,7 @@ tmp/
 .tmp/
 
 # Standard build/tooling
-node_modules/
+node_modules
 dist/
 build/
 .next/
@@ -95,7 +95,7 @@ build/
 coverage/
 __pycache__/
 *.py[cod]
-.venv/
+.venv
 venv/
 .pytest_cache/
 .ruff_cache/

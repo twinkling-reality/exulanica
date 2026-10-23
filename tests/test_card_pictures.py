@@ -7,7 +7,8 @@ JPEG, no other file beside it, every held card with its reason, and every entry'
 its card makes now (a recipe's land included). The page matches a recipe card by its values alone,
 so a recipe whose catalog, specification or land changed with the same values would otherwise keep
 an old picture: such an entry fails here until it is captured again or moved to ``held``, a data
-edit, so the change never needs a browser to pass.
+edit, so the change never needs a browser to pass. The step names every path that differs from the
+commit it captures on, an untracked file included and an ignored one not.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -106,3 +108,48 @@ def test_the_capture_step_names_an_entry_whose_reference_no_longer_holds(
     assert capture.check() == 1
     out = capsys.readouterr().out
     assert "stale: kind:town" in out and "stale: recipe:small_town" not in out
+
+
+def test_the_capture_step_names_every_path_that_differs_but_not_ignored_ones(tmp_path, monkeypatch):
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY"):
+        monkeypatch.delenv(name, raising=False)
+
+    def git(*arguments):
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=card",
+                "-c",
+                "user.email=card@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                *arguments,
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    for name in ("changed.txt", "renamed.txt", "removed.txt"):
+        (tmp_path / name).write_text(name)
+    (tmp_path / ".gitignore").write_text("installed\n*.log\n")
+    git("add", "-A")
+    git("commit", "-q", "--no-verify", "-m", "start")
+    (tmp_path / "changed.txt").write_text("changed")
+    git("mv", "renamed.txt", "moved.txt")
+    (tmp_path / "removed.txt").unlink()
+    (tmp_path / "new" / "deep").mkdir(parents=True)
+    (tmp_path / "new" / "deep" / "catalog.v3.json").write_text("{}")
+    (tmp_path / "installed").mkdir()
+    (tmp_path / "installed" / "package.js").write_text("")
+    (tmp_path / "run.log").write_text("")
+
+    assert capture.tree_changes(tmp_path) == [
+        "changed.txt",
+        "moved.txt",
+        "new/deep/catalog.v3.json",
+        "removed.txt",
+        "renamed.txt",
+    ]

@@ -8,8 +8,9 @@ scales each first view to the card's size and writes the pictures and their reco
 ``exulanica.card-pictures/v1``). Each entry states the card, the reference of the world it was
 made from (a recipe's, as ``town_recipe(key, values).reference()`` states it, or a kind's key,
 version and digest), the picture and its digest and size, the world and entry made, the commit and
-the tracked paths that differed from it, and the day. The page shows an entry's picture only on the
-card whose served values, or version and digest, it records; any other card shows its quiet tile.
+the paths that differed from it (tracked, or untracked and not ignored), and the day. The page shows
+an entry's picture only on the card whose served values, or version and digest, it records; any
+other card shows its quiet tile.
 A card the record holds back (``held``, each with its reason) is not captured.
 
     uv run python scripts/capture_card_pictures.py --state <run state.json>
@@ -107,6 +108,29 @@ def made_reference(card: str, values: dict | None, entry: dict) -> dict:
     return reference
 
 
+def tree_changes(root: Path) -> list[str]:
+    """Every path of the checkout at ``root`` that differs from its commit, sorted: a tracked path
+    changed, added or removed, both names of a rename, and each untracked file its ignore rules do
+    not ignore. An ignored path (an installed dependency, a cache) is not named."""
+    listed = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    fields = iter(listed.split("\0"))
+    paths = set()
+    for field in fields:
+        if not field:
+            continue
+        paths.add(field[3:])
+        # A rename or copy is followed by the path it came from.
+        if field[0] in "RC" or field[1] in "RC":
+            paths.add(next(fields))
+    return sorted(paths)
+
+
 def check() -> int:
     stale = []
     for entry in read_catalog()["entries"]:
@@ -149,14 +173,7 @@ def capture(state_path: Path, port: int) -> int:
     commit = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True, text=True
     ).stdout.strip()
-    changed = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=no"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    tree_changes = sorted(line[3:] for line in changed.splitlines())
+    changes = tree_changes(ROOT)
     with tempfile.TemporaryDirectory() as out, tempfile.TemporaryDirectory() as profile:
         run = subprocess.run(
             [
@@ -204,7 +221,7 @@ def capture(state_path: Path, port: int) -> int:
                     "world_id": saved[item["entry_id"]]["world_id"],
                     "entry_id": item["entry_id"],
                     "commit": commit,
-                    "tree_changes": tree_changes,
+                    "tree_changes": changes,
                     "captured_on": dt.datetime.now(dt.UTC).date().isoformat(),
                 }
             )
