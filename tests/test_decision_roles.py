@@ -51,6 +51,7 @@ from exulanica.world.deciders import EXTERNAL_REASONS
 from exulanica.world.decision_roles import (
     ADAPTER_PACKAGE,
     CHOICE_SUBJECT_FIELDS,
+    LABEL_RULES,
     PROFILE_PATTERNS,
     REGISTRY_DIRECTORY,
     ContractError,
@@ -736,6 +737,41 @@ def test_every_published_registry_version_keeps_its_bytes():
         for path in REGISTRY_DIRECTORY.glob("decision-roles.v*.json")
     }
     assert {name: found.get(name) for name in PUBLISHED_REGISTRIES} == PUBLISHED_REGISTRIES
+
+
+#: Each role's label rules by the action catalog version each holds from, as the registry that added
+#: it first published it (AUDIT's F9 O2): a later registry that moved one would change how every
+#: request already made under it rebuilds, so every later registry, and the one loaded, states the
+#: same, and a new rule is pinned here as it is published.
+LABEL_RULES_AS_PUBLISHED = {
+    "society_decision": {
+        "names_as_written": 9,
+        "straight_line_distances": 9,
+        "activity_names_as_written": 11,
+        "clock_told": 11,
+    },
+    "junction_signal": {
+        "names_as_written": 1,
+        "straight_line_distances": 1,
+        "activity_names_as_written": 1,
+        "clock_told": 1,
+    },
+}
+
+
+def test_a_label_rule_s_version_never_moves_in_a_later_registry():
+    suffix = "_from_action_version"
+    for path in REGISTRY_DIRECTORY.glob("decision-roles.v*.json"):
+        for entry in json.loads(path.read_text())["entries"]:
+            stated = {
+                key[: -len(suffix)]: value for key, value in entry.items() if key.endswith(suffix)
+            }
+            pinned = LABEL_RULES_AS_PUBLISHED[entry["key"]]
+            assert stated == {rule: pinned[rule] for rule in stated}, (path.name, entry["key"])
+    roles = decision_roles()
+    for key, pinned in LABEL_RULES_AS_PUBLISHED.items():
+        assert set(pinned) == set(LABEL_RULES)
+        assert dict(roles.role(key).label_rules_from_action_version) == pinned
 
 
 def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
