@@ -190,6 +190,138 @@ describe('the follow view in a talking scene', () => {
     expect(speaker.x).toBeLessThan(innerWidth * 0.9);
   });
 
+  it('asks again, eased, once a passer-by has stood in front of the speaker for two checks, to a side clear of them', async () => {
+    const { createSceneFollow, SCENE_FOLLOW } = await follow();
+    const { standsInBand, MOMENT_FRAMING } = await framing();
+    const { people, binding, look } = walkingWorld();
+    // Teo and Ines face each other along a north-south line, so either side shows both in profile.
+    people.teo = { x: 0, z: 0, heading: 0 };
+    people.ines = { x: 0, z: -1.2, heading: Math.PI };
+    const view = createSceneFollow(binding);
+    view.saw(scene('teo', 'ines'));
+    const first = view.pose(0);
+    look(first);
+    // Bo stops a third of the way from the camera to Teo: nearer and larger than him, in front of him.
+    people.bo = { x: first.x + (people.teo.x - first.x) / 3, z: first.z + (people.teo.z - first.z) / 3 };
+    binding.authoredSociety.visibleInhabitantIds = Object.keys(people);
+    const live = { ...MOMENT_FRAMING, fov_deg: 60, size_px: [innerWidth, innerHeight] };
+    const teo = () => ({ x: people.teo.x, y: 0, z: people.teo.z, height: 1.7 });
+    const bo = () => ({ x: people.bo!.x, y: 0, z: people.bo!.z, height: 1.7 });
+    expect(standsInBand(first, bo(), live, teo())).toBe(false);
+    // Two checks in a row in front, but no new frame within 2 s of the first.
+    for (let at = SCENE_FOLLOW.checkMs; at < SCENE_FOLLOW.reaskLeastMs; at += SCENE_FOLLOW.checkMs) expect(view.pose(at)).toBe(first);
+    const started = SCENE_FOLLOW.reaskLeastMs;
+    const eased = view.pose(started);
+    expect(Math.hypot(eased.x - first.x, eased.z - first.z)).toBeLessThan(0.01);
+    const settled = view.pose(started + SCENE_FOLLOW.easeMs);
+    look(settled);
+    expect(standsInBand(settled, bo(), live, teo())).toBe(true);
+    expect(SCENE_FOLLOW.crowdedChecks).toBe(2);
+  });
+
+  it('never moves the camera for someone near it at the frame\'s edge who covers neither of the line\'s people', async () => {
+    const { createSceneFollow, SCENE_FOLLOW } = await follow();
+    const { standsInBand, lensOf, MOMENT_FRAMING } = await framing();
+    const { people, binding, look } = walkingWorld();
+    people.teo = { x: 0, z: 0, heading: 0 };
+    people.ines = { x: 0, z: -1.2, heading: Math.PI };
+    const view = createSceneFollow(binding);
+    view.saw(scene('teo', 'ines'));
+    const first = view.pose(0);
+    look(first);
+    // Bo stands 1.5 m ahead of the camera, nine tenths of the way from the middle to the right edge: nearer and
+    // larger than Teo, but over nobody.
+    const live = { ...MOMENT_FRAMING, fov_deg: 60, size_px: [innerWidth, innerHeight] };
+    const ahead = { x: -Math.sin(first.yaw), z: -Math.cos(first.yaw) }, right = { x: Math.cos(first.yaw), z: -Math.sin(first.yaw) };
+    const aside = 0.9 * 1.5 * Math.tan(lensOf(live).horizontal);
+    people.bo = { x: first.x + ahead.x * 1.5 + right.x * aside, z: first.z + ahead.z * 1.5 + right.z * aside };
+    binding.authoredSociety.visibleInhabitantIds = Object.keys(people);
+    expect(standsInBand(first, { x: people.bo.x, y: 0, z: people.bo.z, height: 1.7 }, live, { x: 0, y: 0, z: 0, height: 1.7 })).toBe(false);
+    for (let at = SCENE_FOLLOW.checkMs; at <= 3 * SCENE_FOLLOW.reaskLeastMs; at += SCENE_FOLLOW.checkMs) expect(view.pose(at)).toBe(first);
+  });
+
+  it('counts a passer-by just beside the speaker, within a tenth of the frame\'s width of them', async () => {
+    const { createSceneFollow, SCENE_FOLLOW } = await follow();
+    const { lensOf, MOMENT_FRAMING } = await framing();
+    const { people, binding, look } = walkingWorld();
+    people.teo = { x: 0, z: 0, heading: 0 };
+    people.ines = { x: 0, z: -1.2, heading: Math.PI };
+    const view = createSceneFollow(binding);
+    view.saw(scene('teo', 'ines'));
+    const first = view.pose(0);
+    look(first);
+    // Across the frame, -1 to 1 edge to edge: Teo's box, and Bo 1.5 m ahead of the camera with his box a twentieth
+    // of the width clear of Teo's on the side away from Ines.
+    const tan = Math.tan(lensOf({ ...MOMENT_FRAMING, fov_deg: 60, size_px: [innerWidth, innerHeight] }).horizontal);
+    const ahead = { x: -Math.sin(first.yaw), z: -Math.cos(first.yaw) }, right = { x: Math.cos(first.yaw), z: -Math.sin(first.yaw) };
+    const across = (p: { x: number; z: number }) => {
+      const v = { x: p.x - first.x, z: p.z - first.z };
+      const depth = v.x * ahead.x + v.z * ahead.z;
+      return { at: (v.x * right.x + v.z * right.z) / (depth * tan), half: SCENE_FOLLOW.bodyWidthMetres / 2 / (depth * tan) };
+    };
+    const teo = across(people.teo), ines = across(people.ines);
+    const side = teo.at >= ines.at ? 1 : -1;
+    const boHalf = SCENE_FOLLOW.bodyWidthMetres / 2 / (1.5 * tan);
+    const boAt = teo.at + side * (teo.half + boHalf + 0.1);
+    people.bo = { x: first.x + ahead.x * 1.5 + right.x * boAt * 1.5 * tan, z: first.z + ahead.z * 1.5 + right.z * boAt * 1.5 * tan };
+    binding.authoredSociety.visibleInhabitantIds = Object.keys(people);
+    for (let at = SCENE_FOLLOW.checkMs; at < SCENE_FOLLOW.reaskLeastMs; at += SCENE_FOLLOW.checkMs) expect(view.pose(at)).toBe(first);
+    expect(view.pose(SCENE_FOLLOW.reaskLeastMs)).not.toBe(first);
+  });
+
+  it('asks again once the one spoken to stands over the speaker\'s head, to a frame where they no longer do', async () => {
+    const { createSceneFollow, SCENE_FOLLOW } = await follow();
+    const { standsInBand, MOMENT_FRAMING } = await framing();
+    const { people, binding, look } = walkingWorld();
+    people.teo = { x: 0, z: 0, heading: 0 };
+    people.ines = { x: 0, z: -1.2, heading: Math.PI };
+    const view = createSceneFollow(binding);
+    view.saw(scene('teo', 'ines'));
+    const first = view.pose(0);
+    look(first);
+    // Ines, still the one Teo speaks to, steps round to a third of the way from the camera to him: nearer and larger
+    // than him, straight over his head.
+    people.ines = { x: first.x + (people.teo.x - first.x) / 3, z: first.z + (people.teo.z - first.z) / 3, heading: first.yaw };
+    const live = { ...MOMENT_FRAMING, fov_deg: 60, size_px: [innerWidth, innerHeight] };
+    const teo = { x: people.teo.x, y: 0, z: people.teo.z, height: 1.7 };
+    const ines = { x: people.ines.x, y: 0, z: people.ines.z, height: 1.7 };
+    expect(standsInBand(first, ines, live, teo)).toBe(false);
+    for (let at = SCENE_FOLLOW.checkMs; at < SCENE_FOLLOW.reaskLeastMs; at += SCENE_FOLLOW.checkMs) expect(view.pose(at)).toBe(first);
+    expect(view.pose(SCENE_FOLLOW.reaskLeastMs)).not.toBe(first);
+    const settled = view.pose(SCENE_FOLLOW.reaskLeastMs + SCENE_FOLLOW.easeMs);
+    look(settled);
+    // From the new side Ines is farther than Teo, or her body clears his across the frame.
+    const ahead = { x: -Math.sin(settled.yaw), z: -Math.cos(settled.yaw) }, right = { x: Math.cos(settled.yaw), z: -Math.sin(settled.yaw) };
+    const seen = (p: { x: number; z: number }) => {
+      const v = { x: p.x - settled.x, z: p.z - settled.z };
+      const depth = v.x * ahead.x + v.z * ahead.z;
+      return { depth, at: (v.x * right.x + v.z * right.z) / depth, half: SCENE_FOLLOW.bodyWidthMetres / 2 / depth };
+    };
+    const him = seen(teo), her = seen(ines);
+    expect(her.depth > him.depth || Math.abs(her.at - him.at) > her.half + him.half).toBe(true);
+    expect(settled).not.toEqual(first);
+  });
+
+  it('never moves the camera for a passer-by who crosses in front within a check', async () => {
+    const { createSceneFollow, SCENE_FOLLOW } = await follow();
+    const { people, binding, look } = walkingWorld();
+    const view = createSceneFollow(binding);
+    view.saw(scene('teo', 'ines'));
+    const first = view.pose(0);
+    look(first);
+    // Lia stands well beyond the pair, in the frame and smaller than Teo: in the band, never a reason to move.
+    people.lia = { x: people.teo.x + (people.teo.x - first.x) * 1.5, z: people.teo.z + (people.teo.z - first.z) * 1.5 };
+    binding.authoredSociety.visibleInhabitantIds = Object.keys(people);
+    // Checks pass with nobody in front; then, at the first check a new frame could be asked, Bo is in front of
+    // Teo, and by the next he has walked on out of the frame.
+    for (let at = SCENE_FOLLOW.checkMs; at < SCENE_FOLLOW.reaskLeastMs; at += SCENE_FOLLOW.checkMs) expect(view.pose(at)).toBe(first);
+    people.bo = { x: first.x + (people.teo.x - first.x) / 3, z: first.z + (people.teo.z - first.z) / 3 };
+    binding.authoredSociety.visibleInhabitantIds = Object.keys(people);
+    expect(view.pose(SCENE_FOLLOW.reaskLeastMs)).toBe(first);
+    people.bo = { x: first.x - 40, z: first.z + 40 };
+    for (let at = SCENE_FOLLOW.reaskLeastMs + SCENE_FOLLOW.checkMs; at <= 3 * SCENE_FOLLOW.reaskLeastMs; at += SCENE_FOLLOW.checkMs) expect(view.pose(at)).toBe(first);
+  });
+
   it('holds no frame for a speaker the crowd does not draw', async () => {
     const { createSceneFollow } = await follow();
     const { binding } = world({ ines: { x: 0, z: 0 } });
