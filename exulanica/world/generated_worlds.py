@@ -13,10 +13,12 @@ held to its output digest (:func:`town_records`): the records are never stored, 
 can drift from what the receipt says, and a world whose grammar or catalogs changed under it is
 refused by name. :func:`town_records` is the one interface through which anything reads a
 generated world's records, the society's ground and traffic alike; it keeps the few most recently
-read worlds' records in memory, keyed by the receipt's digest, which is immutable. A world made from
-a world kind (a site world) is the one exception: its kind came from a person, so its records are
-generated only in the kind worker (:mod:`exulanica.world.kinds.worker`), never on a request's
-thread, and :func:`town_records` refuses it (:class:`SiteRecordsElsewhere`).
+read worlds' records in memory, keyed by the receipt's digest, which is immutable, and generates a
+world's records once in a process when several ask at once (the tile worker's bake slots, each
+baking one of a new town's tiles): the first generates them and the others wait for its records. A
+world made from a world kind (a site world) is the one exception: its kind came from a person, so
+its records are generated only in the kind worker (:mod:`exulanica.world.kinds.worker`), never on a
+request's thread, and :func:`town_records` refuses it (:class:`SiteRecordsElsewhere`).
 
 **Its tiles** are found by the digest over each tile's bake inputs (:func:`generated_tiles`): a
 tile is baked once, off the request, and a world whose tile is not yet baked says so rather than
@@ -28,8 +30,8 @@ from __future__ import annotations
 import threading
 import uuid
 from collections import OrderedDict
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Final, Literal
 
@@ -140,6 +142,52 @@ class GeneratedTile:
 _records_lock = threading.Lock()
 _records_kept: OrderedDict[str, tuple[object, ...]] = OrderedDict()
 _records_epoch = 0
+
+
+@dataclass(eq=False)
+class _Making:
+    """Records one caller in this process is generating now: the others asking for them wait for
+    ``done`` and take ``records``, which stays None when the generation failed."""
+
+    done: threading.Event = field(default_factory=threading.Event)
+    records: tuple[object, ...] | None = None
+
+
+#: The keys whose records a caller is generating now, by the key :data:`_records_kept` keeps them
+#: under, so two callers asking for the same records at once generate them once.
+_records_making: dict[str, _Making] = {}
+
+
+def _kept_or_made(key: str, make: Callable[[], tuple[object, ...]]) -> tuple[object, ...]:
+    """The records kept under ``key``, or ``make()``'s, kept. One caller in the process makes a
+    key's records at a time; a caller asking while they are made waits for them and takes the
+    maker's. When the maker fails, its error is its own and the next caller makes them again. As
+    before, records made across a :func:`forget_generated_records` are returned but not kept."""
+    while True:
+        with _records_lock:
+            epoch = _records_epoch
+            records = _records_kept.get(key)
+            if records is not None:
+                _records_kept.move_to_end(key)
+                return records
+            making = _records_making.get(key)
+            if making is None:
+                making = _records_making[key] = _Making()
+                break
+        making.done.wait()
+        if making.records is not None:
+            return making.records
+    try:
+        making.records = make()
+    finally:
+        with _records_lock:
+            del _records_making[key]
+            if making.records is not None and epoch == _records_epoch:
+                _records_kept[key] = making.records
+                while len(_records_kept) > _RECORDS_KEPT:
+                    _records_kept.popitem(last=False)
+        making.done.set()
+    return making.records
 
 
 def forget_generated_records(digests: frozenset[str]) -> None:
@@ -557,19 +605,10 @@ def town_records(
             f"world {world_id} was made from a world kind: its records are generated in the kind "
             "worker"
         )
-    with _records_lock:
-        epoch = _records_epoch
-        records = _records_kept.get(digest)
-        if records is not None:
-            _records_kept.move_to_end(digest)
-    if records is None:
-        composer = receipt["composer"]
-        records = composer_module(composer["key"], composer["version"]).records(receipt)
-        with _records_lock:
-            if epoch == _records_epoch:
-                _records_kept[digest] = records
-                while len(_records_kept) > _RECORDS_KEPT:
-                    _records_kept.popitem(last=False)
+    composer = receipt["composer"]
+    records = _kept_or_made(
+        digest, lambda: composer_module(composer["key"], composer["version"]).records(receipt)
+    )
     return GeneratedRecords(world_id, snapshot_id, digest, receipt, records)
 
 
@@ -589,12 +628,8 @@ def town_records_with(
     if not changes:
         return base
     key = f"{base.receipt_sha256}:{_changes_sha256(changes)}"
-    with _records_lock:
-        epoch = _records_epoch
-        records = _records_kept.get(key)
-        if records is not None:
-            _records_kept.move_to_end(key)
-    if records is None:
+
+    def make() -> tuple[object, ...]:
         composer = base.receipt["composer"]
         module = composer_module(composer["key"], composer["version"])
         records_with = getattr(module, "records_with", None)
@@ -602,12 +637,10 @@ def town_records_with(
             raise InvalidStructuralData(
                 f"a world made by {composer['key']} takes no changes to its buildings"
             )
-        records = records_with(base.receipt, changes)
-        with _records_lock:
-            if epoch == _records_epoch:
-                _records_kept[key] = records
-                while len(_records_kept) > _RECORDS_KEPT:
-                    _records_kept.popitem(last=False)
+        records: tuple[object, ...] = records_with(base.receipt, changes)
+        return records
+
+    records = _kept_or_made(key, make)
     return GeneratedRecords(world_id, snapshot_id, base.receipt_sha256, base.receipt, records)
 
 

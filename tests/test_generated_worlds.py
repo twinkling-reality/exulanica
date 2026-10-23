@@ -1180,6 +1180,79 @@ def test_a_town_is_generated_before_the_asset_read_lock_and_never_under_it(
     assert [call for call in calls if call[1]] == []
 
 
+def _records_asked_at_once(api, entry, monkeypatch, *, first_fails: bool) -> tuple[list, dict]:
+    """Ask for a town's records from two threads with the records cache cold, the second while the
+    first is inside the composer, which holds until the second has had half a second to ask: the
+    composer's calls (whether the second was still waiting then, and each world asked for) and
+    each thread's answer (its records, or the error it raised)."""
+    monkeypatch.setattr(generated_worlds_module, "_records_kept", OrderedDict())
+    inside, release = threading.Event(), threading.Event()
+    calls: list = []
+    original = town_composer.records
+
+    def records(receipt):
+        calls.append(receipt["world_id"])
+        if len(calls) == 1:
+            inside.set()
+            assert release.wait(60)
+            if first_fails:
+                raise RuntimeError("the first caller's composition failed")
+        return original(receipt)
+
+    monkeypatch.setattr(town_composer, "records", records)
+    workspace, snapshot = api.repository.workspace_id, uuid.UUID(entry["source_snapshot_id"])
+    answers: dict = {}
+
+    def ask(name: str) -> None:
+        try:
+            with api.database.session(workspace) as connection:
+                answers[name] = town_records(connection, workspace, entry["world_id"], snapshot)
+        except RuntimeError as exc:
+            answers[name] = exc
+
+    first = threading.Thread(target=ask, args=("first",))
+    first.start()
+    assert inside.wait(60)
+    second = threading.Thread(target=ask, args=("second",))
+    second.start()
+    second.join(0.5)
+    calls.append(("second still waiting", second.is_alive()))
+    release.set()
+    first.join(120)
+    second.join(120)
+    return calls, answers
+
+
+def test_two_callers_asking_for_a_towns_records_at_once_generate_them_once(made, monkeypatch):
+    """The tile worker bakes a new town's tiles in slots side by side, each asking for the town's
+    records: a caller asking while another generates them waits and takes that caller's records,
+    rather than generating the same records again beside it."""
+    api = made
+    entry = _town(api, "Once")
+    calls, answers = _records_asked_at_once(api, entry, monkeypatch, first_fails=False)
+    assert calls == [entry["world_id"], ("second still waiting", True)]
+    assert answers["first"].records is answers["second"].records
+
+
+def test_a_caller_waiting_for_a_towns_records_generates_them_when_the_first_fails(
+    made, monkeypatch
+):
+    """A failed generation is its own caller's error: a caller waiting for it generates the records
+    itself and gets them."""
+    api = made
+    entry = _town(api, "Again")
+    calls, answers = _records_asked_at_once(api, entry, monkeypatch, first_fails=True)
+    assert calls == [entry["world_id"], ("second still waiting", True), entry["world_id"]]
+    assert isinstance(answers["first"], RuntimeError)
+    workspace = api.repository.workspace_id
+    with api.database.session(workspace) as connection:
+        digest, receipt = generation_receipt(
+            connection, workspace, entry["world_id"], uuid.UUID(entry["source_snapshot_id"])
+        )
+    assert answers["second"].receipt_sha256 == digest
+    assert len(answers["second"].records) == receipt["record_count"]
+
+
 def test_the_tessellator_child_is_given_no_database_url_or_credential(tmp_path, monkeypatch):
     """The worker holds the owner's and the runtime role's database URLs; a Node child and every
     web dependency it loads is given only the names the worker allows. A stand-in tessellator
