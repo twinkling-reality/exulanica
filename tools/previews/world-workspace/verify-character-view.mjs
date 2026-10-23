@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
+import { chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -10,6 +10,15 @@ assert.equal(subjectWho(being, { subject: { name: 'duck', kind: { label: 'reside
 assert.equal(subjectWho(being, null).title, 'Character');
 assert.equal(subjectWho({ scene: { type: 'object' }, label: 'Bench' }, null).title, 'Bench');
 assert.equal(subjectWho({ scene: { type: 'object' }, label: 'Bench' }, { subject: { name: 'Lantern tower' } }).title, 'Lantern tower');
+
+// A town's own people are named by the society at once; a placed or written character waits for its offer.
+const society = { state: { inhabitants: [
+  { id: 'p1', synthetic: true, display_name: 'Ada Reed' }, { id: 'p2', synthetic: true, display_name: '  ' },
+  { id: 'heron', synthetic: false, display_name: 'Heron' }, { id: 'p3', display_name: 'Teo' },
+] } };
+assert.deepEqual([...ownPeople(society)], ['p1']);
+assert.deepEqual([...ownPeople(null)], []);
+assert.deepEqual([...ownPeople({ state: {} })], []);
 
 // The doing line is the catalog's sentence, without its full stop and with a capital.
 assert.equal(doingLine('Resting at the bench.'), 'Resting at the bench');

@@ -47,6 +47,17 @@ export function subjectWho(row, offer, role = null) {
   return called({ name, kind: sort, being });
 }
 
+/**
+ * The people a society made for its world and named (a town's own people), by id: each is called by the name the
+ * society gave them, the words their offer would give (subjectWho), so nothing need wait for their offers to name
+ * them. A character placed in the world or written into it (a creature, a world's own cast) is not among them: its
+ * offer may call it by its kind where its society name is only its body's.
+ */
+export function ownPeople(society) {
+  const people = society?.state?.inhabitants;
+  return new Set(Array.isArray(people) ? people.filter(person => person?.synthetic === true && plain(person.display_name)).map(person => person.id) : []);
+}
+
 /** A catalog sentence ("Resting at the bench.", "eating at home") as a tag's or card's line. */
 export function doingLine(sentence) {
   const words = plain(sentence);

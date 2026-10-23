@@ -11,7 +11,7 @@ import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, choosableModels, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, offersModels, openWhileOffered, questionGroup } from './character-group.mjs';
-import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
@@ -1045,11 +1045,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         subjectReads.society = await societyClient.read(entry.authoredVersionId, { places: true }).catch(() => null);
         subjectReads.societyAt = performance.now();
       }
-      // One name per character (J20): as the tag and card call it, from its inventory offer: its name,
-      // else "the" and its kind's label. Only the characters History's rows name are read; a
-      // personality is kept by its placed being.
+      // One name per character (J20): as the tag and card call it, from its inventory offer: its name, else "the" and its
+      // kind's label. Only the characters History's rows name are read, never a town's own people, whom the society read
+      // names as their offers would (ownPeople), so History waits for none of theirs; a personality is kept by its placed being.
       const placedBeings = new Map(rows.filter(row => row.scene?.type === 'being' && row.reference?.source === 'authored-thing').map(row => [row.reference.id, row]));
-      const needed = new Set([...subjects.map(beingRow), ...placed.map(id => placedBeings.get(id))].filter(Boolean));
+      const named = ownPeople(subjectReads.society), needed = new Set([...subjects.filter(id => !named.has(id)).map(beingRow), ...placed.map(id => placedBeings.get(id))].filter(Boolean));
       await Promise.all([...needed].map(row => entityOffer(row).catch(() => null)));
       return {
         subject: calledWithin, speaker: (id) => calledAs(id).title,
