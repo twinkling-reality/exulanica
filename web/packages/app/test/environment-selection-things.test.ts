@@ -114,7 +114,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight; readonly objectDistance?: number; readonly supported?: boolean; readonly peopleOnly?: boolean } = {}) {
+function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight; readonly objectDistance?: number; readonly supported?: boolean; readonly peopleOnly?: boolean; readonly creature?: boolean } = {}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -149,6 +149,15 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     read: vi.fn(async () => {
       if (!withSociety) throw missing();
       const read = thingsSociety();
+      if (scene.creature === true) {
+        // A creature placed from Creatures lives among the people: a being of a kind its workspace made.
+        // Beside them a resident whose engine names no kind, as a living town's people are.
+        const person = read.state.inhabitants[0]!;
+        const creature = { ...person, id: 'creature-0', display_name: 'Duck', kind: { source: 'workspace' as const, sha256: 'c'.repeat(64) }, placed_id: 'duck-1' };
+        const another = { ...person, id: 'person-2', display_name: 'Knight 2', placed_id: 'knight-2' };
+        const resident = { ...person, id: 'person-1', display_name: 'Resident', kind: undefined, came_by: undefined, placed_id: undefined };
+        return { ...read, populationSize: 4, state: { ...read.state, inhabitants: [person, creature, another, resident] } };
+      }
       if (scene.peopleOnly === true) {
         // A society of people only: its state names no things.
         const { things: _none, ...people } = read.state;
@@ -460,6 +469,15 @@ describe('a saved world\'s placed things', () => {
     expect(holdStatus).toHaveBeenLastCalledWith(
       'The world is paused. Press Play to let it run. Everyone is indoors just now: open People to see where they are.');
     expect(holdStatus).not.toHaveBeenCalledWith(expect.stringContaining('People are out in the town'));
+    mounted.dispose();
+  });
+
+  it('counts the people who live here, never a creature placed among them', async () => {
+    const { mounted } = mount(true, { creature: true });
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    // "3 people live here": the duck is seen by its own tag, not in the pill's count.
+    expect(mounted.people.clock()).toMatchObject({ society: 'present', population: 3 });
     mounted.dispose();
   });
 

@@ -377,7 +377,8 @@ nobody lives yet the people line at the top says so, and on a page that may chan
 clock's place offers "[P] Bring people in", then "Bringing people in…"; once they arrive the line
 reads "24 people now live here, invented for this world" for a minute, and with nowhere they could reach
 (`no_reachable_targets`) it reads "People need somewhere to rest or visit nearby" while the clock
-offers Build in its place.
+offers Build in its place. The line counts people: a creature placed from Creatures (a being of a kind
+its workspace made) lives among them and is seen by its own tag, never in the count.
 
 When the playback control says open models are not asked for the people here now (its
 `model_minds_code`, `spending_cap_reached` when the allowance for this visit is used up), People says

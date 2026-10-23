@@ -347,7 +347,7 @@ export interface PeopleClock {
   readonly minute: number | null;
   /** The minute of the day the society's clock started at (its first minute), so a minute reads as a time of day; null while unknown. */
   readonly startMinuteOfDay: number | null;
-  /** How many people live here, or null while unknown. */
+  /** How many people live here, or null while unknown: a creature, a being of a kind its workspace made, is no person. */
   readonly population: number | null;
   readonly busy: boolean;
   /** Why one minute cannot be advanced by hand now, in the panel's own words, or null. */
@@ -3201,7 +3201,7 @@ export function mountEnvironmentSelection(
           speed: control?.speed ?? null,
           minute: view?.snapshot?.currentTick ?? control?.currentTick ?? null,
           startMinuteOfDay: view?.snapshot?.state.start_minute_of_day ?? null,
-          population: view?.snapshot?.state.inhabitants.length ?? null,
+          population: view?.snapshot?.state.inhabitants.filter((one) => one.kind === undefined || !isMadeKind(one.kind)).length ?? null,
           busy: controlBusy || view?.busy === true,
           advanceBlocked: advanceBlocked(),
           playEligible: control?.playEligible === true,
