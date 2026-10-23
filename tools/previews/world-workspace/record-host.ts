@@ -3,7 +3,7 @@
 // the pages draw from them: each moment's title in JOURNEY's moment words, its picture and its people's portraits
 // (MOTION's, through history-host.ts). contextual-world.ts opens the pages, asks and answers keys; this says what
 // each page shows.
-import { askedAt, choiceRows, choicesLabel, choicesOver, decisionTitle, overLabel, resultLines, toldLabel, toldSections } from './decision-words.mjs';
+import { choiceRows, choicesLabel, choicesOver, decisionTitle, overLabel, resultLines, toldLabel, toldSections } from './decision-words.mjs';
 import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { CHARACTER_WORDS, decidesPrint, modelRefusalWords, quoted } from './character-words.mjs';
 import { deciderOf } from './character-group.mjs';
@@ -273,9 +273,11 @@ export function recordStates(host: RecordHost) {
       const to = said?.to ? named.subject(said.to) : null;
       const proposal = receipt?.proposal ?? null, provider = receipt?.provider ?? null, config = request.provider_config ?? null;
       const choices = choiceRows(context, proposal?.label ?? null);
-      const result = resultLines({ verdict, doneAt: consumed === null ? null : worldTime(consumed, start)?.hhmm ?? null,
+      const result = resultLines({ verdict,
         latencyMs: provider?.latency_ms ?? null, costUsd: provider?.cost_usd ?? null, costKnown: provider?.cost_known === true });
-      const at = askedAt(request.base_tick, start);
+      // One time per decision: the minute it applied in, as its row of What Teo did says; the minute it was asked in
+      // only where none has applied it yet.
+      const at = worldTime(consumed ?? request.base_tick, start);
       const applied = (showing.events ?? []).find((event: Json) => (event.event_kind === 'decision_applied' && event.document?.request_id === decision.requestId)
         || (event.event_kind === 'said' && event.document?.thing?.request_id === decision.requestId));
       // Who decided (T7): a model's request names its provider; a person playing or an outside program, its kind.

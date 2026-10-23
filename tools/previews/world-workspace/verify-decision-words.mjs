@@ -28,18 +28,19 @@ assert.equal(overLabel({ at: null, who: teo }), '');
 assert.equal(decisionTitle({ line: ' Morning, Ines. ', chose: 'say something' }), '“Morning, Ines.”');
 assert.equal(decisionTitle({ chose: 'wait here a minute' }), 'Wait here a minute');
 
-// What came of it is the choice account's verdict: Done with its time, else the verdict's words.
+// What came of it: a done decision says only its answer's time and cost (the head names its minute), any other
+// verdict its own words.
 const record = { latencyMs: 912, costUsd: '0.00030000', costKnown: true };
-assert.deepEqual(resultLines({ verdict: { kind: 'applied', words: 'Applied in minute 53.' }, doneAt: '06:53', ...record }),
-  { done: 'Done at 06:53 · answered in 0.9 s · cost $0.0003', verdict: null });
-assert.equal(resultLines({ verdict: { kind: 'applied' }, ...record }).done, 'Done · answered in 0.9 s · cost $0.0003');
+assert.deepEqual(resultLines({ verdict: { kind: 'applied', words: 'Applied in minute 53.' }, ...record }),
+  { done: 'Answered in 0.9 s · cost $0.0003', verdict: null });
+assert.deepEqual(resultLines({ verdict: { kind: 'applied' } }), { done: null, verdict: null });
 assert.deepEqual(resultLines({ verdict: { kind: 'pending', words: 'Accepted; no minute has acted on it yet.' }, latencyMs: 1300, costUsd: '0.0014006', costKnown: false }),
   { done: 'Answered in 1.3 s · cost at most $0.0014', verdict: 'Accepted; no minute has acted on it yet.' });
 assert.deepEqual(resultLines({ verdict: { kind: 'awaiting_answer', words: 'No answer is recorded yet.' } }), { done: null, verdict: 'No answer is recorded yet.' });
-assert.equal(resultLines({ verdict: { kind: 'applied' }, costUsd: '0' }).done, 'Done · cost $0');
+assert.equal(resultLines({ verdict: { kind: 'applied' }, costUsd: '0' }).done, 'Cost $0');
 // A time under a tenth of a second (DESIGN's W5).
-assert.equal(resultLines({ verdict: { kind: 'applied' }, doneAt: '06:53', latencyMs: 13 }).done, 'Done at 06:53 · answered in under 0.1 s');
-assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done, 'Done · answered in 0.1 s');
+assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 13 }).done, 'Answered in under 0.1 s');
+assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done, 'Answered in 0.1 s');
 
 // The record page's words (r10): the column's label, the ring's count, the card's label and the head's small print,
 // who decided first (T7's words where no model did), then the answer's time and cost as resultLines says them.

@@ -274,6 +274,20 @@ describe('a decision, filled', () => {
     });
   });
 
+  it('names the minute the decision applied in, as its row does, not the minute it was asked in', async () => {
+    const { recordStates } = await recordHost();
+    // Asked in minute 412 (06:52), applied in minute 413 (06:53): the day row says 06:53, so the page does.
+    const records = recordStates(host({ latest: (requestId: string) => (requestId === 'r1' ? { consumedTick: 413 } : null) }).host);
+    const showing = teoPage();
+    await records.readMoments(showing);
+    const state = records.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false });
+    expect(state.over).toBe('06:53 · Day 1 · Teo met Ines');
+    // Not applied yet: the minute it was asked in.
+    const pending = recordStates(host().host);
+    await pending.readMoments(showing);
+    expect(pending.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false }).over).toBe('06:52 · Day 1 · Teo met Ines');
+  });
+
   it("says a person playing decided where the request was a person's, with no model, time or cost", async () => {
     const { recordStates } = await recordHost();
     const records = recordStates(host({ modelName: () => null }).host);

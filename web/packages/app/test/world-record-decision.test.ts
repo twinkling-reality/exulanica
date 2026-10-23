@@ -47,7 +47,7 @@ const choices = (words: readonly string[], taken: number): Choice[] => words.map
 function teo(extra: Partial<DecisionPageState> = {}): DecisionPageState {
   return {
     over: '06:52 · Day 1 · Teo met Ines at the bench', title: '“Morning, Ines. The boats are out early.”', model: 'Nemotron 3 Nano 30B',
-    done: 'Done at 06:53 · answered in 0.9 s · cost $0.0003', verdict: null, toldLabel: "What Teo's model was told",
+    done: 'Answered in 0.9 s · cost $0.0003', verdict: null, toldLabel: "What Teo's model was told",
     told: [
       // As personalityRecordLines gives it: the name, then the words.
       { label: 'Personality, as you wrote it', lines: ['Teo', 'A retired fisherman who walks the quay every morning and talks to anyone who will listen.'], apart: false },

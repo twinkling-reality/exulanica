@@ -65,14 +65,14 @@ export function decisionTitle({ line = null, chose = null }) {
 }
 
 /**
- * Under the title. Done: "Done at 06:53 · answered in 0.9 s · cost $0.0003" ("Done" where the
- * society keeps no clock). Any other verdict: its own sentence, then "Answered in 0.9 s · cost
- * $0.0003". `verdict` is the choice account's { kind, words }; a part not recorded is left out.
+ * Under the title: the answer's time and cost, "Answered in 0.9 s · cost $0.0003", and for a verdict
+ * other than done its own sentence. A done decision says nothing more: the head names the minute it
+ * was done in, and the chosen mark what was done. `verdict` is the choice account's { kind, words };
+ * a part not recorded is left out.
  */
-export function resultLines({ verdict, doneAt = null, latencyMs = null, costUsd = null, costKnown = true }) {
+export function resultLines({ verdict, latencyMs = null, costUsd = null, costKnown = true }) {
   const parts = [answeredIn(latencyMs), costWords(costUsd, costKnown)].filter(Boolean);
-  if (verdict?.kind === 'applied') return { done: [doneAt ? `Done at ${doneAt}` : 'Done', ...parts].join(' · '), verdict: null };
-  return { done: parts.length ? capital(parts.join(' · ')) : null, verdict: plain(verdict?.words) };
+  return { done: parts.length ? capital(parts.join(' · ')) : null, verdict: verdict?.kind === 'applied' ? null : plain(verdict?.words) };
 }
 
 /**

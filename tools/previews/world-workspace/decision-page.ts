@@ -23,7 +23,7 @@ export interface DecisionPageState {
   /** The words said, in quotes, or what was chosen; empty while the record is read. */
   readonly title: string;
   readonly model: string | null;
-  /** "Done at 06:53 · answered in 0.9 s · cost $0.0003", or the answer's time and cost. */
+  /** The answer's time and cost, "Answered in 0.9 s · cost $0.0003"; null where neither is recorded. */
   readonly done: string | null;
   /** What came of it when it was not done, in the choice account's words. */
   readonly verdict: string | null;
