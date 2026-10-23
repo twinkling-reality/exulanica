@@ -1096,7 +1096,10 @@ named with their digests in an HTML comment at its end, which GitHub does not sh
 digest, provider or action code appears in what it shows. It is regenerated from the committed
 files on every review. Chosen words, names, personalities and the world's title appear only when
 the repository's visibility reads `PRIVATE`; a public or internal repository is told what kind of
-choice each was, and the review digest binds which. The files follow the same rule
+choice each was, and the review digest binds which. Its closing sentence says what the repository
+holds: a private one kept without names and written words is told it holds the kept changes
+without them. The text promises nothing of a merge, since Exulanica reads one back only when
+`apply` is run. The files follow the same rule
 (below, "What reaches a repository"). The generated text passes the
 value scan and stays within 60,000 characters, below the 65,536 GitHub is reported to accept
 (its pull request API page states no limit); it leaves out decision lines first, then older

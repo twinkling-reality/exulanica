@@ -195,8 +195,9 @@ def with_model(world, evidence):
     return world, evidence
 
 
-def shown(tmp_path, *, readable):
-    """A pull request's title and text for a project with a run, a title and a character."""
+def shown(tmp_path, *, readable, private=None):
+    """A pull request's title and text for a project with a run, a title and a character; the
+    repository is private where the project keeps words, unless ``private`` says."""
     world, sessions = living_evidence()
     [evidence] = sessions.values()
     if not readable:
@@ -208,10 +209,10 @@ def shown(tmp_path, *, readable):
         character["words"] = {"name": "Sir Pip", "about": "Guards the well at night."}
         world["title"] = "Terraces on the bay"
     world["characters"] = [character]
-    folder = tmp_path / str(readable)
+    folder = tmp_path / f"{readable}-{private}"
     create(folder, world, author=AUTHOR, evidence=[evidence])
     repository = Repository()
-    repository.visibility = "PRIVATE" if readable else "PUBLIC"
+    repository.visibility = "PRIVATE" if (readable if private is None else private) else "PUBLIC"
     review = RollingPullRequests(repository.request).review(TARGET, Project(folder, author=AUTHOR))
     return review["title"], review["body"], review["commits"]
 
@@ -247,6 +248,22 @@ def test_a_pull_request_shows_no_identity_digest_or_code(tmp_path, readable):
         assert title == "Changes to this world"
         assert "- Wrote the knight's personality" in visible
         assert "Sir Pip" not in body and "Guards the well" not in body
+
+
+def test_a_private_repository_is_told_whether_it_holds_names_and_promises_nothing_of_a_merge(
+    tmp_path,
+):
+    """GH2 and GH5: the text says what the project sends, and nothing Exulanica does not do."""
+    _, kept_with_words, _ = shown(tmp_path, readable=True)
+    _, kept_without, _ = shown(tmp_path, readable=False, private=True)
+    assert "This repository is private, so it shows names, personalities" in kept_with_words
+    assert (
+        "This repository is private. It holds this world's kept changes, without names or the "
+        "words people wrote." in kept_without
+    )
+    assert "Sir Pip" not in kept_without and "Guards the well" not in kept_without
+    for body in (kept_with_words, kept_without):
+        assert "Merging" not in body and "new version" not in body
 
 
 def parted(project, *parts):

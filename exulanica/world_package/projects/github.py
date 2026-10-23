@@ -580,17 +580,30 @@ class RollingPullRequests:
         named = world.get("title") if readable else None
         title = f"Changes to {named or 'this world'}"
         text = "readable" if readable else "codes"
+        # A private repository is told it holds names and written words only where the project keeps
+        # them: a project kept without them sends a world with none, decisions without words (GH2).
+        holds_words = without_words(world) != world or any(
+            "readable" in decision
+            for evidence in sessions.values()
+            for decision in evidence.get("decisions", ())
+        )
         body = "\n".join(
             [
-                f"Exulanica kept these changes to {named or 'this world'}. Merging them makes a "
-                "new version of the world; the version you have stays as it is.",
+                # Nothing is promised of a merge: Exulanica does not read one back by itself (GH5).
+                f"Exulanica kept these changes to {named or 'this world'}.",
                 "",
                 "## The world",
                 "",
                 *(f"- {line}" for line in words or ["Nothing in the world changed"]),
                 *(["", *insight(world, sessions, readable=readable)] if sessions else []),
                 "",
-                "This repository is private, so it shows names, personalities and what was chosen."
+                (
+                    "This repository is private, so it shows names, personalities and what was "
+                    "chosen."
+                    if holds_words
+                    else "This repository is private. It holds this world's kept changes, without "
+                    "names or the words people wrote."
+                )
                 if readable
                 else "This repository is public, so it shows no names, personalities or chosen "
                 "words.",
