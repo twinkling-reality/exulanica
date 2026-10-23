@@ -13,6 +13,12 @@ and accepted with a ``publisher_not_narrow`` warning elsewhere, so a development
 not provisioned the role keeps baking. Baked tiles go to the tile store
 under ``EXULANICA_DATA_DIR``.
 
+It bakes one tile at a time, or as many of a workspace's tiles at once as
+``EXULANICA_TILE_BAKES_AT_ONCE`` (``--bakes-at-once``) says, up to four, each by two tessellator
+processes, at the priority it was started with: lowered, the bakes were starved by other work
+without sparing the kind worker's process. It says how many it bakes at once in its ``startup``
+event, and each ``bake`` event states its seconds.
+
 Nothing here downloads anything. The tessellator runs either compiled (``EXULANICA_TESS_CLI``, a
 ``cli.js`` built by ``tsc``, run by ``EXULANICA_NODE`` or the ``node`` on ``PATH``), as the tile
 worker's image carries it, or from the checkout's TypeScript through ``tsx``
@@ -47,9 +53,20 @@ from exulanica.env import env_get, env_name
 from exulanica.ingest.generated_tiles import GeneratedTileBaker
 from exulanica.store.configured import content_stores
 
-__all__ = ["PUBLISHER_ENV", "check_publisher", "main"]
+__all__ = [
+    "BAKES_AT_ONCE_ENV",
+    "MOST_BAKES_AT_ONCE",
+    "PUBLISHER_ENV",
+    "bakes_at_once",
+    "check_publisher",
+    "main",
+]
 
 PUBLISHER_ENV: Final = env_name("TILE_PUBLISHER_DATABASE_URL")
+#: How many of a workspace's tiles the worker bakes at once (``--bakes-at-once`` when given).
+BAKES_AT_ONCE_ENV: Final = env_name("TILE_BAKES_AT_ONCE")
+#: The most tiles a worker bakes at once: each bake is two tessellator processes.
+MOST_BAKES_AT_ONCE: Final = 4
 _CHECKOUT_WEB: Final = Path(__file__).resolve().parents[2] / "web"
 
 
@@ -106,6 +123,20 @@ def _installs_generated_tiles(environ: Mapping[str, str]) -> bool:
     return component.get("installed") is True
 
 
+def bakes_at_once(value: str | None) -> int:
+    """How many tiles the worker bakes at once (:data:`BAKES_AT_ONCE_ENV`): one when absent, a
+    whole number from 1 to :data:`MOST_BAKES_AT_ONCE` as stated, and otherwise refused by name."""
+    if value is None or not value.strip():
+        return 1
+    stated = value.strip()
+    if not (stated.isascii() and stated.isdigit()) or not 1 <= int(stated) <= MOST_BAKES_AT_ONCE:
+        raise ValueError(
+            f"tile_bakes_at_once_out_of_bounds: {BAKES_AT_ONCE_ENV} must be a whole number from 1 "
+            f"to {MOST_BAKES_AT_ONCE}, got {value!r}"
+        )
+    return int(stated)
+
+
 def _compiled(environ: Mapping[str, str]) -> tuple[Path, Path] | None:
     """The compiled tessellator and the Node that runs it, when ``EXULANICA_TESS_CLI`` names one."""
     cli = env_get("TESS_CLI", environ)
@@ -132,10 +163,19 @@ def main(
     # costs two short statements a workspace.
     parser.add_argument("--poll-seconds", type=float, default=1.0)
     parser.add_argument("--once", action="store_true", help="bake what is waiting and exit")
+    parser.add_argument(
+        "--bakes-at-once",
+        help=f"tiles baked at once, 1 to {MOST_BAKES_AT_ONCE} ({BAKES_AT_ONCE_ENV})",
+    )
     args = parser.parse_args(argv)
     output = stream or sys.stdout
     environment = os.environ if environ is None else environ
     try:
+        slots = bakes_at_once(
+            args.bakes_at_once
+            if args.bakes_at_once is not None
+            else env_get("TILE_BAKES_AT_ONCE", environment)
+        )
         database = Database.from_env(environment)
         verify_schema(database)
         with database.unscoped() as connection:
@@ -174,11 +214,18 @@ def main(
             worker=f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}",
             compiled=_compiled(environment),
             version_stores=stores.version_tiles,
+            bakes_at_once=slots,
         )
     except Exception as error:
         _emit(output, "startup_failed", failure_class=type(error).__name__, message=str(error))
         return 1
-    _emit(output, "startup", workspaces=len(workspaces), mode="once" if args.once else "daemon")
+    _emit(
+        output,
+        "startup",
+        workspaces=len(workspaces),
+        mode="once" if args.once else "daemon",
+        bakes_at_once=slots,
+    )
     while True:
         failed = 0
         for outcome in baker.drain(workspaces | (source() if source is not None else frozenset())):
@@ -192,6 +239,7 @@ def main(
                 status=outcome.status,
                 detail=outcome.detail,
                 baked_tile_id=outcome.baked_tile_id,
+                seconds=outcome.seconds,
             )
         if args.once:
             return 1 if failed else 0

@@ -2,7 +2,8 @@
 
 A generated world queues one ``bake_generated_tile`` job per tile when it is made
 (:func:`exulanica.world.generated_worlds.create_generated_authorities`). :class:`GeneratedTileBaker`
-drains them one workspace at a time:
+drains them one workspace at a time, baking as many of a workspace's tiles at once as it has slots
+(``bakes_at_once``, one unless a worker is told more), each slot claiming a job no other holds:
 
 1. It **claims** a job as the runtime role, in the job's own workspace, and reads the world's
    records through its receipt (:func:`~exulanica.world.generated_worlds.town_records`), the one
@@ -51,7 +52,7 @@ import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Final
 
@@ -180,6 +181,8 @@ class BakeOutcome:
     status: str
     detail: str
     baked_tile_id: uuid.UUID | None = None
+    #: Seconds from the job's claim to this outcome; None for a stranded job ended unbaked.
+    seconds: float | None = None
 
 
 def claim_bake(
@@ -284,12 +287,18 @@ class GeneratedTileBaker:
         worker: str,
         compiled: tuple[Path, Path] | None = None,
         version_stores: WorkspaceStores | None = None,
+        bakes_at_once: int = 1,
     ) -> None:
         """``compiled`` is ``(node, cli.js)``: the tessellator compiled to JavaScript, as the tile
         worker's image carries it, run by Node with no package installed. Without it the checkout's
         TypeScript runs through ``tsx`` from ``web_directory``. Both bake the same bytes
         (``tests/test_generated_tile_runner.py``). ``version_stores`` is each workspace's
-        ``version-tiles`` namespace; without it no ``bake_version_tile`` job is claimed."""
+        ``version-tiles`` namespace; without it no ``bake_version_tile`` job is claimed.
+        ``bakes_at_once`` is how many of a workspace's tiles are baked at once, each by two
+        tessellator processes."""
+        if bakes_at_once < 1:
+            raise ValueError("a baker bakes at least one tile at a time")
+        self._bakes_at_once = bakes_at_once
         self._session = session
         self._publisher = publisher
         self._store = store
@@ -316,8 +325,8 @@ class GeneratedTileBaker:
                 raise FileNotFoundError(f"the tessellator needs {path}; install or compile it")
 
     def drain(self, workspaces: Iterable[uuid.UUID]) -> list[BakeOutcome]:
-        """End each workspace's stranded bakes, then bake every claimable job, one at a time, and
-        say what happened to each.
+        """End each workspace's stranded bakes, then bake every claimable job, as many at once as
+        the baker has slots, and say what happened to each.
 
         The first time this worker drains a workspace it queues one bake for each tile of its
         generated worlds that has none under the stage this worker runs and none waiting
@@ -342,14 +351,39 @@ class GeneratedTileBaker:
                             str(row["last_error"]),
                         )
                     )
-            while True:
-                outcome = self.bake_one(workspace_id)
-                if outcome is None:
-                    break
-                outcomes.append(outcome)
+            outcomes.extend(self._claimable(workspace_id))
         return outcomes
 
+    def _claimable(self, workspace_id: uuid.UUID) -> list[BakeOutcome]:
+        """Bake every job of the workspace that can be claimed, a slot at a time each: a slot
+        claims and bakes until none is left, and :func:`claim_bake` passes over a job another slot
+        holds, so slots side by side never bake one job twice."""
+
+        def slot(_: int) -> list[BakeOutcome]:
+            baked = []
+            while (outcome := self.bake_one(workspace_id)) is not None:
+                baked.append(outcome)
+            return baked
+
+        if self._bakes_at_once == 1:
+            return slot(0)
+        with ThreadPoolExecutor(max_workers=self._bakes_at_once) as slots:
+            return [
+                outcome
+                for baked in slots.map(slot, range(self._bakes_at_once))
+                for outcome in baked
+            ]
+
     def bake_one(self, workspace_id: uuid.UUID) -> BakeOutcome | None:
+        """Claim the workspace's next job and bake it, timed from its claim, or None when no job
+        can be claimed."""
+        started = time.monotonic()
+        outcome = self._claim_and_bake(workspace_id)
+        if outcome is None:
+            return None
+        return replace(outcome, seconds=round(time.monotonic() - started, 2))
+
+    def _claim_and_bake(self, workspace_id: uuid.UUID) -> BakeOutcome | None:
         with self._session(workspace_id) as connection:
             job = claim_bake(connection, workspace_id, worker=self._worker, kinds=self._kinds)
             if job is None:

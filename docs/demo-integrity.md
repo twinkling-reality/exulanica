@@ -167,10 +167,11 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
   reachable. They also stop starting once the spend the product reports reaches that bound, and a
   step list whose estimates exceed `spend.ask_before_usd` is refused before anything runs.
 - The launcher starts one `exulanica-generated-tile-worker` for its workspace, checks its startup
-  event, records its bake events and stops it with the stack. The rehearsal checks that the worker
-  reported each saved town tile as baked. The rehearsal starts `exulanica-derivative-worker` over
-  the same database and workspace, with the depth model and device the step list gives it, handing
-  it the key through the child process.
+  event, records its bake events and stops it with the stack. A personal install's worker bakes a
+  new town's two tiles at once (`EXULANICA_TILE_BAKES_AT_ONCE=2`). The rehearsal checks that the
+  worker reported each saved town tile as baked. The rehearsal starts
+  `exulanica-derivative-worker` over the same database and workspace, with the depth model and
+  device the step list gives it, handing it the key through the child process.
 - `--bound-usd` sets a lower total spend cap for one run and reduces both process ceilings;
   the result records the requested and effective total cap and both allocations. `--sessions`
   runs only the named browser sessions; `--reuse-database` reuses the slot's database; `--gpu-slot`

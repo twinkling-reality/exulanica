@@ -117,7 +117,7 @@ boundary ([security floor](security-floor.md)).
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |
 | Piece generation worker | `exulanica-piece-generation` | Serves the operator's GPU session with the workspaces' piece requests and keeps what it made; started only with the `generation` compose profile | 5.2.12 |
-| Generated-tile worker | `exulanica-generated-tile-worker` | Bakes the tiles generated towns wait for, in a Node process, and publishes each as the tile role | 9.1 |
+| Generated-tile worker | `exulanica-generated-tile-worker` | Bakes the tiles generated towns wait for, one at a time or as many at once as `EXULANICA_TILE_BAKES_AT_ONCE` says, each in two Node processes, and publishes each as the tile role | 9.1 |
 | Arrival worlds | `exulanica-arrival-worlds` | Makes the installation's arrival worlds in its own workspace, so their tiles are baked before a visitor's copy | 8.2 |
 | Tile faults | `exulanica-tile-fault` | Lists faulted baked tiles, and records the owner's decision to serve one's stored first bake | 9.1 |
 | Creator grants | `exulanica-creator-grant` | Grants and revokes the accounts whose browser sessions may upload a style pack or a workspace asset, and lists them | 5.1.4 |
@@ -1705,6 +1705,16 @@ is never served; the owner may record the decision to serve its stored first bak
 `exulanica-tile-fault clear`, which never changes or deletes the stored tile. `list` names every
 fault with what a clearance would serve and what disagreed with it: the stored container's
 digest, when that bake ran and its receipt, and the differing bake's digest.
+
+The worker bakes one tile at a time unless `EXULANICA_TILE_BAKES_AT_ONCE` (or `--bakes-at-once`)
+states a whole number up to 4; any other value stops its start (`tile_bakes_at_once_out_of_bounds`).
+Each bake runs the tessellator twice at once, so a worker baking two tiles runs four Node processes,
+claiming jobs no other slot holds. The bakes run at the priority the worker was started with:
+lowered, they were starved by other work without sparing the kind worker's process. Its `startup`
+event states how many it bakes at once, and each `bake` event the seconds from the job's claim. The
+acceptance launcher's personal install bakes two at once; `compose.yaml` states none, so a server
+bakes one.
+
 `single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
 and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);

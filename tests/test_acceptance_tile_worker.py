@@ -18,7 +18,9 @@ LAUNCH = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(LAUNCH)
 
 
-def _worker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, event: str) -> tuple[dict, dict]:
+def _worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, event: str, *, personal: bool = False
+) -> tuple[dict, dict]:
     worktree = tmp_path / "checkout"
     program = worktree / ".venv" / "bin" / "exulanica-generated-tile-worker"
     program.parent.mkdir(parents=True)
@@ -26,7 +28,7 @@ def _worker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, event: str) -> tupl
     logs = tmp_path / "logs"
     logs.mkdir()
     state_file = tmp_path / "state.json"
-    state = {"pids": {}}
+    state: dict = {"pids": {}, **({"personal": True} if personal else {})}
     observed: dict = {}
 
     def spawn(command, cwd, environment, log):
@@ -65,6 +67,86 @@ def test_worker_uses_runtime_claims_owner_publication_and_one_workspace(tmp_path
     )
     assert observed["environment"]["EXULANICA_DATA_DIR"] == str(tmp_path / "data")
     assert state["pids"] == {"tile_worker": 12345}
+
+
+def test_a_personal_install_s_worker_bakes_a_town_s_two_tiles_at_once_by_its_environment(
+    tmp_path, monkeypatch
+):
+    observed, state = _worker(tmp_path, monkeypatch, "startup", personal=True)
+    assert observed["environment"]["EXULANICA_TILE_BAKES_AT_ONCE"] == "2"
+    # Given by the environment, so its command is the worker's own as the identity check reads it.
+    assert observed["command"][-2:] == ["--workspace", "workspace"]
+    assert LAUNCH.tile_worker_running(state)
+    (tmp_path / "shared").mkdir()
+    shared, _ = _worker(tmp_path / "shared", monkeypatch, "startup")
+    assert "EXULANICA_TILE_BAKES_AT_ONCE" not in shared["environment"]
+
+
+def _command(
+    monkeypatch: pytest.MonkeyPatch, argv: list[str], environ: dict[str, str]
+) -> tuple[int, list[dict], dict]:
+    """The worker's command run once, its database, roles and stores stood in for: what it answered,
+    the events it said and what its baker was given."""
+    import contextlib
+    import io
+    import uuid
+    from types import SimpleNamespace
+
+    from exulanica.ingest import generated_tiles_command as command
+    from exulanica.ingest.generated_tiles import BakeOutcome
+
+    given: dict = {}
+
+    class Baker:
+        def __init__(self, **kwargs: object) -> None:
+            given.update(kwargs)
+
+        def drain(self, workspaces: object) -> list[BakeOutcome]:
+            tile = BakeOutcome(uuid.uuid4(), "world:generated:w", (0, 0), "baked", "", None, 6.25)
+            return [tile]
+
+    database = SimpleNamespace(
+        session=None, unscoped=lambda: contextlib.nullcontext(None), url="postgresql://unused"
+    )
+    monkeypatch.setattr(command, "Database", SimpleNamespace(from_env=lambda environ: database))
+    monkeypatch.setattr(command, "verify_schema", lambda database: None)
+    monkeypatch.setattr(command, "assert_runtime_role", lambda connection: None)
+    monkeypatch.setattr(command, "check_publisher", lambda url, environ: None)
+    monkeypatch.setattr(
+        command, "content_stores", lambda environ: SimpleNamespace(tiles=None, version_tiles=None)
+    )
+    monkeypatch.setattr(command, "GeneratedTileBaker", Baker)
+    stream = io.StringIO()
+    environ = {"EXULANICA_TILE_PUBLISHER_DATABASE_URL": "postgresql://unused", **environ}
+    workspace = ["--workspace", str(uuid.uuid4()), "--once"]
+    answered = command.main([*workspace, *argv], environ=environ, stream=stream)
+    events = [json.loads(line) for line in stream.getvalue().splitlines()]
+    return answered, events, given
+
+
+def test_the_worker_bakes_as_many_tiles_at_once_as_it_is_told_and_refuses_any_other_number(
+    monkeypatch,
+):
+    # Told nothing, one at a time.
+    answered, events, given = _command(monkeypatch, [], {})
+    startup, bake = events
+    assert answered == 0 and given["bakes_at_once"] == 1 and startup["bakes_at_once"] == 1
+    # Each bake says how long it took.
+    assert bake["event"] == "bake" and bake["seconds"] == 6.25
+    # Told two, two at once; the argument wins over the environment.
+    answered, events, given = _command(monkeypatch, [], {"EXULANICA_TILE_BAKES_AT_ONCE": "2"})
+    assert given["bakes_at_once"] == 2 and events[0]["bakes_at_once"] == 2
+    _, _, given = _command(
+        monkeypatch, ["--bakes-at-once", "3"], {"EXULANICA_TILE_BAKES_AT_ONCE": "2"}
+    )
+    assert given["bakes_at_once"] == 3
+    # Anything else stops the start by name, before the worker is built.
+    for value in ("0", "5", "two", "1.5", "\u00b2"):
+        answered, events, given = _command(monkeypatch, [], {"EXULANICA_TILE_BAKES_AT_ONCE": value})
+        (failed,) = events
+        assert (answered, failed["event"], given) == (1, "startup_failed", {})
+        assert failed["message"].startswith("tile_bakes_at_once_out_of_bounds: ")
+        assert "EXULANICA_TILE_BAKES_AT_ONCE" in failed["message"]
 
 
 def test_worker_runs_by_the_checkout_s_interpreter_so_a_trampoline_script_is_recognised(

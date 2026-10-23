@@ -331,6 +331,9 @@ SCRUBBED_PREFIXES = (
 API_START_SECONDS = 90
 READY_SECONDS = 30
 TILE_WORKER_START_SECONDS = 60  # Schema and role checks complete before a tile job is claimed.
+#: Tiles a personal install's worker bakes at once (EXULANICA_TILE_BAKES_AT_ONCE): a new town's two
+#: tiles side by side.
+PERSONAL_TILE_BAKES_AT_ONCE = "2"
 TOKEN_PROBE_SECONDS = 10
 APP_START_SECONDS = 90
 PROXY_SECONDS = 30
@@ -1247,6 +1250,9 @@ def start_tile_worker(
             "EXULANICA_DATA_DIR": str(data_dir),
         }
     )
+    if state.get("personal"):
+        # Given by the environment, so the command an identity check reads is the worker's own.
+        environment["EXULANICA_TILE_BAKES_AT_ONCE"] = PERSONAL_TILE_BAKES_AT_ONCE
     log = logs / "generated-tile-worker.log"
     # A worker started again appends to the log its predecessor wrote; only what follows counts.
     begun = log.stat().st_size if log.exists() else 0

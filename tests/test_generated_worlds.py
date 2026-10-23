@@ -546,6 +546,72 @@ def test_a_tile_s_two_bakes_run_at_once(made, tmp_path, monkeypatch):
     assert [(o.status, o.detail) for o in outcomes] == [("baked", "stored then identical")] * count
 
 
+def test_a_baker_with_two_slots_bakes_a_towns_two_tiles_side_by_side_and_one_slot_one_at_a_time(
+    made, tmp_path, monkeypatch
+):
+    """With two slots each of a two-tile town's four bakes waits for the other three to begin,
+    which only both tiles baked at once get past; with one, no more than a tile's own two bakes
+    ever run together, as a worker told nothing bakes."""
+    api = made
+    store = tile_store(tmp_path / "data")
+    api.client.app.state.services = dataclasses.replace(api.client.app.state.services, tiles=store)
+    web = _stub_tessellator(tmp_path, monkeypatch)
+    stub = GeneratedTileBaker._bake
+    taking_turns = threading.Lock()
+
+    @contextlib.contextmanager
+    def publisher():
+        # One owner connection, so the slots' publishes take turns on it.
+        with taking_turns:
+            yield api.repository.connection
+            api.repository.connection.commit()
+
+    def baker(slots: int) -> GeneratedTileBaker:
+        return GeneratedTileBaker(
+            session=api.database.session,
+            publisher=publisher,
+            store=store,
+            web_directory=web,
+            worker=f"test-{slots}",
+            bakes_at_once=slots,
+        )
+
+    count = len(world_recipe("small_town").tiles)
+    assert count == 2
+    four = threading.Barrier(2 * count, timeout=10)
+
+    def wait_for_the_others(self, document, container):
+        four.wait()
+        return stub(self, document, container)
+
+    monkeypatch.setattr(GeneratedTileBaker, "_bake", wait_for_the_others)
+    _town(api, "Two at once")
+    outcomes = baker(2).drain([api.repository.workspace_id])
+    assert [(o.status, o.detail) for o in outcomes] == [("baked", "stored then identical")] * count
+    assert len({o.job_id for o in outcomes}) == count
+    assert all(o.seconds is not None and o.seconds >= 0 for o in outcomes)
+
+    running, most = [0], [0]
+    counting = threading.Lock()
+
+    def counted(self, document, container):
+        with counting:
+            running[0] += 1
+            most[0] = max(most[0], running[0])
+        try:
+            threading.Event().wait(0.2)
+            return stub(self, document, container)
+        finally:
+            with counting:
+                running[0] -= 1
+
+    monkeypatch.setattr(GeneratedTileBaker, "_bake", counted)
+    _town(api, "One at a time")
+    outcomes = baker(1).drain([api.repository.workspace_id])
+    assert [o.status for o in outcomes] == ["baked"] * count
+    assert most[0] == 2
+
+
 def test_a_world_is_never_left_being_built_when_a_bake_fails_or_is_stranded(
     made, tmp_path, monkeypatch
 ):
