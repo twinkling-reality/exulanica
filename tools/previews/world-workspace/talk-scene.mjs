@@ -24,7 +24,8 @@ export function createScene(rule = TALK_SCENE) {
   let followed = null, lines = [], quietSince = null;
   const keep = act => {
     if (!followed || !act.said || (act.subjectId !== followed && act.to !== followed)) return;
-    lines = [...lines, Object.freeze({ speaker: act.subjectId, to: act.to ?? null, words: act.words })].slice(-rule.lines);
+    // Who chose it rides with the line where the act says (T14), for the plate.
+    lines = [...lines, Object.freeze({ speaker: act.subjectId, to: act.to ?? null, words: act.words, ...(act.by ? { by: act.by } : {}) })].slice(-rule.lines);
   };
   return {
     follow(id, shown = []) {

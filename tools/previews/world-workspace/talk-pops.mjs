@@ -4,6 +4,7 @@
 // screen sits, and which exchange a followed character is in. It keeps no clock of its own: every call
 // is given `now` in milliseconds. contextual-world.ts reads the events while the world plays and draws
 // what `shown(now)` returns; talk-words.mjs words it. verify-talk-pops.mjs holds these.
+import { byParts, partsText } from './history-words.mjs';
 import { chosePop, saidPop } from './talk-words.mjs';
 
 /** How long a pop holds before it fades, and the fade (T4): 67 ms a character, 3.6 s to 9 s. */
@@ -90,7 +91,9 @@ export function talkActs(events, quiet = new Set()) {
       if (event.event_kind === 'said') {
         const thing = document.thing || {};
         if (typeof thing.line !== 'string' || !thing.line.trim()) return [];
-        return [{ subjectId: event.subject_id, words: saidPop(thing.line), said: true, to: typeof thing.to === 'string' ? thing.to : null }];
+        // Who chose the line, where the minute recorded it (T14): a model, a person playing or an outside program.
+        const by = typeof thing.decider === 'string' ? Object.freeze({ kind: thing.decider, model: thing.model ?? null }) : null;
+        return [{ subjectId: event.subject_id, words: saidPop(thing.line), said: true, to: typeof thing.to === 'string' ? thing.to : null, by }];
       }
       if (event.event_kind !== 'decision_applied' || said.has(document.request_id)) return [];
       if (document.disposition !== undefined && document.disposition !== 'applied') return [];
@@ -99,6 +102,18 @@ export function talkActs(events, quiet = new Set()) {
       const words = mind ? chosePop(document.chose) : null;
       return words ? [{ subjectId: event.subject_id, words, said: false, to: null }] : [];
     });
+}
+
+/**
+ * Who chose a said line, as the scene's plate says it under the name (T14), in History's who-line words (H19):
+ * "By Nemotron 3 Super 120B", "By a person playing", "By an outside program"; null for a line no mind chose.
+ * `modelName` names a recorded `{ provider, model_id }`, the model id where it cannot.
+ */
+export function sceneBy(by, modelName = () => null) {
+  if (!by) return null;
+  const name = by.model ? modelName(by.model) ?? by.model.model_id ?? null : null;
+  const parts = byParts({ kind: by.kind, model: name ? { name } : null });
+  return parts ? partsText(parts) : null;
 }
 
 /**

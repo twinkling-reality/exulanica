@@ -23,7 +23,7 @@ import { worldTime } from './world-clock.mjs';
 import { SocietyControlClient } from '/src/society-control-api.ts';
 import { edgeInset, nameOver, speech, talkScene } from './world-ui-talk.ts';
 import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs';
-import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
+import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, sceneBy, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { historyHooks, historyWrite, recordPictures } from './history-host.ts';
@@ -570,7 +570,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     sceneView.draw({
       before: scened.before ? { speaker: whoOf(scened.before.speaker).start, words: scened.before.words } : null,
       now: scened.now.words,
-      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: pictures.portraitNow(scened.now.speaker) },
+      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: pictures.portraitNow(scened.now.speaker), by: sceneBy(scened.now.by, modelName) },
       day: dayWord(speaker),
       stopFollowing: SCENE_WORDS.stopFollowing,
       dot: head ? { x: head.x, y: head.y - SPEAKING_ABOVE * popScale() } : null,

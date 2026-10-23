@@ -49,6 +49,10 @@
 .wu-scene-orb img { width: 100%; height: 100%; object-fit: cover; }
 .wu-scene-name { font: 500 max(21px, calc(21 * var(--u)))/1 var(--font-sans); letter-spacing: .01em; }
 .wu-scene-to { font: 400 max(15px, calc(15 * var(--u)))/1 var(--font-sans); color: rgba(255, 255, 255, .94); }
+/* Who chose the line said now (T14), small under the name and "to X", where the name starts. */
+.wu-scene-by { margin: var(--space-8) 0 0 calc(max(44px, calc(44 * var(--u))) + var(--space-16));
+  font: 400 max(13px, calc(13 * var(--u)))/1.2 var(--font-sans); color: rgba(255, 255, 255, .80); }
+.wu-scene-by[hidden] { display: none; }
 .wu-scene-choices { position: absolute; right: calc(144 * var(--u)); bottom: calc(128 * var(--u)); text-shadow: var(--text-shadow); color: var(--ink); }
 .wu-scene-choices .wu-row { pointer-events: auto; }
 /* The speaker: a dot with a soft halo, 18 px over the speaking person's head. */

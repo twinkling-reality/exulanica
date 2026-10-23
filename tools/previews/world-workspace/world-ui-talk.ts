@@ -122,8 +122,9 @@ export interface SceneShown {
   readonly before: SceneLine | null;
   /** The line said now, in quotes. */
   readonly now: string;
-  /** The speaker's plate: their portrait (or the letter until it is made), name and whom they spoke to. */
-  readonly plate: { readonly name: string; readonly to: string; readonly letter: string; readonly portrait: string | null };
+  /** The speaker's plate: their portrait (or the letter until it is made), name and whom they spoke to, and who chose
+   * the line said now (T14: "By Nemotron 3 Super 120B"), null for a line no mind chose. */
+  readonly plate: { readonly name: string; readonly to: string; readonly letter: string; readonly portrait: string | null; readonly by: string | null };
   /** The speaker's page's word: "Ines's day". */
   readonly day: string;
   readonly stopFollowing: string;
@@ -160,7 +161,8 @@ export function talkScene({ onStop, onDay }: { readonly onStop: () => void; read
   const orb = element('span', 'wu-scene-orb'), name = element('span', 'wu-scene-name'), to = element('span', 'wu-scene-to');
   orb.setAttribute('aria-hidden', 'true');
   plate.append(orb, name, to);
-  lines.append(before, now, plate);
+  const by = element('div', 'wu-scene-by');
+  lines.append(before, now, plate, by);
   const choices = element('div', 'wu-scene-choices');
   const told = shade();
   told.classList.add('wu-scene-told');
@@ -184,6 +186,8 @@ export function talkScene({ onStop, onDay }: { readonly onStop: () => void; read
       }
       if (name.textContent !== shown.plate.name) name.textContent = shown.plate.name;
       if (to.textContent !== shown.plate.to) to.textContent = shown.plate.to;
+      by.hidden = !shown.plate.by;
+      if (shown.plate.by && by.textContent !== shown.plate.by) by.textContent = shown.plate.by;
       const face = shown.plate.portrait ?? '';
       if (face !== portrait || (!face && orb.textContent !== shown.plate.letter)) {
         portrait = face;

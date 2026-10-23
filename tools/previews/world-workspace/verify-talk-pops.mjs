@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { NAMED_LEAST_PX, NAMES_MOST, OVER_HEAD, QUIET_KINDS, quietWords, STACK_GAP, TALK_HEARING, TALK_HOLD, createTalk, edgePlace, endedBy, exchangeOf, framingStep, holdMs, nameGroups, namedPeople, popLeft, popPlacement, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
+import { NAMED_LEAST_PX, NAMES_MOST, OVER_HEAD, QUIET_KINDS, quietWords, STACK_GAP, TALK_HEARING, TALK_HOLD, createTalk, edgePlace, endedBy, exchangeOf, framingStep, holdMs, nameGroups, namedPeople, popLeft, popPlacement, sceneBy, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
 
 // T4: a pop holds 67 ms a character, at least 3.6 s and at most 9 s, and fades over 600 ms.
 assert.deepEqual({ ...TALK_HOLD }, { perCharacterMs: 67, leastMs: 3600, mostMs: 9000, outMs: 600 });
@@ -23,11 +23,25 @@ const events = [
   { subject_id: 'f', tick: 5, event_kind: 'decision_applied', document: { request_id: 'r7', origin: 'routine', disposition: 'applied', chose: 'wander' } },
 ];
 assert.deepEqual(talkActs(events), [
-  { subjectId: 'a', words: '\u201cRest here.\u201d', said: true, to: null },
+  { subjectId: 'a', words: '\u201cRest here.\u201d', said: true, to: null, by: { kind: 'external', model: null } },
   { subjectId: 'c', words: 'Walk to the lower pools', said: false, to: null },
   { subjectId: 'e', words: 'Rest', said: false, to: null },
-  { subjectId: 'b', words: '\u201cIs there shade?\u201d', said: true, to: 'a' },
+  { subjectId: 'b', words: '\u201cIs there shade?\u201d', said: true, to: 'a', by: { kind: 'person', model: null } },
 ]);
+
+// T14: a said line carries who chose it, and the scene's plate says it in History's who-line words (H19).
+const modelLine = { subject_id: 'g', tick: 7, event_kind: 'said', document: { thing: { request_id: 'r8', line: 'Evening.', to: null, decider: 'model',
+  model: { provider: 'nebius_token_factory', model_id: 'nvidia/nemotron-3-super-120b-a12b' } } } };
+const [said] = talkActs([modelLine]);
+assert.deepEqual(said.by, { kind: 'model', model: { provider: 'nebius_token_factory', model_id: 'nvidia/nemotron-3-super-120b-a12b' } });
+const named = (model) => (model.model_id === 'nvidia/nemotron-3-super-120b-a12b' ? 'Nemotron 3 Super 120B' : null);
+assert.equal(sceneBy(said.by, named), 'By Nemotron 3 Super 120B');
+assert.equal(sceneBy(said.by), 'By nvidia/nemotron-3-super-120b-a12b', 'a model the page cannot name is said by its id');
+assert.equal(sceneBy({ kind: 'person', model: null }), 'By a person playing');
+assert.equal(sceneBy({ kind: 'external', model: null }), 'By an outside program');
+assert.equal(sceneBy(null), null, 'a line no mind chose keeps no who line');
+const [older] = talkActs([{ subject_id: 'h', tick: 8, event_kind: 'said', document: { thing: { request_id: 'r9', line: 'Hello.', to: null } } }]);
+assert.equal(older.by, null, 'a line recorded before deciders were kept names nobody');
 
 // T11: a choice that changes nothing to see (waiting a minute, carrying on) does not pop; the quiet words come
 // from the decision-action catalogs' kinds, every version, a word with a placeholder left out.

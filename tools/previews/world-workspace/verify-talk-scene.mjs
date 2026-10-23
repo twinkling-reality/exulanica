@@ -22,6 +22,12 @@ scene.add(said('marco', 'lia', '“Not ours.”'));
 scene.add({ subjectId: 'teo', to: null, words: 'Walk to the pier', said: false });
 scene.add(said('lia', null, '“Hello, all.”'));
 assert.deepEqual(scene.shown(100, exchange), { showing: true, now: { speaker: 'teo', to: 'ines', words: '“Morning, Ines.”' }, before: null });
+// T14: who chose a line rides with it for the plate; a line whose act names nobody keeps no such field.
+const byModel = { kind: 'model', model: { provider: 'p', model_id: 'm' } };
+const chosen = createScene();
+chosen.follow('teo');
+chosen.add({ subjectId: 'teo', words: '“Evening.”', said: true, to: null, by: byModel });
+assert.deepEqual(chosen.shown(100, exchange).now.by, byModel);
 scene.add(said('ines', 'teo', '“Early enough for the market?”'));
 scene.add(said('teo', null, '“Everyone, the boats.”'));
 const shown = scene.shown(200, exchange);
