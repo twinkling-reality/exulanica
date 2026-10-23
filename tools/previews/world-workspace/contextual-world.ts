@@ -804,11 +804,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     try {
       const { verified } = await recordEntityModel({ entry, subjectId: showing.row.scene.id, selected: picked, key: choosing.key, refresh: () => refreshSubject(showing.row), client: modelsClient, current: () => showing === pageView && current() });
       subjectReads.models = verified;
-      // A new model changes who decides in a run, so the run the page offers is read again.
-      if (showing === pageView) { showing.choosing = null; showing.run.shown = runWatch.limits(verified); showing.run.refusal = null; }
+      // A new model changes who decides in a run, so the run the page offers is read again; an R pressed while it saved starts it now.
+      if (showing === pageView) { showing.choosing = null; showing.run.shown = runWatch.limits(verified); showing.run.refusal = null; if (choosing.runAfter && !runWatch.run) void startNow(showing.run); }
     } catch (error) {
       choosing.refusal = modelRefusalWords(error.code ?? 'stale', subjectView(showing.row).who);
-      choosing.key = crypto.randomUUID();
+      choosing.key = crypto.randomUUID(); choosing.runAfter = false;
     } finally { choosing.busy = false; drawPage(); }
   }
   // Ask (8.6): the Companion's three questions, answered from this world's records alone.
@@ -1220,7 +1220,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) pageAct('back'); }
       else if (event.code === 'KeyN' && !choosing && !event.repeat) { event.preventDefault(); pageAct('personality'); }
       else if (event.code === 'KeyM' && !choosing && !event.repeat) { event.preventDefault(); pageAct('model'); }
-      else if (event.code === 'KeyR' && !choosing && !event.repeat) { event.preventDefault(); pageAct(runWatch.run ? 'stop' : 'run'); }
+      else if (event.code === 'KeyR' && (!choosing || choosing.busy) && !event.repeat) { event.preventDefault(); if (choosing) choosing.runAfter = true; else pageAct(runWatch.run ? 'stop' : 'run'); }
       else if (event.code === 'KeyC' && !choosing && !event.repeat && pageState().canCompare) { event.preventDefault(); pageAct('compare'); }
       else if (event.code === 'KeyQ' && !choosing && !event.repeat) { event.preventDefault(); pageAct('ask'); }
       else if (!choosing && (event.code === 'ArrowUp' || event.code === 'ArrowDown') && pageView.did?.length) {
