@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WORLD_TRAFFIC_NOTE_ATTRIBUTE, openGeneratedWorld } from '../src/composition/generated-world.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
+import { levelWalk } from './navigation-walk.js';
 
 /**
  * A page that cannot load its traffic code (a chunk the network lost) still opens the world, without
@@ -30,7 +31,7 @@ describe('a saved generated world whose traffic code does not load', () => {
     })));
     const dispose = vi.fn();
     const tile = {
-      navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0 }) } },
+      navigationWorld: levelWalk(0),
       attach: vi.fn(() => ({ metrics: {}, animating: false, dispose })),
     };
     loadGeneratedTile.mockResolvedValue(tile);

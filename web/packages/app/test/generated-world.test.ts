@@ -7,10 +7,15 @@ import { RENDER_BUDGET } from '../src/render-budget.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
 import { worldDidNotOpen } from '../src/ui/startup-state.js';
+import { LEVEL, levelWalk, walkOver } from './navigation-walk.js';
 
-// The step back from the kerb a town's first view takes, as the first view's catalog states it.
-const BACK_STEP_MM = (JSON.parse(readFileSync(new URL('../../../../assets/catalogs/arrival/town-first-view.v1.json', import.meta.url), 'utf8')) as
-  { entries: { key: string; value: number }[] }).entries.find((entry) => entry.key === 'back_step_mm')!.value;
+// The step back from the kerb a town's first view takes, as the first view's catalog states it, and how far
+// back and along the footway it steps at most.
+const firstView = (key: string): number => (JSON.parse(readFileSync(new URL('../../../../assets/catalogs/arrival/town-first-view.v1.json', import.meta.url), 'utf8')) as
+  { entries: { key: string; value: number }[] }).entries.find((entry) => entry.key === key)!.value;
+const BACK_STEP_MM = firstView('back_step_mm');
+const BACK_MAXIMUM_MM = firstView('back_maximum_mm');
+const ALONG_MAXIMUM_MM = firstView('along_maximum_mm');
 
 // The tile runtime and the texture library are replaced, so a test sees what the page hands the
 // runtime: which containers, in which roles, read from where.
@@ -51,6 +56,9 @@ vi.mock('@exulanica/atlas-core', async (importOriginal) => ({
 }));
 
 const access = { baseUrl: 'https://exulanica.test', token: 'private' };
+
+/** Ground rising north (south decreasing) at 1 in 2: 26.6 degrees, past what a person walks. */
+const BANK = { x: 0, y: 1, z: 0.5 };
 
 const tile = (x: number, state: GeneratedTile['state']): GeneratedTile => ({
   tileX: x,
@@ -105,7 +113,7 @@ describe('a saved generated world of several tiles', () => {
   }, 60_000);
   beforeEach(() => {
     loadGeneratedTile.mockReset();
-    loadGeneratedTile.mockResolvedValue({ navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } } });
+    loadGeneratedTile.mockResolvedValue({ navigationWorld: levelWalk(0.105) });
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -200,7 +208,7 @@ describe('a saved generated world of several tiles', () => {
     vi.stubGlobal('fetch', fetch);
     const looks: unknown[] = [];
     const plain = {
-      navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } },
+      navigationWorld: levelWalk(0.105),
       inLook(look: unknown) {
         looks.push(look);
         return { ...plain, look };
@@ -239,6 +247,25 @@ describe('a saved generated world of several tiles', () => {
     const loaded = await loadGeneratedWorld(access, entry(tiles, [3000, 0]), '?look=today');
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
     expect(loaded.tile.start).toMatchObject({ x: 128 - BACK_STEP_MM / 1000, z: -58.75 });
+  });
+
+  it('opens on the footway, not on a bank behind it steeper than a person walks', async () => {
+    const tiles = [tile(0, 'baked')];
+    vi.stubGlobal('fetch', tileRoute({ [tiles[0]!.bakedTileId!]: new Uint8Array([1]) }).fetch);
+    // Facing south, a step back from the kerb is a step north. Positive control: on level ground the first
+    // view stands one step back, off the line people walk.
+    const level = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+    if (!isGeneratedWorld(level)) throw new Error('not loaded');
+    expect(level.tile.start).toMatchObject({ x: 128, z: -58.75 - BACK_STEP_MM / 1000 });
+    // Half a metre behind the line the ground rises in a bank at 1 in 2, as a town's edge falls behind a
+    // seaward footway: a person standing on it could take no step, so the view stays on the level ground.
+    loadGeneratedTile.mockResolvedValue({ navigationWorld: walkOver((_x, z) => (z > -59.25
+      ? { height: 0.105, normal: LEVEL } : { height: 0.105 + (-59.25 - z) / 2, normal: BANK })) });
+    const banked = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+    if (!isGeneratedWorld(banked)) throw new Error('not loaded');
+    const { y, z } = banked.tile.start as { x: number; y: number; z: number };
+    expect(z).toBeGreaterThan(-59.25);
+    expect(y).toBeCloseTo(0.105 + 1.6, 9);
   });
 
   it('waits for the version\'s placed things however long they take, and faces them', async () => {
@@ -323,7 +350,7 @@ describe('a saved generated world of several tiles', () => {
     // arrival, from the tile's records at the eye height the tile states.
     const [east, south] = [128, -58.75];
     loadGeneratedTile.mockResolvedValue({
-      navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } },
+      navigationWorld: levelWalk(0.105),
       routeObstructions: { obstacles: [
         { id: 'city.massing:lot-1', rings: [[
           { x: east - 5, z: south + 20 }, { x: east + 5, z: south + 20 }, { x: east + 5, z: south + 30 }, { x: east - 5, z: south + 30 },
@@ -359,15 +386,18 @@ describe('a saved generated world of several tiles', () => {
     const { fetch } = tileRoute({ [west!]: new Uint8Array([1]), [east!]: new Uint8Array([2]) });
     vi.stubGlobal('fetch', fetch);
     // No ground within 300 mm of the arrival (128,000, -58,750), ground everywhere else.
-    loadGeneratedTile.mockResolvedValue({ navigationWorld: { eyeHeight: 1.6, surface: {
-      sample: (x: number, z: number) => (Math.hypot(x * 1000 - 128000, z * 1000 + 58750) < 300 ? null : { height: 0.2 }),
-    } } });
+    loadGeneratedTile.mockResolvedValue({ navigationWorld: walkOver(
+      (x, z) => (Math.hypot(x * 1000 - 128000, z * 1000 + 58750) < 300 ? null : { height: 0.2, normal: LEVEL }),
+    ) });
     const loaded = await loadGeneratedWorld(access, entry(tiles));
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
     const { x, y, z } = loaded.tile.start as { x: number; y: number; z: number };
     expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeGreaterThanOrEqual(300);
-    // On the nearest drawn ground (within 350 mm of the carve), or the one step back from there.
-    expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeLessThanOrEqual(350 + BACK_STEP_MM);
+    // Beside the nearest drawn ground (within 350 mm of the carve), as far as the first view steps from
+    // there: a step whose straight way from that ground crosses the carve is not one a person can walk,
+    // so the view may step along the footway before it steps back.
+    expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750))
+      .toBeLessThanOrEqual(350 + Math.hypot(ALONG_MAXIMUM_MM, BACK_MAXIMUM_MM));
     expect(y).toBeCloseTo(0.2 + 1.6, 9);
   });
 

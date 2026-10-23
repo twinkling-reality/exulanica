@@ -342,7 +342,7 @@ export async function loadGeneratedWorld(
   // waited for, and, only where something is placed, what is parked now, never waited on for long.
   const placing = placedThings(access, entry).then((targets) => targets ?? []);
   const parking = placing.then((targets) => (targets.length === 0 ? [] : parkedNow(access, entry)));
-  const [route, { parseTextureSetManifest }, library] = await Promise.all([
+  const [route, { parseTextureSetManifest, isNavigationGroundPathContinuous, atlasVec3 }, library] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
     committedTextureLibrary(),
@@ -427,6 +427,16 @@ export async function loadGeneratedWorld(
   const [facingEast, facingSouth] = ground.arrivalFacingMm;
   const stand = groundNear(loaded.navigationWorld.surface, east, south, [facingEast, facingSouth]);
   const surface = loaded.navigationWorld.surface;
+  // Where the first view may stand: where a person can walk from the served stand by the walk's own
+  // gate, every step of the way on ground it climbs and nothing missing. Drawn ground alone is not
+  // enough: behind a seaward footway the town's edge falls in a bank steeper than the walk climbs,
+  // and a person standing on it could take no step at all.
+  const served = atlasVec3((stand?.eastMm ?? east) / 1000, stand?.heightM ?? height / 1000, (stand?.southMm ?? south) / 1000);
+  const walkable = (e: number, s: number): boolean => {
+    const at = surface.sample(e / 1000, s / 1000);
+    return at !== null
+      && isNavigationGroundPathContinuous(loaded.navigationWorld, served, atlasVec3(e / 1000, at.height, s / 1000));
+  };
   // Facing the placed things, from the nearest spot whose sight of them nothing parked blocks. With
   // nothing placed the view is chosen from the town's own tiles alone and the parked vehicles, which
   // may or may not arrive in time, are not asked after: the town opens the same way either way.
@@ -442,7 +452,7 @@ export async function loadGeneratedWorld(
     // footway, facing away from it, looks along the shore (town-first-view version 5).
     ...(ground.arrivalTowardMm === undefined ? {} : { toward: ground.arrivalTowardMm }),
     targets, parked,
-    ground: (e, s) => surface.sample(e / 1000, s / 1000) !== null,
+    ground: walkable,
     // What stands at eye height in the town's own records, how a town with nothing placed is looked
     // at, and the seats and doors that view is chosen by.
     blockers: sightBlockers,

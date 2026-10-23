@@ -18,6 +18,7 @@ import { isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generat
 import { askForTownLand, furnitureOnLand, LAND_WAIT_MS, loadTownLand, rememberTownLand, townGround, withoutEdge, withTownLand, type TownLand } from '../src/composition/town-land.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, SavedWorldEntry } from '../src/world-entry-api.js';
+import { levelWalk } from './navigation-walk.js';
 
 // The tile runtime, the texture library and the pack reader are replaced, as in
 // generated-world.test.ts, so a test sees what the page hands the runtime; the tile look states a
@@ -310,7 +311,7 @@ describe('a saved town on its land, opened', () => {
     const looks: unknown[] = [];
     const attached: string[] = [];
     const plain = {
-      navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 6.5 }) } },
+      navigationWorld: levelWalk(6.5),
       attach: () => {
         attached.push('tiles');
         return { metrics: {}, dispose: () => undefined };
