@@ -213,4 +213,26 @@ describe('making a creature where it will stand', () => {
     expect(calls.closed).toBe(1);
     expect(calls.hold).toEqual([]);
   });
+
+  it('says spending is paused, not spent, by the served code, before anyone types and after Make (N34)', async () => {
+    const { openCreatureScreen } = await screen();
+    for (const [code, words] of [
+      ['spending_suspended', 'Spending on AI models is paused here.'],
+      ['budget_exceeded', 'The budget for AI models here is spent.'],
+    ] as const) {
+      const refused = world({ offer: { ...offer, offered: false, code } });
+      await openCreatureScreen(refused.deps);
+      expect(refused.root.querySelector('.wu-refused')?.textContent).toBe(words);
+    }
+    // Held closed after Make: the draft fails paused, and says so rather than spent.
+    const { deps, root } = world({ reads: [{ ...queued, status: 'failed', failure: 'spending_suspended' }] });
+    const opened = await openCreatureScreen(deps);
+    const field = root.querySelector('textarea')!;
+    field.value = 'a round yellow body';
+    field.dispatchEvent(new Event('input'));
+    opened.key(press('Enter'));
+    await settle();
+    expect(root.textContent).toContain('Spending on AI models is paused here.');
+    expect(root.textContent).not.toContain('The budget for AI models here is spent.');
+  });
 });

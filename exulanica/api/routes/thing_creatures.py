@@ -40,8 +40,9 @@ same permissions as a draft.
 
 from __future__ import annotations
 
+import logging
 import uuid
-from typing import Annotated, Any, Final
+from typing import TYPE_CHECKING, Annotated, Any, Final
 
 from fastapi import APIRouter, Depends, Path
 from fastapi.responses import JSONResponse
@@ -61,6 +62,9 @@ from exulanica.things.lines import LineRefused, check_line
 from exulanica.world import creature_look_jobs as look_jobs
 from exulanica.world.committed_content import DIGEST
 from exulanica.world.thing_store import ThingStore
+
+if TYPE_CHECKING:
+    from exulanica.spending.status import SpendingRefusals
 
 __all__ = [
     "DRAFTS_PROFILE",
@@ -84,6 +88,8 @@ _UNKNOWN: Final = "unknown_reference"
 _UNKNOWN_DETAIL: Final = "nothing at this address is available to this credential"
 _HEADERS: Final = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
 
+_LOG = logging.getLogger(__name__)
+
 
 class CreatureBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -96,6 +102,21 @@ class CreatureBody(BaseModel):
 
 def _refusal(status: int, code: str, detail: str) -> JSONResponse:
     return JSONResponse({"code": code, "detail": detail}, status_code=status, headers=_HEADERS)
+
+
+def _spending(
+    services: Services, connection: Any, workspace_id: uuid.UUID
+) -> SpendingRefusals | None:
+    """The workspace's spending as the durable authority would answer its next attempt, read once
+    on the request's connection under a savepoint, or None where nothing reads it or the read fails
+    (admission still refuses the draft's attempt, and the draft fails by its code)."""
+    try:
+        with connection.transaction():
+            return services.spending_refusals(connection, workspace_id)
+    except Exception as exc:
+        # Never the exception's text, which may carry a connection string.
+        _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
+        return None
 
 
 def _view(
@@ -164,12 +185,17 @@ def _view(
 
 @router.get("/creatures/offered")
 def creature_offer(
-    session: CurrentSession, services: Annotated[Services, Depends(get_services)]
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> JSONResponse:
     """Whether this workspace may ask for a creature here, why not by code, how long a draft
     usually takes by the creature drafter's measured calls, and every code a draft may end with."""
-    # Also the model a draft asks first and the most a draft may be charged, to which account.
-    code = services.creature_offer_refusal(session.workspace_id)
+    # Also the model a draft asks first and the most a draft may be charged, to which account. The
+    # workspace's own spending is read once: spending paused or spent is said before anyone types.
+    code = services.creature_offer_refusal(
+        session.workspace_id, spending=_spending(services, connection, session.workspace_id)
+    )
     offered = code is None
     manifest = load_manifest()
     binding = manifest[Role.CREATURE_DRAFTER]

@@ -461,6 +461,14 @@ def _orphaned(served, repository, draft) -> None:
             ),
             "spending_refused",
         ),
+        # Held closed until an operator acts: spending paused, not spent, told apart by its code.
+        (
+            _by_the_worker(
+                _transport(form_of("horse", label="hill walker")),
+                _Refuses(SpendingRefused("spending_suspended")),
+            ),
+            "spending_suspended",
+        ),
         (
             _by_the_worker(
                 _transport(form_of("horse", label="hill walker")),
@@ -472,7 +480,7 @@ def _orphaned(served, repository, draft) -> None:
         (_swept_at_startup, "not_served"),
         (_orphaned, None),
     ],
-    ids=["unavailable", "spending", "request", "stranded", "swept", "orphaned"],
+    ids=["unavailable", "spending", "paused", "request", "stranded", "swept", "orphaned"],
 )
 def test_every_end_without_a_creature_blanks_its_job_s_words(served, repository, end, failure):
     database, workspace_id, _stores = served

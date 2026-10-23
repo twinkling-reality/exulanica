@@ -17,6 +17,9 @@ worker played by the test, so each step is seen. What is shown:
     account it is charged to: the route's dearest model at a whole context window of input and its
     answer bound, for a form and one repair each sent as often as the client may send it; a draft
     states no spend where no durable spending authority records this process's calls;
+*   before anyone types, the offer says spending is paused (the durable authority held closed for
+    the drafter's provider) or spent (refused otherwise, or less left than one attempt), each by
+    its own code;
 *   a made look of a kept creature is asked once, answered 202 and queued, and read by any member
     of the workspace; a kind the workspace does not keep, asked anywhere, is absent, and so is the
     route to a caller without world.write and model.invoke.
@@ -26,6 +29,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from decimal import Decimal
 
 import pytest
 from exulanica.api.app import create_app
@@ -35,7 +39,9 @@ from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import usd_string
+from exulanica.spending.status import SpendingRefusals
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
@@ -344,11 +350,50 @@ def test_the_offer_says_whether_a_workspace_may_ask_and_how_long_drafts_take(ser
         "request_refused",
         "reference_withdrawn",
         "spending_refused",
+        "spending_suspended",
         "stranded",
     ]
     assert offer["codes"]["cancelled"] == ["workspace_deleted"]
     elsewhere = _get(client, "/things/creatures/offered", _ELSEWHERE).json()
     assert (elsewhere["offered"], elsewhere["code"]) == (False, "creatures_not_run_here")
+
+
+def test_the_offer_says_spending_paused_or_spent_before_anyone_types(served, monkeypatch):
+    client, *_ = served
+    provider = load_manifest()[Role.CREATURE_DRAFTER].primary.provider
+    read: dict[str, SpendingRefusals] = {}
+    # The durable authority's answer for the drafter's provider, as the workspace's spending reads.
+    monkeypatch.setattr(Services, "spending_refusals", lambda _self, _connection, _ws: read["now"])
+
+    def offer(refusals: SpendingRefusals) -> tuple[bool, str | None]:
+        read["now"] = refusals
+        answered = _get(client, "/things/creatures/offered").json()
+        return answered["offered"], answered["code"]
+
+    # Enough left, nothing refused: offered (the control).
+    assert offer(SpendingRefusals({provider: None}, {provider: Decimal("5")})) == (True, None)
+    # Held closed until an operator acts: paused, told apart from spent by its code.
+    paused = SpendingRefusals({provider: SpendingRefused("spending_suspended")})
+    assert offer(paused) == (False, "spending_suspended")
+    spent = SpendingRefused("spending_limit_reached", scope="workspace", detail="usd")
+    assert offer(SpendingRefusals({provider: spent})) == (False, "budget_exceeded")
+    # Less left than one attempt's floor admits no attempt: spent, said before typing.
+    short = SpendingRefusals({provider: None}, {provider: Decimal("0.000001")})
+    assert offer(short) == (False, "budget_exceeded")
+
+
+def test_an_offer_whose_spending_read_fails_stays_up(served, monkeypatch):
+    client, *_ = served
+
+    def broken(_self, _connection, _workspace):
+        raise RuntimeError("the spending state is not readable here")
+
+    # A failed read is no refusal: the offer answers as it did before spending was read, and a
+    # draft is still refused by admission at its attempt.
+    monkeypatch.setattr(Services, "spending_refusals", broken)
+    answered = _get(client, "/things/creatures/offered")
+    assert answered.status_code == 200
+    assert (answered.json()["offered"], answered.json()["code"]) == (True, None)
 
 
 def test_a_requester_lists_their_own_drafts_newest_first(served):

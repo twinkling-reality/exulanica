@@ -68,6 +68,9 @@ export interface CreatureMakerDeps {
 const UNAVAILABLE: Readonly<Record<string, string>> = Object.freeze({
   creatures_not_run_here: 'Creatures are not made on this server yet.',
   models_not_configured: 'No model is set up on this server yet, so no creature can be made.',
+  budget_exceeded: 'The budget for AI models here is spent.',
+  // Held closed until an operator acts: paused, not spent, by the served code (N34).
+  spending_suspended: 'Spending on AI models is paused here.',
 });
 /** Why an ask was refused before anything was queued, in words, by the route's code. */
 const ASK_REFUSED: Readonly<Record<string, string>> = Object.freeze({
@@ -81,6 +84,7 @@ const ASK_REFUSED: Readonly<Record<string, string>> = Object.freeze({
 const FAILED: Readonly<Record<string, string>> = Object.freeze({
   drafter_unavailable: 'The model that drafts creatures did not answer. Try again in a moment.',
   spending_refused: 'This world has no allowance left for drafting a creature.',
+  spending_suspended: 'Spending on AI models is paused here.',
   request_refused: 'The words could not be sent to the model as they are.',
   expired: 'Nobody took the request in time. Try again.',
   stranded: 'The request stopped part way. Try again.',

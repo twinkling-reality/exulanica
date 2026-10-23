@@ -812,13 +812,21 @@ class Services(ServiceRefusals, WorkerFactories):
             and workspace_id in self.creature_workspaces
         )
 
-    def creature_offer_refusal(self, workspace_id: uuid.UUID) -> str | None:
+    def creature_offer_refusal(
+        self, workspace_id: uuid.UUID, *, spending: SpendingRefusals | None = None
+    ) -> str | None:
         """Why this workspace may not ask for a creature here, by code, or None when it may: this
-        process has no model client, or no worker here drafts the workspace's creatures."""
-        if self.serves_creatures_to(workspace_id):
-            return None
-        not_run_here, no_models = creature_drafts.OFFER_REFUSALS
-        return no_models if self.model_client is None else not_run_here
+        process has no model client, no worker here drafts the workspace's creatures, or, where the
+        caller read the workspace's ``spending`` (:meth:`spending_refusals`), the durable authority
+        would refuse the drafter's first attempt (:func:`~exulanica.selection.creature_drafts.
+        offer_spending_refusal`: ``spending_suspended`` while it is held closed, else
+        ``budget_exceeded``). It reads nothing itself."""
+        client = self.model_client
+        if not self.serves_creatures_to(workspace_id):
+            if client is None:
+                return creature_drafts.MODELS_NOT_CONFIGURED
+            return creature_drafts.CREATURES_NOT_RUN_HERE
+        return None if client is None else creature_drafts.offer_spending_refusal(spending, client)
 
     def sweep_creatures(self) -> int:
         """End the creature drafts no worker here will take, for every workspace this process knows,

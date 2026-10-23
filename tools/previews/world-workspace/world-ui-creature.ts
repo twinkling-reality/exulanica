@@ -27,6 +27,7 @@ export const CREATURE_WORDS = Object.freeze({
   untitled: 'Creature',
   notOffered: 'Making creatures isn\'t offered here.',
   budgetSpent: 'The budget for AI models here is spent.',
+  spendingPaused: 'Spending on AI models is paused here.',
   maker: 'An AI model makes the creature from your words',
   leave: 'You can leave this page: the making carries on, and the creature waits in Creatures.',
   kept: 'kept in Creatures',

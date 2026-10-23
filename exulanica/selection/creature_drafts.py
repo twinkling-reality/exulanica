@@ -73,9 +73,14 @@ from exulanica.epistemics.saved_names import PLACEHOLDER, redact_names, saved_na
 from exulanica.errors import ExulanicaError, TombstonedError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
-from exulanica.models.manifest import Manifest, Role
+from exulanica.models.manifest import Manifest, Role, load_manifest
 from exulanica.models.policy import HostedRequestPolicy, HostedRequestRefused
-from exulanica.models.spending import SpendingRefused, spending_request_key
+from exulanica.models.spending import (
+    BUDGET_EXCEEDED,
+    HELD_CLOSED,
+    SpendingRefused,
+    spending_request_key,
+)
 from exulanica.models.usage import USD_QUANTUM, CallOutcome, CallUsage, CostBasis, usd_string
 from exulanica.references import store as reference_store
 from exulanica.references.bundle import BASES, THINGS_PICTURE_PROFILE
@@ -93,9 +98,11 @@ from exulanica.selection.creature_drafting import (
     DRAFTER_ROLE,
     NOT_DRAFTED_SENTENCE,
     CreatureDraftRefusalCode,
+    creature_drafting_prompt,
     draft_creature,
     draft_form,
 )
+from exulanica.spending.status import SpendingRefusals
 from exulanica.store.base import ContentAddressedStore
 from exulanica.things.bodies import body_grammar
 from exulanica.things.lines import check_line
@@ -105,6 +112,7 @@ from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
     "CANCELLATION_CODES",
+    "CREATURES_NOT_RUN_HERE",
     "CREATURE_WORKER_ENV",
     "CREATURE_WORKSPACES_ENV",
     "FAILURE_CODES",
@@ -116,6 +124,7 @@ __all__ = [
     "MAX_OPEN_PER_ACTOR",
     "MAX_PER_ACTOR_HOUR",
     "MAX_WORDS_CHARACTERS",
+    "MODELS_NOT_CONFIGURED",
     "OFFER_REFUSALS",
     "QUEUED_EXPIRY_SECONDS",
     "ClaimedDraft",
@@ -169,9 +178,10 @@ FINISHED: Final = ("kept", "refused", "failed", "cancelled")
 _ENDS: Final = ("kept", "refused", "failed")
 #: Why a draft was cancelled, by code: its workspace was erased, which ends every unfinished draft.
 CANCELLATION_CODES: Final = ("workspace_deleted",)
-#: Why a draft could not be made, by code: the drafter did not answer, the spending authority or the
-#: workspace's rules refused the request, or no worker took the draft (queued too long, stranded,
-#: or its workspace not served here).
+#: Why a draft could not be made, by code: the drafter did not answer, the spending authority
+#: (``spending_suspended`` while it is held closed until an operator acts, nothing spent;
+#: ``spending_refused`` otherwise) or the workspace's rules refused the request, or no worker took
+#: the draft (queued too long, stranded, or its workspace not served here).
 FAILURE_CODES: Final = (
     "drafter_unavailable",
     "expired",
@@ -179,11 +189,21 @@ FAILURE_CODES: Final = (
     "request_refused",
     "reference_withdrawn",
     "spending_refused",
+    "spending_suspended",
     "stranded",
 )
-#: Why a workspace may not ask for a creature here, by code: no worker here drafts its creatures, or
-#: this process has no model client to draft them with.
-OFFER_REFUSALS: Final = ("creatures_not_run_here", "models_not_configured")
+CREATURES_NOT_RUN_HERE: Final = "creatures_not_run_here"
+MODELS_NOT_CONFIGURED: Final = "models_not_configured"
+#: Why a workspace may not ask for a creature here, by code: no worker here drafts its creatures,
+#: this process has no model client to draft them with, the durable authority would refuse the
+#: drafter's first attempt (``budget_exceeded``), or it is held closed until an operator acts
+#: (``spending_suspended``: spending paused, not spent; :func:`offer_spending_refusal`).
+OFFER_REFUSALS: Final = (
+    CREATURES_NOT_RUN_HERE,
+    MODELS_NOT_CONFIGURED,
+    BUDGET_EXCEEDED,
+    HELD_CLOSED,
+)
 #: The most drafts a listing answers, newest first.
 LISTED: Final = 20
 _JOB_STATE: Final = {"kept": "done", "refused": "done", "failed": "failed"}
@@ -276,6 +296,30 @@ def price_at_most(manifest: Manifest, wire_attempts: int) -> dict[str, Any]:
             "answer_tokens_at_most": answer,
         },
     }
+
+
+def offer_spending_refusal(refusals: SpendingRefusals | None, client: ModelClient) -> str | None:
+    """Why the durable authority would refuse a draft's first attempt, by code, before anyone types:
+    ``spending_suspended`` while it is held closed for the drafter's provider, ``budget_exceeded``
+    where it refuses that provider otherwise (spent, not granted, revoked or expired) or what is
+    left is below one attempt's floor; None where it would admit one, or in a process no durable
+    authority admits. A draft asks its route's first model and the chain never falls back on a
+    refusal, so that model's provider answers. The floor is the answer bound and the prompt's own
+    instructions at the model's prices, which the rendered instructions and the words only add to,
+    so a remainder below it admits no attempt."""
+    if refusals is None:
+        return None
+    binding = load_manifest()[DRAFTER_ROLE]
+    spec = binding.primary
+    refused = refusals.by_provider.get(spec.provider)
+    if refused is not None:
+        return refused.problem_code
+    left = refusals.available_usd.get(spec.provider)
+    answer = binding.default_max_tokens if binding.max_tokens is None else binding.max_tokens.value
+    floor = client.budget.estimate_usd(
+        spec, prompt_chars=len(creature_drafting_prompt().instructions), max_tokens=answer
+    )
+    return BUDGET_EXCEEDED if left is not None and left < floor else None
 
 
 #: What the spending authority recorded of one draft's attempts, from migration 0124's
@@ -1059,7 +1103,7 @@ class CreatureDraftWorker:
                 except _ClaimLost:
                     return "lost"
             failure = (
-                "spending_refused"
+                ("spending_suspended" if refused.reason == HELD_CLOSED else "spending_refused")
                 if isinstance(refused, SpendingRefused)
                 else (
                     "request_refused"

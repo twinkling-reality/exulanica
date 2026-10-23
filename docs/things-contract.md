@@ -841,7 +841,7 @@ it goes:
 | `kept` | The kind made and its sketch, each by key, version and digest, its label, the model that drafted it, and, once one is asked, its creature's newest look job (`look_job`, as `GET /things/creatures/looks/{look_id}` answers it; [below](#a-creatures-made-look)) |
 | `erased` | Nothing: the draft was kept, and the workspace has erased the creature since |
 | `refused` | The refusing check's code, the field of the drafter's form it refused, and the code's fixed sentence, an unbuilt movement's in the grammar's own words ("This world has no flying creatures yet.") |
-| `failed` | Why, by code: `drafter_unavailable`, `spending_refused`, `request_refused`, `reference_withdrawn`, `expired`, `stranded`, `not_served` |
+| `failed` | Why, by code: `drafter_unavailable`, `spending_refused`, `spending_suspended` (the spending authority held closed until an operator acts: spending paused, nothing spent), `request_refused`, `reference_withdrawn`, `expired`, `stranded`, `not_served` |
 | `cancelled` | Why, by code: `workspace_deleted`, its workspace erased before the draft ended |
 
 In every status a draft states what it spent (`spend`), read from the durable spending authority's
@@ -852,12 +852,15 @@ still under way hold, both decimal strings at the ledger's eight places. It is n
 where no durable authority admits the process's calls, nothing is recorded and `spend` is null.
 
 `GET /things/creatures/offered` (`exulanica.creature-offer/v1`) says before anyone types whether
-the workspace may ask here and why not by code, the model a draft asks first (`model`, by id and
-the name a person reads), the most one draft may be charged (`price`), how long the drafter's calls
-take by the record its timeout rests on (the median and longest call, rounded up to whole seconds,
-and the timeout), and the closed lists of codes a draft may end with: a refusal outside the list is
-carried as `creature_not_drafted`. The price is `usd_at_most`, a decimal string, with the account
-it is charged to (`provider` and `provider_description`) and its basis
+the workspace may ask here and why not by code (`creatures_not_run_here`, `models_not_configured`,
+and, from the workspace's own spending, `spending_suspended` while the durable authority is held
+closed for the drafter's provider or `budget_exceeded` where it refuses that provider otherwise or
+less is left than one attempt's answer bound and instructions cost), the model a draft asks first
+(`model`, by id and the name a person reads), the most one draft may be charged (`price`), how long
+the drafter's calls take by the record its timeout rests on (the median and longest call, rounded
+up to whole seconds, and the timeout), and the closed lists of codes a draft may end with: a refusal
+outside the list is carried as `creature_not_drafted`. The price is `usd_at_most`, a decimal string,
+with the account it is charged to (`provider` and `provider_description`) and its basis
 (`full_context_ceiling`): each dispatch priced at a whole context window of input and the route's
 answer bound, at the manifest's prices, which the spending authority prices attempts by, for a form
 and one repair, each sent as often as the client may send it (every fallback and retry), at the

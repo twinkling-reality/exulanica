@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { atlasVec3 } from '@exulanica/atlas-core';
 import { DEFAULT_PLACEMENT_DISTANCE_MM, generatedRegionName, type WorldGround } from '@exulanica/atlas-react/playcanvas';
 import { ApiError } from '@exulanica/graph-client';
-import { fartherAhead, mountCreatureMaker, offerWords, placementInGeneratedRegion, planPlacement } from '../src/composition/creature-maker.js';
+import { endedWords, fartherAhead, mountCreatureMaker, offerWords, placementInGeneratedRegion, planPlacement } from '../src/composition/creature-maker.js';
 import { rememberTownLand, type TownLand } from '../src/composition/town-land.js';
 import type { CreatureDraft, CreatureDraftsClient, CreatureOffer } from '../src/creature-drafts-api.js';
 import type { CreatureSheet, CreatureSheetOffer } from '../src/ui/creature-sheet.js';
@@ -61,6 +61,13 @@ describe('making a creature from the open world', () => {
     expect(offerWords({ ...OFFER, offered: false, code: 'creatures_not_run_here' })).toEqual({
       unavailable: 'Creatures are not made on this server yet.', timing: 'Usually about 18 seconds; at most 50.',
     });
+  });
+
+  it('says spending is paused, not spent, by the served code, before anyone types and after Make (N34)', () => {
+    expect(offerWords({ ...OFFER, offered: false, code: 'spending_suspended' }).unavailable).toBe('Spending on AI models is paused here.');
+    expect(offerWords({ ...OFFER, offered: false, code: 'budget_exceeded' }).unavailable).toBe('The budget for AI models here is spent.');
+    expect(endedWords(draft('failed', { failure: 'spending_suspended' }))).toBe('Spending on AI models is paused here.');
+    expect(endedWords(draft('failed', { failure: 'spending_refused' }))).toBe('This world has no allowance left for drafting a creature.');
   });
 
   it('places a kept creature by its kind\'s digest alone, in front of the person and facing them, advancing the saved entry', async () => {

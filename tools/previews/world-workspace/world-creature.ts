@@ -15,11 +15,16 @@ export const STAND_RING_M = 1.0;
 /** The words one creature may be described with, as the drafter's form states its own. */
 const WORDS_MAXIMUM = 400;
 
-/** Why a world may not ask, or an ask was refused, in words, by code (M10 and M11). */
+/**
+ * Why a world may not ask, or an ask was refused, in words, by code (M10 and M11); spending paused
+ * (the authority held closed until an operator acts) told apart from spent by the served code (N34).
+ */
 const REFUSED: Readonly<Record<string, string>> = Object.freeze({
   creatures_not_run_here: CREATURE_WORDS.notOffered,
   models_not_configured: CREATURE_WORDS.notOffered,
+  budget_exceeded: CREATURE_WORDS.budgetSpent,
   spending_refused: CREATURE_WORDS.budgetSpent,
+  spending_suspended: CREATURE_WORDS.spendingPaused,
 });
 
 /** How a hold ends, as build mode answers it. */
