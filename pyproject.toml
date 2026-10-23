@@ -366,6 +366,9 @@ markers = [
   # see scripts/run_backend_suite.py, which runs them serially against the copy in its phase 2.
   "reference_copy: requires the pinned local reference copy, port 5433 and exulanica_inspect_test",
 ]
+# A worker thread that dies fails the test it dies under: as a mere warning, a test stand-in
+# missing one method could kill a worker thread in every app it started while every test passed.
+filterwarnings = ["error::pytest.PytestUnhandledThreadExceptionWarning"]
 
 
 # --------------------------------------------------------------------------------------------

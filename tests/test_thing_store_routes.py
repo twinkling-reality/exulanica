@@ -266,6 +266,10 @@ class _Accounts:
         session, role = found
         return AccountSession(uuid.uuid4(), session, "c" * 43, None, role)  # type: ignore[arg-type]
 
+    def watched_workspaces(self) -> frozenset[uuid.UUID]:
+        """What the draft workers read through the services: no account discovery here."""
+        return frozenset()
+
 
 def _drafter_of(database, workspace, creature) -> uuid.UUID:
     with database.session(workspace) as connection:
