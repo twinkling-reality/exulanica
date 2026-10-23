@@ -282,6 +282,68 @@ export function seatsOf(
 }
 
 /**
+ * The share of a level view's width, `frameHalf` either side of the unit direction `toward` from `from`,
+ * in which something of the rings stands nearer than `nearMm`: each ring edge's stretch within that
+ * distance and in front of the viewer covers the columns of the frame it spans, each column weighed by
+ * the width it takes in the frame, and the share is that of their union. Exact, not sampled, so a thin
+ * post is counted as wide as it is drawn.
+ */
+export function nearFaceShare(
+  from: readonly [number, number], toward: readonly [number, number], rings: readonly SightBlocker[],
+  frameHalf: number, nearMm: number,
+): number {
+  const edge = Math.tan(frameHalf);
+  const covered: [number, number][] = [];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i += 1) {
+      const a = ring[i]!;
+      const b = ring[(i + 1) % ring.length]!;
+      const w = [a[0] - from[0], a[1] - from[1]] as const;
+      const d = [b[0] - a[0], b[1] - a[1]] as const;
+      // The stretch of the edge within `nearMm` of the viewer: |w + t d| <= nearMm.
+      const dd = d[0] * d[0] + d[1] * d[1];
+      if (dd === 0) continue;
+      const wd = w[0] * d[0] + w[1] * d[1];
+      const disc = wd * wd - dd * (w[0] * w[0] + w[1] * w[1] - nearMm * nearMm);
+      if (disc <= 0) continue;
+      let lo = Math.max(0, (-wd - Math.sqrt(disc)) / dd);
+      let hi = Math.min(1, (-wd + Math.sqrt(disc)) / dd);
+      // In front of the viewer only: how far ahead a point of the edge stands is linear along it.
+      const ahead0 = w[0] * toward[0] + w[1] * toward[1];
+      const aheadStep = d[0] * toward[0] + d[1] * toward[1];
+      const least = 1e-6 * nearMm;
+      if (aheadStep === 0) {
+        if (ahead0 <= least) continue;
+      } else {
+        const crossing = (least - ahead0) / aheadStep;
+        if (aheadStep > 0) lo = Math.max(lo, crossing);
+        else hi = Math.min(hi, crossing);
+      }
+      if (!(lo < hi)) continue;
+      // A point's column is its sideways offset over its distance ahead, which runs one way along an edge.
+      const column = (s: number): number => {
+        const x = w[0] + d[0] * s;
+        const y = w[1] + d[1] * s;
+        return (x * -toward[1] + y * toward[0]) / (x * toward[0] + y * toward[1]);
+      };
+      const [u, v] = [column(lo), column(hi)];
+      const left = Math.max(-edge, Math.min(u, v));
+      const right = Math.min(edge, Math.max(u, v));
+      if (left < right) covered.push([left, right]);
+    }
+  }
+  covered.sort((p, q) => p[0] - q[0]);
+  let total = 0;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const [left, right] of covered) {
+    if (right <= end) continue;
+    total += right - Math.max(left, end);
+    end = right;
+  }
+  return total / (2 * edge);
+}
+
+/**
  * How near anything of the rings stands inside the wedge `half` either side of the unit direction
  * `toward` from `from`: the least distance to any part of a ring's edge that lies in the wedge, or
  * infinity where none does. The whole wedge is tested, not sampled lines, so a thin post is found.
@@ -390,7 +452,10 @@ function distanceToRing(point: readonly [number, number], ring: SightBlocker): n
  *
  * Under a rule that states how life is judged (version 2 of the catalog and later), the view taken
  * has nothing at eye height dead ahead (across its middle third, under version 5)
- * nearer than the rule's floor and, where the rule states a
+ * nearer than the rule's floor, no more of its frame's width than the rule allows showing the town's
+ * buildings nearer than its near face and no trunk or post nearer than its near post anywhere in the
+ * frame (version 6: so it does not stand against a plain ground floor or a lamp post), and,
+ * where the rule states a
  * least distance (version 3), no seat nearer than that inside its fan (where every view has one or
  * the other, the one with the most room before it, each against what the rule asks); of those the
  * most of the town's life in view; of equally alive views the most open, and of equally open ones
@@ -488,8 +553,9 @@ interface JudgedView {
   readonly view: ArrivalView;
   /**
    * How much room the view has before it, as a share of what the rule asks: the nearest thing at
-   * eye height dead ahead against the centre floor, and the nearest seat in the fan against the
-   * least distance, whichever is the less. Clear at 1 or more.
+   * eye height dead ahead against the centre floor, the nearest seat in the fan against the least
+   * distance, and (version 6) the share of the frame its near walls may fill against what they fill and
+   * the nearest trunk or post in the frame against the near post, whichever is the least. Clear at 1 or more.
    */
   readonly room: number;
   readonly clear: boolean;
@@ -528,11 +594,17 @@ function liveliestView(
   const fronts = input.fronts ?? [];
   const slant = seafront?.slant ?? rule.slant;
   const centreHalf = rule.middleThirdHalf ?? rule.life.centreHalf;
+  const near = rule.nearFace;
   const alongMaximumMm = seafront?.alongMaximumMm ?? rule.alongMaximumMm;
   const judgedLife: TownLife = seafront === undefined ? life : { seats: [], doors: life.doors };
   // Only what stands within sight of any spot the view may take is tested, so a larger town costs no more.
   const within = Math.max(rule.reachMm, rule.life.farMm) + Math.hypot(alongMaximumMm, rule.backMaximumMm);
   const rings = every.filter((ring) => distanceToRing([input.eastMm, input.southMm], ring) <= within);
+  // The town's buildings (its fronts) are its walls; anything else at eye height is a trunk or a post.
+  const ringKey = (ring: SightBlocker): string => ring.map((point) => `${point[0]},${point[1]}`).join(';');
+  const wallKeys = new Set(fronts.map(ringKey));
+  const walls = rings.filter((ring) => wallKeys.has(ringKey(ring)));
+  const posts = rings.filter((ring) => !wallKeys.has(ringKey(ring)));
   const better = (a: JudgedView, b: JudgedView): boolean => {
     if (a.clear !== b.clear) return a.clear;
     if (!a.clear && a.room !== b.room) return a.room > b.room;
@@ -561,7 +633,14 @@ function liveliestView(
           // inside its fan stands behind a bench: it is passed over as one with a post dead ahead is.
           const feet = rule.life.leastMm > 0
             ? nearestSeatInFan(spot, toward, rule.fanHalf, life.seats) / rule.life.leastMm : Number.POSITIVE_INFINITY;
-          const room = Math.min(centre, feet);
+          // A view whose frame shows more of the town's near walls than the rule allows stands against
+          // one filling the side of the picture, and one with a trunk or post near anywhere in its frame
+          // stands beside it: either is passed over as one with a post dead ahead is.
+          const share = near === undefined ? 0 : nearFaceShare(spot, toward, walls, near.frameHalf, near.nearMm);
+          const faces = near === undefined || share === 0 ? Number.POSITIVE_INFINITY : near.shareMost / share;
+          const beside = near === undefined
+            ? Number.POSITIVE_INFINITY : nearestInWedge(spot, toward, near.frameHalf, posts) / near.postMm;
+          const room = Math.min(centre, feet, faces, beside);
           const judged: JudgedView = {
             view: { eastMm: spot[0], southMm: spot[1], yaw: Math.atan2(-toward[0], -toward[1]), moved: back > 0 || step > 0 },
             room,

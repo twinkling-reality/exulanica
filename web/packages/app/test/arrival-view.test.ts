@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  arrivalView, crosses, frontsInView, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
+  arrivalView, crosses, frontsInView, nearFaceShare, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
   waterInView, type LifeViewRule, type OpenViewRule, type SeaSight, type SightBlocker,
 } from '../src/composition/arrival-view.js';
 import { FIRST_VIEW_DEFAULTS } from '../src/town-first-view.js';
@@ -765,5 +765,70 @@ describe('the open water a seafront view shows', () => {
     expect(arrivalView({ ...seafront, sea: coast(60_000) })).toEqual(own);
     // Handed no sea, a seafront view stands as chosen.
     expect(arrivalView(seafront)).toEqual(near);
+  });
+});
+
+describe('the near faces at a first view\'s edges', () => {
+  const FRAME = 51 * DEGREE;
+
+  it('is the share of the frame\'s width in which something stands nearer than the near face', () => {
+    // Facing north from the origin, a wall along the left 2 m off, running 10 m ahead. Within 4 m it reaches
+    // from 30 degrees left of the middle (2 m across, 3.46 m ahead) out past the frame's edge.
+    const wall: SightBlocker = [[-2_500, 1_000], [-2_000, 1_000], [-2_000, -10_000], [-2_500, -10_000]];
+    expect(nearFaceShare([0, 0], [0, -1], [wall], FRAME, 4_000))
+      .toBeCloseTo((Math.tan(FRAME) - Math.tan(30 * DEGREE)) / (2 * Math.tan(FRAME)), 9);
+    // Five metres off it is nowhere nearer than 4 m; looking away from it, it is behind the viewer.
+    const far: SightBlocker = [[-5_500, 1_000], [-5_000, 1_000], [-5_000, -10_000], [-5_500, -10_000]];
+    expect(nearFaceShare([0, 0], [0, -1], [far], FRAME, 4_000)).toBe(0);
+    expect(nearFaceShare([0, 4_000], [0, 1], [wall], FRAME, 4_000)).toBe(0);
+    // Two walls covering the same columns count once.
+    expect(nearFaceShare([0, 0], [0, -1], [wall, wall], FRAME, 4_000)).toBeCloseTo(nearFaceShare([0, 0], [0, -1], [wall], FRAME, 4_000), 12);
+  });
+
+  it('keeps a first view off the frontage behind its footway, where the rule states a near face', () => {
+    // Arriving facing north across the street, the near frontage 1.6 m behind the line people walk. Standing
+    // back from the kerb, off that line, is worth a little, so a view takes a step back toward the frontage.
+    const frontage: SightBlocker = [[-200_000, 1_600], [200_000, 1_600], [200_000, 30_000], [-200_000, 30_000]];
+    const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+    const life = { seats: [], doors: [[20_000, -16_000]] as [number, number][] };
+    const NEAR = { ...LIVELY, middleThirdHalf: 23 * DEGREE, nearFace: { nearMm: 4_000, shareMost: 0.1, frameHalf: FRAME, postMm: 4_000 } };
+    const share = (view: { eastMm: number; southMm: number; yaw: number }) =>
+      nearFaceShare([view.eastMm, view.southMm], looks(view.yaw), [opposite, frontage], FRAME, 4_000);
+    // Positive control: without the near face, the view stands a step back, 0.85 m off the frontage, which
+    // fills more than a tenth of the frame.
+    const { nearFace: _near, ...without } = NEAR;
+    const walls = { blockers: [opposite, frontage], fronts: [opposite, frontage] };
+    const before = arrivalView({ ...town, ...walls, open: without, life });
+    expect(before.southMm).toBeGreaterThan(0);
+    expect(share(before)).toBeGreaterThan(0.1);
+    const view = arrivalView({ ...town, ...walls, open: NEAR, life });
+    expect(share(view)).toBeLessThanOrEqual(0.1);
+    expect(view.southMm).toBeLessThan(before.southMm);
+    // Still the town's view along the street at its slant.
+    expect(Math.abs(looks(view.yaw)[1])).toBeCloseTo(Math.cos(60 * DEGREE), 9);
+  });
+
+  it('passes over a view with a trunk or post near anywhere in its frame, however little of it the post takes', () => {
+    // Arriving facing north across the street, a view a step back looks east along it, from (0, 750) toward 30
+    // degrees north of east. A lamp post 2 m off at 40 degrees from that view's middle: outside its middle third,
+    // inside its frame.
+    const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+    const life = { seats: [], doors: [[20_000, -16_000]] as [number, number][] };
+    const bearing = -70 * DEGREE;
+    const lamp = post(Math.round(2_000 * Math.cos(bearing)), Math.round(750 + 2_000 * Math.sin(bearing)), 200);
+    const NEAR = { ...LIVELY, middleThirdHalf: 23 * DEGREE, nearFace: { nearMm: 4_000, shareMost: 0.1, frameHalf: FRAME, postMm: 4_000 } };
+    const scene = { blockers: [opposite, behind, lamp], fronts: [opposite, behind] };
+    const nearestPost = (view: { eastMm: number; southMm: number; yaw: number }) =>
+      nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), FRAME, [lamp]);
+    // Positive control: as walls are judged, the post takes under a tenth of the frame, so without the near
+    // post the view stands beside it.
+    const asWall = arrivalView({ ...town, ...scene, open: { ...NEAR, nearFace: { ...NEAR.nearFace, postMm: 1 } }, life });
+    expect(nearestPost(asWall)).toBeLessThan(4_000);
+    expect(nearFaceShare([asWall.eastMm, asWall.southMm], looks(asWall.yaw), [lamp], FRAME, 4_000)).toBeLessThan(0.1);
+    const view = arrivalView({ ...town, ...scene, open: NEAR, life });
+    expect(nearestPost(view)).toBeGreaterThanOrEqual(4_000);
+    // The same square as a building's corner is a wall, judged by its share: under a tenth, the view stands by it.
+    const asBuilding = arrivalView({ ...town, blockers: [opposite, behind, lamp], fronts: [opposite, behind, lamp], open: NEAR, life });
+    expect(asBuilding).toEqual(asWall);
   });
 });

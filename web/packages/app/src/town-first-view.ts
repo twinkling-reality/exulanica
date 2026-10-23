@@ -1,6 +1,6 @@
 /**
  * How the first view of a generated town is chosen, read from the data files that state each value
- * with its reason, `assets/catalogs/arrival/town-first-view.v5.json` and the versions before it.
+ * with its reason, `assets/catalogs/arrival/town-first-view.v6.json` and the versions before it.
  * Presentation only.
  *
  * Version 1 chooses the most open view. Version 2 chooses by what of the town's life lies in view
@@ -12,11 +12,12 @@
  * (the sea of a town on land that holds one) and its arrival faces away from it, across the shore
  * street from its seaward footway, the view turns along the shore, the fronts on the land side and the
  * open view on the other, with nothing near across its middle third, where that open view holds enough
- * water; it is the version the page opens a town by. All stay readable:
- * `firstViewRule` reads any of the five files, and an earlier one with the figures version 4 states
- * as `FIRST_VIEW_DEFAULTS` states them.
+ * water. Version 6 is version 5 with the frame kept clear of near walls and posts, so a view does not
+ * stand against a plain ground floor or a lamp post filling the side of the picture; it is the version the page opens a
+ * town by. All stay readable: `firstViewRule` reads any of the six files, and an earlier one with the
+ * figures version 4 states as `FIRST_VIEW_DEFAULTS` states them.
  */
-import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v5.json?raw';
+import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v6.json?raw';
 
 /**
  * How a view is judged by the town's life, as version 2 of the catalog states it: angles in
@@ -105,6 +106,15 @@ export interface OpenViewRule {
    * is `water.halfHeight`) across `water.share` of its width, each column's sight line reading the
    * land's heights `water.stepMm` apart; elsewhere the town's own view does. Absent before version 5.
    */
+  /**
+   * Version 6: what of the frame, `frameHalf` either side of where a view looks, may stand near the
+   * viewer. The town's buildings nearer than `nearMm` may show across at most `shareMost` of its width,
+   * and no trunk or post may stand nearer than `postMm` anywhere in it; a view that breaks either is
+   * passed over as one with a post in its middle third is. Absent before version 6.
+   */
+  readonly nearFace?: {
+    readonly nearMm: number; readonly shareMost: number; readonly frameHalf: number; readonly postMm: number;
+  };
   readonly seafront?: {
     readonly facingMost: number; readonly slant: number; readonly frontHalf: number;
     readonly frontStep: number; readonly frontLinesLeast: number; readonly frontsLeast: number; readonly alongMaximumMm: number;
@@ -132,9 +142,9 @@ interface FirstViewEntry {
   readonly reason: string;
 }
 
-const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4 | 5> = new Map([
+const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4 | 5 | 6> = new Map([
   ['exulanica.town-first-view/v1', 1], ['exulanica.town-first-view/v2', 2], ['exulanica.town-first-view/v3', 3],
-  ['exulanica.town-first-view/v4', 4], ['exulanica.town-first-view/v5', 5],
+  ['exulanica.town-first-view/v4', 4], ['exulanica.town-first-view/v5', 5], ['exulanica.town-first-view/v6', 6],
 ]);
 
 /** The figures of version 4 an earlier version is read with. */
@@ -210,6 +220,14 @@ export function firstViewRule(text: string): OpenViewRule {
         }),
       }),
     }),
+    ...(version < 6 ? {} : {
+      nearFace: Object.freeze({
+        nearMm: millimetres('near_face_mm'),
+        shareMost: thousandths('near_face_share_most_thousandths'),
+        frameHalf: radians('frame_half_degrees'),
+        postMm: millimetres('near_post_mm'),
+      }),
+    }),
   };
   if (version === 1) return Object.freeze(rule);
   const life: LifeViewRule = Object.freeze({
@@ -228,6 +246,9 @@ export function firstViewRule(text: string): OpenViewRule {
   if (!(life.farMm > life.nearMm) || !(life.nearMm > life.leastMm) || !(life.seatTopMaximumMm >= life.seatTopMinimumMm)
     || !(life.centreHalf < Math.PI / 2)
     || (rule.middleThirdHalf !== undefined && !(rule.middleThirdHalf >= life.centreHalf && rule.middleThirdHalf < Math.PI / 2))
+    || (rule.nearFace !== undefined && (!(rule.nearFace.nearMm > 0) || !(rule.nearFace.postMm > 0)
+      || !(rule.nearFace.shareMost > 0 && rule.nearFace.shareMost < 1)
+      || !(rule.nearFace.frameHalf > 0 && rule.nearFace.frameHalf < Math.PI / 2)))
     || (rule.seafront !== undefined && (!(rule.seafront.frontStep > 0)
       || !(rule.seafront.frontHalf > 0 && rule.seafront.frontHalf < Math.PI / 2)
       || !Number.isInteger(rule.seafront.frontsLeast) || rule.seafront.frontsLeast < 1
