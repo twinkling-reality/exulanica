@@ -75,6 +75,7 @@ from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import Manifest, Role, load_manifest
 from exulanica.models.policy import HostedRequestPolicy, HostedRequestRefused
+from exulanica.models.request_envelopes import request_bytes_at_most
 from exulanica.models.spending import (
     BUDGET_EXCEEDED,
     HELD_CLOSED,
@@ -137,6 +138,7 @@ __all__ = [
     "claim",
     "create_draft",
     "creature_workspaces",
+    "draft_limits",
     "draft_spend",
     "end_unserved",
     "expire_unclaimed",
@@ -263,22 +265,45 @@ def spending_key(job_id: uuid.UUID) -> str:
     return f"creature:{job_id}"
 
 
+def _answer_tokens(manifest: Manifest) -> int:
+    """The drafter's answer bound: the manifest's limit for its role, else the role's default."""
+    binding = manifest[DRAFTER_ROLE]
+    return binding.default_max_tokens if binding.max_tokens is None else binding.max_tokens.value
+
+
+def draft_limits(manifest: Manifest) -> dict[Role, tuple[int, int]] | None:
+    """The request bound and answer bound a draft's attempts are held to, as its price states
+    them: the drafter's request envelope (:mod:`exulanica.models.request_envelopes`) and answer
+    bound, for the client's chain to refuse any attempt beyond before it is sent; None where the
+    catalog names no envelope for the drafter, whose price is then a whole context window."""
+    envelope = request_bytes_at_most(DRAFTER_ROLE)
+    return None if envelope is None else {DRAFTER_ROLE: (envelope, _answer_tokens(manifest))}
+
+
 def price_at_most(manifest: Manifest, wire_attempts: int) -> dict[str, Any]:
     """The most one draft may be charged, a decimal string, with the account it is charged to and
     its basis.
 
-    Each dispatch is priced at a whole context window of input and the route's answer bound, at the
-    manifest's prices, which the spending authority prices every attempt by: no request sends more,
-    so neither an attempt's reported cost nor the reservation one of unknown outcome keeps passes
-    it. A draft is a form and one repair (``DRAFT_ATTEMPTS``), each sent at most ``wire_attempts``
-    times (every fallback and retry of the client), all priced at the route's dearest model. The
-    reservation the client holds for an attempt counts prompt characters at a fixed rate and leaves
-    the form's schema out, so it is no bound and is not used here.
+    Each dispatch is priced at the drafter's request envelope of input (never more than the
+    model's context window) and the route's answer bound, at the manifest's prices: the draft's
+    attempts run under those two bounds (:func:`draft_limits`), and the client's chain refuses one
+    beyond either before it is sent, so neither an attempt's reported cost nor the reservation one
+    of unknown outcome keeps passes it. A draft is a form and one repair (``DRAFT_ATTEMPTS``), each
+    sent at most ``wire_attempts`` times (every fallback and retry of the client), all priced at
+    the route's dearest model. Where the catalog names no envelope for the drafter, each dispatch
+    is priced at a whole context window, as no request can pass that either.
     """
     binding = manifest[DRAFTER_ROLE]
-    answer = binding.default_max_tokens if binding.max_tokens is None else binding.max_tokens.value
+    answer = _answer_tokens(manifest)
+    envelope = request_bytes_at_most(DRAFTER_ROLE)
+    inputs = {
+        spec.model_id: spec.context_window_tokens
+        if envelope is None
+        else min(envelope, spec.context_window_tokens)
+        for spec in binding.chain
+    }
     each = max(
-        spec.cost_usd(prompt_tokens=spec.context_window_tokens, completion_tokens=answer)
+        spec.cost_usd(prompt_tokens=inputs[spec.model_id], completion_tokens=answer)
         for spec in binding.chain
     )
     dispatches = DRAFT_ATTEMPTS * wire_attempts
@@ -289,10 +314,10 @@ def price_at_most(manifest: Manifest, wire_attempts: int) -> dict[str, Any]:
         "provider": binding.provider,
         "provider_description": manifest.provider(binding.provider).description,
         "basis": {
-            "kind": "full_context_ceiling",
+            "kind": "full_context_ceiling" if envelope is None else "request_envelope_ceiling",
             "attempts_at_most": DRAFT_ATTEMPTS,
             "wire_attempts_per_attempt_at_most": wire_attempts,
-            "input_tokens_at_most": max(spec.context_window_tokens for spec in binding.chain),
+            "input_tokens_at_most": max(inputs.values()),
             "answer_tokens_at_most": answer,
         },
     }
@@ -888,6 +913,10 @@ class CreatureDraftWorker:
     def _play(self, claimed: ClaimedDraft) -> str:
         workspace_id = claimed.workspace_id
         client = self._client.with_policy(self._policy_for(workspace_id))
+        # Held to the bounds its price states: an attempt larger than either is refused unsent.
+        held = draft_limits(client.manifest)
+        if held is not None:
+            client = client.with_prices({}, limits=held)
         status = "failed"
         kind_sha256: str | None = None
         refusal: tuple[str, str | None] | None = None

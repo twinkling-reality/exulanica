@@ -1,7 +1,10 @@
 """A world draft's operation ceiling, derived from its stages and fresh provider metadata.
 
-Prices are inputs, not an operation estimate. The full-context envelope is deliberately
-conservative and is served as a reservation ceiling, never as expected or invoiced spend.
+Prices are inputs, not an operation estimate. Each request is priced at the most it can hold: its
+role's request envelope of input (:mod:`exulanica.models.request_envelopes`, the bytes the chain
+refuses a request beyond, never more than the model's context window) and its answer limit. The
+sum is served as a reservation ceiling, never as expected or invoiced spend: the worst case the
+draft's calls can reach, not every model's whole context.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from typing import Any
 from exulanica.errors import CanonicalisationError
 from exulanica.models.manifest import Manifest, Role
 from exulanica.models.provider_catalog import ProviderPrice
+from exulanica.models.request_envelopes import request_bytes_at_most
 from exulanica.models.usage import USD_QUANTUM
 from exulanica.selection import (
     kind_drafting,
@@ -79,9 +83,11 @@ def operation_sheet(
 ) -> dict[str, Any]:
     """A finite envelope for every native path, including retries and fallbacks.
 
-    Each per-model reservation prices a full current context of input plus the actual stage
-    output bound. Separate provider ceilings sum to the accepted total; switching paths or
-    providers cannot obtain another copy of that total after a restart.
+    Each per-model reservation prices the stage's request envelope of input (its role's, never
+    more than the model's current context; a role with none is priced at that whole context) plus
+    the actual stage output bound. The stage states the envelope (``request_bytes_at_most``), which
+    the draft's chain refuses any request beyond. Separate provider ceilings sum to the accepted
+    total; switching paths or providers cannot obtain another copy of that total after a restart.
     """
     if now.tzinfo is None:
         raise WorldDraftOfferRefused("world_draft_price_unavailable")
@@ -105,6 +111,8 @@ def operation_sheet(
             wire = maximum_wire_attempts(role)
             if type(wire) is not int or wire < len(binding.chain):
                 raise WorldDraftOfferRefused("world_draft_attempt_limit_unavailable")
+            envelope = request_bytes_at_most(role)
+            inputs = []
             costs = []
             for spec in binding.chain:
                 key = (spec.provider, spec.model_id)
@@ -127,14 +135,16 @@ def operation_sheet(
                     )
                 ):
                     raise WorldDraftOfferRefused("world_draft_price_unavailable")
+                context = min(spec.context_window_tokens, price.context_window_tokens)
+                most_in = context if envelope is None else min(envelope, context)
                 cost = (
                     (
-                        Decimal(min(spec.context_window_tokens, price.context_window_tokens))
-                        * price.input_usd_per_mtok
+                        Decimal(most_in) * price.input_usd_per_mtok
                         + Decimal(answer) * price.output_usd_per_mtok
                     )
                     / Decimal(1_000_000)
                 ).quantize(USD_QUANTUM, rounding=ROUND_CEILING)
+                inputs.append(most_in)
                 costs.append(cost)
                 rates[key] = dict(
                     provider=spec.provider,
@@ -159,6 +169,7 @@ def operation_sheet(
                     schema_attempts_at_most=repairs,
                     wire_attempts_per_request_at_most=wire,
                     dispatches_at_most=count,
+                    request_bytes_at_most=min(inputs) if envelope is None else envelope,
                     answer_tokens_at_most=answer,
                     models=[
                         dict(provider=s.provider, model_id=s.model_id, reservation_usd=str(c))
@@ -178,7 +189,7 @@ def operation_sheet(
         dict(
             profile=PROFILE,
             pipeline_version=manifest.pipeline_version,
-            basis="full_context_reservation_ceiling",
+            basis="request_envelope_ceiling",
             estimate_is_expected_spend=False,
             read_at=now.isoformat(),
             expires_at=min(

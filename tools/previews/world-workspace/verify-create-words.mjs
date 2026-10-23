@@ -21,7 +21,8 @@ assert.equal(CREATE_WORDS.noModel, 'Making a world from your words needs an AI m
 assert.equal(CREATE_WORDS.budgetSpent, 'The budget for AI models here is spent. You can still start from these:');
 assert.equal(CREATE_WORDS.spendingPaused, 'Spending on AI models is paused here, so nothing can be made from your words now. You can still start from these:');
 assert.equal(CREATE_WORDS.offline, 'Not connected to your world. Trying again.');
-assert.equal(priceLine('1.42270464'), 'An AI model makes it from your words: at most $1.43, and you see what it really spent.');
+assert.equal(priceLine('0.20766720'), 'An open model makes it from your words: at most $0.21, and you see what it really spent.');
+assert.equal(priceLine('0.00410000'), 'An open model makes it from your words: at most $0.01, and you see what it really spent.');
 assert.equal(countWords(86, 1000), '86 of 1000');
 assert.equal(countWords(1000, 1000), '1000 of 1000');
 assert.equal(countWords(0, 1000), null);

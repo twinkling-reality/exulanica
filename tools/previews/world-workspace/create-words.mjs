@@ -147,9 +147,9 @@ export function ceilingAmount(usd) {
   return amount(Math.ceil(value * 100 - 1e-9) / 100);
 }
 
-/** The line under the field with the offer's most (frame 20). */
+/** The line under the field with the offer's most (frame 20; DESIGN's A1 words: an open model, the honest worst case). */
 export const priceLine = maximumUsd =>
-  `An AI model makes it from your words: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
+  `An open model makes it from your words: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
 
 /** Starts left this hour, shown only when three or fewer remain (N19); none left is a refusal. */
 export function startsLeftLine(left) {

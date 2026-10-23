@@ -1,0 +1,41 @@
+{
+  "catalog_id": "request-envelopes",
+  "catalog_version": 1,
+  "schema_version": 1,
+  "profile": "exulanica.request-envelopes/v1",
+  "source_build": "Measured: each role's largest request as the model chain measures it before sending, its whole JSON with every character outside ASCII escaped, the answer's schema and every repair included, for the longest words a person may send written in letters that escape longest. tests/test_request_envelopes.py measures every stage again and holds each under its envelope.",
+  "unit": "Bytes of the request's escaped JSON. A tokenizer that works on bytes, or falls back to them, makes no token of less than one byte, and the JSON's keys and quotes outnumber the few tokens a chat template adds to a message, so these bytes bound the request's input tokens.",
+  "fallback": "A role with no envelope is priced at its model's whole context window of input, the bound no request can pass.",
+  "entries": [
+    {
+      "role": "world_tool_chooser",
+      "request_bytes_at_most": 16384,
+      "reason": "The tool chooser's request is the tool catalog's instructions and the person's words, about 10 KB at the longest words with its one repair; the envelope leaves room for the catalog to grow and for a long repair."
+    },
+    {
+      "role": "kind_drafter",
+      "request_bytes_at_most": 65536,
+      "reason": "The kind drafter's request is the kind catalogs' instructions, the answer's schema and the person's words, about 36 KB at the longest words with its two repairs; the envelope leaves room for the catalogs to grow and for a long repair."
+    },
+    {
+      "role": "specification_drafter",
+      "request_bytes_at_most": 65536,
+      "reason": "The specification drafter's request is the town's form, its schema and the person's words, about 37 KB at the longest words with its one repair; the envelope leaves room for the form to grow and for a long repair."
+    },
+    {
+      "role": "look_chooser",
+      "request_bytes_at_most": 16384,
+      "reason": "The look chooser's request is the looks offered and the person's words, about 9 KB at the longest words with its one repair; the envelope leaves room for more looks and for a long repair."
+    },
+    {
+      "role": "setting_chooser",
+      "request_bytes_at_most": 16384,
+      "reason": "The setting chooser's request is the parts of a setting and the person's words, about 10 KB at the longest words with its one repair; the envelope leaves room for more parts and for a long repair."
+    },
+    {
+      "role": "creature_drafter",
+      "request_bytes_at_most": 32768,
+      "reason": "The creature drafter's request is the body grammar's instructions, the form's schema and the person's words, about 19 KB at the longest words with its one repair, and about 26 KB with the largest block of reference notes a draft may carry; the envelope leaves room for the grammar to grow and for a long repair."
+    }
+  ]
+}

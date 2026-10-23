@@ -861,11 +861,16 @@ the drafter's calls take by the record its timeout rests on (the median and long
 up to whole seconds, and the timeout), and the closed lists of codes a draft may end with: a refusal
 outside the list is carried as `creature_not_drafted`. The price is `usd_at_most`, a decimal string,
 with the account it is charged to (`provider` and `provider_description`) and its basis
-(`full_context_ceiling`): each dispatch priced at a whole context window of input and the route's
-answer bound, at the manifest's prices, which the spending authority prices attempts by, for a form
-and one repair, each sent as often as the client may send it (every fallback and retry), at the
-route's dearest model. No request sends more, so neither a reported cost nor the reservation an
-attempt of unknown outcome keeps passes it; a typical draft spends a small part of it. The
+(`request_envelope_ceiling`): each dispatch priced at the drafter's request envelope of input
+(`assets/catalogs/request-envelopes/`, the most bytes its request may send, never more than the
+model's context window) and the route's answer bound, at the manifest's prices, for a form and one
+repair, each sent as often as the client may send it (every fallback and retry), at the route's
+dearest model. A draft runs under those two bounds: its client's chain refuses an attempt larger
+than either before sending it, so neither a reported cost nor the reservation an attempt of unknown
+outcome keeps passes the price; a typical draft spends a small part of it. A request's escaped JSON
+bytes bound its input tokens, since a tokenizer that works on bytes makes no token of less than one.
+Where the catalog names no envelope for the drafter, the basis is `full_context_ceiling`, each
+dispatch priced at a whole context window. The
 reservation an attempt holds counts prompt characters at a fixed rate and leaves out the form's
 schema, so it is no bound and the price does not use it. With no model client the price is null. `GET /things/creatures/drafts` lists the requester's own drafts, newest
 first, so a reload finds one still running; a draft states when it was asked, when a worker first

@@ -154,6 +154,12 @@ function maybeText(value: unknown, what: string): string | null {
   return value === null || value === undefined ? null : text(value, what);
 }
 
+/**
+ * How an operation's ceiling was priced: each request at its role's request envelope of input and its answer limit, or,
+ * for a quote priced before envelopes, at its model's whole context window. Both are ceilings no request can pass.
+ */
+const OPERATION_BASES: readonly unknown[] = ['request_envelope_ceiling', 'full_context_reservation_ceiling'];
+
 function operation(value: unknown): WorldDraftOperation | null {
   if (value === null || value === undefined) return null;
   const held = object(value, 'world draft operation');
@@ -161,7 +167,7 @@ function operation(value: unknown): WorldDraftOperation | null {
   const expires = Date.parse(text(held['expires_at'], 'operation expiry'));
   const readAt = Date.parse(text(held['read_at'], 'operation date'));
   if (held['profile'] !== 'exulanica.world-draft-operation/v1'
-    || held['basis'] !== 'full_context_reservation_ceiling' || held['estimate_is_expected_spend'] !== false
+    || !OPERATION_BASES.includes(held['basis']) || held['estimate_is_expected_spend'] !== false
     || !/^[0-9]{1,6}(\.[0-9]{1,8})?$/.test(maximum)
     || Number(maximum) <= 0 || !Number.isFinite(expires) || !Number.isFinite(readAt) || expires <= readAt || expires > readAt + 60_000
     || !/^[a-f0-9]{64}$/.test(text(held['document_sha256'], 'operation digest'))) fail('world draft operation');

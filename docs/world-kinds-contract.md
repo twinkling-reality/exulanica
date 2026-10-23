@@ -629,7 +629,14 @@ this person in this workspace: `offered`, or the first refusal a start would giv
 `detail`, in the order the start asks them; `calls_at_most`, the most times one draft asks a model,
 including schema repairs, transport retries, declared fallbacks and both native tool paths;
 `operation`, a sealed monetary reservation ceiling derived from fresh provider metadata, with
-per-provider bounds, individual model rates, response digests and expiry; `starts`, the hourly
+per-provider bounds, individual model rates, response digests and expiry. Its basis is
+`request_envelope_ceiling`: each request is priced at its role's request envelope of input
+(`assets/catalogs/request-envelopes/`, the most bytes its escaped JSON may hold, schema and repairs
+included, never more than the model's context window), which each stage states as
+`request_bytes_at_most`, and its answer limit; the draft's chain refuses any request beyond either
+before sending it, so the ceiling is the worst case the draft can reach. A quote priced before
+envelopes keeps its whole-context basis (`full_context_reservation_ceiling`) and is held to it;
+`starts`, the hourly
 allowance and starts left for this actor across workspaces and API processes, counting both native
 kind and whole-world starts;
 `description_characters`; and

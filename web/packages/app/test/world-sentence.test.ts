@@ -728,6 +728,9 @@ describe('durable world creation consent and recovery', () => {
     expect(result).toMatchObject({ state: 'queued', requestId: id, recovered: true });
     expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, estimate_is_expected_spend: true } }))).toThrow();
     expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, profile: 'unknown' } }))).toThrow();
+    // Priced at each request's envelope, or before envelopes at whole context windows; nothing else is a ceiling.
+    expect(parseWorldDraftOffer(offerWire({ operation: { ...quote, basis: 'request_envelope_ceiling' } })).operation?.maximumUsd).toBe(quote.maximum_usd);
+    expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, basis: 'expected_spend' } }))).toThrow();
     expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, expires_at: quote.read_at } }))).toThrow();
     expect(() => parseWorldDraftOffer(offerWire({ operation: operationWire('0') }))).toThrow();
     await expect(client.start(WORDS, { idempotencyKey: DRAFT, operation, maximumUsd: operation.maximumUsd })).rejects.toThrow('identity');

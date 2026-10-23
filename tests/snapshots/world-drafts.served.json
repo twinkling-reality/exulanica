@@ -164,16 +164,16 @@
   "operation": {
    "profile": "exulanica.world-draft-operation/v1",
    "pipeline_version": 3,
-   "basis": "full_context_reservation_ceiling",
+   "basis": "request_envelope_ceiling",
    "estimate_is_expected_spend": false,
    "read_at": "2026-01-01T00:00:00Z",
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "1.42270464",
+   "maximum_usd": "0.20766720",
    "calls_at_most": 16,
    "providers": [
     {
      "provider": "nebius_token_factory",
-     "ceiling_usd": "1.42270464",
+     "ceiling_usd": "0.20766720",
      "max_calls": 16
     }
    ],
@@ -218,75 +218,79 @@
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 16384,
        "answer_tokens_at_most": 1024,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920"
+       "ceiling_usd": "0.02334720"
       },
       {
        "role": "kind_drafter",
        "schema_attempts_at_most": 3,
        "wire_attempts_per_request_at_most": 1,
        "dispatches_at_most": 3,
+       "request_bytes_at_most": 65536,
        "answer_tokens_at_most": 32768,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
-         "reservation_usd": "0.15597568"
+         "reservation_usd": "0.01835008"
         }
        ],
-       "ceiling_usd": "0.46792704"
+       "ceiling_usd": "0.05505024"
       },
       {
        "role": "look_chooser",
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 16384,
        "answer_tokens_at_most": 1024,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920"
+       "ceiling_usd": "0.02334720"
       },
       {
        "role": "setting_chooser",
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 16384,
        "answer_tokens_at_most": 1024,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920"
+       "ceiling_usd": "0.02334720"
       }
      ]
     },
@@ -298,80 +302,84 @@
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 16384,
        "answer_tokens_at_most": 1024,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920"
+       "ceiling_usd": "0.02334720"
       },
       {
        "role": "specification_drafter",
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 65536,
        "answer_tokens_at_most": 16384,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.09338880"
+         "reservation_usd": "0.03440640"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.06225920"
+         "reservation_usd": "0.02293760"
         }
        ],
-       "ceiling_usd": "0.37355520"
+       "ceiling_usd": "0.13762560"
       },
       {
        "role": "look_chooser",
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 16384,
        "answer_tokens_at_most": 1024,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920"
+       "ceiling_usd": "0.02334720"
       },
       {
        "role": "setting_chooser",
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
+       "request_bytes_at_most": 16384,
        "answer_tokens_at_most": 1024,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920"
+       "ceiling_usd": "0.02334720"
       }
      ]
     }
@@ -384,7 +392,7 @@
   "draft_id": "00000000-0000-0000-0000-000000000001",
   "request_id": "00000000-0000-0000-0000-000000000002",
   "operation": {
-   "basis": "full_context_reservation_ceiling",
+   "basis": "request_envelope_ceiling",
    "paths": [
     {
      "tool": "kind",
@@ -395,17 +403,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -415,12 +424,13 @@
         {
          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.15597568"
+         "reservation_usd": "0.01835008"
         }
        ],
-       "ceiling_usd": "0.46792704",
+       "ceiling_usd": "0.05505024",
        "dispatches_at_most": 3,
        "answer_tokens_at_most": 32768,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 3,
        "wire_attempts_per_request_at_most": 1
       },
@@ -430,17 +440,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -450,17 +461,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -475,17 +487,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -495,17 +508,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.09338880"
+         "reservation_usd": "0.03440640"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.06225920"
+         "reservation_usd": "0.02293760"
         }
        ],
-       "ceiling_usd": "0.37355520",
+       "ceiling_usd": "0.13762560",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 16384,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -515,17 +529,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -535,17 +550,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -590,11 +606,11 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "1.42270464"
+     "ceiling_usd": "0.20766720"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "1.42270464",
+   "maximum_usd": "0.20766720",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
@@ -946,7 +962,7 @@
   "draft_id": "00000000-0000-0000-0000-000000000001",
   "request_id": "00000000-0000-0000-0000-000000000002",
   "operation": {
-   "basis": "full_context_reservation_ceiling",
+   "basis": "request_envelope_ceiling",
    "paths": [
     {
      "tool": "kind",
@@ -957,17 +973,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -977,12 +994,13 @@
         {
          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.15597568"
+         "reservation_usd": "0.01835008"
         }
        ],
-       "ceiling_usd": "0.46792704",
+       "ceiling_usd": "0.05505024",
        "dispatches_at_most": 3,
        "answer_tokens_at_most": 32768,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 3,
        "wire_attempts_per_request_at_most": 1
       },
@@ -992,17 +1010,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1012,17 +1031,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -1037,17 +1057,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1057,17 +1078,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.09338880"
+         "reservation_usd": "0.03440640"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.06225920"
+         "reservation_usd": "0.02293760"
         }
        ],
-       "ceiling_usd": "0.37355520",
+       "ceiling_usd": "0.13762560",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 16384,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1077,17 +1099,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1097,17 +1120,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -1152,11 +1176,11 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "1.42270464"
+     "ceiling_usd": "0.20766720"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "1.42270464",
+   "maximum_usd": "0.20766720",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
@@ -1176,7 +1200,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "world_tool_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1187,7 +1211,7 @@
      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
      "role": "kind_drafter",
      "state": "settled",
-     "reserved_usd": "0.15597568",
+     "reserved_usd": "0.01835008",
      "settled_usd": "0.00007000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1198,7 +1222,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "look_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1209,7 +1233,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "setting_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1594,7 +1618,7 @@
   "draft_id": "00000000-0000-0000-0000-000000000001",
   "request_id": "00000000-0000-0000-0000-000000000002",
   "operation": {
-   "basis": "full_context_reservation_ceiling",
+   "basis": "request_envelope_ceiling",
    "paths": [
     {
      "tool": "kind",
@@ -1605,17 +1629,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1625,12 +1650,13 @@
         {
          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.15597568"
+         "reservation_usd": "0.01835008"
         }
        ],
-       "ceiling_usd": "0.46792704",
+       "ceiling_usd": "0.05505024",
        "dispatches_at_most": 3,
        "answer_tokens_at_most": 32768,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 3,
        "wire_attempts_per_request_at_most": 1
       },
@@ -1640,17 +1666,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1660,17 +1687,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -1685,17 +1713,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1705,17 +1734,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.09338880"
+         "reservation_usd": "0.03440640"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.06225920"
+         "reservation_usd": "0.02293760"
         }
        ],
-       "ceiling_usd": "0.37355520",
+       "ceiling_usd": "0.13762560",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 16384,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1725,17 +1755,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -1745,17 +1776,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -1800,11 +1832,11 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "1.42270464"
+     "ceiling_usd": "0.20766720"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "1.42270464",
+   "maximum_usd": "0.20766720",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
@@ -1824,7 +1856,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "world_tool_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1835,7 +1867,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "specification_drafter",
      "state": "settled",
-     "reserved_usd": "0.09338880",
+     "reserved_usd": "0.03440640",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1846,7 +1878,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "look_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1857,7 +1889,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "setting_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -2191,7 +2223,7 @@
   "draft_id": "00000000-0000-0000-0000-000000000001",
   "request_id": "00000000-0000-0000-0000-000000000002",
   "operation": {
-   "basis": "full_context_reservation_ceiling",
+   "basis": "request_envelope_ceiling",
    "paths": [
     {
      "tool": "kind",
@@ -2202,17 +2234,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -2222,12 +2255,13 @@
         {
          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.15597568"
+         "reservation_usd": "0.01835008"
         }
        ],
-       "ceiling_usd": "0.46792704",
+       "ceiling_usd": "0.05505024",
        "dispatches_at_most": 3,
        "answer_tokens_at_most": 32768,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 3,
        "wire_attempts_per_request_at_most": 1
       },
@@ -2237,17 +2271,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -2257,17 +2292,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -2282,17 +2318,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -2302,17 +2339,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.09338880"
+         "reservation_usd": "0.03440640"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.06225920"
+         "reservation_usd": "0.02293760"
         }
        ],
-       "ceiling_usd": "0.37355520",
+       "ceiling_usd": "0.13762560",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 16384,
+       "request_bytes_at_most": 65536,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -2322,17 +2360,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       },
@@ -2342,17 +2381,18 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.07956480"
+         "reservation_usd": "0.00583680"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.05304320"
+         "reservation_usd": "0.00389120"
         }
        ],
-       "ceiling_usd": "0.31825920",
+       "ceiling_usd": "0.02334720",
        "dispatches_at_most": 4,
        "answer_tokens_at_most": 1024,
+       "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
       }
@@ -2397,11 +2437,11 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "1.42270464"
+     "ceiling_usd": "0.20766720"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "1.42270464",
+   "maximum_usd": "0.20766720",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
@@ -2421,7 +2461,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "world_tool_chooser",
      "state": "settled",
-     "reserved_usd": "0.07956480",
+     "reserved_usd": "0.00583680",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -2432,7 +2472,7 @@
      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
      "role": "kind_drafter",
      "state": "settled",
-     "reserved_usd": "0.15597568",
+     "reserved_usd": "0.01835008",
      "settled_usd": "0.00007000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -2443,7 +2483,7 @@
      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
      "role": "kind_drafter",
      "state": "settled",
-     "reserved_usd": "0.15597568",
+     "reserved_usd": "0.01835008",
      "settled_usd": "0.00007000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -2454,7 +2494,7 @@
      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
      "role": "kind_drafter",
      "state": "settled",
-     "reserved_usd": "0.15597568",
+     "reserved_usd": "0.01835008",
      "settled_usd": "0.00007000",
      "cost_basis": "reported",
      "prompt_tokens": 100,

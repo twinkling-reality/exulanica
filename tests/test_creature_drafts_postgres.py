@@ -281,6 +281,21 @@ def test_a_drafter_that_does_not_answer_fails_the_draft_by_name(served):
         assert (failed.status, failed.failure) == ("failed", "drafter_unavailable")
 
 
+def test_a_draft_is_held_to_the_request_envelope_its_price_is_counted_at(served, monkeypatch):
+    """The price counts each attempt at the drafter's request envelope; the draft runs under it, so
+    a request larger than the envelope is refused before anything is sent, and the draft fails."""
+    database, workspace_id, stores = served
+    monkeypatch.setattr(drafts, "request_bytes_at_most", lambda role: 256)
+    with database.session(workspace_id) as connection:
+        queued = _queue(connection, workspace_id, uuid.uuid4())
+    transport = _transport(form_of("horse", label="hill walker"))
+    assert _worker(database, workspace_id, stores, transport).run_once(workspace_id) == "failed"
+    assert transport.requests == []
+    with database.session(workspace_id) as connection:
+        failed = drafts.read_draft(connection, workspace_id, queued.draft_id)
+        assert failed is not None and failed.status == "failed"
+
+
 def test_what_a_draft_spent_is_read_from_its_own_recorded_attempts(bench, tmp_path):
     workspace_id = uuid.uuid4()
     authority = bench.issue(ceiling="1")

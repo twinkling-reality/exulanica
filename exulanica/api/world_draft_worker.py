@@ -79,10 +79,14 @@ def manifest_sha256(client: ModelClient) -> str:
 
 
 def limits(quote: Mapping[str, Any]) -> dict[Role, tuple[int, int]]:
+    """Each stage's request bound and answer bound, as its quote priced them: the stage's request
+    envelope where the quote states one, else (a quote priced before envelopes) its models' least
+    context, as that quote was priced."""
     contexts = {(p["provider"], p["model_id"]): p["input_tokens_at_most"] for p in quote["prices"]}
     return {
         Role(stage["role"]): (
-            min(contexts[m["provider"], m["model_id"]] for m in stage["models"]),
+            stage.get("request_bytes_at_most")
+            or min(contexts[m["provider"], m["model_id"]] for m in stage["models"]),
             stage["answer_tokens_at_most"],
         )
         for path in quote["paths"]

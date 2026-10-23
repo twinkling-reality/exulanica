@@ -14,9 +14,10 @@ worker played by the test, so each step is seen. What is shown:
     installation does not list is told so; one requester has one draft open at a time;
 *   asking needs world.write and model.invoke;
 *   the offer names the model a draft asks first and the most a draft may be charged, with the
-    account it is charged to: the route's dearest model at a whole context window of input and its
-    answer bound, for a form and one repair each sent as often as the client may send it; a draft
-    states no spend where no durable spending authority records this process's calls;
+    account it is charged to: the route's dearest model at the drafter's request envelope of
+    input and its answer bound, for a form and one repair each sent as often as the client may
+    send it; a draft states no spend where no durable spending authority records this process's
+    calls;
 *   before anyone types, the offer says spending is paused (the durable authority held closed for
     the drafter's provider) or spent (refused otherwise, or less left than one attempt), each by
     its own code;
@@ -39,6 +40,7 @@ from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.request_envelopes import request_bytes_at_most
 from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import usd_string
 from exulanica.spending.status import SpendingRefusals
@@ -320,12 +322,16 @@ def test_the_offer_says_whether_a_workspace_may_ask_and_how_long_drafts_take(ser
     # The model a draft asks first, by the name a person reads.
     primary = binding.primary.model_id
     assert offer["model"] == {"model_id": primary, "name": load_manifest().model_name(primary)}
-    # The most one draft may be charged: no request sends more than a context window of input and
-    # the answer bound, priced at the route's dearest model, for a form and one repair, each sent
-    # once to the primary and once to the fallback a withdrawn primary is answered by.
+    # The most one draft may be charged: no request sends more than the drafter's request
+    # envelope of input and the answer bound, priced at the route's dearest model, for a form and
+    # one repair, each sent once to the primary and once to the fallback a withdrawn primary is
+    # answered by.
     answer = binding.max_tokens.value
+    envelope = request_bytes_at_most(Role.CREATURE_DRAFTER)
     dearest = max(
-        spec.cost_usd(prompt_tokens=spec.context_window_tokens, completion_tokens=answer)
+        spec.cost_usd(
+            prompt_tokens=min(envelope, spec.context_window_tokens), completion_tokens=answer
+        )
         for spec in binding.chain
     )
     assert len(binding.chain) == 2
@@ -334,10 +340,12 @@ def test_the_offer_says_whether_a_workspace_may_ask_and_how_long_drafts_take(ser
         "provider": binding.provider,
         "provider_description": load_manifest().provider(binding.provider).description,
         "basis": {
-            "kind": "full_context_ceiling",
+            "kind": "request_envelope_ceiling",
             "attempts_at_most": 2,
             "wire_attempts_per_attempt_at_most": 2,
-            "input_tokens_at_most": max(spec.context_window_tokens for spec in binding.chain),
+            "input_tokens_at_most": max(
+                min(envelope, spec.context_window_tokens) for spec in binding.chain
+            ),
             "answer_tokens_at_most": answer,
         },
     }
