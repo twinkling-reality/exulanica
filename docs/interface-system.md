@@ -228,8 +228,10 @@ its first view looks toward (the sea of a town on land that holds one, `arrival_
 arrival faces away from it, across the shore street from its seaward footway, the view turns along the
 shore (86 degrees from straight across rather than 60), the fronts across the street on the land side
 and open water on the other, from the spot and the way with the most buildings' fronts in view (three
-asked, stepping up to 18 m along the footway for them), then the most of the town's doors; and the
-middle third every first view keeps clear, where earlier versions test only its middle sixth. Versions 1
+asked, stepping up to 18 m along the footway for them), then the most of the town's doors, standing only
+where its open water, read from the land's heights and the sea's level past what stands at eye height,
+fills a band of a twentieth of the frame's height across a quarter of its width (elsewhere, a sea far
+beyond a wide field, the town opens on its own first view); and the middle third every first view keeps clear, where earlier versions test only its middle sixth. Versions 1
 to 4 of that catalog (by openness alone;
 by life with no least distance; with one; with the figures of the view of placed things) stay beside
 it and are read by the same reader, with those figures at the values version 4 states, so a town

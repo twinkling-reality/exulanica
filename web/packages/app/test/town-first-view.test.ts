@@ -123,6 +123,13 @@ describe('the town first-view catalog', () => {
     expect(rule.seafront!.frontHalf).toBeGreaterThan(rule.fanHalf);
     expect(rule.seafront!.alongMaximumMm).toBe(v5.get('seafront_along_maximum_mm')!.value);
     expect(rule.seafront!.alongMaximumMm).toBeGreaterThan(rule.alongMaximumMm);
+    // It stands only where its open water fills a band of the frame's height across a share of its width.
+    expect(rule.seafront!.water).toEqual({
+      band: v5.get('seafront_water_band_thousandths')!.value / 1000,
+      share: v5.get('seafront_water_share_thousandths')!.value / 1000,
+      halfHeight: v5.get('seafront_water_half_height_degrees')!.value * DEGREE,
+      stepMm: v5.get('seafront_water_step_mm')!.value,
+    });
     // Every value version 4 states is version 4's own, unchanged.
     const before = entries(4);
     expect([...v5.keys()].slice(0, before.size)).toEqual([...before.keys()]);
@@ -140,6 +147,16 @@ describe('the town first-view catalog', () => {
       entry.key === 'seafront_front_step_degrees' ? { ...entry, value: 0 } : entry)) }))).toThrow('cannot be held together');
     expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.map((entry) => (
       entry.key === 'seafront_fronts_least' ? { ...entry, value: 2.5 } : entry)) }))).toThrow('cannot be held together');
+    // Nor one without its water's figures, or with a band, a share or a field that cannot be measured by.
+    expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.filter((entry) => entry.key !== 'seafront_water_share_thousandths') })))
+      .toThrow('seafront_water_share_thousandths');
+    for (const [key, value] of [
+      ['seafront_water_band_thousandths', 0], ['seafront_water_band_thousandths', 1_000], ['seafront_water_share_thousandths', 0],
+      ['seafront_water_share_thousandths', 1_001], ['seafront_water_half_height_degrees', 90], ['seafront_water_step_mm', 0],
+    ] as const) {
+      expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.map((entry) => (
+        entry.key === key ? { ...entry, value } : entry)) }))).toThrow('cannot be held together');
+    }
   });
 
   it('refuses a file of another profile, a version 2 missing a value, and distances that cannot hold together', () => {

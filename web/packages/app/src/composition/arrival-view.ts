@@ -18,8 +18,9 @@
  * nearest car in the way is farthest from it, so that car stands smallest in the view. Where no spot near
  * the footway sees the placed things at all, they stand inside or close against a building: it steps out
  * toward and across the street to the nearest spot that sees them, and where none does, it takes the
- * town's own first view, as for a town with nothing placed. Everything is in the region's plan frame:
- * millimetres east and south.
+ * town's own first view, as for a town with nothing placed. A seafront view (`liveliestView`) stands
+ * only where the land's heights show enough open water in it (`waterInView`). Everything is in the
+ * region's plan frame: millimetres east and south.
  */
 import { FIRST_VIEW_DEFAULTS, type LifeViewRule, type OpenViewRule, type PlacedViewRule } from '../town-first-view.js';
 
@@ -144,6 +145,62 @@ export function frontsInView(
     }
   }
   return [...met.values()].filter((lines) => lines >= least).length;
+}
+
+/**
+ * What a view's open water is read from, where a town's land holds a sea: the ground's height under a
+ * plan point (millimetres, in the frame the sea's level is in), the sea's level, and how far above the
+ * ground a standing person's eye is.
+ */
+export interface SeaSight {
+  readonly groundMm: (eastMm: number, southMm: number) => number;
+  readonly levelMm: number;
+  readonly eyeMm: number;
+}
+
+/**
+ * The share of a level view's width in which open water fills a band at least `water.band` of the
+ * frame's height (whose half field is `water.halfHeight`), from a person standing at `from` and looking
+ * along the unit direction `toward`: columns `step` apart across `half` either side, each weighed by the
+ * width it takes in the frame. In a column the band runs from the nearest open water seen (ground below
+ * the sea's level that neither the land nearer nor anything of `rings` at eye height hides) up to the
+ * horizon, so its sight line is read only as far as open water would still stand that far below the
+ * horizon, `water.stepMm` at a time.
+ */
+export function waterInView(
+  from: readonly [number, number], toward: readonly [number, number], sea: SeaSight, rings: readonly SightBlocker[],
+  half: number, step: number, water: { readonly band: number; readonly halfHeight: number; readonly stepMm: number },
+): number {
+  const eye = sea.groundMm(from[0], from[1]) + sea.eyeMm;
+  const lift = eye - sea.levelMm;
+  if (!(lift > 0) || !(step > 0) || !(water.stepMm > 0)) return 0;
+  // A point `distance` along a sight line `angle` off the middle stands that far ahead of the camera
+  // times cos(angle), so open water there is lift / (distance * cos(angle) * frame) below the horizon.
+  const frame = 2 * Math.tan(water.halfHeight);
+  // Whole columns, so a half field of whole steps is not given a sliver of a last one by rounding.
+  const columns = Math.ceil((2 * half) / step - 1e-9);
+  let seen = 0;
+  let whole = 0;
+  for (let column = 0; column < columns; column += 1) {
+    const lo = -half + column * step;
+    const hi = Math.min(half, lo + step);
+    const angle = (lo + hi) / 2;
+    const width = Math.tan(hi) - Math.tan(lo);
+    whole += width;
+    const way = [toward[0] * Math.cos(angle) - toward[1] * Math.sin(angle), toward[0] * Math.sin(angle) + toward[1] * Math.cos(angle)] as const;
+    // Past what stands at eye height in the line, its water is hidden.
+    const reach = openDistance(from, way, rings, lift / (Math.cos(angle) * frame * water.band));
+    let highest = Number.NEGATIVE_INFINITY;
+    for (let distance = water.stepMm; distance <= reach; distance += water.stepMm) {
+      const ground = sea.groundMm(from[0] + way[0] * distance, from[1] + way[1] * distance);
+      if (ground < sea.levelMm && (sea.levelMm - eye) / distance > highest) {
+        seen += width;
+        break;
+      }
+      highest = Math.max(highest, (Math.max(ground, sea.levelMm) - eye) / distance);
+    }
+  }
+  return whole > 0 ? seen / whole : 0;
 }
 
 /** A parked vehicle's footprint, grown by `clearanceMm` all round, as a plan ring. */
@@ -369,6 +426,7 @@ function openView(
     readonly ground: (eastMm: number, southMm: number) => boolean;
     readonly toward?: readonly [east: number, south: number];
     readonly fronts?: readonly SightBlocker[];
+    readonly sea?: SeaSight;
   },
   ahead: readonly [number, number], rings: readonly SightBlocker[], rule: OpenViewRule, life: TownLife,
 ): ArrivalView {
@@ -452,6 +510,7 @@ function liveliestView(
     readonly ground: (eastMm: number, southMm: number) => boolean;
     readonly toward?: readonly [east: number, south: number];
     readonly fronts?: readonly SightBlocker[];
+    readonly sea?: SeaSight;
   },
   ahead: readonly [number, number], every: readonly SightBlocker[],
   rule: OpenViewRule & { readonly life: LifeViewRule }, life: TownLife,
@@ -523,6 +582,20 @@ function liveliestView(
       }
     }
   }
+  // A seafront view stands only where its open water fills the band the rule asks across the share it
+  // asks, as the land's heights say; elsewhere (a sea far beyond a wide field shows as a line at the
+  // foot of the sky) the town's own view does, as for an arrival facing any other way.
+  if (seafront !== undefined && input.sea !== undefined) {
+    const { view } = best!;
+    const share = waterInView(
+      [view.eastMm, view.southMm], [-Math.sin(view.yaw), -Math.cos(view.yaw)], input.sea, every, seafront.frontHalf,
+      seafront.frontStep, seafront.water,
+    );
+    if (share < seafront.water.share) {
+      const { toward: _sea, ...own } = input;
+      return liveliestView(own, ahead, every, rule, life);
+    }
+  }
   return best!.view;
 }
 
@@ -558,6 +631,11 @@ export function arrivalView(input: {
    * along the shore at its seafront slant.
    */
   readonly toward?: readonly [east: number, south: number];
+  /**
+   * The town's land's heights and its sea's level, by which a seafront view is held to the open water it
+   * shows (`waterInView`). Absent, a seafront view stands as chosen.
+   */
+  readonly sea?: SeaSight;
 }): ArrivalView {
   const { eastMm, southMm, facing } = input;
   const length = Math.hypot(facing[0], facing[1]) || 1;

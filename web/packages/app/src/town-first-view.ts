@@ -11,8 +11,8 @@
  * version 4 with a seafront view: where a town's entry names a direction its first view looks toward
  * (the sea of a town on land that holds one) and its arrival faces away from it, across the shore
  * street from its seaward footway, the view turns along the shore, the fronts on the land side and the
- * open view on the other, with nothing near across its middle third; it is the version the page
- * opens a town by. All stay readable:
+ * open view on the other, with nothing near across its middle third, where that open view holds enough
+ * water; it is the version the page opens a town by. All stay readable:
  * `firstViewRule` reads any of the five files, and an earlier one with the figures version 4 states
  * as `FIRST_VIEW_DEFAULTS` states them.
  */
@@ -100,12 +100,15 @@ export interface OpenViewRule {
    * away from it within `facingMost`: the view turns `slant` from straight across instead of the rule's slant,
    * from the spot and the way with the most buildings' fronts in view, counted by sight lines `frontStep`
    * apart across `frontHalf` either side, a front once `frontLinesLeast` of them meet it, up to
-   * `frontsLeast`, stepping up to `alongMaximumMm` along the footway, then the most doors. Absent before
-   * version 5.
+   * `frontsLeast`, stepping up to `alongMaximumMm` along the footway, then the most doors. It stands
+   * only where open water fills a band at least `water.band` of the frame's height (whose half field
+   * is `water.halfHeight`) across `water.share` of its width, each column's sight line reading the
+   * land's heights `water.stepMm` apart; elsewhere the town's own view does. Absent before version 5.
    */
   readonly seafront?: {
     readonly facingMost: number; readonly slant: number; readonly frontHalf: number;
     readonly frontStep: number; readonly frontLinesLeast: number; readonly frontsLeast: number; readonly alongMaximumMm: number;
+    readonly water: { readonly band: number; readonly share: number; readonly halfHeight: number; readonly stepMm: number };
   };
 }
 
@@ -199,6 +202,12 @@ export function firstViewRule(text: string): OpenViewRule {
         frontLinesLeast: stated('seafront_front_lines_least', 'count'),
         frontsLeast: stated('seafront_fronts_least', 'count'),
         alongMaximumMm: millimetres('seafront_along_maximum_mm'),
+        water: Object.freeze({
+          band: thousandths('seafront_water_band_thousandths'),
+          share: thousandths('seafront_water_share_thousandths'),
+          halfHeight: radians('seafront_water_half_height_degrees'),
+          stepMm: millimetres('seafront_water_step_mm'),
+        }),
       }),
     }),
   };
@@ -222,7 +231,11 @@ export function firstViewRule(text: string): OpenViewRule {
     || (rule.seafront !== undefined && (!(rule.seafront.frontStep > 0)
       || !(rule.seafront.frontHalf > 0 && rule.seafront.frontHalf < Math.PI / 2)
       || !Number.isInteger(rule.seafront.frontsLeast) || rule.seafront.frontsLeast < 1
-      || !Number.isInteger(rule.seafront.frontLinesLeast) || rule.seafront.frontLinesLeast < 1))) {
+      || !Number.isInteger(rule.seafront.frontLinesLeast) || rule.seafront.frontLinesLeast < 1
+      || !(rule.seafront.water.band > 0 && rule.seafront.water.band < 1)
+      || !(rule.seafront.water.share > 0 && rule.seafront.water.share <= 1)
+      || !(rule.seafront.water.halfHeight > 0 && rule.seafront.water.halfHeight < Math.PI / 2)
+      || !(rule.seafront.water.stepMm > 0)))) {
     throw new Error('the town first-view catalog states distances or an angle that cannot be held together');
   }
   return Object.freeze({ ...rule, life });

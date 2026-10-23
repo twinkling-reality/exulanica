@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.town-first-view/v5",
-  "note": "How the first view of a generated town is chosen. Where nothing is placed in it: by what of the town's life lies in view (its seats and its doors, from its own tiles), with openness to break a tie and nothing at eye height dead ahead. Where things are placed: facing them from the nearest spot that sees them past what the town's tiles stand at eye height and past parked vehicles, with nothing dead ahead nearer than centre_floor_mm. It is chosen from the town's tiles, its served arrival and what is placed, so a town opens the same way every time. Version 4 is version 3 with the figures the view of placed things and the walking-line preference were chosen by, which earlier versions left to the page: the page reads versions 1 to 3 with these same values. Version 5 is version 4 with every first view keeping its middle third clear (middle_third_half_degrees), not dead ahead alone, and with a seafront view: where a town's entry names a direction its first view looks toward (the sea of a town on land that holds one) and its arrival faces away from it, across the shore street from its seaward footway, within seafront_facing_most_degrees, the view turns seafront_slant_degrees from straight across instead of slant_degrees, from the spot and the way with the most buildings' fronts in view up to seafront_fronts_least (seafront_front_half_degrees, seafront_front_step_degrees, seafront_front_lines_least), stepping up to seafront_along_maximum_mm along the footway, then the most of the town's doors (its seats do not count). Every value is a chosen default with its reason: presentation only, changeable by a later version beside this one. Nothing here is a measured cost or a safety bound. Versions 1 to 4 stay beside this file and are read as before.",
+  "note": "How the first view of a generated town is chosen. Where nothing is placed in it: by what of the town's life lies in view (its seats and its doors, from its own tiles), with openness to break a tie and nothing at eye height dead ahead. Where things are placed: facing them from the nearest spot that sees them past what the town's tiles stand at eye height and past parked vehicles, with nothing dead ahead nearer than centre_floor_mm. It is chosen from the town's tiles, its served arrival and what is placed, so a town opens the same way every time. Version 4 is version 3 with the figures the view of placed things and the walking-line preference were chosen by, which earlier versions left to the page: the page reads versions 1 to 3 with these same values. Version 5 is version 4 with every first view keeping its middle third clear (middle_third_half_degrees), not dead ahead alone, and with a seafront view: where a town's entry names a direction its first view looks toward (the sea of a town on land that holds one) and its arrival faces away from it, across the shore street from its seaward footway, within seafront_facing_most_degrees, the view turns seafront_slant_degrees from straight across instead of slant_degrees, from the spot and the way with the most buildings' fronts in view up to seafront_fronts_least (seafront_front_half_degrees, seafront_front_step_degrees, seafront_front_lines_least), stepping up to seafront_along_maximum_mm along the footway, then the most of the town's doors (its seats do not count); it stands only where open water fills a band at least seafront_water_band_thousandths of the frame's height across seafront_water_share_thousandths of its width (seafront_water_half_height_degrees, seafront_water_step_mm), and elsewhere the town's own first view, as for an arrival facing any other way. Every value is a chosen default with its reason: presentation only, changeable by a later version beside this one. Nothing here is a measured cost or a safety bound. Versions 1 to 4 stay beside this file and are read as before.",
   "entries": [
     {
       "key": "slant_degrees",
@@ -246,6 +246,34 @@
       "unit": "millimetre",
       "class": "chosen_default",
       "reason": "A seafront view may step this far along the footway from where the town says a person arrives, where along_maximum_mm's 6 m may not be enough for three fronts: on a small town whose shore row is three buildings over 71 m (26 m and 30 m fronts among them), three fronts show only from 16.5 m along from the middle of the block; on seven other towns measured, within 6 m. The arrival stands mid-block, so 18 m along still stands at least 27 m from either corner on the shortest block the schema admits (90 m), more than the 15 m DESIGN asked a seafront arrival to keep from a corner, and a view that already shows three fronts is not moved (seafront_fronts_least)."
+    },
+    {
+      "key": "seafront_water_band_thousandths",
+      "value": 50,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "A seafront view looks along the shore with the town on one side and open water on the other, and the water counts in a column of the frame only where it fills a band at least this many thousandths of the frame's height, from the nearest open water seen past the land up to the horizon: 54 px of a 1080 px frame, which DESIGN asks for. Where a town's land holds its sea far beyond a wide field, the sea is a grey line about 12 px tall at the foot of the sky and the view shows the town beside an empty field: measured on a small town on hillside land, the seafront view's water reached that band in no column."
+    },
+    {
+      "key": "seafront_water_share_thousandths",
+      "value": 250,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "A seafront view stands only where its water fills that band across at least this share of the frame's width; elsewhere the town's own first view stands, as for an arrival facing any other way. DESIGN asks for water across a third, measured on the drawn picture, where the cascade's pools count too; measured from the land's own heights, open sea alone, the two towns by the sea on coast land version 3 read 328 and 311 thousandths at their seafront views (their pictures 341 and 330) and the small town on hillside land, whose sea is a line at the foot of the sky, none. A quarter keeps both towns by the sea seafront with room for a town that shows a little less, and still turns away every view whose sea is only a line."
+    },
+    {
+      "key": "seafront_water_half_height_degrees",
+      "value": 35,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "The water's band is measured in the frame DESIGN measures views in: half of the page's 70 degree vertical field, the field seafront_front_half_degrees' 102 degree horizontal one goes with at 16:9. A viewer's own field of view does not change which view a town opens on, so a town opens the same way for every viewer."
+    },
+    {
+      "key": "seafront_water_step_mm",
+      "value": 500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Each column's sight line reads the land's heights this far apart, out to where even open water would stand under the band: half the near land's 1 m cell, so a bank or a dune a cell wide between the viewer and the water is not stepped over."
     }
   ]
 }

@@ -44,7 +44,7 @@
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import { rememberTownFurniture } from './town-furniture.js';
-import { furnitureOnLand, loadTownLand, rememberTownLand, withTownLand, withoutEdge } from './town-land.js';
+import { furnitureOnLand, loadTownLand, rememberTownLand, townGround, withTownLand, withoutEdge } from './town-land.js';
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -432,6 +432,10 @@ export async function loadGeneratedWorld(
   // may or may not arrive in time, are not asked after: the town opens the same way either way.
   const [targets, parked] = await Promise.all([placing, parking]);
   const sightBlockers = sightBlockersOfTown(route, containers, loaded);
+  // Where the town's land holds a sea, its heights (the walked ground, else the land's) and the sea's
+  // level, so a seafront view stands only where it shows enough open water (town-first-view version 5).
+  const sea = town?.land.section.water.find((body) => body.kind === 'sea');
+  const heights = sea === undefined ? undefined : townGround(entry.entryId, loaded.navigationWorld);
   const view = arrivalView({
     eastMm: stand?.eastMm ?? east, southMm: stand?.southMm ?? south, facing: [facingEast, facingSouth],
     // The way to the sea, where the town's land holds one: an arrival on the shore street's seaward
@@ -446,6 +450,13 @@ export async function loadGeneratedWorld(
     fronts: buildingsOfTown(loaded),
     open: TOWN_FIRST_VIEW,
     life: lifeOfTown(route, containers, furniture),
+    ...(sea === undefined || heights === undefined ? {} : {
+      sea: {
+        groundMm: (e: number, s: number) => heights(e / 1000, s / 1000) * 1000,
+        levelMm: sea.levelMm,
+        eyeMm: loaded.navigationWorld.eyeHeight * 1000,
+      },
+    }),
   });
   const standHeight = view.moved ? surface.sample(view.eastMm / 1000, view.southMm / 1000)?.height ?? null : null;
   const start = {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   arrivalView, crosses, frontsInView, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
-  type LifeViewRule, type OpenViewRule, type SightBlocker,
+  waterInView, type LifeViewRule, type OpenViewRule, type SeaSight, type SightBlocker,
 } from '../src/composition/arrival-view.js';
 import { FIRST_VIEW_DEFAULTS } from '../src/town-first-view.js';
 
@@ -593,6 +593,7 @@ describe('the first view of a town whose entry names a direction to look toward'
     seafront: {
       facingMost: Math.PI / 4, slant: 72 * DEGREE, frontHalf: 40 * DEGREE, frontStep: DEGREE,
       frontLinesLeast: 2, frontsLeast: 3, alongMaximumMm: 6_000,
+      water: { band: 0.05, share: 1 / 3, halfHeight: 35 * DEGREE, stepMm: 500 },
     },
   };
 
@@ -702,5 +703,67 @@ describe('the first view of a town whose entry names a direction to look toward'
     }
     expect(arrivalView({ ...town, blockers: street, open: LIVELY, life, toward: [0, 1_000] }))
       .toEqual(arrivalView({ ...town, blockers: street, open: LIVELY, life }));
+  });
+});
+
+describe('the open water a seafront view shows', () => {
+  // Level land at the sea's level out to a straight shore `shoreMm` south of a person standing on it, the
+  // sea's floor 1 m under its level beyond; an eye 1.6 m above the ground. At a 70 degree vertical field,
+  // open water stands a twentieth of the frame's height below the horizon out to
+  // 1.6 m / (2 tan 35 degrees x 0.05) = 22.85 m ahead.
+  const WATER = { band: 0.05, halfHeight: 35 * DEGREE, stepMm: 500 };
+  const coast = (shoreMm: number, ridge?: { fromMm: number; toMm: number; heightMm: number }): SeaSight => ({
+    groundMm: (_east, south) => (ridge !== undefined && south >= ridge.fromMm && south <= ridge.toMm
+      ? ridge.heightMm : south < shoreMm ? 0 : -1_000),
+    levelMm: 0,
+    eyeMm: 1_600,
+  });
+  const share = (sea: SeaSight, toward: readonly [number, number], rings: readonly SightBlocker[] = []) =>
+    waterInView([0, 0], toward, sea, rings, 51 * DEGREE, DEGREE, WATER);
+
+  it('is the share of the frame\'s width whose nearest open water stands far enough below the horizon', () => {
+    expect(share(coast(4_000), [0, 1])).toBe(1);
+    expect(share(coast(4_000), [0, -1])).toBe(0);
+    // Along the shore, a column a degrees seaward of the middle meets the sea 4 m / sin a off, which stands
+    // in the band while 4 m / sin a <= 22.85 m / cos a: from 9.93 degrees, so every column from 10 degrees out.
+    expect(share(coast(4_000), [1, 0])).toBeCloseTo((Math.tan(51 * DEGREE) - Math.tan(10 * DEGREE)) / (2 * Math.tan(51 * DEGREE)), 9);
+    // A sea beyond a wide field is a line at the foot of the sky: no column holds the band.
+    expect(share(coast(60_000), [0, 1])).toBe(0);
+    // Positive control for the next two: the sea 10 m off, looked straight at.
+    expect(share(coast(10_000), [0, 1])).toBe(1);
+  });
+
+  it('counts no water the land nearer or a wall at eye height hides', () => {
+    // A dune 6 m high from 2 m to 4 m out, the shore at 10 m.
+    expect(share(coast(10_000, { fromMm: 2_000, toMm: 4_000, heightMm: 6_000 }), [0, 1])).toBe(0);
+    const wall: SightBlocker = [[-200_000, 3_000], [200_000, 3_000], [200_000, 4_000], [-200_000, 4_000]];
+    expect(share(coast(10_000), [0, 1], [wall])).toBe(0);
+  });
+
+  it('holds a seafront view to it, else opens on the town\'s own view', () => {
+    // As above: arriving on the seaward footway facing north across the street, the sea to the south.
+    const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+    const SEAFRONT = {
+      ...LIVELY,
+      middleThirdHalf: 23 * DEGREE,
+      seafront: {
+        facingMost: Math.PI / 4, slant: 86 * DEGREE, frontHalf: 51 * DEGREE, frontStep: DEGREE,
+        frontLinesLeast: 2, frontsLeast: 3, alongMaximumMm: 6_000, water: { ...WATER, share: 1 / 3 },
+      },
+    };
+    const life = { seats: [], doors: [[20_000, -16_000]] as [number, number][] };
+    const seafront = { ...town, blockers: [opposite], open: SEAFRONT, life, toward: [0, 1_000] as const };
+    const own = arrivalView({ ...town, blockers: [opposite], open: SEAFRONT, life });
+    // Positive control: with the sea 4 m off the view runs along the shore at the seafront slant, which the
+    // town's own view (60 degrees) does not, and over a third of its width holds the band.
+    const near = arrivalView({ ...seafront, sea: coast(4_000) });
+    expect(looks(near.yaw)[1]).toBeCloseTo(-Math.cos(86 * DEGREE), 9);
+    expect(looks(own.yaw)[1]).toBeCloseTo(-Math.cos(60 * DEGREE), 9);
+    expect(waterInView([near.eastMm, near.southMm], looks(near.yaw), coast(4_000), [opposite], 51 * DEGREE, DEGREE, WATER))
+      .toBeGreaterThanOrEqual(1 / 3);
+    // The sea 60 m off: the town's own view, as for an arrival facing any other way.
+    expect(arrivalView({ ...seafront, sea: coast(60_000) })).toEqual(own);
+    // Handed no sea, a seafront view stands as chosen.
+    expect(arrivalView(seafront)).toEqual(near);
   });
 });
