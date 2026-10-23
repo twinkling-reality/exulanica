@@ -442,6 +442,88 @@ decoder pins and the migrated courtyard point map are exceptions; preserve their
 The preview also needs its locally supplied synthetic source images. Do not infer a complete
 clean-checkout preview from the presence of one tracked geometry file.
 
+### Running your own install
+
+A person runs Exulanica on their own computer as a personal install: one command starts its database, API, workers
+and the world workspace, and keeps everything they make in `~/Exulanica`. Install the [prerequisites](#prerequisites),
+the [backend](#backend) and [web](#web) dependencies and PostgreSQL 18 with pgvector
+([local database](local-database.md)), then work in a terminal at the root of the checkout.
+
+For open models to decide for a world's people and to make a world from a sentence, the install needs your own Nebius
+Token Factory key. Type it so that it neither shows nor enters your shell's history:
+
+```bash
+read -rs "NEBIUS_API_KEY?Nebius key: "; export NEBIUS_API_KEY      # zsh
+read -rsp "Nebius key: " NEBIUS_API_KEY; echo; export NEBIUS_API_KEY  # bash
+```
+
+Then say where model requests may go and how the install spends:
+
+```bash
+export EXULANICA_EGRESS_ALLOWLIST='["https://api.tokenfactory.nebius.com"]'
+export EXULANICA_SPENDING=durable
+export EXULANICA_BUDGET_USD=5
+export EXULANICA_BUDGET_MAX_CALLS=2000
+```
+
+The allowlist names the only origin the API may send a model request to. `durable` spends only within an allowance
+granted to the install (below), which stays open across restarts. The two budget figures are a limit on each start of
+the API: it stops asking after that many US dollars or calls and counts from zero at the next start. Choose your own
+figures.
+
+Start the install:
+
+```bash
+python3 scripts/acceptance/launch.py up --worktree . --personal --model --tiles
+```
+
+- `--personal` makes it your own install, kept in `~/Exulanica`.
+- `--model` hands the five settings above to the API, and refuses to start, naming the first one that is missing.
+- `--tiles` lets the install bake the tiles a made town is drawn from.
+- `--creatures`, optional, lets the install draft creatures from words.
+- `--slot N` (0 to 6) moves the install to another set of ports when one is taken.
+
+The install keeps everything the person makes in `~/Exulanica`, a folder of theirs that no other account can write:
+the durable [local database](local-database.md) in `database/` (made on the first run, started on every later one, and
+upgraded first when this checkout has migrations it lacks, after a file copy of the stopped data), the workspace's
+identity and token in `install/`, the content store in `store/`, the world projects in `projects/` and the spending
+witness in `spending-witness/`, the same directory on every run, so an allowance granted to the install stays open
+across `down` and `up`. It then starts the API with a personal install's settings and its workers, and the world
+workspace on the slot's app port, and prints that page's address. `down` stops the database through
+`exulanica-local-db stop`, which takes a backup. Worlds played before this checkout kept their moments get them from
+`python3 scripts/acceptance/launch.py moments-backfill --worktree .`, run once while the install is up and before its
+worlds play on: it reports what it would write, and writes it with `--apply`
+([a world's moments](synthetic-society-contract.md#a-worlds-moments)).
+
+The launcher never writes the key to a file, a log or a record: it hands it to the API process, which holds it in
+memory and sends model requests only to the allowlist's origins. Each later `up` needs the five settings again in its
+terminal. Stop the install with `python3 scripts/acceptance/launch.py down --worktree .`.
+
+#### Opening spending
+
+A durable install spends nothing until it is granted an allowance. Grant one once, after the first `up` and while the
+install runs, from a second terminal at the checkout. First read the database's owner address and the install's
+workspace:
+
+```bash
+OWNER=$(uv run exulanica-local-db status --directory ~/Exulanica/database | sed -n 's/^owner (migrations and provisioning only; the API refuses it): //p')
+WS=$(python3 -c 'import json, os; print(json.load(open(os.path.expanduser("~/Exulanica/install/workspace.json")))["workspace_id"])')
+export EXULANICA_DATABASE_URL=$OWNER EXULANICA_SPENDING_WITNESS_DIR=~/Exulanica/spending-witness
+```
+
+Then issue the install's spending authority (the most it may ever spend, until an end date you choose), grant the
+workspace an allowance under it (no larger than the authority) and check it:
+
+```bash
+uv run python -m exulanica.spending issue --provider nebius_token_factory --ceiling-usd 10 --max-calls 4000 --valid-until <YYYY-MM-DDT00:00:00Z> --operator owner --reason "own install"
+uv run python -m exulanica.spending grant --authority <authority_id> --workspace "$WS" --ceiling-usd 10 --max-calls 4000 --valid-until <YYYY-MM-DDT00:00:00Z> --operator owner --reason "own install"
+uv run python -m exulanica.spending status --workspace "$WS"
+```
+
+`issue` prints the `authority_id` the grant names. The running install sees the grant at once, and it stays open across
+`down` and `up`. The [spending contract](model-spending-contract.md#10-operator-commands) owns these commands and
+their refusals. The owner address is needed only for them, so close the second terminal afterwards.
+
 ### What runs
 
 The API and worker entrypoints above exist; execution requires their stated database, role,
@@ -450,29 +532,18 @@ development-only, read-only synthetic fixture, not the authenticated backend or 
 acceptance run. Stop the landing server before starting the application on its default port, or use
 the port printed by Vite.
 
-One command starts a person's own install on this computer:
-`python3 scripts/acceptance/launch.py up --worktree . --personal`. It keeps everything the person
-makes in `~/Exulanica`, a folder of theirs that no other account can write: the durable
-[local database](local-database.md) in `database/` (made on the first run, started on every later one,
-and upgraded first when this checkout has migrations it lacks, after a file copy of the stopped data),
-the workspace's identity and token in `install/`, the content store in `store/`, the world projects
-in `projects/` and the spending witness in `spending-witness/`, the same directory on every run, so an
-allowance granted to the install stays open across `down` and `up`. It then starts the API with a personal install's settings and its workers, and the
-world workspace on the slot's app port, and prints that page's address. `down` stops the database
-through `exulanica-local-db stop`, which takes a backup. Worlds played before this checkout kept
-their moments get them from `python3 scripts/acceptance/launch.py moments-backfill --worktree .`,
-run once while the install is up and before its worlds play on: it reports what it would write, and
-writes it with `--apply` ([a world's moments](synthetic-society-contract.md#a-worlds-moments)).
 See [capability boundaries](README.md#capability-boundaries) and [product direction](product-direction.md).
 
-### Opt-in world interface previews
+### The world workspace and the product preview
 
-The source adapters under [`tools/previews`](../tools/previews/) preserve experimental
-interfaces without replacing the production application's entry point. They use the native
-application and authenticated world reads. Their source transformations refuse changed bootstrap
-seams; they are development tools, not deployment launchers or an approved visual system.
+The world workspace ([`tools/previews/world-workspace`](../tools/previews/world-workspace/)) is the page a personal
+install serves: `--personal` starts it on its slot's app port ([running your own install](#running-your-own-install)).
+The product preview ([`tools/previews/product-uiux`](../tools/previews/product-uiux/)) is a preview of a landing page
+and a chooser. Both are source adapters: they transform the native application's source and use authenticated world
+reads, rather than replace the production application's entry point, and their source transformations refuse changed
+bootstrap seams. `?preview=1` is the read-only fixture [above](#what-runs), separate from both.
 
-Both launchers require `EXULANICA_REVIEW_RUNTIME_STATE_FILE`, the path to a private JSON descriptor
+Run by hand against an existing runtime, both launchers require `EXULANICA_REVIEW_RUNTIME_STATE_FILE`, the path to a private JSON descriptor
 with `ports.api` and an absolute `token_file` path. The descriptor and bearer file must stay outside
 Git. Use an existing authorized runtime; the preview never creates replacement worlds. Do not log
 the injected browser environment or raw transformed source, which can contain credentials.
@@ -499,17 +570,17 @@ limited object-relative discovery, proximity-gated Inspect, declared entity data
 behavior/activity and selected-record Companion flows. Model offers come from the server's role
 catalog; an assigned model does not prove a connected provider or a recorded decision. These
 adapters do not provide whole-world semantic selection, a global Companion, or renderer performance
-acceptance. Their initial6m/7m inspect thresholds are prototype presentation settings.
+acceptance. Their initial 6 m and 7 m inspect thresholds are prototype presentation settings.
 
-The product preview uses19972: `/home` serves its rebuildable landing output and `/?workspace=1`
-opens the chooser. Ordinary saved-entry navigation forwards to19974. Native camera previews stay
-on19972 and refuse writes. The tracked capture catalog is empty; live previews use actual saved
+The product preview uses 19972: `/home` serves its rebuildable landing output and `/?workspace=1`
+opens the chooser. Ordinary saved-entry navigation forwards to 19974. Native camera previews stay
+on 19972 and refuse writes. The tracked capture catalog is empty; live previews use actual saved
 worlds. An optional private `EXULANICA_REVIEW_PREVIEWS_DIRECTORY` can supply a capture catalog and
 images bound to matching entry/version/style/state identities. Keep captures and runtime data
 private. The source adapters have browser/esbuild and focused boundary checks; they are outside the
 production packages' strict TypeScript project graph.
 
-The workspace's isolated observer mode requires an explicitly supplied descriptor for API20031,
+The workspace's isolated observer mode requires an explicitly supplied descriptor for API 20031,
 `EXULANICA_REVIEW_PORT=20032` and `EXULANICA_REVIEW_OBSERVER_ONLY=1`. It has a separate cache, permits
 only GET/HEAD on its native API proxy and hides assignment, playback and Companion POST controls.
 The backend must also enforce read-only authorization. This viewer reads stored activity; it does

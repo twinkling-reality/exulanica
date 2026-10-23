@@ -14,6 +14,7 @@ saved world is one capability. The
 | Understand the goal and delivery order | [Product direction](product-direction.md) |
 | See how people and models run a world, and how two models are compared | [People and models in a world](capabilities/simulation.md) |
 | Understand how the system fits together | [Architecture overview](architecture-overview.md) |
+| Run Exulanica on my own computer, with open models deciding | [Running your own install](development-setup.md#running-your-own-install) |
 | Run or change the application | [Development setup](development-setup.md), then the contract for the affected behavior |
 | Keep a world's database on my own computer | [Local database](local-database.md) |
 | Build something using a world | [World API](capabilities/world-api.md) and [Python client](capabilities/developer-client.md) |

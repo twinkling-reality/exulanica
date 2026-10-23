@@ -8,7 +8,7 @@
       "documents": [
         {"path": "product-direction.md", "role": "overview", "owns": "Product scope, delivery order, milestone status and acceptance gates"},
         {"path": "architecture-overview.md", "role": "overview", "owns": "System shape, backend layers, source-code entry points and language adoption"},
-        {"path": "development-setup.md", "role": "guide", "owns": "Installation, test and API servers, workers and focused verification"},
+        {"path": "development-setup.md", "role": "guide", "owns": "Installation, running your own install, test and API servers, workers and focused verification"},
         {"path": "documentation-standard.md", "role": "standard", "owns": "Documentation ownership, lifecycle and review rubric"}
       ]
     },
