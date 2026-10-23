@@ -324,7 +324,8 @@ def role_request(
         option.kind == role.adapter.IDLE_KIND for option in options
     ):
         return None, "nothing_to_choose"
-    context = role.adapter.context(role, state, source, subject_id, options)
+    # The request's own contract, so what it is told reads its own catalogs' rules (F9).
+    context = role.adapter.context(role, state, source, subject_id, options, contract=contract)
     if withhold is not None:
         context = withhold(context)
     if context_bytes(context) > contract.value("context_bytes_maximum"):

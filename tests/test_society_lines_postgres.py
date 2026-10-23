@@ -54,8 +54,8 @@ class _Speaker(FakeTransport):
         properties = payload["tools"][0]["function"]["parameters"]["properties"]
         labels = properties["action"]["enum"]
         say = next(
-            # The other knight, named as the page names it: "knight 2".
-            (label for label in labels if label.startswith("say something to knight")),
+            # The other knight, named as the page names it: "Knight 2", capitals kept (F9).
+            (label for label in labels if label.startswith("say something to Knight")),
             None,
         )
         if say is not None:

@@ -637,6 +637,21 @@ replays under the prompt it records; the sixth prompt stays readable for them. O
 its existing bound), and a being whose context would exceed the bound is not asked that minute,
 never sent a shortened context.
 
+Registry version 11 asks new requests of an `exulanica-society/v7` society under action catalog
+version 9 and prompt `society-person-choice/v8`, with policy catalog version 8 and the seventh
+prompt's instruction. The ninth action catalog keeps the eighth's actions and words. From version
+11 each registry entry states the action catalog version from which each of its label rules holds
+(`names_as_written_from_action_version`, `straight_line_distances_from_action_version`), and a
+contract carries the rules its action catalog reaches (`label_rules`). Under `names_as_written` an
+option, what a being notices and what it remembers name a being as the page names it, capitals
+kept ("say something to Ivo Reed (a villager), 3 m away"); under an earlier contract they read in
+lowercase words. Under `straight_line_distances` an option naming a being states the straight-line
+metres to it, as what the being notices does. A request's context reads its rules from the
+request's own contract, so every stored request rebuilds to the byte under the catalogs it records.
+An option label a model answers with is words with or without capitals, digits, spaces and a
+little punctuation, never a double quote, a square bracket or a newline
+(`exulanica.models.choice.ChoiceRequest`).
+
 Version 3 keeps version 2's actions and bounds and adds:
 
 | Action | Kind | Words a model reads |

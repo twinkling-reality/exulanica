@@ -63,8 +63,9 @@ LINE_ARGUMENT: Final = "line"
 #: The most characters any request may let a line hold: a bound on the schema, which rides in
 #: every request that takes a line.
 LINE_CHARACTERS_BOUND: Final = 1_000
-#: An option label: lowercase product vocabulary, no capitals, brackets, quotes or newlines.
-_LABEL: Final = re.compile(r"^[a-z0-9][a-z0-9 ,.'()-]{0,118}[a-z0-9)]$")
+#: An option label: product vocabulary, a being's name keeping its capitals (F9); no brackets but
+#: round ones, no double quotes and no newlines.
+_LABEL: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ,.'()-]{0,118}[A-Za-z0-9)]$")
 #: The description is instruction text: printable ASCII, one line, bounded.
 _DESCRIPTION: Final = re.compile(r"^[ -~]{1,300}$")
 
@@ -102,7 +103,7 @@ class ChoiceRequest:
         for option in options:
             if not isinstance(option, str) or not _LABEL.fullmatch(option):
                 raise ValueError(
-                    f"option {option!r} is not a label: lowercase words, digits, spaces and "
+                    f"option {option!r} is not a label: words, digits, spaces and "
                     "a little punctuation, as product vocabulary reads"
                 )
         object.__setattr__(self, "options", options)

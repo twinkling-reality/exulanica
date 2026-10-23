@@ -8,6 +8,7 @@ positions this file sets, and what a being is doing from actions this file write
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 
 import pytest
@@ -69,9 +70,11 @@ def _square(population: int = 3):
 
 def test_a_being_notices_who_is_near_named_as_its_say_options_name_them():
     state, document, knight, _spirit, villagers = _square()
-    block = surroundings(state, document, knight["id"], TERMS)
     role = person_role()
     contract = role.contract(role.terms(THINGS_PROFILE).versions)
+    # Named as a request under that contract names them: capitals kept from the ninth catalog (F9).
+    terms = dataclasses.replace(TERMS, names_as_written="names_as_written" in contract.label_rules)
+    block = surroundings(state, document, knight["id"], terms)
     options = choice_options(state, document, knight["id"], contract, seed=SEED)
     # The say options name each being who hears, and the block must name it the same way.
     said_to = {o.addressee_id: o.label for o in options if o.kind == "say_to" and o.addressee_id}

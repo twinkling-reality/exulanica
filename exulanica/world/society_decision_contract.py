@@ -474,7 +474,7 @@ def things_options(
                     label=contract.words["say_to"].format(
                         who=kind_of(other, state).document["label"],
                         number=other["ordinal"] + 1,
-                        name=page_name(other, state).lower(),
+                        name=option_name(other, state, contract),
                         metres=round(distance / 1000),
                     ),
                     addressee_id=other["id"],
@@ -526,7 +526,7 @@ def follow_options(
                 label=contract.words["stop_following"].format(
                     who=kind_of(other, state).document["label"],
                     number=other["ordinal"] + 1,
-                    name=page_name(other, state).lower(),
+                    name=option_name(other, state, contract),
                 ),
                 addressee_id=following,
             )
@@ -558,7 +558,7 @@ def follow_options(
                 label=contract.words["follow"].format(
                     who=kind_of(other, state).document["label"],
                     number=other["ordinal"] + 1,
-                    name=page_name(other, state).lower(),
+                    name=option_name(other, state, contract),
                     metres=round(distance / 1000),
                 ),
                 addressee_id=other["id"],
@@ -612,7 +612,7 @@ def hands_options(
             words.update(
                 who=kind_of(other, state).document["label"],
                 number=other["ordinal"] + 1,
-                name=page_name(other, state).lower(),
+                name=option_name(other, state, contract),
             )
         walk = 0
         if offer.approach_node is not None:
@@ -849,7 +849,7 @@ def choice_options(
                 # The number their simulated name ends with: theirs for the society's life.
                 label=contract.words["talk"].format(
                     number=other["ordinal"] + 1,
-                    name=page_name(other, state).lower(),
+                    name=option_name(other, state, contract),
                     metres=round(walk / 1000),
                 ),
                 kind="talk",
@@ -904,9 +904,11 @@ def observed_context(
     options: Sequence[DecisionOption],
     *,
     profile: str,
+    contract: DecisionContract | None = None,
 ) -> dict[str, Any]:
     """What the person sees, as a request of ``profile`` records it: how they are, and their
-    options in order."""
+    options in order; ``contract``, the request's own, says how the beings it notices and
+    remembers are named."""
     person = _person(state, subject_id)
     routine = routine_of(dict(document))
     rest = [a.preferred_at_need for a in routine.activities.values() if a.preferred_at_need > 0]
@@ -923,7 +925,7 @@ def observed_context(
         "doing": {"kind": action["kind"], "status": action["status"], "reason": action["reason"]},
         "last_activity": None if last is None else _activity_label(routine, last)[1],
         "options": [option.as_record() for option in options],
-        **_things_context(state, person, document),
+        **_things_context(state, person, document, contract),
         **(
             {
                 "clock": dict(state["clock"]),
@@ -975,6 +977,16 @@ def page_name(person: Mapping[str, Any], state: Mapping[str, Any] | None = None)
     return named(person["display_name"], None if kind is None else kind.document["label"])
 
 
+def option_name(
+    person: Mapping[str, Any], state: Mapping[str, Any] | None, contract: DecisionContract
+) -> str:
+    """A being as an option of ``contract`` names it: as the page names it (:func:`page_name`),
+    capitals kept, where the contract holds its words to ``names_as_written``; in lowercase words
+    under an earlier one, as its requests were asked."""
+    name = page_name(person, state)
+    return name if "names_as_written" in contract.label_rules else name.lower()
+
+
 def _speaker_words(heard: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> str:
     """Who said a heard line, as a model reads it: as the page named them (:func:`named`), or, for
     a line heard before names were kept, their kind's label and number."""
@@ -990,17 +1002,23 @@ def _minutes_ago(state: Mapping[str, Any], tick: int) -> int:
 
 
 def _things_context(
-    state: Mapping[str, Any], person: Mapping[str, Any], document: Mapping[str, Any]
+    state: Mapping[str, Any],
+    person: Mapping[str, Any],
+    document: Mapping[str, Any],
+    asked: DecisionContract | None = None,
 ) -> dict[str, Any]:
     """What a society of things' person sees beside a purposeful person's: the engine they are
     asked under, whether something is under way for them, the most characters a line may hold,
     and the lines they heard, oldest first, each with who said it, whether to them and when; and,
     where its society records the modules, what it notices around it and what it remembers.
-    Nothing for any other society's people, whose requests read as they always did."""
+    Nothing for any other society's people, whose requests read as they always did. The beings it
+    notices and remembers are named as written where the request's own contract (``asked``; left
+    out, the one a new request records) holds its words to ``names_as_written`` (F9)."""
     if not of_things(state["profile"]):
         return {}
     role = person_role()
     contract = role.contract(role.terms(state["profile"]).versions)
+    as_written = "names_as_written" in (asked or contract).label_rules
     return {
         "engine": state["profile"],
         "under_way": not at_choice_point(person),
@@ -1019,8 +1037,8 @@ def _things_context(
         **_character(state, person),
         **_said(state, person),
         **_holding(state, person),
-        **_noticed(state, document, person),
-        **_remembers(state, person),
+        **_noticed(state, document, person, as_written),
+        **_remembers(state, person, as_written),
     }
 
 
@@ -1085,7 +1103,10 @@ def _holding(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, A
 
 
 def _noticed(
-    state: Mapping[str, Any], document: Mapping[str, Any], person: Mapping[str, Any]
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    person: Mapping[str, Any],
+    as_written: bool = False,
 ) -> dict[str, Any]:
     """What the being notices around it (:mod:`exulanica.world.society_surroundings`), where its
     society records the notice module: bounded by the row of the version it recorded, and who hears
@@ -1107,11 +1128,14 @@ def _noticed(
         bytes_maximum=row.value("bytes_maximum"),
         hearing_reach_mm=say.value("hearing_reach_mm"),
         offers_version=row.value("offers_version"),
+        names_as_written=as_written,
     )
     return {"surroundings": surroundings(state, document, person["id"], terms)}
 
 
-def _remembers(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]:
+def _remembers(
+    state: Mapping[str, Any], person: Mapping[str, Any], as_written: bool = False
+) -> dict[str, Any]:
     """What the being remembers (:mod:`exulanica.world.society_recollection`), where its society
     records the memory module and it keeps one, a line it already sees as heard or said left out;
     bounded by the row of the version its society recorded. Stated only there."""
@@ -1126,6 +1150,7 @@ def _remembers(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str,
         places_maximum=row.value("places_maximum"),
         handed_maximum=row.value("handed_maximum"),
         bytes_maximum=row.value("bytes_maximum"),
+        names_as_written=as_written,
     )
     shown = {(line["tick"], line["line"]) for line in person.get("heard", ())} | {
         (line["tick"], line["line"]) for line in person.get("said", ())

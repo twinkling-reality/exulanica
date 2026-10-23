@@ -145,6 +145,8 @@ def context(
     source: Mapping[str, Any],
     subject_id: str,
     options: Sequence[SignalOption],
+    *,
+    contract: DecisionContract | None = None,
 ) -> dict[str, Any]:
     signal = _signal(state, subject_id)
     return {

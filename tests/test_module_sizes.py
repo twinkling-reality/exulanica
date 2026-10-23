@@ -73,8 +73,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "reopening a personal world at a saved state, and making a town on its land",
     ),
     "exulanica/world/society_decision_contract.py": (
-        1_537,
-        "the contract a model answers under when it runs a person",
+        1_562,
+        "the contract a model answers under when it runs a person, with the request's own contract "
+        "threaded through its context builders",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
         1_556,

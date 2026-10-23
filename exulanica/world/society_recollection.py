@@ -139,6 +139,9 @@ class RecollectionBounds:
     handed_maximum: int
     bytes_maximum: int
     choices_maximum: int | None = None
+    #: Whether a remembered being is named as written, capitals kept (a request under
+    #: ``names_as_written``).
+    names_as_written: bool = False
 
     def __post_init__(self) -> None:
         names = ("beings_maximum", "places_maximum", "handed_maximum", "bytes_maximum")
@@ -614,19 +617,25 @@ def _label(reference: Mapping[str, Any], state: Mapping[str, Any] | None = None)
 
 
 def _who(
-    entry: Mapping[str, Any], here: Mapping[str, Any], state: Mapping[str, Any] | None = None
+    entry: Mapping[str, Any],
+    here: Mapping[str, Any],
+    state: Mapping[str, Any] | None = None,
+    as_written: bool = False,
 ) -> str:
     """A remembered being as the options name it where it is still here, else by what the
-    meeting kept: its name and kind as the page names them, or its kind and number."""
+    meeting kept: its name and kind as the page names them, or its kind and number; a name keeps
+    its capitals ``as_written``, else it reads in lowercase words."""
     from exulanica.world.society_decision_contract import named, page_name
 
     person = here.get(entry["id"])
     if person is not None:
-        return page_name(person, state).lower()
+        name = page_name(person, state)
+        return name if as_written else name.lower()
     label = _label(entry["kind"], state)
     if entry["name"] is None:
         return f"the {label} (person {entry['number']})"
-    return named(entry["name"], label).lower()
+    name = named(entry["name"], label)
+    return name if as_written else name.lower()
 
 
 def remembered(
@@ -650,7 +659,7 @@ def remembered(
     beings = []
     for entry in sorted(recollection["met"], key=lambda e: (-e["last_tick"], e["id"])):
         being: dict[str, Any] = {
-            "who": _who(entry, here, state),
+            "who": _who(entry, here, state, bounds.names_as_written),
             "met_minutes_ago": now - entry["first_tick"],
             "last_minutes_ago": now - entry["last_tick"],
             "times": entry["times"],
@@ -681,7 +690,7 @@ def remembered(
             {
                 "thing": _label(entry["thing"], state),
                 "way": entry["way"],
-                "who": _who(entry["other"], here, state),
+                "who": _who(entry["other"], here, state, bounds.names_as_written),
                 "minutes_ago": now - entry["tick"],
             },
         )

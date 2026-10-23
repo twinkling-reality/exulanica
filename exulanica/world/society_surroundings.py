@@ -68,6 +68,8 @@ class NoticeTerms:
     bytes_maximum: int
     hearing_reach_mm: int
     offers_version: int
+    #: Whether a being is named as written, capitals kept (a request under ``names_as_written``).
+    names_as_written: bool = False
 
     def __post_init__(self) -> None:
         for name in ("reach_mm", "beings_maximum", "things_maximum", "bytes_maximum"):
@@ -99,11 +101,15 @@ def _metres(distance_mm: int) -> int:
     return round(distance_mm / 1000)
 
 
-def _who(person: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> str:
-    """A being as the say and give options name it."""
+def _who(
+    person: Mapping[str, Any], state: Mapping[str, Any] | None = None, as_written: bool = False
+) -> str:
+    """A being as the say and give options name it: capitals kept ``as_written``, else in
+    lowercase words."""
     from exulanica.world.society_decision_contract import page_name
 
-    return page_name(person, state).lower()
+    name = page_name(person, state)
+    return name if as_written else name.lower()
 
 
 def _doing(
@@ -218,7 +224,7 @@ def surroundings(
     beings = [row for row in beings if row[0] <= terms.reach_mm]
     listed_beings = [
         {
-            "who": _who(other, state),
+            "who": _who(other, state, terms.names_as_written),
             "kind": str(kind_of(other, state).document["label"]),
             "metres": _metres(distance),
             "doing": _doing(other, people, targets, routine, state),

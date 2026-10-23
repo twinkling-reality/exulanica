@@ -583,10 +583,10 @@ def test_a_being_that_can_say_something_is_offered_to_say_it_to_whoever_hears_it
         p["id"] for _d, p in near[: contract.value("say_options_maximum") - 1]
     ]
     for option, (distance, other) in zip(said, near, strict=False):
-        # Named as the page names it, so a line that copies the words names somebody a viewer
-        # can find.
+        # Named as the page names it, capitals kept (F9), so a line that copies the words names
+        # somebody a viewer can find.
         assert option.label == (
-            f"say something to {other['display_name'].lower()} (a villager), "
+            f"say something to {other['display_name']} (a villager), "
             f"{round(distance / 1000)} m away"
         )
     assert "say_all" in {o.kind for o in options}

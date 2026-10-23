@@ -86,7 +86,10 @@ def context(
     source: Mapping[str, Any],
     subject_id: str,
     options: Sequence[SignalOption],
+    *,
+    contract: DecisionContract | None = None,
 ) -> dict[str, Any]:
+    # A junction's context names no being, so no label rule of its contract changes it.
     return {
         "profile": role.context_profile,
         "subject_id": subject_id,

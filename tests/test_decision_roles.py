@@ -474,10 +474,15 @@ def test_every_role_s_contract_loads_at_every_version_its_catalogs_keep():
                 int(path.name.rsplit(".v", 1)[1].split(".")[0])
                 for path in role.catalog_directory.glob(f"{role.policy_catalog}.v*.json")
             )
-            assert actions and actions == policies, role.key
-            for version in actions:
+            assert actions and policies, role.key
+            # Each version beside the newest of the other catalog at or before it: an action
+            # catalog may move on alone (F9's ninth beside the eighth policy).
+            for version in sorted(set(actions) | set(policies)):
                 contract = role.contract(
-                    {role.action_catalog: version, role.policy_catalog: version}
+                    {
+                        role.action_catalog: max(v for v in actions if v <= version),
+                        role.policy_catalog: max(v for v in policies if v <= version),
+                    }
                 )
                 assert role.adapter.IDLE_KIND in contract.words
 
@@ -719,6 +724,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v8.json": "2e2e53a8402db44d4974f7e69e73b0c4e5135c7895e43fcb7f859c3244c6a5a8",
     "decision-roles.v9.json": "69228db40433e855d23caca3c65a84d7193e01196faefda04b939b24df5f2121",
     "decision-roles.v10.json": "36144cb5efe68c11e5cf11c848bbef79c53fc91bc878a05e7837b6f3c33a0380",
+    "decision-roles.v11.json": "d743b0b9e83f1c356af7b1c0c307ff09e8e08d2e4470f8d976636cb13cf1b6f7",
 }
 
 
@@ -735,15 +741,20 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 8, "society-decision-policy": 8}
+    assert things.versions == {"society-decision-action": 9, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v7",
+        "society-person-choice/v8",
     )
-    # The sixth prompt, which every request made before the seventh records, stays readable with
-    # the same catalogs; the seventh speaks of a character and of past choices only where shown.
+    # The sixth and seventh prompts, which every request made before the eighth records, stay
+    # readable with the eighth catalogs; the seventh speaks of a character and of past choices only
+    # where shown, and the eighth says the same over the ninth action catalog (F9).
     sixth = person.terms_with_prompt("society-person-choice/v6")
-    assert sixth is not None and sixth.versions == things.versions
+    seventh = person.terms_with_prompt("society-person-choice/v7")
+    assert sixth is not None and seventh is not None
+    eighth = {"society-decision-action": 8, "society-decision-policy": 8}
+    assert sixth.versions == seventh.versions == eighth
+    assert seventh.instruction == things.instruction
     assert "When you are told who the being is" in things.instruction
     assert "When you are shown what the being chose lately" in things.instruction
     assert "who the being is" not in sixth.instruction

@@ -61,8 +61,8 @@ class _Hands(FakeTransport):
         properties = payload["tools"][0]["function"]["parameters"]["properties"]
         labels = properties["action"]["enum"]
         chosen = next(
-            # The other knight, named as the page names it: "knight 2".
-            (label for label in labels if label.startswith("give the sword to knight")),
+            # The other knight, named as the page names it: "Knight 2", capitals kept (F9).
+            (label for label in labels if label.startswith("give the sword to Knight")),
             next(
                 (label for label in labels if label.startswith("pick up the sword")),
                 next(label for label in labels if label.startswith(("wait", "carry on"))),

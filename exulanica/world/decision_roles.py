@@ -70,6 +70,7 @@ __all__ = [
     "CHOICE_SUBJECT_FIELDS",
     "FEWEST_OPTIONS",
     "GENERIC_REASONS",
+    "LABEL_RULES",
     "POLICY_KEYS",
     "PROFILE_PATTERNS",
     "REGISTRY_CATALOG",
@@ -281,6 +282,8 @@ class RoleAdapter(Protocol):
         source: Mapping[str, Any],
         subject_id: str,
         options: Sequence[RoleOption],
+        *,
+        contract: DecisionContract | None = None,
     ) -> dict[str, Any]: ...
 
     def option_from_record(self, record: Mapping[str, Any]) -> RoleOption: ...
@@ -325,6 +328,9 @@ class DecisionContract:
     asks_in_a_models_own_order: bool = False
     #: Whether an option this contract states says something, so an answer may carry a line.
     takes_lines: bool = False
+    #: The rules this contract's option words are held to (:data:`LABEL_RULES`), by the action
+    #: catalog version it reads.
+    label_rules: frozenset[str] = frozenset()
 
     def binding(self) -> dict[str, object]:
         """What a decision request records about the contract it was asked under."""
@@ -442,6 +448,9 @@ class DecisionRole:
     #: The terms an engine hosting the role states for its own requests, by engine; an engine
     #: stating none is asked under the role's own terms.
     engine_terms: Mapping[str, RoleTerms] = field(default_factory=dict)
+    #: The action catalog version from which each label rule holds (:data:`LABEL_RULES`), as its
+    #: entry states from registry version :data:`LABEL_RULES_FROM`; none before it.
+    label_rules_from_action_version: Mapping[str, int] = field(default_factory=dict)
     #: Earlier published prompts remain authoritative for already reserved requests.
     historical_terms: Mapping[str, RoleTerms] = field(default_factory=dict, repr=False)
     _contracts: dict[tuple[tuple[str, int], ...], DecisionContract] = field(
@@ -702,6 +711,14 @@ ENGINE_TERMS_FROM: Final = 5
 #: The registry version from which an engine's terms may state the rules their lines are held to
 #: beside the line rule (``line_rules``).
 LINE_RULES_FROM: Final = 7
+#: The registry version from which an entry states, for each rule its options' words are held to
+#: (:data:`LABEL_RULES`), the action catalog version it holds from (``<rule>_from_action_version``).
+LABEL_RULES_FROM: Final = 11
+#: The rules a role's option words are held to from the action catalog version its entry states:
+#: ``names_as_written``, a being named as the page names it, capitals kept, in the options, what
+#: the being notices and what it remembers; ``straight_line_distances``, an option naming a being
+#: stating the straight-line metres to it.
+LABEL_RULES: Final = ("names_as_written", "straight_line_distances")
 _TERM_FIELDS: Final = frozenset(
     {
         "engine",
@@ -780,6 +797,10 @@ def _registry_schema(version: int) -> CatalogSchema:
             ("action_version", _VERSION),
             ("policy_version", _VERSION),
             ("own_order_from_policy_version", _VERSION),
+            *(
+                (f"{rule}_from_action_version", _VERSION)
+                for rule in (LABEL_RULES if version >= LABEL_RULES_FROM else ())
+            ),
             ("subjects_bound", _key),
             *(
                 (name, _matching(re.compile(pattern), f"a {name.replace('_', ' ')}"))
@@ -959,6 +980,11 @@ def load_decision_roles(
             not_offered=str(values["not_offered"]),
             adapter=adapter,  # type: ignore[arg-type]
             engine_terms=engine_terms,
+            label_rules_from_action_version={
+                rule: _whole(values[f"{rule}_from_action_version"])
+                for rule in LABEL_RULES
+                if f"{rule}_from_action_version" in values
+            },
             historical_terms=historical.get(entry.key, {}),
         )
     for name in PROFILE_PATTERNS:
@@ -1076,4 +1102,9 @@ def _contract(role: DecisionRole, versions: Mapping[str, int]) -> DecisionContra
             versions[role.policy_catalog] >= role.own_order_from_policy_version
         ),
         takes_lines=bool(set(words) & set(getattr(role.adapter, "LINE_KINDS", ()))),
+        label_rules=frozenset(
+            rule
+            for rule, since in role.label_rules_from_action_version.items()
+            if versions[role.action_catalog] >= since
+        ),
     )
