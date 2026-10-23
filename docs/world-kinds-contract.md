@@ -199,7 +199,12 @@ landscape's drawing is a job of its own, made when the landscape routes first as
 time its volumes take is never counted against making the world. The worker's bounds:
 
 - a check waits at most 40 s, a world's composition 15 s, a drawing 15 s, a landscape drawing
-  40 s and a place 15 s;
+  40 s and a place 15 s, each counted from when the worker's process starts the job: a request
+  first waits out the jobs handed to the process before its own, so time queued behind other work
+  never refuses it;
+- work that yields to a person's (the shipped settings' ground below, warmed as an API starts where
+  `EXULANICA_WARM_SETTING_GROUNDS` is on) is skipped while any job runs, and a job asked while only
+  such work runs ends that process and runs at once in a new one;
 - one request waits for a job; asking for a job already running is answered at once;
 - at most four jobs wait besides the one running, and one workspace has at most two jobs waiting or
   running, each counting until it finishes, whoever stopped waiting for it;
@@ -209,7 +214,8 @@ time its volumes take is never counted against making the world. The worker's bo
   places (by the receipt's digest and the place, 16 kept) are kept, so asking again reads them; a
   composed world is never kept, since each is made for a fresh identity, and its drawing and its
   society's place are kept as they are made;
-- a process whose oldest job runs past 160 s is replaced, checked at every request.
+- a process whose oldest job runs past 160 s is replaced, checked at every request and every
+  second a request waits out the jobs before its own.
 
 A job the worker does not finish in time, cannot take or loses answers 503 `kind_work_overran`,
 `kind_work_busy` or `kind_work_unavailable` with words and a `Retry-After`, and nothing is written.

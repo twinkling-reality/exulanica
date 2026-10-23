@@ -86,6 +86,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "kinds_from_people_not_boolean": "must be an explicit boolean",
     "personal_install_not_boolean": "must be an explicit boolean",
     "worlds_on_land_not_boolean": "must be an explicit boolean",
+    "warm_setting_grounds_not_boolean": "must be an explicit boolean",
     "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
@@ -144,6 +145,11 @@ PERSONAL_INSTALL_ENV: Final = env_name("PERSONAL_INSTALL")
 #: :mod:`exulanica.world.land_choice`), or on level ground as a place made before it does. On
 #: unless it is set off.
 WORLDS_ON_LAND_ENV: Final = env_name("WORLDS_ON_LAND")
+#: Whether the kind worker realizes the ground below each shipped setting's landscape as the
+#: instance starts, without waiting on it, so the first world made on a setting after a restart is
+#: drawn as soon as the second: on for a personal install (:data:`PERSONAL_INSTALL_ENV`) unless it
+#: is set off, off for any other unless it is set on.
+WARM_SETTING_GROUNDS_ENV: Final = env_name("WARM_SETTING_GROUNDS")
 
 
 def _style_pack_uploads(environ: Mapping[str, str]) -> bool:
@@ -225,6 +231,15 @@ def _societies_of_things(value: str | None, *, personal: bool) -> bool:
     if value is None or not value.strip():
         return personal
     return _explicitly_enabled(value, "society_of_things_not_boolean", SOCIETY_OF_THINGS_ENV)
+
+
+def _warm_setting_grounds(value: str | None, *, personal: bool) -> bool:
+    """Whether the kind worker warms the shipped settings' ground below at start
+    (:data:`WARM_SETTING_GROUNDS_ENV`), or a named refusal: as stated, and when it is absent, on
+    for a personal install and off for any other."""
+    if value is None or not value.strip():
+        return personal
+    return _explicitly_enabled(value, "warm_setting_grounds_not_boolean", WARM_SETTING_GROUNDS_ENV)
 
 
 def _worlds_on_land(value: str | None) -> bool:

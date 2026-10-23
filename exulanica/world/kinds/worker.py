@@ -13,8 +13,13 @@ request. So each runs in one spawned worker process
 request waits for its job without holding the lock, within these bounds:
 
 - **a time limit per job** (:data:`CHECK_SECONDS`, :data:`COMPOSE_SECONDS`,
-  :data:`DRAWING_SECONDS`, :data:`LANDSCAPE_SECONDS`): a job not done by then is answered
-  ``overran``;
+  :data:`DRAWING_SECONDS`, :data:`LANDSCAPE_SECONDS`), counted from when the worker's process
+  starts the job: a request first waits out the jobs handed to the process before it (at most
+  :data:`JOBS_WAITING`), so time queued behind other work never refuses it, and a job not done
+  within its limit after that is answered ``overran``;
+- **work that yields** to a person's: a job asked as yielding (the shipped settings' ground below,
+  warmed as the server starts) is skipped while any job runs, and a request arriving while only
+  yielding work runs ends that process and is computed at once in a new one;
 - **one request waits for a job**: asking for a job already running is answered ``overran`` at
   once, rather than holding another thread, admission place and connection for it;
 - **a bound on jobs waiting** (:data:`JOBS_WAITING`) and **on one workspace's jobs**
@@ -29,7 +34,8 @@ request waits for its job without holding the lock, within these bounds:
   drawn with it: its drawing is a job of its own, made when it is first read. A kept place is
   handed out as a copy of its own, so no request changes what another reads;
 - a worker that dies answers ``unavailable``, and the next job starts a new process; at every
-  request, one whose oldest job runs past :data:`STUCK_SECONDS` is replaced and its process stopped.
+  request, and every second a request waits out the jobs before its own, one whose oldest job runs
+  past :data:`STUCK_SECONDS` is replaced and its process stopped.
 
 Nothing is handed to the pool, or taken from it, while this module's own lock is held: the pool
 runs its callbacks under a lock of its own, and they take this one.
@@ -187,7 +193,8 @@ class Kept:
 @dataclass(frozen=True, slots=True)
 class JobOutcome:
     """A job's answer: ``done`` with what the job returned, or why there is none (``busy`` says
-    ``workspace`` when it is this workspace's own bound)."""
+    ``workspace`` when it is this workspace's own bound, and ``yields`` for work that yields while
+    another job runs)."""
 
     status: JobStatus
     value: dict[str, Any] | None = None
@@ -791,20 +798,42 @@ def parts_job(
 
 
 class _Running:
-    """A job handed to the pool: the pool, when, whose, where it is kept, and its future once the
-    pool has taken it."""
+    """A job handed to the pool: the pool, when, whose, where it is kept, whether it yields to a
+    person's job, its future once the pool has taken it, and whether it has settled (finished, or
+    let go with its pool) for the requests waiting behind it."""
 
-    __slots__ = ("executor", "future", "invalidated", "kept", "started", "workspace")
+    __slots__ = (
+        "executor",
+        "future",
+        "invalidated",
+        "kept",
+        "settled",
+        "started",
+        "workspace",
+        "yields",
+    )
 
     def __init__(
-        self, executor: Executor, started: float, workspace: str, kept: Kept | None
+        self,
+        executor: Executor,
+        started: float,
+        workspace: str,
+        kept: Kept | None,
+        yields: bool = False,
     ) -> None:
         self.executor = executor
         self.started = started
         self.workspace = workspace
         self.kept = kept
+        self.yields = yields
         self.invalidated = False
+        self.settled = threading.Event()
         self.future: Future[dict[str, Any]] | None = None
+
+    def let_go(self) -> None:
+        """Invalidated with its pool: a late answer is never read, and nobody waits behind it."""
+        self.invalidated = True
+        self.settled.set()
 
 
 def _terminate(executor: Executor) -> None:
@@ -875,7 +904,7 @@ class KindWorker:
             self.places.forget(tuple(f"place:{workspace}:{digest}:" for digest in digests))
             executor, self._executor = self._executor, None
             for running in self._running.values():
-                running.invalidated = True
+                running.let_go()
             self._running.clear()
         if executor is not None:
             _terminate(executor)
@@ -887,7 +916,7 @@ class KindWorker:
             self.checks.forget((check_key(workspace, digest),))
             executor, self._executor = self._executor, None
             for running in self._running.values():
-                running.invalidated = True
+                running.let_go()
             self._running.clear()
         if executor is not None:
             _terminate(executor)
@@ -915,10 +944,14 @@ class KindWorker:
         *args: Any,
         workspace: str,
         kept: Kept | None = None,
+        yields: bool = False,
     ) -> JobOutcome:
-        """``job(*args)`` in the worker for ``workspace``, waited for at most ``seconds``; kept in
-        ``kept`` under ``key`` when it finishes, if given."""
+        """``job(*args)`` in the worker for ``workspace``, waited for at most ``seconds`` once the
+        worker's process starts it, after the jobs handed to it before; kept in ``kept`` under
+        ``key`` when it finishes, if given. A job that ``yields`` is answered ``busy`` while any
+        job runs, and ended with its process when a job that does not yield is asked."""
         self._let_stuck_go()
+        yielded: Executor | None = None
         with self._lock:
             if self._closed:
                 # Closed with its server: a job still asking (a draft's thread) starts no process.
@@ -928,6 +961,15 @@ class KindWorker:
                 return JobOutcome("done", found)
             if key in self._running:
                 return JobOutcome("overran")
+            if yields and self._running:
+                return JobOutcome("busy", reason="yields")
+            if self._running and all(running.yields for running in self._running.values()):
+                # Only work that yields runs: its process is ended, and this job starts at once
+                # in a new one.
+                yielded, self._executor = self._executor, None
+                for running in self._running.values():
+                    running.let_go()
+                self._running.clear()
             if len(self._running) > self._waiting:
                 return JobOutcome("busy")
             mine = sum(1 for running in self._running.values() if running.workspace == workspace)
@@ -936,7 +978,13 @@ class KindWorker:
             executor = self._executor
             if executor is None:
                 executor = self._executor = self._make()
-            running = self._running[key] = _Running(executor, self._clock(), workspace, kept)
+            # The process computes one job at a time, in the order handed to it.
+            ahead = [running for running in self._running.values() if running.executor is executor]
+            running = self._running[key] = _Running(
+                executor, self._clock(), workspace, kept, yields
+            )
+        if yielded is not None:
+            _terminate(yielded)
         try:
             future = executor.submit(job, *args)
         except Exception as failed:
@@ -945,6 +993,7 @@ class KindWorker:
             with self._lock:
                 if self._running.get(key) is running:
                     del self._running[key]
+            running.settled.set()
             if not isinstance(failed, BrokenProcessPool | RuntimeError):
                 _log.exception("the kind worker could not take a job")
             self._discard(executor)
@@ -952,6 +1001,11 @@ class KindWorker:
         running.future = future
         # Added once the future is recorded: a future already done runs it at once, here.
         future.add_done_callback(functools.partial(self._finished, key, running))
+        # The limit counts from when the process starts this job, so time queued behind another
+        # never refuses it; one stuck ahead is let go, ending this job's process too.
+        for before in ahead:
+            while not before.settled.wait(1.0):
+                self._let_stuck_go()
         try:
             value = future.result(timeout=seconds)
             with self._lock:
@@ -984,7 +1038,7 @@ class KindWorker:
             if self._executor is executor:
                 self._executor = None
             for key in [k for k, running in self._running.items() if running.executor is executor]:
-                self._running[key].invalidated = True
+                self._running[key].let_go()
                 del self._running[key]
         _terminate(executor)
 
@@ -1000,6 +1054,7 @@ class KindWorker:
                 ):
                     running.kept.put(key, future.result())
                 del self._running[key]
+        running.settled.set()
 
     def close(self) -> None:
         """Stop the worker without waiting on a stuck job, for good: a later job is answered
@@ -1008,7 +1063,7 @@ class KindWorker:
             self._closed = True
             executor, self._executor = self._executor, None
             for running in self._running.values():
-                running.invalidated = True
+                running.let_go()
             self._running.clear()
         if executor is not None:
             _terminate(executor)

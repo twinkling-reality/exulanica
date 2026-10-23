@@ -214,7 +214,14 @@ composition realized, by each field's `input_sha256` and the levels, and the gro
 volume's top by its land's digest and frame: a world's landscape drawn again after a part edit
 realizes only the volume whose top was regraded, if any, and from landscape rules 6, whose ground
 below takes the landscape's own seed, every other world made on that landscape stands over the
-ground realized once. In the kind worker that process is its child, which erasing a world ends.
+ground realized once. In the kind worker that process is its child, which erasing a world ends. An
+API that warms the settings' ground (`EXULANICA_WARM_SETTING_GROUNDS`, on for a personal install)
+asks that child, as it starts and without waiting, to realize the ground below each shipped
+setting's landscape under the newest landscape rules, so the first world made on a setting after a
+restart stands over ground already realized too; the child keeps one ground, so of several settings
+the last warmed is kept. The warming yields to a person's work: a job asked before it finishes ends
+it and runs at once ([world kinds](world-kinds-contract.md#checks)), and that world's ground is realized
+with it, as without the warming.
 
 ## Sea stacks
 

@@ -236,7 +236,7 @@ from exulanica.world import (
 )
 from exulanica.world.errors import WorldRemoved
 from exulanica.world.flight_input import close_flight_worker
-from exulanica.world.kinds.worker import close_kind_worker
+from exulanica.world.kinds.worker import close_kind_worker, kind_worker
 from exulanica.world.society import SocietyBytesNotRead
 from exulanica.world.specification_samples import close_sample_worker
 from exulanica.world.style_pack_library import style_pack_library
@@ -290,6 +290,27 @@ def _problem(
     """
     content: dict[str, object] = {**(extensions or {}), "code": code, "detail": detail}
     return JSONResponse(status_code=status, content=content)
+
+
+def _warm_setting_grounds() -> None:
+    """Ask the kind worker, once, to realize the shipped settings' ground below, never waiting on
+    it: the job runs on in the worker's process and holds what it realized there, unless a person's
+    job is asked first, which it yields to."""
+    from exulanica.world.landscape_drawing import warm_setting_grounds
+
+    try:
+        kind_worker().run(
+            "installation:warm-setting-grounds",
+            0.0,
+            warm_setting_grounds,
+            workspace="installation",
+            yields=True,
+        )
+    except Exception as failure:
+        _LOG.warning(
+            "warming the settings' ground at startup failed",
+            extra={"failure": type(failure).__name__},
+        )
 
 
 @asynccontextmanager
@@ -436,6 +457,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.derivative_worker = worker
     if worker is not None:
         worker.start()
+    if services.warm_setting_grounds:
+        # The shipped settings' ground below, realized in the kind worker as the instance starts,
+        # so the first world made on a setting after a restart is drawn as soon as the second.
+        threading.Thread(target=_warm_setting_grounds, name="warm-grounds", daemon=True).start()
     try:
         if society_thread is not None:
             society_thread.start()

@@ -98,6 +98,7 @@ from exulanica.api.instance_settings import (
     _society_opening,
     _society_tick_interval_ms,
     _style_pack_uploads,
+    _warm_setting_grounds,
     _worlds_on_land,
 )
 from exulanica.api.instance_settings import (
@@ -380,6 +381,10 @@ class Services(ServiceRefusals, WorkerFactories):
     #: hand-built Services, while ``build_services`` reads the setting, which is on unless a host
     #: sets it off.
     worlds_on_land: bool = False
+    #: Whether the kind worker warms the shipped settings' ground below as the instance starts
+    #: (:data:`WARM_SETTING_GROUNDS_ENV`); off for a hand-built Services, as for a shared server
+    #: that does not set it.
+    warm_setting_grounds: bool = False
     #: How a society that is made opens (:data:`SOCIETY_OPENING_ENV`, read by
     #: :mod:`exulanica.api.society_opening`): advanced until a share of its people is outdoors or,
     #: for a society of things, doing something, or not at all. Nothing for a hand-built
@@ -1310,6 +1315,9 @@ def build_services(
         ),
         kinds_from_people=_kinds_from_people(environ),
         worlds_on_land=_worlds_on_land(env_get("WORLDS_ON_LAND", environ)),
+        warm_setting_grounds=_warm_setting_grounds(
+            env_get("WARM_SETTING_GROUNDS", environ), personal=personal
+        ),
         society_opening=_society_opening(env_get("SOCIETY_OPENING", environ)),
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",

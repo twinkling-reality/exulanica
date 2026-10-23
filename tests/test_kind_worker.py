@@ -118,23 +118,31 @@ def test_past_the_waiting_bound_a_job_is_busy_rather_than_queued() -> None:
     release = threading.Event()
     worker = KindWorker(lambda: ThreadPoolExecutor(1), waiting=1, per_workspace=8)
     assert worker.run("one", 0.01, _held(release), workspace="a").status == "overran"
-    assert worker.run("two", 0.01, _held(release), workspace="b").status == "overran"
-    busy = worker.run("three", 0.01, _held(release), workspace="c")
-    assert (busy.status, busy.reason) == ("busy", "")
-    release.set()
+    # A request waits out the jobs before its own, so the one queued is asked aside.
+    with ThreadPoolExecutor(1) as asking:
+        two = asking.submit(worker.run, "two", 5.0, _held(release), workspace="b")
+        _until(lambda: "two" in worker._running)
+        busy = worker.run("three", 0.01, _held(release), workspace="c")
+        assert (busy.status, busy.reason) == ("busy", "")
+        release.set()
+        assert two.result(5).status == "done"
 
 
 def test_a_workspace_past_its_own_bound_is_busy_while_another_is_served() -> None:
     release = threading.Event()
     worker = KindWorker(lambda: ThreadPoolExecutor(1), waiting=8, per_workspace=2)
     assert worker.run("a1", 0.01, _held(release), workspace="a").status == "overran"
-    assert worker.run("a2", 0.01, _held(release), workspace="a").status == "overran"
-    # A job counts until it finishes, whoever stopped waiting for it.
-    mine = worker.run("a3", 0.01, _held(release), workspace="a")
-    assert (mine.status, mine.reason) == ("busy", "workspace")
-    assert "This workspace" in str(KindWorkWaiting("busy", reason="workspace"))
-    assert worker.run("b1", 0.01, _held(release), workspace="b").status == "overran"
-    release.set()
+    with ThreadPoolExecutor(2) as asking:
+        a2 = asking.submit(worker.run, "a2", 5.0, _held(release), workspace="a")
+        _until(lambda: "a2" in worker._running)
+        # A job counts until it finishes, whoever stopped waiting for it.
+        mine = worker.run("a3", 0.01, _held(release), workspace="a")
+        assert (mine.status, mine.reason) == ("busy", "workspace")
+        assert "This workspace" in str(KindWorkWaiting("busy", reason="workspace"))
+        b1 = asking.submit(worker.run, "b1", 5.0, _held(release), workspace="b")
+        _until(lambda: "b1" in worker._running)
+        release.set()
+        assert (a2.result(5).status, b1.result(5).status) == ("done", "done")
 
 
 def test_a_job_that_fails_is_unavailable_not_a_failed_request() -> None:
@@ -161,6 +169,72 @@ def test_a_stuck_job_is_let_go_at_any_request_so_later_ones_are_not_busy_for_eve
     assert worker._running == {}
     assert worker.run("next", 0.01, _held(release), workspace="b").status == "overran"
     release.set()
+
+
+def test_time_queued_behind_another_job_never_refuses_a_job_within_its_own_limit() -> None:
+    release = threading.Event()
+    worker = KindWorker(lambda: ThreadPoolExecutor(1))
+    assert worker.run("first", 0.01, _held(release), workspace="a").status == "overran"
+    # The first job holds the process for a second; the next, limited to a fifth of that, waits it
+    # out and is answered within its own limit once the process starts it.
+    timer = threading.Timer(1.0, release.set)
+    timer.start()
+    started = time.monotonic()
+    second = worker.run("second", 0.2, _held(_released()), workspace="b")
+    assert second.status == "done"
+    assert time.monotonic() - started >= 0.9
+    timer.join()
+
+
+def test_a_request_waiting_behind_a_stuck_job_lets_it_go_rather_than_waiting_for_ever() -> None:
+    now = [0.0]
+    release = threading.Event()
+    worker = KindWorker(lambda: ThreadPoolExecutor(1), stuck_seconds=10.0, clock=lambda: now[0])
+    assert worker.run("stuck", 0.01, _held(release), workspace="a").status == "overran"
+    timer = threading.Timer(0.5, lambda: now.__setitem__(0, 11.0))
+    timer.start()
+    started = time.monotonic()
+    # Waiting behind it, the request finds it stuck and lets its process go, its own job with it.
+    behind = worker.run("behind", 5.0, _held(_released()), workspace="b")
+    assert behind.status == "unavailable"
+    assert time.monotonic() - started < 3.0
+    assert worker._running == {}
+    release.set()
+
+
+def test_work_that_yields_is_ended_by_a_persons_job_and_skipped_while_one_runs() -> None:
+    pools: list[Executor] = []
+
+    def pool() -> Executor:
+        pools.append(ThreadPoolExecutor(1))
+        return pools[-1]
+
+    worker = KindWorker(pool)
+    warming = threading.Event()
+    warm = worker.run("warm", 0.0, _held(warming), workspace="installation", yields=True)
+    assert warm.status == "overran"
+    # A person's job asked while only the yielding work runs is not queued behind it: that work's
+    # process is ended and the job runs at once in a new one.
+    started = time.monotonic()
+    assert worker.run("mine", 1.0, _held(_released()), workspace="w").status == "done"
+    assert time.monotonic() - started < 1.0
+    assert len(pools) == 2 and worker._running == {}
+    # Work that yields, asked while a person's job runs, is skipped and never run.
+    theirs = threading.Event()
+    assert worker.run("theirs", 0.01, _held(theirs), workspace="w").status == "overran"
+    ran: list[str] = []
+
+    def warmed() -> dict[str, str]:
+        ran.append("warm")
+        return {"status": "done"}
+
+    skipped = worker.run("warm", 0.0, warmed, workspace="installation", yields=True)
+    assert (skipped.status, skipped.reason) == ("busy", "yields")
+    theirs.set()
+    warming.set()
+    _until(lambda: not worker._running)
+    assert ran == []
+    worker.close()
 
 
 class _PoolWithItsOwnLock(Executor):
@@ -606,3 +680,134 @@ def _released() -> threading.Event:
     release = threading.Event()
     release.set()
     return release
+
+
+def _until(condition: Any) -> None:
+    for _ in range(250):
+        if condition():
+            return
+        threading.Event().wait(0.02)
+    raise AssertionError("never came to pass")
+
+
+def test_a_personal_install_warms_the_settings_ground_unless_set_off_and_other_values_are_refused(
+    tmp_path, monkeypatch
+) -> None:
+    from types import SimpleNamespace
+
+    from exulanica.api.instance_settings import SocietySettingRefused, _warm_setting_grounds
+    from exulanica.api.services import build_services
+
+    spelled = (None, "", "  ", "on", "off")
+    assert [_warm_setting_grounds(value, personal=True) for value in spelled] == [
+        True,
+        True,
+        True,
+        True,
+        False,
+    ]
+    assert [_warm_setting_grounds(value, personal=False) for value in spelled] == [
+        False,
+        False,
+        False,
+        True,
+        False,
+    ]
+    monkeypatch.setattr(
+        "exulanica.api.services.load_account_runtime", lambda _: SimpleNamespace(guest=None)
+    )
+    environ = {"EXULANICA_DATABASE_URL": "postgresql://unused", "EXULANICA_DATA_DIR": str(tmp_path)}
+    personal = {**environ, "EXULANICA_PERSONAL_INSTALL": "on"}
+    assert build_services(environ).warm_setting_grounds is False
+    assert build_services(personal).warm_setting_grounds is True
+    off = {**personal, "EXULANICA_WARM_SETTING_GROUNDS": "off"}
+    assert build_services(off).warm_setting_grounds is False
+    # Any other value stops startup by name.
+    with pytest.raises(SocietySettingRefused) as caught:
+        build_services({**personal, "EXULANICA_WARM_SETTING_GROUNDS": "soon"})
+    assert caught.value.code == "warm_setting_grounds_not_boolean"
+
+
+def test_after_the_settings_ground_is_warmed_a_world_made_on_its_setting_realizes_no_ground(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from exulanica.grammar.landscape import (
+        LANDSCAPE_RULES_VERSION,
+        read_landscape_document,
+        starting_setting,
+    )
+    from exulanica.world import landscape_drawing as drawing_module
+    from exulanica.world.kinds.library import shipped_kinds, starter_landscape
+
+    # Stand-ins for realizing, which takes seconds: what is counted is each ground realized, in a
+    # memo of the test's own.
+    realized: list[str] = []
+
+    def near(_land: Any, frame: Any) -> Any:
+        realized.append(frame.seed)
+        return SimpleNamespace(chunks=list)
+
+    backdrop = SimpleNamespace(sha256="0" * 64, document=dict)
+    monkeypatch.setattr(drawing_module, "realize_near", near)
+    monkeypatch.setattr(drawing_module, "realize_backdrop", lambda *_: backdrop)
+    monkeypatch.setattr(drawing_module, "water_bodies", lambda *_: [])
+    monkeypatch.setattr(drawing_module, "_grounds", {})
+    warmed = drawing_module.warm_setting_grounds()
+    assert warmed["status"] == "done"
+    assert warmed["warmed"] and len(realized) == len(warmed["warmed"])
+    # Each kind that starts on the setting held last is drawn over the ground the warming realized.
+    starters = [
+        kind
+        for kind in shipped_kinds()
+        if (setting := starting_setting(kind.kind, kind.version)) is not None
+        and setting.key == warmed["warmed"][-1]
+    ]
+    assert starters
+    for kind in starters:
+        landscape = read_landscape_document(starter_landscape(kind))
+        drawing_module._ground(f"world:generated:{kind.kind}", landscape, LANDSCAPE_RULES_VERSION)
+    assert len(realized) == len(warmed["warmed"])
+
+
+@pytest.mark.parametrize("warm", [True, False])
+def test_an_instance_asks_the_kind_worker_once_to_warm_the_settings_ground_and_never_waits(
+    monkeypatch, tmp_path, warm: bool
+) -> None:
+    import asyncio
+    from types import SimpleNamespace
+
+    from exulanica.api.app import _lifespan
+    from exulanica.world.landscape_drawing import warm_setting_grounds
+
+    from test_account_control_integration import services
+
+    release, asked_once = threading.Event(), threading.Event()
+    asked: list[tuple[Any, ...]] = []
+
+    class Worker:
+        def run(
+            self, key: str, seconds: float, job: Any, *args: Any, workspace: str, yields: bool
+        ) -> None:
+            # Released once startup is through: a startup that waited on the job would hold it.
+            asked.append((key, seconds, job, args, workspace, yields, release.wait(5)))
+            asked_once.set()
+
+    monkeypatch.setattr("exulanica.api.app.kind_worker", Worker)
+    monkeypatch.setattr("exulanica.api.app.verify_restore", lambda *_: None)
+    monkeypatch.setattr("exulanica.api.app.seed_reviewed_assets", lambda *_: None)
+    configured = services(tmp_path, warm_setting_grounds=warm)
+    app = SimpleNamespace(state=SimpleNamespace(services=configured, verify_schema_at_boot=False))
+
+    async def scenario() -> None:
+        context = _lifespan(app)
+        await context.__aenter__()
+        release.set()
+        await asyncio.to_thread(asked_once.wait, 5 if warm else 0.2)
+        await context.__aexit__(None, None, None)
+
+    asyncio.run(scenario())
+    # Asked once, as work that yields to a person's, and not waited on.
+    job = ("installation:warm-setting-grounds", 0.0, warm_setting_grounds, (), "installation")
+    assert asked == ([(*job, True, True)] if warm else [])

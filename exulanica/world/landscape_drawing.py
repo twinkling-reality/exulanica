@@ -54,12 +54,14 @@ from exulanica.grammar.landform import (
     water_bodies,
 )
 from exulanica.grammar.landscape import (
+    LANDSCAPE_RULES_VERSION,
     SERVED_LANDSCAPE_RULES,
     LandscapeDocument,
     LandscapeRefused,
     LandscapeSite,
     compose_volumes,
     landscape_catalog,
+    landscape_settings,
     read_landscape_document,
     volume_bodies,
     volumes_section,
@@ -78,6 +80,7 @@ __all__ = [
     "place_landscape_on_site",
     "read_site_landscape",
     "receipt_landscape",
+    "warm_setting_grounds",
 ]
 
 LANDSCAPE_DRAWING_PROFILE: Final = "exulanica.landscape-drawing/v1"
@@ -285,6 +288,22 @@ def ground_seed(world_id: str, land_sha256: str, rules_version: int) -> str:
     if rules_version >= OWN_GROUND_SEED_FROM:
         return hashlib.sha256(f"exulanica.landscape-ground:{land_sha256}".encode()).hexdigest()
     return land_seed(world_id, land_sha256)
+
+
+def warm_setting_grounds() -> dict[str, Any]:
+    """The kind worker's job as an instance starts: the ground below each shipped setting's
+    landscape realized under the newest landscape rules into the ground memo, so the first world
+    made on a setting after a restart draws over ground already realized, as every later one does.
+    The memo keeps one ground, so of several settings the last is held. Answers the settings warmed;
+    none where the newest rules still realize the ground under each world's own seed."""
+    warmed: list[str] = []
+    if LANDSCAPE_RULES_VERSION >= OWN_GROUND_SEED_FROM:
+        for setting in landscape_settings():
+            landscape = read_landscape_document(setting.landscape())
+            if landscape.site is not None:
+                _ground("", landscape, LANDSCAPE_RULES_VERSION)
+                warmed.append(setting.key)
+    return {"status": "done", "warmed": warmed}
 
 
 def _ground(
