@@ -833,7 +833,9 @@ _TILES: Final = _every(
 
 #: Every change to the authored world, and recording generated content against a scene. A bake
 #: request (POST /materials/recipes/{recipe_id}/bake) is a compute amplifier, bounded per workspace
-#: by migration 0066's quota.
+#: by migration 0066's quota. Asking a generated world's tiles to be baked again
+#: (POST /world/versions/{version_id}/tiles/bakes) queues at most one bake per tile at a time, for
+#: a tile with no servable bake, of a world the workspace's world-count policy already bounds.
 _WORLD_WRITES: Final = _every(
     _WORLD_WRITE,
     "POST /materials/recipes",
@@ -930,6 +932,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/things/{thing_id}/move/preview",
     "POST /world/versions/{version_id}/things/{thing_id}/remove",
     "POST /world/versions/{version_id}/things/{thing_id}/remove/preview",
+    "POST /world/versions/{version_id}/tiles/bakes",
     "POST /worlds/generated",
     "POST /worlds/generated/terrain",
     "POST /worlds/kinds",

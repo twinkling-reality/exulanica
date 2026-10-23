@@ -26001,6 +26001,84 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/tiles/bakes",
+    "method": "post",
+    "id": "queue_world_tile_bakes_world_versions__version_id__tiles_bakes_post",
+    "title": "Ask again for the bakes a generated world's tiles lack, as making it did.",
+    "description": "Queue a bake for each tile of the version's generated world that has no servable bake and\nnone queued or running: its own tiles\n(:func:`~exulanica.world.generated_worlds.queue_world_bakes`) and the tiles the version's\nchanges to its buildings alter (:func:`~exulanica.world.version_tiles.queue_version_bakes`),\nin one transaction. A tile whose bake failed is such a tile. Answers how many were queued,\nnone when nothing is missing. A world no recipe's composer composed has no tiles and answers\n404 ``unknown_reference``, as an unknown world or version does; a deployment whose database\nrole cannot register a world is refused 403 ``worlds_read_only`` before anything is queued, as\nmaking one is.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "202": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/TileBakesQueuedView"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "No such world or version here, or a world with no tiles."
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/worlds/kinds",
     "method": "get",
     "id": "library_worlds_kinds_get",

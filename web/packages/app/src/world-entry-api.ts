@@ -493,6 +493,20 @@ export class WorldEntryClient {
     ));
   }
 
+  /**
+   * Ask for the bakes `entry`'s tiles lack, as making its world did
+   * (`POST /world/versions/{version_id}/tiles/bakes`), so a tile whose bake failed is baked again;
+   * how many were queued, none where every tile is baked or has a bake waiting.
+   */
+  async askForBakesAgain(entry: SavedWorldEntry): Promise<number> {
+    const answer = record(await this.#transport.postJson<unknown>(
+      worldPath(`/world/versions/${encodeURIComponent(entry.authoredVersionId)}/tiles/bakes`, entry.worldId), {},
+    ), 'answer to a tile bakes request');
+    const queued = integer(answer['queued'], 'count of tile bakes queued');
+    if (queued < 0) throw new TypeError('Invalid count of tile bakes queued.');
+    return queued;
+  }
+
   /** The kept picture's bytes, while `sha256` is its digest (`GET /world-entries/{entry_id}/picture`). */
   async picture(entryId: string, sha256: string): Promise<Blob> {
     const response = await this.#transport.getBytes(

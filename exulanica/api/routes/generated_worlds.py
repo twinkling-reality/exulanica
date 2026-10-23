@@ -18,6 +18,11 @@ charges the workspace tile quota.
 A generated world's page reads each baked tile through the world it belongs to: the tile's bytes
 are served only when the version's own snapshot names it, held to their digest under the final read
 check, and never charged (``exulanica/api/permissions.py`` says why).
+
+A tile whose bake failed stays failed until it is asked for again: ``POST
+/world/versions/{version_id}/tiles/bakes`` queues the bakes a generated world's tiles lack, as
+making it did, and its tile worker bakes them. A tile already baked, or with a bake queued or
+running, queues nothing, so asking again however often queues one bake per tile at most.
 """
 
 from __future__ import annotations
@@ -124,6 +129,13 @@ class CreateTerrainWorldBody(BaseModel):
     #: The closed terrain-authoring document is validated by the canonical creator.
     authoring: dict[str, Any]
     style_pack: StylePackBody | None = None
+
+
+class TileBakesQueuedView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: How many tile bakes this ask queued: none where every tile is baked or has a bake waiting.
+    queued: int
 
 
 def _problem(status: int, code: str, detail: str, **extra: str) -> JSONResponse:
@@ -445,3 +457,57 @@ def read_world_tile_bytes(
             "X-Exulanica-Tile-Inputs-Digest": inputs,
         },
     )
+
+
+@tiles_router.post(
+    "/versions/{version_id}/tiles/bakes",
+    status_code=202,
+    response_model=TileBakesQueuedView,
+    summary="Ask again for the bakes a generated world's tiles lack, as making it did.",
+    responses={404: {"description": "No such world or version here, or a world with no tiles."}},
+)
+def queue_world_tile_bakes(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> TileBakesQueuedView | JSONResponse:
+    """Queue a bake for each tile of the version's generated world that has no servable bake and
+    none queued or running: its own tiles
+    (:func:`~exulanica.world.generated_worlds.queue_world_bakes`) and the tiles the version's
+    changes to its buildings alter (:func:`~exulanica.world.version_tiles.queue_version_bakes`),
+    in one transaction. A tile whose bake failed is such a tile. Answers how many were queued,
+    none when nothing is missing. A world no recipe's composer composed has no tiles and answers
+    404 ``unknown_reference``, as an unknown world or version does; a deployment whose database
+    role cannot register a world is refused 403 ``worlds_read_only`` before anything is queued, as
+    making one is."""
+    from exulanica.world.generated_worlds import (
+        generation_receipt,
+        queue_world_bakes,
+        states_records,
+    )
+    from exulanica.world.version_tiles import queue_version_bakes, version_changes
+
+    try:
+        require_world_registration(connection)
+    except WorldsReadOnly as exc:
+        return _problem(403, exc.code, str(exc))
+    require_world(connection, session.workspace_id, world_id)
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            "select source_snapshot_id from world_alternate_version where workspace_id=%s "
+            "and world_id=%s and version_id=%s",
+            (session.workspace_id, world_id, version_id),
+        ).fetchone()
+    if row is None:
+        return _problem(404, "unknown_reference", "no such world version")
+    scope = (connection, session.workspace_id, world_id, row["source_snapshot_id"])
+    if not states_records(*scope):
+        return _problem(404, "unknown_reference", "this world has no tiles to bake")
+    try:
+        digest, receipt = generation_receipt(*scope)
+        queued = len(queue_world_bakes(*scope, receipt, digest))
+        queued += len(queue_version_bakes(*scope, version_id, version_changes(*scope, version_id)))
+    except InvalidStructuralData as exc:
+        return _problem(409, "generated_world_unreadable", str(exc))
+    return TileBakesQueuedView(queued=queued)

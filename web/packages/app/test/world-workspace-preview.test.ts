@@ -179,12 +179,27 @@ describe('the world workspace preview\'s edits to this app', () => {
     expect(fails).toBeGreaterThan(-1);
     expect(fails).toBeLessThan(waits);
     const failing = opened.slice(fails, waits);
-    expect(failing).toContain("failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed')");
+    expect(failing).toContain("failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed') + ' ' + say('world.generated.openTriesAgain')");
     expect(failing).toMatch(/await mountNoWorld\(\{ retry: \(\) => start\(token, csrfToken\), failed: [^\n]*\}\);\n\s*return;/u);
     expect(failing).not.toMatch(/\bmount\(\)|setTimeout|location\.reload/u);
     // What Your worlds says, in the words a world that did not open is said with.
-    expect(fill('world.opening.didNotOpen', { title: 'A small town' }) + ' ' + say('world.generated.failed'))
-      .toBe('A small town did not open. Part of this world could not be made, so it cannot be drawn.');
+    expect(fill('world.opening.didNotOpen', { title: 'A small town' }) + ' ' + say('world.generated.failed') + ' ' + say('world.generated.openTriesAgain'))
+      .toBe('A small town did not open. Part of this world could not be made, so it cannot be drawn. Open tries to make it again.');
+  });
+
+  it("asks for a failed world's bakes again on a person's Open, never as its address opens", async () => {
+    const { patchSource } = await seams();
+    const main = 'web/packages/app/src/main.ts';
+    const patched = patchSource(main, source(main), here)!;
+    const opening = patched.slice(patched.indexOf('const open = async (entry'));
+    const open = opening.slice(0, opening.indexOf('\n  };') + 5);
+    const asks = open.indexOf("if (entry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) await state.worldEntries?.askForBakesAgain(entry).catch(() => 0);");
+    // Asked, and waited for, before the world opens; a refused ask opens it all the same.
+    expect(asks).toBeGreaterThan(-1);
+    expect(asks).toBeLessThan(open.indexOf('return openFromFrontDoor(entry.entryId);'));
+    // The address opens on what the server says, and asks for nothing: a fault every bake meets is not asked for in a loop.
+    const address = patched.slice(patched.indexOf('const reviewEntryId'), patched.indexOf("pendingEntryProblem = 'This saved world is no longer available."));
+    expect(address).not.toContain('askForBakesAgain');
   });
 
   it('notices a seam whose code no longer fits: a positive control', async () => {

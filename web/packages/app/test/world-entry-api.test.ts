@@ -920,3 +920,30 @@ describe('a saved world\'s picture', () => {
       .rejects.toMatchObject({ status: 409, code: 'picture_not_current' });
   });
 });
+
+describe("a generated world's tile bakes, asked for again", () => {
+  it("asks through the entry's version, naming its world, and answers how many were queued", async () => {
+    const asked: { url: URL; method: string; csrf: string | null; body: unknown }[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
+      asked.push({ url: new URL(String(input)), method: init.method ?? 'GET', csrf: headers.get('x-csrf-token'), body: JSON.parse(String(init.body)) });
+      return Response.json({ queued: 2 }, { status: 202 });
+    });
+    const client = new WorldEntryClient({ baseUrl: 'https://exulanica.test/', token: 'private', csrfToken: 'csrf', fetch });
+    const entry = parseFixture();
+    expect(await client.askForBakesAgain(entry)).toBe(2);
+    expect(asked.map((one) => [one.method, one.url.pathname, one.url.searchParams.get('world_id'), one.csrf, one.body])).toEqual([
+      ['POST', `/world/versions/${entry.authoredVersionId}/tiles/bakes`, entry.worldId, 'csrf', {}],
+    ]);
+  });
+
+  it('refuses an answer that is not a count, and passes on a refusal', async () => {
+    const answering = (body: unknown, status = 202) => new WorldEntryClient({
+      baseUrl: 'https://exulanica.test/', token: 'private', fetch: vi.fn(async () => Response.json(body, { status })),
+    });
+    await expect(answering({ queued: -1 }).askForBakesAgain(parseFixture())).rejects.toThrow('count of tile bakes queued');
+    await expect(answering({ queued: 'two' }).askForBakesAgain(parseFixture())).rejects.toThrow('count of tile bakes queued');
+    await expect(answering({ code: 'unknown_reference', detail: 'this world has no tiles to bake' }, 404).askForBakesAgain(parseFixture()))
+      .rejects.toMatchObject({ status: 404, code: 'unknown_reference' });
+  });
+});

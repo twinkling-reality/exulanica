@@ -63,6 +63,9 @@ export const occurrences = (code, target) => code.split(target).length - 1;
  * empty scene far from the town, over a mount that could not open it. A town with a tile that could
  * not be baked is not mounted either: Your worlds says it did not open and why, as for any world that
  * does not open, where its world view would stand on the same empty scene with the reason under it.
+ * Open on Your worlds asks for such a world's bakes again before opening it, so a passing fault is
+ * baked under its opening; its address alone never asks, so a fault every bake meets is not asked
+ * for in a loop.
  */
 export function patchSource(file, code, here) {
   if (!SEAM_FILES.includes(file)) return null;
@@ -90,7 +93,7 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
       const reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
       if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) {
         // A tile that could not be baked stays so: Your worlds says which world did not open and why.
-        await mountNoWorld({ retry: () => start(token, csrfToken), failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed') });
+        await mountNoWorld({ retry: () => start(token, csrfToken), failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed') + ' ' + say('world.generated.openTriesAgain') });
         return;
       }
       if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'baking')) {
@@ -117,7 +120,11 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
       if (scenePreviewPage()) mountScenePreview({ state, renderer });
       else if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects, send: sendPlanned, binding: activeEntryWriteBinding, makeCreature: creatureMakerFor(state)});`)
     .replace(seam('Your worlds pictures'), '    picture: (entry) => frontDoorPicture(entry) ?? worldPicture(entry),')
-    .replace(seam('Your worlds open'), '  const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => openFromFrontDoor(entry.entryId);')
+    // A world with a tile that could not be baked asks for its bakes again on a person's Open, never as its address opens.
+    .replace(seam('Your worlds open'), `  const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => {
+    if (entry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) await state.worldEntries?.askForBakesAgain(entry).catch(() => 0);
+    return openFromFrontDoor(entry.entryId);
+  };`)
     .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries });')
     .replace(seam('Your worlds create'), '        creating = mountCreateWorld({ root: yourWorlds.root, credentials: state.credentials, entries: state.worldEntries, onClose: closeCreate });');
 }

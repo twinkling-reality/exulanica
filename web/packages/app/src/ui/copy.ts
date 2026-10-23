@@ -584,6 +584,8 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
     + 'this page looks again every few seconds and opens it when they are.',
   'world.generated.failed':
     'Part of this world could not be made, so it cannot be drawn.',
+  // Said on Your worlds after the line above, where Open asks for that part to be made again.
+  'world.generated.openTriesAgain': 'Open tries to make it again.',
   'world.site.failed':
     'This world\'s drawing could not be read, so the world is not drawn.',
   'world.site.making':
