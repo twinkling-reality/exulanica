@@ -345,7 +345,8 @@ The site-plan composer ([`site_plan.py`](../exulanica/world/composers/site_plan.
 of a kind for the world's own identity: it tries the kind's seed candidates in order and keeps the
 first whose site is laid out and meets every need above. The world is one region,
 `region:generated`, whose frame is the site's own. A person arrives on the spine 4 m in from the
-entry, facing into the site.
+entry, facing into the site; on a placed volume's top, on the open top just outside the gate,
+facing the site through it ([landscape contract](landscape-contract.md#a-site-on-a-volumes-top)).
 
 The receipt (`world_generation_receipt`, the same profile a town's uses) names the composer
 `site-plan` and carries:

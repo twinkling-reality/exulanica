@@ -22,10 +22,8 @@ world it made as a structural snapshot and a receipt:
   person arrives. The element's streaming key names the receipt's digest, so the snapshot binds it.
 * **Where a person arrives**: on the spine, :data:`ARRIVAL_INSIDE_MM` in from the entry, facing
   into the site; on a volume's top (version 7), on the open top outside the gate, facing the
-  nearest open rim away from the site, one with another volume or the land in view first
-  (:func:`~exulanica.world.site_on_top.arrival_beyond_gate`,
-  :func:`~exulanica.world.site_on_top.open_rim_facing`,
-  :func:`~exulanica.world.site_on_top.landmarks_in_view`).
+  site through it (:func:`~exulanica.world.site_on_top.arrival_beyond_gate`,
+  :data:`~exulanica.world.site_on_top.INTO_SITE`). A world keeps the arrival its receipt states.
 
 A receipt whose kind document, routine catalogs or grammar no longer read the same, or whose records
 come out otherwise, is refused by name (``generated_world_*``), never generated into something else.
@@ -87,14 +85,11 @@ from exulanica.world.landscape_drawing import (
 )
 from exulanica.world.site_land import SiteLand, check_receipt_land_rules, site_land_of
 from exulanica.world.site_on_top import (
-    AWAY_FROM_SITE,
+    INTO_SITE,
     arrival_beyond_gate,
     check_on_rock,
-    landmarks_in_view,
     natural_top,
     on_top,
-    open_rim_facing,
-    sea_past_rim,
     top_field,
     top_rules,
 )
@@ -409,8 +404,7 @@ def compose_kind(
     whose people come in from homes off the site is refused, since nothing lies beyond a top; the
     kind's plan is held inside the top's square and on its rock before any candidate is laid out,
     and the kept candidate's graded top on the rock again; its land is the volume's top land, and a
-    person arrives on the open top outside the site's gate, facing the nearest open rim away from
-    the site. Refused as
+    person arrives on the open top outside the site's gate, facing the site through it. Refused as
     :func:`~exulanica.world.kinds.samples.compose_site` refuses
     (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate named)."""
     if base_routine is None:
@@ -454,16 +448,9 @@ def compose_kind(
         )
         sized = next(r for r in world.records if isinstance(r, SiteExtentRecord))
         check_on_rock(capped, on, sized.width_mm, sized.depth_mm, top.height_at)
-        # A person arrives on the open top outside the gate, the site behind them, facing the rim
-        # with the sea past it and something still in view where an open rim has them, else with
-        # another volume or the land in view where an open rim has one.
+        # A person arrives on the open top outside the gate, facing the hamlet through it.
         arrival["position_mm"] = arrival_beyond_gate(capped, on, top, sized.entry_x_mm)
-        ahead = (stated_landscape, placement, on, top, world_id, arrival["position_mm"])
-        seen, sea = landmarks_in_view(*ahead), sea_past_rim(*ahead)
-        facing = open_rim_facing(
-            capped, on, top, arrival["position_mm"], world.records, AWAY_FROM_SITE, seen, sea
-        )
-        arrival["facing_mm"] = facing if facing is not None else [0, -1000]
+        arrival["facing_mm"] = list(INTO_SITE)
         on_top_up_mm = top.height_at(*arrival["position_mm"])
     receipt = {
         "profile": RECEIPT_PROFILE,
