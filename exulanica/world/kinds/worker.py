@@ -38,7 +38,8 @@ request waits for its job without holding the lock, within these bounds:
   past :data:`STUCK_SECONDS` is replaced and its process stopped.
 
 Nothing is handed to the pool, or taken from it, while this module's own lock is held: the pool
-runs its callbacks under a lock of its own, and they take this one.
+runs its callbacks under a lock of its own, and they take this one. A job is handed over under an
+ordering lock that only a request takes, so the process takes jobs in the order they are recorded.
 
 What a job answers is plain data: ``{"status": "done", ...}`` with the report, the composed world,
 the drawing or the landscape drawing, or ``{"status": "refused", ...}`` with the refusal's code and
@@ -864,6 +865,9 @@ class KindWorker:
         self._stuck = stuck_seconds
         self._clock = clock
         self._lock = threading.Lock()
+        #: Held by a request while its job's place in the queue is chosen and the job handed to the
+        #: pool; never taken while :attr:`_lock` is held, and the pool's callbacks never take it.
+        self._order = threading.Lock()
         self._executor: Executor | None = None
         self._running: dict[str, _Running] = {}
         self._closed = False
@@ -952,52 +956,61 @@ class KindWorker:
         job runs, and ended with its process when a job that does not yield is asked."""
         self._let_stuck_go()
         yielded: Executor | None = None
-        with self._lock:
-            if self._closed:
-                # Closed with its server: a job still asking (a draft's thread) starts no process.
-                return JobOutcome("unavailable", reason="closed")
-            found = None if kept is None else kept.get(key)
-            if found is not None:
-                return JobOutcome("done", found)
-            if key in self._running:
-                return JobOutcome("overran")
-            if yields and self._running:
-                return JobOutcome("busy", reason="yields")
-            if self._running and all(running.yields for running in self._running.values()):
-                # Only work that yields runs: its process is ended, and this job starts at once
-                # in a new one.
-                yielded, self._executor = self._executor, None
-                for running in self._running.values():
-                    running.let_go()
-                self._running.clear()
-            if len(self._running) > self._waiting:
-                return JobOutcome("busy")
-            mine = sum(1 for running in self._running.values() if running.workspace == workspace)
-            if mine >= self._per_workspace:
-                return JobOutcome("busy", reason="workspace")
-            executor = self._executor
-            if executor is None:
-                executor = self._executor = self._make()
-            # The process computes one job at a time, in the order handed to it.
-            ahead = [running for running in self._running.values() if running.executor is executor]
-            running = self._running[key] = _Running(
-                executor, self._clock(), workspace, kept, yields
-            )
-        if yielded is not None:
-            _terminate(yielded)
-        try:
-            future = executor.submit(job, *args)
-        except Exception as failed:
-            # A pool that cannot take the job (broken, shut down, or unable to start its process)
-            # leaves no job behind, counted against the workspace and the queue, and is let go.
+        # A job's place in the queue is chosen and the job handed over as one step, so the process
+        # takes jobs in the order they are recorded and each waits out exactly those before it.
+        with self._order:
             with self._lock:
-                if self._running.get(key) is running:
-                    del self._running[key]
-            running.settled.set()
-            if not isinstance(failed, BrokenProcessPool | RuntimeError):
-                _log.exception("the kind worker could not take a job")
-            self._discard(executor)
-            return JobOutcome("unavailable")
+                if self._closed:
+                    # Closed with its server: a job still asking (a draft's thread) starts no
+                    # process.
+                    return JobOutcome("unavailable", reason="closed")
+                found = None if kept is None else kept.get(key)
+                if found is not None:
+                    return JobOutcome("done", found)
+                if key in self._running:
+                    return JobOutcome("overran")
+                if yields and self._running:
+                    return JobOutcome("busy", reason="yields")
+                if self._running and all(running.yields for running in self._running.values()):
+                    # Only work that yields runs: its process is ended, and this job starts at once
+                    # in a new one.
+                    yielded, self._executor = self._executor, None
+                    for running in self._running.values():
+                        running.let_go()
+                    self._running.clear()
+                if len(self._running) > self._waiting:
+                    return JobOutcome("busy")
+                mine = sum(
+                    1 for running in self._running.values() if running.workspace == workspace
+                )
+                if mine >= self._per_workspace:
+                    return JobOutcome("busy", reason="workspace")
+                executor = self._executor
+                if executor is None:
+                    executor = self._executor = self._make()
+                # The process computes one job at a time, in the order handed to it.
+                ahead = [
+                    running for running in self._running.values() if running.executor is executor
+                ]
+                running = self._running[key] = _Running(
+                    executor, self._clock(), workspace, kept, yields
+                )
+            if yielded is not None:
+                _terminate(yielded)
+            try:
+                future = executor.submit(job, *args)
+            except Exception as failed:
+                # A pool that cannot take the job (broken, shut down, or unable to start its
+                # process) leaves no job behind, counted against the workspace and the queue, and is
+                # let go.
+                with self._lock:
+                    if self._running.get(key) is running:
+                        del self._running[key]
+                running.settled.set()
+                if not isinstance(failed, BrokenProcessPool | RuntimeError):
+                    _log.exception("the kind worker could not take a job")
+                self._discard(executor)
+                return JobOutcome("unavailable")
         running.future = future
         # Added once the future is recorded: a future already done runs it at once, here.
         future.add_done_callback(functools.partial(self._finished, key, running))

@@ -186,6 +186,53 @@ def test_time_queued_behind_another_job_never_refuses_a_job_within_its_own_limit
     timer.join()
 
 
+class _PausingPool(ThreadPoolExecutor):
+    """One thread whose first hand-over pauses until ``go`` is set, saying ``paused`` meanwhile."""
+
+    def __init__(self, go: threading.Event, paused: threading.Event) -> None:
+        super().__init__(1)
+        self.go, self.paused, self.first = go, paused, True
+
+    def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Any]:
+        if self.first:
+            self.first = False
+            self.paused.set()
+            self.go.wait(5)
+        return super().submit(fn, *args, **kwargs)
+
+
+def test_jobs_are_handed_to_the_process_in_the_order_they_are_recorded() -> None:
+    go, paused, release = threading.Event(), threading.Event(), threading.Event()
+    worker = KindWorker(lambda: _PausingPool(go, paused))
+    order: list[str] = []
+
+    def first() -> dict[str, str]:
+        order.append("first")
+        return {"status": "done"}
+
+    def second() -> dict[str, str]:
+        order.append("second")
+        release.wait(5)
+        return {"status": "done"}
+
+    with ThreadPoolExecutor(2) as asking:
+        # The first job is recorded, and its hand-over to the process pauses.
+        ran_first = asking.submit(worker.run, "first", 0.5, first, workspace="a")
+        assert paused.wait(5)
+        # A second asked meanwhile is handed over after it, never before: were it first, it would
+        # hold the process past the first job's limit.
+        ran_second = asking.submit(worker.run, "second", 5.0, second, workspace="b")
+        threading.Event().wait(0.2)
+        go.set()
+        timer = threading.Timer(1.5, release.set)
+        timer.start()
+        assert ran_first.result(10).status == "done"
+        assert ran_second.result(10).status == "done"
+        timer.join()
+    assert order == ["first", "second"]
+    worker.close()
+
+
 def test_a_request_waiting_behind_a_stuck_job_lets_it_go_rather_than_waiting_for_ever() -> None:
     now = [0.0]
     release = threading.Event()
