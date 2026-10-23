@@ -30,6 +30,7 @@ from typing import Any
 import pytest
 from exulanica.api import world_making
 from exulanica.api.app import create_app
+from exulanica.api.instance_settings import SocietySettingRefused, _host_keeps_until
 from exulanica.api.routes import world_making as world_making_routes
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
@@ -132,8 +133,9 @@ def _drafts_alias(request, bench, monkeypatch):
 
     monkeypatch.setattr(ModelClient, "provider_prices", price_read)
 
-    def app(*args, on_land: bool = False, **kwargs):
-        """``on_land``: a deployment that makes places from a sentence on land."""
+    def app(*args, on_land: bool = False, keeps_until: dt.date | None = None, **kwargs):
+        """``on_land``: a deployment that makes places from a sentence on land; ``keeps_until``: the
+        day a host keeps what is made on it until."""
         if kwargs.get("spending") is None:
             for provider in load_manifest().providers:
                 if bench.query(
@@ -170,6 +172,7 @@ def _drafts_alias(request, bench, monkeypatch):
             database=bench.runtime,
             readonly_database=bench.runtime,
             worlds_on_land=on_land,
+            host_keeps_until=keeps_until,
         )
         application = create_app(services, verify=False)
         application.dependency_overrides.update(original.app.dependency_overrides)
@@ -646,6 +649,27 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         assert spent["code"] in {code["code"] for code in spent["refusals"]}
         again = _start(client, FARM_WORDS)
         assert (again.status_code, again.json()["code"]) == (429, "kind_draft_limit")
+
+
+def test_the_offer_says_the_day_a_host_keeps_what_is_made_on_it_until(drafts):
+    app, _transport = drafts
+    with app() as client:
+        assert _offer(client)["host_keeps_until"] is None
+    with app(keeps_until=dt.date(2026, 12, 15)) as client:
+        assert _offer(client)["host_keeps_until"] == "2026-12-15"
+        # Stated whatever else the offer says: to one who may not draft too.
+        assert _offer(client, NO_MODEL_TOKEN)["host_keeps_until"] == "2026-12-15"
+
+
+@pytest.mark.parametrize(
+    "stated", ["15/12/2026", "2026-13-01", "2026-12-15T00:00", "20261215", "soon"]
+)
+def test_a_host_keeps_until_only_a_calendar_date(stated):
+    assert _host_keeps_until(None) is None and _host_keeps_until("  ") is None
+    assert _host_keeps_until(" 2026-12-15 ") == dt.date(2026, 12, 15)
+    with pytest.raises(SocietySettingRefused) as refused:
+        _host_keeps_until(stated)
+    assert refused.value.code == "host_keeps_until_not_a_date"
 
 
 def test_a_refused_offer_says_the_same_most_calls_as_the_offered_one(drafts):

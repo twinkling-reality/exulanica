@@ -286,6 +286,22 @@ describe('Create a world as a page', () => {
     return shown!;
   };
 
+  it('says under the field how long a host keeps what is made where it states a day, and nothing where it states none (A5)', async () => {
+    const kept = 'The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.';
+    serve(offerOf());
+    const quiet = await mount();
+    expect(document.body.textContent).not.toContain('stay on this server');
+    quiet.remove(); document.body.replaceChildren();
+    serve(offerOf({ host_keeps_until: '2026-12-15' }));
+    await mount();
+    expect(document.body.textContent).toContain(kept);
+    document.body.replaceChildren();
+    // Said too where words make no world here and the starters stand alone (a host that takes none from a person).
+    serve(offerOf({ offered: false, code: 'kinds_from_people_not_offered', operation: null, host_keeps_until: '2026-12-15' }));
+    await mount();
+    expect(document.body.textContent).toContain(kept);
+  });
+
   it('says a refusal now in its own words, with no starts left over it and Create dimmed', async () => {
     serve(offerOf({ offered: false, code: 'kind_draft_limit', operation: null }));
     await mount();

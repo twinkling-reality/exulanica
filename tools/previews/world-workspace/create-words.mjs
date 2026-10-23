@@ -151,6 +151,21 @@ export function ceilingAmount(usd) {
 export const priceLine = maximumUsd =>
   `An open model makes it from your words: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
 
+/** The months as a host's date is said in the line under Create's field ("15 December 2026"). */
+const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);
+
+/**
+ * Where a host states the day it keeps what is made on it until (the offer's host_keeps_until, YYYY-MM-DD), the line
+ * under Create's field (A5), the date kept whole on one line; null where it states none or what it states is not such a date.
+ */
+export function hostKeepsLine(isoDate) {
+  const parts = typeof isoDate === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/u.exec(isoDate) : null;
+  const month = parts ? MONTHS[Number(parts[2]) - 1] : undefined;
+  const day = parts ? Number(parts[3]) : 0;
+  if (month === undefined || day < 1 || day > 31) return null;
+  return `The worlds you make here and the words you type stay on this server until it is deleted after ${day}\u00a0${month}\u00a0${parts[1]}.`;
+}
+
 /** Starts left this hour, shown only when three or fewer remain (N19); none left is a refusal. */
 export function startsLeftLine(left) {
   if (!Number.isSafeInteger(left) || left <= 0 || left > 3) return null;

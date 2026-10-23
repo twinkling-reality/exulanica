@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, leftAmount, madeSpent, priceLine,
+  CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, leftAmount, madeSpent, hostKeepsLine, priceLine,
   priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime,
 } from './create-words.mjs';
 
@@ -23,6 +23,9 @@ assert.equal(CREATE_WORDS.spendingPaused, 'Spending on AI models is paused here,
 assert.equal(CREATE_WORDS.offline, 'Not connected to your world. Trying again.');
 assert.equal(priceLine('0.20766720'), 'An open model makes it from your words: at most $0.21, and you see what it really spent.');
 assert.equal(priceLine('0.00410000'), 'An open model makes it from your words: at most $0.01, and you see what it really spent.');
+assert.equal(hostKeepsLine('2026-12-15'), 'The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.');
+assert.equal(hostKeepsLine('2027-01-03'), 'The worlds you make here and the words you type stay on this server until it is deleted after 3\u00a0January\u00a02027.');
+for (const none of [undefined, null, '', '2026-13-01', '15/12/2026', '2026-12-15T00:00', 20261215]) assert.equal(hostKeepsLine(none), null, String(none));
 assert.equal(countWords(86, 1000), '86 of 1000');
 assert.equal(countWords(1000, 1000), '1000 of 1000');
 assert.equal(countWords(0, 1000), null);

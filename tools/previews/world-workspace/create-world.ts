@@ -16,7 +16,7 @@ import {
   type FilmStrip, type LightPage, type SentenceField,
 } from './world-ui-create.ts';
 import {
-  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
+  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, hostKeepsLine, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
   stepTime,
 } from './create-words.mjs';
 import {
@@ -36,6 +36,14 @@ const BLANK_TITLE = 'My world';
 
 /** How far under the last line the stepped surface's lower edge stays (N24), in u. */
 const SURFACE_BELOW = 64;
+/** How far under the last line the surface's curved edge stays where the lines start, in CSS pixels at every width. */
+const EDGE_BELOW_PX = 24;
+/**
+ * Where that edge stands under the head's left edge, as a share of the surface's height: front-door.css's --nav-shape
+ * (240 by 300, stretched over the surface) ends its left part at 276 and rounds its corner up over its first 24, which
+ * at the head's inset (46 of the surface's 930) has risen to 273.9.
+ */
+const EDGE_SHARE = 0.912;
 /** Frame 21's steps under the stepped surface (520u under a 450u surface), in u. */
 const STEPS_BELOW_SURFACE = 70;
 /** The least room between frame 20's surface and the cards, in u. */
@@ -180,6 +188,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
         if (left) head.push(lightLine(left));
       }
     }
+    // Where the host states the day it keeps what is made on it until, under the field or the sentence alike (A5).
+    const kept = hostKeepsLine(rawOffer?.['host_keeps_until']);
+    if (kept !== null) head.push(lightLine(kept));
     if (sentenceId !== null) page.root.dataset.sentence = 'true'; else delete page.root.dataset.sentence;
     page.head.replaceChildren(...head);
     drawCards();
@@ -189,7 +200,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
 
   /**
    * The stepped surface holds every line in the head (N24): from its own height, it grows so its
-   * lower edge stays `SURFACE_BELOW` under the last line, and never reaches what is under it.
+   * lower edge stays `SURFACE_BELOW` under the last line, and never reaches what is under it. On
+   * frame 20 its curved edge, which rises where the lines start, also stays `EDGE_BELOW_PX` under
+   * the last line; with no field, the cards under the surface move down with it.
    */
   const fit = (): void => {
     page.surface.style.removeProperty('height');
@@ -199,18 +212,30 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     const last = page.head.lastElementChild as HTMLElement | null;
     if (!last || drawn === 0) return;
     const bottom = page.head.offsetTop + last.offsetTop + last.offsetHeight;
-    const wanted = bottom + SURFACE_BELOW * unit - top;
     if (form === 'creating') {
       // Frame 21: the surface grows with the quote, and the steps move down with it.
+      const wanted = bottom + SURFACE_BELOW * unit - top;
       if (wanted > drawn) {
         page.surface.style.height = `${wanted}px`;
         page.lower.style.top = `${top + wanted + STEPS_BELOW_SURFACE * unit}px`;
       }
       return;
     }
+    const wanted = Math.max(bottom - top + SURFACE_BELOW * unit, (bottom - top + EDGE_BELOW_PX) / EDGE_SHARE);
+    if (wanted <= drawn) return;
+    if (page.root.dataset.sentence === 'true') {
+      const below = page.lower.offsetTop - top - drawn;
+      page.surface.style.height = `${wanted}px`;
+      page.lower.style.top = `${top + wanted + below}px`;
+      return;
+    }
     const ceiling = page.lower.offsetTop - top - CARDS_CLEARANCE * unit;
-    if (wanted > drawn) page.surface.style.height = `${Math.min(wanted, ceiling)}px`;
+    page.surface.style.height = `${Math.min(wanted, ceiling)}px`;
   };
+  // The head's sizes are in u and its type may arrive after it is drawn: whenever it changes size, fit again.
+  const refit = new ResizeObserver(() => fit());
+  refit.observe(page.head);
+  signal.addEventListener('abort', () => refit.disconnect());
 
   const drawCards = (): void => {
     const shown = startCards([...cardWords.values()], [], { blankExists });

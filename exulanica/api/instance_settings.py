@@ -8,6 +8,7 @@ that imports a setting from there keeps working.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import uuid
@@ -93,6 +94,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "kinds_from_people_not_boolean": "must be an explicit boolean",
     "personal_install_not_boolean": "must be an explicit boolean",
     "worlds_on_land_not_boolean": "must be an explicit boolean",
+    "host_keeps_until_not_a_date": "must be a calendar date written YYYY-MM-DD",
     "warm_setting_grounds_not_boolean": "must be an explicit boolean",
     "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
@@ -158,6 +160,10 @@ WORLDS_ON_LAND_ENV: Final = env_name("WORLDS_ON_LAND")
 #: drawn as soon as the second: on for a personal install (:data:`PERSONAL_INSTALL_ENV`) unless it
 #: is set off, off for any other unless it is set on.
 WARM_SETTING_GROUNDS_ENV: Final = env_name("WARM_SETTING_GROUNDS")
+#: The day a host keeps what is made on it until (an ISO date, ``YYYY-MM-DD``), which the Create
+#: offer states so a person knows before typing how long their words and worlds stay; a host that
+#: keeps them for good, a personal install among them, states nothing.
+HOST_KEEPS_UNTIL_ENV: Final = env_name("HOST_KEEPS_UNTIL")
 
 
 def _style_pack_uploads(environ: Mapping[str, str]) -> bool:
@@ -259,6 +265,19 @@ def _warm_setting_grounds(value: str | None, *, personal: bool) -> bool:
     if value is None or not value.strip():
         return personal
     return _explicitly_enabled(value, "warm_setting_grounds_not_boolean", WARM_SETTING_GROUNDS_ENV)
+
+
+def _host_keeps_until(value: str | None) -> dt.date | None:
+    """The day this host keeps what is made on it until (:data:`HOST_KEEPS_UNTIL_ENV`), None where
+    it states none, or a named refusal of anything but a calendar date written ``YYYY-MM-DD``."""
+    if value is None or not value.strip():
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value.strip()) is None:
+        raise SocietySettingRefused("host_keeps_until_not_a_date", HOST_KEEPS_UNTIL_ENV)
+    try:
+        return dt.date.fromisoformat(value.strip())
+    except ValueError:
+        raise SocietySettingRefused("host_keeps_until_not_a_date", HOST_KEEPS_UNTIL_ENV) from None
 
 
 def _worlds_on_land(value: str | None) -> bool:

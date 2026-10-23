@@ -51357,6 +51357,17 @@
        }
       ],
       "title": "Left Usd"
+     },
+     "host_keeps_until": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Host Keeps Until"
      }
     },
     "type": "object",

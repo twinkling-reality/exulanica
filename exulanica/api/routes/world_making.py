@@ -273,6 +273,10 @@ class WorldDraftOfferView(BaseModel):
     #: this draft, in USD (each of the operation's providers, at most its ceiling, summed), less
     #: than ``operation``'s ``maximum_usd``. The workspace's figures only, never the authority's.
     left_usd: str | None = None
+    #: The day this host keeps what is made on it until (``YYYY-MM-DD``), where the host states one
+    #: (``EXULANICA_HOST_KEEPS_UNTIL``): the worlds made here and the words typed stay on it until
+    #: then. Absent on a host that keeps them, a person's own install among them.
+    host_keeps_until: str | None = None
 
 
 #: The offer's code where the most a draft may spend is more than the workspace has left for it
@@ -721,6 +725,9 @@ def read_world_draft_offer(
         running_draft_id=own_running,
         refusals=_codes(),
         left_usd=left_usd,
+        host_keeps_until=(
+            None if services.host_keeps_until is None else services.host_keeps_until.isoformat()
+        ),
     )
 
 

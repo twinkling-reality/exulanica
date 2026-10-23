@@ -639,8 +639,10 @@ envelopes keeps its whole-context basis (`full_context_reservation_ceiling`) and
 `starts`, the hourly
 allowance and starts left for this actor across workspaces and API processes, counting both native
 kind and whole-world starts;
-`description_characters`; and
-`running_draft_id`, this person's own draft of a world still running here. A page shows the calls
+`description_characters`;
+`running_draft_id`, this person's own draft of a world still running here; and, where the host
+states one (`EXULANICA_HOST_KEEPS_UNTIL`), `host_keeps_until`, the day it keeps what is made on it
+until, which the page says under the field. A page shows the calls
 and the starts before the words are sent. Another person's running draft is `kind_draft_busy`
 with no id. Every refusal that is known before a model is asked is answered by the start before
 one is, so nobody is charged to be told no: the server's switch, a missing model credential, an

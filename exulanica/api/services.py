@@ -37,6 +37,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal
@@ -89,6 +90,7 @@ from exulanica.api.instance_settings import (
     _comparison_player,
     _enabled,
     _explicitly_enabled,
+    _host_keeps_until,
     _kinds_from_people,
     _minute_cost_scale_milli,
     _personal_install,
@@ -382,6 +384,9 @@ class Services(ServiceRefusals, WorkerFactories):
     #: hand-built Services, while ``build_services`` reads the setting, which is on unless a host
     #: sets it off.
     worlds_on_land: bool = False
+    #: The day this host keeps what is made on it until, which the Create offer states
+    #: (:data:`HOST_KEEPS_UNTIL_ENV`); None for a hand-built Services and for a host that keeps it.
+    host_keeps_until: date | None = None
     #: Whether the kind worker warms the shipped settings' ground below as the instance starts
     #: (:data:`WARM_SETTING_GROUNDS_ENV`); off for a hand-built Services, as for a shared server
     #: that does not set it.
@@ -1327,6 +1332,7 @@ def build_services(
         ),
         kinds_from_people=_kinds_from_people(environ),
         worlds_on_land=_worlds_on_land(env_get("WORLDS_ON_LAND", environ)),
+        host_keeps_until=_host_keeps_until(env_get("HOST_KEEPS_UNTIL", environ)),
         warm_setting_grounds=_warm_setting_grounds(
             env_get("WARM_SETTING_GROUNDS", environ), personal=personal
         ),
