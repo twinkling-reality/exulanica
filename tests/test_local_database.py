@@ -17,6 +17,8 @@ import contextlib
 import io
 import json
 import os
+import shutil
+import socket
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -450,3 +452,27 @@ def test_a_copy_that_fails_is_refused_and_the_server_runs_again(tmp_path, monkey
     assert "No space left on device" in refused.value.detail
     assert refused.value.exit_status == 2, "nothing was migrated, so it is a refusal"
     assert cluster.calls == ["stop", "start"]
+
+
+def test_a_port_is_held_only_by_a_listener_and_a_drawn_port_is_never_one_the_system_lends():
+    """A first run was refused "port held by another process" while nothing listened: the probe
+    bound without SO_REUSEADDR, and a connection's leftover port failed it. A listener on
+    127.0.0.1 still holds its port; the local end of a connection, live or closing, does not."""
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        listening = server.getsockname()[1]
+        assert not cluster.port_is_free(listening)
+        if shutil.which("lsof"):
+            assert cluster.port_holder(listening).endswith(f"(pid {os.getpid()})")
+        client = socket.socket()
+        client.connect(("127.0.0.1", listening))
+        leftover = client.getsockname()[1]
+        accepted, _ = server.accept()
+        assert cluster.port_is_free(leftover)
+        client.close()
+        accepted.close()
+        assert cluster.port_is_free(leftover)
+    drawn = {cluster._free_port() for _ in range(20)}
+    assert all(port in cluster.PORT_RANGE for port in drawn)
+    assert cluster.PORT_RANGE.stop <= cluster.EPHEMERAL_FROM

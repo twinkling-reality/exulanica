@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg
+import psycopg.sql
 import pytest
 from exulanica import migrations as migration_package
 from exulanica.db.local import cli as local_cli
@@ -335,6 +336,48 @@ def test_stop_takes_a_backup_and_start_never_migrates(servers, tmp_path):
     assert f"1 pending ({pending})" in started.out
     versions, _ = _state(database)
     assert versions == older
+
+
+def test_a_database_on_a_port_the_system_lends_moves_once_and_its_api_role_connects(
+    servers, tmp_path
+):
+    """An earlier init drew a port the system also lends to outgoing connections, and a start could
+    be refused for a connection's leftover port. Such a database starts on a port of the cluster's
+    own range and keeps it; the URLs that start prints, the API's among them, reach it."""
+    database = _init(servers, tmp_path / "database")
+    assert database.cluster.running_port() in cluster.PORT_RANGE
+    lent = next(
+        port
+        for port in range(cluster.EPHEMERAL_FROM + 20_000, 65_536)
+        if cluster.port_is_free(port)
+    )
+    # Recorded as an earlier init recorded its port: in the cluster's own settings, for every start.
+    owner = database.cluster.url(database.cluster.running_port(), database.owner, "postgres")
+    with psycopg.connect(owner, autocommit=True) as connection:
+        connection.execute(
+            psycopg.sql.SQL("alter system set port = {}").format(psycopg.sql.Literal(lent))
+        )
+    assert cli("stop", "--directory", database.root).status == 0
+    assert database.cluster.configured_port() == lent
+
+    started = cli("start", "--directory", database.root)
+    assert started.status == 0, started.err
+    moved = database.cluster.running_port()
+    assert moved in cluster.PORT_RANGE
+    assert f"on port {moved}, moved from {lent}" in started.out
+    assert database.cluster.configured_port() == moved
+    runtime = next(
+        line.split("=", 1)[1]
+        for line in started.out.splitlines()
+        if line.startswith(f"export {env_name('DATABASE_URL')}=")
+    )
+    with psycopg.connect(runtime) as connection:
+        assert connection.execute("select current_user").fetchone() == (RUNTIME_ROLE,)
+    # Kept: the next start serves on the same port and moves nothing.
+    assert cli("stop", "--directory", database.root).status == 0
+    again = cli("start", "--directory", database.root)
+    assert again.status == 0, again.err
+    assert "moved" not in again.out and database.cluster.running_port() == moved
 
 
 def test_an_upgrade_takes_a_backup_before_and_after(servers, module_machine, tmp_path):

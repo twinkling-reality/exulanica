@@ -37,7 +37,11 @@ A refusal prints `refused (<name>)` and exits 2; a step that was attempted and f
 The directory holds `data/`, `backups/`, `file-backups/` once an upgrade has run, and `server.log`. `init` and `restore` refuse a directory
 inside the system temporary directory (`TMPDIR`, or the platform's default), `/tmp` or `/var/tmp`,
 anything under the test servers' directory, and a directory that already holds files. Durability
-settings stay at PostgreSQL's defaults. The server listens on the loopback interface only, over TCP.
+settings stay at PostgreSQL's defaults. The server listens on the loopback interface only, over TCP,
+on a port `init` draws from 15432 to 16431 and records, below the range every system lends to
+outgoing connections, so a connection's port can never be the one it starts on again; a database
+recorded on such a port moves into that range at its next `start` and keeps the new one, and a
+port truly held is refused with the process that holds it.
 
 The photographs and other files a world cites are in the content-addressed store
 (`EXULANICA_DATA_DIR`), which this command does not back up.

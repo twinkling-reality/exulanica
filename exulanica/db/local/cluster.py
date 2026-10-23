@@ -26,6 +26,7 @@ import contextlib
 import functools
 import os
 import pwd
+import random
 import re
 import shlex
 import shutil
@@ -105,8 +106,16 @@ STOP_TIMEOUT_SECONDS: Final = 60
 #: choice and the bind; each try draws a new one, so a second collision needs a second race.
 PORT_ATTEMPTS: Final = 5
 
-#: Draws of an ephemeral port before giving up. A port free on the IPv4 loopback and held on the
-#: IPv6 one is drawn again, because ``localhost`` listens on both.
+#: Where this module draws a cluster's port: below every system's ephemeral range (Linux lends
+#: 32768 and up to outgoing connections, macOS 49152 and up), so no connection's port is ever the
+#: one a database records and starts on again.
+PORT_RANGE: Final = range(15432, 16432)
+
+#: The lowest port a system lends to outgoing connections (Linux's default; macOS starts higher).
+EPHEMERAL_FROM: Final = 32768
+
+#: Draws of a port before giving up. A port free on the IPv4 loopback and held on the IPv6 one is
+#: drawn again, because ``localhost`` listens on both.
 _PORT_DRAWS: Final = 100
 
 #: How often a scratch copy's watcher asks whether the process that owns it still runs, which is
@@ -242,9 +251,12 @@ def run(program: str, *arguments: str, refusal: Refusal) -> subprocess.Completed
 
 
 def port_is_free(port: int) -> bool:
-    """Whether ``port`` can be bound on both loopback families, as ``localhost`` listens on both."""
+    """Whether a server can listen on ``port`` on both loopback families, as ``localhost`` listens
+    on both. The probe binds as PostgreSQL binds its own sockets (``SO_REUSEADDR``), so a port that
+    is only the local end of a connection, or of one closing, is free: only a listener holds it."""
     for family, address in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
         with socket.socket(family, socket.SOCK_STREAM) as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 probe.bind((address, port))
             except OSError:
@@ -252,14 +264,33 @@ def port_is_free(port: int) -> bool:
     return True
 
 
+def port_holder(port: int) -> str | None:
+    """The process listening on ``port``, as ``lsof`` names it ("postgres (pid 123)"), or None where
+    lsof is absent or names none."""
+    lsof = shutil.which("lsof")
+    if lsof is None:
+        return None
+    listed = subprocess.run(
+        [lsof, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    fields = {line[0]: line[1:] for line in listed.stdout.splitlines() if line[:1] in ("p", "c")}
+    if "p" not in fields:
+        return None
+    return f"{fields.get('c', 'a process')} (pid {fields['p']})"
+
+
 def _free_port() -> int:
     for _ in range(_PORT_DRAWS):
-        with socket.socket(socket.AF_INET) as probe:
-            probe.bind(("127.0.0.1", 0))
-            port = int(probe.getsockname()[1])
+        port = random.choice(PORT_RANGE)
         if port_is_free(port):
             return port
-    raise LocalDatabaseRefused(Refusal.PORT_IN_USE, "no free loopback port")
+    raise LocalDatabaseRefused(
+        Refusal.PORT_IN_USE,
+        f"no free loopback port from {PORT_RANGE.start} to {PORT_RANGE.stop - 1}",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -361,9 +392,11 @@ class Cluster:
             )
         wanted = port if port is not None else self.configured_port()
         if not port_is_free(wanted):
+            holder = port_holder(wanted)
             raise LocalDatabaseRefused(
                 Refusal.PORT_IN_USE,
-                f"port {wanted} is held by another process, so {self.data} cannot start on it",
+                f"port {wanted} is held by {holder or 'another process'}, so {self.data} cannot "
+                "start on it",
             )
         options = [f"-p {wanted}"]
         options += [f"-c {name}={value}" for name, value in (settings or {}).items()]

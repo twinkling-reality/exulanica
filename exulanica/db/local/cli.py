@@ -40,6 +40,7 @@ from exulanica.db.local.backup import (
     verify_backup,
 )
 from exulanica.db.local.cluster import (
+    EPHEMERAL_FROM,
     binaries,
     bootstrap_user,
     port_is_free,
@@ -192,6 +193,16 @@ def _start(arguments: argparse.Namespace, stream: TextIO) -> None:
     cluster = database.cluster
     if cluster.running():
         print(f"already running: {database.root} on port {cluster.running_port()}", file=stream)
+    elif (recorded := cluster.configured_port()) >= EPHEMERAL_FROM:
+        # A port the system also lends to outgoing connections (one an earlier init drew): moved
+        # once to a port of the cluster's own range, and kept.
+        moved = cluster.start_on_a_free_port()
+        _keep_port(database, moved)
+        print(
+            f"started {database.root} on port {moved}, moved from {recorded}, a port the system "
+            "also lends to outgoing connections",
+            file=stream,
+        )
     else:
         cluster.start()
         print(f"started {database.root} on port {cluster.running_port()}", file=stream)
