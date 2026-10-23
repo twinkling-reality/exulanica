@@ -718,11 +718,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         rowsOf: (held) => didRows({ events: held, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null, foldable: () => true, limit: want }).length });
       const facts = characterFacts(subjectReads.society, showing.row.scene.id, false, personName);
       Object.assign(showing, { events, didNext: next, didWant: want });
-      await records.readMoments(showing);
+      await records.readMoments(showing, true);
       // The people its rows name (a line heard, a line said to someone), named as History names them: offers read first.
       await Promise.all([...new Set((since?.fresh ?? events).filter(event => event.event_kind === 'said').map(event => event.subject_id === showing.row.scene.id ? event.document?.thing?.to : event.document?.thing?.heard_by?.includes(showing.row.scene.id) ? event.subject_id : null).map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
       if (showing !== pageView || showing.events !== events) return;
-      showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
+      showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName, runs: showing.runs ?? [],
         options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row), limit: want,
         wordGoal: (document) => {
           if (!facts) return null;

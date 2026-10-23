@@ -120,6 +120,30 @@ describe("a record page's moments", () => {
     expect(made.pictures.momentNow.mock.calls.map(([moment]) => moment.moment_id)).toEqual(['m1']);
   });
 
+  it("reads the society's runs where the day page asks, each the minutes it played (P2), and keeps them where refused", async () => {
+    const { recordStates } = await recordHost();
+    const sessions = { sessions: [{ opened: { start_tick: 430 }, closed: null }, { opened: { start_tick: 360 }, closed: { end_tick: 375 } }] };
+    const made = host({ read: vi.fn(async (path: string) => (path.includes('/control/sessions') ? sessions : path.includes('/history/moments') ? { moments: MOMENTS } : { things: [] })) });
+    const records = recordStates(made.host);
+    const showing: Json = teoPage();
+    await records.readMoments(showing, true);
+    expect(made.host.read).toHaveBeenCalledWith('/world/versions/v1/society/control/sessions?world_id=w1');
+    expect(showing.runs).toEqual([{ from: 430, to: null }, { from: 360, to: 375 }]);
+    // A decision opened from History reads no runs.
+    made.host.read.mockClear();
+    await records.readMoments(teoPage());
+    expect(made.host.read.mock.calls.map(([path]) => path).filter((path) => path.includes('/control/sessions'))).toEqual([]);
+    // A refused read keeps the runs read before, and a page that had none has none.
+    const refused = recordStates(host({ read: vi.fn(async (path: string) => {
+      if (path.includes('/control/sessions')) throw new Error('refused');
+      return path.includes('/history/moments') ? { moments: MOMENTS } : { things: [] };
+    }) }).host);
+    const quiet: Json = teoPage();
+    await refused.readMoments(quiet, true);
+    await refused.readMoments(showing, true);
+    expect([quiet.runs, showing.runs]).toEqual([undefined, [{ from: 430, to: null }, { from: 360, to: 375 }]]);
+  });
+
   it('says what Teo did at a choice that made no moment, in the past, else keeps the choice as offered (R5e)', async () => {
     const { recordStates } = await recordHost();
     const bench = { thing_id: 'bench:1', kind: { kind: 'bench' } };

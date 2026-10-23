@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
+import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -27,6 +27,7 @@ assert.equal(whatDid(teo), 'What Teo did');
 assert.equal(nothingYet(teo), 'Teo has not done anything yet.');
 assert.equal(rowSub({ model: 'Nemotron 3 Nano 30B', options: 7 }), 'Nemotron 3 Nano 30B · 7 choices');
 assert.equal(rowSub(null), 'Routine');
+assert.equal(routineBetween('Nemotron 3 Super 120B'), "Routine, between Nemotron 3 Super 120B's choices");
 assert.equal(lastRunLine({ from: '06:00', to: '07:15', decisions: 12, spent: '0.00420000' }), 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042');
 assert.equal(lastRunLine({ from: '06:00', to: '06:10', decisions: 1, spent: '0' }), 'Last run 06:00 to 06:10 · 1 decision · spent $0');
 

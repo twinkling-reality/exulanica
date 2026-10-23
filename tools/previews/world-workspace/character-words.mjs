@@ -109,6 +109,10 @@ export function rowSub(decision) {
   return Number.isSafeInteger(decision.options) && decision.options > 0 ? `${decision.model} · ${choices(decision.options)}` : decision.model;
 }
 
+/** A routine row the society made while the character's model decided (P2): "Routine, between Nemotron 3 Super
+ * 120B's choices". */
+export const routineBetween = model => `${CHARACTER_WORDS.routine}, between ${possessive(model)} choices`;
+
 /** Who decides where a model does not (T7): "A person playing", "An outside program", or null. */
 export const deciderWords = decider => decider === 'person' ? CHARACTER_WORDS.personPlaying : decider === 'external' ? CHARACTER_WORDS.outsideProgram : null;
 

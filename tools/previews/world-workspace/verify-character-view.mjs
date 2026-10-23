@@ -113,6 +113,22 @@ assert.deepEqual(didRows({ events: stood, subjectId: 't', startMinute: 360, word
   ['06:03', 'Said: \u201cMorning.\u201d', 'Nemotron 3 Super 120B · 8 choices'],
   ['06:01 to 06:03', 'Went to stand a while', 'Routine'],
 ]);
+// P2: a routine row made in a run in which a model chose for Teo says it lies between that model's choices; outside a
+// run, or in a run with no choice of his, it stays "Routine". A run's minutes are those after the one it opened at, to
+// the one it closed at, or on while it plays; the model is Teo's nearest choice in that run, the one before the row first.
+const between = "Routine, between Nemotron 3 Super 120B's choices";
+const inRuns = (runs, events = stood, modelName = () => 'Nemotron 3 Super 120B') => didRows({ events, subjectId: 't', startMinute: 360, wordGoal: goalWords, modelName, options: () => 8, runs })
+  .filter(row => !row.model).map(row => [row.time, row.sub]);
+assert.deepEqual(inRuns([{ from: 2, to: 12 }]), [['06:12', between], ['06:01 to 06:03', 'Routine']]);
+assert.deepEqual(inRuns([{ from: 10, to: null }]), [['06:12', between], ['06:01 to 06:03', 'Routine']], 'a run still playing');
+assert.deepEqual(inRuns([{ from: 0, to: 2 }]), [['06:12', 'Routine'], ['06:01 to 06:03', 'Routine']], 'a run with no choice of his');
+assert.deepEqual(inRuns([{ from: 0, to: 12 }]), [['06:12', between], ['06:01 to 06:03', between]], 'before his first choice in it');
+assert.deepEqual(inRuns([]), [['06:12', 'Routine'], ['06:01 to 06:03', 'Routine']]);
+const nanoModel = { provider: 'p', model_id: 'nano' };
+const picked = (tick, model) => ({ subject_id: 't', tick, event_kind: 'decision_applied', document: { request_id: `p${tick}`, chose: 'wait here', model } });
+const named = model => (model.model_id === 'nano' ? 'Nemotron 3 Nano 30B' : 'Nemotron 3 Super 120B');
+assert.deepEqual(inRuns([{ from: 0, to: null }], served([[picked(1, nanoModel)], [aim(2, { kind: 'rest', target_id: 'bench', reason: 'resting' })], [picked(3, nemo)]]), named),
+  [['06:02', "Routine, between Nemotron 3 Nano 30B's choices"]], 'the choice before it names the model');
 // A living society's goal names its spot: the same activity at another spot is somewhere new, and another activity at
 // the same spot is something new.
 const eat = (tick, spot, activity = 'eat') => aim(tick, { activity, destination_id: 'home', spot_id: spot, node_id: null, reason: 'most_pressing_need' }, 'most_pressing_need');

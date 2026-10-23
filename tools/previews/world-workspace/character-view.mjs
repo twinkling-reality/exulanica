@@ -2,7 +2,7 @@
 // it is looked at, and the ring and card once it is chosen. Pure: the reads come in as data and the
 // words from character-words.mjs; character-presence.ts draws the answer. verify-character-view.mjs
 // holds it.
-import { CHARACTER_WORDS, called, chosenLine, deciderWords, readingRecord, rowSub } from './character-words.mjs';
+import { CHARACTER_WORDS, called, chosenLine, deciderWords, readingRecord, routineBetween, rowSub } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords, whoDecides } from './run-words.mjs';
 import { plural } from './history-words.mjs';
 import { heardRow, saidRow } from './talk-words.mjs';
@@ -211,9 +211,12 @@ export function runQuestion({ who, model, limits, refusal = null, busy = false }
  * choices once read; `who(id)` calls a person as the tag and card do (J20). A choice's row keeps what was
  * done (`did`, which the events read joins onto the event, R5e), the offered words (`chose`) and its minute
  * (`tick`); the same choice
- * made several times in a row folds into one row where `foldable(row)` says each made no moment (foldRows).
+ * made several times in a row folds into one row where `foldable(row)` says each made no moment (foldRows). `runs` are
+ * the society's runs, each the minutes it played ({from, to}: after the minute it opened at, to the one it closed at,
+ * or on while it plays): a routine row in a run in which a model chose for the character says it lies between that
+ * model's choices (P2).
  */
-export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7, foldable = () => false }) {
+export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7, foldable = () => false, runs = [] }) {
   const heard = event => event.subject_id !== subjectId && event.event_kind === 'said' && typeof event.document?.thing?.line === 'string'
     && Array.isArray(event.document.thing.heard_by) && event.document.thing.heard_by.includes(subjectId) && (event.document.thing.to === subjectId || !event.document.thing.to);
   const mine = events.map((event, index) => ({ event, index })).filter(({ event }) => event.subject_id === subjectId || heard(event))
@@ -237,7 +240,7 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
       const model = document.thing.model ? modelName(document.thing.model) : null;
       const to = typeof document.thing.to === 'string' ? who(document.thing.to) : null;
       push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model,
-        decider: document.thing.decider ?? null });
+        decider: document.thing.decider ?? null, tick: event.tick });
     } else if (event.event_kind === 'decision_applied' && !said.has(document.request_id)) {
       const what = typeof document.chose === 'string' && document.chose ? document.chose.charAt(0).toUpperCase() + document.chose.slice(1) : wordGoal(document);
       if (!what) continue;
@@ -251,9 +254,18 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
         continue;
       }
       const what = wordGoal(document);
-      if (what) push({ time: span?.goal === event ? timeRange(time, span.time) : time, what, sub: rowSub(null), requestId: null, model: null });
+      if (what) push({ time: span?.goal === event ? timeRange(time, span.time) : time, what, sub: rowSub(null), requestId: null, model: null, tick: event.tick });
       else span = null;
     }
+  }
+  // A routine row in a run in which a model chose for the character (P2): the model of the character's nearest choice
+  // in the same run, the one before the row first. A run with no choice of theirs read leaves the row "Routine".
+  const runOf = tick => (Number.isSafeInteger(tick) ? runs.find(run => tick > run.from && (run.to === null || tick <= run.to)) ?? null : null);
+  for (const row of rows) {
+    const run = !row.model && row.sub === CHARACTER_WORDS.routine ? runOf(row.tick) : null;
+    const chose = run ? rows.filter(one => one.model && runOf(one.tick) === run) : [];
+    const by = chose.find(one => one.tick <= row.tick) ?? chose.at(-1);
+    if (by) row.sub = routineBetween(by.model);
   }
   return foldRows(rows, foldable).slice(0, limit);
 }

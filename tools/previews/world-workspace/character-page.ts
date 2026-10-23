@@ -378,12 +378,13 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
   return [block];
 }
 
-/** A card's who line (r06): "By Nemotron 3 Nano 30B · 7 choices", "By a person playing", "Routine". */
+/** A card's who line (r06): "By Nemotron 3 Nano 30B · 7 choices", "By a person playing", "Routine", or a routine row's
+ * own words in a run ("Routine, between Nemotron 3 Super 120B's choices", P2). */
 function decidedBy(row: DidRow): Parts | string | null {
   if (row.decider === 'person') return PATH_WORDS.personPlaying;
   if (row.decider === 'external') return PATH_WORDS.outsideProgram;
   if (row.model === undefined) return row.sub || null;
-  if (!row.model) return CHARACTER_WORDS.routine;
+  if (!row.model) return row.sub || CHARACTER_WORDS.routine;
   const by: Parts = byParts({ kind: 'model', model: { name: row.model } });
   // A folded row counts its decisions ("· 23 decisions", R5e), else the one decision's choices.
   if (Number.isSafeInteger(row.decisions) && (row.decisions ?? 0) > 1) return [...by, ` · ${plural(row.decisions, 'decision')}`];

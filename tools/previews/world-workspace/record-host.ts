@@ -140,11 +140,14 @@ export function dayFocus({ rows, focus, earlier = false, before = null, moved = 
 }
 
 export function recordStates(host: RecordHost) {
-  /** Reads the moments and the version's placed things for a page (`showing`): kept on it, re-read with its rows. */
-  async function readMoments(showing: Json): Promise<void> {
-    const [moments, version] = await Promise.all([
+  /** Reads the moments and the version's placed things for a page (`showing`): kept on it, re-read with its rows; and,
+   * where the day page asks (`runs`), the society's runs, each the minutes it played (P2), kept as they were where the
+   * read is refused. */
+  async function readMoments(showing: Json, runs = false): Promise<void> {
+    const [moments, version, sessions] = await Promise.all([
       host.read(`${host.versionPath}/history/moments${host.scope}&limit=${MOMENTS_READ}&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`).catch(() => null),
       showing.things ? null : host.read(`${host.versionPath}${host.scope}`).catch(() => null),
+      runs ? host.read(`${host.versionPath}/society/control/sessions${host.scope}`).catch(() => null) : null,
     ]);
     if (moments) {
       showing.moments = moments.moments ?? [];
@@ -154,6 +157,8 @@ export function recordStates(host: RecordHost) {
       showing.momentsFrom = moments.more && ticks.length ? Math.min(...ticks) : moments.more ? Number.POSITIVE_INFINITY : null;
     }
     if (version) showing.things = new Map((version.things ?? []).map((thing: Json) => [thing.thing_id, thing]));
+    if (sessions) showing.runs = (sessions.sessions ?? []).map((run: Json) => ({ from: run.opened?.start_tick, to: run.closed?.end_tick ?? null }))
+      .filter((run: Json) => Number.isSafeInteger(run.from) && (run.to === null || Number.isSafeInteger(run.to)));
   }
 
   /** The names a moment's words take, as History names them: people as their tags do, placed things as build mode. */

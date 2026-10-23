@@ -235,6 +235,15 @@ describe("Teo's day", () => {
     expect(one(root, '.wu-day-decides')).toBe(`${NEMOTRON}Current`);
   });
 
+  it("says a routine row made in a run lies between the person's model's choices, and Routine elsewhere (P2)", async () => {
+    const { root, page } = await open();
+    const between = `Routine, between ${NEMOTRON}'s choices`;
+    page.draw(teoState({ did: rows().map((row) => (row.model === null && row.sub === 'Routine' ? { ...row, sub: between } : row)) }));
+    expect(all(root, '.wu-day-decided').slice(-1)).toEqual([between]);
+    page.draw(teoState());
+    expect(all(root, '.wu-day-decided').slice(-1)).toEqual(['Routine']);
+  });
+
   it('draws the same choice folded into one row: its span of minutes and its decisions counted (R5e)', async () => {
     const { root, page } = await open();
     page.draw(teoState({ did: [
