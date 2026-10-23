@@ -159,6 +159,26 @@ describe('the world workspace preview\'s edits to this app', () => {
     expect(BAKE_POLL_MS * BAKE_READS).toBe(300_000);
   });
 
+  it('sends a town with a tile that could not be baked to Your worlds, saying which and why, never mounting it', async () => {
+    const { patchSource } = await seams();
+    const { fill, say } = await import('../src/ui/copy.js');
+    const main = 'web/packages/app/src/main.ts';
+    const patched = patchSource(main, source(main), here)!;
+    const opened = patched.slice(patched.indexOf('const reviewEntryId'));
+    const fails = opened.indexOf("if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) {");
+    const waits = opened.indexOf("tile.state === 'baking'");
+    // Read before the bake's wait, so a bake that fails while it is waited for ends here after its reload.
+    expect(fails).toBeGreaterThan(-1);
+    expect(fails).toBeLessThan(waits);
+    const failing = opened.slice(fails, waits);
+    expect(failing).toContain("failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed')");
+    expect(failing).toMatch(/await mountNoWorld\(\{ retry: \(\) => start\(token, csrfToken\), failed: [^\n]*\}\);\n\s*return;/u);
+    expect(failing).not.toMatch(/\bmount\(\)|setTimeout|location\.reload/u);
+    // What Your worlds says, in the words a world that did not open is said with.
+    expect(fill('world.opening.didNotOpen', { title: 'A small town' }) + ' ' + say('world.generated.failed'))
+      .toBe('A small town did not open. Part of this world could not be made, so it cannot be drawn.');
+  });
+
   it('notices a seam whose code no longer fits: a positive control', async () => {
     const { patchSource, occurrences } = await seams();
     const file = 'web/packages/app/src/composition/environment-selection.ts';

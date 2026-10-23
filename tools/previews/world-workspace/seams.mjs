@@ -60,7 +60,9 @@ export const occurrences = (code, target) => code.split(target).length - 1;
  * place of the app's old dialog.
  * A town whose tiles are still baking when its address opens keeps its opening up and is opened only
  * once they are baked, as a reload opens it: mounted while they bake, its world view would stand on an
- * empty scene far from the town, over a mount that could not open it.
+ * empty scene far from the town, over a mount that could not open it. A town with a tile that could
+ * not be baked is not mounted either: Your worlds says it did not open and why, as for any world that
+ * does not open, where its world view would stand on the same empty scene with the reason under it.
  */
 export function patchSource(file, code, here) {
   if (!SEAM_FILES.includes(file)) return null;
@@ -86,6 +88,11 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
       const reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
+      if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) {
+        // A tile that could not be baked stays so: Your worlds says which world did not open and why.
+        await mountNoWorld({ retry: () => start(token, csrfToken), failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed') });
+        return;
+      }
       if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'baking')) {
         // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads; then the page opens again with whatever it reads.
         for (let read = 0, baking = true; baking && read < ${BAKE_READS}; read += 1) {

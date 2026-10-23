@@ -583,7 +583,7 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
     '{recipe} is being built. Its streets and buildings appear here once its tiles are baked; '
     + 'this page looks again every few seconds and opens it when they are.',
   'world.generated.failed':
-    'A tile of this world could not be baked, so the world is not drawn.',
+    'Part of this world could not be made, so it cannot be drawn.',
   'world.site.failed':
     'This world\'s drawing could not be read, so the world is not drawn.',
   'world.site.making':
