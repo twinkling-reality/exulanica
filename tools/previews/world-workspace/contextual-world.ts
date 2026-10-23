@@ -27,7 +27,7 @@ import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePla
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { historyHooks, historyWrite, recordPictures } from './history-host.ts';
-import { readDayEvents, recordStates } from './record-host.ts';
+import { dayFocus, readDayEvents, readNewerEvents, recordStates } from './record-host.ts';
 import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
 import { createKindLabels, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
@@ -61,6 +61,8 @@ const BODY_HALF_WIDTH = 0.4;
 const DID_PAGES = 4;
 /** The rows of What Teo did the page reads at a time: when it opens, and at each [↓] past the oldest. */
 const DID_ROWS = 7;
+/** The kinds of the society's events a character's page makes its rows from. */
+const DAY_KINDS = ['goal_selected', 'decision_applied', 'said'];
 /** How often the reads behind a tag or card are refreshed while one shows, in milliseconds. */
 const SUBJECT_READ_MS = Object.freeze({ society: 3000, models: 5000 });
 
@@ -596,7 +598,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       for (const act of talkActs(page.events, quietChoices)) { talk.add(act, now); scene.add(act); }
     } catch { readBackoff.failed('talk', performance.now()); } finally { talkReading = false; }
   }
-  const talkTimer = window.setInterval(() => { void readTalk(); }, WATCH_MS);
+  const talkTimer = window.setInterval(() => { void readTalk(); if (selection.people?.clock().mode === 'playing' && !document.hidden) void readDid(false, true); }, WATCH_MS);
   lifetime.signal.addEventListener('abort', () => clearInterval(talkTimer), { once: true });
   /** The models read's choice for a character, and whether its model can be asked here. */
   function modelOf(row) {
@@ -700,23 +702,28 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (pageView.comparison) pageView.comparison.page.draw(comparisonState());
   }
   /** The page's rows: the character's recorded events, read when the page opens; [↓] past the oldest row reads on
-   * from where the last read stopped, DID_ROWS rows further back (`earlier`), while the read has more. */
-  async function readDid(earlier = false) {
-    const showing = pageView;
-    if (!showing || (earlier && !showing.didNext)) return;
+   * from where the last read stopped, DID_ROWS rows further back (`earlier`), while the read has more. Left open while
+   * the world plays, it reads on the talk read's cadence what was recorded since its newest minute (`newer`, F12). */
+  async function readDid(earlier = false, newer = false) {
+    const showing = pageView, was = showing?.did ?? null, held = showing?.events ?? [];
+    if (!showing || (earlier && !showing.didNext) || (newer && (!was || showing.reading))) return;
     try {
+      showing.reading = true;
+      const since = newer ? await readNewerEvents({ held, pages: DID_PAGES, readWindow: (from, after) => read(eventsPath(DAY_KINDS, `&from_tick=${from}&limit=256` + (after ? '&after=' + encodeURIComponent(after) : ''))) }) : null;
+      // Nothing new of the character's, or another read changed the page meanwhile: its rows stay as they are.
+      if (since && (showing.events !== held || !didRows({ events: since.fresh, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null }).length)) { if (showing.events === held) showing.events = since.events; return; }
       // The events read serves the whole society, newest first, a page at a time: read back until
       // the rows wanted are found (counted as they fold, R5e) or DID_PAGES pages are read.
-      const want = earlier ? showing.didWant + DID_ROWS : DID_ROWS;
-      const { events, next } = await readDayEvents({ want, pages: DID_PAGES, held: earlier ? showing.events : [], next: earlier ? showing.didNext : '',
-        readPage: (before) => read(eventsPath(['goal_selected', 'decision_applied', 'said'], '&limit=256' + (before ? '&before=' + encodeURIComponent(before) : ''))),
+      const want = earlier || newer ? showing.didWant + DID_ROWS : DID_ROWS;
+      const { events, next } = since ? { events: since.events, next: showing.didNext } : await readDayEvents({ want, pages: DID_PAGES, held: earlier ? held : [], next: earlier ? showing.didNext : '',
+        readPage: (before) => read(eventsPath(DAY_KINDS, '&limit=256' + (before ? '&before=' + encodeURIComponent(before) : ''))),
         rowsOf: (held) => didRows({ events: held, subjectId: showing.row.scene.id, wordGoal: () => true, modelName: () => null, foldable: () => true, limit: want }).length });
       const facts = characterFacts(subjectReads.society, showing.row.scene.id);
       Object.assign(showing, { events, didNext: next, didWant: want });
       await records.readMoments(showing);
       // The people its rows name (a line heard, a line said to someone), named as History names them: offers read first.
-      await Promise.all([...new Set(events.filter(event => event.event_kind === 'said').map(event => event.subject_id === showing.row.scene.id ? event.document?.thing?.to : event.document?.thing?.heard_by?.includes(showing.row.scene.id) ? event.subject_id : null).map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
-      if (showing !== pageView) return;
+      await Promise.all([...new Set((since?.fresh ?? events).filter(event => event.event_kind === 'said').map(event => event.subject_id === showing.row.scene.id ? event.document?.thing?.to : event.document?.thing?.heard_by?.includes(showing.row.scene.id) ? event.subject_id : null).map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
+      if (showing !== pageView || showing.events !== events) return;
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName,
         options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row), limit: want,
         wordGoal: (document) => {
@@ -724,17 +731,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };
           return doingLine(characterFacts(shown, showing.row.scene.id)?.done ?? null);
         } });
-      // The chosen row stays where it was; at first it is the newest row a decision stands behind. A
-      // line heard is never chosen (T6).
-      // Read on from the oldest row, the choice moves on to the first row the read brought.
-      if (earlier && showing.didFocus !== null) { let at = showing.didFocus + 1; while (showing.did[at]?.heard) at += 1; if (showing.did[at]) showing.didFocus = at; }
-      if (showing.didFocus === null || showing.didFocus >= showing.did.length || showing.did[showing.didFocus]?.heard) {
-        const first = showing.did.findIndex(row => row.requestId);
-        const own = showing.did.findIndex(row => !row.heard);
-        showing.didFocus = first >= 0 ? first : own >= 0 ? own : null;
-      }
+      // The chosen row stays the same row (dayFocus); at first it is the newest row a decision stands behind.
+      showing.didFocus = dayFocus({ rows: showing.did, focus: showing.didFocus, earlier, before: newer ? was : null }); if (newer) showing.didWant = Math.max(DID_ROWS, showing.did.length);
       drawPage();
-    } catch { if (showing === pageView && showing.did === null) { showing.did = []; drawPage(); } }
+    } catch { if (showing === pageView && showing.did === null) { showing.did = []; drawPage(); } } finally { showing.reading = false; }
   }
   function pageAct(action, index?) {
     if (!pageView) return;
@@ -1353,10 +1353,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
           headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x), head: { x: heldFrame.headInView ? heldFrame.overhead.x : ring.x, y: headY } });
       } else presence.place(null);
     } else groundRing.hide();
-    // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4): within hearing,
-    // 24 px over the head and never nearer an edge of the view than the edge inset; two that would
-    // overlap stack, the earlier above. A line said off screen by someone the person attends to sits at
-    // the view's side nearest them (T8); a line said beyond hearing names its people instead (section 5).
+    // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4), none over a record page
+    // (F12): within hearing, 24 px over the head and never nearer an edge of the view than the edge inset; two that
+    // would overlap stack, the earlier above. A line said off screen by someone the person attends to sits at the
+    // view's side nearest them (T8); a line said beyond hearing names its people instead (section 5).
     const s = popScale(), inset = insetNow(), placedPops = [], beyond = [];
     const safeTop = BESIDE.top * s, safeBottom = innerHeight - BESIDE.bottom * s;
     const asked = runWatch.run ? new Set((subjectReads.models?.choices ?? []).filter(choice => choice.model).map(choice => choice.subjectId)) : null;
@@ -1368,7 +1368,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       const attended = shown.subjectId === held?.scene.id || Boolean(asked?.has(shown.subjectId)) || Boolean(heard?.headInView && seen(listener, heard));
       const how = row ? popPlacement({ onScreen, metres: reachDistance(row), chosen: shown.subjectId === held?.scene.id, attended }) : 'none';
       let part = speechParts.get(shown.subjectId);
-      if (how === 'far' || how === 'none' || inScene.has(shown.subjectId)) {
+      if (pageShown() || how === 'far' || how === 'none' || inScene.has(shown.subjectId)) {
         part?.away();
         if (how === 'far' && !inScene.has(shown.subjectId)) beyond.push(shown.subjectId, ...(listener ? [listener.scene.id] : []));
         continue;

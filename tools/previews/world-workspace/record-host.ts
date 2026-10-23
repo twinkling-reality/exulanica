@@ -87,6 +87,55 @@ export async function readDayEvents({ readPage, rowsOf, held = [], next = '', wa
   return { events, next: more };
 }
 
+/**
+ * What was recorded since the newest minute a day page holds (F12), for a page left open while the world plays: the
+ * events window from that minute, oldest first and continued with `after`, which replaces that minute whole (its
+ * events keep the read's order within it) on top of the rest, newest first, with the events the page did not hold
+ * (`fresh`). Null for a page that holds none, and where `pages` pages do not reach the window's end: a backlog,
+ * read again from the newest.
+ */
+export async function readNewerEvents({ readWindow, held, pages }: {
+  readonly readWindow: (fromTick: number, after: string) => Promise<Json>; readonly held: readonly Json[]; readonly pages: number;
+}): Promise<{ readonly events: Json[]; readonly fresh: Json[] } | null> {
+  const ticks = held.map((event) => event.tick).filter(Number.isSafeInteger);
+  if (!ticks.length) return null;
+  const from = ticks.reduce((newest, tick) => Math.max(newest, tick)), recorded: Json[] = [];
+  let after = '';
+  for (let page = 0; page < pages; page += 1) {
+    const read = await readWindow(from, after);
+    recorded.push(...(read.events ?? []));
+    if (read.next) { after = read.next; continue; }
+    const known = new Set(held.map((event) => event.event_id));
+    // Newest minute first, as the newest-first read gives them; a stable sort keeps the order within a minute.
+    return { events: [...[...recorded].sort((a, b) => b.tick - a.tick), ...held.filter((event) => !(event.tick >= from))],
+      fresh: recorded.filter((event) => !known.has(event.event_id)) };
+  }
+  return null;
+}
+
+/**
+ * Which row of a day page is chosen once its rows (`rows`, newest first) are read: the row chosen before (`focus`)
+ * where it still is one; read on from the oldest row (`earlier`), the first row the read brought; with rows put on top
+ * while the page was open (`before`, the rows it showed, F12), the same row, found by its decision, else as many rows
+ * further down as came on top. Otherwise, and at first, the newest row a decision stands behind, else the newest of
+ * the character's own. A line heard is never chosen (T6).
+ */
+export function dayFocus({ rows, focus, earlier = false, before = null }: {
+  readonly rows: readonly Json[]; readonly focus: number | null; readonly earlier?: boolean; readonly before?: readonly Json[] | null;
+}): number | null {
+  let at = focus;
+  if (before && focus !== null && before[focus]) {
+    const was = before[focus], same = was.requestId ? rows.findIndex((row) => row.requestId === was.requestId) : -1;
+    at = same >= 0 ? same : focus + rows.length - before.length;
+  }
+  if (earlier && at !== null) { let next = at + 1; while (rows[next]?.heard) next += 1; if (rows[next]) at = next; }
+  if (at === null || at < 0 || at >= rows.length || rows[at]?.heard) {
+    const first = rows.findIndex((row) => row.requestId), own = rows.findIndex((row) => !row.heard);
+    at = first >= 0 ? first : own >= 0 ? own : null;
+  }
+  return at;
+}
+
 export function recordStates(host: RecordHost) {
   /** Reads the moments and the version's placed things for a page (`showing`): kept on it, re-read with its rows. */
   async function readMoments(showing: Json): Promise<void> {

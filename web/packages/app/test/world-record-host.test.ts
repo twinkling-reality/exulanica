@@ -195,6 +195,49 @@ describe("the day page's events, read back on demand", () => {
   });
 });
 
+describe('a day page left open while the world plays (F12)', () => {
+  // Held newest first: minute 12 read while e4 alone was recorded in it.
+  const held = [{ event_id: 'e4', tick: 12 }, { event_id: 'e3', tick: 11 }, { event_id: 'e2', tick: 11 }];
+
+  it('reads from its newest minute and puts what came since on top, that minute in the read\'s order', async () => {
+    const { readNewerEvents } = await recordHost();
+    // The window reads oldest first: minute 12 whole (e5 came in it after e4 was read), then 13 over two pages.
+    const windows: Record<string, Json> = {
+      '': { events: [{ event_id: 'e4', tick: 12 }, { event_id: 'e5', tick: 12 }, { event_id: 'e6', tick: 13 }], next: 'w1' },
+      w1: { events: [{ event_id: 'e7', tick: 13 }], next: null },
+    };
+    const readWindow = vi.fn(async (_from: number, after: string) => windows[after]!);
+    const since = await readNewerEvents({ readWindow, held, pages: 4 });
+    expect(readWindow.mock.calls).toEqual([[12, ''], [12, 'w1']]);
+    expect(since.events.map((event: Json) => event.event_id)).toEqual(['e6', 'e7', 'e4', 'e5', 'e3', 'e2']);
+    expect(since.fresh.map((event: Json) => event.event_id)).toEqual(['e5', 'e6', 'e7']);
+  });
+
+  it('answers nothing new as no fresh events, and a backlog or an empty page as null', async () => {
+    const { readNewerEvents } = await recordHost();
+    const quiet = await readNewerEvents({ readWindow: async () => ({ events: [{ event_id: 'e4', tick: 12 }], next: null }), held, pages: 4 });
+    expect([quiet.fresh, quiet.events.map((event: Json) => event.event_id)]).toEqual([[], ['e4', 'e3', 'e2']]);
+    expect(await readNewerEvents({ readWindow: async () => ({ events: [], next: 'more' }), held, pages: 2 })).toBeNull();
+    expect(await readNewerEvents({ readWindow: async () => ({ events: [], next: null }), held: [], pages: 2 })).toBeNull();
+  });
+
+  it('keeps the chosen row chosen as rows come on top', async () => {
+    const { dayFocus } = await recordHost();
+    const before = [{ requestId: 'r2' }, { requestId: null }, { requestId: 'r1' }];
+    // Two rows on top: the decision chosen stays chosen, found by its decision; a routine row moves down with it.
+    const rows = [{ requestId: 'r4' }, { requestId: null, heard: true }, ...before];
+    expect(dayFocus({ rows, focus: 2, before })).toBe(4);
+    expect(dayFocus({ rows, focus: 1, before })).toBe(3);
+    // A repeat folded into the newest row takes its newest decision: no row came on top, the same place is chosen.
+    expect(dayFocus({ rows: [{ requestId: 'r3' }, ...before.slice(1)], focus: 0, before })).toBe(0);
+    // A fold further down that split once its moment was read: the decision chosen is found where it now stands.
+    expect(dayFocus({ rows: [{ requestId: 'r2' }, { requestId: 'r1' }, { requestId: 'r0' }], focus: 0, before: [{ requestId: 'r2' }, { requestId: 'r1' }] })).toBe(0);
+    // At first, the newest row a decision stands behind; read on, the first row past the old oldest that is not heard.
+    expect(dayFocus({ rows, focus: null })).toBe(0);
+    expect(dayFocus({ rows: [{ requestId: null }, { requestId: 'r1' }, { requestId: null, heard: true }, { requestId: 'r0' }], focus: 1, earlier: true })).toBe(3);
+  });
+});
+
 describe('a decision, filled', () => {
   const detail = (label: string, provider: Json | null = { latency_ms: 900, cost_usd: '0.0003', cost_known: true }) => ({
     request: { base_tick: 412, provider_config: { provider: 'nvidia', model_id: 'nemotron-3-nano-30b' }, context: { options: [{ label }, { label: 'walk to the bench' }] } },
