@@ -430,6 +430,36 @@ describe("Teo's day keys", () => {
     page.draw(teoState());
     expect(items(root)[2]!.getAttribute('aria-current')).toBe('true');
   });
+
+  it("draws the chooser as a gallery: free first in groups, maker and size, the focused row opened with its maker's words (A3)", async () => {
+    const { root, page } = await open();
+    const card = (maker: string, total: string, says: string, licence: string) => ({
+      maker, parameters: { total, active: null }, licence, says, source: `https://huggingface.co/maker/model/blob/${'0'.repeat(40)}/README.md`, readOn: '2026-10-23',
+    });
+    const nebius = 'Nebius Token Factory, which serves open models behind one OpenAI-compatible API.';
+    const says = 'This model is optimized for collaborative agents and high-volume workloads.';
+    const choices = [
+      { model: { provider: 'ollama_local', providerDescription: 'This computer, through Ollama.', modelId: 'qwen/4b', name: 'Qwen3 4B Instruct', price: { input: '0', output: '0' }, local: true,
+        card: card('Qwen', '4.0B', 'Improvements in general capabilities.', 'Apache 2.0') }, current: false },
+      { model: { provider: 'nebius', providerDescription: nebius, modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' },
+        card: card('NVIDIA', '30B', says, 'NVIDIA Nemotron Open Model License') }, current: true },
+      { model: null, current: false },
+    ];
+    page.draw(teoState({ choosing: { choices, focus: 1, refusal: null, busy: false } }));
+    expect(all(root, '.wu-day-side .wu-model-intro')).toEqual(['Open models, each from its maker. Picking one spends nothing. Only a run spends.']);
+    expect(all(root, '.wu-gallery-label')).toEqual(['On this computer, free', 'With your Nebius Token Factory key, per million tokens']);
+    expect(all(root, '.wu-model-sub')).toEqual(['Qwen · 4B', 'NVIDIA · 30B']);
+    expect(all(root, '.wu-model-price')).toEqual(['Free', '$0.06 in · $0.24 out', 'No AI model · Free']);
+    // Only the focused row opens, inside itself: the maker's words, then on a line of their own where they come from and the licence.
+    expect([...root.querySelectorAll('.wu-model-open')].map((open) => open.firstChild?.textContent)).toEqual([`“${says}”`]);
+    expect(all(root, '.wu-model-open > .wu-model-from')).toEqual(["from NVIDIA's model card · NVIDIA Nemotron Open Model License"]);
+    expect(root.querySelectorAll('.wu-model-row')[1]!.querySelector('.wu-model-open')).not.toBeNull();
+    // None running on this computer yet: its group stands with its one line and no key; a guest's key group is the host's.
+    page.draw(teoState({ choosing: { choices: choices.slice(1), focus: 0, refusal: null, busy: false, waiting: true, fromServer: true } }));
+    expect(all(root, '.wu-gallery-label')).toEqual(['On this computer, free', "From this server's budget, per million tokens"]);
+    expect(all(root, '.wu-gallery-waiting')).toEqual(['None is running yet. Start one with a local model runner, and it shows here, free.']);
+    expect([...root.querySelectorAll('.wu-model-row')].map((row) => row.querySelector('.wu-key')?.textContent)).toEqual(['1', '2']);
+  });
 });
 
 describe("Teo's day keeps the world's clock", () => {

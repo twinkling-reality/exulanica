@@ -363,9 +363,16 @@ that work for them now (their day; letting their model decide, or stopping it wh
 choosing a model where they have none and the page may choose one; following them) and, as small
 print, who decides for them. R asks the run's question in the same place: how long it runs, whose
 models it asks, the model and the most it may spend. M lists the models the server offers there too,
-in its order with their prices and Routine last, and a number or Enter gives the person that model by
-the same write the character page uses. Looking at someone before choosing them shows one soft label
-over their head: their name, what they are doing and [E] Inspect.
+as the character page's chooser does, and a number or Enter gives the person that model by the same
+write the character page uses. Both choosers show the models as a gallery that teaches: in groups by
+where each runs, free first (what this computer runs, then the models a key pays for, or a guest's
+host's budget, by price), each group under its label, Routine last; under each model's name its maker
+and size, and on the focused row its maker's own words about it, quoted from its model card with that
+card named and the model's licence (the models read's `card`, [model and service
+selection](model-and-service-selection.md)). Where this install lets a model on this computer in and
+none runs yet, that group stands with one line saying how to start one. Nothing in the gallery sets one
+model against another. Looking at someone before choosing them shows one soft label over their head:
+their name, what they are doing and [E] Inspect.
 
 People come into a saved world only when its owner asks (Bring people in). The page creates its society
 with the engine the world's entry states at that moment (`society_engine` on `GET

@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, modelsDecide, modelsNamed, priceWords, quoted, readingRecord, routineRow, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, providerName, quoted, readingRecord, routineRow, rowPrice, saidUnder, stopsAfter } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -187,13 +187,46 @@ export const MODEL_ROWS = 9;
 const sameModel = (model, current) => model === null || current === null ? model === current
   : model.provider === current.provider && (model.modelId ?? model.model_id) === (current.modelId ?? current.model_id);
 
+/** What the price of a model a key pays for is ordered by (A3): a million tokens in, then out. */
+const PRICE_ORDER = [model => Number(model?.price?.input ?? Infinity), model => Number(model?.price?.output ?? Infinity)];
+
 /**
  * The models a person may choose here (F5), from the models read: the ones it says this install can ask, so a
  * model refused here (a server on this computer the install does not reach, a provider it holds no key for)
- * is never offered, "On this computer · Free" least of all. Both choosers, their number keys too, take this list.
+ * is never offered, "On this computer · Free" least of all. Both choosers, their number keys too, take this list,
+ * in the gallery's order (A3): what this computer runs first, then the rest by price, lowest first, the served
+ * order breaking a tie.
  */
 export function choosableModels(read) {
-  return (read?.models ?? []).filter(model => !model.refusal);
+  const offered = (read?.models ?? []).filter(model => !model.refusal).map((model, at) => ({ model, at }));
+  const order = (one, other) => Number(one.model.local !== true) - Number(other.model.local !== true)
+    || PRICE_ORDER.reduce((found, price) => found || price(one.model) - price(other.model), 0) || one.at - other.at;
+  return offered.sort(order).map(({ model }) => model);
+}
+
+/** The code a model on this computer is refused by while no server runs there (PROJECT's A2 liveness read). */
+export const NOT_RUNNING = 'provider_not_running';
+
+/**
+ * Whether the chooser's group for this computer stands with no model in it (A3 item 2, amended 17:22): this install
+ * lets a model on this computer in, and none runs yet. Where it does not let one in, the group is left out.
+ */
+export function noneRunningHere(read) {
+  const models = read?.models ?? [];
+  return models.some(model => model.local === true && model.refusal === NOT_RUNNING) && !models.some(model => model.local === true && !model.refusal);
+}
+
+/**
+ * The chooser's rows as a gallery that teaches (A3, WORDS.md): the models in choosableModels' order, then Routine, each
+ * with the label of the group it stands in (this computer, free; a provider's key, or this server's budget on a
+ * guest's page, per million tokens; Routine under none), its maker and size, its price, and its maker's own words
+ * (shown on the focused row). `fromServer` where the page is a guest's, whose models a host pays for.
+ */
+export function galleryItems(models, fromServer = false) {
+  return [...models.map(model => ({
+    model, word: model.name, sub: makerLine(model), price: rowPrice(model), open: cardWords(model),
+    group: model.local === true ? CHARACTER_WORDS.hereFree : fromServer ? CHARACTER_WORDS.serverBudget : keyGroup(providerName(model)),
+  })), { model: null, word: CHARACTER_WORDS.routine, sub: null, price: routineRow(), open: null, group: null }];
 }
 
 /** Whether [M] is offered (F5): the models read takes choices and offers a model this install can ask. */
@@ -207,30 +240,38 @@ export function openWhileOffered(choosing, read) {
 }
 
 /**
- * Choose a model (r07, R-RUN-BUILD-SHEET section 3): M turns the same group, in place, into the list of the models the
- * server offers, in its order, with Routine last. Top to bottom: the name, "Choose a model", that picking spends nothing,
- * "Per million tokens" over the price column, one row per model (its number key, its name with "Current" after the
- * character's own, its price), at most MODEL_ROWS at once around `focus` (an index into the models, `models.length` for
- * Routine), then the small keys. `refusal` is the write's refusal in its own words (modelRefusalWords); `busy` while
- * the choice is written. Each list row: { action: 'use', index, key, word, price, current, on }.
+ * Choose a model (r07, R-RUN-BUILD-SHEET section 3; a gallery that teaches, A3): M turns the same group, in place,
+ * into the list of the models the server offers, in choosableModels' order, with Routine last. Top to bottom: the
+ * name, "Choose a model", what the models are and that picking spends nothing, then the rows in groups by where they
+ * run, each group under its label: a row per model (its number key, its name with "Current" after the character's
+ * own, under it its maker and size, its price), the focused one opened beneath with its maker's own words, at most
+ * MODEL_ROWS at once around `focus` (an index into the models, `models.length` for Routine), then the small keys.
+ * `waiting` stands this computer's group with its one line and no key where none runs yet (noneRunningHere);
+ * `fromServer` labels the key group as this server's budget (a guest's page). `refusal` is the write's refusal in
+ * its own words (modelRefusalWords); `busy` while the choice is written. Each list row: { action: 'use', index, key,
+ * word, sub, price, current, on, label, open }, `label` the group's where the row starts one in the window, `open`
+ * the maker's words on the focused row.
  */
-export function modelGroup({ who, models = [], current = null, focus = 0, refusal = null, busy = false }) {
-  const items = [...models.map(model => ({ model, word: model.name, price: priceWords(model) ?? '' })),
-    { model: null, word: CHARACTER_WORDS.routine, price: routineRow() }];
+export function modelGroup({ who, models = [], current = null, focus = 0, refusal = null, busy = false, waiting = false, fromServer = false }) {
+  const items = galleryItems(models, fromServer);
   const at = Math.max(0, Math.min(items.length - 1, Number.isSafeInteger(focus) ? focus : 0));
   const first = Math.max(0, Math.min(items.length - MODEL_ROWS, at - MODEL_ROWS + 1));
-  const rows = items.slice(first, first + MODEL_ROWS).map((item, offset) => Object.freeze({
-    action: 'use', index: first + offset, key: String(offset + 1), word: item.word, price: item.price,
+  const shown = items.slice(first, first + MODEL_ROWS);
+  const rows = shown.map((item, offset) => Object.freeze({
+    action: 'use', index: first + offset, key: String(offset + 1), word: item.word, sub: item.sub, price: item.price,
     current: sameModel(item.model, current), on: first + offset === at,
+    label: item.group !== null && (offset === 0 || shown[offset - 1].group !== item.group) ? item.group : null,
+    open: first + offset === at ? item.open : null,
   }));
   return Object.freeze({
     name: who.title,
     doing: CHARACTER_WORDS.chooseModel,
     said: null,
-    note: CHARACTER_WORDS.pickingSpendsNothing,
+    note: CHARACTER_WORDS.chooserIntro,
     rows: Object.freeze([]),
     list: Object.freeze({
-      head: CHARACTER_WORDS.perMillion, first, rows: Object.freeze(rows), busy,
+      waiting: waiting && first === 0 ? Object.freeze({ label: CHARACTER_WORDS.hereFree, line: CHARACTER_WORDS.noneRunning }) : null,
+      first, rows: Object.freeze(rows), busy,
       keys: Object.freeze([{ keys: ['\u2191', '\u2193'], word: CHARACTER_WORDS.choose }, { keys: ['Enter'], word: CHARACTER_WORDS.useThisModel }]),
     }),
     print: refusal,

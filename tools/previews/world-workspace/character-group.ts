@@ -13,12 +13,19 @@ const SVG = 'http://www.w3.org/2000/svg';
 /** One key row: what it does, its key, its word and its aria-keyshortcuts value. */
 export interface GroupRow { readonly action: string; readonly key: string; readonly word: string; readonly shortcut: string; readonly disabled?: boolean }
 
-/** One row of the model list (r07): its number key, the model's name, its price, and whether it is theirs now or the one chosen. */
-export interface ModelRow { readonly action: 'use'; readonly index: number; readonly key: string; readonly word: string; readonly price: string; readonly current: boolean; readonly on: boolean }
+/**
+ * One row of the model list (r07, A3): its number key, the model's name and under it its maker and size (`sub`), its
+ * price, whether it is theirs now or the one chosen, the label of the group it starts in the window (`label`), and on
+ * the focused row its maker's own words (`open`).
+ */
+export interface ModelRow {
+  readonly action: 'use'; readonly index: number; readonly key: string; readonly word: string; readonly sub: string | null; readonly price: string;
+  readonly current: boolean; readonly on: boolean; readonly label: string | null; readonly open: { readonly said: string; readonly from: string } | null;
+}
 
-/** The model list in the group's place of its rows (r07): the price column's head, the rows, and the small keys. */
+/** The model list in the group's place of its rows (r07, A3): this computer's group where none runs yet, the rows in their groups, and the small keys. */
 export interface ModelList {
-  readonly head: string;
+  readonly waiting: { readonly label: string; readonly line: string } | null;
   readonly first: number;
   readonly rows: readonly ModelRow[];
   readonly keys: readonly { readonly keys: readonly string[]; readonly word: string }[];
@@ -108,6 +115,7 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
         parts.push(print);
       }
       group.dataset.refused = String(content.refused);
+      group.dataset.list = String(content.list !== null);
       group.replaceChildren(...parts);
       group.setAttribute('aria-label', content.name);
       placed = '';
@@ -132,12 +140,18 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
   };
 }
 
-/** The model list's parts (r07): the price column's head, a button per row, and the small keys under them. */
+/**
+ * The model list's parts (r07, A3): the rows in groups, each group under its label (this computer's with its one line
+ * where none runs yet), a button per row with its maker and size under its name, the focused row opened beneath with
+ * its maker's own words, and the small keys under them.
+ */
 function modelList(list: ModelList, onAction: (action: string) => void): HTMLElement[] {
   const rows = document.createElement('div');
   rows.className = 'cg-list';
   rows.setAttribute('role', 'listbox');
+  if (list.waiting) rows.append(text('p', 'cg-group-label', list.waiting.label), text('p', 'cg-waiting', list.waiting.line));
   for (const row of list.rows) {
+    if (row.label) rows.append(text('p', 'cg-group-label', row.label));
     const button = document.createElement('button');
     button.type = 'button';
     button.className = row.on ? 'cg-model cg-on' : 'cg-model';
@@ -149,9 +163,18 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
     glyph.setAttribute('aria-hidden', 'true');
     const word = text('span', 'cg-model-word', row.word);
     if (row.current) word.append(text('span', 'cg-current', CHARACTER_WORDS.current));
-    button.append(glyph, word, text('span', 'cg-price', row.price));
+    const named = document.createElement('span');
+    named.className = 'cg-model-named';
+    named.append(word);
+    if (row.sub) named.append(text('span', 'cg-model-sub', row.sub));
+    button.append(glyph, named, text('span', 'cg-price', row.price));
     button.addEventListener('click', () => onAction(`use:${row.index}`));
     rows.append(button);
+    if (row.open) {
+      const open = text('p', 'cg-model-open', row.open.said);
+      open.append(text('span', 'cg-model-from', row.open.from));
+      rows.append(open);
+    }
   }
   const keys = document.createElement('p');
   keys.className = 'cg-keys';
@@ -161,7 +184,7 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
     group.append(item.word);
     keys.append(group);
   }
-  return [text('p', 'cg-list-head', list.head), rows, keys];
+  return [rows, keys];
 }
 
 /**

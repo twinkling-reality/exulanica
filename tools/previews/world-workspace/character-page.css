@@ -18,6 +18,15 @@
 /* r07's number key on each of the first nine rows, as Choose a model's on the card (F11). */
 .wu-model-row > .wu-key { margin-right: calc(16 * var(--u)); }
 .wu-model-row > .wu-model-name { flex: 1; }
+/* The chooser as a gallery that teaches (A3): rows in groups under their labels in the faint ink; a model's maker and
+   size under its name; the focused row opened beneath, inside the row, with its maker's own words. */
+.wu-gallery .wu-gallery-label { padding: calc(14 * var(--u)) calc(20 * var(--u)) calc(6 * var(--u)); }
+.wu-gallery .wu-gallery-waiting { padding: calc(6 * var(--u)) calc(20 * var(--u)) calc(10 * var(--u)); color: var(--ink-2); text-wrap: pretty; }
+.wu-gallery .wu-model-row { flex-wrap: wrap; height: auto; min-height: calc(62 * var(--u)); }
+.wu-gallery .wu-model-row > .wu-model-named { flex: 1; display: grid; row-gap: calc(4 * var(--u)); padding: calc(10 * var(--u)) 0; }
+.wu-gallery .wu-model-row > .wu-model-open { flex-basis: 100%; margin: 0 0 calc(14 * var(--u)); text-wrap: pretty; color: var(--ink-2); }
+.wu-gallery .wu-model-open > .wu-model-from { display: block; }
+.wu-gallery .wu-model-row[data-current="true"] .wu-model-name::before { display: none; }
 .wu-orb-row { display: flex; align-items: center; gap: calc(20 * var(--u)); }
 .wu-orb-row .wu-big, .wu-orb-row .wu-small-text { margin: 0; }
 .wu-orb-row .wu-small-text { margin-top: calc(8 * var(--u)); }

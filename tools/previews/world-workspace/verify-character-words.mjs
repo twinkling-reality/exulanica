@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid } from './character-words.mjs';
+import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -43,6 +43,29 @@ assert.equal(priceWords({ price: { input: '0', output: '0.00' } }), 'Free');
 assert.equal(priceWords({ price: null }), null);
 // A model its provider serves from this computer (the read's on_this_computer), DESIGN's J11.
 assert.equal(priceWords({ price: { input: '0', output: '0' }, local: true }), 'On this computer · Free');
+// The chooser as a gallery that teaches (A3): a row's price ("Free" where its group says this computer), the key group
+// by the provider's own name, a model's maker and size, and its maker's own words with their source and the licence.
+assert.equal(rowPrice({ price: { input: '0', output: '0' }, local: true }), 'Free');
+assert.equal(rowPrice({ price: { input: '0.3', output: '0.9' } }), '$0.30 in · $0.90 out');
+assert.equal(rowPrice({ price: null }), '');
+assert.equal(providerName({ provider: 'nebius_token_factory', providerDescription: 'Nebius Token Factory, which serves open models.' }), 'Nebius Token Factory');
+assert.equal(providerName({ provider: 'nebius_token_factory' }), 'nebius_token_factory', 'no description: the provider\'s key');
+assert.equal(keyGroup('Nebius Token Factory'), 'With your Nebius Token Factory key, per million tokens');
+assert.equal(CHARACTER_WORDS.chooserIntro, 'Open models, each from its maker. Picking one spends nothing. Only a run spends.');
+assert.equal(CHARACTER_WORDS.hereFree, 'On this computer, free');
+assert.equal(CHARACTER_WORDS.serverBudget, "From this server's budget, per million tokens");
+const nemotron = { maker: 'NVIDIA', parameters: { total: '120B', active: '12B' }, licence: 'NVIDIA Nemotron Open Model License', says: 'This model is optimized for collaborative agents and high-volume workloads.' };
+assert.equal(makerLine({ card: nemotron }), 'NVIDIA · 120B');
+assert.equal(makerLine({ card: { ...nemotron, maker: 'DeepSeek', parameters: null } }), 'DeepSeek');
+assert.equal(makerLine({ card: { ...nemotron, maker: 'Qwen', parameters: { total: '4.0B', active: null } } }), 'Qwen · 4B', 'the size as a name writes it');
+assert.equal(makerLine({ card: { ...nemotron, parameters: { total: '3.5B', active: null } } }), 'NVIDIA · 3.5B');
+assert.equal(makerLine({ card: null }), null);
+assert.deepEqual(cardWords({ card: nemotron }), { said: '\u201cThis model is optimized for collaborative agents and high-volume workloads.\u201d', from: "from NVIDIA's model card · NVIDIA Nemotron Open Model License" });
+assert.equal(cardWords({}), null);
+// Never a word that sets one model against another (A3 item 5) in the product's own words of the gallery.
+for (const words of [CHARACTER_WORDS.chooserIntro, CHARACTER_WORDS.hereFree, CHARACTER_WORDS.serverBudget, CHARACTER_WORDS.noneRunning, keyGroup('Nebius Token Factory')]) {
+  assert.doesNotMatch(words, /\b(best|better|fastest|faster|top|rank|score|cheapest|smartest)\b/iu, words);
+}
 assert.equal(modelLine({ price: { input: '0', output: '0' }, local: true }), 'On this computer · Free');
 assert.equal(modelLine({ price: { input: '0.06', output: '0.24' } }), '$0.06 in · $0.24 out per million tokens');
 assert.equal(modelLine(null), 'No AI model · Free');

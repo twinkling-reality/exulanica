@@ -41,6 +41,21 @@ export interface SocietyModel extends NamedModelRef {
   readonly refusal: string | null;
   /** Whether its provider serves it from this computer, billing nothing; absent or false where a read does not say. */
   readonly local?: boolean;
+  /** What its maker says of it, from its own model card (`exulanica/models/model_cards.py`); null where none is kept or a read does not say. */
+  readonly card?: ModelCard | null;
+}
+
+/**
+ * A model's card as the server keeps it: its maker, its parameters as the card states them (null where it states
+ * none), its licence, one short quote of what the maker says it is for, and the card's address at the revision read.
+ */
+export interface ModelCard {
+  readonly maker: string;
+  readonly parameters: { readonly total: string; readonly active: string | null } | null;
+  readonly licence: string;
+  readonly says: string;
+  readonly source: string;
+  readonly readOn: string;
 }
 
 /** A model's served price, in US dollars per million tokens, as decimal strings. */
@@ -276,6 +291,18 @@ const list = (value: unknown): readonly unknown[] => (Array.isArray(value) ? val
 const text = (value: unknown): string => (typeof value === 'string' && value.length > 0 ? value : invalid());
 const count = (value: unknown): number => (Number.isSafeInteger(value) && (value as number) >= 0 ? value as number : invalid());
 const maybe = <T>(value: unknown, read: (held: unknown) => T): T | null => (value === null ? null : read(value));
+
+function modelCard(value: unknown): ModelCard {
+  const held = object(value);
+  const parameters = maybe(held['parameters'], (counts) => {
+    const stated = object(counts);
+    return Object.freeze({ total: text(stated['total']), active: maybe(stated['active'], text) });
+  });
+  return Object.freeze({
+    maker: text(held['maker']), parameters, licence: text(held['licence']), says: text(held['says']),
+    source: text(held['source']), readOn: text(held['read_on']),
+  });
+}
 const flag = (value: unknown): boolean => (typeof value === 'boolean' ? value : invalid());
 
 function modelRef(value: unknown): NamedModelRef {
@@ -419,6 +446,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         price: held['usd_per_mtok'] === undefined ? null : maybe(held['usd_per_mtok'], price),
         refusal: maybe(held['refusal'], text),
         local: held['on_this_computer'] === true,
+        card: held['card'] === undefined ? null : maybe(held['card'], modelCard),
       };
     }),
     choices: list(row['choices']).map((entry) => {

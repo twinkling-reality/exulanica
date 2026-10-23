@@ -112,6 +112,18 @@ describe('reading who decides', () => {
     expect(parseSocietyModels(read()).models[0]!.local).toBe(false);
   });
 
+  it("reads what each model's maker says of it, and nothing from a server that does not say (A3)", () => {
+    const card = {
+      maker: 'NVIDIA', parameters: { total: '30B', active: '3.5B' }, licence: 'NVIDIA Nemotron Open Model License',
+      says: 'A general purpose reasoning and chat model.', source: `https://huggingface.co/nvidia/model/blob/${'0'.repeat(40)}/README.md`, read_on: '2026-10-23',
+    };
+    const view = parseSocietyModels(read({ models: [{ ...read().models[0]!, card }, { ...read().models[0]!, card: { ...card, parameters: null } }] }));
+    expect(view.models[0]!.card).toEqual({ ...card, read_on: undefined, readOn: '2026-10-23' });
+    expect(view.models[1]!.card!.parameters).toBeNull();
+    expect(parseSocietyModels(read()).models[0]!.card).toBeNull();
+    expect(() => parseSocietyModels(read({ models: [{ ...read().models[0]!, card: { ...card, says: '' } }] }))).toThrow();
+  });
+
   it('reads whether recorded decisions are asked again here, as a server that does not say does', () => {
     expect(parseSocietyModels(read()).asksAgain).toBe(true);
     expect(parseSocietyModels(read({ asks_again: true })).asksAgain).toBe(true);

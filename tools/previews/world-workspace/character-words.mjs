@@ -25,7 +25,13 @@ export const CHARACTER_WORDS = Object.freeze({
   free: 'Free',
   current: 'Current',
   chooseModel: 'Choose a model',
-  pickingSpendsNothing: 'Picking one spends nothing. Only a run spends.',
+  /** Above the chooser's rows (A3): what the models are, and that picking one spends nothing. */
+  chooserIntro: 'Open models, each from its maker. Picking one spends nothing. Only a run spends.',
+  /** The chooser's groups by where a model runs (A3), free first; the key group is keyGroup's. */
+  hereFree: 'On this computer, free',
+  serverBudget: "From this server's budget, per million tokens",
+  /** The group of models on this computer where none runs yet (A3 item 2, amended 17:22). */
+  noneRunning: 'None is running yet. Start one with a local model runner, and it shows here, free.',
   perMillion: 'Per million tokens',
   choose: 'Choose',
   useThisModel: 'Use this model',
@@ -139,6 +145,36 @@ export function priceWords(model) {
   const input = Number(price.input), output = Number(price.output);
   if (input === 0 && output === 0) return CHARACTER_WORDS.free;
   return `${amount(input)} in · ${amount(output)} out`;
+}
+
+/** A model's price in the chooser's row (A3): "Free" on this computer, where its group says where, else priceWords'. */
+export const rowPrice = model => onThisComputer(model) ? CHARACTER_WORDS.free : priceWords(model) ?? '';
+
+/** A provider's name: its description up to the first comma, as a model's name is its description's. */
+export const providerName = model => (typeof model?.providerDescription === 'string' ? model.providerDescription.split(',')[0].trim() : '') || model?.provider || '';
+
+/** The chooser's group of models a key pays for (A3): "With your Nebius Token Factory key, per million tokens". */
+export const keyGroup = provider => `With your ${provider} key, per million tokens`;
+
+/**
+ * Under a model's name in the chooser (A3): its maker and size, "NVIDIA · 120B", the size written as a name writes it
+ * ("Qwen · 4B" where the card states 4.0B); its maker alone where its card states no size; null without a card.
+ */
+export function makerLine(model) {
+  const card = model?.card;
+  if (!card) return null;
+  return card.parameters ? `${card.maker} · ${card.parameters.total.replace(/\.0(?=B$)/u, '')}` : card.maker;
+}
+
+/**
+ * The focused row's words (A3 item 4): its maker's own words in quotes (`said`), then on a line of its own in the
+ * faint ink where they come from and the model's licence (`from`: "from NVIDIA's model card · OpenMDW 1.1"); null
+ * where no card is kept. Never our own claim.
+ */
+export function cardWords(model) {
+  const card = model?.card;
+  if (!card) return null;
+  return Object.freeze({ said: `\u201c${card.says}\u201d`, from: `from ${possessive(card.maker)} model card · ${card.licence}` });
 }
 
 /** The page's Model line: the price per million tokens, or no model. */

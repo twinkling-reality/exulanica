@@ -26,15 +26,26 @@
 .cg-group[data-refused="true"] .cg-rows > .wu-row:first-child { opacity: .55; }
 .cg-group > .cg-rows { margin-top: var(--space-24); pointer-events: auto; }
 .cg-print { margin-top: var(--space-16); }
-/* The model list (r07): "Per million tokens" over the price column, a row per model (its number key, its name with
-   "Current" after the character's own, its price), the chosen row's marker 14 px left of its key, the small keys under. */
-.cg-list-head { margin-top: var(--space-24); text-align: right; font: 400 max(12px, calc(13 * var(--u)))/max(14px, calc(16 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
-.cg-list { margin-top: var(--space-8); display: grid; row-gap: max(16px, calc(16 * var(--u))); --glyph: max(32px, calc(32 * var(--u))); pointer-events: auto; }
-.wu-root .cg-list > .cg-model { position: relative; display: grid; grid-template-columns: var(--glyph) auto 1fr; column-gap: max(16px, calc(16 * var(--u))); align-items: center;
-  height: var(--glyph); margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+/* The model list (r07; a gallery that teaches, A3): rows in groups by where the model runs, each group under a small
+   label in the faint ink; a row per model (its number key, its name with "Current" after the character's own and under
+   it its maker and size in the faint ink, its price), the chosen row's marker 14 px left of its key, the focused row
+   opened beneath with its maker's own words; the small keys under. The group grows to hold the open row: 620 wide at
+   1920, the same at 1440 by the shared scale. While it holds the list its backing darkens, so every faint line reads at
+   4.5 to 1 or more and the names at 7 to 1 over a sunlit front (DESIGN 17:44, measured with its contrast.py). */
+.cg-group[data-list="true"] { width: calc(620 * var(--u)); --shade-fill: rgba(6, 12, 16, .88); }
+.cg-list { margin-top: var(--space-16); display: grid; row-gap: max(16px, calc(16 * var(--u))); --glyph: max(32px, calc(32 * var(--u))); pointer-events: auto; }
+.cg-group-label { margin: var(--space-8) 0 calc(-8 * var(--u)); font: 400 max(12px, calc(13 * var(--u)))/max(14px, calc(16 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .80); }
+.cg-waiting { margin: 0; text-wrap: pretty; font: 400 max(14px, calc(15 * var(--u)))/max(20px, calc(22 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
+.wu-root .cg-list > .cg-model { position: relative; display: grid; grid-template-columns: var(--glyph) minmax(0, 1fr) auto; column-gap: max(16px, calc(16 * var(--u))); align-items: center;
+  min-height: var(--glyph); margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.cg-model-named { display: grid; }
+.cg-model-sub { font: 400 max(12px, calc(13 * var(--u)))/max(16px, calc(18 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .80); white-space: nowrap; }
+/* The focused row opened beneath it, inside the group: the maker's words, then where they come from, fainter. */
+.cg-model-open { margin: calc(-8 * var(--u)) 0 0 calc(var(--glyph) + max(16px, calc(16 * var(--u)))); text-wrap: pretty; font: 400 max(14px, calc(15 * var(--u)))/max(20px, calc(22 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .92); }
+.cg-model-from { display: block; color: rgba(255, 255, 255, .80); }
 .cg-model:disabled { cursor: default; }
 .cg-model:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: calc(var(--glyph) / 4); }
-.cg-model-word { font-size: max(18px, calc(19 * var(--u))); line-height: var(--glyph); white-space: nowrap; }
+.cg-model-word { font-size: max(18px, calc(19 * var(--u))); line-height: max(24px, calc(26 * var(--u))); white-space: nowrap; }
 .cg-model.cg-on .cg-model-word { font-weight: 500; }
 .cg-model.cg-on::before { content: ''; position: absolute; left: calc(-14 * var(--u)); top: calc(6 * var(--u)); width: 3px; height: calc(20 * var(--u)); border-radius: 1px;
   background: var(--wash); box-shadow: 0 0 10px rgba(168, 203, 210, .8); }

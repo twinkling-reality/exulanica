@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, questionGroup, readLastSaid } from './character-group.mjs';
+import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
 import { GROUP_WORDS, called, decidesPrint, modelsDecide, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
@@ -171,24 +171,47 @@ assert.equal(three.print, 'Nemotron 3 Nano 30B and 2 other models · at most $0.
 assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], limits }).print, 'Nemotron 3 Nano 30B and Qwen3 235B Instruct · at most $0.05');
 assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Nemotron 3 Nano 30B', 'Nemotron 3 Nano 30B'], limits }).print, 'Nemotron 3 Nano 30B · at most $0.05', 'one model two people use is named once');
 
-// Choose a model (r07): the served models in the server's order, Routine last, Current on theirs, the chosen row marked.
+// Choose a model (r07; a gallery that teaches, A3): what this computer runs first, then the key group by price, Routine
+// last; each group under its label, a model's maker and size under its name, Current on theirs, the chosen row marked
+// and opened with its maker's own words, where they come from and the licence.
+const card = (maker, total, says, licence) => ({ maker, parameters: total ? { total, active: null } : null, licence, says,
+  source: `https://huggingface.co/maker/model/blob/${'0'.repeat(40)}/README.md`, readOn: '2026-10-23' });
+const NEBIUS = 'Nebius Token Factory, which serves open models behind one OpenAI-compatible API.';
 const served = [
-  { provider: 'nebius', modelId: 'nvidia/nano', name: 'Nemotron 3 Nano 30B', price: { input: '0.06', output: '0.24' } },
-  { provider: 'nebius', modelId: 'qwen/235b', name: 'Qwen3 235B Instruct', price: { input: '0.20', output: '0.60' } },
-  { provider: 'local', modelId: 'qwen/4b', name: 'Qwen3 4B Instruct', local: true },
+  { provider: 'nebius', providerDescription: NEBIUS, modelId: 'qwen/235b', name: 'Qwen3 235B Instruct', price: { input: '0.20', output: '0.60' }, card: card('Qwen', '235B', 'Improvements in general capabilities.', 'Apache 2.0') },
+  { provider: 'nebius', providerDescription: NEBIUS, modelId: 'nvidia/nano', name: 'Nemotron 3 Nano 30B', price: { input: '0.06', output: '0.24' }, card: card('NVIDIA', '30B', 'A general purpose reasoning and chat model.', 'NVIDIA Nemotron Open Model License') },
+  { provider: 'local', providerDescription: 'This computer, through Ollama: an open model.', modelId: 'qwen/4b', name: 'Qwen3 4B Instruct', local: true, card: card('Qwen', '4.0B', 'Improvements in general capabilities.', 'Apache 2.0') },
 ];
-const listed = modelGroup({ who: teo, models: served, current: { provider: 'nebius', modelId: 'nvidia/nano' }, focus: 1 });
+const ordered = choosableModels({ models: served });
+assert.deepEqual(ordered.map(model => model.name), ['Qwen3 4B Instruct', 'Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], 'this computer first, then the lowest price');
+const listed = modelGroup({ who: teo, models: ordered, current: { provider: 'nebius', modelId: 'nvidia/nano' }, focus: 1 });
 assert.equal(listed.name, 'Teo');
 assert.equal(listed.doing, 'Choose a model');
-assert.equal(listed.note, 'Picking one spends nothing. Only a run spends.');
+assert.equal(listed.note, 'Open models, each from its maker. Picking one spends nothing. Only a run spends.');
 assert.deepEqual(listed.rows, [], 'the list takes the rows\' place');
-assert.equal(listed.list.head, 'Per million tokens');
-assert.deepEqual(listed.list.rows.map(row => [row.key, row.word, row.price, row.current, row.on, row.index]), [
-  ['1', 'Nemotron 3 Nano 30B', '$0.06 in · $0.24 out', true, false, 0],
-  ['2', 'Qwen3 235B Instruct', '$0.20 in · $0.60 out', false, true, 1],
-  ['3', 'Qwen3 4B Instruct', 'On this computer · Free', false, false, 2],
-  ['4', 'Routine', 'No AI model · Free', false, false, 3],
+assert.equal(listed.list.waiting, null, 'a model runs on this computer: its group holds it');
+assert.deepEqual(listed.list.rows.map(row => [row.key, row.word, row.sub, row.price, row.current, row.on, row.index, row.label]), [
+  ['1', 'Qwen3 4B Instruct', 'Qwen · 4B', 'Free', false, false, 0, 'On this computer, free'],
+  ['2', 'Nemotron 3 Nano 30B', 'NVIDIA · 30B', '$0.06 in · $0.24 out', true, true, 1, 'With your Nebius Token Factory key, per million tokens'],
+  ['3', 'Qwen3 235B Instruct', 'Qwen · 235B', '$0.20 in · $0.60 out', false, false, 2, null],
+  ['4', 'Routine', null, 'No AI model · Free', false, false, 3, null],
 ]);
+assert.deepEqual(listed.list.rows.map(row => row.open), [null, {
+  said: '\u201cA general purpose reasoning and chat model.\u201d', from: "from NVIDIA's model card · NVIDIA Nemotron Open Model License",
+}, null, null], 'only the focused row opens, with its maker\'s words');
+assert.equal(modelGroup({ who: teo, models: ordered, fromServer: true }).list.rows[1].label, "From this server's budget, per million tokens", 'a guest\'s page: the host pays');
+const bare = modelGroup({ who: teo, models: [{ ...served[1], card: null }], focus: 0 }).list.rows[0];
+assert.deepEqual([bare.sub, bare.open], [null, null], 'no card kept: no maker line and nothing opens');
+assert.equal(modelGroup({ who: teo, models: [{ ...served[1], card: { ...served[1].card, maker: 'DeepSeek', parameters: null } }] }).list.rows[0].sub, 'DeepSeek', 'no size stated: the maker alone');
+// This computer's group where none runs yet (A3 item 2): its label and one line, no key, never focused; left out where
+// the install does not let one in, or once one runs.
+assert.equal(noneRunningHere({ models: [{ ...served[2], refusal: 'provider_not_running' }, served[1]] }), true);
+assert.equal(noneRunningHere({ models: [{ ...served[2], refusal: 'provider_not_admitted' }, served[1]] }), false);
+assert.equal(noneRunningHere({ models: served }), false);
+assert.equal(noneRunningHere(null), false);
+const waiting = modelGroup({ who: teo, models: [served[1]], waiting: true });
+assert.deepEqual(waiting.list.waiting, { label: 'On this computer, free', line: 'None is running yet. Start one with a local model runner, and it shows here, free.' });
+assert.deepEqual(waiting.list.rows.map(row => [row.key, row.word, row.label]), [['1', 'Nemotron 3 Nano 30B', 'With your Nebius Token Factory key, per million tokens'], ['2', 'Routine', null]]);
 assert.deepEqual(listed.list.keys.map(item => [item.keys.join(' '), item.word]), [['↑ ↓', 'Choose'], ['Enter', 'Use this model']]);
 assert.equal(listed.print, null);
 assert.equal(modelGroup({ who: teo, models: served, current: null, focus: 3 }).list.rows[3].current, true, 'no model: Routine is theirs');
@@ -201,12 +224,12 @@ const refusedHere = [
   { ...served[1], refusal: 'provider_credential_absent' },
   { ...served[2], refusal: 'provider_not_admitted' },
 ];
-assert.deepEqual(choosableModels({ models: refusedHere }).map(model => model.name), ['Nemotron 3 Nano 30B']);
+assert.deepEqual(choosableModels({ models: refusedHere }).map(model => model.name), ['Qwen3 235B Instruct']);
 assert.deepEqual(modelGroup({ who: teo, models: choosableModels({ models: refusedHere }) }).list.rows.map(row => [row.word, row.price]), [
-  ['Nemotron 3 Nano 30B', '$0.06 in · $0.24 out'],
+  ['Qwen3 235B Instruct', '$0.20 in · $0.60 out'],
   ['Routine', 'No AI model · Free'],
 ]);
-assert.deepEqual(choosableModels({ models: served }), served, 'nothing refused: every served model is offered');
+assert.deepEqual(new Set(choosableModels({ models: served })), new Set(served), 'nothing refused: every served model is offered');
 assert.deepEqual(choosableModels(null), [], 'no models read yet: nothing offered');
 // Every model refused (DESIGN, "F5 A"): nothing to choose, so neither the card nor the page offers [M] for a person on
 // their routine, and a chooser left open closes; the Run line says why by its code.
@@ -249,8 +272,8 @@ assert.equal(modelGroup({ who: teo, models: many, focus: 12 }).list.rows.at(-1).
   // Esc closes unchanged, movement keys pass, a key repeat is taken but does nothing.
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
   const row = { key: 'teo' }, writes = [], used = [];
-  let current = { provider: 'nebius', modelId: 'qwen/235b' }, keys = 0, answer = null;
-  const picker = modelPicker({ models: () => served, currentOf: () => current, refusal: (error) => `refused ${error.code}`,
+  let current = { provider: 'nebius', modelId: 'nvidia/nano' }, keys = 0, answer = null;
+  const picker = modelPicker({ models: () => ordered, currentOf: () => current, refusal: (error) => `refused ${error.code}`,
     write: (at, selected, key) => { writes.push([at.key, selected?.modelId ?? null, key]); return answer ?? Promise.resolve('verified'); },
     onUsed: (verified) => used.push(verified), newKey: () => `key-${++keys}` });
   const press = (code, extra = {}) => { let prevented = false; const fate = picker.key({ code, repeat: false, ...extra, preventDefault: () => { prevented = true; } }, 0, extra.onButton === true); return [fate, prevented]; };
@@ -273,7 +296,7 @@ assert.equal(modelGroup({ who: teo, models: many, focus: 12 }).list.rows.at(-1).
   picker.open(row);
   press('Digit3');
   await settle();
-  assert.deepEqual(writes, [['teo', 'qwen/4b', 'key-2']]);
+  assert.deepEqual(writes, [['teo', 'qwen/235b', 'key-2']]);
   assert.deepEqual(used, ['verified']);
   assert.equal(picker.of(row), null);
   // With nothing chosen it opens on Routine; Enter writes Routine (null); a refusal keeps the list with its words and a new key.

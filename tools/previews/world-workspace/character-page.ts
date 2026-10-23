@@ -9,6 +9,8 @@
 import { label, orb as runOrb, page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orb as portraitOrb, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import { CHARACTER_WORDS, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
+import { galleryItems } from './character-group.mjs';
+import type { ModelCard } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { PATH_WORDS, byParts, plural } from './history-words.mjs';
@@ -48,8 +50,11 @@ export interface DidRow {
 }
 
 export interface ModelChoice {
-  /** null for Routine. */
-  readonly model: { readonly provider: string; readonly modelId: string; readonly name: string; readonly price: unknown; readonly local?: boolean } | null;
+  /** null for Routine; `card` what its maker says of it and `providerDescription` who serves it (A3), where the read says. */
+  readonly model: {
+    readonly provider: string; readonly modelId: string; readonly name: string; readonly price: unknown; readonly local?: boolean;
+    readonly providerDescription?: string; readonly card?: ModelCard | null;
+  } | null;
   readonly current: boolean;
 }
 
@@ -102,7 +107,11 @@ export interface CharacterPageState {
   /** The personality being written, or null: its fields hold their own words while a person types. */
   readonly editing: { readonly session: string; readonly refusal: string | null; readonly busy: boolean } | null;
   /** The model list while choosing, or null. */
-  readonly choosing: { readonly choices: readonly ModelChoice[] | null; readonly focus: number; readonly refusal: string | null; readonly busy: boolean } | null;
+  readonly choosing: {
+    readonly choices: readonly ModelChoice[] | null; readonly focus: number; readonly refusal: string | null; readonly busy: boolean;
+    /** This computer's group stands with its one line where none runs yet (A3); its key group is this server's budget on a guest's page. */
+    readonly waiting?: boolean; readonly fromServer?: boolean;
+  } | null;
   /** Whether [C] Compare is offered (frame 12a). */
   readonly canCompare: boolean;
   /**
@@ -521,6 +530,69 @@ function modelRows(choices: readonly ModelChoice[], focus: number, labelled: str
   return list;
 }
 
+/**
+ * The chooser's rows as a gallery that teaches (A3, WORDS.md): in groups by where each model runs, free first, each
+ * group under its label in the faint ink (this computer's with its one line and no key where none runs yet); a row
+ * per model (its number key for the first nine, its name with Current after the character's own, under it its maker
+ * and size, its price), the focused row opened with its maker's own words and, fainter, where they come from and the
+ * licence; Routine last.
+ */
+/** One row of the gallery as character-group.mjs galleryItems words it. */
+interface GalleryItem {
+  readonly word: string; readonly sub: string | null; readonly price: string; readonly group: string | null;
+  readonly open: { readonly said: string; readonly from: string } | null;
+}
+
+function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void): HTMLElement {
+  const list = element('ul', 'wu-model-rows wu-gallery');
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', CHARACTER_WORDS.chooseModel);
+  const groupLabel = (words: string) => {
+    const item = element('li', 'wu-gallery-label wu-small-text wu-faint', words);
+    item.setAttribute('role', 'presentation');
+    return item;
+  };
+  let group: string | null = null;
+  if (waiting) {
+    const here: string = CHARACTER_WORDS.hereFree;
+    const line = element('li', 'wu-gallery-waiting wu-small-text', CHARACTER_WORDS.noneRunning);
+    line.setAttribute('role', 'presentation');
+    list.append(groupLabel(here), line);
+    group = here;
+  }
+  const items: readonly GalleryItem[] = galleryItems(choices.flatMap((choice) => (choice.model ? [choice.model] : [])), fromServer);
+  items.forEach((item: GalleryItem, index: number) => {
+    if (item.group !== null && item.group !== group) list.append(groupLabel(item.group));
+    group = item.group;
+    const choice = choices[index]!;
+    const row = element('li', 'wu-model-row');
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(index === focus));
+    row.dataset['current'] = String(choice.current);
+    const named = element('span', 'wu-model-named');
+    const name = element('span', 'wu-model-name', item.word);
+    if (choice.current) name.append(element('span', 'wu-model-current', CHARACTER_WORDS.current));
+    named.append(name);
+    if (item.sub) named.append(element('span', 'wu-model-sub wu-small-text wu-faint', item.sub));
+    if (index < 9) {
+      const cap = element('span', 'wu-key wu-small', String(index + 1));
+      cap.setAttribute('aria-hidden', 'true');
+      row.setAttribute('aria-keyshortcuts', String(index + 1));
+      row.append(cap);
+    }
+    row.append(named, element('span', 'wu-model-price', item.price));
+    if (index === focus && item.open) {
+      const open = element('p', 'wu-model-open wu-small-text', item.open.said);
+      open.append(element('span', 'wu-model-from wu-faint', item.open.from));
+      row.append(open);
+    }
+    row.addEventListener('click', () => onChoose(index));
+    row.addEventListener('dblclick', () => onUse(index));
+    list.append(row);
+  });
+  return list;
+}
+
 function refusalLine(words: string): HTMLElement {
   const line = element('p', 'wu-small-text wu-refused', words);
   line.setAttribute('role', 'status');
@@ -568,10 +640,9 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
   }
   if (state.choosing) {
     const choosing = state.choosing;
-    side.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.pickingSpendsNothing));
+    side.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.chooserIntro));
     if (!choosing.choices) side.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
-    else side.append(element('div', 'wu-model-head wu-small-text wu-faint', CHARACTER_WORDS.perMillion),
-      modelRows(choosing.choices, choosing.focus, CHARACTER_WORDS.chooseModel, (index) => act('choose', index), (index) => act('use', index), true, true));
+    else side.append(galleryRows(choosing.choices, choosing.focus, choosing.waiting === true, choosing.fromServer === true, (index) => act('choose', index), (index) => act('use', index)));
     if (choosing.refusal) side.append(refusalLine(choosing.refusal));
     return side;
   }
