@@ -20,6 +20,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -469,7 +470,10 @@ def test_a_port_is_held_only_by_a_listener_and_a_drawn_port_is_never_one_the_sys
         client.connect(("127.0.0.1", listening))
         leftover = client.getsockname()[1]
         accepted, _ = server.accept()
-        assert cluster.port_is_free(leftover)
+        if sys.platform == "darwin":
+            # Linux refuses a live connection's own port to PostgreSQL's bind as well, so only
+            # macOS, where the first run was refused, lends it while the connection lives.
+            assert cluster.port_is_free(leftover)
         client.close()
         accepted.close()
         assert cluster.port_is_free(leftover)
