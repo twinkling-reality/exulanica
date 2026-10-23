@@ -1,7 +1,10 @@
 """A generated town's tiles asked to be baked again
 (``POST /world/versions/{version_id}/tiles/bakes``): a tile whose bake failed gets one bake
 queued, and reads as baking; asked again while it waits, or once every tile is baked, nothing more
-is queued; another workspace is answered as for a world it cannot see.
+is queued; another workspace is answered as for a world it cannot see. A tile whose latest job
+ended failed beside a servable stored bake, which reads failed until a job of its own ends done,
+is queued again too, a public tile and a version's changed tile alike. Two asks at once queue one
+bake per tile: the world's bake queue is checked and changed under its own lock.
 
 Against PostgreSQL as a deployment runs it, the tiles baked by the stand-in tessellator
 ``tests/test_generated_worlds.py`` bakes with. A token without ``world.write`` is refused by the
@@ -12,13 +15,26 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import threading
+import uuid
 
 import psycopg
 import pytest
 from exulanica.db.tiles_role import provision_tiles_role
 from exulanica.ingest.generated_tiles import GeneratedTileBaker
 from exulanica.store.configured import local_content_stores
-from exulanica.world.generated_worlds import BAKE_JOB_KIND
+from exulanica.world import generated_worlds
+from exulanica.world.generated_worlds import (
+    BAKE_JOB_KIND,
+    generation_receipt,
+    queue_workspace_bakes,
+    queue_world_bakes,
+    town_records,
+)
+from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.objects import ElementOverride
+from exulanica.world.town_parts import town_buildings
+from exulanica.world.version_tiles import VERSION_BAKE_JOB_KIND
 from psycopg.rows import dict_row
 
 from conftest import scratch_role_database
@@ -92,6 +108,22 @@ def _fail_every_bake(api, world_id: str) -> None:  # type: ignore[no-untyped-def
     connection.commit()
 
 
+def _fail_latest(api, kind: str, world_id: str) -> int:  # type: ignore[no-untyped-def]
+    """End each tile's latest bake job of ``kind`` failed, as a job that died after its first
+    publish on its last claim is ended, its stored bake kept; how many were ended so."""
+    connection = api.repository.connection
+    ended = connection.execute(
+        "update job set state = 'failed', last_error = 'a stand-in fault after publish' "
+        "where job_id in (select distinct on (coalesce(payload->>'tile_inputs_digest', "
+        "payload->>'tile')) job_id from job where kind = %s and payload->>'world_id' = %s "
+        "order by coalesce(payload->>'tile_inputs_digest', payload->>'tile'), created_at desc, "
+        "job_id desc)",
+        (kind, world_id),
+    ).rowcount
+    connection.commit()
+    return ended
+
+
 def _ask(api, entry: dict, token: str | None = None):  # type: ignore[no-untyped-def]
     path = (
         f"/world/versions/{entry['authored_version_id']}/tiles/bakes?world_id={entry['world_id']}"
@@ -149,3 +181,112 @@ def test_a_world_no_recipe_composed_has_no_tiles_to_bake(made):
     assert starter.status_code == 200, starter.text
     untiled = _ask(made, starter.json())
     assert (untiled.status_code, untiled.json()["code"]) == (404, "unknown_reference")
+
+
+def test_a_tile_read_failed_beside_its_stored_bake_is_queued_again_and_reads_baked(town):
+    api, entry, baker = town
+    assert {outcome.status for outcome in baker.drain([api.repository.workspace_id])} == {"baked"}
+    # The positive control: every tile baked and its job done, nothing is queued.
+    assert _ask(api, entry).json() == {"queued": 0}
+    tiles = _fail_latest(api, BAKE_JOB_KIND, entry["world_id"])
+    assert tiles == len(entry["generated_ground"]["tiles"])
+    assert set(_states(api, entry)) == {"failed"}
+    assert _ask(api, entry).json() == {"queued": tiles}
+    assert _ask(api, entry).json() == {"queued": 0}
+    outcomes = baker.drain([api.repository.workspace_id])
+    assert [outcome.status for outcome in outcomes] == ["baked"] * tiles
+    assert set(_states(api, entry)) == {"baked"}
+
+
+def test_a_changed_tile_read_failed_beside_its_stored_bake_is_queued_again(town):
+    api, entry, baker = town
+    workspace = api.repository.workspace_id
+    assert {outcome.status for outcome in baker.drain([workspace])} == {"baked"}
+    version = api.version(entry)
+    snapshot = version["source_snapshot_id"]
+    with api.database.session(workspace) as connection:
+        generated = town_records(connection, workspace, entry["world_id"], snapshot)
+        [building, *_rest] = [one.identity for one in town_buildings(generated.records)]
+        WorldObjectRepository(connection, workspace, world_id=entry["world_id"]).set_part_change(
+            version["version_id"],
+            ElementOverride(f"part:{building}", suppressed=True),
+            base_state_sha256=version["state_sha256"],
+            actor=api.actor,
+            part_ids=frozenset({building}),
+        )
+    # Removing a building alters a tile: asked, its changed tile is queued and baked.
+    changed = _ask(api, entry).json()["queued"]
+    assert changed >= 1
+    assert {outcome.status for outcome in baker.drain([workspace])} == {"baked"}
+    assert _ask(api, entry).json() == {"queued": 0}
+    assert _fail_latest(api, VERSION_BAKE_JOB_KIND, entry["world_id"]) == changed
+    assert "failed" in _states(api, entry)
+    assert _ask(api, entry).json() == {"queued": changed}
+    assert {outcome.status for outcome in baker.drain([workspace])} == {"baked"}
+    assert set(_states(api, entry)) == {"baked"}
+
+
+def test_two_asks_at_once_queue_each_failed_tile_once(town):
+    api, entry, _baker = town
+    tiles = len(entry["generated_ground"]["tiles"])
+    _fail_every_bake(api, entry["world_id"])
+    workspace = api.repository.workspace_id
+    snapshot = uuid.UUID(api.version(entry)["source_snapshot_id"])
+    holding, release = threading.Event(), threading.Event()
+    first: list[int] = []
+
+    def held() -> None:
+        """An ask held between its check and its commit, as a concurrent one is."""
+        with api.database.session(workspace) as connection, connection.transaction():
+            scope = (connection, workspace, entry["world_id"], snapshot)
+            digest, receipt = generation_receipt(*scope)
+            first.append(len(queue_world_bakes(*scope, receipt, digest)))
+            holding.set()
+            release.wait(10)
+
+    thread = threading.Thread(target=held)
+    thread.start()
+    assert holding.wait(10)
+    # The route is asked while the held ask holds the lock, and reads what it queued once it ends.
+    threading.Timer(1.0, release.set).start()
+    answer = _ask(api, entry)
+    thread.join(10)
+    assert first == [tiles]
+    assert (answer.status_code, answer.json()) == (202, {"queued": 0})
+    assert [state for _tile, state in _jobs(api, entry["world_id"])].count("queued") == tiles
+
+
+def test_the_worker_look_over_and_an_ask_at_once_queue_each_failed_tile_once(town, monkeypatch):
+    """The tile worker looks its workspace over on a session with no transaction of its own: held
+    between reading a tile's stored bake and queueing it, an ask meanwhile still queues nothing."""
+    api, entry, _baker = town
+    tiles = len(entry["generated_ground"]["tiles"])
+    _fail_every_bake(api, entry["world_id"])
+    workspace = api.repository.workspace_id
+    holding, release = threading.Event(), threading.Event()
+    looking: dict[str, int] = {}
+    read = generated_worlds.current_bake
+
+    def held_read(connection, digest):  # type: ignore[no-untyped-def]
+        if threading.get_ident() == looking.get("thread") and not holding.is_set():
+            holding.set()
+            release.wait(10)
+        return read(connection, digest)
+
+    monkeypatch.setattr(generated_worlds, "current_bake", held_read)
+    looked: list[int] = []
+
+    def look_over() -> None:
+        looking["thread"] = threading.get_ident()
+        with api.database.session(workspace) as connection:
+            looked.append(len(queue_workspace_bakes(connection, workspace)))
+
+    thread = threading.Thread(target=look_over)
+    thread.start()
+    assert holding.wait(10)
+    threading.Timer(1.0, release.set).start()
+    answer = _ask(api, entry)
+    thread.join(10)
+    assert looked == [tiles]
+    assert (answer.status_code, answer.json()) == (202, {"queued": 0})
+    assert [state for _tile, state in _jobs(api, entry["world_id"])].count("queued") == tiles

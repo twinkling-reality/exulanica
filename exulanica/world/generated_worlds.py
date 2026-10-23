@@ -72,6 +72,7 @@ __all__ = [
     "generated_site",
     "generated_tiles",
     "generation_receipt",
+    "hold_bake_queue",
     "queue_workspace_bakes",
     "queue_world_bakes",
     "states_records",
@@ -330,6 +331,17 @@ def _create_authorities(
     return snapshot.snapshot_id, style, version.version_id
 
 
+def hold_bake_queue(connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str) -> None:
+    """Take, until the caller's transaction ends, the lock one world's bake queue is changed
+    under: whatever checks what that world's tiles have waiting and queues what is missing (a
+    request asking for its bakes, the tile worker's look-over of its workspace, its making) does
+    so one at a time, so two at once never queue a tile twice."""
+    connection.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"bake-queue:{workspace_id}:{world_id}",),
+    )
+
+
 def queue_world_bakes(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
@@ -345,10 +357,15 @@ def queue_world_bakes(
     A tile whose bake is already stored under the current stage, by the digest over its inputs
     (the columns its key is derived from, migration 0144), is the same bytes this world's tile
     would bake to: it queues no job, and the tile reads baked at once, as a world with no job for a
-    tile is read (:func:`generated_tiles`). A bake of another stage is never read and never
+    tile is read (:func:`generated_tiles`). It checks and queues under the world's bake queue lock
+    (:func:`hold_bake_queue`), in a transaction of its own or a savepoint of the caller's, so two
+    callers at once never queue a tile twice. A bake of another stage is never read and never
     deleted, so after a stage change every tile queues one bake. A tile stored with a fault the
-    owner has not cleared queues one again, whose job then fails as every bake of it does. A world
-    made from a world kind states no tiles: it is drawn from its records and never baked.
+    owner has not cleared queues one again, whose job then fails as every bake of it does. So does a
+    tile whose latest job ended failed or cancelled beside a servable stored bake: a stored bake
+    proves its first publish only, the job's end that its two bakes agreed, so the tile reads failed
+    (:func:`generated_tiles`) until a job of its own ends done. A world made from a world kind
+    states no tiles: it is drawn from its records and never baked.
     """
     composer = receipt["composer"]
     inputs = {
@@ -358,34 +375,44 @@ def queue_world_bakes(
         ).tile_inputs(receipt)
     }
     queued = []
-    for tile_x, tile_y in receipt.get("tiles", ()):
-        stored = current_bake(connection, inputs[(int(tile_x), int(tile_y))])
-        if stored is not None and stored.servable:
-            continue
-        with connection.cursor(row_factory=dict_row) as cursor:
-            waiting = cursor.execute(
-                "select 1 from job where workspace_id=%s and kind=%s and payload->>'world_id'=%s "
-                "and payload->'tile'=%s and state in ('queued','running') limit 1",
-                (workspace_id, BAKE_JOB_KIND, world_id, Jsonb([tile_x, tile_y])),
-            ).fetchone()
-        if waiting is not None:
-            continue
-        connection.execute(
-            "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
-            (
-                workspace_id,
-                BAKE_JOB_KIND,
-                Jsonb(
-                    {
-                        "world_id": world_id,
-                        "snapshot_id": str(snapshot_id),
-                        "receipt_sha256": receipt_digest,
-                        "tile": [tile_x, tile_y],
-                    }
+    with connection.transaction():
+        hold_bake_queue(connection, workspace_id, world_id)
+        for tile_x, tile_y in receipt.get("tiles", ()):
+            with connection.cursor(row_factory=dict_row) as cursor:
+                waiting = cursor.execute(
+                    "select 1 from job where workspace_id=%s and kind=%s "
+                    "and payload->>'world_id'=%s and payload->'tile'=%s "
+                    "and state in ('queued','running') limit 1",
+                    (workspace_id, BAKE_JOB_KIND, world_id, Jsonb([tile_x, tile_y])),
+                ).fetchone()
+                latest = cursor.execute(
+                    "select state from job where workspace_id=%s and kind=%s "
+                    "and payload->>'world_id'=%s and payload->'tile'=%s "
+                    "order by created_at desc, job_id desc limit 1",
+                    (workspace_id, BAKE_JOB_KIND, world_id, Jsonb([tile_x, tile_y])),
+                ).fetchone()
+            if waiting is not None:
+                continue
+            stored = current_bake(connection, inputs[(int(tile_x), int(tile_y))])
+            ended = None if latest is None else str(latest["state"])
+            if stored is not None and stored.servable and ended not in ("failed", "cancelled"):
+                continue
+            connection.execute(
+                "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
+                (
+                    workspace_id,
+                    BAKE_JOB_KIND,
+                    Jsonb(
+                        {
+                            "world_id": world_id,
+                            "snapshot_id": str(snapshot_id),
+                            "receipt_sha256": receipt_digest,
+                            "tile": [tile_x, tile_y],
+                        }
+                    ),
                 ),
-            ),
-        )
-        queued.append((int(tile_x), int(tile_y)))
+            )
+            queued.append((int(tile_x), int(tile_y)))
     return tuple(queued)
 
 

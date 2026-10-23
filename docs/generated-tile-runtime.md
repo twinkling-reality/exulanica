@@ -570,8 +570,9 @@ served, a tile whose bake job failed (the tessellator refused it, a publish was 
 every claim, or every claim was stranded) is never drawn, and in either case the page says the world
 is not drawn rather than waiting. A failed tile is baked again only when asked:
 `POST /world/versions/{version_id}/tiles/bakes` (`world.write`) queues a bake for each tile of the
-version's world that has no servable bake and none queued or running, as making the world did, and
-answers how many it queued, so asking however often queues one bake per tile at most. The
+version's world that has no servable bake, or whose latest job ended failed beside one (a stored
+bake proves its first publish, the job's end that both bakes agreed), and none queued or running,
+as making the world did, and answers how many it queued, so asking however often queues one bake per tile at most. The
 workspace's front door asks it when a person presses Open on a world with a failed tile, never when
 the world's address opens, so a passing fault is baked again under the opening and a tile whose
 every bake fails is said not drawn again rather than asked for in a loop. A tessellator that bakes other bytes is a new stage, stated by a

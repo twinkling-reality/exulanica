@@ -505,9 +505,13 @@ def queue_world_tile_bakes(
     if not states_records(*scope):
         return _problem(404, "unknown_reference", "this world has no tiles to bake")
     try:
-        digest, receipt = generation_receipt(*scope)
-        queued = len(queue_world_bakes(*scope, receipt, digest))
-        queued += len(queue_version_bakes(*scope, version_id, version_changes(*scope, version_id)))
+        # One transaction under the world's bake queue lock, which both halves take: a refusal of
+        # either queues nothing, and asks at once queue one at a time.
+        with connection.transaction():
+            digest, receipt = generation_receipt(*scope)
+            queued = len(queue_world_bakes(*scope, receipt, digest))
+            changes = version_changes(*scope, version_id)
+            queued += len(queue_version_bakes(*scope, version_id, changes))
     except InvalidStructuralData as exc:
         return _problem(409, "generated_world_unreadable", str(exc))
     return TileBakesQueuedView(queued=queued)

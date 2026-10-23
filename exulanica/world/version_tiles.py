@@ -65,6 +65,7 @@ from exulanica.world.composers import composer_module
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import (
     GeneratedTile,
+    hold_bake_queue,
     states_records,
     town_records,
     town_records_with,
@@ -330,36 +331,44 @@ def queue_version_bakes(
     """Queue a ``bake_version_tile`` job for each tile the version's changes alter whose bake is
     not stored and not already queued or running, in the caller's transaction, and return the
     tiles queued. A tile stored with a fault queues one again, whose job fails as every bake of it
-    does until the bake is deterministic again."""
+    does until the bake is deterministic again; so does a tile whose latest job ended failed or
+    cancelled beside a servable stored bake, which reads failed until a job of its own ends done
+    (:func:`version_tile_states`). It checks and queues under the world's bake queue lock
+    (:func:`~exulanica.world.generated_worlds.hold_bake_queue`), as a public tile's queue does."""
     if not changes:
         return ()
     base = town_records(connection, workspace_id, world_id, snapshot_id)
     queued = []
-    for tile in changed_tiles(connection, workspace_id, world_id, snapshot_id, changes):
-        stored = stored_version_bake(connection, workspace_id, world_id, tile.tile_inputs_digest)
-        if stored is not None and stored.servable:
-            continue
-        if _latest_job(connection, workspace_id, world_id, tile) in ("queued", "running"):
-            continue
-        connection.execute(
-            "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
-            (
-                workspace_id,
-                VERSION_BAKE_JOB_KIND,
-                Jsonb(
-                    {
-                        "world_id": world_id,
-                        "snapshot_id": str(snapshot_id),
-                        "receipt_sha256": base.receipt_sha256,
-                        "version_id": str(version_id),
-                        "tile": [tile.tile_x, tile.tile_y],
-                        "tile_inputs_digest": tile.tile_inputs_digest,
-                        "edit_delta_digest": tile.edit_delta_digest,
-                    }
+    with connection.transaction():
+        hold_bake_queue(connection, workspace_id, world_id)
+        for tile in changed_tiles(connection, workspace_id, world_id, snapshot_id, changes):
+            stored = stored_version_bake(
+                connection, workspace_id, world_id, tile.tile_inputs_digest
+            )
+            ended = _latest_job(connection, workspace_id, world_id, tile)
+            if ended in ("queued", "running"):
+                continue
+            if stored is not None and stored.servable and ended not in ("failed", "cancelled"):
+                continue
+            connection.execute(
+                "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
+                (
+                    workspace_id,
+                    VERSION_BAKE_JOB_KIND,
+                    Jsonb(
+                        {
+                            "world_id": world_id,
+                            "snapshot_id": str(snapshot_id),
+                            "receipt_sha256": base.receipt_sha256,
+                            "version_id": str(version_id),
+                            "tile": [tile.tile_x, tile.tile_y],
+                            "tile_inputs_digest": tile.tile_inputs_digest,
+                            "edit_delta_digest": tile.edit_delta_digest,
+                        }
+                    ),
                 ),
-            ),
-        )
-        queued.append(tile)
+            )
+            queued.append(tile)
     return tuple(queued)
 
 
