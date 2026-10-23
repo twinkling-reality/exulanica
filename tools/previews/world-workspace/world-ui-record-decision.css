@@ -73,7 +73,6 @@
    the choices' note stands where their label stood (decision-page.ts raises the label), and Compare's sits in the key
    row before its key. N hides them. */
 .wu-record-decision .wu-rd-hint { margin: 6px 0 0; font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); opacity: .78; text-wrap: pretty; }
-.wu-record-decision .wu-rd-head .wu-rd-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wu-record-decision .wu-rd-told > .wu-rd-label + .wu-rd-hint { margin: -14px 0 14px; }
 .wu-record-decision .wu-rd-over-hint { position: absolute; margin: 0; }
 .wu-record-decision .wu-rd-text > .wu-rd-label + .wu-rd-hint { margin: 6px 0 4px; }

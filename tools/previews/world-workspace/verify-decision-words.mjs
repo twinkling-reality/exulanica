@@ -54,9 +54,13 @@ assert.equal(noted.choices, 'The actions the world allowed Teo there. The model 
 assert.equal(noted.happened, 'What the choice did in the world, at that minute.');
 assert.equal(noted.compare, 'Compare asks another open model the same moment, to see what it would choose.');
 assert.equal(decisionNotes({ who: teo, decider: 'model' }).compare, null);
-assert.deepEqual({ ...decisionNotes({ who: teo, decider: 'person', canCompare: true }) },
-  { by: null, told: null, choices: null, happened: 'What the choice did in the world, at that minute.', compare: null });
+assert.deepEqual({ ...decisionNotes({ who: teo, decider: 'person', canCompare: true }) }, { by: null, told: null,
+  choices: 'The actions the world allowed Teo there. A person playing picked one, and the world checked it before it happened.',
+  happened: 'What the choice did in the world, at that minute.', compare: null });
 assert.equal(decisionNotes({ who: teo, decider: 'external' }).by, null);
+assert.equal(decisionNotes({ who: teo, decider: 'external' }).choices,
+  'The actions the world allowed Teo there. An outside program picked one, and the world checked it before it happened.');
+assert.equal(decisionNotes({ who: teo }).choices, null);
 assert.match(decisionNotes({ who: resident, decider: 'model' }).told, /^The prompt the resident's model was given/);
 assert.deepEqual({ ...DECISION_NOTE_WORDS }, { hide: 'Hide notes', show: 'Notes' });
 assert.equal(choicesOver(resident), "The resident's choices");

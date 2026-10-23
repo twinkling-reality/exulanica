@@ -4,7 +4,7 @@
 // context does not carry leaves its line or section out. The stored text itself is the Full record.
 // What came of a choice is the choice account's verdict (web/packages/app/src/decision-record.ts),
 // passed in, so the page and the account never disagree. verify-decision-words.mjs holds these.
-import { amount, possessive } from './character-words.mjs';
+import { amount, deciderWords, possessive } from './character-words.mjs';
 import { personalityRecordLines } from './personality-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
@@ -104,15 +104,16 @@ export const DECISION_NOTE_WORDS = Object.freeze({ hide: 'Hide notes', show: 'No
 /**
  * The decision page's notes for a newcomer (A7, DESIGN 17:13): one plain line under the head's small print, what
  * was told, the choices and What happened, and the Compare key's where it shows, each claiming nothing the page does
- * not show. A model's words where a model decided; where a person playing or an outside program did, What happened's
- * alone. `who` is the being as a sentence calls it.
+ * not show. A model's words where a model decided; where a person playing or an outside program did, the choices'
+ * naming who picked (the world checks every choice, whoever makes it) and What happened's. `who` is the being as a
+ * sentence calls it.
  */
 export function decisionNotes({ who, decider = null, canCompare = false }) {
-  const name = who.within, model = decider === 'model';
+  const name = who.within, model = decider === 'model', picker = model ? 'The model' : deciderWords(decider);
   return Object.freeze({
     by: model ? `The open model that chose for ${name}, how long it took to answer, and what this one choice cost.` : null,
     told: model ? `The prompt ${possessive(name)} model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.` : null,
-    choices: model ? `The actions the world allowed ${name} there. The model picked one, and the world checked it before it happened.` : null,
+    choices: picker ? `The actions the world allowed ${name} there. ${picker} picked one, and the world checked it before it happened.` : null,
     happened: 'What the choice did in the world, at that minute.',
     compare: model && canCompare ? 'Compare asks another open model the same moment, to see what it would choose.' : null,
   });

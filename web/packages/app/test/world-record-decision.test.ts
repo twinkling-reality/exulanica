@@ -401,10 +401,13 @@ describe('A decision explains itself to a newcomer (A7)', () => {
     expect(keys(later.root)).toContain('NHide notes');
   });
 
-  it("notes a person playing's decision with What happened's line alone, and Compare only where C shows", async () => {
-    const played = { by: null, told: null, choices: null, happened: NOTES.happened, compare: null };
+  it("notes a person playing's decision with who picked and What happened, and Compare only where C shows", async () => {
+    const picked = 'The actions the world allowed Teo there. A person playing picked one, and the world checked it before it happened.';
+    const played = { by: null, told: null, choices: picked, happened: NOTES.happened, compare: null };
     const { root } = await open(teo({ notes: played, decider: 'person', model: null, answered: null, toldLabel: 'What the person playing Teo was shown', canCompare: false }));
-    expect(all(root, '.wu-rd-hint')).toEqual([NOTES.happened]);
+    expect(all(root, '.wu-rd-head .wu-rd-hint, .wu-rd-told .wu-rd-hint')).toEqual([]);
+    expect(all(root, '.wu-rd-over-hint')).toEqual([picked]);
+    expect(all(root, '.wu-rd-text .wu-rd-hint')).toEqual([NOTES.happened]);
     document.body.replaceChildren();
     const quiet = await open(teo({ notes: NOTES, canCompare: false }));
     expect(all(quiet.root, '.wu-rd-key-hint')).toEqual([]);
