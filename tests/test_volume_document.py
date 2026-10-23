@@ -254,6 +254,31 @@ def test_a_volume_lists_one_to_its_catalog_most_parts_and_adds_at_least_one():
     assert "adds at least one part" in refusal(volume(carved)).detail
 
 
+def test_the_page_reads_every_volume_rules_version_the_server_serves():
+    """The page's own list (``web/packages/atlas-core/src/landscape.ts``) names every volume rules
+    version a served chunk may carry and the newest as the server's: raising the server's rules
+    without the page fails here, rather than leaving every new landscape undrawn on the page."""
+    import re
+
+    source = (
+        Path(__file__).resolve().parents[1] / "web/packages/atlas-core/src/landscape.ts"
+    ).read_text()
+    newest = re.search(r"^export const VOLUME_RULES_VERSION = (\d+);$", source, re.MULTILINE)
+    listed = re.search(
+        r"^const VOLUME_RULES_READ: readonly number\[\] = Object\.freeze\(\[([^\]]*)\]\);$",
+        source,
+        re.MULTILINE,
+    )
+    assert newest is not None and listed is not None
+    page_newest = int(newest.group(1))
+    read = {
+        page_newest if item.strip() == "VOLUME_RULES_VERSION" else int(item)
+        for item in listed.group(1).split(",")
+    }
+    assert page_newest == VOLUME_RULES_VERSION
+    assert read == set(SERVED_VOLUME_RULES)
+
+
 def test_the_volume_rules_name_the_shipped_catalogs_by_digest():
     assert VOLUME_RULES_VERSION in SERVED_VOLUME_RULES
     for version, catalogs in RULES.items():

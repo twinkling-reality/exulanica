@@ -25,9 +25,9 @@ export const LANDSCAPE_DRAWING_PROFILE = 'exulanica.landscape-drawing/v1';
 export const TOP_LANDSCAPE_DRAWING_PROFILE = 'exulanica.landscape-drawing/v2';
 export const VOLUME_CHUNK_PROFILE = 'exulanica.volume-chunk/v1';
 /** The newest volume rules the server realizes chunks by. */
-export const VOLUME_RULES_VERSION = 3;
+export const VOLUME_RULES_VERSION = 4;
 /** Every volume rules version a chunk this page reads may name: they share one chunk format. */
-const VOLUME_RULES_READ: readonly number[] = Object.freeze([1, 2, VOLUME_RULES_VERSION]);
+const VOLUME_RULES_READ: readonly number[] = Object.freeze([1, 2, 3, VOLUME_RULES_VERSION]);
 /** A chunk's side. */
 export const VOLUME_CHUNK_MM = 32_000;
 /** The cells a chunk is realized at, finest first: a level of detail each. */
