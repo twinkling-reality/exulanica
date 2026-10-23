@@ -1,10 +1,10 @@
 /**
  * How the page draws what a society records, where the record leaves it open: read from the one
  * data file that states each value with its reason,
- * `assets/catalogs/society-presentation/society-presentation.v1.json`. Presentation only: nothing
+ * `assets/catalogs/society-presentation/society-presentation.v2.json`. Presentation only: nothing
  * here changes a recorded position, path or event.
  */
-import catalogText from '../../../../assets/catalogs/society-presentation/society-presentation.v1.json?raw';
+import catalogText from '../../../../assets/catalogs/society-presentation/society-presentation.v2.json?raw';
 
 interface PresentationEntry {
   readonly key: string;
@@ -40,3 +40,9 @@ function millimetres(key: string): number {
 
 /** How far apart two people who stand talking are drawn when recorded nearer, in metres. */
 export const CONVERSATION_DISTANCE_METRES = millimetres('conversation_distance_mm') / 1000;
+
+/** How far apart any two people standing outdoors who are not talking are drawn when nearer, in metres. */
+export const PEOPLE_SPACING_METRES = millimetres('people_spacing_mm') / 1000;
+
+/** The most a standing person is drawn off their recorded point to keep that spacing, in metres. */
+export const SPACING_STEP_METRES = millimetres('spacing_step_most_mm') / 1000;

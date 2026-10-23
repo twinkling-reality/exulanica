@@ -630,16 +630,29 @@ that person is. Every turn the crowd makes is a pivot: no figure draws a step fo
 
 **A conversation's distance.** A society stands each of two talkers at a point of its own walking
 lines, and two such points can lie a few hundred millimetres apart, so two bodies would be drawn
-inside each other. Two people talking with each other (each one's goal names the other) who are
-nearer than a conversation's distance are drawn that distance apart: each stands half the shortfall
+inside each other. Two people talking with each other (each one's goal names the other, or one said
+a line to the other and both stand) who are nearer than a conversation's distance are drawn that
+distance apart: each stands half the shortfall
 back along the line between them, a step taken at their own walking pace, and two at one point part
 east and west. One who walks up to the other stops a conversation away. When the
 talk ends they walk on from where they are drawn, back onto their recorded path. The distance is a
 chosen default, stated with its reason in
-`assets/catalogs/society-presentation/society-presentation.v1.json` (`conversation_distance_mm`)
+`assets/catalogs/society-presentation/society-presentation.v2.json` (`conversation_distance_mm`)
 and handed to the crowd with each state (`conversationMetres` in `CrowdTiming`); a caller that
 hands none draws everyone at their recorded point. It is presentation only: no recorded position
 changes, and `positionOf` still answers the recorded point.
+
+**People never stand inside each other.** Any two people standing outdoors at rest who are not
+talking with each other (off a seat, in no conversation) and are recorded nearer than the people
+spacing are drawn that far apart, each half the shortfall back along the line between them, two at
+one point parting east and west; a person's steps from every neighbour together are held to the most
+one step may take, so a body never reaches a wall (`society/spacing.ts` in atlas-react's
+playcanvas package). Both figures are chosen defaults with their reasons in
+`assets/catalogs/society-presentation/society-presentation.v2.json` (`people_spacing_mm`,
+`spacing_step_most_mm`; v2 carries v1's conversation distance unchanged), handed to the crowd as
+`peopleSpacingMetres` and `spacingStepMetres`. Two recorded very near part only as far as two such
+steps allow. A walker is not steered: one walking past another, or two walking in step on one path,
+may still pass through each other for a moment. Presentation only, as above.
 
 **Seats.** With each state the page hands the crowd a seating layout (`society/seating.ts`): each
 kind's use as `GET /world/assets` serves it from the world object catalog, the drawn version's

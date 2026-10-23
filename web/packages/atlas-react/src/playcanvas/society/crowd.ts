@@ -14,6 +14,7 @@ import {
   type PlaceDrawing, type SeatingLayout, type SeatingMiss, type SeatingResult,
 } from './seating.js';
 import { activityOnSeat, facingRule, type FacingRule } from './activity-facing.js';
+import { spacingSteps } from './spacing.js';
 import { spokenPartners } from './spoken-partners.js';
 import type {
   CrowdJump,
@@ -433,6 +434,7 @@ export class SocietyCrowd {
   private startLagMs = 0;
   /** How far apart talking partners are drawn when recorded nearer, metres; 0 draws everyone where recorded. */
   private conversationMetres = 0;
+  private spacing = { metres: 0, stepMost: 0, steps: new Map() as ReadonlyMap<string, readonly [number, number]> };
   /** Whether anybody still has recorded walking to present. */
   private moving = false;
   /** When the crowd was last drawn, in the caller's clock. */
@@ -536,6 +538,7 @@ export class SocietyCrowd {
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
     this.startLagMs = Math.max(0, options.startLagMs ?? 0);
     this.conversationMetres = Math.max(0, options.conversationMetres ?? 0);
+    this.spacing = { ...this.spacing, metres: Math.max(0, options.peopleSpacingMetres ?? 0), stepMost: Math.max(0, options.spacingStepMetres ?? 0) };
     // Drawn below as on any frame: the figures are handed the time since they were last drawn.
     const sinceDrawn = continuing
       ? Math.max(0, nowMs - this.lastFrameMs) / MILLISECONDS_PER_SECOND
@@ -1273,16 +1276,20 @@ export class SocietyCrowd {
 
   /**
    * Where a walker stands for a conversation, as an offset from where their path has them: two
-   * people talking with each other, nearer than a conversation's distance, each stand half the
-   * shortfall back along the line between them, so they are that distance apart; two at one point
-   * part east and west, the lesser id to the west. It holds while one walks up to the other, so
-   * they stop a conversation apart instead of walking in and stepping back. Nothing for anyone else.
+   * people talking with each other (each one's goal names the other, or one said a line to the other
+   * and both stand), nearer than a conversation's distance, each stand half the shortfall back along
+   * the line between them, so they are that distance apart; two at one point part east and west, the
+   * lesser id to the west. It holds while one walks up to the other by their goal, so they stop a
+   * conversation apart instead of walking in and stepping back. Anyone else standing is kept the
+   * people spacing apart instead (`./spacing.ts`).
    */
   private conversationStep(walker: Walker): readonly [number, number] {
     if (this.conversationMetres <= 0 || walker.indoors) return NO_STEP;
-    if (walker.facingRule !== 'partner' || walker.partnerId === null) return NO_STEP;
-    const partner = this.walkers.get(walker.partnerId);
-    if (partner === undefined || partner.indoors || partner.partnerId !== walker.id) return NO_STEP;
+    // Talking by their goals, or by a line one said to the other while both stand (T0).
+    const goal = walker.facingRule === 'partner' && walker.partnerId !== null ? this.walkers.get(walker.partnerId) : undefined;
+    const said = walker.spokenWith === null || !walker.arrived ? undefined : this.walkers.get(walker.spokenWith);
+    const partner = goal?.partnerId === walker.id ? goal : said?.spokenWith === walker.id && said.arrived ? said : undefined;
+    if (partner === undefined || partner.indoors) return NO_STEP;
     const dx = walker.position[0] - partner.position[0], dz = walker.position[1] - partner.position[1];
     const between = Math.hypot(dx, dz);
     if (between >= this.conversationMetres) return NO_STEP;
@@ -1299,7 +1306,8 @@ export class SocietyCrowd {
   private stepAside(walker: Walker, dt: number, reduced: boolean): boolean {
     // At rest they stand where they are kept (before a seat they got up from), else on their point.
     const talking = this.conversationStep(walker);
-    const wanted = talking === NO_STEP ? walker.beside : talking;
+    const spaced = talking === NO_STEP && walker.arrived ? this.spacing.steps.get(walker.id) : undefined;
+    const wanted = talking !== NO_STEP ? talking : spaced === undefined ? walker.beside : [walker.beside[0] + spaced[0], walker.beside[1] + spaced[1]] as const;
     const dx = wanted[0] - walker.aside[0], dz = wanted[1] - walker.aside[1];
     const left = Math.hypot(dx, dz);
     if (left === 0) return false;
@@ -1474,6 +1482,13 @@ export class SocietyCrowd {
       } else {
         moving = true;
       }
+    }
+    if (this.spacing.metres > 0) {
+      // Everyone standing outdoors at rest, off a seat and in no conversation, kept a spacing apart (T0).
+      const standers = [...this.walkers.values()]
+        .filter((w) => w.arrived && !w.indoors && w.settle === null && !w.onSeat && this.conversationStep(w) === NO_STEP)
+        .map((w) => ({ id: w.id, at: [w.position[0] + w.beside[0], w.position[1] + w.beside[1]] as const }));
+      this.spacing.steps = spacingSteps(standers, this.spacing.metres, this.spacing.stepMost);
     }
     for (const walker of this.walkers.values()) {
       // Someone getting up from a seat walks on once they are back at their place.

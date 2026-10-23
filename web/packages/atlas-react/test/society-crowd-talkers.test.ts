@@ -81,6 +81,15 @@ const state = (tick: number, inhabitants: OwnedSocietyState['inhabitants']): Own
 const looks = (yaw: number) => [-Math.sin(yaw), -Math.cos(yaw)] as const;
 
 describe('two people who stand talking', () => {
+  it('are drawn a conversation apart when one said a line to the other and both stand, as a routine pair is', () => {
+    const { crowd, last, run, done } = setup();
+    const said = { tick: 1, from: 'west', to: 'east', line: 'Good evening.', from_number: 1, from_kind: { kind: 'villager', version: 2, sha256: 'a'.repeat(64) } };
+    crowd.set(state(1, [person('west', [[10, 5]], null), { ...person('east', [[10.4, 5]], null), heard: [said] }]), [10, 5], TIMING);
+    run(2);
+    expect(last('east').position[0] - last('west').position[0]).toBeCloseTo(CONVERSATION, 9);
+    done();
+  });
+
   it('are drawn a conversation apart, each a step back, facing each other, where they were recorded nearer', () => {
     const { crowd, last, run, done } = setup();
     // Recorded 0.4 m apart on an east-west line, at 10.0 and 10.4 m east.

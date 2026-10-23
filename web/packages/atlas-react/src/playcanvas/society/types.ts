@@ -254,6 +254,13 @@ export interface CrowdTiming {
    */
   readonly conversationMetres?: number;
   /**
+   * How far apart, centre to centre, any two people standing outdoors who are not talking with each
+   * other are drawn when nearer (`./spacing.ts`), and the most one is drawn off their recorded point
+   * for it, in metres. Presentation only. Absent or zero, standers are drawn at their recorded points.
+   */
+  readonly peopleSpacingMetres?: number;
+  readonly spacingStepMetres?: number;
+  /**
    * What one tick lets each person whose kind states its own pace walk, millimetres, by id, as the
    * server serves it beside the state (`walk_budgets_mm_per_tick`). Such a person walks that budget
    * and, when nothing hurries them and their figure states no pace, walks at it over the tick's
