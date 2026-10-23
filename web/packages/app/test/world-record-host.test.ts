@@ -236,6 +236,20 @@ describe('a day page left open while the world plays (F12)', () => {
     expect(dayFocus({ rows, focus: null })).toBe(0);
     expect(dayFocus({ rows: [{ requestId: null }, { requestId: 'r1' }, { requestId: null, heard: true }, { requestId: 'r0' }], focus: 1, earlier: true })).toBe(3);
   });
+
+  it('follows the newest decision as rows come on top until the person moves the choice (F12b)', async () => {
+    const { dayFocus } = await recordHost();
+    const before = [{ requestId: 'r2' }, { requestId: null }, { requestId: 'r1' }];
+    // A routine row, a decision and a line heard came on top.
+    const rows = [{ requestId: null }, { requestId: 'r4' }, { requestId: null, heard: true }, ...before];
+    // Not moved: the choice goes to the newest row a decision stands behind, past the routine row on top.
+    expect(dayFocus({ rows, focus: 0, before, moved: false })).toBe(1);
+    // With no decision on top, the newest of the character's own.
+    expect(dayFocus({ rows: [{ requestId: null, heard: true }, { requestId: null }], focus: 0, before: [{ requestId: null }], moved: false })).toBe(1);
+    // Moved, or left unsaid: the row it was on stays chosen.
+    expect(dayFocus({ rows, focus: 2, before, moved: true })).toBe(5);
+    expect(dayFocus({ rows, focus: 2, before })).toBe(5);
+  });
 });
 
 describe('a decision, filled', () => {

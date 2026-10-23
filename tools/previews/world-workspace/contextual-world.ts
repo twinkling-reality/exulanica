@@ -731,8 +731,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
           const shown = { ...subjectReads.society, state: { ...subjectReads.society.state, inhabitants: subjectReads.society.state.inhabitants.map(person => person.id === showing.row.scene.id ? { ...person, goal: document.goal ?? null, action: document.action ?? person.action } : person) } };
           return doingLine(characterFacts(shown, showing.row.scene.id)?.done ?? null);
         } });
-      // The chosen row stays the same row (dayFocus); at first it is the newest row a decision stands behind.
-      showing.didFocus = dayFocus({ rows: showing.did, focus: showing.didFocus, earlier, before: newer ? was : null }); if (newer) showing.didWant = Math.max(DID_ROWS, showing.did.length);
+      // The chosen row follows the newest until the person moves it, then stays that row (dayFocus, F12b).
+      showing.didMoved ||= earlier; showing.didFocus = dayFocus({ rows: showing.did, focus: showing.didFocus, earlier, before: newer ? was : null, moved: showing.didMoved }); if (newer) showing.didWant = Math.max(DID_ROWS, showing.did.length);
       drawPage();
     } catch { if (showing === pageView && showing.did === null) { showing.did = []; drawPage(); } } finally { showing.reading = false; }
   }
@@ -747,7 +747,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: 0, offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
     else if (action === 'compareChoose' && compare && !compare.asking) { compare.focus = index; readOffer(pageView); drawPage(); }
     else if (action === 'compareStart' && compare && !compare.asking) void compareAsk(pageView);
-    else if (action === 'row' && pageView.did?.[index] && !pageView.did[index].heard) { pageView.didFocus = index; drawPage(); }
+    else if (action === 'row' && pageView.did?.[index] && !pageView.did[index].heard) { pageView.didFocus = index; pageView.didMoved = index > (dayFocus({ rows: pageView.did, focus: null }) ?? -1); drawPage(); }
     else if (action === 'inspect' && !choosing && !pageView.ask) void openDecision(index ?? pageView.didFocus);
     else if (action === 'ask' && !readOnly && !choosing) { pageView.ask = { focus: 0, busy: false, asked: null, answer: null, failure: null, serial: 0 }; drawPage(); }
     else if (action === 'question' && pageView.ask) void askQuestion(index ?? pageView.ask.focus);
@@ -1007,7 +1007,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const page = openCharacterPage(root, (action, index) => pageAct(action, index));
     // Only a being its owner placed can have a personality: its inventory reference is the placed thing.
     const placedId = row.reference?.source === 'authored-thing' ? row.reference.id : null;
-    pageView = { page, row, did: null, didFocus: null, events: [], ask: null, decision: null, compare: null, comparison: null, choosing: null, personality: null, editing: null, placedId, run: { busy: false, refusal: null, shown: runWatch.limits(subjectReads.models) }, before: { pose: { ...b.controls.state }, hold: b.controls.hold }, ease: null };
+    pageView = { page, row, did: null, didFocus: null, didMoved: false, events: [], ask: null, decision: null, compare: null, comparison: null, choosing: null, personality: null, editing: null, placedId, run: { busy: false, refusal: null, shown: runWatch.limits(subjectReads.models) }, before: { pose: { ...b.controls.state }, hold: b.controls.hold }, ease: null };
     presence.setCovered(true); notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     guidance.hidden = true; worlds.hidden = true;

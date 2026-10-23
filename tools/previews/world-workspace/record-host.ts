@@ -117,14 +117,17 @@ export async function readNewerEvents({ readWindow, held, pages }: {
  * Which row of a day page is chosen once its rows (`rows`, newest first) are read: the row chosen before (`focus`)
  * where it still is one; read on from the oldest row (`earlier`), the first row the read brought; with rows put on top
  * while the page was open (`before`, the rows it showed, F12), the same row, found by its decision, else as many rows
- * further down as came on top. Otherwise, and at first, the newest row a decision stands behind, else the newest of
- * the character's own. A line heard is never chosen (T6).
+ * further down as came on top, where the person moved the choice (`moved`); where they have not, it follows the
+ * newest (F12b), so Enter opens the decision that just happened. Otherwise, and at first, the newest row a decision
+ * stands behind, else the newest of the character's own. A line heard is never chosen (T6).
  */
-export function dayFocus({ rows, focus, earlier = false, before = null }: {
+export function dayFocus({ rows, focus, earlier = false, before = null, moved = true }: {
   readonly rows: readonly Json[]; readonly focus: number | null; readonly earlier?: boolean; readonly before?: readonly Json[] | null;
+  readonly moved?: boolean;
 }): number | null {
   let at = focus;
-  if (before && focus !== null && before[focus]) {
+  if (before && !moved) at = null;
+  else if (before && focus !== null && before[focus]) {
     const was = before[focus], same = was.requestId ? rows.findIndex((row) => row.requestId === was.requestId) : -1;
     at = same >= 0 ? same : focus + rows.length - before.length;
   }
