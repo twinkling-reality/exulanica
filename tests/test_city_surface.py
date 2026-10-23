@@ -261,3 +261,67 @@ def test_a_corner_the_carve_refuses_leaves_only_its_wedge_unstated(
             continue
         assert abs(answer[0] * 1_000 - page_um) <= WITHIN_UM, (x, y, answer, page_um)
     assert unstated == 61
+
+
+def test_a_footway_the_ring_rule_refuses_leaves_only_that_footway_unstated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A curb's straight footway the ring rule refuses goes unstated alone, as the tessellator
+    refuses only that tile's drawing, where it used to refuse the whole town's reading: with every
+    straight footway refused, the town on land still reads, its straight footway rows answer None
+    (771 of its 1,053) and every other row is the page's height."""
+
+    def refused(*_: object) -> tuple[()]:
+        raise ValueError("a footway ring has no ear left to cut")
+
+    monkeypatch.setattr(surface, "_footway", refused)
+    reading = city_surface_reading(_records("town_on_land"))
+    unstated = 0
+    for x, y, page_um, _kind in _tile("town_on_land")["rows"]:
+        answer = reading((x, y))
+        if answer is None:
+            unstated += 1
+            continue
+        assert abs(answer[0] * 1_000 - page_um) <= WITHIN_UM, (x, y, answer, page_um)
+    assert unstated == 771
+
+
+def _sloping_footway(length: int, mitre_back: int) -> set[tuple[int, int]]:
+    """The plan corners of a left curb's footway triangles, its kerb line 10 m long along x
+    climbing 400 mm, between two mitred corners whose frontage stands ``mitre_back`` in from each
+    end of the strip's back edge."""
+    curb = CurbEdgeRecord(
+        identity="curb",
+        segment_identity="segment",
+        side="left",
+        block_identity=(),
+        kerb_line_mm=((0, 0, 0), (length, 0, 400)),
+        kerb_height_mm=150,
+        kerb_width_mm=300,
+        gutter_width_mm=500,
+        footway_width_mm=2_000,
+        footway_crossfall_millionths=20_000,
+        next_curb_identity=(),
+        corner_radius_mm=0,
+        extent=None,  # type: ignore[arg-type]
+    )
+    line = surface._line(curb.kerb_line_mm, (1, 0))
+    assert line is not None
+    back = curb.kerb_width_mm + curb.footway_width_mm
+    turned = surface._Mitre(centre=(length, back, 400), frontage=(length - mitre_back, back, 400))
+    met = surface._Mitre(centre=(0, back, 0), frontage=(mitre_back, back, 0))
+    triangles = surface._footway(curb, line, surface._left((1, 0)), turned, met)
+    return {point[:2] for triangle in triangles for point in triangle}
+
+
+def test_a_sloping_strip_whose_two_ramps_would_cross_keeps_its_one_ring() -> None:
+    """Each ramp into a mitred corner starts as far before the mitre's frontage as the strip's end
+    lies beyond it, and where the two ramps of one strip would cross, the strip keeps its one ring,
+    as the tessellator draws it. Positive control: on a 20 m strip with mitres 3 m in, the ramps
+    start 6 m and 14 m along the kerb top's back. On a 10 m strip they would start at 4 m and 6 m,
+    the far one first: the footway is cut from its one ring, with no corner between the ends."""
+    kerb_back = 300
+    long_strip = _sloping_footway(20_000, 3_000)
+    assert sorted(x for x, y in long_strip if y == kerb_back) == [0, 6_000, 14_000, 20_000]
+    short_strip = _sloping_footway(10_000, 3_000)
+    assert sorted(x for x, y in short_strip if y == kerb_back) == [0, 10_000]

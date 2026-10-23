@@ -37,9 +37,9 @@ records' own fields and the corner rule's measure; nothing is measured from a dr
   arc to the next leg, cut by the ring rule.
 
 Where surfaces overlap, the highest is the answer, as on the page. A corner's wedge the carve or
-the ring rule refuses is not stated by this version: it answers ``None`` there, as it does where
-the records state no street surface at all (a lot, a building, open land). The caller keeps its
-own ground for ``None``.
+the ring rule refuses, and a curb's straight footway the ring rule refuses, is not stated by this
+version: it answers ``None`` there, as it does where the records state no street surface at all (a
+lot, a building, open land). The caller keeps its own ground for ``None``.
 
 Heights are exact ratios of integers, rounded half away from zero once at the end. A reading
 indexes its pieces (each straight kerb top, footway triangle, carriageway strip, corner kerb-top
@@ -806,7 +806,13 @@ def city_surface_reading(records: Iterable[object]) -> Callable[[Plan], tuple[in
             turned = _mitre(curb, followers[0]) if followers else None
             owner = owners.get(curb.identity)
             met = None if owner is None else _mitre(owner, curb)
-            footway = _footway(curb, line, outward, turned, met)
+            # A footway the ring rule refuses is one the tessellator refuses too (that tile alone),
+            # and only that curb's footway goes unstated: its kerb top and the rest of the town
+            # still answer.
+            try:
+                footway = _footway(curb, line, outward, turned, met)
+            except ValueError:
+                footway = ()
             straight.append(_Curb(line, outward, curb.kerb_height_mm, curb.kerb_width_mm, footway))
         if len(lines) == 2:
             left, right = lines["left"], lines["right"]

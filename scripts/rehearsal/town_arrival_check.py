@@ -17,12 +17,24 @@ from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, St
 from exulanica.world.composers import city_grammar_town
 from exulanica.world.generated_worlds import town_records
 
+#: The arrival policies a town's receipt may pin, by profile, each read from its own file: version 2
+#: for a town whose land holds a sea, version 1 for every other.
+POLICY_FILES = {
+    "exulanica.town-arrival/v1": "town-arrival.v1.json",
+    "exulanica.town-arrival/v2": "town-arrival.v2.json",
+}
+
 
 def measure(
     receipt: dict[str, Any], records: tuple[object, ...], served: dict[str, Any]
 ) -> dict[str, Any]:
-    """Use the full occupied rectangle, not a tree trunk or furniture centre."""
-    policy_file = Path(city_grammar_town.__file__).with_name("town-arrival.v1.json")
+    """Use the full occupied rectangle, not a tree trunk or furniture centre, against the policy
+    the receipt pins; a pin to no policy this code holds is not clear."""
+    pin = receipt.get("arrival_policy")
+    pinned = pin.get("profile") if isinstance(pin, dict) else None
+    policy_file = Path(city_grammar_town.__file__).with_name(
+        POLICY_FILES.get(pinned, POLICY_FILES["exulanica.town-arrival/v1"])
+    )
     policy_bytes = policy_file.read_bytes()
     policy = json.loads(policy_bytes)
     point = receipt["arrival"]["position_mm"]
@@ -57,7 +69,8 @@ def measure(
         "nearest_object_distance_squared_mm": nearest,
         "minimum_object_clearance_mm": clearance,
         "ok": (
-            policy["profile"] == "exulanica.town-arrival/v1"
+            pinned in POLICY_FILES
+            and policy["profile"] == pinned
             and receipt.get("arrival_policy")
             == {"profile": policy["profile"], "sha256": policy_digest}
             and str(receipt["arrival"].get("spot_id", "")).startswith("footway:")

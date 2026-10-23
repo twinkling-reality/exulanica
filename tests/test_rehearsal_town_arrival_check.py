@@ -20,6 +20,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "rehearsal"))
 
+from exulanica.grammar.landform import land_recipes  # noqa: E402
+from exulanica.world.composers.city_grammar_town import on_land  # noqa: E402
 from exulanica.world.generated_worlds import compose_generated_world  # noqa: E402
 from exulanica.world.society_living import (  # noqa: E402
     LIVING_TOWN_PROFILE,
@@ -28,7 +30,7 @@ from exulanica.world.society_living import (  # noqa: E402
     input_routine,
     living_places,
 )
-from exulanica.world.world_recipes import world_recipe  # noqa: E402
+from exulanica.world.world_recipes import town_recipe, world_recipe  # noqa: E402
 from steplist import load  # noqa: E402
 from town_arrival_check import measure  # noqa: E402
 
@@ -70,6 +72,34 @@ def test_real_market_town_arrival_is_clear_and_a_different_served_pose_is_refuse
     )
     moved = {**served, "arrival_mm": [served["arrival_mm"][0] + 1, *served["arrival_mm"][1:]]}
     assert measure(dict(town.receipt), town.records, moved)["ok"] is False
+
+
+def test_a_town_by_the_sea_is_measured_against_the_arrival_policy_it_pins():
+    """A town whose land holds a sea pins town-arrival version 2, which chose its arrival on the
+    shore street's seaward footway: the measure reads that policy, held to its digest, and finds the
+    arrival clear. A pin to a policy this code does not hold is not clear."""
+    [coast] = [recipe for recipe in land_recipes() if recipe.key == "coast"]
+    town = compose_generated_world(
+        on_land(town_recipe("small_town"), dict(coast.land)), "world:arrival-by-the-sea"
+    )
+    assert town.receipt["arrival_policy"]["profile"] == "exulanica.town-arrival/v2"
+    arrival = town.receipt["arrival"]
+    served = {
+        "arrival_mm": [
+            arrival["position_mm"][0],
+            arrival["support_z_mm"],
+            -arrival["position_mm"][1],
+        ],
+        "arrival_facing_mm": [arrival["facing_mm"][0], -arrival["facing_mm"][1]],
+    }
+    checked = measure(dict(town.receipt), town.records, served)
+    assert checked["ok"] is True
+    assert checked["policy_profile"] == "exulanica.town-arrival/v2"
+    unknown = {
+        **town.receipt,
+        "arrival_policy": {"profile": "exulanica.town-arrival/v9", "sha256": "0" * 64},
+    }
+    assert measure(unknown, town.records, served)["ok"] is False
 
 
 def test_resident_clearance_in_the_step_matches_the_pinned_town_policy():
