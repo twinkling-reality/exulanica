@@ -147,6 +147,7 @@ def context(
     options: Sequence[SignalOption],
     *,
     contract: DecisionContract | None = None,
+    day_start: int | None = None,
 ) -> dict[str, Any]:
     signal = _signal(state, subject_id)
     return {

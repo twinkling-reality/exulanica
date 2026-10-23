@@ -169,11 +169,18 @@ def context(
     options: Sequence[DecisionOption],
     *,
     contract: DecisionContract | None = None,
+    day_start: int | None = None,
 ) -> dict[str, Any]:
     if _living(state["profile"]):
         return living_context(state, source, subject_id, options, profile=role.context_profile)
     return observed_context(
-        state, source, subject_id, options, profile=role.context_profile, contract=contract
+        state,
+        source,
+        subject_id,
+        options,
+        profile=role.context_profile,
+        contract=contract,
+        day_start=day_start,
     )
 
 

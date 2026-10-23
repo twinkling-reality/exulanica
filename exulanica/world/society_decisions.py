@@ -73,6 +73,7 @@ def person_request(
     seed: str,
     provider_config: dict,
     offer: Callable[[Sequence[RoleOption]], Sequence[RoleOption]] | None = None,
+    day_start: int | None,
 ) -> tuple[dict | None, str]:
     """A person's sealed request, as :func:`~exulanica.world.role_decisions.role_request` seals
     any role's, under the person role. The comparison modules build one here until a comparison
@@ -87,6 +88,7 @@ def person_request(
         seed=seed,
         provider_config=provider_config,
         offer=offer,
+        day_start=day_start,
     )
 
 

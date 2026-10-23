@@ -83,6 +83,9 @@ assert.deepEqual(toldSections(town, resident), [
   { label: 'Where and when', lines: ['On the glass terraces · 06:54 · Day 1'] , apart: false },
   { label: 'How the resident is', lines: ['Rest: not needed yet (417 of 1000).', 'A meal: needed now (712 of 1000).'] , apart: true },
 ]);
+// A society of things' model told the world's clock (clock_told) is shown it as told; before that it was told a minute.
+assert.deepEqual(toldSections({ here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0].lines, ['On the quay · 18:28 · Day 1']);
+assert.deepEqual(toldSections({ here: 'on the quay', tick: 27 }, resident)[0].lines, ['On the quay · Minute 27']);
 assert.deepEqual(choiceRows(town, 'wait here a minute'), [
   { number: 1, words: 'Walking, 62 m away', chosen: false },
   { number: 2, words: 'Wait here a minute', chosen: true },

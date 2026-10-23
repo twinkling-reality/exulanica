@@ -203,6 +203,7 @@ def _run(registry, key: str, adapter) -> dict[str, Any]:
             ),
             asking=asking,
             seam=lambda _state, _due: {},
+            day_start=None,
         )
 
     played = play(_Live(role, client, spec, mechanism, contract))
@@ -725,6 +726,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v9.json": "69228db40433e855d23caca3c65a84d7193e01196faefda04b939b24df5f2121",
     "decision-roles.v10.json": "36144cb5efe68c11e5cf11c848bbef79c53fc91bc878a05e7837b6f3c33a0380",
     "decision-roles.v11.json": "d743b0b9e83f1c356af7b1c0c307ff09e8e08d2e4470f8d976636cb13cf1b6f7",
+    "decision-roles.v12.json": "e2bc7705b493014d63c29fde90bee8e7177fa53eab5223f648099c30b3ed799c",
 }
 
 
@@ -741,11 +743,16 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 9, "society-decision-policy": 8}
+    assert things.versions == {"society-decision-action": 11, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v8",
+        "society-person-choice/v9",
     )
+    # The eighth prompt, which every request made under the ninth catalog records, stays readable
+    # with it, and the ninth says the same over the eleventh.
+    eighth_prompt = person.terms_with_prompt("society-person-choice/v8")
+    assert eighth_prompt is not None and eighth_prompt.instruction == things.instruction
+    assert eighth_prompt.versions == {"society-decision-action": 9, "society-decision-policy": 8}
     # The sixth and seventh prompts, which every request made before the eighth records, stay
     # readable with the eighth catalogs; the seventh speaks of a character and of past choices only
     # where shown, and the eighth says the same over the ninth action catalog (F9).

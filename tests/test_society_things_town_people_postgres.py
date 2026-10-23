@@ -2,8 +2,8 @@
 deployment stores it: its first stored input carries what they are made from, authorised by
 composing it again; its villagers are residents with homes and jobs; the document its state
 records is the one the world's own seed makes from that input; a later input states no people;
-its time of day is served beside its state from the day that input's people start; and the stored
-minutes replay.
+its time of day is served beside its state from the day that input's people start, and a model asked
+there is told it; and the stored minutes replay.
 
 A town made through the API takes a fresh identity, and its seed, its streets and how many
 positions its premises offer follow from that identity: of 48 small towns made under fixed
@@ -15,9 +15,16 @@ fewer, and each of the rest says that no position was open."""
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
+from exulanica.models.manifest import AnsweringMechanism
+from exulanica.selection.validation import Session
 from exulanica.world import saved_entries
 from exulanica.world.society import served_clock, world_society_seed
+from exulanica.world.society_decision_contract import decision_messages, person_role
+from exulanica.world.society_decision_repository import SocietyDecisionRepository
+from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.town_people import people_from_frame
 
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -136,3 +143,58 @@ def test_a_town_with_a_knight_in_it_keeps_its_bakers_as_a_deployment_stores_them
     )
     assert replayed.status_code == 200, replayed.text
     assert replayed.json()["replay_verified"] is True
+    # A model asked now is told the town's clock (clock_told), from the day the first input's people
+    # start, though the latest input states no people: the host's reservation reads it there.
+    request = _reserved(api, entry, body)
+    # The minute the choice is made for, the one after the state's, which its answer is said in.
+    clock = served_clock(start, body["current_tick"] + 1)
+    told = {"minute_of_day": clock["minute_of_day"], "day": clock["day"]}
+    assert request["context"]["world_clock"] == told
+    hours, minutes = divmod(clock["minute_of_day"], 60)
+    messages = decision_messages(request["context"], AnsweringMechanism.TOOL_CALL)
+    assert (
+        f"It is {hours:02d}:{minutes:02d} on day {clock['day'] + 1} in the world"
+        in (messages[-1]["content"])
+    )
+
+
+def _reserved(api, entry: dict, body: dict) -> dict:
+    """A request reserved, as the host reserves one, for the first villager with a choice now,
+    under the person role's newest terms for the town's engine."""
+    role = person_role()
+    contract = role.contract(role.terms(body["state"]["profile"]).versions)
+    runtime = api.client.app.state.services.society_runtime
+    session = Session(workspace_id=api.repository.workspace_id, actor=api.actor)
+    villagers = [p for p in body["state"]["inhabitants"] if p["came_by"] == "populated"]
+    with api.database.session(api.repository.workspace_id) as connection:
+        society = SocietyRepository(
+            connection,
+            api.repository.workspace_id,
+            world_id=entry["world_id"],
+            input_authorizer=lambda document: runtime.authorize(connection, session, document),
+        )
+        decisions = SocietyDecisionRepository(society)
+        for villager in villagers:
+            with connection.transaction():
+                reserved, _fresh = decisions.prepare_role(
+                    role,
+                    uuid.UUID(entry["authored_version_id"]),
+                    request_id=uuid.uuid4(),
+                    subject_id=uuid.UUID(villager["id"]),
+                    base_tick=body["current_tick"],
+                    base_state_sha256=body["state_sha256"],
+                    contract=contract,
+                    provider_config={
+                        "provider": "test",
+                        "model_id": "test",
+                        "mechanism": "tool_call",
+                        "choice_seq": 1,
+                        "manifest_sha256": "a" * 64,
+                        "prompt_version": role.terms(body["state"]["profile"]).prompt_version,
+                        "contract": contract.binding(),
+                        "deadline_ms": contract.value("decision_deadline_ms"),
+                    },
+                )
+            if reserved["request"] is not None:
+                return reserved["request"]
+    raise AssertionError("no villager has a choice this minute")

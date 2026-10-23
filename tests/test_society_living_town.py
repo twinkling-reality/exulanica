@@ -268,6 +268,7 @@ def _played(minutes: int, chosen: set[str], asking):
             request_id_for=lambda subject, tick: uuid.uuid5(SOCIETY, f"{subject}:{tick}"),
             asking=port,
             seam=lambda _s, _due: LivingSeam(SEED, living_places([document], routine), routine),
+            day_start=None,
         )
 
     return role, contract, state, play, play(asking(role, contract))

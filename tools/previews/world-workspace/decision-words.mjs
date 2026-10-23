@@ -140,7 +140,8 @@ function whereWhen(context) {
   const at = context?.surroundings?.at;
   const spot = plain(at?.words) ? [plain(at.words), plain(at.good_for) ? `(${plain(at.good_for)})` : null].filter(Boolean).join(' ') : null;
   const where = plain(context?.here) ?? spot;
-  const clock = context?.clock;
+  // A town's own clock, or the world's clock a society of things' model was told (clock_told).
+  const clock = context?.clock ?? context?.world_clock;
   const told = clock && Number.isSafeInteger(clock.day) ? worldTime(clock.minute_of_day, 0) : null;
   const when = told ? [told.hhmm, `Day ${clock.day + 1}`] : Number.isSafeInteger(context?.tick) ? [`Minute ${context.tick}`] : [];
   const parts = [where ? capital(where) : null, ...when].filter(Boolean);

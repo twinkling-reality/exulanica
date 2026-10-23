@@ -270,6 +270,9 @@ RELEASED_CATALOGS = {
     "society-decision-action.v10.json": (
         "560ca9aaecfb894764c0d842c9a479a17ce3b6765933177e16305d79dfb6604b"
     ),
+    "society-decision-action.v11.json": (
+        "91e1be1fdf628dc9ae704b831826140f452a3d211802ab2713d88d92d2f8cfef"
+    ),
     "society-decision-policy.v5.json": (
         "67744ddc361badc5816f032f87880f05baf15ed25764d9e29fd3e4780c07fbf2"
     ),

@@ -655,6 +655,25 @@ An option label a model answers with is words with or without capitals, digits, 
 little punctuation, never a double quote, a square bracket or a newline
 (`exulanica.models.choice.ChoiceRequest`).
 
+Registry version 12 asks new requests of an `exulanica-society/v7` society under action catalog
+version 11 and prompt `society-person-choice/v9`, with policy catalog version 8 and the same
+instruction. The eleventh action catalog keeps the ninth's actions and words (the tenth is a person
+playing's). From version 12 an entry states two more label rules' versions
+(`activity_names_as_written_from_action_version`, `clock_told_from_action_version`), each from 11 for
+the person role. Under `activity_names_as_written` a being the model notices is said to be doing its
+activity with whom as the page names them ("talking with Jonah Grove"). Under `clock_told`, where the
+world keeps a clock, the model is told the time of day and the day in place of the minute's number
+("It is 18:28 on day 1 in the world, and ..."): the minute the choice is made for, the one after the
+request's tick, which its answer is carried out and its line said in (as a living town is told the
+minute being chosen for), counted on from the society's own clock where it keeps one (a resident
+day's), else from its people's first minute of the day, which only its first input's people frame
+states. The context records it as `world_clock` (`minute_of_day`, `day` from 0), so
+the decision page shows what was told; a world with no clock is told the minute's number as before.
+Every path that builds or replays a person's request states that day start (`role_request`'s required
+`day_start`: the host's reservation reads it from the society's first input, a comparison from its
+plan's first input), so a request is rebuilt telling the clock it told. Requests under the ninth and
+tenth catalogs hold neither rule and rebuild to the byte.
+
 Version 3 keeps version 2's actions and bounds and adds:
 
 | Action | Kind | Words a model reads |

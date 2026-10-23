@@ -164,6 +164,7 @@ def _played(
                 contract=contract,
                 seed=SEED,
                 provider_config=_config(contract, prompt),
+                day_start=None,
             )
             assert request is not None, status
             context = request["context"]

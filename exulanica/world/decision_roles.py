@@ -284,6 +284,7 @@ class RoleAdapter(Protocol):
         options: Sequence[RoleOption],
         *,
         contract: DecisionContract | None = None,
+        day_start: int | None = None,
     ) -> dict[str, Any]: ...
 
     def option_from_record(self, record: Mapping[str, Any]) -> RoleOption: ...
@@ -717,8 +718,23 @@ LABEL_RULES_FROM: Final = 11
 #: The rules a role's option words are held to from the action catalog version its entry states:
 #: ``names_as_written``, a being named as the page names it, capitals kept, in the options, what
 #: the being notices and what it remembers; ``straight_line_distances``, an option naming a being
-#: stating the straight-line metres to it.
-LABEL_RULES: Final = ("names_as_written", "straight_line_distances")
+#: stating the straight-line metres to it; ``activity_names_as_written``, a noticed being's
+#: activity naming whom it is with as the page names them; ``clock_told``, the minute told as the
+#: world's clock where the world keeps one.
+LABEL_RULES: Final = (
+    "names_as_written",
+    "straight_line_distances",
+    "activity_names_as_written",
+    "clock_told",
+)
+#: The registry version from which an entry states each label rule's from-version: the first two
+#: from :data:`LABEL_RULES_FROM`, a later one from the version that added it.
+LABEL_RULE_REGISTRY_VERSIONS: Final = {
+    "names_as_written": LABEL_RULES_FROM,
+    "straight_line_distances": LABEL_RULES_FROM,
+    "activity_names_as_written": 12,
+    "clock_told": 12,
+}
 _TERM_FIELDS: Final = frozenset(
     {
         "engine",
@@ -799,7 +815,8 @@ def _registry_schema(version: int) -> CatalogSchema:
             ("own_order_from_policy_version", _VERSION),
             *(
                 (f"{rule}_from_action_version", _VERSION)
-                for rule in (LABEL_RULES if version >= LABEL_RULES_FROM else ())
+                for rule in LABEL_RULES
+                if version >= LABEL_RULE_REGISTRY_VERSIONS[rule]
             ),
             ("subjects_bound", _key),
             *(

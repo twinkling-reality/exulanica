@@ -286,6 +286,31 @@ def served_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     return served
 
 
+def people_day_start(first_input: Mapping[str, Any]) -> int | None:
+    """The first minute of the day a society's people start at, as its first input's people frame
+    states it (``day.start_minute_of_day``; only a first input carries one), or None."""
+    start = ((first_input.get("people") or {}).get("day") or {}).get("start_minute_of_day")
+    return start if type(start) is int else None
+
+
+def told_clock(state: Mapping[str, Any], day_start: int | None) -> dict[str, int] | None:
+    """The time of day and the day, counted from 0, of the minute a choice is made for, as
+    ``clock_told`` tells it: the minute after the state's, which the answer is carried out and its
+    line said in, so what the model was told names the minute its row does. One after the
+    society's own clock (a resident day's), else after its people's from ``day_start``; None where
+    it keeps neither."""
+    from exulanica.world.society_catalogs import MINUTES_PER_DAY
+
+    clock = state.get("clock")
+    if clock is not None:
+        now = clock["day"] * MINUTES_PER_DAY + clock["minute_of_day"]
+    elif day_start is not None:
+        now = day_start + state["tick"]
+    else:
+        return None
+    return {"minute_of_day": (now + 1) % MINUTES_PER_DAY, "day": (now + 1) // MINUTES_PER_DAY}
+
+
 def served_clock(start_minute_of_day: int, tick: int) -> dict[str, int]:
     """The time of day a society that keeps no clock of its own is served at ``tick``, from the
     first minute its people's day starts at: the minute of the day and the day, counted from 0, as a

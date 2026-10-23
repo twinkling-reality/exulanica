@@ -904,10 +904,12 @@ def observed_context(
     *,
     profile: str,
     contract: DecisionContract | None = None,
+    day_start: int | None = None,
 ) -> dict[str, Any]:
     """What the person sees, as a request of ``profile`` records it: how they are, and their
     options in order; ``contract``, the request's own, says how the beings it notices and
-    remembers are named."""
+    remembers are named and whether the minute is told as the world's clock, from its own or
+    from ``day_start``, its people's first minute of the day."""
     person = _person(state, subject_id)
     routine = routine_of(dict(document))
     rest = [a.preferred_at_need for a in routine.activities.values() if a.preferred_at_need > 0]
@@ -924,7 +926,7 @@ def observed_context(
         "doing": {"kind": action["kind"], "status": action["status"], "reason": action["reason"]},
         "last_activity": None if last is None else _activity_label(routine, last)[1],
         "options": [option.as_record() for option in options],
-        **_things_context(state, person, document, contract),
+        **_things_context(state, person, document, contract, day_start),
         **(
             {
                 "clock": dict(state["clock"]),
@@ -1005,6 +1007,7 @@ def _things_context(
     person: Mapping[str, Any],
     document: Mapping[str, Any],
     asked: DecisionContract | None = None,
+    day_start: int | None = None,
 ) -> dict[str, Any]:
     """What a society of things' person sees beside a purposeful person's: the engine they are
     asked under, whether something is under way for them, the most characters a line may hold,
@@ -1012,12 +1015,18 @@ def _things_context(
     where its society records the modules, what it notices around it and what it remembers.
     Nothing for any other society's people, whose requests read as they always did. The beings it
     notices and remembers are named as written where the request's own contract (``asked``; left
-    out, the one a new request records) holds its words to ``names_as_written`` (F9)."""
+    out, the one a new request records) holds its words to ``names_as_written`` (F9); where it holds
+    them to ``clock_told``, the minute is recorded as the world's clock (``world_clock``), the
+    society's own or its people's from ``day_start``, where it keeps either."""
+    from exulanica.world.society import told_clock
+
     if not of_things(state["profile"]):
         return {}
     role = person_role()
     contract = role.contract(role.terms(state["profile"]).versions)
     as_written = "names_as_written" in (asked or contract).label_rules
+    activities = "activity_names_as_written" in (asked or contract).label_rules
+    told = "clock_told" in (asked or contract).label_rules
     return {
         "engine": state["profile"],
         "under_way": not at_choice_point(person),
@@ -1036,8 +1045,9 @@ def _things_context(
         **_character(state, person),
         **_said(state, person),
         **_holding(state, person),
-        **_noticed(state, document, person, as_written),
+        **_noticed(state, document, person, as_written, activities),
         **_remembers(state, person, as_written),
+        **({"world_clock": clock} if told and (clock := told_clock(state, day_start)) else {}),
     }
 
 
@@ -1106,6 +1116,7 @@ def _noticed(
     document: Mapping[str, Any],
     person: Mapping[str, Any],
     as_written: bool = False,
+    activities_as_written: bool = False,
 ) -> dict[str, Any]:
     """What the being notices around it (:mod:`exulanica.world.society_surroundings`), where its
     society records the notice module: bounded by the row of the version it recorded, and who hears
@@ -1128,6 +1139,7 @@ def _noticed(
         hearing_reach_mm=say.value("hearing_reach_mm"),
         offers_version=row.value("offers_version"),
         names_as_written=as_written,
+        activity_names_as_written=activities_as_written,
     )
     return {"surroundings": surroundings(state, document, person["id"], terms)}
 
@@ -1180,6 +1192,16 @@ def _doing(context: Mapping[str, Any]) -> str:
     return "you have just arrived"
 
 
+def _now(context: Mapping[str, Any]) -> str:
+    """The minute as told: the world's clock where the context records one ("18:28 on day 1"),
+    else the minute's number ("minute 27")."""
+    clock = context.get("world_clock")
+    if clock is None:
+        return f"minute {context['tick']}"
+    hours, minutes = divmod(clock["minute_of_day"], 60)
+    return f"{hours:02d}:{minutes:02d} on day {clock['day'] + 1}"
+
+
 def _quoted(line: str) -> str:
     """A heard line in double quotes, its own quotes and backslashes escaped, as JSON writes it."""
     return json.dumps(line, ensure_ascii=False)
@@ -1199,7 +1221,7 @@ def situation(context: Mapping[str, Any]) -> list[str]:
             else []
         ),
         *_character_lines(context.get("character")),
-        f"It is minute {context['tick']} in the world, and {_doing(context)}.",
+        f"It is {_now(context)} in the world, and {_doing(context)}.",
         f"Tiredness: {context['need_milli']} of 1000."
         + (
             f" People here rest once it passes {context['rest_at_need_milli']}."

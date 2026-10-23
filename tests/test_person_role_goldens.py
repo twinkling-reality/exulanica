@@ -252,6 +252,7 @@ def _run(versions: dict[str, int]) -> dict[str, Any]:
                 contract=contract,
                 seed=SEED,
                 provider_config=_config(contract),
+                day_start=None,
             )
             if request is not None:
                 asked.append(request)

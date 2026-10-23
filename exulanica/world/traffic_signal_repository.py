@@ -429,6 +429,7 @@ class TrafficSignalRepository:
                 request_id=request_id,
                 contract=contract,
                 seed="0" * 64,
+                day_start=None,
                 provider_config={
                     "provider": model["provider"],
                     "model_id": model["model_id"],

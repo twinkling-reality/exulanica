@@ -199,6 +199,7 @@ def run_scenario(*, invalid=False):
             seam=lambda _state, _due: {},
             contract=contract,
             finish=_things_finish(SEED),
+            day_start=None,
         )
 
     played = play(PursuitAnswers(role, client, spec, mechanism, contract, transport=transport))

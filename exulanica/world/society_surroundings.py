@@ -72,6 +72,8 @@ class NoticeTerms:
     offers_version: int
     #: Whether a being is named as written, capitals kept (a request under ``names_as_written``).
     names_as_written: bool = False
+    #: Whether a being's activity names whom it is with as written (``activity_names_as_written``).
+    activity_names_as_written: bool = False
 
     def __post_init__(self) -> None:
         for name in ("reach_mm", "beings_maximum", "things_maximum", "bytes_maximum"):
@@ -121,9 +123,11 @@ def _doing(
     targets: Mapping[str, Mapping[str, Any]],
     routine: Any,
     state: Mapping[str, Any] | None = None,
+    as_written: bool = False,
 ) -> str:
     """What a being is doing, in its routine's words: the activity at a place it is using, the
-    routine's words for standing a while or talking (with whom), walking, or waiting."""
+    routine's words for standing a while or talking (with whom, named ``as_written`` where the
+    request's rules say so), walking, or waiting."""
     from exulanica.world.society_decision_contract import _activity_label
 
     action = person["action"]
@@ -143,7 +147,7 @@ def _doing(
             return (
                 activity.label
                 if partner is None
-                else f"{activity.label} with {_who(partner, state)}"
+                else f"{activity.label} with {_who(partner, state, as_written)}"
             )
         if activity is not None:
             return str(activity.label)
@@ -230,7 +234,9 @@ def surroundings(
             "who": _who(other, state, terms.names_as_written),
             "kind": str(kind_of(other, state).document["label"]),
             "metres": whole_metres(distance),
-            "doing": _doing(other, people, targets, routine, state),
+            "doing": _doing(
+                other, people, targets, routine, state, terms.activity_names_as_written
+            ),
             "holding": held.get(other["id"], []),
             "from_elsewhere": other.get("came_by") == "crossed",
             "hears_you": distance <= terms.hearing_reach_mm and _hears(kind_of(other, state)),

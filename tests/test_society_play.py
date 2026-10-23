@@ -161,6 +161,7 @@ def test_a_walk_s_receipt_names_its_node_and_no_other_option_s_does():
         contract=played,
         seed=SEED,
         provider_config={"kind": "person", "contract": played.binding()},
+        day_start=None,
     )
     assert request is not None
     options = request["context"]["options"]
@@ -224,6 +225,7 @@ def test_a_play_reads_names_as_written_and_a_stored_one_keeps_its_words():
             contract=contract,
             seed=SEED,
             provider_config={"kind": "person", "contract": contract.binding()},
+            day_start=None,
         )
         assert status == "in_progress"
         return made

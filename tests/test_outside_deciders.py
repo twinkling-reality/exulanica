@@ -141,6 +141,7 @@ def _run() -> dict[str, Any]:
             ),
             asking=asking,
             seam=lambda _state, _due: {},
+            day_start=None,
         )
 
     program = _Program()
@@ -248,6 +249,7 @@ def test_a_request_names_an_outside_program_in_its_one_shape_or_is_refused(chang
             contract=contract,
             seed=SEED,
             provider_config=config,
+            day_start=None,
         )
 
     good, _status = requested(_config(contract))

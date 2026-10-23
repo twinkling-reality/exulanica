@@ -88,8 +88,9 @@ def context(
     options: Sequence[SignalOption],
     *,
     contract: DecisionContract | None = None,
+    day_start: int | None = None,
 ) -> dict[str, Any]:
-    # A junction's context names no being, so no label rule of its contract changes it.
+    # A junction's context names no being and tells no clock, so no label rule changes it.
     return {
         "profile": role.context_profile,
         "subject_id": subject_id,

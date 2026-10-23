@@ -271,13 +271,17 @@ class SocietyReads:
         engine = society_engine(row["engine_version"])
         if engine.state_family != "things" or "clock" in row["state"]:
             return None
+        start = self.people_day_start(row)
+        return None if start is None else served_clock(start, int(row["current_tick"]))
+
+    def people_day_start(self, row: dict[str, Any]) -> int | None:
+        """The first minute of the day the society's people start at, as its first input's people
+        frame states it, or None where it states none."""
         found = self.connection.execute(
             PEOPLE_DAY_START_SQL, (self.workspace_id, row["society_id"])
         ).fetchone()
         start = None if found is None else found["start"]
-        if type(start) is not int:
-            return None
-        return served_clock(start, int(row["current_tick"]))
+        return start if type(start) is int else None
 
     def input_provenance(self, version_id: uuid.UUID, input_seq: int) -> dict[str, Any]:
         """One stored input's identity and the authored state it followed, never the input itself.
