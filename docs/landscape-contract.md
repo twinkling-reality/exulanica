@@ -434,7 +434,14 @@ datum. In order:
    and the rim: the first of 3, 2.5, 2 and 1.5 m beyond the gate with rock 1 m under the top there
    and a metre either side and beyond, or in the gate's opening where the site fills the top. They
    face the site through its gate, north into it, so the first view holds the hamlet: its track
-   through the gate between its houses, with the island's other volumes beyond. On a top this
+   through the gate between its houses, with the island's other volumes beyond. From there they
+   walk in through the gate, and from the yard out over the open top to the rim and no further:
+   the page's walker on a site's graded land and on a volume's top climbs ground up to the land's
+   walking grade, 1 in 4 (`LAND_WALK_GRADE_PERMILLE` in `web/packages/atlas-core/src/landform.ts`,
+   the grader's `WALK_GRADE_PERMILLE`, held equal by `tests/test_landscape_surfaces.py`), the grade
+   a site's edge eases onto the land beyond it at; a town's walker and a level site's climb at most
+   12 degrees. `web/packages/atlas-react/test/site-top-walk.test.ts` walks a starter island both
+   ways. On a top this
    small no spot holds both the houses and a third of the view in sea, so the first view is the
    hamlet's. Both are stored with the arrival, and a world keeps the arrival its receipt states.
 

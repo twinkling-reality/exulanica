@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 from exulanica.grammar.landform import CELL_MM as LAND_CELL_MM
+from exulanica.grammar.landform import WALK_GRADE_PERMILLE
 from exulanica.grammar.landscape import (
     SURFACES_PROFILE,
     LandscapeRefused,
@@ -88,6 +90,17 @@ def joined(surfaces: LandscapeSurfaces) -> set[tuple[str, str]]:
 def test_the_step_and_the_lattice_are_the_place_contracts_and_the_lands():
     assert STEP_MM == STEP_LIMIT_MM
     assert CELL_MM == LAND_CELL_MM
+
+
+def test_the_page_walks_land_at_the_lands_walking_grade():
+    """The page's walker on a site's graded land and a volume's top climbs what the land's walking
+    grade allows (``LAND_WALK_GRADE_PERMILLE`` in ``web/packages/atlas-core/src/landform.ts``): a
+    lower figure there leaves the band where a site's edge eases onto a falling top unwalkable, so a
+    person arriving outside its gate cannot walk in."""
+    source = (ROOT / "web/packages/atlas-core/src/landform.ts").read_text()
+    stated = re.search(r"^export const LAND_WALK_GRADE_PERMILLE = (\d+);$", source, re.MULTILINE)
+    assert stated is not None
+    assert int(stated.group(1)) == WALK_GRADE_PERMILLE
 
 
 def test_a_sea_stack_whose_top_stands_far_above_the_water_is_reached_only_by_flight():

@@ -26,6 +26,12 @@ export const LAND_CELL_MM = 1_000;
 export const LAND_SAMPLES_PER_SIDE = LAND_CHUNK_MM / LAND_CELL_MM + 1;
 /** The exact sheet's height bound, the near land's. */
 export const LAND_NEAR_BOUND_MM = 64_000;
+/**
+ * The land's walking grade, per mille: the steepest open ground a person walks, 1 in 4, the grade
+ * the server grades the land a person walks to (`exulanica.grammar.landform.grading`'s
+ * `WALK_GRADE_PERMILLE`).
+ */
+export const LAND_WALK_GRADE_PERMILLE = 250;
 const BACKDROP_MOST_SAMPLES = 1_000_000;
 
 export class LandformError extends Error {

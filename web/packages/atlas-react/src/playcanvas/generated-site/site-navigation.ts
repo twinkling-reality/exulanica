@@ -3,6 +3,7 @@ import {
   DEFAULT_MAXIMUM_STEP_HEIGHT_AU,
   DISPLAY_EYE_HEIGHT,
   LAND_CELL_MM,
+  LAND_WALK_GRADE_PERMILLE,
   SupportNavigationError,
   atlasVec3,
   siteTopCellHeld,
@@ -43,6 +44,14 @@ export const SITE_WALKER_RADIUS_M = 0.34;
 const FIELD_MARGIN_M = 2;
 /** The step a site's floor is sampled at for support: 50 mm, finer than any opening it states. */
 const SUPPORT_SAMPLE_SPACING_M = 0.05;
+/**
+ * The steepest a person walks on a site's graded land and on a volume's top round it: the land's
+ * walking grade, 1 in 4 (about 14 degrees), the grade the server grades that land to, in place of
+ * the default 12 degrees. A site's edge eases onto the land beyond it at up to that grade, so a
+ * lower limit can leave the band at a gate unwalkable and a person arriving outside it unable to
+ * walk in.
+ */
+const LAND_WALK_SLOPE_DEGREES = (Math.atan(LAND_WALK_GRADE_PERMILLE / 1000) * 180) / Math.PI;
 
 const LEVEL: SurfaceSample = Object.freeze({ height: 0, normal: Object.freeze({ x: 0, y: 1, z: 0 }) });
 
@@ -162,7 +171,7 @@ export function siteNavigationWorld(drawing: SiteDrawing, occupancy: TerrainOccu
     centre: atlasVec3(centreEast, 0, centreSouth),
     fieldRadius: reach,
     recoveryRadius: reach + FIELD_MARGIN_M,
-    maximumSlopeDegrees: DEFAULT_MAXIMUM_SLOPE_DEGREES,
+    maximumSlopeDegrees: support === undefined && land !== undefined ? LAND_WALK_SLOPE_DEGREES : DEFAULT_MAXIMUM_SLOPE_DEGREES,
     maximumStepHeight: DEFAULT_MAXIMUM_STEP_HEIGHT_AU,
     surfaceSampleSpacing: SUPPORT_SAMPLE_SPACING_M,
     regions: Object.freeze([]),
