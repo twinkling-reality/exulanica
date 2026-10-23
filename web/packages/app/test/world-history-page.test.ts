@@ -549,6 +549,20 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
   });
 
+  it('opens at the newest end each time, not where it was left (GH3)', async () => {
+    const { read } = reads();
+    const made = host(read);
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    history.key(press('ArrowLeft'));
+    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    history.close();
+    await history.open();
+    expect(chosen(made.root)).toBe('Marco asked Teo');
+    expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
+    history.close();
+  });
+
   it('makes missing pictures and portraits one at a time, and stops making them when it closes', async () => {
     const { read } = reads();
     let release: (value: Picture | null) => void = () => {};
@@ -572,6 +586,74 @@ describe('History', () => {
     await Promise.resolve();
     expect(made.root.querySelector('[role="dialog"]')).toBeNull();
     expect(made.closed).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a kept picture in view before it draws a missing one, which takes seconds', async () => {
+    const read = moments();
+    const kept = { sha256: 'a'.repeat(64), width: 600, height: 340 };
+    read.moments = [{ ...read.moments[0]!, picture: kept }, { ...read.moments[1]!, picture: null }] as typeof read.moments;
+    const { read: reader } = reads({ [`/world/versions/${VERSION}/history/moments`]: read });
+    const renderMomentPicture = vi.fn((_moment: Record<string, unknown>, _signal: AbortSignal) => new Promise<Picture | null>(() => {}));
+    const made = host(reader, { renderMomentPicture });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    // The newest moment is chosen and has no picture: the older one's kept picture is shown while it is drawn.
+    await vi.waitFor(() => expect(renderMomentPicture).toHaveBeenCalledTimes(1));
+    expect(renderMomentPicture.mock.calls[0]![0]).toMatchObject({ moment_id: 'm2' });
+    const pictures = [...made.root.querySelectorAll('.wu-hr-card .wu-hr-pic')].map((box) => box.querySelector('img')?.getAttribute('src') ?? null);
+    expect(pictures).toEqual([null, `/world/pictures/${'a'.repeat(64)}?world_id=${encodeURIComponent(WORLD)}`, null]);
+    history.close();
+  });
+
+  it('draws next the missing picture nearest the moment chosen now, so the arrows move the making with the reader', async () => {
+    const read = moments();
+    const third = { ...read.moments[1]!, moment_id: 'm3', tick: 433, at: at(20), picture: null, branches: [] };
+    read.moments = [read.moments[0]!, { ...read.moments[1]!, picture: null, branches: [] }, third] as typeof read.moments;
+    const { read: reader } = reads({ [`/world/versions/${VERSION}/history/moments`]: read });
+    const releases: ((picture: Picture | null) => void)[] = [];
+    const renderMomentPicture = vi.fn((_moment: Record<string, unknown>, _signal: AbortSignal) => new Promise<Picture | null>((resolve) => { releases.push(resolve); }));
+    const made = host(reader, { renderMomentPicture, portrait: async (subject: string) => `/portraits/${subject}.png` });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    await vi.waitFor(() => expect(renderMomentPicture).toHaveBeenCalledTimes(1));
+    expect(renderMomentPicture.mock.calls[0]![0]).toMatchObject({ moment_id: 'm3' });
+    // The reader goes back to the oldest moment while the newest is drawn: it is drawn next, not the one between.
+    history.key(press('ArrowLeft'));
+    history.key(press('ArrowLeft'));
+    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    releases[0]!({ sha256: 'c'.repeat(64), width: 600, height: 340 });
+    await vi.waitFor(() => expect(renderMomentPicture).toHaveBeenCalledTimes(2));
+    expect(renderMomentPicture.mock.calls[1]![0]).toMatchObject({ moment_id: 'm1' });
+    history.close();
+  });
+
+  it('draws the cards in view before one as near that the line has slid out of view', async () => {
+    const read = moments();
+    const exchange = read.moments[1]!;
+    // Seven moments a minute apart, none with a picture but the third's, which is kept.
+    read.moments = Array.from({ length: 7 }, (_, index) => ({ ...exchange, moment_id: `m${index + 1}`, tick: 412 + index, at: at(40 - index),
+      said: [{ ...exchange.said[0]!, line: `Line ${index + 1}` }], branches: [],
+      picture: index === 2 ? { sha256: 'b'.repeat(64), width: 600, height: 340 } : null })) as typeof read.moments;
+    const { read: reader } = reads({ [`/world/versions/${VERSION}/history/moments`]: read });
+    const releases: ((picture: Picture | null) => void)[] = [];
+    const renderMomentPicture = vi.fn((_moment: Record<string, unknown>, _signal: AbortSignal) => new Promise<Picture | null>((resolve) => { releases.push(resolve); }));
+    const made = host(reader, { renderMomentPicture, portrait: async (subject: string) => `/portraits/${subject}.png` });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    await vi.waitFor(() => expect(renderMomentPicture).toHaveBeenCalledTimes(1));
+    expect(renderMomentPicture.mock.calls[0]![0]).toMatchObject({ moment_id: 'm7' });
+    // Back to the third: the line slides so it stands first in view, the two before it out of view.
+    for (let press_ = 0; press_ < 4; press_ += 1) history.key(press('ArrowLeft'));
+    const shown = () => all(made.root, '.wu-hr-card .wu-hr-said');
+    expect(shown().slice(0, 1)).toEqual(['Marco: “Line 3”']);
+    const drawn = async (count: number) => {
+      releases[count - 1]!({ sha256: String(count).repeat(64), width: 600, height: 340 });
+      await vi.waitFor(() => expect(renderMomentPicture).toHaveBeenCalledTimes(count + 1));
+      return (renderMomentPicture.mock.calls[count]![0] as { moment_id: string }).moment_id;
+    };
+    // The fourth and fifth are in view, the second as near as the fifth but out of it.
+    expect([await drawn(1), await drawn(2)]).toEqual(['m4', 'm5']);
+    history.close();
   });
 
   it('draws no ring around the title it focuses itself; a ring is only for focus Tab moves', async () => {

@@ -132,6 +132,8 @@ export function mountHistory(host: HistoryHost): History {
   let held: { readonly compose: () => ReturnType<typeof historyPath> } | null = null;
   let unlisten: (() => void) | null = null;
   let making: AbortController | null = null;
+  /** The cards drawn whole in the last view: their pictures are made first. */
+  let inView = new Set<string>();
   /** What the characters are called, from the last read. */
   let called: { subject(id: string): string; speaker?(id: string): string } = { subject: () => '' };
   /** The page's lasting parts, made once when it opens, so the focus on its title stays through every draw. */
@@ -243,37 +245,74 @@ export function mountHistory(host: HistoryHost): History {
     void makePictures();
   }
 
-  /** Makes each missing picture and portrait once, one at a time, the chosen moment's first; stops on close. */
+  /**
+   * Makes each missing picture and portrait once, one at a time, and stops on close. One making serves the page while
+   * it is open: what a read adds is taken up at its next step, so a drawing under way is never thrown away.
+   */
   async function makePictures() {
-    making?.abort();
+    if (making) return;
     const controller = new AbortController();
     making = controller;
-    const order = [...moments()].sort((a, b) => Number(b.id === chosen) - Number(a.id === chosen) || b.at - a.at);
-    const creation = (path?.items ?? []).find((item: Json) => item.kind === 'creation');
-    if (creation && !creation.picture && host.beginningPicture && !pictures.has(creation.id)) {
-      const address = await host.beginningPicture(controller.signal).catch(() => null);
-      if (controller.signal.aborted) return;
-      pictures.set(creation.id, address);
-      draw();
-    }
-    for (const moment of order) {
-      if (controller.signal.aborted) return;
-      // A kept picture is read at its address; a missing one is made once, then read.
-      if (!pictures.has(moment.id) && host.pictureAddress && (moment.picture || host.renderMomentPicture)) {
-        const kept = moment.picture ?? (await host.renderMomentPicture?.(moment, controller.signal).catch(() => null)) ?? null;
-        if (controller.signal.aborted) return;
-        const address = kept ? await host.pictureAddress(kept as Picture, controller.signal).catch(() => null) : null;
-        if (controller.signal.aborted) return;
-        pictures.set(moment.id, address);
-        draw();
-      }
-      for (const subject of moment.subjects.slice(0, ORBS)) {
-        if (controller.signal.aborted || portraits.has(subject) || !host.portrait) continue;
-        portraits.set(subject, await host.portrait(subject, controller.signal).catch(() => null));
+    try {
+      for (let step = nextStep(); step && !controller.signal.aborted; step = nextStep()) {
+        await step(controller.signal);
         if (controller.signal.aborted) return;
         draw();
       }
+    } finally {
+      if (making === controller) making = null;
     }
+  }
+
+  /**
+   * What to make next, chosen again after every step so the making follows the reader: a kept picture of a card in
+   * view first (only a read, where a drawing takes seconds), then the card nearest the one chosen now, in view before
+   * out of it, the newer of two as near: its picture, then its people's portraits. Null when nothing is left.
+   */
+  function nextStep(): ((signal: AbortSignal) => Promise<void>) | null {
+    const items: Json[] = path?.items ?? [];
+    const place = new Map<string, number>(items.map((item: Json, index: number) => [item.id, index]));
+    const here = (chosen !== null ? place.get(chosen) : undefined) ?? items.length - 1;
+    const far = (item: Json) => Math.abs(place.get(item.id)! - here);
+    const nearest = (a: Json, b: Json) => Number(!inView.has(a.id)) - Number(!inView.has(b.id)) || far(a) - far(b) || place.get(b.id)! - place.get(a.id)!;
+    const pictured: Json[] = items.filter((item: Json) => item.kind === 'moment' || item.kind === 'creation');
+    const kept = pictured.filter((item: Json) => item.kind === 'moment' && item.picture && inView.has(item.id) && needsPicture(item)).sort(nearest)[0];
+    if (kept) return (signal) => makePicture(kept, signal);
+    const next = pictured.filter((item: Json) => needsPicture(item) || unportrayed(item).length > 0).sort(nearest)[0];
+    if (!next) return null;
+    if (needsPicture(next)) return (signal) => (next.kind === 'creation' ? makeBeginning(next, signal) : makePicture(next, signal));
+    const subject = unportrayed(next)[0]!;
+    return (signal) => makePortrait(subject, signal);
+  }
+
+  /** Whether a card's picture is still to be made here: how the world began, or a moment, kept or not. */
+  function needsPicture(item: Json): boolean {
+    if (pictures.has(item.id)) return false;
+    if (item.kind === 'creation') return !item.picture && Boolean(host.beginningPicture);
+    return Boolean(host.pictureAddress && (item.picture || host.renderMomentPicture));
+  }
+
+  /** A moment's people still without a portrait here. */
+  function unportrayed(item: Json): string[] {
+    return item.kind === 'moment' && host.portrait ? item.subjects.slice(0, ORBS).filter((subject: string) => !portraits.has(subject)) : [];
+  }
+
+  async function makeBeginning(creation: Json, signal: AbortSignal) {
+    const address = await host.beginningPicture!(signal).catch(() => null);
+    if (!signal.aborted) pictures.set(creation.id, address);
+  }
+
+  /** A kept picture is read at its address; a missing one is made once, then read. */
+  async function makePicture(moment: Json, signal: AbortSignal) {
+    const kept = moment.picture ?? (await host.renderMomentPicture?.(moment, signal).catch(() => null)) ?? null;
+    if (signal.aborted) return;
+    const address = kept ? await host.pictureAddress!(kept as Picture, signal).catch(() => null) : null;
+    if (!signal.aborted) pictures.set(moment.id, address);
+  }
+
+  async function makePortrait(subject: string, signal: AbortSignal) {
+    const address = await host.portrait!(subject, signal).catch(() => null);
+    if (!signal.aborted) portraits.set(subject, address);
   }
 
   function pictureOf(item: Json): string | null {
@@ -496,6 +535,7 @@ export function mountHistory(host: HistoryHost): History {
     const placed = pathLayout(items, layout);
     const view = pathView(items, placed, layout, width, chosen, offset);
     offset = view.offset;
+    inView = view.drawn;
     track.style.transform = `translateX(${view.offset}px)`;
     const local = (screen: number) => screen - view.offset;
     const svg = storySvg(Math.max(width, placed.nowAt + layout.margin) - Math.min(0, view.offset), Math.max(layout.lineY + 360, (made.root.clientHeight || window.innerHeight)));
@@ -807,6 +847,7 @@ export function mountHistory(host: HistoryHost): History {
   function remove() {
     making?.abort();
     making = null;
+    inView = new Set();
     // The host takes back the addresses it made for this page as it closes; the next open reads them again.
     pictures.clear();
     portraits.clear();
@@ -820,6 +861,8 @@ export function mountHistory(host: HistoryHost): History {
     made?.close();
     made = null;
     lasting = null;
+    // The next open starts at the newest end again (GH3), not where this one was left.
+    chosen = null;
     opened = null;
     earlier = [];
     momentsMore = false;
