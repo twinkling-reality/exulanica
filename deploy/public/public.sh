@@ -21,6 +21,9 @@
 #   grant <label>     grant a rehearsal visitor's workspace an allowance under the authority
 #   spending          the authority's state, as the operator command prints it
 #   backup-now        one maintenance pass now: export, backup set and verification when due
+#   restore-planned <set>  restore one backup set, the current database kept aside under its own name;
+#                     stop the server first (`down`); run again to resume one stopped part way
+#   restore-return    abandon a restore stopped part way: the database it set aside serves again
 #   status            the containers, readiness from inside, and disk use
 #   watch             one health check through the edge; recreates the API after three failures
 #   preflight         check every model identifier against the provider's public catalog
@@ -80,6 +83,7 @@ authority_file="$deploy_dir/authority.json"
 watch_state="$deploy_dir/watch-failures"
 proxy_state="$deploy_dir/watch-proxy-failures"
 edge_state="$deploy_dir/watch-edge-failures"
+restore_pending="$deploy_dir/restore-pending"
 
 refuse() {
   echo "public.sh: $*" >&2
@@ -190,6 +194,16 @@ keep_model_credential() {
       | sed -n 's/^NEBIUS_API_KEY=//p' | head -n 1 || true
   )"
   export NEBIUS_API_KEY
+}
+
+# A restore needs every writer of the database stopped: only postgres may run. A listing that fails
+# refuses too, since its empty answer would read as nothing running.
+refuse_running_writers() {
+  local listed running
+  listed="$(compose ps --services --status running)" \
+    || refuse "could not list the running services (docker compose ps failed), so nothing was started"
+  running="$(printf '%s\n' "$listed" | grep -vx postgres | tr '\n' ' ' || true)"
+  [ -z "${running// /}" ] || refuse "these services are running: ${running% }; run down first"
 }
 
 merge_tokens() {
@@ -569,6 +583,38 @@ PY
   backup-now)
     need_env_file
     compose exec -T maintenance exulanica-installation maintenance --once
+    ;;
+
+  restore-planned)
+    # A planned restore (docs/deployment.md 9.4): the restore job seals the current database, keeps it aside under its
+    # own name, loads the set and replays every withdrawal since. Every writer of the database must be stopped first,
+    # or it writes past the seal and holds a connection the rename after sealing cannot take. An attempt stopped part
+    # way is resumed by the same checkpoint and set, which a pending file in the secrets directory keeps until it ends.
+    need_env_file
+    set_name="${2:?name the backup set, a directory under the sets of the backup path}"
+    case "$set_name" in "" | */* | .*) refuse "name a backup set by its directory name alone" ;; esac
+    [ -d "$(env_value EXULANICA_BACKUP_PATH)/sets/$set_name" ] || refuse "no backup set $set_name under $(env_value EXULANICA_BACKUP_PATH)/sets"
+    refuse_running_writers
+    if [ -s "$restore_pending" ]; then
+      checkpoint="$(sed -n 1p "$restore_pending")" pending_set="$(sed -n 2p "$restore_pending")"
+      [ "$pending_set" = "$set_name" ] || refuse "a restore of $pending_set is pending: run restore-planned $pending_set to resume it, or restore-return to abandon it"
+      echo "public.sh: resuming the restore of $set_name stopped part way" >&2
+    else
+      checkpoint="/var/lib/exulanica-restore/planned-$(date -u +%Y%m%dT%H%M%SZ).checkpoint"
+      printf '%s\n%s\n' "$checkpoint" "$set_name" >"$restore_pending"
+    fi
+    compose --profile recovery run --rm restore planned --backup-set "/var/lib/exulanica-backup/sets/$set_name" \
+      --checkpoint "$checkpoint" --set-aside
+    rm -f "$restore_pending"
+    ;;
+
+  restore-return)
+    # Abandons a planned restore stopped part way: the source database it set aside serves again (9.4).
+    need_env_file
+    [ -s "$restore_pending" ] || refuse "no restore is pending"
+    refuse_running_writers
+    compose --profile recovery run --rm restore return-to-source --checkpoint "$(sed -n 1p "$restore_pending")" --set-aside
+    rm -f "$restore_pending"
     ;;
 
   status)

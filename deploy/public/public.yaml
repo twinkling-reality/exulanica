@@ -150,6 +150,9 @@ services:
   restore:
     image: exulanica-public-maintenance
     pull_policy: never
+    # Run from the loaded image (public.sh restore-planned): the base composition builds the restore job from source,
+    # naming the API's image as a context, which a server that never builds cannot do.
+    build: !reset null
 
   client:
     image: exulanica-public-client

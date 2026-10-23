@@ -999,3 +999,125 @@ def test_watch_reports_a_failing_edge_and_restarts_nothing_for_it(tmp_path):
         assert ("edge failing" in output) == (checks >= 3)
     output, _ = _watch(tmp_path, inside="200", proxied="200", live="200")
     assert "edge_failures=0" in output and "edge failing" not in output
+
+
+def test_a_composed_restore_runs_from_the_loaded_maintenance_image():
+    """The base composition builds the restore job from source, naming the API's image as a
+    context; the public server never builds, so its restore runs from the loaded image."""
+    restore = OVERLAY_SERVICES["restore"]
+    assert "image: exulanica-public-maintenance" in restore
+    assert "build: !reset null" in restore
+
+
+def test_restore_planned_waits_for_a_stopped_server_and_keeps_the_source_aside():
+    script = _directives(SCRIPT.read_text(encoding="utf-8")).replace("\\\n", " ")
+    guard = script.split("\nrefuse_running_writers() {\n", 1)[1].split("\n}\n", 1)[0]
+    assert "ps --services --status running" in guard and "grep -vx postgres" in guard
+    assert "run down first" in guard
+    step = script.split("\n  restore-planned)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert step.index("refuse_running_writers") < step.index("restore planned")
+    run = next(line for line in step.splitlines() if "restore planned" in line)
+    assert "compose --profile recovery run --rm restore planned" in run
+    assert '--backup-set "/var/lib/exulanica-backup/sets/$set_name"' in run
+    assert '--checkpoint "$checkpoint" --set-aside' in run
+
+
+def _restore_shim(tmp_path, running: str, run_exit: int = 0, ps_exit: int = 0) -> dict[str, str]:
+    """A stand-in docker: `compose ps --services --status running` names `running` and exits with
+    `ps_exit`, and each `compose ... run` is written down and exits with `run_exit`."""
+    shim = tmp_path / "bin"
+    shim.mkdir(exist_ok=True)
+    (shim / "docker").write_text(
+        "#!/bin/sh\n"
+        'case " $* " in\n'
+        '  *" ps "*) printf "%s\\n" $RUNNING; exit "$PS_EXIT" ;;\n'
+        '  *" run "*) printf "%s\\n" "$*" >> "$RUN_LOG"; exit "$RUN_EXIT" ;;\n'
+        "esac\n",
+        encoding="utf-8",
+    )
+    (shim / "docker").chmod(0o755)
+    return {
+        "PATH": f"{shim}:{os.environ['PATH']}",
+        "RUNNING": running,
+        "RUN_LOG": str(tmp_path / "runs"),
+        "RUN_EXIT": str(run_exit),
+        "PS_EXIT": str(ps_exit),
+    }
+
+
+def _a_set(tmp_path) -> str:
+    name = "20261023T200955407871Z"
+    (tmp_path / "backup" / "sets" / name).mkdir(parents=True)
+    return name
+
+
+@needs_shell
+def test_restore_planned_refuses_while_any_writer_runs(tmp_path):
+    assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    name = _a_set(tmp_path)
+    refused = _script(
+        tmp_path, "restore-planned", name, **_restore_shim(tmp_path, "postgres tile-worker")
+    )
+    assert refused.returncode == 2
+    assert "tile-worker" in refused.stderr and "run down first" in refused.stderr
+    assert not (tmp_path / "runs").exists()
+    ran = _script(tmp_path, "restore-planned", name, **_restore_shim(tmp_path, "postgres"))
+    assert ran.returncode == 0, ran.stderr
+    assert "--set-aside" in (tmp_path / "runs").read_text(encoding="utf-8")
+
+
+@needs_shell
+def test_restore_planned_refuses_when_the_running_services_cannot_be_listed(tmp_path):
+    """A failed listing would otherwise read as nothing running and let a restore start."""
+    assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    name = _a_set(tmp_path)
+    refused = _script(
+        tmp_path, "restore-planned", name, **_restore_shim(tmp_path, "postgres", ps_exit=1)
+    )
+    assert refused.returncode == 2
+    assert "could not list the running services" in refused.stderr
+    assert not (tmp_path / "runs").exists()
+
+
+@needs_shell
+def test_a_restore_stopped_part_way_resumes_with_its_own_checkpoint_or_returns(tmp_path):
+    assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    name = _a_set(tmp_path)
+    stopped = _script(
+        tmp_path, "restore-planned", name, **_restore_shim(tmp_path, "postgres", run_exit=1)
+    )
+    assert stopped.returncode == 1
+    first = (tmp_path / "runs").read_text(encoding="utf-8").split("--checkpoint ", 1)[1].split()[0]
+    (tmp_path / "backup" / "sets" / "20261024T000000Z").mkdir()
+    other = _script(
+        tmp_path, "restore-planned", "20261024T000000Z", **_restore_shim(tmp_path, "postgres")
+    )
+    assert other.returncode == 2 and f"a restore of {name} is pending" in other.stderr
+    resumed = _script(tmp_path, "restore-planned", name, **_restore_shim(tmp_path, "postgres"))
+    assert resumed.returncode == 0, resumed.stderr
+    assert "resuming" in resumed.stderr
+    runs = (tmp_path / "runs").read_text(encoding="utf-8").splitlines()
+    assert runs[-1].split("--checkpoint ", 1)[1].split()[0] == first
+    assert (
+        _script(tmp_path, "restore-return", **_restore_shim(tmp_path, "postgres")).returncode == 2
+    )
+    _script(tmp_path, "restore-planned", name, **_restore_shim(tmp_path, "postgres", run_exit=1))
+    blocked = _script(tmp_path, "restore-return", **_restore_shim(tmp_path, "postgres tile-worker"))
+    assert blocked.returncode == 2 and "tile-worker" in blocked.stderr
+    returned = _script(tmp_path, "restore-return", **_restore_shim(tmp_path, "postgres"))
+    assert returned.returncode == 0, returned.stderr
+    assert (
+        "restore return-to-source --checkpoint"
+        in (tmp_path / "runs").read_text(encoding="utf-8").splitlines()[-1]
+    )
+
+
+@needs_shell
+def test_restore_planned_takes_a_backup_set_by_its_name_alone(tmp_path):
+    assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    climbing = _script(tmp_path, "restore-planned", "../sets")
+    assert climbing.returncode == 2
+    assert "by its directory name alone" in climbing.stderr
+    missing = _script(tmp_path, "restore-planned", "20261023T000000Z")
+    assert missing.returncode == 2
+    assert "no backup set 20261023T000000Z" in missing.stderr
