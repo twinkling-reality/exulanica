@@ -22,7 +22,7 @@ import { assignmentSubject } from './entity-properties.mjs';
 import { worldTime } from './world-clock.mjs';
 import { SocietyControlClient } from '/src/society-control-api.ts';
 import { edgeInset, nameOver, speech, talkScene } from './world-ui-talk.ts';
-import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs';
+import { SPEAKING_ABOVE, createScene } from './talk-scene.mjs'; import { createSceneFollow } from './scene-follow.ts';
 import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePlace, quietWords, endedBy, exchangeOf, framingStep, nameGroups, namedPeople, popLeft, popPlacement, sceneBy, shownWhile, stackPops, talkActs } from './talk-pops.mjs';
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
@@ -348,7 +348,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
    * following stood, and eases back 2 s after the exchange's last pop has gone. The person's own
    * movement, a page or reduced motion ends it where the camera stands.
    */
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)'), sceneFollow = createSceneFollow(b); // F8: the talking scene's own frame
   let shownNow = [];
   function framePair(now, shownPops) {
     if (!following) return;
@@ -362,8 +362,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const step = framingStep({ exchange, ended: following.ended ?? null, framed, near, seen: Boolean(otherFrame && seen(other, otherFrame)) });
     following.ended = step.ended;
     const base = following.pair?.base ?? { ...b.controls.state };
-    const to = step.frame ? pairFraming({ from: base, a: mine, b: theirs, fovDeg: b.camera.camera.fov, aspect: innerWidth / innerHeight,
-      safe: TALK_FRAMING.safe, least: Math.hypot(mine.x - base.x, mine.z - base.z) }) : null;
+    const to = sceneFollow.pose(now) ?? (step.frame ? pairFraming({ from: base, a: mine, b: theirs, fovDeg: b.camera.camera.fov, aspect: innerWidth / innerHeight,
+      safe: TALK_FRAMING.safe, least: Math.hypot(mine.x - base.x, mine.z - base.z) }) : null);
     if (to && ['x', 'y', 'z', 'yaw', 'pitch'].every(key => Number.isFinite(to[key]))) {
       if (!following.pair || following.pair.back) following.pair = { base, from: { ...b.controls.state }, at: now, to, quiet: null, back: null };
       else Object.assign(following.pair, { to, quiet: null });
@@ -1322,7 +1322,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const exchange = following && held ? exchangeOf(shownPops, held.scene.id) : null;
     scene.follow(following && held ? held.scene.id : null, shownPops);
     const scened = scene.shown(now, exchange, selection.people?.clock().minute ?? null);
-    drawScene(scened);
+    drawScene(scened); sceneFollow.saw(scened);
     const inScene = new Set(scened.showing ? [held.scene.id, exchange?.other ?? scened.now.to, scened.now.speaker].filter(Boolean) : []);
     const looking = !pageShown() && !asking && !dragging && targetReachable && target.key !== held?.key && targetFrame?.headInView && seen(target, targetFrame); if (looking) lookedAt = { key: target.key, until: now + DISCOVERY.lookStayMs };
     const lookRow = looking ? target : lookedAt && now < lookedAt.until && !pageShown() && !asking && !dragging && lookedAt.key !== held?.key ? rows.find(item => item.key === lookedAt.key) ?? null : null, lookFrame = lookRow && (looking ? targetFrame : screenFrame(lookRow)); if (lookRow && lookFrame?.headInView && seen(lookRow, lookFrame)) {
@@ -1368,9 +1368,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       const attended = shown.subjectId === held?.scene.id || Boolean(asked?.has(shown.subjectId)) || Boolean(heard?.headInView && seen(listener, heard));
       const how = row ? popPlacement({ onScreen, metres: reachDistance(row), chosen: shown.subjectId === held?.scene.id, attended }) : 'none';
       let part = speechParts.get(shown.subjectId);
-      if (pageShown() || how === 'far' || how === 'none' || inScene.has(shown.subjectId)) {
+      if (pageShown() || scened.showing || how === 'far' || how === 'none' || inScene.has(shown.subjectId)) {
         part?.away();
-        if (how === 'far' && !inScene.has(shown.subjectId)) beyond.push(shown.subjectId, ...(listener ? [listener.scene.id] : []));
+        if (how === 'far' && !scened.showing && !inScene.has(shown.subjectId)) beyond.push(shown.subjectId, ...(listener ? [listener.scene.id] : []));
         continue;
       }
       if (!part) { part = speech(); beside.append(part.root); speechParts.set(shown.subjectId, part); }
