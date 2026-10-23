@@ -4,6 +4,7 @@ the horizon in a drawn-only backdrop."""
 from __future__ import annotations
 
 import hashlib
+import random
 from fractions import Fraction
 from itertools import pairwise
 
@@ -25,6 +26,7 @@ from exulanica.grammar.landform import (
     landform_catalog,
     level_land,
     near_chunks,
+    noise,
     read_land_chunk,
     read_land_document,
     realize_backdrop,
@@ -78,6 +80,85 @@ HILLS = read_land_document(
         ],
     }
 )
+
+
+def _value_by_samples(seed: bytes, xs: list[int], ys: list[int], wavelength: int) -> list[int]:
+    """Value noise as one sample at a time: its four lattice values read and interpolated along x,
+    then along y, in the fixed point :mod:`~exulanica.grammar.landform.noise` states."""
+    one, half = noise.ONE, 32_768
+
+    def at(i: int, j: int) -> int:
+        digest = hashlib.sha256(
+            seed + i.to_bytes(8, "little", signed=True) + j.to_bytes(8, "little", signed=True)
+        ).digest()
+        return int.from_bytes(digest[:2], "little")
+
+    def axis(value: int) -> tuple[int, int]:
+        cell, rest = divmod(value, wavelength)
+        t = rest * one // wavelength
+        return cell, (6 * t**5 - 15 * t**4 * one + 10 * t**3 * one * one) // one**4
+
+    out = []
+    for y in ys:
+        j, wy = axis(y)
+        for x in xs:
+            i, wx = axis(x)
+            a, b, c, d = at(i, j), at(i + 1, j), at(i, j + 1), at(i + 1, j + 1)
+            ab, cd = a * one + (b - a) * wx, c * one + (d - c) * wx
+            out.append((ab * one + (cd - ab) * wy) // (one * one) - half)
+    return out
+
+
+def _fbm_by_samples(
+    seed: bytes, xs: list[int], ys: list[int], wavelength: int, octaves: int, ridged: bool
+) -> list[int]:
+    """The fractal sum, one sample at a time, of :func:`_value_by_samples`'s octaves."""
+    one, half = noise.ONE, 32_768
+    total, weight = [0] * (len(xs) * len(ys)), [one] * (len(xs) * len(ys))
+    norm, amplitude, length = 0, 1000, wavelength
+    for octave in range(octaves):
+        values = _value_by_samples(
+            seed + bytes([octave]),
+            [x + octave * 7_919_000 for x in xs],
+            [y - octave * 6_271_000 for y in ys],
+            max(1, length),
+        )
+        for k, value in enumerate(values):
+            if ridged:
+                crest = (half - abs(value)) ** 2 // half * weight[k] // one
+                weight[k] = min(one, crest * 2 * one // half)
+                total[k] += crest * amplitude
+            else:
+                total[k] += value * amplitude
+        norm += amplitude
+        amplitude = amplitude * 1000 // (2100 if ridged else 2000)
+        length = length * 1000 // 2030
+    return [value // norm for value in total]
+
+
+def test_noise_by_rows_is_the_value_one_sample_at_a_time_gives():
+    """Value noise made a row of samples at a time, with the interpolation along x shared by the
+    rows between two lattice rows, and its fractal sums, are every integer of the per-sample
+    formula: on grids of any spacing, order and wavelength, a single point among them, and rows
+    that leave a lattice row and come back to it."""
+    rng = random.Random(20261023)
+    grids = [([0], [0], 1), ([-1, 5, 3], [7, -2, 7, 7], 4), ([12], list(range(-9, 9)), 5)]
+    for _ in range(120):
+        xs = [rng.randrange(-400_000, 400_000) for _ in range(rng.randint(1, 30))]
+        ys = [rng.randrange(-400_000, 400_000) for _ in range(rng.randint(1, 30))]
+        if rng.random() < 0.5:
+            xs.sort()
+            ys.sort()
+        grids.append((xs, ys, rng.choice([1, 3, 1000, 7777, 50_000, 300_000])))
+    for case, (xs, ys, wavelength) in enumerate(grids):
+        seed = rng.randbytes(32)
+        assert noise.value_grid(seed, xs, ys, wavelength) == _value_by_samples(
+            seed, xs, ys, wavelength
+        ), case
+        for ridged in (False, True):
+            assert noise.fbm_grid(seed, xs, ys, wavelength, 4, ridged=ridged) == _fbm_by_samples(
+                seed, xs, ys, wavelength, 4, ridged
+            ), (case, ridged)
 
 
 def test_the_chunk_is_the_city_tile_and_one_metre_sampling_fills_it():
