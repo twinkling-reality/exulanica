@@ -110,7 +110,10 @@ class CreatureDraftRefusalCode(StrEnum):
 
 
 #: What a person reads for :attr:`CreatureDraftRefusalCode.NOT_DRAFTED`.
-NOT_DRAFTED_SENTENCE: Final = "No creature was drafted from these words that this world can build."
+NOT_DRAFTED_SENTENCE: Final = (
+    "The AI model could not make these words into a creature this world can build, "
+    "so nothing was made."
+)
 
 
 @dataclass(frozen=True, slots=True)
