@@ -167,7 +167,7 @@ describe('walking a site', () => {
 // Relative to web/, where the suite runs: the catalog a deployment ships.
 const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const ROOF_FORMS = readRoofForms(readFileSync('../assets/catalogs/world-kinds/roof-form.v1.json', 'utf8'));
-const FURNITURE_FORMS = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v2.json', 'utf8'));
+const FURNITURE_FORMS = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v3.json', 'utf8'));
 const bytes = (rgb: readonly number[]): number[] => rgb.map((channel) => Math.round(channel * 255));
 /** The default light of the committed cozy town pack, which states a ground beyond the world: a lawn, 0.6 m down. */
 const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy-town/manifest.json', 'utf8')) as {
@@ -288,6 +288,39 @@ describe('drawing a site', () => {
     expect(Math.max(...ys(4.75))).toBeCloseTo(1.2 + 0.475, 5);
     draped.undrape();
     draped.destroy();
+    plain.destroy();
+    formed.destroy();
+  });
+
+  it('draws a stall as a counter, four posts and a cover inside its box, not as its box', () => {
+    const { app } = nullApp();
+    const document = served();
+    // The island hamlet's vegetable stall: 2 m wide, 1 m deep and 2.2 m tall, beside the yard.
+    (document['slots'] as unknown[]).push(slot('stall', 'fixture.stall', 'box', [5000, 2000, 0], 0, [2000, 1000, 2200]));
+    const stalled = parseStructuredSiteDrawing(document);
+    const plain = drawSiteSlots(app.graphicsDevice, stalled, MATERIALS);
+    const formed = drawSiteSlots(app.graphicsDevice, stalled, MATERIALS, null, FURNITURE_FORMS);
+    expect((plain.root.findByName('stall:shape') as pc.Entity).render!.type).toBe('box');
+    const shape = formed.root.findByName('stall:shape') as pc.Entity;
+    expect(shape.render!.type).not.toBe('box');
+    const positions: number[] = [];
+    for (const instance of shape.render!.meshInstances) {
+      const some: number[] = [];
+      instance.mesh.getPositions(some);
+      positions.push(...some);
+    }
+    // Inside its box, metres in the renderer's frame: x along its width, y up, z its depth.
+    for (let at = 0; at < positions.length; at += 3) {
+      expect(Math.abs(positions[at]!)).toBeLessThanOrEqual(1 + 1e-6);
+      expect(positions[at + 1]!).toBeGreaterThanOrEqual(-1e-6);
+      expect(positions[at + 1]!).toBeLessThanOrEqual(2.2 + 1e-6);
+      expect(Math.abs(positions[at + 2]!)).toBeLessThanOrEqual(0.5 + 1e-6);
+    }
+    // Its cover reaches the box's top and its posts the ground: not a slab, and not hollow either.
+    const ys = positions.filter((_, at) => at % 3 === 1);
+    expect(Math.max(...ys)).toBeCloseTo(2.2, 5);
+    expect(Math.min(...ys)).toBeCloseTo(0, 5);
+    expect(formed.triangles).toBeGreaterThan(plain.triangles);
     plain.destroy();
     formed.destroy();
   });

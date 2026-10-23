@@ -5,7 +5,7 @@
  * geometry: boxes and prisms in the furniture's own frame, `+x` its facing, `+y` to its left, `+z` up,
  * each offset placing a part's bottom centre (`exulanica.grammar.grammars.city.common.FormPart`). The
  * parts are what a person sits on, walks round and sees past, and the bake draws them as they are. The
- * street furniture form catalog (`assets/catalogs/world-kinds/street-furniture-form.v2.json`) states,
+ * street furniture form catalog (`assets/catalogs/world-kinds/street-furniture-form.v3.json`) states,
  * by the record's furniture class, how its parts are drawn instead: a seat as slats, a leg as a frame,
  * a bin as a turned body, a stand's posts and rail as one bent tube, a plate with a rim. Every form
  * stays inside the boxes of the parts it draws (a tube inside its parts' common box), so nothing
@@ -18,8 +18,9 @@
  * A made place's fixture is a slot, a box with no parts (`site-drawing.ts`). The catalog's slot entries
  * state, by the slot's leaf, the parts a form draws in thousandths of the slot's width, depth and height
  * (centred on its base, in the slot's own frame: `+x` along its width, `+y` toward its front, `+z` up),
- * so a site's bench is drawn by the same forms inside its own box, and a boundary run whose leaf has an
- * entry (a timber fence) as posts and rails inside its own box.
+ * so a site's bench is drawn by the same forms inside its own box, a stall as a counter and a cover on
+ * two end frames, and a boundary run whose leaf has an entry (a timber fence) as posts and rails inside
+ * its own box.
  *
  * Pure: no DOM, no Node, no renderer. The catalog's text is passed in. Millimetres in the furniture's
  * own frame; `s` and `t` are the surface coordinates a texture is placed by, in millimetres, as the

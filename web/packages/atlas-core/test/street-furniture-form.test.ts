@@ -357,6 +357,50 @@ describe('a boundary run drawn as a timber fence (catalog v2)', () => {
   });
 });
 
+/** The catalog the page bundles: v2's forms and a stall for a made place's stall slot. */
+const FORMS3 = readStreetFurnitureForms(readFileSync('../assets/catalogs/world-kinds/street-furniture-form.v3.json', 'utf8'));
+
+describe('a stall slot drawn as a counter and a cover on two end frames (catalog v3)', () => {
+  // The island hamlet's vegetable stall: 2 m wide, 1 m deep, 2.2 m tall.
+  const STALL = [2000, 1000, 2200] as const;
+
+  it('reads v3 as v2 with a stall, and v2 still reads as made', () => {
+    expect(FORMS3.version).toBe(3);
+    expect([...FORMS3.byClass]).toEqual([...FORMS2.byClass]);
+    expect([...FORMS3.bySlotLeaf.keys()]).toEqual(['bench', 'fence_wood', 'stall']);
+    for (const leaf of ['bench', 'fence_wood']) expect(FORMS3.bySlotLeaf.get(leaf)).toEqual(FORMS2.bySlotLeaf.get(leaf));
+  });
+
+  it('draws a counter at its front, a post at each corner and a cover over it, inside its box, as closed solids facing out', () => {
+    const surfaces = slotFurnitureSurfaces(FORMS3, 'stall', STALL)!;
+    expect(surfaces.map((surface) => surface.role).sort()).toEqual(['object_primary', 'object_secondary']);
+    expect(unpairedEdges(surfaces)).toEqual([]);
+    expect(volume(surfaces)).toBeGreaterThan(0);
+    const feet = new Set<string>();
+    for (const surface of surfaces) {
+      expect(pageNormals(surface).every(Number.isFinite)).toBe(true);
+      for (let at = 0; at < surface.positions.length; at += 3) {
+        const [x, y, z] = [surface.positions[at]!, surface.positions[at + 1]!, surface.positions[at + 2]!];
+        expect(Math.abs(x)).toBeLessThanOrEqual(STALL[0] / 2 + 1e-6);
+        expect(Math.abs(y)).toBeLessThanOrEqual(STALL[1] / 2 + 1e-6);
+        expect(z).toBeGreaterThanOrEqual(-1e-6);
+        expect(z).toBeLessThanOrEqual(STALL[2] + 1e-6);
+        if (z === 0 && Math.abs(x) === STALL[0] / 2 && Math.abs(y) === STALL[1] / 2) feet.add(`${Math.sign(x)},${Math.sign(y)}`);
+      }
+    }
+    // A post stands on the ground at each of the box's four corners.
+    expect([...feet].sort()).toEqual(['-1,-1', '-1,1', '1,-1', '1,1']);
+    const [top, front, , , cover] = slotFurnitureParts(FORMS3.bySlotLeaf.get('stall')!, STALL);
+    // The counter: a top at 880 mm over the front half, on a panel at the front down to the ground.
+    expect([top!.offsetZMm, top!.offsetYMm, top!.sizeYMm]).toEqual([880, 200, 560]);
+    expect([front!.offsetZMm, front!.offsetYMm + front!.sizeYMm / 2]).toEqual([0, 480]);
+    // The cover: across the whole box from 2.1 m to its top.
+    expect([cover!.sizeXMm, cover!.sizeYMm, cover!.offsetZMm + cover!.sizeZMm]).toEqual([2000, 1000, 2200]);
+    // A slot too low for the cover's inset panel is drawn as its box.
+    expect(slotFurnitureSurfaces(FORMS3, 'stall', [2000, 1000, 150])).toBeNull();
+  });
+});
+
 describe('a made place\'s fixture slot drawn by its leaf\'s form', () => {
   // A bench slot of Terraces on the bay: 2 m along its front, 500 mm deep, as tall as its seat.
   const BOX = [2000, 500, 450] as const;
