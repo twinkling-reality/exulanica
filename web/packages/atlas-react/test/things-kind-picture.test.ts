@@ -185,6 +185,34 @@ describe('a kind\'s picture for build mode\'s tray', () => {
     expect(seen.map((one) => [one.frame.width, one.frame.height])).toEqual([[96, 72], [112, 84]]);
   });
 
+  it('makes the figures of pictures waiting their turn while an earlier one is taken, the pictures still one at a time', async () => {
+    const { app, pictures, seen, made, release, well } = setup({ held: true });
+    const asked = [96, 112, 128, 144].map((width) => pictures.picture(well, { width, height: 72 }));
+    await until(() => seen.length === 1, 'the first picture\'s frame');
+    // Every later figure is made while the first picture is held: one making after another would have made none.
+    await until(() => made.length === 4, 'the later figures made ahead');
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+    expect(seen).toHaveLength(1);
+    // Made away from the scene: only the picture being taken stands in it.
+    expect(app.root.find((node) => node.name === 'thing-picture')).toHaveLength(1);
+    release();
+    expect(await Promise.all(asked)).toEqual([PICTURE, PICTURE, PICTURE, PICTURE]);
+    expect(seen.map((one) => one.frame.width)).toEqual([96, 112, 128, 144]);
+  });
+
+  it('puts away the figures made ahead with the pictures, leaving nothing behind', async () => {
+    const { app, pictures, seen, made, release, well } = setup({ held: true });
+    const before = census(app);
+    const asked = [96, 112, 128].map((width) => pictures.picture(well, { width, height: 72 }));
+    await until(() => seen.length === 1 && made.length === 3, 'a picture held and two figures made ahead');
+    pictures.destroy();
+    release();
+    expect(await Promise.all(asked)).toEqual([null, null, null]);
+    expect(seen).toHaveLength(1);
+    expect(census(app)).toEqual(before);
+    expect(app.root.findByName('thing-picture')).toBeNull();
+  });
+
   it('draws the figure alone on a layer only its camera draws, the whole of it in frame and centred', async () => {
     const { pictures, seen, well } = setup();
     expect(await pictures.picture(well, { width: 160, height: 120 })).toBe(PICTURE);

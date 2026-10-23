@@ -19,7 +19,9 @@
  *
  * Pictures are kept by the kind's digest, the look's, the framing and their size in device pixels,
  * so a kind is drawn once a look, a framing and a size on a page, and asks for a picture still being
- * drawn share that drawing. They are drawn one at a time, so a whole tray asked for at once adds one picture's pass to a frame, not one a tile. A
+ * drawn share that drawing. They are drawn one at a time, so a whole tray asked for at once adds one picture's pass to a frame, not one a tile;
+ * the figures of pictures waiting their turn are made meanwhile, a few at once (making one, reading its kind, look and container
+ * and making the container's parts, is most of a picture's time), each away from the scene until its picture is taken. A
  * kind that cannot be made, a figure that draws nothing, or a frame that cannot be read answers null,
  * which is not kept, so a later ask tries again.
  */
@@ -114,6 +116,13 @@ const LIGHTS = [
   { name: 'thing-picture:fill', colour: new pc.Color(0.78, 0.85, 1), intensity: 0.4, euler: [70, 110, 0] },
 ] as const;
 
+/**
+ * How many asked figures are made at once while pictures wait their turn: enough that a tray's pictures follow each
+ * other a frame or two apart rather than a figure's making apart, few enough that the containers' parts are not all
+ * made in the world's same frames.
+ */
+const MAKING_AT_ONCE = 3;
+
 export class KindPictures {
   /** Each picture asked for, by the kind's digest, the look's, the framing and the size, drawn or being drawn. */
   private readonly pictures = new Map<string, Promise<string | null>>();
@@ -121,6 +130,9 @@ export class KindPictures {
   private readonly drawing = new Set<AbortController>();
   /** The last picture asked for, which the next waits for: one is drawn at a time. */
   private turn: Promise<unknown> = Promise.resolve();
+  /** How many figures are being made now, and the makings waiting for one of them to end, first asked first. */
+  private making = 0;
+  private readonly waiting: Array<() => void> = [];
   private destroyed = false;
 
   constructor(private readonly options: KindPicturesOptions) {}
@@ -137,7 +149,12 @@ export class KindPictures {
     const key = `${kind.sha256}|${look === null ? 'first' : look.sha256}|${round ? 'round' : 'whole'}|${width}x${height}`;
     const held = this.pictures.get(key);
     if (held !== undefined) return held;
-    const drawn = this.turn.then(() => this.draw(kind, look, round, width, height)).catch(() => null);
+    // Its figure is made now, while earlier pictures are taken; the picture itself waits its turn.
+    const control = new AbortController();
+    this.drawing.add(control);
+    const stage = new pc.Entity('thing-picture');
+    const made = this.make(stage, kind, look, control);
+    const drawn = this.turn.then(() => this.draw(stage, made, round, width, height, control)).catch(() => null);
     this.turn = drawn;
     this.pictures.set(key, drawn);
     // A picture that could not be drawn is not kept: a later ask may find its kind served.
@@ -156,19 +173,46 @@ export class KindPictures {
     this.pictures.clear();
   }
 
-  private async draw(kind: Named | WorkspaceNamed, look: Named | null, round: boolean, width: number, height: number): Promise<string | null> {
-    // Asked for before the pictures were put away, and its turn came after.
-    if (this.destroyed) return null;
-    const { app, maker } = this.options;
-    const control = new AbortController();
-    this.drawing.add(control);
-    // The figure is made away from the scene, so no part of it is ever on the world's layers.
-    const stage = new pc.Entity('thing-picture');
+  /** A making's turn: at once while fewer than MAKING_AT_ONCE figures are being made, else when one ends. */
+  private async slot(): Promise<void> {
+    if (this.making < MAKING_AT_ONCE) {
+      this.making += 1;
+      return;
+    }
+    await new Promise<void>((resolve) => this.waiting.push(resolve));
+  }
+
+  /** A making ended: the next waiting takes its place. */
+  private free(): void {
+    const next = this.waiting.shift();
+    if (next !== undefined) next();
+    else this.making -= 1;
+  }
+
+  /**
+   * The figure of `kind` in `look`, made under `stage` away from the scene once a making's turn comes;
+   * null where it cannot be made or its picture is no longer wanted.
+   */
+  private async make(stage: pc.Entity, kind: Named | WorkspaceNamed, look: Named | null, control: AbortController): Promise<FigureMade | null> {
+    await this.slot();
+    try {
+      if (this.destroyed || control.signal.aborted) return null;
+      return await this.options.maker.make(stage, { name: 'thing-picture:kind', thingId: UNPLACED_THING, kind, look }, () => control.signal.aborted);
+    } catch {
+      return null;
+    } finally {
+      this.free();
+    }
+  }
+
+  private async draw(stage: pc.Entity, making: Promise<FigureMade | null>, round: boolean, width: number, height: number, control: AbortController): Promise<string | null> {
+    const { app } = this.options;
     let made: FigureMade | null = null;
     let scene: { readonly camera: pc.CameraComponent; readonly texture: pc.Texture; readonly contact: Contact | null; destroy(): void } | null = null;
     try {
-      made = await maker.make(stage, { name: 'thing-picture:kind', thingId: UNPLACED_THING, kind, look }, () => control.signal.aborted);
-      if (made === null || made.figure.pickVolume === null || control.signal.aborted) return null;
+      made = await making;
+      // Asked for before the pictures were put away, and its turn came after.
+      if (this.destroyed || made === null || made.figure.pickVolume === null || control.signal.aborted) return null;
       scene = stagePicture(app, stage, made.figure, made.figure.pickVolume, width, height, round);
       const ask = (): void => {
         if (this.options.invalidate !== undefined) this.options.invalidate();
