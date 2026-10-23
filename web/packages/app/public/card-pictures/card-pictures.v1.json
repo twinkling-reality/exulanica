@@ -1,0 +1,153 @@
+{
+  "profile": "exulanica.card-pictures/v1",
+  "entries": [
+    {
+      "card": "recipe:small_town",
+      "reference": {
+        "catalog_id": "world-recipe",
+        "catalog_version": 4,
+        "key": "small_town",
+        "specification": "world-specification.v2",
+        "specification_sha256": "18383aa6a9082489b0479dda923aa4eae8c335a067c8dcb320265e2a038b17cb",
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "cross_street_hierarchy": "local_street",
+          "ground_floor_use_weight_bakery_permille": 500,
+          "ground_floor_use_weight_bookshop_permille": 500,
+          "ground_floor_use_weight_cafe_permille": 500,
+          "ground_floor_use_weight_grocery_permille": 500,
+          "ground_floor_use_weight_office_permille": 500,
+          "ground_floor_use_weight_pharmacy_permille": 500,
+          "ground_floor_use_weight_restaurant_permille": 500,
+          "ground_floor_use_weight_workshop_permille": 500,
+          "high_street_count": 1,
+          "storey_band_high": 4,
+          "storey_band_low": 2,
+          "typology_weight_apartment_block_permille": 500,
+          "typology_weight_loft_building_permille": 500,
+          "typology_weight_mansion_block_permille": 500,
+          "typology_weight_rowhouse_permille": 500,
+          "typology_weight_shophouse_permille": 500
+        },
+        "land_sha256": "c86c19559634dcc913800a14568e1dad4f75598206705929dea7ac67d6c36d98",
+        "land_rules": {
+          "version": 7,
+          "catalogs": {
+            "landform-feature.v3": "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08",
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+            "landform-grading.v2": "8d226984ab3884fcecd47ed0691b2fb485312839ca94e89ca4a45775b895e3f3"
+          }
+        }
+      },
+      "picture": "recipe-small_town.jpg",
+      "picture_sha256": "34ff2ab7337315359b084439af3fbc70e684e4027ee19ef10c0b9a6883d78a7b",
+      "width": 640,
+      "height": 360,
+      "world_id": "world:generated:d6b3127e-8e91-4d3e-939e-a4368fde7146",
+      "entry_id": "01a167a4-3d3a-7a40-95b4-c647012fa7bf",
+      "commit": "5f385ea18ea8439cd5f58a4495fc882aed9c7bc0",
+      "tree_changes": [
+        "tools/previews/world-workspace/create-world.ts",
+        "web/packages/app/public/your-worlds/market_town.jpg",
+        "web/packages/app/public/your-worlds/small_town.jpg",
+        "web/packages/app/src/composition/world-pictures.ts",
+        "web/packages/app/src/ui/recipe-pictures.ts",
+        "web/packages/app/src/ui/world-recipes.ts",
+        "web/packages/app/test/world-create.test.ts",
+        "web/packages/app/test/your-worlds.test.ts"
+      ],
+      "captured_on": "2026-10-23"
+    },
+    {
+      "card": "recipe:market_town",
+      "reference": {
+        "catalog_id": "world-recipe",
+        "catalog_version": 4,
+        "key": "market_town",
+        "specification": "world-specification.v2",
+        "specification_sha256": "18383aa6a9082489b0479dda923aa4eae8c335a067c8dcb320265e2a038b17cb",
+        "values": {
+          "block_length_mm": 140000,
+          "city_extent_x_mm": 384000,
+          "cross_street_hierarchy": "local_street",
+          "ground_floor_use_weight_bakery_permille": 500,
+          "ground_floor_use_weight_bookshop_permille": 500,
+          "ground_floor_use_weight_cafe_permille": 500,
+          "ground_floor_use_weight_grocery_permille": 500,
+          "ground_floor_use_weight_office_permille": 500,
+          "ground_floor_use_weight_pharmacy_permille": 500,
+          "ground_floor_use_weight_restaurant_permille": 500,
+          "ground_floor_use_weight_workshop_permille": 500,
+          "high_street_count": 1,
+          "storey_band_high": 4,
+          "storey_band_low": 2,
+          "typology_weight_apartment_block_permille": 500,
+          "typology_weight_loft_building_permille": 500,
+          "typology_weight_mansion_block_permille": 500,
+          "typology_weight_rowhouse_permille": 500,
+          "typology_weight_shophouse_permille": 500
+        },
+        "land_sha256": "979a03267bfb6ed4d3d94593ed37adb71312dfbf46f193cb117ed4e8ca2763a5",
+        "land_rules": {
+          "version": 7,
+          "catalogs": {
+            "landform-feature.v3": "73abe3180354f30f1d6505f6b0c6c6dae7d9424ac3a8bec30516d4cc5cc23b08",
+            "landform-value.v3": "e808f5b162d160185c51b7873dc49f0ce040920bcbef56ca2832e84800d412c1",
+            "landform-grading.v2": "8d226984ab3884fcecd47ed0691b2fb485312839ca94e89ca4a45775b895e3f3"
+          }
+        }
+      },
+      "picture": "recipe-market_town.jpg",
+      "picture_sha256": "1e6f1aac35e60d9c39181562755bf6e5ef51505ef277f64eaa8ded1a992947f0",
+      "width": 640,
+      "height": 360,
+      "world_id": "world:generated:7aa3034a-7962-4ab6-877f-6548265236d6",
+      "entry_id": "01a167a4-f09c-7cc8-ad99-ef19cc23cf74",
+      "commit": "5f385ea18ea8439cd5f58a4495fc882aed9c7bc0",
+      "tree_changes": [
+        "tools/previews/world-workspace/create-world.ts",
+        "web/packages/app/public/your-worlds/market_town.jpg",
+        "web/packages/app/public/your-worlds/small_town.jpg",
+        "web/packages/app/src/composition/world-pictures.ts",
+        "web/packages/app/src/ui/recipe-pictures.ts",
+        "web/packages/app/src/ui/world-recipes.ts",
+        "web/packages/app/test/world-create.test.ts",
+        "web/packages/app/test/your-worlds.test.ts"
+      ],
+      "captured_on": "2026-10-23"
+    },
+    {
+      "card": "kind:town",
+      "reference": {
+        "kind": "town",
+        "version": 1,
+        "sha256": "59cb72a26dfe79dc87abf59ecaa08d7a0a262546874650105117669f9ffef119"
+      },
+      "picture": "kind-town.jpg",
+      "picture_sha256": "f804e61f625276ee34d396d4ee872c761d4c003c1b9a09b2d673cec886375ff1",
+      "width": 640,
+      "height": 360,
+      "world_id": "world:generated:643dcb13-acb8-4c57-b9dd-544fb44f92b7",
+      "entry_id": "01a167a5-b061-7290-a884-42ff1ed6ff45",
+      "commit": "5f385ea18ea8439cd5f58a4495fc882aed9c7bc0",
+      "tree_changes": [
+        "tools/previews/world-workspace/create-world.ts",
+        "web/packages/app/public/your-worlds/market_town.jpg",
+        "web/packages/app/public/your-worlds/small_town.jpg",
+        "web/packages/app/src/composition/world-pictures.ts",
+        "web/packages/app/src/ui/recipe-pictures.ts",
+        "web/packages/app/src/ui/world-recipes.ts",
+        "web/packages/app/test/world-create.test.ts",
+        "web/packages/app/test/your-worlds.test.ts"
+      ],
+      "captured_on": "2026-10-23"
+    }
+  ],
+  "held": [
+    {
+      "card": "kind:island_hamlet",
+      "reason": "Its first view shows sky and a green rise, not the hamlet; it is captured once its kind's first view shows the place."
+    }
+  ]
+}

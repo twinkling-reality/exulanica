@@ -5,10 +5,9 @@
  * while that picture shows the world as opening it draws it now, read by its digest and checked
  * against it. Else it shows the picture this browser kept: a frame of the world as this browser last
  * drew it, taken from the renderer's canvas a few seconds after the world opens and again when the
- * person leaves for Your worlds, kept in `localStorage`. Else a world made from a recipe shows a
- * frame of a town made from that recipe, captured from the running application and shipped with the
- * page. Anything else shows the brand's blend in place of one. Storage that is full, blocked or
- * absent only means no picture.
+ * person leaves for Your worlds, kept in `localStorage`. Else it shows the brand's blend in place of
+ * one: a picture of another world, even one made from the same recipe (every world of a recipe is
+ * its own), never stands in for it. Storage that is full, blocked or absent only means no picture.
  *
  * The frame taken a few seconds after a world opens is its first view. That one is also put to the
  * server, so every browser shows it, unless the server's is current already. A frame of a world that
@@ -17,7 +16,6 @@
  */
 
 import type { SavedWorldEntry, SavedWorldEntryPicture } from '../world-entry-api.js';
-import { recipePicture } from '../ui/recipe-pictures.js';
 
 const KEY_PREFIX = 'exulanica.world-picture.v1.';
 /** The size Your worlds draws it at most: behind the page, faded at its edges. */
@@ -58,10 +56,7 @@ export function ownWorldPicture(entry: SavedWorldEntry): string | null {
 
 /** The picture a card shows for `entry`, or null. */
 export function worldPicture(entry: SavedWorldEntry): string | null {
-  const own = ownWorldPicture(entry);
-  if (own !== null) return own;
-  const recipe = entry.generatedGround?.recipeKey ?? null;
-  return recipe === null ? null : recipePicture(recipe);
+  return ownWorldPicture(entry);
 }
 
 /** The server's two picture calls (`WorldEntryClient.picture` and `putPicture`). */

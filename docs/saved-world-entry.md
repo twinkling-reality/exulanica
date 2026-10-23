@@ -547,7 +547,8 @@ answers the bytes while its `sha256` query is the kept picture's digest, with th
 
 The browser (`web/packages/app/src/composition/world-pictures.ts`) shows the server's picture on a
 card while its `current` is true, after checking the bytes against the stated digest. Otherwise
-the card shows the picture the browser kept itself, then the recipe picture. A few seconds after a
+the card shows the picture the browser kept itself, else none: a picture of another world, even one
+made from the same recipe, never stands in for it. A few seconds after a
 world opens, the page keeps a picture of its first view and puts it, unless the server's is current
 already or the world holds or held a photograph, whose picture never leaves the browser. The
 picture kept when a person leaves the world is the view they left; it stays in that browser. A

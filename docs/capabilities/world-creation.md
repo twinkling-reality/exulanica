@@ -68,6 +68,15 @@ decide how long a town may be. Each bound is a range in the served schema, so a 
 later version of it: a wider range for its length, and a city grammar version whose towns two
 tiles deep lay junctions traffic can drive.
 
+Create a world's cards to start from (the recipes, then the shipped kinds) each show the first view
+of a world made from that card, captured with `scripts/capture_card_pictures.py` from a release's
+checkout and shipped with the page in `web/packages/app/public/card-pictures/` with its record: the
+card, the recipe's or kind's reference, the world made, the commit and the day. Every press of a card
+makes another world, so the picture is one world made from it. A card shows its picture only while
+what is served for it (a recipe's values, a kind's version and digest) is what the record states; any
+other card shows its quiet tile, and the step's `--check` names each entry that no longer holds. A
+card the record holds back, with its reason, has no picture.
+
 A person can also describe the town they want in their own words: Create a world, Describe it. An
 open model reads the specification the server serves and drafts a preset and values from the words
 (`POST /worlds/specification/drafts`,

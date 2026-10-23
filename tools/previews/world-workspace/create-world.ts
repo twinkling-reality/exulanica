@@ -8,6 +8,7 @@
 import { WorldMakingClient, parseWorldDraftOffer, parseWorldMakingDraft, type WorldDraftOffer, type WorldMakingStart } from '../../../web/packages/app/src/world-making-api.ts';
 import { WorldKindsClient, type WorldKind } from '../../../web/packages/app/src/world-kinds-api.ts';
 import { WorldSpecificationClient, type SpecificationPreset } from '../../../web/packages/app/src/world-specification.ts';
+import { cardPicture, readCardPictures } from '../../../web/packages/app/src/ui/card-pictures.ts';
 import type { Credentials } from '../../../web/packages/app/src/config.ts';
 import type { SavedWorldEntry, WorldEntryClient } from '../../../web/packages/app/src/world-entry-api.ts';
 import {
@@ -225,23 +226,24 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   // Whether the workspace's blank world (its authored starter) is saved already: Blank then reopens it (N27).
   let blankExists = false;
   const readCards = async (): Promise<void> => {
-    const [presets, kinds, saved] = await Promise.all([
+    const [presets, kinds, saved, pictures] = await Promise.all([
       new WorldSpecificationClient(credentials).specification().then((spec) => spec.presets, () => [] as readonly SpecificationPreset[]),
       new WorldKindsClient(credentials).library().then((library) => library.kinds, () => [] as readonly WorldKind[]),
       entries.entries().then((list) => list, () => [] as readonly SavedWorldEntry[]),
+      readCardPictures(),
     ]);
     blankExists = saved.some((entry) => entry.authoredScene?.kind === 'authored-starter');
     const found: StartCard[] = [];
     for (const preset of presets) {
       const key = `recipe:${preset.key}`;
-      cardWords.set(key, { key, name: preset.label, picture: null });
+      cardWords.set(key, { key, name: preset.label, picture: cardPicture(pictures, key, { values: preset.values }) });
       found.push({ key, start: () => entries.makeGenerated(preset.key, preset.label, preset.values) });
     }
     for (const kind of kinds) {
       const first = kind.presets[0];
       if (!first) continue;
       const key = `kind:${kind.kind}`;
-      cardWords.set(key, { key, name: kind.label, picture: null });
+      cardWords.set(key, { key, name: kind.label, picture: cardPicture(pictures, key, { version: kind.version, sha256: kind.sha256 }) });
       found.push({ key, start: () => entries.makeOfKind(kind, first.key, kind.label, first.values) });
     }
     cards = [...found, ...cards.filter((card) => card.key === 'blank')];

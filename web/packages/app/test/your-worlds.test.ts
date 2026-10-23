@@ -146,16 +146,16 @@ describe('Your worlds', () => {
 });
 
 describe('the pictures on Your worlds', () => {
-  it('shows a world its own kept frame first, else its recipe, else none', () => {
-    expect(worldPicture(entry())).toBe('/your-worlds/market_town.jpg');
-    expect(worldPicture(quiet)).toBe('/your-worlds/small_town.jpg');
+  it('shows a world its own kept frame, else none: never another world\'s, not even one of its recipe', () => {
+    expect(worldPicture(entry())).toBeNull();
+    expect(worldPicture(quiet)).toBeNull();
     expect(worldPicture(starter())).toBeNull();
     expect(worldPicture(entry({ generatedGround: { ...entry().generatedGround!, recipeKey: 'harbour' } }))).toBeNull();
     window.localStorage.setItem(`exulanica.world-picture.v1.${entry().entryId}`, 'data:image/jpeg;base64,AAAA');
     expect(worldPicture(entry())).toBe('data:image/jpeg;base64,AAAA');
     // Anything else under the key is not a picture and is not shown.
     window.localStorage.setItem(`exulanica.world-picture.v1.${quiet.entryId}`, 'javascript:alert(1)');
-    expect(worldPicture(quiet)).toBe('/your-worlds/small_town.jpg');
+    expect(worldPicture(quiet)).toBeNull();
   });
 });
 
@@ -189,11 +189,11 @@ describe('the pictures the server keeps', () => {
     expect(worldPicture(current)).toMatch(/^blob:/);
     expect(await readServedPictures(server, [current])).toBe(0);
     expect(server.picture).toHaveBeenCalledTimes(1);
-    // The world changed since: its own picture, then its recipe's, until a page puts a new one.
+    // The world changed since: its own picture, then none, until a page puts a new one.
     const changed = { ...current, picture: kept(digest, { current: false }) };
     expect(worldPicture(changed)).toBe('data:image/jpeg;base64,AAAA');
     window.localStorage.clear();
-    expect(worldPicture(changed)).toBe('/your-worlds/market_town.jpg');
+    expect(worldPicture(changed)).toBeNull();
     const unread = world({ picture: kept(digest, { current: false }) });
     expect(await readServedPictures(server, [unread])).toBe(0);
     expect(server.picture).toHaveBeenCalledTimes(1);
@@ -203,10 +203,10 @@ describe('the pictures the server keeps', () => {
     const stated = await hex(jpeg(1, 2, 3));
     const other = world({ picture: kept(stated) });
     expect(await readServedPictures({ picture: vi.fn(async () => jpeg(4, 5, 6)) }, [other])).toBe(0);
-    expect(worldPicture(other)).toBe('/your-worlds/market_town.jpg');
+    expect(worldPicture(other)).toBeNull();
     const failed = world({ picture: kept(stated) });
     expect(await readServedPictures({ picture: vi.fn(async () => { throw new Error('offline'); }) }, [failed])).toBe(0);
-    expect(worldPicture(failed)).toBe('/your-worlds/market_town.jpg');
+    expect(worldPicture(failed)).toBeNull();
   });
 
   it('draws the cards again with the pictures that arrived', async () => {
@@ -215,7 +215,7 @@ describe('the pictures the server keeps', () => {
     const bare = world({ generatedGround: { ...entry().generatedGround!, recipeKey: 'harbour' }, picture: kept(await hex(bytes)) });
     const { root, refreshPictures } = build([pictured, bare], { picture: worldPicture });
     const image = (one: SavedWorldEntry) => root.querySelector(`[data-entry-id="${one.entryId}"] .your-worlds-picture img`);
-    expect(image(pictured)?.getAttribute('src')).toBe('/your-worlds/market_town.jpg');
+    expect(image(pictured)).toBeNull();
     expect(image(bare)).toBeNull();
     await readServedPictures({ picture: vi.fn(async () => bytes) }, [pictured, bare]);
     refreshPictures();

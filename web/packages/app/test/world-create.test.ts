@@ -359,6 +359,21 @@ describe('Create a world as a page', () => {
     expect(document.activeElement).toBe(document.querySelector('.wu-light-field'));
   });
 
+  it('draws a served card\'s picture where the release captured one for what is served now', async () => {
+    const offer = offerOf();
+    vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+      const body = address === '/card-pictures/card-pictures.v1.json'
+        ? { profile: 'exulanica.card-pictures/v1', entries: [{ card: 'recipe:town', reference: { values: {} }, picture: 'recipe-town.jpg' }], held: [] }
+        : address === '/review-api/worlds/drafts' ? offer : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+      return { ok: true, status: 200, json: async () => body };
+    }));
+    await mount();
+    await settle();
+    const card = document.querySelector<HTMLElement>('.wu-film-card[data-key="recipe:town"]')!;
+    expect(card.dataset['picture']).toBe('served');
+    expect(card.querySelector<HTMLElement>('.wu-film-picture')!.style.backgroundImage).toContain('/card-pictures/recipe-town.jpg');
+  });
+
   it('leaves on the first Esc, even from the field, and keeps the words for next time', async () => {
     serve(offerOf());
     let closed = 0;

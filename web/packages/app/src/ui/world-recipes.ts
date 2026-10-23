@@ -33,7 +33,7 @@ import {
   type SpecificationValue,
   type WorldSpecification,
 } from '../world-specification.js';
-import { recipePicture } from './recipe-pictures.js';
+import { cardPicture, readCardPictures } from './card-pictures.js';
 import { TOWN_KIND, type KindDraft, type KindLibrary, type WorldKind } from '../world-kinds-api.js';
 import { buildKindDraft, type KindDraftPanel } from './kind-draft.js';
 import './create-world.css';
@@ -385,6 +385,8 @@ export function buildWorldRecipes(options: {
     });
   });
 
+  // The cards' pictures are read beside the recipes and never hold them up (card-pictures.ts).
+  const pictures = readCardPictures();
   const loaded = options.specification().then((served) => {
     specification = served;
     status.textContent = '';
@@ -393,10 +395,12 @@ export function buildWorldRecipes(options: {
         type: 'button', class: 'world-recipes-choice', 'data-recipe': offered.key, text: offered.label,
         'aria-pressed': 'false',
       });
-      // A frame of a town made from this recipe, where one ships with the page; the label stays
-      // the button's only text.
-      const picture = recipePicture(offered.key);
-      if (picture !== null) choice.style.setProperty('--recipe-picture', `url("${picture}")`);
+      // The first view of a town made from this recipe, where the release captured one for the
+      // values served now, once the record arrives; the label stays the button's only text.
+      void pictures.then((held) => {
+        const picture = cardPicture(held, `recipe:${offered.key}`, { values: offered.values });
+        if (picture !== null) choice.style.setProperty('--recipe-picture', `url("${picture}")`);
+      });
       choice.addEventListener('click', () => choose(offered));
       list.append(choice);
     }
