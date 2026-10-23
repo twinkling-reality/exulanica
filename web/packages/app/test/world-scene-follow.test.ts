@@ -36,7 +36,8 @@ const scene = (speaker: string, to: string | null) => ({ showing: true, now: { s
  * the camera to a pose.
  */
 function walkingWorld() {
-  const people: Record<string, { x: number; z: number; heading?: number }> = {
+  type Pose = { x: number; z: number; heading?: number };
+  const people: { teo: Pose; ines: Pose } & Record<string, Pose> = {
     teo: { x: 0, z: 0, heading: Math.PI / 2 }, ines: { x: 1.2, z: 0, heading: -Math.PI / 2 },
   };
   const { binding } = world(people);
