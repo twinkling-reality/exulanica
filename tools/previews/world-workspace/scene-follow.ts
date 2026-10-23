@@ -4,12 +4,22 @@
 // speaking most prominent, a side where no bystander stands nearer and larger, the foreground's share bounded,
 // stepping back within the band) at the live camera's own lens. contextual-world.ts's framePair eases to it
 // as it eases to a pair, and back when the scene closes. It is asked again when the speaker or the one spoken
-// to changes, and when the speaker is no longer seen or has left the frame (checked every `checkMs`).
-import { MOMENT_FRAMING, foregroundShare, framingInSight } from './moment-framing.mjs';
+// to changes. (F8b) A pair walking on is followed: between askings the frame is carried with the speaker as
+// they walk (at the world's pace a walker crosses a frame within a second or two), and it is asked again when
+// the speaker is no longer seen, or the speaker or a listener framed with them has drifted out of the middle
+// of the width, at most once every `reaskLeastMs`. A frame asked again mid-scene is eased to from the pose the
+// camera holds, never jumped to.
+import { easePose } from './character-view.mjs';
+import { MOMENT_FRAMING, foregroundShare, framingInSight, lensOf } from './moment-framing.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
+import { TALK_FRAMING } from './talk-pops.mjs';
 
-/** How often a framed speaker is checked, ms, and how far from them another person counts as a bystander, metres. */
-export const SCENE_FOLLOW = Object.freeze({ checkMs: 500, nearMetres: 20 });
+/**
+ * How often a framed scene is checked, ms; how far from the speaker another person counts as a bystander,
+ * metres; the middle share of the width the speaker (and a listener framed with them) is kept inside; the
+ * least time between two frames asked in one scene, ms; and how long the camera eases to a new one, ms.
+ */
+export const SCENE_FOLLOW = Object.freeze({ checkMs: 500, nearMetres: 20, middleShare: 0.8, reaskLeastMs: 2000, easeMs: TALK_FRAMING.easeMs });
 
 type Point = { x: number; y: number; z: number };
 type Pose = Point & { yaw: number; pitch: number };
@@ -31,6 +41,11 @@ function anchorOf(society: any, id: string): (Point & { height: number; heading:
 export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = MOMENT_FRAMING, rule = SCENE_FOLLOW) {
   let shown: Shown = null, key: string | null = null, pose: Pose | null = null, checkedAt = Number.NEGATIVE_INFINITY;
   let hit: ReturnType<typeof sceneHit> | null = null;
+  // The frame eased from when one is asked mid-scene, and when; when this scene's frame was last asked;
+  // whether the listener stood in the middle at the last check (only a listener held there can drift out).
+  let easedFrom: Pose | null = null, easedAt = 0, framedAt = 0, listenerIn = false;
+  // Where the speaker stood when the frame was asked: the frame is carried by how far they have walked since.
+  let speakerAt: Point | null = null;
 
   /** The live lens: the recipe's framing at the world camera's field of view and the window's shape. */
   const live = () => ({ ...recipe, fov_deg: binding.camera?.camera?.fov ?? recipe.fov_deg, size_px: [innerWidth, innerHeight] });
@@ -48,8 +63,12 @@ export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = 
     const lens = live();
     hit = sceneHit(binding.app);
     const scene = hit;
-    const sighted = framingInSight(subjects, sceneSight(scene, recipe.sight.own_m), lens as typeof recipe,
+    const framing = (who: readonly object[]) => framingInSight(who, sceneSight(scene, recipe.sight.own_m), lens as typeof recipe,
       (at: Pose, framed: readonly object[]) => foregroundShare(at, framed, scene, lens as typeof recipe), bystanders) as Pose | null;
+    // The listener only where both fit: a frame of the two that leaves the speaker outside the middle of the
+    // width gives way to one of the speaker alone.
+    const both = framing(subjects);
+    const sighted = both !== null && (subjects.length === 1 || centred(both, first, lens)) ? both : framing([first]);
     if (sighted === null) return null;
     // The framing is in render space, which starts where the world was last re-centred; the controls'
     // pose and the camera's position say by how much.
@@ -57,30 +76,99 @@ export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = 
     return { ...sighted, x: sighted.x + held.x - eye.x, y: sighted.y + held.y - eye.y, z: sighted.z + held.z - eye.z };
   }
 
+  /** Whether a point stands before a pose within the middle `middleShare` of the lens's width. */
+  function centred(at: Pose, point: Point, lens: ReturnType<typeof live>): boolean {
+    const dx = point.x - at.x, dz = point.z - at.z;
+    const depth = -dx * Math.sin(at.yaw) - dz * Math.cos(at.yaw), across = dx * Math.cos(at.yaw) - dz * Math.sin(at.yaw);
+    return depth > 0 && Math.abs(across / depth) <= Math.tan(lensOf(lens as typeof recipe).horizontal) * rule.middleShare;
+  }
+
+  /** Someone's drawn head (render space), or null where the crowd does not draw them. */
+  function headOf(id: string): Point | null {
+    const at = anchorOf(binding.authoredSociety, id);
+    return at === null ? null : { x: at.x, y: at.y + (Number.isFinite(at.height) ? at.height : recipe.subject_height_m), z: at.z };
+  }
+
+  /** Where a point falls on the screen, or null where the camera cannot say (then it is taken as in frame). */
+  function onScreen(point: Point): { x: number; y: number; z: number } | null {
+    return binding.camera?.camera?.worldToScreen?.({ x: point.x, y: point.y, z: point.z, clone() { return this; } }) ?? null;
+  }
+
+  /** Whether a head stands in front of the camera within the middle `middleShare` of the width. */
+  function inMiddle(head: Point): boolean {
+    const seen = onScreen(head);
+    const margin = innerWidth * (1 - rule.middleShare) / 2;
+    return !seen || (seen.z > 0 && seen.x >= margin && seen.x <= innerWidth - margin);
+  }
+
   /** Whether the speaker's head is in the frame and nothing the scene draws stands between it and the camera. */
   function stillSeen(speaker: string): boolean {
-    const at = anchorOf(binding.authoredSociety, speaker);
-    if (at === null || hit === null) return false;
-    const head = { x: at.x, y: at.y + (Number.isFinite(at.height) ? at.height : recipe.subject_height_m), z: at.z };
-    const seen = binding.camera?.camera?.worldToScreen?.({ x: head.x, y: head.y, z: head.z, clone() { return this; } });
+    const head = headOf(speaker);
+    if (head === null || hit === null) return false;
+    const seen = onScreen(head);
     const inFrame = !seen || (seen.z > 0 && seen.x >= 0 && seen.x <= innerWidth && seen.y >= 0 && seen.y <= innerHeight);
     const eye = binding.camera.getPosition();
     return inFrame && sceneSight(hit, recipe.sight.own_m)({ x: eye.x, y: eye.y, z: eye.z }, head);
+  }
+
+  /**
+   * Whether the pair has walked on: the speaker out of the middle, or a listener who has stood in it since the
+   * frame was asked now out of it (one the frame left out is not followed).
+   */
+  function drifted(speaker: string, listener: string | null): boolean {
+    const mine = headOf(speaker);
+    if (mine !== null && !inMiddle(mine)) return true;
+    const theirs = listener ? headOf(listener) : null;
+    const middle = theirs !== null && inMiddle(theirs);
+    listenerIn ||= middle;
+    return listenerIn && !middle;
+  }
+
+  /** The frame (eased to from the one before where it was asked mid-scene), carried by the speaker's walk since. */
+  function held(now: number, speaker: string): Pose | null {
+    if (pose === null) return null;
+    let at: Pose = pose;
+    if (easedFrom !== null) {
+      const t = (now - easedAt) / rule.easeMs;
+      if (t >= 1) easedFrom = null;
+      else at = easePose(easedFrom, pose, t) as Pose;
+    }
+    const ground = speakerAt && anchorOf(binding.authoredSociety, speaker);
+    if (!ground || !speakerAt) return at;
+    const dx = ground.x - speakerAt.x, dy = ground.y - speakerAt.y, dz = ground.z - speakerAt.z;
+    return dx === 0 && dy === 0 && dz === 0 ? at : { ...at, x: at.x + dx, y: at.y + dy, z: at.z + dz };
+  }
+
+  /** The speaker's ground where they stand now (render space), for carrying the frame just asked. */
+  function groundOf(speaker: string): Point | null {
+    const at = anchorOf(binding.authoredSociety, speaker);
+    return at === null ? null : { x: at.x, y: at.y, z: at.z };
   }
 
   return {
     saw(next: Shown): void { shown = next; },
     pose(now: number): Pose | null {
       const line = shown?.showing ? shown.now : null;
-      if (!line) { key = null; pose = null; hit = null; return null; }
-      const asked = `${line.speaker}|${line.to ?? ''}`;
+      if (!line) { key = null; pose = null; hit = null; easedFrom = null; listenerIn = false; speakerAt = null; return null; }
+      const asked = `${line.speaker}|${line.to ?? ''}`, listener = line.to ?? null;
       if (asked !== key) {
-        key = asked; checkedAt = now; pose = frame(line.speaker, line.to ?? null);
+        // A new line's people: framePair eases to the first frame from where the camera stands.
+        key = asked; checkedAt = now; framedAt = now; easedFrom = null; listenerIn = false;
+        pose = frame(line.speaker, listener); speakerAt = groundOf(line.speaker);
       } else if (now - checkedAt >= rule.checkMs) {
         checkedAt = now;
-        if (!stillSeen(line.speaker)) pose = frame(line.speaker, line.to ?? null) ?? pose;
+        const lost = !stillSeen(line.speaker), walkedOn = drifted(line.speaker, listener);
+        if ((lost || walkedOn) && now - framedAt >= rule.reaskLeastMs) {
+          const from = held(now, line.speaker), next = frame(line.speaker, listener);
+          framedAt = now;
+          if (next !== null) {
+            // With no frame held before, framePair eases to this one from where the camera stands.
+            if (from !== null) { easedFrom = from; easedAt = now; }
+            pose = next; listenerIn = false; speakerAt = groundOf(line.speaker);
+          }
+        }
       }
-      return pose;
+      return held(now, line.speaker);
     },
   };
 }
