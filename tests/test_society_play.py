@@ -29,7 +29,12 @@ from exulanica.world.society_model_choice_repository import (
     choice_steps,
     latest_choices,
 )
-from exulanica.world.society_play import answer_document, person_result, play_contract
+from exulanica.world.society_play import (
+    PLAY_CATALOG_VERSION,
+    answer_document,
+    person_result,
+    play_contract,
+)
 from exulanica.world.society_things import initial_things_society
 
 from things_society_support import SEED, SOCIETY, compose, thing
@@ -190,3 +195,42 @@ def test_a_walk_s_receipt_names_its_node_and_no_other_option_s_does():
         node_id=None,
     )
     assert idle is not None and idle["reason"] == "person_no_answer"
+
+
+#: A played knight's request under the seventh action catalog, as the code before the tenth
+#: sealed it: a play stored then rebuilds to these bytes.
+SEVENTH_PLAY_REQUEST_SHA256 = "343f21b0312924ccfd6e2fd2f1c39f14120d2722d0200b031950f8db333f7008"
+
+
+def test_a_play_reads_names_as_written_and_a_stored_one_keeps_its_words():
+    """A person playing is asked under the tenth action catalog, which the label rules reach: a
+    being named as the page names it and one straight-line distance, as a model reads them. A play
+    stored under the seventh rebuilds to the byte, in lowercase words."""
+    state, document, knight = _knight_free_to_choose()
+    role = person_role()
+    played = play_contract(role, "exulanica-society/v7")
+    assert played.versions[role.action_catalog] == PLAY_CATALOG_VERSION == 10
+    assert played.label_rules == {"names_as_written", "straight_line_distances"}
+    stored = role.contract({**played.versions, role.action_catalog: 7})
+    assert stored.label_rules == frozenset()
+
+    def request(contract):
+        made, status = role_request(
+            role,
+            state,
+            document,
+            knight["id"],
+            request_id=uuid.UUID(int=7),
+            contract=contract,
+            seed=SEED,
+            provider_config={"kind": "person", "contract": contract.binding()},
+        )
+        assert status == "in_progress"
+        return made
+
+    assert request(stored)["document_sha256"] == SEVENTH_PLAY_REQUEST_SHA256
+    labels = [option["label"] for option in request(played)["context"]["options"]]
+    named = [label for label in labels if label != label.lower()]
+    assert named and all(" (a villager), " in label for label in named)
+    seventh = [option["label"] for option in request(stored)["context"]["options"]]
+    assert all(label == label.lower() for label in seventh)

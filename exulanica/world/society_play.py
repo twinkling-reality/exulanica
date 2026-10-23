@@ -51,6 +51,7 @@ __all__ = [
     "ANSWERS_PER_MINUTE",
     "PERSON_ANSWER_PROFILE",
     "PLAY_CATALOG_VERSION",
+    "PLAY_POLICY_VERSION",
     "PLAY_REFUSALS",
     "QUIET_MINUTES",
     "PlayRefused",
@@ -74,8 +75,14 @@ QUIET_MINUTES: Final = 5
 #: The action catalog version a played being's requests are asked under: the sixth first states
 #: the person's own walk to a spot (``point``), its
 #: policy holding the fifth's bounds, and the seventh adds following another being and stopping
-#: (``follow``, ``stop_following``) with the bound on those options.
-PLAY_CATALOG_VERSION: Final = 7
+#: (``follow``, ``stop_following``) with the bound on those options; the tenth keeps the seventh's
+#: actions and words under the label rules the registry holds from the ninth, so a person playing
+#: reads a being named as written and one straight-line distance, as a model does. A stored play
+#: keeps the catalog it recorded.
+PLAY_CATALOG_VERSION: Final = 10
+#: The policy version a played being's requests read at least: the seventh, whose bounds the
+#: player's catalog needs (following among them); the engine's own where it is later.
+PLAY_POLICY_VERSION: Final = 7
 #: Why an answer is refused, by the code the route answers with, its detail and its status.
 PLAY_REFUSALS: Final = {
     "minute_passed": (
@@ -116,7 +123,7 @@ def play_contract(role: DecisionRole, engine: str) -> DecisionContract:
     """
     versions = dict(role.terms(engine).versions)
     versions[role.action_catalog] = PLAY_CATALOG_VERSION
-    versions[role.policy_catalog] = max(int(versions[role.policy_catalog]), PLAY_CATALOG_VERSION)
+    versions[role.policy_catalog] = max(int(versions[role.policy_catalog]), PLAY_POLICY_VERSION)
     return role.contract(versions)
 
 

@@ -144,7 +144,7 @@ def _following(document):
     state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
     knight, squire = _placed(state, "knight"), _placed(state, "squire")
     follow = _option(state, document, knight, "follow", squire["id"])
-    assert follow.label.startswith("follow knight 2")
+    assert follow.label.startswith("follow Knight 2")
     state, events, _ = _minute(state, document, [_receipt(state, document, knight, follow)])
     [began] = [e for e in events if e.kind == "followed"]
     assert began.document["reason"] == "chose_to_follow"

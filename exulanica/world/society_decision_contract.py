@@ -504,9 +504,9 @@ def follow_options(
     row = recorded_row(state.get("modules", ()), "follow")
     if row is None or not set(contract.words) >= FOLLOW_KINDS:
         return []
-    # Model terms need a pursuit that survives between choice points. The older player
-    # contract retains follow/v2 with its own per-minute answers, including no-answer carry on.
-    if contract.versions["society-decision-action"] >= 8 and row.version < 3:
+    # Model terms need a pursuit that survives between choice points. A player's catalog, the one
+    # stating the walk to a spot, keeps follow/v2 with its own per-minute answers and carry on.
+    if POINT_KIND not in contract.words and row.version < 3:
         return []
     kind = kind_of(person, state)
     from exulanica.world.society_resident_day import inside

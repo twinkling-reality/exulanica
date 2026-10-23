@@ -38,7 +38,7 @@ def test_a_played_being_follows_another_from_its_turn_and_its_minute_records_it(
     turn = client.get(path + "/turn", headers=OWNER, params=scope).json()
     [follow] = [o for o in turn["options"] if o["kind"] == "follow"]
     assert (follow["being_id"], follow["takes_line"]) == (other, False)
-    assert follow["label"].startswith("follow knight 2")
+    assert follow["label"].startswith("follow Knight 2")
     body = {"base_tick": turn["base_tick"], "label": follow["label"]}
     assert play._post(client, path + "/answer", scope, body).status_code == 202
     host = outside._doorkeeping_host(world, services, None)
@@ -53,4 +53,4 @@ def test_a_played_being_follows_another_from_its_turn_and_its_minute_records_it(
     assert person["following"]["being"] == other
     turn = client.get(path + "/turn", headers=OWNER, params=scope).json()
     [stop] = [o for o in turn["options"] if o["kind"] == "stop_following"]
-    assert stop["being_id"] == other and stop["label"].startswith("stop following knight 2")
+    assert stop["being_id"] == other and stop["label"].startswith("stop following Knight 2")
