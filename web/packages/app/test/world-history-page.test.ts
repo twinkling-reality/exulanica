@@ -467,6 +467,15 @@ describe('History', () => {
     }
   });
 
+  it('says a paused project is paused when GitHub no longer answers, never that its changes will be sent (GH6)', async () => {
+    const gone = { version_id: VERSION, link: { repository: 'learner/terraces-on-the-bay', publish: 'automatic' },
+      github: { reached: false, visibility: 'PRIVATE', not_sent: 0, pull_request: { number: 3, title: 'Moved the bench' }, paused: { at: at(5), reason: 'GitHub refused or failed the request.' } } };
+    const made = host(reads({ '/world/github-projects': { projects: [gone] } }).read);
+    await (await module()).mountHistory(made).open();
+    const kept = made.root.querySelector('.wu-hr-kept');
+    expect([kept?.textContent, kept?.getAttribute('data-refused')]).toEqual(['Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', 'true']);
+  });
+
   it("asks H12's question with G where the project is kept on this computer only, its keys alone in the row", async () => {
     const local = { version_id: VERSION, project_id: 'project:demo', link: null, github: null, publications_per_day: 4 };
     const { read } = reads({ '/world/github-projects': { projects: [local], requests: [], publications: [] } });

@@ -36,6 +36,8 @@ export const HEAD_WORDS = Object.freeze({
   starting: 'Starting a project…',
   putting: 'Putting it on GitHub…',
   unreachable: 'GitHub could not be reached. Your changes are kept here and sent when it answers.',
+  // Sending has stopped for good: said after "Kept on GitHub in <name> · ", in the refusal ink (GH6).
+  stopped: 'sending has stopped. Your changes are kept on this computer.',
   refusals: Object.freeze({
     nothing_to_keep: 'Nothing to keep in a project yet: change something first.',
     world_unreadable: 'Not kept: the world could not be read. Try again.',
@@ -424,8 +426,10 @@ export function headLine(project, request = null, putting = false) {
   if (!project.link) return { words: HEAD_WORDS.localProject, refused: false };
   const name = String(project.link.repository).split('/').pop();
   const github = project.github;
+  // A pause is said first and in the page's own words, never the follower's: sending stays stopped whether GitHub
+  // answers or not and nothing here starts it again, so "sent when it answers" would be untrue (GH6, DESIGN's form).
+  if (github?.paused) return { words: `Kept on GitHub in ${name} · ${HEAD_WORDS.stopped}`, refused: true };
   if (github && !github.reached) return { words: HEAD_WORDS.unreachable, refused: false };
-  if (github?.paused) return { words: `Kept on GitHub in ${name} · sending is paused: ${github.paused.reason}`, refused: true };
   const visibility = github && github.visibility !== 'unstated' ? `, ${github.visibility.toLowerCase()}` : '';
   const state = github && github.not_sent > 0 ? `${plural(github.not_sent, 'change')} not sent yet` : 'up to date';
   return { words: `Kept on GitHub in ${name}${visibility} · ${state}`, refused: false };

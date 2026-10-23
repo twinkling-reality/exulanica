@@ -74,7 +74,7 @@ describe('Keep on GitHub, from History', () => {
     expect(text(card)).toEqual([
       'Private: only you can see it.',
       "What goes there: this world's kept changes, without names or the words people wrote.",
-      'From then on each change is sent by itself, at most 4 times a day. If anything looks wrong, sending pauses and History says why.',
+      'From then on each change is sent by itself, at most 4 times a day. If anything looks wrong, sending stops and History says so.',
       'Exulanica uses your own GitHub sign-in on this computer and never sees or keeps it.',
     ]);
     expect(card.keys().map((key) => `${key.keys.join('')} ${key.word}`)).toEqual(['Enter Create', 'Esc Back']);
@@ -103,7 +103,7 @@ describe('Keep on GitHub, from History', () => {
     await vi.waitFor(() => expect(writes.at(-1)).toEqual(['POST', `/world/github-projects/publications${SCOPE}`, { project_id: 'project:demo', name: 'bay-terraces' }]));
     await vi.waitFor(() => expect(orb(card).disabled).toBe(false));
     // Without a served bound the sentence names no number.
-    expect(text(card)[2]).toBe('From then on each change is sent by itself. If anything looks wrong, sending pauses and History says why.');
+    expect(text(card)[2]).toBe('From then on each change is sent by itself. If anything looks wrong, sending stops and History says so.');
     card.close();
   });
 

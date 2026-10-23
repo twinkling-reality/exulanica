@@ -45,12 +45,12 @@ export function nameCount(name) {
 
 /**
  * How often changes go once the repository exists: "From then on each change is sent by itself, at most 4 times a
- * day. If anything looks wrong, sending pauses and History says why." The bound is the follower's own, as its status
+ * day. If anything looks wrong, sending stops and History says so." The bound is the follower's own, as its status
  * serves it; where it serves none the sentence says no number.
  */
 export function sendingWords(perDay) {
   const bound = Number.isSafeInteger(perDay) && perDay > 0 ? `, at most ${perDay === 1 ? 'once' : `${perDay} times`} a day` : '';
-  return `From then on each change is sent by itself${bound}. If anything looks wrong, sending pauses and History says why.`;
+  return `From then on each change is sent by itself${bound}. If anything looks wrong, sending stops and History says so.`;
 }
 
 /** Why a publication could not go on, by its code; an unknown code says the general failure. */

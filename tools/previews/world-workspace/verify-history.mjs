@@ -26,8 +26,12 @@ const linked = (state) => ({ link: { repository: 'learner/terraces-on-the-bay', 
 assert.deepEqual(headLine(linked({})), { words: 'Kept on GitHub in terraces-on-the-bay, private · up to date', refused: false });
 assert.equal(headLine(linked({ not_sent: 3 })).words, 'Kept on GitHub in terraces-on-the-bay, private · 3 changes not sent yet');
 assert.equal(headLine(linked({ not_sent: 1 })).words, 'Kept on GitHub in terraces-on-the-bay, private · 1 change not sent yet');
-assert.deepEqual(headLine(linked({ paused: { reason: 'the repository is no longer private' } })), { words: 'Kept on GitHub in terraces-on-the-bay · sending is paused: the repository is no longer private', refused: true });
+// A pause reads the page's own words, never the follower's reason, and promises no sending (GH6).
+assert.deepEqual(headLine(linked({ paused: { reason: 'the repository is no longer private' } })), { words: 'Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', refused: true });
 assert.equal(headLine(linked({ reached: false })).words, HEAD_WORDS.unreachable);
+// A pause GitHub no longer answers for (a deleted repository) is still a pause: sending will not resume on its own (GH6).
+const gone = { reason: 'GitHub refused or failed the request.' };
+assert.deepEqual(headLine(linked({ reached: false, paused: gone })), { words: 'Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', refused: true });
 assert.equal(headLine({ link: null }).words, 'Kept in a project on this computer, not on GitHub');
 assert.equal(headLine(null).words, 'Not kept in a project');
 assert.equal(headLine(null, { refused: null }).words, 'Starting a project…');
