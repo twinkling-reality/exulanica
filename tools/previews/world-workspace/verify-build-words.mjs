@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, namesTogether, nothingInView, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, namesTogether, nothingInView, nothingPlaceable, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { townThingName } from './town-thing-names.mjs';
 
@@ -367,5 +367,6 @@ for (const state of [{}, { moving: true, ready: true }, { placing: true, ready: 
 }
 for (const words of [...Object.values(TRAY), did({ kind: 'add_thing', thing_id: 'bench:1' }, 'bench')]) assert.doesNotMatch(words, /\u2014|_/u);
 assert.equal(nothingInView(), 'No placed things in view. Walk closer to one.');
+assert.equal(nothingPlaceable(), 'Nothing can be placed in this world.');
 assert.deepEqual({ ...HISTORY }, { title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
 console.log('Build words checks passed: names by kind, refusals as sentences, each change as History says it, snapping, the changes list, keys per state.');

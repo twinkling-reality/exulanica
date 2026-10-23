@@ -279,6 +279,11 @@ export function nothingInView() {
   return 'No placed things in view. Walk closer to one.';
 }
 
+/** Said when B is pressed in a world drawn with nowhere to place a thing, where build mode does not open. */
+export function nothingPlaceable() {
+  return 'Nothing can be placed in this world.';
+}
+
 /** History's words: its title, the heading of today's changes and its line when nothing has changed. */
 export const HISTORY = Object.freeze({ title: 'History', today: 'Today', empty: 'Nothing has been changed yet.' });
 

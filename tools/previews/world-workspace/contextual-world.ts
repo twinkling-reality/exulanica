@@ -196,6 +196,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       },
       // The tray's first tile opens the page's own creature maker.
       makeCreature,
+      // Building starts with nobody chosen or followed, so its tray shows wherever the person stands (B never opens on nothing).
+      onStart: () => { if (held) release(); },
     }) : null;
   worldHints();
   function notice(words) {
@@ -1146,7 +1148,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!pageShown() && wakesHints(event)) corners.wake();
     if (!pageShown() && !event.repeat) corners.pressed(event.code);
     if (!pageShown() && event.code === 'Tab') corners.hold(true);
-    if (!pageShown() && !asking && build?.key(event)) { event.stopImmediatePropagation(); return; }
+    // Esc lets go of a chosen person before build mode takes it, so it never leaves building with someone still chosen.
+    if (!pageShown() && !asking && !(held && event.code === 'Escape') && build?.key(event)) { event.stopImmediatePropagation(); return; }
     // History takes its keys; what it leaves (Tab, Enter on a focused button) keeps the browser's own
     // default, and no key reaches the old shell's listeners while it is open (K8).
     if (otherPage && historyDecision) {

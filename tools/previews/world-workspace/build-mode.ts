@@ -25,7 +25,7 @@ import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
 import { townThingName } from './town-thing-names.mjs';
-import { BUSY, MADE_WITH_WORLD, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, MADE_WITH_WORLD, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, nothingPlaceable, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -74,7 +74,9 @@ const LAYER_RETRY_MS = 5000;
 export type HoldOutcome = { readonly outcome: 'placed'; readonly thingId: string } | { readonly outcome: 'put-back' };
 const PUT_BACK: HoldOutcome = Object.freeze({ outcome: 'put-back' });
 
-export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null, people = null, makeCreature = null }) {
+// `onStart` is called as building starts, by B, the rail's Build or a hold, for the page to let go of whoever it has
+// chosen: the tray hides while `inspecting()` says something stands over it, and B never opens on nothing.
+export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null, people = null, makeCreature = null, onStart = null }) {
   const lifetime = new AbortController();
   const listen = (target, type, run, options = {}) => target.addEventListener(type, run, { ...options, signal: lifetime.signal });
   const scale = () => scaleOf(root);
@@ -135,7 +137,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   // A site's made parts are its structured drawing's slots; a terrain drawing has none.
   const siteDrawing = () => { const drawing = currentOpenSite()?.drawing() ?? null; return drawing !== null && 'slots' in drawing ? drawing : null; };
   const slotOf = (id) => siteDrawing()?.slots?.find(slot => slot.identity === id.slice(PART.length)) ?? null;
-  /** The region a made world is drawn in, where new things are placed; null in a world drawn otherwise, which offers no tray. */
+  /** The region a made world is drawn in, where new things are placed; null in a world drawn otherwise, where B does not open build mode. */
   const placingRegion = () => entry.generatedSite?.regionId ?? entry.generatedGround?.regionId ?? null;
   const regionRoot = (regionId = entry.generatedSite?.regionId ?? null) => (regionId ? b.regionRoots?.get(regionId) ?? null : null);
   /** The first read of the version's things after B, which a click made before it ends waits for. */
@@ -620,7 +622,9 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   async function toggle() {
     if (on) { leave(); return; }
-    on = true; say(''); render();
+    // A world drawn with nowhere to place a thing does not open build mode: it says so and stays as it was.
+    if (placingRegion() === null) { say(nothingPlaceable()); return; }
+    on = true; onStart?.(); say(''); render();
     reading = refreshRecords().catch(error => { say(error.message); });
     await reading; reading = null;
     render();
