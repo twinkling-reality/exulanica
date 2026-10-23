@@ -217,7 +217,8 @@ own bounds, or the durable spending authority with its witness directory in the 
 `tests/test_acceptance_scripted_model.py` checks. `restart-api` stops the recorded API and starts
 it again on the same port, database, store and grants, and with `--revoke <token file>` leaves that
 grant out, so a client can reopen its work from a fresh process or be shown a withdrawn credential
-refused.
+refused. Restarting the first API restarts the run's tile worker too, from the checkout as it is
+then, so the worlds the new API makes are baked by the same code.
 
 `scripts/acceptance/foundation.py baseline` checks a finite set of acceptance rows against such a
 stack as an independent client: world creation for each world kind, the no-model mode, workspace

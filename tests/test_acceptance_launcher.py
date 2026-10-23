@@ -321,6 +321,155 @@ def test_restart_api_with_nothing_recorded_is_refused(tmp_path, temporary):
     assert _refusal(LAUNCH.restart_api, arguments) == "no-state"
 
 
+#: What a lane database prints as it serves, the API's URLs on its own port.
+SERVED = "\n".join(
+    [
+        "export EXULANICA_DATABASE_URL=postgresql://exulanica_app@localhost:20145/exulanica",
+        "export EXULANICA_READONLY_DATABASE_URL=postgresql://exulanica_readonly@localhost:20145/exulanica",
+        "export EXULANICA_PURGE_DATABASE_URL=postgresql://exulanica_purge@localhost:20145/exulanica",
+        "owner postgresql://localhost:20145/exulanica",
+    ]
+)
+
+
+def _restarted(tmp_path, monkeypatch, api: str) -> tuple[list, dict]:
+    """Restart a recorded run's ``api`` with every process stood in for; what happened to its tile
+    worker, in order, and the restart as the run state records it."""
+    worktree = _checkout(tmp_path / "checkout")
+    state_file = LAUNCH.state_dir(worktree) / "state.json"
+    state_file.parent.mkdir(parents=True)
+    run_dir = tmp_path / "run"
+    state = _recorded_run(run_dir)
+    (run_dir / "logs").mkdir()
+    (run_dir / "logs" / "database-serve.txt").write_text(SERVED)
+    # The API reaches its database through a latency proxy; workers connect directly.
+    state.update(
+        {
+            "run_dir": str(run_dir),
+            "data_dir": str(tmp_path / "data"),
+            "ports": LAUNCH.ports(1),
+            "pids": {"api": 101, "api_2": 102, "tile_worker": 202},
+            # The worker as it was started; its successor is a new process with its own.
+            "tile_worker_identity": {
+                "executable": "worker",
+                "workspace": "w1",
+                "started_at": "then",
+            },
+            "database_latency": {"port": 29999},
+        }
+    )
+    state_file.write_text(json.dumps(state))
+    happened: list = []
+    monkeypatch.setattr(LAUNCH, "stop", lambda *rest: None)
+    monkeypatch.setattr(LAUNCH, "listening", lambda port: False)
+    monkeypatch.setattr(LAUNCH, "spawn", lambda command, cwd, environment, log: 111)
+    monkeypatch.setattr(LAUNCH, "wait_http", lambda *rest: (200, b""))
+    monkeypatch.setattr(
+        LAUNCH,
+        "stop_tile_worker",
+        lambda recorded: happened.append(("stop", recorded["pids"]["tile_worker"])),
+    )
+
+    def start(tree, exports, data_dir, workspace, logs, recorded, written):
+        happened.append(
+            (
+                "start",
+                tree,
+                exports["EXULANICA_DATABASE_URL"],
+                exports["OWNER_URL"],
+                data_dir,
+                workspace,
+                "tile_worker_identity" in recorded,
+            )
+        )
+        recorded["pids"]["tile_worker"] = 303
+
+    monkeypatch.setattr(LAUNCH, "start_tile_worker", start)
+    arguments = LAUNCH.build_parser().parse_args(
+        ["restart-api", "--worktree", str(worktree), "--api", api]
+    )
+    with redirect_stdout(io.StringIO()):
+        LAUNCH.restart_api(arguments)
+    return happened, json.loads(state_file.read_text())["restarts"][-1]
+
+
+def test_restarting_the_api_restarts_the_tile_worker_from_the_checkout_as_it_is(
+    tmp_path, temporary, monkeypatch
+):
+    """A restarted API makes worlds under the catalogs the checkout holds now; a tile worker left on
+    the code it started with could not read them, and every tile of those worlds failed to bake."""
+    happened, restart = _restarted(tmp_path, monkeypatch, "primary")
+
+    assert happened == [
+        ("stop", 202),
+        (
+            "start",
+            (tmp_path / "checkout").resolve(),
+            "postgresql://exulanica_app@localhost:20145/exulanica",
+            "postgresql://localhost:20145/exulanica",
+            tmp_path / "data",
+            "w1",
+            False,
+        ),
+    ]
+    assert restart["tile_worker"] == 303
+
+
+def test_restarting_the_second_api_leaves_the_tile_worker_be(tmp_path, temporary, monkeypatch):
+    happened, restart = _restarted(tmp_path, monkeypatch, "second")
+
+    assert happened == []
+    assert "tile_worker" not in restart
+
+
+def test_a_worker_started_again_is_judged_by_its_own_lines_not_its_predecessors(
+    tmp_path, monkeypatch
+):
+    worktree = tmp_path / "checkout"
+    program = worktree / ".venv" / "bin" / "exulanica-generated-tile-worker"
+    program.parent.mkdir(parents=True)
+    program.touch()
+    exports = {
+        "EXULANICA_DATABASE_URL": "postgresql://exulanica_app@localhost/runtime",
+        "OWNER_URL": "postgresql://localhost/owner",
+    }
+    command: list[str] = []
+    monkeypatch.setattr(LAUNCH, "command_of", lambda pid: " ".join(command))
+    monkeypatch.setattr(LAUNCH, "process_started_at", lambda pid: "Thu Oct 22 20:00:00 2026")
+    monkeypatch.setattr(LAUNCH, "TILE_WORKER_START_SECONDS", 0.2)
+
+    def started(name: str, says: str) -> None:
+        """Start a worker on a log holding its predecessor's startup; the new one writes `says`."""
+        logs = tmp_path / name
+        logs.mkdir()
+        (logs / "generated-tile-worker.log").write_text(
+            json.dumps({"component": "generated-tile-worker", "event": "startup"}) + "\n"
+        )
+
+        def spawn(argv, cwd, environment, log):
+            command[:] = argv
+            with log.open("a") as handle:
+                handle.write(says + "\n")
+            return 12345
+
+        monkeypatch.setattr(LAUNCH, "spawn", spawn)
+        LAUNCH.start_tile_worker(
+            worktree,
+            exports,
+            tmp_path / "data",
+            "workspace",
+            logs,
+            {"pids": {}},
+            tmp_path / f"{name}.json",
+        )
+
+    # A worker that dies on a catalog it cannot read says no startup of its own.
+    with pytest.raises(LAUNCH.Refused, match="tile-worker-startup"):
+        started("dies", "Traceback: CatalogError: society-policy v5 has no schema")
+    # The positive control: the same start passes once the new worker reports its own startup.
+    started("starts", json.dumps({"component": "generated-tile-worker", "event": "startup"}))
+
+
 def test_the_api_command_is_unchanged_without_a_plan_and_scripted_with_one(tmp_path):
     python, worktree = tmp_path / "python", tmp_path / "tree"
     plain = LAUNCH.api_command(python, worktree, 19431, None)

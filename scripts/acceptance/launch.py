@@ -156,7 +156,10 @@ starts exactly what it always did:
 
 ``restart-api`` stops the recorded API and starts it again on the same port, database, store and
 grants, rebuilt from the run's token files and recorded state, so a client can reopen its work from a
-fresh process. ``--revoke NAME`` leaves the named token file's grant out of the restarted API, so a
+fresh process. Restarting the first API restarts the run's generated-tile worker too, once the new
+API has answered its health check, on the database, data directory and workspace it started with: a
+restarted API makes worlds under the catalogs the checkout holds now, which a worker still running
+the code it started with may not read, so every tile of them would fail to bake. ``--revoke NAME`` leaves the named token file's grant out of the restarted API, so a
 client can be shown that a withdrawn credential is refused while the rest of the run continues.
 Each restart is recorded in the run state with its time, process and any revoked grant. In a run
 that keeps world projects, a follower that has stopped is started again once the API answers.
@@ -1207,12 +1210,13 @@ def spawn(command: list[str], cwd: Path, env: Mapping[str, str], log: Path) -> i
     return process.pid
 
 
-def tile_worker_events(log: Path) -> list[dict[str, object]]:
-    """Read only the worker's structured events, never treating other output as success."""
+def tile_worker_events(log: Path, start: int = 0) -> list[dict[str, object]]:
+    """Read only the worker's structured events, never treating other output as success; from byte
+    ``start`` on, so a worker started again on the same log is judged by its own lines alone."""
     if not log.exists():
         return []
     events = []
-    for line in log.read_text(errors="replace").splitlines():
+    for line in log.read_bytes()[start:].decode(errors="replace").splitlines():
         try:
             event = json.loads(line)
         except ValueError:
@@ -1244,6 +1248,8 @@ def start_tile_worker(
         }
     )
     log = logs / "generated-tile-worker.log"
+    # A worker started again appends to the log its predecessor wrote; only what follows counts.
+    begun = log.stat().st_size if log.exists() else 0
     # Run by the checkout's own interpreter: a console script in a venv whose path is long or holds a
     # space begins with a /bin/sh exec trampoline, which would show as "/bin/sh <script> ..." and never
     # as the worker; the interpreter's form is one worker_command_matches accepts.
@@ -1256,7 +1262,7 @@ def start_tile_worker(
     deadline = time.monotonic() + TILE_WORKER_START_SECONDS
     expected = {"executable": str(program), "workspace": workspace_id}
     while time.monotonic() < deadline:
-        events = tile_worker_events(log)
+        events = tile_worker_events(log, begun)
         if any(event.get("event") == "startup_failed" for event in events):
             refuse("tile-worker-startup", str(events[-1])[:REFUSAL_EXCERPT_CHARACTERS])
         command = command_of(pid)
@@ -2728,6 +2734,9 @@ def restart_api(arguments: argparse.Namespace) -> None:
     healthz, _ = wait_http(f"http://127.0.0.1:{chosen[port_role]}/healthz", API_START_SECONDS)
     restart["healthz"] = healthz
     write_state(state_file, state)
+    if not second and "tile_worker" in state["pids"]:
+        restart["tile_worker"] = restart_tile_worker(worktree, state, state_file, logs)
+        write_state(state_file, state)
     started = (
         None
         if second
@@ -2737,6 +2746,26 @@ def restart_api(arguments: argparse.Namespace) -> None:
         restart["project_worker"] = started
         write_state(state_file, state)
     print(json.dumps(restart, indent=2))
+
+
+def restart_tile_worker(worktree: Path, state: dict, state_file: Path, logs: Path) -> int:
+    """Stop the run's generated-tile worker, where it is still this run's, and start it again from
+    the checkout as it is now, on the database URLs the run's database printed (workers connect
+    directly, never through a latency proxy), its data directory and its workspace; answer its
+    process. A job the stopped worker had claimed is claimed again once its lease ends."""
+    stop_tile_worker(state)
+    state.pop("tile_worker_identity", None)
+    exports = served_exports((logs / "database-serve.txt").read_text())
+    start_tile_worker(
+        worktree,
+        exports,
+        Path(state["data_dir"]),
+        str(state["workspace_id"]),
+        logs,
+        state,
+        state_file,
+    )
+    return int(state["pids"]["tile_worker"])
 
 
 def keep_follower_up(
