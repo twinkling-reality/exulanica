@@ -11,6 +11,19 @@ export function isScenePreview(url) {
   return target.searchParams.get('capture') === '1' || target.searchParams.get('livePreview') === '1';
 }
 
+/**
+ * Whether a first run lands on Create a world in place of the front door (aha item 3): the only saved world is the
+ * starter an empty workspace is given, never changed (authored, no edit since it was made, no photograph added or
+ * removed, its first revision) and never opened in this browser (`pictured`: no picture kept of it), and the person
+ * did not come back here from a world (`remembered`). Once any world is opened or made, the front door is the landing.
+ */
+export function leadsWithCreate(entries, { remembered = null, pictured = () => false } = {}) {
+  if (remembered || entries.length !== 1) return false;
+  const [only] = entries;
+  return only.sourceKind === 'authored' && only.currentAuthoredEditSeq === 0 && only.revision === 1
+    && (only.sourceAttachments ?? []).length === 0 && (only.previousSourceAttachments ?? []).length === 0 && !pictured(only);
+}
+
 /** The front door itself, on `origin`. */
 export function frontDoorAddress(origin) {
   return new URL('/', origin).href;

@@ -3,10 +3,24 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
-import { capturedPicture, frontDoorAddress, isScenePreview, openWorldAddress, scenePreviewAddress, worldAddress } from './front-door-routes.mjs';
+import { capturedPicture, frontDoorAddress, isScenePreview, leadsWithCreate, openWorldAddress, scenePreviewAddress, worldAddress } from './front-door-routes.mjs';
 import { CAPTURE_CATALOG_PROFILE, capturePictures, capturesModule, checkedCaptureCatalog, scenePreviewWriteGuard } from './front-door-server.mjs';
 
 const origin = 'http://127.0.0.1:19974';
+
+// A first run lands on Create a world (aha item 3) only with the one untouched starter, never opened here, and no
+// return from a world; anything else lands on the front door as before.
+const starter = { entryId: 'first', sourceKind: 'authored', currentAuthoredEditSeq: 0, revision: 1, sourceAttachments: [], previousSourceAttachments: [] };
+assert.equal(leadsWithCreate([starter]), true);
+assert.equal(leadsWithCreate([]), false, 'no world at all is not a first run this page sees');
+assert.equal(leadsWithCreate([starter], { remembered: 'first' }), false, 'back from a world');
+assert.equal(leadsWithCreate([starter], { pictured: () => true }), false, 'opened here: a picture is kept of it');
+assert.equal(leadsWithCreate([{ ...starter, currentAuthoredEditSeq: 1 }]), false, 'changed');
+assert.equal(leadsWithCreate([{ ...starter, revision: 2 }]), false, 'renamed');
+assert.equal(leadsWithCreate([{ ...starter, sourceAttachments: [{}] }]), false, 'a photograph added');
+assert.equal(leadsWithCreate([{ ...starter, previousSourceAttachments: [{}] }]), false, 'a photograph removed');
+assert.equal(leadsWithCreate([{ ...starter, sourceKind: 'generated' }]), false, 'a made world');
+assert.equal(leadsWithCreate([starter, { ...starter, entryId: 'second' }]), false, 'two worlds');
 
 // Open goes to this workspace's own world view; the live background is the same world, read only.
 assert.equal(worldAddress('01a1-shore', origin), origin + '/?entry=01a1-shore');

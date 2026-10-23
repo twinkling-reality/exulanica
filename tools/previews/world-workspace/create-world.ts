@@ -242,7 +242,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       found.push({ key, start: () => entries.makeOfKind(kind, first.key, kind.label, first.values) });
     }
     cards = [...found, ...cards.filter((card) => card.key === 'blank')];
-    if (!signal.aborted && form === 'create') drawCreate();
+    if (!signal.aborted && form === 'create') { const hadFocus = field !== null && document.activeElement === field.field; drawCreate(); if (hadFocus) field?.field.focus({ preventScroll: true }); }
   };
 
   /** Reads the offer (raw for its codes, parsed for its sealed quote), quietly again on failure (L14). */

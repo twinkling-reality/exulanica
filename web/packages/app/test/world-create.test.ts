@@ -228,8 +228,10 @@ vi.mock('../../../../tools/previews/world-workspace/front-door.ts', () => ({
   chosenWorldPicture: () => null,
   openMadeWorld: async (entry: { entryId: string }) => { opened.push(entry.entryId); },
 }));
+// The cards to start from arrive when a test lets them (`cardsHeld`), else at once.
+const cardsHeld = vi.hoisted(() => ({ until: null as Promise<void> | null }));
 vi.mock('../src/world-specification.ts', () => ({
-  WorldSpecificationClient: class { async specification() { return { presets: [{ key: 'town', label: 'Small town', values: {} }] }; } },
+  WorldSpecificationClient: class { async specification() { await cardsHeld.until; return { presets: [{ key: 'town', label: 'Small town', values: {} }] }; } },
 }));
 vi.mock('../src/world-kinds-api.ts', () => ({ WorldKindsClient: class { async library() { return { kinds: [] }; } } }));
 vi.mock('../src/world-making-api.ts', async (original) => {
@@ -338,6 +340,23 @@ describe('Create a world as a page', () => {
     const event = key(document.querySelector('.wu-light-field')!, 'Enter', { shiftKey: true });
     expect(event.defaultPrevented).toBe(false);
     expect(starts).toHaveLength(2);
+  });
+
+  it('keeps the focus in the field when the cards to start from arrive after it', async () => {
+    let release = () => {};
+    cardsHeld.until = new Promise<void>((resolve) => { release = resolve; });
+    serve(offerOf());
+    await mount();
+    const focusedFirst = document.activeElement === document.querySelector('.wu-light-field');
+    const cardsFirst = document.body.textContent?.includes('Small town');
+    cardsHeld.until = null;
+    release();
+    await settle();
+    expect(focusedFirst).toBe(true);
+    expect(cardsFirst).toBe(false);
+    // The page drew again with the cards: the field it drew has the focus, the caret in it.
+    expect(document.body.textContent).toContain('Small town');
+    expect(document.activeElement).toBe(document.querySelector('.wu-light-field'));
   });
 
   it('leaves on the first Esc, even from the field, and keeps the words for next time', async () => {

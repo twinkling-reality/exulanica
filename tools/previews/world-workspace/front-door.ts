@@ -4,7 +4,7 @@ import { createScenePreview, scenePreviewPage } from './front-door-preview.ts';
 import { showWorldDetails } from './front-door-details.ts';
 import { endOpening, handOverOpening } from './world-opening.ts';
 import { showBeingMade } from './create-world.ts';
-import { capturedPicture, frontDoorAddress, openWorldAddress, worldAddress } from './front-door-routes.mjs';
+import { capturedPicture, frontDoorAddress, leadsWithCreate, openWorldAddress, worldAddress } from './front-door-routes.mjs';
 import { worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
@@ -168,6 +168,8 @@ export function mountFrontDoor({ root, entries }: { root: HTMLElement; entries: 
   const again = remembered ? [...strip.querySelectorAll<HTMLElement>('.your-worlds-card')].find(card => card.dataset.entryId === remembered) : undefined;
   if (again) { again.click(); again.focus({ preventScroll: true }); }
   reflect();
+  // A first run with only the untouched starter lands on Create a world, as its own button opens it (aha item 3).
+  if (leadsWithCreate(entries, { remembered, pictured: (entry: SavedWorldEntry) => (frontDoorPicture(entry) ?? worldPicture(entry)) !== null })) root.querySelector<HTMLElement>('.your-worlds-create')?.click();
   // A world this person is having made still runs: its card waits here (N12).
   void showBeingMade(root);
 }
