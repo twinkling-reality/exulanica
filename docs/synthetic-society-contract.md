@@ -1647,7 +1647,14 @@ beside the state: the minute its people's day starts at, as its first input's pe
 (`day.start_minute_of_day`), and the minute of the day and the day, counted from 0, at the state's
 tick (`served_clock` in `exulanica/world/society.py`). The read takes that one value of the first
 input and nothing else of it; the clock is stored nowhere and `state_sha256` does not cover it. A
-society whose first input carries no people frame is read with no clock.
+society whose first input carries no people frame is read with no clock. The minute is the one
+`society-day-start` v1 gives the world's look, so the clock and the sky agree: the hour of the sky
+part its setting names (a world made at dusk starts its clock at its dusk), or, where its setting
+names none or it has none, the hour by where its look's own day sun stands (the morning's east of
+south, the afternoon's due south and west of it). A look the style pack library does not hold, or
+none, starts at the society policy's minute. It is read from the world's current look once, when
+the first input is composed, so a society keeps the minute it recorded whatever its world's look
+becomes, and one made before the catalog keeps the policy's.
 
 Every society, action, playback, decision, experiment and district route requires the world as a
 `world_id` query parameter, as every world route does, and a world the workspace does not hold

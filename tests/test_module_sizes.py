@@ -53,9 +53,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the v2 society's input, graph, spots, talk and minute",
     ),
     "exulanica/api/society_runtime.py": (
-        2_421,
+        2_424,
         "society composition for districts and for authored worlds, and the site reads, "
-        "with the version's changes to a site's made parts",
+        "with the version's changes to a site's made parts, and a first input's day start from "
+        "the world's setting",
     ),
     "exulanica/world/society_things.py": (2_291, "the society of things, exulanica-society/v7"),
     "exulanica/reconstruction/standpoint.py": (
@@ -91,7 +92,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the world kinds library, its drafts and the worlds made of it, and a site world's "
         "drawing, land, graded top and landscape reads",
     ),
-    "exulanica/world/society_catalogs.py": (1_519, "the living society routine model as data"),
+    "exulanica/world/society_catalogs.py": (
+        1_530,
+        "the living society routine model as data, and the day-start catalog's schema",
+    ),
 }
 
 #: What writes the generated files below.

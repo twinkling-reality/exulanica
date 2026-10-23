@@ -110,7 +110,9 @@ sea, desert sand, snowfields or wheat fields) and snow. A person chooses each in
 "As the look has it" or a named part, and the open world is drawn in it at once; a town may be made
 already in one (`style_pack.setting_parts` on `POST /worlds/generated`). A setting changes how a
 world is drawn and nothing a person walks on or traffic drives
-([a world's setting](../style-pack-contract.md#12-a-worlds-setting)).
+([a world's setting](../style-pack-contract.md#12-a-worlds-setting)); a society of things made in it
+starts its clock at the hour its sky shows, a world made at dusk at its dusk
+([the synthetic society](../synthetic-society-contract.md)).
 A draft of a person's words also offers the parts the words ask for, chosen by a short step of its
 own with the person's words that chose them: Describe it shows them in one line as a suggestion
 with one press to use them, never taken with the values; once pressed, the Setting row under the

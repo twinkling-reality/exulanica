@@ -607,6 +607,17 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             ("reason", text_field),
         ),
     ),
+    # A new society's first minute by its world's sky part (society_day_start.py).
+    ("society-day-start", 1): CatalogSchema(
+        "society-day-start",
+        1,
+        (
+            ("from", _choice(("sky_part", "day_sun"))),
+            ("sun_azimuth_below_mdeg", integer_field(0, 360_000)),
+            ("start_minute_of_day", integer_field(0, MINUTES_PER_DAY - 1)),
+            ("reason", text_field),
+        ),
+    ),
     ("society-use-class", 1): CatalogSchema(
         "society-use-class",
         1,

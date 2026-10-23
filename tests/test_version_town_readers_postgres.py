@@ -13,6 +13,7 @@ import dataclasses
 import math
 import uuid
 from fractions import Fraction
+from types import SimpleNamespace
 
 import pytest
 from exulanica.canonical import canonical_json
@@ -33,6 +34,7 @@ from exulanica.world.placed_things import PlacedThing, named_kind
 from exulanica.world.society_authored_ground import read_authored_ground
 from exulanica.world.society_authored_ground_area import ground_place_id
 from exulanica.world.society_city_place import city_blocked_parts
+from exulanica.world.society_day_start import world_day_start
 from exulanica.world.society_living import town_routine_of
 from exulanica.world.society_walking_surfaces import (
     surface_height_at,
@@ -103,10 +105,17 @@ class _Town:
 
     def frame(self, records, made=None) -> dict:
         """The people frame the town's living place under its own routine makes from ``records``,
-        with ``made`` the town's records as made where a version changed its buildings."""
+        with ``made`` the town's records as made where a version changed its buildings, its day
+        starting at the minute the world's look gives (:func:`world_day_start`), as a society's
+        first input records it."""
         routine = town_routine_of(self.made.receipt)
         place = walking_surfaces_place(ground_place_id(self.region), records, routine, made)
-        return people_frame(place, routine, population=town_head_count(place, made, routine))
+        with self.api.database.session(self.workspace) as connection:
+            start = world_day_start(
+                connection, SimpleNamespace(workspace_id=self.workspace, world_id=self.world)
+            )
+        population = town_head_count(place, made, routine)
+        return people_frame(place, routine, population=population, start_minute=start)
 
 
 @pytest.fixture

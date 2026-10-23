@@ -93,6 +93,7 @@ from exulanica.world.society_composition import (
     validate_recorded_registry,
     workspace_obstacle,
 )
+from exulanica.world.society_day_start import world_day_start
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
     ARRIVAL_INPUTS,
@@ -2024,9 +2025,11 @@ class SocietyRuntime:
                 else:
                     made_under = self._made_under(town)
                     lived_in = self._living_place(ground, town, made_under)
+                # A first input's day starts at the hour the world's setting is lit for (dusk's).
+                at = world_day_start(connection, binding) if seq == 1 else None
                 try:
                     count = town_head_count(lived_in, town.made, made_under)
-                    people = people_frame(lived_in, made_under, population=count)
+                    people = people_frame(lived_in, made_under, population=count, start_minute=at)
                     if self._resident_day and seq == 1:
                         day_place, day_routine = lived_in, made_under
                 except TownPeopleRefused as exc:

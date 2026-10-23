@@ -151,6 +151,7 @@ def people_frame(
     routine: RoutineModel,
     *,
     population: int | None = None,
+    start_minute: int | None = None,
 ) -> dict[str, Any]:
     """What the people of the town whose place document is ``place`` are made from, before any
     draw: :data:`FRAME_PROFILE`, a document a society input may carry.
@@ -158,8 +159,10 @@ def people_frame(
     ``place`` is a validated living place (a town's city place or a site's, in any frame: only its
     id, its digest and its enabled destinations are read) and ``routine`` the routine it was made
     under. ``population`` is how many of the place's homes' places are lived in, every one where it
-    is None. The frame states the rule that completes it, the routine by its binding, the place by
-    id and digest, the minute the day starts at, the two policy figures the rule reads (the share
+    is None, and ``start_minute`` the minute the day starts at, the policy's where it is None
+    (a world's setting gives its own: :mod:`~exulanica.world.society_day_start`). The frame states
+    the rule that completes it, the routine by its binding, the place by id and digest, the minute
+    the day starts at, the two policy figures the rule reads (the share
     who work, or none where the policy states none, and the shift jitter) and every premises that
     offers a place in a home or a position, in the place's destination order, which is the order
     the rule houses people in. It holds no seed and nothing drawn from one. A place that offers no
@@ -198,7 +201,11 @@ def people_frame(
         "rule": RULE_V1,
         "routine": routine.binding(),
         "place": {"place_id": place["place_id"], "document_sha256": place["document_sha256"]},
-        "day": {"start_minute_of_day": policy["start_minute_of_day"]},
+        "day": {
+            "start_minute_of_day": policy["start_minute_of_day"]
+            if start_minute is None
+            else start_minute
+        },
         "employment_share_milli": policy.get("employment_share_milli"),
         "shift_jitter_minutes": policy["shift_jitter_minutes"],
         "population": size,

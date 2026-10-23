@@ -216,6 +216,9 @@ RELEASED_CATALOGS = {
     "society-comparison-seeds.v3.json": (
         "0b48a3c0a5a331f42a548fd7d5c0c88676a1c6346c30c057b21123295723915d"
     ),
+    "society-day-start.v1.json": (
+        "3b8dc32d92ca334d91e526612e4df52cd6725a4a4b3d18e59a5ba859c089d2f7"
+    ),
     "society-decision-action.v1.json": (
         "900e91eabcdb60a3d373639a096a7ee3be037bfc2e80431ec6e9f37c715c823f"
     ),

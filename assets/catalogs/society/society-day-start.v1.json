@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-day-start",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "dawn_mist",
+      "from": "sky_part",
+      "sun_azimuth_below_mdeg": 0,
+      "start_minute_of_day": 360,
+      "reason": "Dawn mist is drawn at first light, so a society in a world at dawn starts its day at six in the morning.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "clear_noon",
+      "from": "sky_part",
+      "sun_azimuth_below_mdeg": 0,
+      "start_minute_of_day": 720,
+      "reason": "A clear noon sky stands the sun high, so a society in a world at noon starts its day at midday and its clock reads twelve under that sun.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "overcast",
+      "from": "sky_part",
+      "sun_azimuth_below_mdeg": 0,
+      "start_minute_of_day": 600,
+      "reason": "An overcast sky reads as grey daylight, so a society under it starts its day at ten in the morning; a dawn hour under a day's grey would be false.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "dusk",
+      "from": "sky_part",
+      "sun_azimuth_below_mdeg": 0,
+      "start_minute_of_day": 1080,
+      "reason": "Dusk lights the world from its look's evening, the sun low in the west, so a society in a world at dusk starts its day at six in the evening and its clock reads the hour its sky shows.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "thick_fog",
+      "from": "sky_part",
+      "sun_azimuth_below_mdeg": 0,
+      "start_minute_of_day": 360,
+      "reason": "Thick fog hides the sun at any hour, so a society in a fogbound world starts its day at six in the morning, as the policy's own day does.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "night",
+      "from": "sky_part",
+      "sun_azimuth_below_mdeg": 0,
+      "start_minute_of_day": 1290,
+      "reason": "Night is drawn after dark, so a society in a world at night starts its day at half past nine in the evening, the hour its sky shows.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "sun_east_of_south",
+      "from": "day_sun",
+      "sun_azimuth_below_mdeg": 180000,
+      "start_minute_of_day": 600,
+      "reason": "A world with no sky of its setting is lit by its look's own day; where that sun stands east of south (azimuth under 180 degrees) it is the morning's, so its society starts at ten in the morning.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    },
+    {
+      "key": "sun_west_of_south",
+      "from": "day_sun",
+      "sun_azimuth_below_mdeg": 360000,
+      "start_minute_of_day": 900,
+      "reason": "Where the look's own day sun stands due south or west of it (azimuth from 180 degrees) it is the afternoon's, so a society in a world with no sky of its setting starts at three in the afternoon.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society clock; see the entry reason"
+      }
+    }
+  ]
+}
