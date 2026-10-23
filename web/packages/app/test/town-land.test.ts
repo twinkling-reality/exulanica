@@ -2,10 +2,11 @@
 /**
  * A town made on its land, in the page: its land section is read through the world's version and
  * held to its entity tag, its world and the digest its entry names; every chunk and the backdrop it
- * names are held to their digests; the land is drawn round the town's tiles and never under them,
- * and taken away with them; the look's flat plane beyond the town is not drawn; and the town's
- * people stand on the ground its tiles walk, and on the land where they walk none. A saved town
- * whose entry names its land is opened with it, in every look it is redrawn in.
+ * names are held to their digests; land the server is still making is asked for again after the
+ * seconds each 503 states, until `LAND_WAIT_MS` is spent; the land is drawn round the town's tiles
+ * and never under them, and taken away with them; the look's flat plane beyond the town is not
+ * drawn; and the town's people stand on the ground its tiles walk, and on the land where they walk
+ * none. A saved town whose entry names its land is opened with it, in every look it is redrawn in.
  *
  * The land is synthetic, in the served shape: two chunks on land that rises 40 per mille to the
  * north and steps up 500 mm east of 8 m, and a backdrop with the sea to the south.
@@ -14,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
-import { furnitureOnLand, loadTownLand, rememberTownLand, townGround, withoutEdge, withTownLand, type TownLand } from '../src/composition/town-land.js';
+import { furnitureOnLand, LAND_WAIT_MS, loadTownLand, rememberTownLand, townGround, withoutEdge, withTownLand, type TownLand } from '../src/composition/town-land.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, SavedWorldEntry } from '../src/world-entry-api.js';
 
@@ -116,6 +117,22 @@ function host(body = section(), tag: { path: string; etag: string } | null = nul
   return { fetched, asked };
 }
 
+/** A host whose land section answers 503 with `retry` as its Retry-After (none when null) to its first `refusals` asks; when each was asked. */
+function making(refusals: number, retry: string | null = '2') {
+  const served = host();
+  const asks: number[] = [];
+  const fetched = vi.fn(async (input: string): Promise<Response> => {
+    if (input.includes('/land?')) {
+      asks.push(Date.now());
+      if (asks.length <= refusals) {
+        return new Response('{"code":"kind_work_overran"}', { status: 503, headers: retry === null ? {} : { 'Retry-After': retry } });
+      }
+    }
+    return served.fetched(input);
+  });
+  return { fetched, asks };
+}
+
 // The page loads what reads and draws land only when a town on land opens; loading it the first
 // time takes seconds, so it is loaded once here, apart from what any test holds to its time.
 beforeAll(async () => {
@@ -123,6 +140,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   rememberTownLand('entry', null);
 });
@@ -147,6 +165,37 @@ describe("a town on its land's land, read", () => {
   ])('refuses %s', async (_case, served, words) => {
     vi.stubGlobal('fetch', served.fetched);
     await expect(loadTownLand(access, entry, LAND_SHA256)).rejects.toThrow(words);
+  });
+
+  it('reads land the server is still making, asking again after the seconds each 503 states', async () => {
+    vi.useFakeTimers();
+    const { fetched, asks } = making(2);
+    vi.stubGlobal('fetch', fetched);
+    const start = Date.now();
+    const town = loadTownLand(access, entry, LAND_SHA256);
+    await vi.advanceTimersByTimeAsync(LAND_WAIT_MS);
+    expect((await town).land.groundMm(4000, 8000)).toBe(6320);
+    expect(asks.map((at) => at - start)).toEqual([0, 2000, 4000]);
+  });
+
+  it('refuses land still being made once the wait is spent, having asked until then', async () => {
+    vi.useFakeTimers();
+    const { fetched, asks } = making(Number.POSITIVE_INFINITY);
+    vi.stubGlobal('fetch', fetched);
+    const start = Date.now();
+    const refused = expect(loadTownLand(access, entry, LAND_SHA256)).rejects.toThrow('HTTP 503');
+    await vi.advanceTimersByTimeAsync(LAND_WAIT_MS);
+    await refused;
+    expect(asks.at(-1)! - start).toBeGreaterThanOrEqual(LAND_WAIT_MS - 2000);
+  });
+
+  it.each([
+    ['a 503 that states no Retry-After', making(1, null).fetched, 503],
+    ['a 404', vi.fn(async () => new Response('{}', { status: 404, headers: { 'Retry-After': '2' } })), 404],
+  ])('refuses at once %s', async (_case, fetched, status) => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', fetched);
+    await expect(loadTownLand(access, entry, LAND_SHA256)).rejects.toThrow(`HTTP ${status}`);
   });
 });
 

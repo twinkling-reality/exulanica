@@ -138,6 +138,27 @@ describe('the world workspace preview\'s edits to this app', () => {
     }
   }, 60_000);
 
+  it('keeps a town still baking under its opening and opens it, as a reload does, once baked (B1)', async () => {
+    const { patchSource, BAKE_POLL_MS, BAKE_READS } = await seams() as Seams & { BAKE_POLL_MS: number; BAKE_READS: number };
+    const main = 'web/packages/app/src/main.ts';
+    const patched = patchSource(main, source(main), here)!;
+    const opened = patched.slice(patched.indexOf('const reviewEntryId'));
+    const waits = opened.indexOf("if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'baking')) {");
+    const mounts = opened.indexOf('await mount(); return;');
+    // While a tile bakes the address waits, reading the entry again, and opens again as a reload does:
+    // nothing is mounted before then.
+    expect(waits).toBeGreaterThan(-1);
+    expect(waits).toBeLessThan(mounts);
+    const waiting = opened.slice(waits, mounts);
+    expect(waiting).toContain('await state.worldEntries?.entry(reviewEntry.entryId)');
+    expect(waiting).toContain(`setTimeout(done, ${BAKE_POLL_MS})`);
+    expect(waiting).toContain(`read < ${BAKE_READS}`);
+    expect(waiting).toContain('location.reload();');
+    expect(waiting).not.toContain('mount(');
+    // Bounded: five minutes of reads at most before it opens again.
+    expect(BAKE_POLL_MS * BAKE_READS).toBe(300_000);
+  });
+
   it('notices a seam whose code no longer fits: a positive control', async () => {
     const { patchSource, occurrences } = await seams();
     const file = 'web/packages/app/src/composition/environment-selection.ts';

@@ -30,6 +30,10 @@ export const SEAMS = Object.freeze([
   { seam: 'opening first', file: BOOTSTRAP, target: "void import('./main.js')" },
 ]);
 
+/** How often a town's page reads its entry again while its tiles bake, and how many times at most. */
+export const BAKE_POLL_MS = 1000;
+export const BAKE_READS = 300;
+
 /** How a seam tells the opening (world-opening.ts) that a loading stage ended (opening-steps.mjs). */
 const report = (index, title = '') => `window.dispatchEvent(new CustomEvent('${OPENING_EVENT}', { detail: { report: '${OPENING_STAGES[index].report}'${title ? `, title: ${title}` : ''} } }));`;
 
@@ -54,6 +58,9 @@ export const occurrences = (code, target) => code.split(target).length - 1;
  * loading stage to it as the stage ends: the world read, the land drawn, the people in.
  * Create a world on the front door is the workspace's own (create-world.ts, frames 20 to 22), in
  * place of the app's old dialog.
+ * A town whose tiles are still baking when its address opens keeps its opening up and is opened only
+ * once they are baked, as a reload opens it: mounted while they bake, its world view would stand on an
+ * empty scene far from the town, over a mount that could not open it.
  */
 export function patchSource(file, code, here) {
   if (!SEAM_FILES.includes(file)) return null;
@@ -79,6 +86,16 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
       const reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
+      if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'baking')) {
+        // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads; then the page opens again with whatever it reads.
+        for (let read = 0, baking = true; baking && read < ${BAKE_READS}; read += 1) {
+          await new Promise((done) => setTimeout(done, ${BAKE_POLL_MS}));
+          const again = await state.worldEntries?.entry(reviewEntry.entryId).catch(() => null);
+          baking = again?.generatedGround?.tiles.some((tile) => tile.state === 'baking') ?? true;
+        }
+        location.reload();
+        return;
+      }
       if (reviewEntry) { await openWorldEntryContext(state, reviewEntry); ${report(0, 'reviewEntry.title')} state.worldEntryError = null; shell.removeAttribute('data-world-state'); await mount(); return; }
       pendingEntryProblem = 'This saved world is no longer available. Choose a world here.';
     }

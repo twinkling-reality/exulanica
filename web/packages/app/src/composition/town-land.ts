@@ -7,8 +7,10 @@
  * the town and its backdrop by digest, and states its water. The page holds the section to its
  * entity tag, to the world it opened and to that digest, then reads each chunk and the backdrop
  * through the same version and holds each to the digest the section names (`readLandSection`), as
- * a site on land's are. Land that cannot be read is not stood in for: the world does not open, as
- * it does not with a tile that is not the one its entry names.
+ * a site on land's are. While the kind worker is still making the land, the route answers 503 with
+ * a `Retry-After`, and the page asks again after the seconds it states, for at most `LAND_WAIT_MS`
+ * in all. Land that cannot be read is not stood in for: the world does not open, as it does not
+ * with a tile that is not the one its entry names.
  *
  * The tiles draw the town and the terrain under it, and the land is drawn round them: every near
  * chunk no tile covers (a chunk is a tile's square, and chunk (x, y) lies under tile (x, y)), the
@@ -31,6 +33,13 @@ import type { GeneratedTile, SavedWorldEntry } from '../world-entry-api.js';
 
 /** The profile of a town on its land's land section. */
 export const TOWN_LAND_PROFILE = 'exulanica.town-land/v1';
+
+/**
+ * The longest a town's land is waited for while the server says it is still being made: as long
+ * as the workspace keeps a town's opening up while its tiles bake (`BAKE_POLL_MS` times
+ * `BAKE_READS` in `tools/previews/world-workspace/seams.mjs`).
+ */
+export const LAND_WAIT_MS = 300_000;
 
 /** A town on land's land, read and held, and how to draw it round the town's tiles. */
 /** What the land round a town wears: one material for every near chunk, with its surfaces over it. */
@@ -66,12 +75,21 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
   const query = new URLSearchParams({ world_id: entry.worldId });
   const version = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`;
   let bytes = 0;
+  const until = Date.now() + LAND_WAIT_MS;
   /** A land document, held to `sha256`, or for the section, to the digest of its own bytes. */
   const read = async (path: string, sha256: string | null): Promise<unknown> => {
-    const response = await fetch(`${version}/${path}?${query.toString()}`, {
-      headers: { ...accessHeaders(access), Accept: 'application/json' },
-      credentials: 'same-origin',
-    });
+    let response: Response;
+    for (;;) {
+      response = await fetch(`${version}/${path}?${query.toString()}`, {
+        headers: { ...accessHeaders(access), Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      // Still being made: asked again after the seconds stated, a second at least, until the wait is spent.
+      const stated = response.status === 503 ? Number(response.headers.get('Retry-After') ?? Number.NaN) : Number.NaN;
+      const ms = Math.max(1, stated) * 1000;
+      if (!Number.isFinite(stated) || Date.now() + ms > until) break;
+      await new Promise((done) => { setTimeout(done, ms); });
+    }
     if (!response.ok) throw new Error(`This town's land could not be read: HTTP ${response.status}.`);
     const body = new Uint8Array(await response.arrayBuffer());
     const tag = response.headers.get('ETag')?.replaceAll('"', '');
