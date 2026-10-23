@@ -16,7 +16,8 @@ assert.equal(money('0'), '$0');
 const now = new Date(2026, 9, 16, 9, 0).getTime();
 const at = (day, hour, minute) => new Date(2026, 9, day, hour, minute).getTime();
 assert.deepEqual([dayHeading(at(16, 8, 30), now), dayHeading(at(15, 21, 40), now), dayHeading(at(13, 8, 0), now)], ['Today', 'Yesterday', '13 Oct']);
-assert.deepEqual([personWhen(at(16, 8, 30), now), personWhen(at(15, 21, 40), now)], ['08:30', 'Yesterday · 21:40']);
+// The person's own time always names its day, so it never reads as the world's (F12b).
+assert.deepEqual([personWhen(at(16, 8, 30), now), personWhen(at(15, 21, 40), now)], ['Today at 08:30', 'Yesterday at 21:40']);
 assert.deepEqual([creationWhen(at(16, 9, 12), now), creationWhen(at(15, 21, 40), now)], ['Today · 09:12', 'Yesterday · 21:40']);
 
 // The head's GitHub line (sheet section 2), refusals marked for the refusal ink.
@@ -270,9 +271,9 @@ assert.equal(busy.items[3].by, null);
 // A grouped dot keeps every change it stands for, oldest first, each its own time and You sentence, for the list it
 // opens (H15); its count is the list's length.
 assert.deepEqual(busy.items[0].changes.map((row) => [row.when, text(row.words)]), [
-  ['08:30', 'You moved the bench'],
-  ['08:35', "You changed Teo's model to Qwen3 235B"],
-  ['08:41', 'You moved the lantern'],
+  ['Today\u00a0at\u00a008:30', 'You moved the bench'],
+  ['Today\u00a0at\u00a008:35', "You changed Teo's model to Qwen3 235B"],
+  ['Today\u00a0at\u00a008:41', 'You moved the lantern'],
 ]);
 
 // A choice of the model the same characters already have is no change (F12b, JOURNEY's 18:23): Teo given Nemotron,

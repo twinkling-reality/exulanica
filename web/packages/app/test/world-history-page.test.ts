@@ -582,9 +582,15 @@ describe('History', () => {
     const { personSpan } = await import('../../../../tools/previews/world-workspace/' + 'history-words.mjs') as { personSpan(from: string, to: string, now: Date): string };
     const now = new Date(2026, 9, 16, 12, 0);
     const whole = (words: string) => words.replace(/ /g, '\u00a0');
-    expect(personSpan(new Date(2026, 9, 11, 18, 59).toISOString(), new Date(2026, 9, 11, 20, 45).toISOString(), now)).toBe(`${whole('11 Oct · 18:59')} to 20:45`);
-    expect(personSpan(new Date(2026, 9, 11, 23, 50).toISOString(), new Date(2026, 9, 12, 0, 10).toISOString(), now)).toBe(`${whole('11 Oct · 23:50')} to ${whole('12 Oct · 00:10')}`);
-    expect(personSpan(new Date(2026, 9, 11, 18, 59).toISOString(), new Date(2026, 9, 11, 18, 59).toISOString(), now)).toBe(whole('11 Oct · 18:59'));
+    expect(personSpan(new Date(2026, 9, 11, 18, 59).toISOString(), new Date(2026, 9, 11, 20, 45).toISOString(), now)).toBe(`${whole('11 October, 18:59')} to 20:45`);
+    expect(personSpan(new Date(2026, 9, 11, 23, 50).toISOString(), new Date(2026, 9, 12, 0, 10).toISOString(), now)).toBe(`${whole('11 October at 23:50')} to ${whole('12 October at 00:10')}`);
+    expect(personSpan(new Date(2026, 9, 11, 18, 59).toISOString(), new Date(2026, 9, 11, 18, 59).toISOString(), now)).toBe(whole('11 October at 18:59'));
+    // The person's own time always names its day, so it never reads as the world's (F12b): today too.
+    expect(personSpan(new Date(2026, 9, 16, 8, 17).toISOString(), new Date(2026, 9, 16, 9, 1).toISOString(), now)).toBe(`${whole('Today, 08:17')} to 09:01`);
+    expect(personSpan(new Date(2026, 9, 16, 8, 17).toISOString(), new Date(2026, 9, 16, 8, 17).toISOString(), now)).toBe(whole('Today at 08:17'));
+    // The day before reads "Yesterday"; an older day names its month whole, never "11 Oct" (DESIGN, "Today at" as built).
+    expect(personSpan(new Date(2026, 9, 15, 23, 50).toISOString(), new Date(2026, 9, 15, 23, 50).toISOString(), now)).toBe(whole('Yesterday at 23:50'));
+    expect(personSpan(new Date(2026, 9, 15, 18, 59).toISOString(), new Date(2026, 9, 15, 20, 45).toISOString(), now)).toBe(`${whole('Yesterday, 18:59')} to 20:45`);
   });
 
   it('names a speaker a kind names in its title form, as their tag does', async () => {

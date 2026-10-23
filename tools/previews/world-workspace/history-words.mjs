@@ -45,6 +45,9 @@ export const HEAD_WORDS = Object.freeze({
 });
 
 const MONTHS = Object.freeze(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+/** A person's own day older than yesterday names its month whole, as whenWords does elsewhere ("11 October"). */
+const MONTHS_WHOLE = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December']);
 const SMALLEST = 0.0001;
 
 /** Dollars as the workspace writes them: "$0.05", under a cent "$0.0042", "less than $0.0001", "$0". */
@@ -98,10 +101,20 @@ export function dayHeading(at, now) {
   return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
-/** When the person did something, in their own time: "Yesterday · 21:40", "13 Oct · 21:40", today "08:30". */
-export function personWhen(at, now) {
+/** The day of something the person did: "Today", "Yesterday", "13 October". */
+function personDay(at, now) {
   const heading = dayHeading(at, now);
-  return heading === HISTORY.today ? clockAt(at) : `${heading} · ${clockAt(at)}`;
+  if (heading === HISTORY.today || heading === 'Yesterday') return heading;
+  const date = new Date(at);
+  return `${date.getDate()} ${MONTHS_WHOLE[date.getMonth()]}`;
+}
+
+/**
+ * When the person did something, in their own time, its day always named so it never reads as the world's time
+ * (F12b): "Today at 08:30", "Yesterday at 21:40", "13 October at 21:40".
+ */
+export function personWhen(at, now) {
+  return `${personDay(at, now)} at ${clockAt(at)}`;
 }
 
 /** The creation's time, always with its day: "Today · 09:12", "Yesterday · 21:40", "13 Oct · 21:40" (H4). */
@@ -119,13 +132,15 @@ export function worldWhen(clock) {
 const whole = (words) => words.replace(/ /g, '\u00a0');
 
 /**
- * When a run of changes happened, in the person's own time: "11 Oct · 18:59 to 20:45" within one day (the day
- * named once), each date and time kept whole, so the words wrap only at "to"; one change, its time alone.
+ * When a run of changes happened, in the person's own time: "Today, 18:17 to 19:01" within one day (the day named
+ * once), "11 October at 23:50 to 12 October at 00:10" across days, and one change as personWhen says it; each date
+ * and time kept whole, so the words wrap only at "to".
  */
 export function personSpan(from, to, now) {
-  const start = personWhen(from, now);
-  const end = dayHeading(to, now) === dayHeading(from, now) ? clockAt(to) : personWhen(to, now);
-  return start === end || from === to ? whole(start) : `${whole(start)} to ${whole(end)}`;
+  const start = personWhen(from, now), end = personWhen(to, now);
+  if (from === to || start === end) return whole(start);
+  if (personDay(from, now) === personDay(to, now)) return `${whole(`${personDay(from, now)}, ${clockAt(from)}`)} to ${clockAt(to)}`;
+  return `${whole(start)} to ${whole(end)}`;
 }
 
 export function spanWhen(from, to) {
