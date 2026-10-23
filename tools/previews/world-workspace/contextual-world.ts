@@ -1321,7 +1321,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     // give way to it.
     const exchange = following && held ? exchangeOf(shownPops, held.scene.id) : null;
     scene.follow(following && held ? held.scene.id : null, shownPops);
-    const scened = scene.shown(now, exchange);
+    const scened = scene.shown(now, exchange, selection.people?.clock().minute ?? null);
     drawScene(scened);
     const inScene = new Set(scened.showing ? [held.scene.id, exchange?.other ?? scened.now.to, scened.now.speaker].filter(Boolean) : []);
     const looking = !pageShown() && !asking && !dragging && targetReachable && target.key !== held?.key && targetFrame?.headInView && seen(target, targetFrame); if (looking) lookedAt = { key: target.key, until: now + DISCOVERY.lookStayMs };
