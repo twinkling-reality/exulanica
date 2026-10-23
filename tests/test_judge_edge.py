@@ -256,22 +256,55 @@ def test_the_client_bundle_is_built_on_the_build_host_platform():
 
 #: A relative module specifier in the web workspace's source, including glob patterns.
 _RELATIVE_SPECIFIER = re.compile(r"""['"]((?:\.\./)+[^'"\n]+)['"]""")
+#: A build plugin `vite.config.ts` imports from the app's own `src/dev`.
+_BUILD_PLUGIN = re.compile(r"""from\s+['"]\./(src/dev/[^'"]+)\.js['"]""")
+#: A path named from the repository root, which `vite.config.ts` hands its build plugins.
+_REPOSITORY_PATH = re.compile(r"""['"]([A-Za-z_][\w.-]*(?:/[\w.-]+)+)['"]""")
+
+
+def _folders_the_build_loads_by_path() -> set[str]:
+    """Every repository folder outside web/ that a build plugin of `vite.config.ts` names.
+
+    A plugin loads such a folder by a computed path, which no relative specifier shows, and the
+    build fails without it as surely as without an import (MEASURED 2026-10-23: CI's judge web
+    image failed with "Cannot find module .../tools/previews/world-workspace/seams.mjs").
+    """
+    app = ROOT / "web" / "packages" / "app"
+    found: set[str] = set()
+    for plugin in _BUILD_PLUGIN.finditer((app / "vite.config.ts").read_text(encoding="utf-8")):
+        source = (app / f"{plugin.group(1)}.ts").read_text(encoding="utf-8")
+        for match in _REPOSITORY_PATH.finditer(source):
+            path = match.group(1)
+            if not path.startswith("web/") and (ROOT / path).is_dir():
+                found.add(path)
+    return found
 
 
 def _paths_the_bundle_reads_outside_web() -> set[str]:
     """Every repository path a web source file names by a relative specifier that leaves web/.
 
     Derived from the source rather than listed, so an import added later is checked too. Tests
-    are left out: they are not part of the bundle.
+    are left out, the world workspace's `verify-*.mjs` checks among them: they are not part of the
+    bundle. A folder the build loads by path counts, with what its own sources name the same way.
+    A specifier naming the repository root itself is a script reading files by name and names no
+    one path.
     """
     web = (ROOT / "web").resolve()
     found: set[str] = set()
-    for source in (ROOT / "web" / "packages").glob("*/src/**/*"):
-        if source.suffix not in (".ts", ".tsx") or ".test." in source.name:
+    sources = [*(ROOT / "web" / "packages").glob("*/src/**/*")]
+    for folder in _folders_the_build_loads_by_path():
+        found.add(folder)
+        sources.extend((ROOT / folder).rglob("*"))
+    for source in sources:
+        if source.suffix not in (".ts", ".tsx", ".mjs") or ".test." in source.name:
+            continue
+        if source.name.startswith("verify-"):
             continue
         for match in _RELATIVE_SPECIFIER.finditer(source.read_text(encoding="utf-8")):
             specifier = match.group(1).split("?", 1)[0].split("*", 1)[0]
             target = (source.parent / specifier).resolve()
+            if target == ROOT.resolve():
+                continue
             if not target.is_relative_to(web) and target.is_relative_to(ROOT.resolve()):
                 found.add(target.relative_to(ROOT.resolve()).as_posix().rstrip("/"))
     return found
