@@ -26,6 +26,7 @@ from exulanica.world.society_decision_contract import (
 from exulanica.world.society_model_choice_repository import (
     SocietyModelChoiceRepository,
     _view,
+    choice_steps,
     latest_choices,
 )
 from exulanica.world.society_play import answer_document, person_result, play_contract
@@ -72,6 +73,17 @@ def test_giving_a_being_back_restores_what_decided_for_it_before_the_play():
     # A comparison names the same decider for it, by the same rule over the choices as read.
     views = [_view(row["document"], None) for row in restored_rows]
     assert latest_choices(role, views)[SUBJECT]["choice_seq"] == 1
+
+
+def test_the_one_fold_read_to_its_end_is_latest_choices():
+    """Each step of the fold as a person's History reads it: the model, the person playing, the
+    model again once given back; read to its end, it is what latest_choices answers."""
+    role = person_role()
+    rows = [_row(1, MODEL), _row(2, PLAYED), _row(3, PLAYED, ended="given_back")]
+    views = [_view(row["document"], None) for row in rows]
+    steps = [dict(after) for _choice, after, _since in choice_steps(role, views)]
+    assert [after[SUBJECT]["decider"] for after in steps] == [MODEL, PLAYED, MODEL]
+    assert steps[-1] == latest_choices(role, views)
 
 
 def test_a_minute_takes_the_person_s_answer_else_carries_on():

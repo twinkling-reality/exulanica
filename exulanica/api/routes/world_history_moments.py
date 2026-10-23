@@ -14,8 +14,9 @@
     (``GET /world/pictures/{sha256}``); for anyone else, and without ``recipe``, it is null.
 
     With ``story=true``, only the moments History's line draws: those a model, a person playing or
-    an outside program decided, and those with a being this person touched (given a model, asked
-    in a run, placed); ``before``, ``limit`` and ``more`` count within them.
+    an outside program decided, and those with a being recorded while this person's hand was on it
+    (from being given a model, played or asked in a run until set back to routine; a placed being
+    always); ``before``, ``limit`` and ``more`` count within them.
 """
 
 from __future__ import annotations

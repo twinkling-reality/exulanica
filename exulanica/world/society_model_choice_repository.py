@@ -44,7 +44,7 @@ not the world's: a choice outlives a deployment.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping, Sequence, Set
+from collections.abc import Callable, Iterator, Mapping, Sequence, Set
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
@@ -73,6 +73,7 @@ __all__ = [
     "GROUPS",
     "ModelChoiceRefused",
     "SocietyModelChoiceRepository",
+    "choice_steps",
     "decider_of",
     "decides_at",
     "latest_choices",
@@ -195,12 +196,14 @@ def latest_choices(
     return _latest(role, choices)[0]
 
 
-def _latest(
+def choice_steps(
     role: DecisionRole, choices: Sequence[Mapping[str, Any]]
-) -> tuple[dict[str, Mapping[str, Any]], dict[str, int]]:
-    """:func:`latest_choices`, and the ``choice_seq`` of the choice from which each subject's
-    latest choice decides: its own, or, for one restored when a play ended, the choice that ended
-    it."""
+) -> Iterator[tuple[Mapping[str, Any], Mapping[str, Mapping[str, Any]], Mapping[str, int]]]:
+    """The one fold of ``role``'s ``choices`` every reader of who decides reads, in order: each
+    choice with each subject's latest choice, and the ``choice_seq`` it decides from, as that choice
+    leaves them (:func:`latest_choices` reads it to its end; a person's History reads every step).
+    A choice ending a person's play (``ended``) restores what the subject had before the play
+    began. The two mappings are the fold's own, read at each step before the next."""
     current: dict[str, Mapping[str, Any]] = {}
     since: dict[str, int] = {}
     before: dict[str, Mapping[str, Any] | None] = {}
@@ -219,7 +222,20 @@ def _latest(
                 before[subject] = current.get(subject)
             current[subject] = choice
             since[subject] = int(choice["choice_seq"])
-    return current, since
+        yield choice, current, since
+
+
+def _latest(
+    role: DecisionRole, choices: Sequence[Mapping[str, Any]]
+) -> tuple[dict[str, Mapping[str, Any]], dict[str, int]]:
+    """:func:`latest_choices`, and the ``choice_seq`` of the choice from which each subject's
+    latest choice decides: its own, or, for one restored when a play ended, the choice that ended
+    it. The fold (:func:`choice_steps`) read to its end."""
+    current: Mapping[str, Mapping[str, Any]] = {}
+    since: Mapping[str, int] = {}
+    for _choice, after, decides_from in choice_steps(role, choices):
+        current, since = after, decides_from
+    return dict(current), dict(since)
 
 
 def _asked_model(model: Any) -> dict[str, Any] | None:

@@ -24,7 +24,7 @@ from exulanica.world.society_moments import (
     RULES_PROFILE,
     _Stored,
     backfill,
-    touched_subjects,
+    touched_spans,
 )
 from exulanica.world.society_repository import SocietyRepository
 from psycopg.types.json import Jsonb
@@ -278,10 +278,57 @@ def test_a_version_s_history_reads_its_own_society_s_moments_and_lines_alone(app
         assert said == {line}, said
 
 
+def _choice(
+    connection, world, row, subjects, model, recorded_at=None, *, decider=None, ended=None
+) -> None:
+    """A person's model choice for ``subjects``: in the first choice's shape, ``model`` a model or
+    None, the routine; with ``decider``, that decider, and ``ended`` where it ends a person's play;
+    recorded at ``recorded_at`` where given, else now."""
+    role = person_role()
+    sequence = connection.execute(
+        "select coalesce(max(choice_seq), 0) + 1 as next from world_society_model_choice "
+        "where workspace_id=%s and world_id=%s and society_id=%s",
+        (world["workspace"], row["world_id"], row["society_id"]),
+    ).fetchone()["next"]
+    document = {
+        "profile": role.choice_profile,
+        "choice_seq": sequence,
+        "request_id": str(uuid.uuid4()),
+        "society_id": str(row["society_id"]),
+        role.choice_subjects: [str(one) for one in subjects],
+        **({"model": model} if decider is None else {"decider": decider}),
+        **({"ended": ended} if ended else {}),
+        "contract": {},
+        "chosen_by": str(world["session"].actor),
+    }
+    document["document_sha256"] = society_state_sha256(document)
+    connection.execute(
+        "insert into world_society_model_choice(workspace_id,world_id,society_id,choice_seq,"
+        "request_id,document,document_sha256,chosen_by,recorded_at) "
+        "values(%s,%s,%s,%s,%s,%s,%s,%s,coalesce(%s,statement_timestamp()))",
+        (
+            world["workspace"],
+            row["world_id"],
+            row["society_id"],
+            sequence,
+            uuid.UUID(document["request_id"]),
+            Jsonb(document),
+            document["document_sha256"],
+            world["session"].actor,
+            recorded_at,
+        ),
+    )
+
+
+MODEL = {"provider": "test", "model_id": "test"}
+PLAYED = {"kind": "person", "account_id": str(uuid.UUID(int=0xA1))}
+
+
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_each_source_of_a_touched_being_counts_alone(app):
     """A being counts as touched by any one source alone: a decision request for them, their
-    coming by being placed, or a model choice naming them (H18's three sources, each apart)."""
+    coming by being placed, or a model choice giving them a model (H18's three sources, each
+    apart); a choice that leaves them to their routine touches nobody."""
     world, client = app
     _, knight = erasure._played_line(world, client, _services(client))
     knight = uuid.UUID(str(knight))
@@ -290,9 +337,8 @@ def test_each_source_of_a_touched_being_counts_alone(app):
 
     def touched(inhabitants: list[dict], **where) -> set[uuid.UUID]:
         state = {"inhabitants": inhabitants}
-        return set(
-            touched_subjects(connection, world["workspace"], {**row, **where, "state": state})
-        )
+        spans = touched_spans(connection, world["workspace"], {**row, **where, "state": state})
+        return {being for being, _opened, _closed in spans}
 
     # A decision request alone: read as of a world with no model choices (the choices' half names
     # its world; a request has no world column) and with nobody placed, the knight the person
@@ -307,37 +353,96 @@ def test_each_source_of_a_touched_being_counts_alone(app):
         {"id": str(populated), "came_by": "populated"},
     ]
     assert touched(people) - asked == {placed}
-    # A model choice alone: a being named by one counts with no request or placement.
-    chosen, role = uuid.uuid4(), person_role()
-    sequence = connection.execute(
-        "select coalesce(max(choice_seq), 0) + 1 as next from world_society_model_choice "
-        "where workspace_id=%s and world_id=%s and society_id=%s",
-        (world["workspace"], row["world_id"], row["society_id"]),
-    ).fetchone()["next"]
-    document = {
-        "profile": role.choice_profile,
-        "choice_seq": sequence,
-        "request_id": str(uuid.uuid4()),
-        "society_id": str(row["society_id"]),
-        role.choice_subjects: [str(chosen)],
-        "model": None,
-        "contract": {},
-        "chosen_by": str(world["session"].actor),
-    }
-    document["document_sha256"] = society_state_sha256(document)
+    # A model choice alone: a being given a model counts with no request or placement; one a
+    # choice leaves to its routine does not.
+    chosen, routine = uuid.uuid4(), uuid.uuid4()
     with connection.transaction():
-        connection.execute(
-            "insert into world_society_model_choice(workspace_id,world_id,society_id,choice_seq,"
-            "request_id,document,document_sha256,chosen_by) values(%s,%s,%s,%s,%s,%s,%s,%s)",
-            (
-                world["workspace"],
-                row["world_id"],
-                row["society_id"],
-                sequence,
-                uuid.UUID(document["request_id"]),
-                Jsonb(document),
-                document["document_sha256"],
-                world["session"].actor,
-            ),
-        )
+        _choice(connection, world, row, [chosen], MODEL)
+        _choice(connection, world, row, [routine], None)
     assert touched([]) - asked == {chosen}
+
+
+def _four_meetings(world, client, choices):
+    """A resident's routine meetings in four minutes recorded one after another, each anchored to
+    one, with ``choices(between)`` made for the resident in the same transaction; answers the four
+    ticks, the ticks the record holds and the ticks the story holds."""
+    erasure._played_line(world, client, _services(client))
+    connection = world["connection"]
+    society_id = erasure._society_id(world)
+    _, row = _replayed(world)
+    times = connection.execute(
+        "select distinct on (recorded_at) event_id, recorded_at from world_society_event "
+        "where society_id=%s order by recorded_at, event_id",
+        (society_id,),
+    ).fetchall()
+    assert len(times) >= 4, "the played world records minutes at four times"
+    anchors = times[-4:]
+    top = connection.execute(
+        "select max(tick) as tick from world_society_moment where society_id=%s", (society_id,)
+    ).fetchone()["tick"]
+    ticks = [int(top or 0) + index for index in range(1, 5)]
+
+    def between(first, second):
+        earlier, later = anchors[first]["recorded_at"], anchors[second]["recorded_at"]
+        return earlier + (later - earlier) / 2
+
+    resident, other = uuid.uuid4(), uuid.uuid4()
+    with connection.transaction():
+        for anchor, tick in zip(anchors, ticks, strict=True):
+            _later(
+                connection, world, society_id, anchor["event_id"], tick, "met", [resident, other]
+            )
+        for model, at, more in choices(between):
+            _choice(connection, world, row, [resident], model, at, **more)
+    scope, version, _ = routes(world)
+
+    def read(**more):
+        return client.get(
+            version + "/history/moments", headers=OWNER, params={**scope, **more}
+        ).json()["moments"]
+
+    every = {moment["tick"] for moment in read()}
+    story = {moment["tick"] for moment in read(story="true")}
+    return ticks, every & set(ticks), story & set(ticks)
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_resident_is_in_the_story_only_while_the_person_s_hand_is_on_them(app):
+    """H18 as amended: a resident given a model is in the person's story from that choice until a
+    choice sets them back to routine; their routine meetings recorded after it leave the line, and
+    given a model again they come back (creature-town's Dev and Ada were given a model on 18 October
+    and set back, and their meetings of today filled History's line)."""
+    world, client = app
+    # Given a model after the first meeting, set back to routine after the second and given a model
+    # again before the fourth.
+    ticks, every, story = _four_meetings(
+        world,
+        client,
+        lambda between: [
+            (MODEL, between(0, 1), {}),
+            (None, between(1, 2), {}),
+            (MODEL, between(2, 3), {}),
+        ],
+    )
+    # The positive control: the record holds all four meetings.
+    assert every == set(ticks)
+    assert story == {ticks[1], ticks[3]}
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_play_ending_inside_a_span_gives_back_the_model_and_the_span_runs_on(app):
+    """A person plays the resident while their model decides, then gives them back: the model
+    decides again, as every reader of who decides reads it (choice_steps), so the span runs on and
+    the meeting after the play stays on the line."""
+    world, client = app
+    ticks, every, story = _four_meetings(
+        world,
+        client,
+        lambda between: [
+            (MODEL, between(0, 1), {}),
+            (None, between(1, 2), {"decider": PLAYED}),
+            (None, between(2, 3), {"decider": PLAYED, "ended": "given_back"}),
+        ],
+    )
+    assert every == set(ticks)
+    assert story == {ticks[1], ticks[2], ticks[3]}

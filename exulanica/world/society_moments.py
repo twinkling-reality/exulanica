@@ -30,7 +30,6 @@ from typing import Any, Final, Protocol
 
 from psycopg.types.json import Jsonb
 
-from exulanica.world.decision_roles import CHOICE_SUBJECT_FIELDS
 from exulanica.world.society import SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import POINT_KIND
 
@@ -48,7 +47,7 @@ __all__ = [
     "option_did",
     "read_moments",
     "record_moments",
-    "touched_subjects",
+    "touched_spans",
 ]
 
 RULES_PROFILE: Final = "exulanica.society-moment-rules/v1"
@@ -792,33 +791,65 @@ def _session_of(tick: int, sessions: Sequence[Mapping[str, Any]]) -> str | None:
     return None
 
 
-def touched_subjects(
+def touched_spans(
     connection: Any, workspace_id: uuid.UUID, row: Mapping[str, Any]
-) -> list[uuid.UUID]:
-    """The beings a person touched in a society (H18), from what it stores: those given a model
-    (its model choices), those asked in a run (its decision requests, whoever decided them) and
-    those placed in it (its state's beings that came by being placed; a personality is written on
-    a placed being)."""
-    chosen = " || ".join(
-        f"case when jsonb_typeof(document->'{name}') = 'array' "
-        f"then document->'{name}' else '[]'::jsonb end"
-        for name in CHOICE_SUBJECT_FIELDS
-    )
-    rows = connection.execute(
-        f"select jsonb_array_elements_text({chosen}) as subject from world_society_model_choice "
-        "where workspace_id=%s and world_id=%s and society_id=%s "
-        "union select subject_id::text from world_society_decision_request "
-        "where workspace_id=%s and society_id=%s",
-        (workspace_id, row["world_id"], row["society_id"], workspace_id, row["society_id"]),
+) -> list[tuple[uuid.UUID, Any, Any]]:
+    """When the person's hand was on each being of a society (H18 as amended: a resident is in the
+    person's story while they touch it), as ``(being, from, until)`` in recorded time, ``None``
+    for an open end, read from what it stores: from the choice that gives a being a model, a
+    person playing or an outside program until the choice that sets it back to its routine, each
+    choice read as every reader reads it (a play's end restores what it had before); from a run's
+    request for a being recorded while no such span is open (one asked before choices were kept)
+    until the next choice that sets it back; and always for a being placed in it (a personality
+    is written on a placed being)."""
+    from exulanica.world.decision_roles import decision_roles
+    from exulanica.world.society_model_choice_repository import choice_steps, decider_of
+
+    stored = connection.execute(
+        "select document, recorded_at from world_society_model_choice "
+        "where workspace_id=%s and world_id=%s and society_id=%s order by choice_seq",
+        (workspace_id, row["world_id"], row["society_id"]),
     ).fetchall()
-    found = {_uuid(one["subject"]) for one in rows}
+    # Each being's hand on (True) or off (False) as each record left it: a choice, then a request.
+    marks: list[tuple[Any, int, str, bool]] = []
+    for role in decision_roles():
+        choices = [
+            {
+                **one["document"],
+                "decider": decider_of(one["document"]),
+                "recorded_at": one["recorded_at"],
+            }
+            for one in stored
+            if role.reads_choice(str(one["document"].get("profile", "")))
+        ]
+        # One pass over the role's choices: each step as the one fold every reader reads leaves it.
+        for choice, after, _since in choice_steps(role, choices):
+            for subject in choice.get(role.choice_subjects, ()):
+                held = after.get(subject)
+                on = held is not None and held["decider"].get("kind") != "routine"
+                marks.append((choice["recorded_at"], 0, str(subject), on))
+    requests = connection.execute(
+        "select subject_id, recorded_at from world_society_decision_request "
+        "where workspace_id=%s and society_id=%s",
+        (workspace_id, row["society_id"]),
+    ).fetchall()
+    marks += [(one["recorded_at"], 1, str(one["subject_id"]), True) for one in requests]
+    spans: list[tuple[str, Any, Any]] = []
+    opened: dict[str, Any] = {}
+    for at, _order, subject, on in sorted(marks, key=lambda mark: (mark[0], mark[1])):
+        if on and subject not in opened:
+            opened[subject] = at
+        elif not on and subject in opened:
+            spans.append((subject, opened.pop(subject), at))
+    spans += [(subject, at, None) for subject, at in opened.items()]
     state = row.get("state") or {}
-    found |= {
-        _uuid(person.get("id"))
+    spans += [
+        (str(person.get("id")), None, None)
         for person in state.get("inhabitants", ())
         if person.get("came_by") == "placed"
-    }
-    return sorted((one for one in found if one is not None), key=str)
+    ]
+    found = [(being, start, until) for subject, start, until in spans if (being := _uuid(subject))]
+    return sorted(found, key=lambda span: (str(span[0]), str(span[1]), str(span[2])))
 
 
 def read_moments(
@@ -837,16 +868,25 @@ def read_moments(
     lines (an exchange joins the moment it answers), who decided, where, its run, its scene and the
     other models' answers to its decision as branches. ``more`` says whether earlier ones exist.
     With ``story``, only the moments a person's History draws (H18): each one a model, a person
-    playing or an outside program decided, and each one with a being they touched
-    (:func:`touched_subjects`); ``before``, ``limit`` and ``more`` count within them."""
+    playing or an outside program decided, and each one with a being recorded while the person's
+    hand was on it (:func:`touched_spans`, by the time its anchor event was recorded); ``before``,
+    ``limit`` and ``more`` count within them."""
     rules = load_rules() if rules is None else rules
     society_id = row["society_id"]
-    touched = touched_subjects(connection, workspace_id, row) if story else []
+    spans = touched_spans(connection, workspace_id, row) if story else []
     rows = connection.execute(
         "select moment_id, tick, kind, anchor_event_id, event_ids, request_id, subjects, document "
-        "from world_society_moment where workspace_id=%s and society_id=%s "
+        "from world_society_moment m where workspace_id=%s and society_id=%s "
         "and (%s::int is null or tick < %s::int) "
-        "and (not %s or document->'decider'->>'kind' = any(%s) or subjects && %s::uuid[]) "
+        "and (not %s or document->'decider'->>'kind' = any(%s) or exists ("
+        # A being of the moment whose span holds the time its anchor event was recorded.
+        "select 1 from unnest(%s::uuid[], %s::timestamptz[], %s::timestamptz[]) "
+        "as span(being, opened, closed) where span.being = any(m.subjects) and "
+        "(span.opened is null and span.closed is null or exists ("
+        "select 1 from world_society_event e where e.workspace_id=m.workspace_id "
+        "and e.society_id=m.society_id and e.event_id=m.anchor_event_id "
+        "and (span.opened is null or e.recorded_at >= span.opened) "
+        "and (span.closed is null or e.recorded_at < span.closed))))) "
         "order by tick desc, moment_id desc limit %s",
         (
             workspace_id,
@@ -855,7 +895,9 @@ def read_moments(
             before,
             story,
             list(_STORY_DECIDERS),
-            touched,
+            [span[0] for span in spans],
+            [span[1] for span in spans],
+            [span[2] for span in spans],
             limit + 1,
         ),
     ).fetchall()
