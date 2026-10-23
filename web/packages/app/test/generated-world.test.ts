@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
 import { planSight } from '../src/composition/sight.js';
 import { RENDER_BUDGET } from '../src/render-budget.js';
@@ -93,6 +93,16 @@ function tileRoute(bytes: Readonly<Record<string, Uint8Array>>, stated: (id: str
 }
 
 describe('a saved generated world of several tiles', () => {
+  // Opening a world loads the page's modules it reads lazily (the core library, the version's reader, the
+  // look reader, the furniture forms), and the first test to open one would pay for that load alone: about
+  // 3 to 5 s on a loaded machine, against vitest's 5 s for a test. They are loaded once here, under a limit
+  // of their own.
+  beforeAll(async () => {
+    await Promise.all([
+      import('@exulanica/atlas-core'), import('@exulanica/graph-client'), import('../src/world-objects-api.js'),
+      import('../src/world-look.js'), import('../src/street-furniture-forms.js'),
+    ]);
+  }, 60_000);
   beforeEach(() => {
     loadGeneratedTile.mockReset();
     loadGeneratedTile.mockResolvedValue({ navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } } });
