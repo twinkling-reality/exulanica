@@ -2,6 +2,7 @@ import './front-door.css';
 import captures from 'virtual:front-door-captures';
 import { createScenePreview, scenePreviewPage } from './front-door-preview.ts';
 import { showWorldDetails } from './front-door-details.ts';
+import { offerOpenAndDetailsOnly } from './front-door-card.ts';
 import { endOpening, handOverOpening } from './world-opening.ts';
 import { showBeingMade } from './create-world.ts';
 import { capturedPicture, frontDoorAddress, leadsWithCreate, openWorldAddress, worldAddress } from './front-door-routes.mjs';
@@ -87,6 +88,7 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   const title = document.createElement('h1'); title.className = 'ux-entry-title';
   const lede = root.querySelector('.your-worlds-lede')!;
   const actions = root.querySelector('.your-worlds-actions')!;
+  offerOpenAndDetailsOnly(root);
   const createRow = root.querySelector('.your-worlds-create-row')!;
   for (const [selector, name] of [['.your-worlds-open', null], ['.your-worlds-create', 'add']] as const) {
     const control = root.querySelector(selector)!;
