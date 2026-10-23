@@ -390,7 +390,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     // The maker is handed what places what it makes where it was made: hold, and the ground ahead of the eye.
     if (tile.make) {
       putBack(); deselect();
-      makeCreature?.({ hold: (kind, at) => built.hold(kind, at), ahead: groundAhead, mark: standMark, head: heldHeadOnScreen, showing: (now, key = null) => { making = now; makerKey = now ? key : null; drawTray(); renderCorners(); } });
+      makeCreature?.({ hold: (kind, at, told) => built.hold(kind, at, told), ahead: groundAhead, mark: standMark, head: heldHeadOnScreen, showing: (now, key = null) => { making = now; makerKey = now ? key : null; drawTray(); renderCorners(); } });
       return;
     }
     if (placing?.tileId === tile.id) { putBack(); return; }
@@ -482,7 +482,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     showKindCopy(held, held.verdict.state === 'refused');
     render();
     // Let go here while it was asked about: placed now that the server says it may stand here, else carried on.
-    if (held.letGo) { held.letGo = false; if (held.verdict.state === 'ready') void placeNew(); }
+    if (held.letGo) { held.letGo = false; if (held.verdict.state === 'ready') { void placeNew(); return; } }
+    tellPlacing(held);
   }
   /** `to` at the height a ready preview says the thing rests at (`landing.rest_y_mm`), where it says one. */
   const restingAt = (answered, to) => (Number.isFinite(answered.landing?.rest_y_mm) && answered.landing.rest_y_mm !== to.y ? { ...to, y: answered.landing.rest_y_mm } : to);
@@ -503,14 +504,19 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (at === null) groundRing.hide();
     else groundRing.place({ x: at.x, y: at.y, z: at.z }, Math.hypot(placing.box.width, placing.box.depth) / 2000 * RING_MARGIN);
   }
+  /**
+   * Tells the maker of a held creature how its placing stands (`told`, from `hold`): placing from the moment it is let
+   * go until the server answers, or refused with build mode's own words.
+   */
+  const tellPlacing = (held) => held.told?.({ placing: held.letGo === true || (busy && placing === held), refused: held.verdict.state === 'refused' ? held.verdict.words : null });
   /** Place the new thing where the server said it may stand: the placing's own base and pose. */
   async function placeNew() {
     if (placing === null || busy) return;
     // Still asked about where it stands: let go there, and placed when the answer says it may stand (askPlace).
-    if (placing.verdict.state === 'checking') { if (placing.to !== null) placing.letGo = true; return; }
+    if (placing.verdict.state === 'checking') { if (placing.to !== null) { placing.letGo = true; tellPlacing(placing); } return; }
     if (placing.verdict.state !== 'ready') return;
     const held = placing, verdict = held.verdict, name = held.name;
-    busy = true; render();
+    busy = true; render(); tellPlacing(held);
     try {
       await post('things.place', '/things', { base_state_sha256: verdict.base, ...placingBody(held, verdict.to), saved_entry: savedEntry() });
       busy = false; dropPlacing({ outcome: 'placed', thingId: held.thingId });
@@ -523,7 +529,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       busy = false;
       if (placing === held) held.verdict = { state: 'refused', words: problem(error) };
       showKindCopy(held, true);
-      render();
+      render(); tellPlacing(held);
     }
     try { await refreshRecords(); } catch {}
   }
@@ -1087,9 +1093,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
      * region frame's east and south in millimetres) to be placed, as picking its creatures tile does, switching
      * build mode on first. Resolves { outcome: 'placed', thingId } once the server keeps it, { outcome: 'put-back' }
      * when it is let go unplaced (put back, another tile picked, build mode left or closed), or null when nothing
-     * can be held here (no region to place in, or a write under way).
+     * can be held here (no region to place in, or a write under way). `told` hears how its placing stands, as
+     * { placing, refused }: placing from the moment Enter lets it go until the server answers, refused with why.
      */
-    async hold(kind, at): Promise<HoldOutcome | null> {
+    async hold(kind, at, told = null): Promise<HoldOutcome | null> {
       if (kind?.source !== 'workspace' || typeof kind.sha256 !== 'string' || !Number.isFinite(at?.xMm) || !Number.isFinite(at?.zMm)) return null;
       if (!on) await toggle();
       // Held from its creatures tab, read again first when it is newer than the tab's list (its name is the list's).
@@ -1100,6 +1107,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       pick({ id: 'made:' + kind.sha256, kind: { source: 'workspace', sha256: kind.sha256 } }, { xMm: at.xMm, zMm: at.zMm });
       const held = placing;
       if (held === null) return null;
+      if (told !== null) held.told = told;
       return new Promise<HoldOutcome>((settle) => { held.settle = settle; });
     },
     /**

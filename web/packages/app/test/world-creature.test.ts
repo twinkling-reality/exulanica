@@ -198,7 +198,34 @@ describe('making a creature where it will stand', () => {
     expect(refused.calls.ask).toEqual([]);
   });
 
-  it('shows a refusal in its code\'s sentence, and Esc goes back to building', async () => {
+  it('reads "Placing…" with its key dimmed from the moment build mode lets the creature go, and a refused place says why', async () => {
+    const { openCreatureScreen } = await screen();
+    const { deps, root } = world();
+    type Told = (placing: { readonly placing: boolean; readonly refused: string | null }) => void;
+    let told: Told | undefined;
+    const opened = await openCreatureScreen({ ...deps, hold: (kind: unknown, at: unknown, heard?: Told) => { told = heard; return deps.hold(kind, at); } });
+    const field = root.querySelector('textarea')!;
+    field.value = 'a round yellow body';
+    field.dispatchEvent(new Event('input'));
+    opened.key(press('Enter'));
+    await settle();
+    const row = () => root.querySelector('.wu-creature-made .wu-row');
+    expect(row()?.textContent).toBe('Place');
+    told!({ placing: true, refused: null });
+    expect(row()?.textContent).toBe('Placing…');
+    expect(row()?.getAttribute('aria-disabled')).toBe('true');
+    // Refused: why, in build mode's words, and Place dimmed, as build mode offers no Place for a refused placing.
+    told!({ placing: false, refused: 'It cannot stand here: something is in the way.' });
+    expect(row()?.textContent).toBe('Place');
+    expect(row()?.getAttribute('aria-disabled')).toBe('true');
+    expect(root.querySelector('.wu-creature-made .wu-refused')?.textContent).toBe('It cannot stand here: something is in the way.');
+    // Where it may stand again: Place is back, and the refusal goes.
+    told!({ placing: false, refused: null });
+    expect(row()?.getAttribute('aria-disabled')).toBeNull();
+    expect(root.querySelector('.wu-creature-made .wu-refused')).toBeNull();
+  });
+
+  it('shows a refusal in its code\'s sentence with Try again, back to the words, and Esc goes back to building', async () => {
     const { openCreatureScreen } = await screen();
     const refusal = { code: 'creature_movement_unbuilt', field: 'moves_fly', detail: 'This world has no flying creatures yet.' };
     const { deps, calls, root } = world({ reads: [{ ...queued, status: 'refused', refusal }] });
@@ -209,9 +236,130 @@ describe('making a creature where it will stand', () => {
     opened.key(press('Enter'));
     await settle();
     expect(root.textContent).toContain('This world has no flying creatures yet.');
+    // Changed words may pass: Try again shows, and Enter goes back to the field with the words kept.
+    expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try again');
+    expect(opened.key(press('Enter'))).toBe(true);
+    expect(root.querySelector('textarea')?.value).toBe('a winged body that flies');
     expect(opened.key(press('Escape'))).toBe(true);
     expect(calls.closed).toBe(1);
     expect(calls.hold).toEqual([]);
+  });
+
+  it('says why a draft ended with nothing made, by its code, and offers Try again wherever making is still offered', async () => {
+    const { openCreatureScreen } = await screen();
+    for (const [failure, words, retry] of [
+      ['drafter_unavailable', 'The AI model did not answer, so nothing was made. Try again in a minute.', true],
+      ['stranded', 'Making stopped part way, so nothing was kept. Try again.', true],
+      ['expired', 'Making did not start in time, so nothing was made. Try again in a few minutes.', true],
+      ['not_served', 'Making creatures isn\'t offered here.', false],
+      ['request_refused', 'The rules here kept your words from being sent to the model, so nothing was made.', true],
+      ['reference_withdrawn', 'The picture it was to be made from was withdrawn, so nothing was made.', true],
+      ['spending_suspended', 'Spending on AI models is paused here.', false],
+      ['spending_refused', 'The budget for AI models here is spent.', false],
+      ['a_code_served_later', 'Something went wrong while making it, so nothing was made. Try again.', true],
+    ] as const) {
+      const { deps, root } = world({ reads: [{ ...queued, status: 'failed', failure }] });
+      const opened = await openCreatureScreen(deps);
+      const field = root.querySelector('textarea')!;
+      field.value = 'a round yellow body';
+      field.dispatchEvent(new Event('input'));
+      opened.key(press('Enter'));
+      await settle();
+      expect(root.querySelector('.wu-creature-step.wu-refused')?.textContent).toBe(words);
+      // Nothing carries on at the server, so the small print saying it does goes; nothing was spent, so no spend.
+      expect(root.textContent).not.toContain('You can leave this page');
+      expect(root.textContent).not.toContain('At most');
+      expect(root.textContent).not.toContain('Spent');
+      expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent ?? null).toBe(retry ? 'Try again' : null);
+      // Enter tries again only where Try again shows: back to the field, the words kept.
+      expect(opened.key(press('Enter'))).toBe(retry);
+      expect(root.querySelector('.wu-creature-group') === null).toBe(retry);
+      if (retry) expect(root.querySelector('textarea')?.value).toBe('a round yellow body');
+      document.body.replaceChildren();
+    }
+  });
+
+  it('tries again from the Try again key as from Enter, and says what was spent before it stopped', async () => {
+    const { openCreatureScreen } = await screen();
+    const { deps, calls, root } = world({ reads: [{ ...queued, status: 'failed', failure: 'drafter_unavailable', spentUsd: '0.00020000' }, kept] });
+    const opened = await openCreatureScreen(deps);
+    const field = root.querySelector('textarea')!;
+    field.value = 'a round yellow body';
+    field.dispatchEvent(new Event('input'));
+    opened.key(press('Enter'));
+    await settle();
+    expect(root.querySelector('.wu-creature-group .wu-creature-small')?.textContent).toBe('Spent $0.0002 before it stopped.');
+    root.querySelector<HTMLButtonElement>('.wu-creature-group button[aria-keyshortcuts="Enter"]')!.click();
+    expect(root.querySelector('textarea')?.value).toBe('a round yellow body');
+    opened.key(press('Enter'));
+    await settle();
+    expect(calls.ask).toEqual(['a round yellow body', 'a round yellow body']);
+    expect(root.textContent).toContain('Yellow pond wader');
+  });
+
+  it('sends the words as the server takes a line: one space for each run of white space, none at either end', async () => {
+    const { openCreatureScreen, sendableWords } = await screen();
+    expect(sendableWords('  a round\n\nyellow body​ \t')).toBe('a round yellow body');
+    const { deps, calls, root } = world();
+    const opened = await openCreatureScreen(deps);
+    const field = root.querySelector('textarea')!;
+    field.value = ' a round yellow body\non two short legs ';
+    field.dispatchEvent(new Event('input'));
+    opened.key(press('Enter'));
+    await settle();
+    expect(calls.ask).toEqual(['a round yellow body on two short legs']);
+    expect(root.textContent).toContain('“a round yellow body on two short legs”');
+    // White space alone asks nothing.
+    const blank = world();
+    const empty = await openCreatureScreen(blank.deps);
+    const space = blank.root.querySelector('textarea')!;
+    space.value = ' \n ';
+    space.dispatchEvent(new Event('input'));
+    empty.key(press('Enter'));
+    await settle();
+    expect(blank.calls.ask).toEqual([]);
+  });
+
+  it('says a draft the page stops following is taking longer, and offers nothing to press', async () => {
+    const { openCreatureScreen } = await screen();
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      const { deps, root } = world({ reads: Array.from({ length: 200 }, () => ({ ...queued, status: 'running' as const })) });
+      const opened = await openCreatureScreen({ ...deps, wait: async (ms: number) => { now += ms; } });
+      const field = root.querySelector('textarea')!;
+      field.value = 'a round yellow body';
+      field.dispatchEvent(new Event('input'));
+      opened.key(press('Enter'));
+      const late = 'This is taking longer than usual. The creature waits in Creatures when it\'s done.';
+      await vi.waitFor(() => expect(root.querySelector('.wu-creature-step')?.textContent).toBe(late));
+      expect(root.querySelector('.wu-refused')).toBeNull();
+      // The line says it may still finish; the small print keeps only the price.
+      expect(root.querySelector('.wu-creature-group .wu-creature-small')?.textContent).toBe('At most $0.37.');
+      expect(opened.key(press('Enter'))).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('follows the draft already being made when an ask is refused for it, and otherwise says the hour is used up', async () => {
+    const { openCreatureScreen } = await screen();
+    const limited = Object.assign(new Error('creature_limit_reached'), { code: 'creature_limit_reached' });
+    for (const running of [true, false]) {
+      let listed: readonly CreatureDraft[] = [];
+      const { deps, root } = world();
+      const opened = await openCreatureScreen({ ...deps, client: { ...deps.client, ask: async () => { throw limited; }, drafts: async () => listed } });
+      // Asked meanwhile from another page.
+      listed = running ? [{ ...queued, status: 'running' }] : [];
+      const field = root.querySelector('textarea')!;
+      field.value = 'a round yellow body';
+      field.dispatchEvent(new Event('input'));
+      opened.key(press('Enter'));
+      await settle();
+      if (running) expect(root.textContent).toContain('Yellow pond wader');
+      else expect(root.querySelector('.wu-creature-line.wu-refused')?.textContent).toBe('You\'ve made as many creatures as you can this hour. Try again later.');
+      document.body.replaceChildren();
+    }
   });
 
   it('says spending is paused, not spent, by the served code, before anyone types and after Make (N34)', async () => {

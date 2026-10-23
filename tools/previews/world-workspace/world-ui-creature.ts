@@ -28,6 +28,15 @@ export const CREATURE_WORDS = Object.freeze({
   notOffered: 'Making creatures isn\'t offered here.',
   budgetSpent: 'The budget for AI models here is spent.',
   spendingPaused: 'Spending on AI models is paused here.',
+  modelSilent: 'The AI model did not answer, so nothing was made. Try again in a minute.',
+  stoppedPartWay: 'Making stopped part way, so nothing was kept. Try again.',
+  notStarted: 'Making did not start in time, so nothing was made. Try again in a few minutes.',
+  notSent: 'The rules here kept your words from being sent to the model, so nothing was made.',
+  pictureWithdrawn: 'The picture it was to be made from was withdrawn, so nothing was made.',
+  hourLimit: 'You\'ve made as many creatures as you can this hour. Try again later.',
+  wentWrong: 'Something went wrong while making it, so nothing was made. Try again.',
+  takingLonger: 'This is taking longer than usual. The creature waits in Creatures when it\'s done.',
+  placingNow: 'Placing…',
   maker: 'An AI model makes the creature from your words',
   leave: 'You can leave this page: the making carries on, and the creature waits in Creatures.',
   kept: 'kept in Creatures',
@@ -106,6 +115,13 @@ export interface MakingGroup {
   readonly root: HTMLElement;
   /** The one served step with its live dot and time, or, with no time, a refusal's sentence in the refused ink. */
   step(words: string, refused?: boolean, time?: string | null): void;
+  /**
+   * Ended with nothing made: the step becomes why, in the refused ink; "[↵] Try again" shows under it where making is
+   * still offered (`onRetry`); the small print says what was spent before it stopped, or goes (DESIGN, 23 October).
+   */
+  ended(words: string, onRetry: (() => void) | null, spentUsd: string | null): void;
+  /** Still being made when the page stops following it: the step says so, and the small print keeps only the price. */
+  late(words: string): void;
 }
 
 /** The light rising from the stand while the creature is made (r19t; still, M13). The caller places it. */
@@ -120,8 +136,9 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
   const root = shade();
   root.classList.add('wu-creature-group');
   const step = element('p', 'wu-creature-step');
-  const small = [priceUsdAtMost === null ? null : `At most ${money(priceUsdAtMost)}.`, CREATURE_WORDS.leave].filter(Boolean).join(' ');
-  root.append(element('h2', 'wu-creature-title', CREATURE_WORDS.making), element('p', 'wu-creature-quote', quoted(words)), step, element('p', 'wu-creature-small', small));
+  const atMost = priceUsdAtMost === null ? null : `At most ${money(priceUsdAtMost)}.`;
+  const small = element('p', 'wu-creature-small', [atMost, CREATURE_WORDS.leave].filter(Boolean).join(' '));
+  root.append(element('h2', 'wu-creature-title', CREATURE_WORDS.making), element('p', 'wu-creature-quote', quoted(words)), step, small);
   return {
     root,
     step(words, refused = false, time = null) {
@@ -130,6 +147,17 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
       const dot = element('span', 'wu-creature-dot');
       dot.setAttribute('aria-hidden', 'true');
       step.replaceChildren(dot, element('span', '', words), element('span', 'wu-creature-time', time));
+    },
+    ended(words, onRetry, spentUsd) {
+      step.classList.add('wu-refused');
+      step.textContent = words;
+      const spent = spentUsd !== null && Number(spentUsd) > 0 ? element('p', 'wu-creature-small', `Spent ${money(spentUsd)} before it stopped.`) : null;
+      small.replaceWith(...(onRetry === null ? [] : [glyphRows([{ key: 'Enter', word: CREATURE_WORDS.tryAgain, shortcut: 'Enter', onPress: onRetry }])]), ...(spent === null ? [] : [spent]));
+    },
+    late(words) {
+      step.classList.remove('wu-refused');
+      step.textContent = words;
+      if (atMost === null) small.remove(); else small.textContent = atMost;
     },
   };
 }
@@ -161,6 +189,21 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
     ...lines.map((line) => element('p', 'wu-creature-small', line)),
   );
   return root;
+}
+
+/**
+ * The made card's Place row as build mode's placing stands (DESIGN, 23 October): "[↵] Place"; once Enter lets the
+ * creature go, "Placing…" with its key dimmed until the server answers; a refused place says why in build mode's own
+ * words, in the refused ink, under "Place" dimmed as build mode's own refused placing offers no Place (Esc puts it back,
+ * and it waits in Creatures).
+ */
+export function placeRow(card: HTMLElement, state: { readonly placing: boolean; readonly refused: string | null }): void {
+  const rows = card.querySelector('.wu-rows');
+  if (rows === null) return;
+  const row = glyphRows([{ key: 'Enter', word: state.placing ? CREATURE_WORDS.placingNow : CREATURE_WORDS.place, shortcut: 'Enter', disabled: state.placing || state.refused !== null }]);
+  rows.replaceWith(row);
+  card.querySelector('.wu-creature-unplaced')?.remove();
+  if (state.refused !== null && !state.placing) row.after(element('p', 'wu-creature-small wu-refused wu-creature-unplaced', state.refused));
 }
 
 export interface Leader {

@@ -60,6 +60,8 @@
   filter: blur(calc(14 * var(--u))); pointer-events: none;
 }
 .wu-refused { color: var(--refused-ink); }
+/* "Placing…": the made card's Place key dimmed while the server answers, as an empty field's Make key is. */
+.wu-creature-made .wu-row[aria-disabled="true"] { opacity: .55; }
 /* While a creature step shows, the keys button and its card give way (N29), as they do under a page; the pill, Back
    and the clock stay. */
 #contextual-world:has(> .wu-creature-layer) :is(.wu-keys-button, .wu-keys-card) { visibility: hidden; }

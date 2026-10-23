@@ -5,7 +5,7 @@
 // place it where it was made or put it back. The server's drafter and checks decide what the creature is.
 import { CreatureDraftsClient, draftEnded, type CreatureDraft, type CreatureOffer, type SocietyStand } from '../../../web/packages/app/src/creature-drafts-api.ts';
 import type { Credentials } from '../../../web/packages/app/src/config.ts';
-import { CREATURE_WORDS, creatureField, leader, madeGroup, makerLine, makingGroup, standLabel, standLight } from './world-ui-creature.ts';
+import { CREATURE_WORDS, creatureField, leader, madeGroup, makerLine, makingGroup, placeRow, standLabel, standLight } from './world-ui-creature.ts';
 import { ANCHOR_INSET } from './world-ui-layout.mjs';
 
 /** How far ahead of the eye the stand is looked for (the sheet's 8 m: 3 m falls under the field). */
@@ -27,6 +27,38 @@ const REFUSED: Readonly<Record<string, string>> = Object.freeze({
   spending_suspended: CREATURE_WORDS.spendingPaused,
 });
 
+/**
+ * Why a draft ended with nothing made, by its failure code (the offer's `codes.failed`), in DESIGN's words of 23
+ * October, and whether "[↵] Try again" shows under it: back to the field with the words kept, wherever making is still
+ * offered here and changed words may pass. Not where the field cannot help: the budget spent, spending paused, or
+ * making not offered here. Any other code reads `wentWrong`, with Try again.
+ */
+const FAILED: Readonly<Record<string, { readonly words: string; readonly retry: boolean }>> = Object.freeze({
+  drafter_unavailable: { words: CREATURE_WORDS.modelSilent, retry: true },
+  stranded: { words: CREATURE_WORDS.stoppedPartWay, retry: true },
+  expired: { words: CREATURE_WORDS.notStarted, retry: true },
+  not_served: { words: CREATURE_WORDS.notOffered, retry: false },
+  request_refused: { words: CREATURE_WORDS.notSent, retry: true },
+  reference_withdrawn: { words: CREATURE_WORDS.pictureWithdrawn, retry: true },
+  spending_refused: { words: CREATURE_WORDS.budgetSpent, retry: false },
+  spending_suspended: { words: CREATURE_WORDS.spendingPaused, retry: false },
+});
+
+/**
+ * The words as the server takes a line: in normal form C, with no control or format character, every run of white
+ * space (a line break included) one space, and none at either end, so what a person typed is never refused for what
+ * they cannot see.
+ */
+export function sendableWords(words: string): string {
+  return words.normalize('NFC').replace(/\s+/gu, ' ').replace(/[\p{Cc}\p{Cf}]/gu, '').replace(/ {2,}/g, ' ').trim();
+}
+
+/** A refusal's served code, from an error the app's transport throws (ApiError), or null. */
+const codeOf = (error: unknown): string | null => {
+  const code = (error as { readonly code?: unknown } | null)?.code;
+  return typeof code === 'string' && code ? code : null;
+};
+
 /** How a hold ends, as build mode answers it. */
 export type Held = { readonly outcome: 'placed'; readonly thingId: string } | { readonly outcome: 'put-back' } | null;
 
@@ -41,8 +73,15 @@ export interface CreatureScreenDeps {
   readonly mark: (stand: SocietyStand | null) => { readonly x: number; readonly y: number } | null;
   /** Where the held creature's head shows on the screen, for the made card's leader; null where it is not drawn. */
   readonly head?: () => { readonly x: number; readonly y: number } | null;
-  /** Build mode's hold: the kept kind held at the stand's point to be placed. */
-  readonly hold: (kind: { readonly source: 'workspace'; readonly sha256: string }, at: { readonly xMm: number; readonly zMm: number }) => Promise<Held>;
+  /**
+   * Build mode's hold: the kept kind held at the stand's point to be placed; `told` hears how its placing stands
+   * (placing once Enter lets it go, until the server answers; refused with build mode's own words).
+   */
+  readonly hold: (
+    kind: { readonly source: 'workspace'; readonly sha256: string },
+    at: { readonly xMm: number; readonly zMm: number },
+    told?: (placing: { readonly placing: boolean; readonly refused: string | null }) => void,
+  ) => Promise<Held>;
   /** Back to building; the making, if any, carries on. */
   readonly close: () => void;
   /**
@@ -74,7 +113,10 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   let offer: CreatureOffer | null = null;
   let stand: SocietyStand | null = null;
   let words = '';
-  let state: 'describe' | 'making' | 'made' | 'ended' = 'describe';
+  // 'late': the page stopped following a draft the server is still making; it waits in Creatures when done.
+  let state: 'describe' | 'making' | 'made' | 'ended' | 'late' = 'describe';
+  // Ended with nothing made, whether trying again can help (Try again shows, and Enter does it).
+  let retryable = false;
   let ended = false;
   const field = creatureField({ maximum: WORDS_MAXIMUM, onMake: () => { void make(); } });
   const label = standLabel(), light = standLight();
@@ -157,11 +199,12 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     if (current.status === 'kept' && current.kind !== null) {
       state = 'made';
       making.root.remove();
-      layer.append(madeGroup({
+      const card = madeGroup({
         label: current.label, words, modelName: current.model?.name ?? null, spentUsd: current.spentUsd ?? null,
         // Until its made look is made, the creature wears its sketch (M15).
         sketch: current.lookStatus !== 'made', placeable: stand !== null,
-      }));
+      });
+      layer.append(card);
       if (stand !== null) {
         // It stands where it was made, held to be placed (B8): build mode draws it there and its own keys place it or
         // put it back; either way this step ends, and a creature put back waits in Creatures.
@@ -169,23 +212,49 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
         deps.mark(null);
         deps.release();
         const at = { xMm: stand.positionMm[0], zMm: stand.positionMm[1] };
-        void deps.hold({ source: 'workspace', sha256: current.kind.sha256 }, at).then(() => {
+        // Build mode tells how its placing stands, so the card says "Placing…" until the server answers.
+        void deps.hold({ source: 'workspace', sha256: current.kind.sha256 }, at, (placing) => { placeRow(card, placing); }).then(() => {
           if (!ended) { destroy(); deps.close(); }
         });
       }
       return;
     }
+    if (!draftEnded(current)) {
+      // Still being made when the page stops following: it carries on at the server and waits in Creatures.
+      state = 'late';
+      making.late(CREATURE_WORDS.takingLonger);
+      return;
+    }
     state = 'ended';
-    making.step(current.refusal?.detail ?? REFUSED[current.failure ?? ''] ?? CREATURE_WORDS.notOffered, true);
+    // A refused draft says its check's own sentence; changed words may pass, so Try again shows under it too.
+    const failed = current.refusal !== null ? { words: current.refusal.detail, retry: true } : FAILED[current.failure ?? ''] ?? { words: CREATURE_WORDS.wentWrong, retry: true };
+    retryable = failed.retry;
+    making.ended(failed.words, retryable ? tryAgain : null, current.spentUsd ?? null);
+  }
+
+  /** Back to the field with the words kept, as Enter does where "[↵] Try again" shows. */
+  function tryAgain(): void {
+    if (state !== 'ended' || ended) return;
+    state = 'describe';
+    layer.replaceChildren(field.root);
+    lineUnder();
+    field.input.focus();
   }
 
   async function make(): Promise<void> {
-    if (state !== 'describe' || offer === null || !offer.offered || words.trim() === '') return;
+    if (state !== 'describe' || offer === null || !offer.offered) return;
+    const sent = sendableWords(words);
+    if (sent === '') return;
+    words = sent;
     let asked: CreatureDraft;
     try {
-      asked = await deps.client.ask(words);
-    } catch {
-      field.line(CREATURE_WORDS.notOffered, true);
+      asked = await deps.client.ask(sent);
+    } catch (error) {
+      const code = codeOf(error);
+      // One draft open at a time: the one being made is followed rather than refused (a second page asked it).
+      const running = code === 'creature_limit_reached' ? (await deps.client.drafts().catch(() => [])).find((draft) => !draftEnded(draft)) : undefined;
+      if (running !== undefined) { await follow(running); return; }
+      field.line(code === 'creature_limit_reached' ? CREATURE_WORDS.hourLimit : REFUSED[code ?? ''] ?? CREATURE_WORDS.wentWrong, true);
       return;
     }
     await follow(asked);
@@ -212,7 +281,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       if (event.key === 'Escape') { event.preventDefault(); destroy(); deps.close(); return true; }
       if (event.key === 'Enter' && !event.shiftKey) {
         if (state === 'describe') { event.preventDefault(); void make(); return true; }
-        if (state === 'ended') { event.preventDefault(); state = 'describe'; layer.replaceChildren(field.root); lineUnder(); field.input.focus(); return true; }
+        if (state === 'ended' && retryable) { event.preventDefault(); tryAgain(); return true; }
       }
       return false;
     },

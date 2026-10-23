@@ -10,8 +10,9 @@ vi.mock('../src/composition/sight.ts', () => ({ pickSiteSlot: () => null }));
 vi.mock('../src/composition/site-world.ts', () => ({ currentOpenSite: () => null }));
 vi.mock('../src/composition/visitor-notices.ts', () => ({ kindDocumentLabel: () => null }));
 
+interface Placing { readonly placing: boolean; readonly refused: string | null }
 interface Hand {
-  hold(kind: unknown, at: unknown): Promise<unknown>;
+  hold(kind: unknown, at: unknown, told?: (placing: Placing) => void): Promise<unknown>;
   ahead(millimetres: number): unknown;
   mark(at: unknown, radiusM: number): unknown;
   head(): unknown;
@@ -37,8 +38,11 @@ class Point {
 let mounted: BuildMode | null = null;
 afterEach(() => { mounted?.dispose(); mounted = null; document.body.replaceChildren(); });
 
-/** Build mode in a made world with one creature made and a creature maker that keeps what it is handed. */
-async function mount(): Promise<{ mode: BuildMode; root: HTMLElement; writes: Write[]; hands: Hand[] }> {
+/**
+ * Build mode in a made world with one creature made and a creature maker that keeps what it is handed; `place`
+ * answers the place itself where given (else at once).
+ */
+async function mount(place?: () => Promise<{ body: unknown }>): Promise<{ mode: BuildMode; root: HTMLElement; writes: Write[]; hands: Hand[] }> {
   const writes: Write[] = [], hands: Hand[] = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -49,6 +53,7 @@ async function mount(): Promise<{ mode: BuildMode; root: HTMLElement; writes: Wr
   };
   const send = async (write: Write): Promise<{ body: unknown }> => {
     writes.push(write);
+    if (write.actionId === 'things.place' && place) return place();
     return { body: write.actionId === 'things.place.preview' ? { availability: 'ready', landing: { checked: true } } : {} };
   };
   const notes = { show: () => {}, clear: () => {}, place: () => {} };
@@ -125,5 +130,45 @@ describe('build mode handing a creature maker what places what it makes', () => 
     void hands[0]!.hold({ source: 'workspace', sha256: PIP }, { xMm: 4200, zMm: -1800 });
     await vi.waitFor(() => expect(asked(writes)).toBeDefined());
     expect(asked(writes)!.body).toMatchObject({ kind: { source: 'workspace', sha256: PIP }, pose: { x_mm: 4200, z_mm: -1800 } });
+  });
+
+  it('tells the maker its creature is placing from Enter until the server answers, and why a place was refused', async () => {
+    let answer: { settle: (body: { body: unknown }) => void; refuse: (error: Error) => void } | null = null;
+    const { mode, root, writes, hands } = await mount(() => new Promise((settle, refuse) => { answer = { settle, refuse }; }));
+    await picked(root, mode);
+    const told: Placing[] = [];
+    const held = hands[0]!.hold({ source: 'workspace', sha256: PIP }, { xMm: 4200, zMm: -1800 }, (placing) => { told.push(placing); });
+    await vi.waitFor(() => expect(told).toEqual([{ placing: false, refused: null }]));
+    const enter = () => mode.key(new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter' }));
+    enter();
+    expect(told.at(-1)).toEqual({ placing: true, refused: null });
+    // A second Enter while the server answers places nothing more.
+    enter();
+    expect(writes.filter((write) => write.actionId === 'things.place')).toHaveLength(1);
+    answer!.refuse(new Error('refused'));
+    await vi.waitFor(() => expect(told.at(-1)?.placing).toBe(false));
+    expect(told.at(-1)?.refused).toEqual(expect.any(String));
+    expect(told.at(-1)?.refused).not.toBe('');
+    // Refused, Enter places nothing more; Esc puts it back and the hold ends.
+    enter();
+    expect(writes.filter((write) => write.actionId === 'things.place')).toHaveLength(1);
+    mode.key(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
+    await expect(held).resolves.toMatchObject({ outcome: 'put-back' });
+  });
+
+  it('tells the maker its creature is placing while the server still checks where it stands, then places it', async () => {
+    let answer: ((body: { body: unknown }) => void) | null = null;
+    const { mode, root, hands } = await mount(() => new Promise((settle) => { answer = settle; }));
+    await picked(root, mode);
+    const told: Placing[] = [];
+    const held = hands[0]!.hold({ source: 'workspace', sha256: PIP }, { xMm: 4200, zMm: -1800 }, (placing) => { told.push(placing); });
+    // Enter before the check answers lets it go there: placing at once, and placed once it may stand.
+    await vi.waitFor(() => expect(mode.active()).toBe(true));
+    mode.key(new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter' }));
+    expect(told).toEqual([{ placing: true, refused: null }]);
+    await vi.waitFor(() => expect(answer).not.toBeNull());
+    expect(told.every((placing) => placing.placing)).toBe(true);
+    answer!({ body: {} });
+    await expect(held).resolves.toMatchObject({ outcome: 'placed' });
   });
 });
