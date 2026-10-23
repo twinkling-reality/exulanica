@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
-import { furnitureOnLand, LAND_WAIT_MS, loadTownLand, rememberTownLand, townGround, withoutEdge, withTownLand, type TownLand } from '../src/composition/town-land.js';
+import { askForTownLand, furnitureOnLand, LAND_WAIT_MS, loadTownLand, rememberTownLand, townGround, withoutEdge, withTownLand, type TownLand } from '../src/composition/town-land.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, SavedWorldEntry } from '../src/world-entry-api.js';
 
@@ -187,6 +187,22 @@ describe("a town on its land's land, read", () => {
     await vi.advanceTimersByTimeAsync(LAND_WAIT_MS);
     await refused;
     expect(asks.at(-1)! - start).toBeGreaterThanOrEqual(LAND_WAIT_MS - 2000);
+  });
+
+  it('asks once for the land of a town whose tiles still bake, reading nothing, and nothing for a town on level ground', async () => {
+    const onLand = { ...entry, generatedGround: { landSha256: LAND_SHA256 } } as unknown as SavedWorldEntry;
+    const level = { ...entry, generatedGround: {} } as unknown as SavedWorldEntry;
+    const asked = vi.fn(async (_input: string, _init?: RequestInit) => new Response('{}', { status: 503, headers: { 'Retry-After': '2' } }));
+    vi.stubGlobal('fetch', asked);
+    askForTownLand(access, level);
+    expect(asked).not.toHaveBeenCalled();
+    askForTownLand(access, onLand);
+    expect(asked.mock.calls.map(([input]) => input)).toEqual([`${access.baseUrl}/world/versions/version/land?world_id=world%3Agenerated%3Atown-on-land`]);
+    expect(asked.mock.calls[0]![1]!.headers).toMatchObject({ Authorization: 'Bearer private' });
+    // A host that cannot be reached is not the opening's to say: the ask throws nothing.
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    expect(() => askForTownLand(access, onLand)).not.toThrow();
+    await new Promise((done) => { setTimeout(done, 0); });
   });
 
   it.each([

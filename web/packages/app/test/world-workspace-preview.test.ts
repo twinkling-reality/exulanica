@@ -50,9 +50,13 @@ function diagnostics(file: string, text: string): string[] {
 
 /**
  * What the edit adds, beyond what the file says unpatched. The workspace imports are `/@fs/` paths
- * Vite serves, never resolvable here, so they are expected to be unresolved.
+ * Vite serves, never resolvable here, so they are expected to be unresolved, as is the app module a
+ * seam imports where it is needed (a baking town's land, asked for while it bakes).
  */
-const EXPECTED = [/^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world|world-creature)\.ts'/u];
+const EXPECTED = [
+  /^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world|world-creature)\.ts'/u,
+  /^TS(2307|2792): Cannot find module '\.\/composition\/town-land\.js'/u,
+];
 function introduced(file: string, before: string, after: string): string[] {
   const left = new Map<string, number>();
   for (const one of diagnostics(file, before)) left.set(one, (left.get(one) ?? 0) + 1);
@@ -155,6 +159,10 @@ describe('the world workspace preview\'s edits to this app', () => {
     expect(waiting).toContain(`read < ${BAKE_READS}`);
     expect(waiting).toContain('location.reload();');
     expect(waiting).not.toContain('mount(');
+    // Its land is asked for before the first wait, and nothing waits on the ask.
+    const asks = waiting.indexOf("void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry)");
+    expect(asks).toBeGreaterThan(-1);
+    expect(asks).toBeLessThan(waiting.indexOf('await new Promise((done) => setTimeout(done'));
     // Bounded: five minutes of reads at most before it opens again.
     expect(BAKE_POLL_MS * BAKE_READS).toBe(300_000);
   });

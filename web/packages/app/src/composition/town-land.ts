@@ -10,7 +10,8 @@
  * a site on land's are. While the kind worker is still making the land, the route answers 503 with
  * a `Retry-After`, and the page asks again after the seconds it states, for at most `LAND_WAIT_MS`
  * in all. Land that cannot be read is not stood in for: the world does not open, as it does not
- * with a tile that is not the one its entry names.
+ * with a tile that is not the one its entry names. A town whose tiles still bake asks for its land
+ * once beforehand (`askForTownLand`), so the server makes it beside the bakes and keeps it.
  *
  * The tiles draw the town and the terrain under it, and the land is drawn round them: every near
  * chunk no tile covers (a chunk is a tile's square, and chunk (x, y) lies under tile (x, y)), the
@@ -61,6 +62,25 @@ interface WalkedSurface {
 
 let held: { readonly entryId: string; readonly town: TownLand } | null = null;
 
+/** Where a land document of the town an entry opens is read: through its world's version. */
+function landAddress(access: Credentials, entry: SavedWorldEntry, path: string): string {
+  const query = new URLSearchParams({ world_id: entry.worldId });
+  return `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}/${path}?${query.toString()}`;
+}
+
+/**
+ * Ask once for the land section of a town on land, neither waiting for nor reading the answer: the
+ * server starts making the land and keeps it once made, so the read that opens the town finds it
+ * made. A town on level ground asks nothing.
+ */
+export function askForTownLand(access: Credentials, entry: SavedWorldEntry): void {
+  if (entry.generatedGround?.landSha256 === undefined) return;
+  void fetch(landAddress(access, entry, 'land'), {
+    headers: { ...accessHeaders(access), Accept: 'application/json' },
+    credentials: 'same-origin',
+  }).then((response) => response.body?.cancel(), () => {});
+}
+
 /**
  * The land a town on land's entry names, read through its world's version: the section, held to
  * its entity tag, its world and the entry's digest, and every chunk and the backdrop it names,
@@ -72,15 +92,13 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
     import('@exulanica/atlas-react/playcanvas'),
     import('../land-surfaces.js'),
   ]);
-  const query = new URLSearchParams({ world_id: entry.worldId });
-  const version = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`;
   let bytes = 0;
   const until = Date.now() + LAND_WAIT_MS;
   /** A land document, held to `sha256`, or for the section, to the digest of its own bytes. */
   const read = async (path: string, sha256: string | null): Promise<unknown> => {
     let response: Response;
     for (;;) {
-      response = await fetch(`${version}/${path}?${query.toString()}`, {
+      response = await fetch(landAddress(access, entry, path), {
         headers: { ...accessHeaders(access), Accept: 'application/json' },
         credentials: 'same-origin',
       });

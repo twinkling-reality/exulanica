@@ -94,6 +94,9 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
         return;
       }
       if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'baking')) {
+        // Its land is asked for now, so the server makes it beside the bakes; nothing waits on it.
+        const asking = state.credentials;
+        if (asking) void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry), () => {});
         // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads; then the page opens again with whatever it reads.
         for (let read = 0, baking = true; baking && read < ${BAKE_READS}; read += 1) {
           await new Promise((done) => setTimeout(done, ${BAKE_POLL_MS}));
