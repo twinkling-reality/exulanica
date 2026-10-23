@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
   TrafficLayer,
+  VEHICLE_LOOKS,
   VehicleLookError,
   pointAlong,
   poseBetween,
@@ -135,6 +136,67 @@ describe('the traffic layer', () => {
     expect(root.findByName('vehicle:plain')!.children.map((child) => child.name)).toContain('body');
     // A vehicle's body is asked for once, when it is first drawn.
     expect(asked.sort()).toEqual(['plain', 'styled']);
+  });
+
+  it('draws a bicycle\'s wheels as discs across it and its frame as rods between their two points', () => {
+    const { root } = setup();
+    const layer = new TrafficLayer(root, () => 0, toRenderer);
+    const BIKE = { length: 1780, width: 690, height: 1500, wheelbase: 1780, frontOverhang: 0, rearOverhang: 0 };
+    layer.setWindow(trafficWindow([car('bike', 3, false, { vehicleClass: 'bicycle', bodyFamily: 'upright_bicycle', dimensionsMm: BIKE })]), 0);
+    layer.update(500);
+    const bike = root.findByName('vehicle:bike')!;
+    const parts = bike.children as pc.Entity[];
+    const wheels = parts.filter((part) => part.name === 'wheel');
+    expect(wheels.map((part) => part.render!.type)).toEqual(['cylinder', 'cylinder']);
+    for (const wheel of wheels) {
+      // Its axis lies across the bicycle, and it is a round wheel about 660 mm high and long.
+      const axis = new pc.Vec3();
+      wheel.getLocalRotation().transformVector(pc.Vec3.UP, axis);
+      expect(Math.abs(axis.x)).toBeCloseTo(1, 5);
+      expect(wheel.getLocalScale().x).toBeCloseTo(0.66, 2);
+      expect(wheel.getLocalScale().z).toBeCloseTo(0.66, 2);
+    }
+    // Every rod's two ends are the points its look states, in the body's frame.
+    const { boxes } = VEHICLE_LOOKS.body_families['upright_bicycle']!;
+    const rods = boxes.filter((box) => box.shape === 'rod');
+    const drawn = parts.filter((part) => part.render?.type === 'cylinder' && part.name === 'frame');
+    expect(drawn.length).toBe(rods.length);
+    rods.forEach((rod, index) => {
+      const part = drawn[index]!;
+      const half = part.getLocalScale().y / 2;
+      const axis = new pc.Vec3();
+      part.getLocalRotation().transformVector(pc.Vec3.UP, axis);
+      const centre = part.getLocalPosition();
+      const end = [centre.y + axis.y * half, centre.z + axis.z * half];
+      const point = (along: number, up: number) => [(up / 1000) * 1.5, -((along / 1000) * 1.78 - 0.89)];
+      const expected = point(rod.along_permille[1], rod.up_permille[1]);
+      expect(end[0]).toBeCloseTo(expected[0]!, 5);
+      expect(end[1]).toBeCloseTo(expected[1]!, 5);
+    });
+  });
+
+  it('draws a bicycle\'s rider only while it rides, and none on one parked at its stand', () => {
+    const { root } = setup();
+    const layer = new TrafficLayer(root, () => 0, toRenderer);
+    const BIKE = { length: 1780, width: 690, height: 1500, wheelbase: 1780, frontOverhang: 0, rearOverhang: 0 };
+    const bike = (id: string, moving: boolean) => car(id, 3, moving, { vehicleClass: 'bicycle', bodyFamily: 'upright_bicycle', dimensionsMm: BIKE });
+    layer.setWindow(trafficWindow([bike('riding', true), bike('parked', false)]), 0);
+    layer.update(500);
+    const rider = (id: string) => root.findByName(`vehicle:${id}`)!.children.find((child) => child.name === 'rider') as pc.Entity;
+    expect(rider('riding').enabled).toBe(true);
+    expect(rider('parked').enabled).toBe(false);
+    // Its head is at the top of the class's envelope, 1.5 m up.
+    const head = rider('riding').children.find((child) => child.name === 'rider_head') as pc.Entity;
+    expect(head.getLocalPosition().y + head.getLocalScale().y / 2).toBeCloseTo(1.5, 5);
+    // Arms and legs either side of the frame, by their offsets across the bicycle's width.
+    const across = (rider('riding').children as pc.Entity[]).map((part) => Math.round(part.getLocalPosition().x * 1000));
+    const stated = VEHICLE_LOOKS.body_families['upright_bicycle']!.rider!.boxes.map((box) => Math.round(((box.across_offset_permille ?? 0) / 1000) * 690));
+    expect(across).toEqual(stated);
+    expect(new Set(across).size).toBeGreaterThan(2);
+    // A car has no rider.
+    layer.setWindow(trafficWindow([car('car', 3, true)]), 0);
+    layer.update(600);
+    expect(root.findByName('vehicle:car')!.children.some((child) => child.name === 'rider')).toBe(false);
   });
 
   it('draws every vehicle in the new bodies from the next frame when a redraw hands them in', () => {

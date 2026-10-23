@@ -1,16 +1,26 @@
 /**
- * VEHICLE LOOKS, VERSION 1: how the page draws each body family and colour the traffic catalog
+ * VEHICLE LOOKS, VERSION 2: how the page draws each body family and colour the traffic catalog
  * names (`assets/catalogs/traffic/vehicle-class.v1.json`), as data.
  *
- * A figure of boxes proportioned to the record's own length, width and height, so a body is
+ * A figure of parts proportioned to the record's own length, width and height, so a body is
  * exactly the size the simulation drove, and nothing the record does not state (lamps, doors,
- * occupants) is drawn. Each box is placed along the body from its rear bumper, up from the road and
- * across its width, in thousandths of the record's dimensions. Presentation only; the simulation
- * reads none of it. `test/traffic-layer.test.ts` holds its keys to the traffic catalog's, both ways.
+ * occupants) is drawn. Each part is placed along the body from its rear bumper, up from the road
+ * and across its width, in thousandths of the record's dimensions, and drawn inside that box by its
+ * shape: a box (the default), a disc filling the box's along and up sides and as thick as it is
+ * across (a wheel), or a rod from its first along and up point to its second, as thick as the box is
+ * across (a frame's tube, rising or falling as its points say), set off the centre line across by
+ * its offset. A family may state a rider, parts drawn only while the vehicle is not parked. Version 2
+ * adds the shapes, the offset and the rider; every family drawn in boxes is as version 1 drew it. Presentation only; the simulation reads none of
+ * it. `test/traffic-looks.test.ts` holds its keys to the traffic catalog's, both ways.
  */
 
 export interface LookBox {
   readonly role: string;
+  /** How the part is drawn inside its box; a box where it states none. */
+  readonly shape?: 'box' | 'disc' | 'rod';
+  /** How far the part's centre stands off the body's centre line across, thousandths of its width, the sign its side; none is 0. */
+  readonly across_offset_permille?: number;
+  /** A rod's two ends where it states a rod; otherwise the box's extent, the first the lower. */
   readonly along_permille: readonly [number, number];
   readonly up_permille: readonly [number, number];
   readonly across_permille: number;
@@ -21,12 +31,17 @@ export interface VehicleLooks {
   readonly reason: string;
   readonly roles: Readonly<Record<string, { readonly colour: string; readonly reason: string }>>;
   readonly colours: Readonly<Record<string, string>>;
-  readonly body_families: Readonly<Record<string, { readonly boxes: readonly LookBox[]; readonly reason: string }>>;
+  readonly body_families: Readonly<Record<string, {
+    readonly boxes: readonly LookBox[];
+    /** Parts drawn only while the vehicle is not parked (a bicycle's rider); none where it states none. */
+    readonly rider?: { readonly boxes: readonly LookBox[]; readonly reason: string };
+    readonly reason: string;
+  }>>;
 }
 
-export const VEHICLE_LOOKS_V1: VehicleLooks = {
-  "profile": "exulanica.vehicle-looks/v1",
-  "reason": "How the page draws each body family and colour the traffic catalog names (assets/catalogs/traffic/vehicle-class.v1.json): a figure of boxes proportioned to the record's own length, width and height, so a body is exactly the size the simulation drove, and nothing the record does not state (lamps, doors, occupants) is drawn. Each box is placed along the body from its rear bumper, up from the road and across its width, in thousandths of the record's dimensions. Presentation only; the simulation reads none of it.",
+export const VEHICLE_LOOKS_V2: VehicleLooks = {
+  "profile": "exulanica.vehicle-looks/v2",
+  "reason": "How the page draws each body family and colour the traffic catalog names (assets/catalogs/traffic/vehicle-class.v1.json): a figure of parts proportioned to the record's own length, width and height, so a body is exactly the size the simulation drove, and nothing the record does not state (lamps, doors, occupants) is drawn. Each part is placed along the body from its rear bumper, up from the road and across its width, in thousandths of the record's dimensions, and drawn in that box as a box, a disc (a wheel) or a rod between two of its points. Presentation only; the simulation reads none of it.",
   "roles": {
     "body": {
       "colour": "vehicle",
@@ -39,6 +54,22 @@ export const VEHICLE_LOOKS_V1: VehicleLooks = {
     "wheel": {
       "colour": "#16171a",
       "reason": "Tyres are drawn dark; the record states no wheel angle, so they do not turn."
+    },
+    "seat": {
+      "colour": "#16171a",
+      "reason": "A bicycle's saddle is drawn dark."
+    },
+    "handlebar": {
+      "colour": "#16171a",
+      "reason": "A bicycle's handlebar is drawn dark across the head of its frame."
+    },
+    "rider": {
+      "colour": "#5b6b60",
+      "reason": "A riding bicycle's rider is drawn in one plain clothing colour, a muted grey green that is no vehicle colour, so the rider reads apart from the frame."
+    },
+    "rider_head": {
+      "colour": "#2b2d33",
+      "reason": "A rider's head is drawn as a dark helmet; the record states no person, so no face or skin is drawn."
     },
     "frame": {
       "colour": "vehicle",
@@ -323,54 +354,272 @@ export const VEHICLE_LOOKS_V1: VehicleLooks = {
       "boxes": [
         {
           "role": "wheel",
+          "shape": "disc",
           "along_permille": [
             0,
-            380
+            371
           ],
           "up_permille": [
             0,
-            380
+            440
           ],
           "across_permille": 60
         },
         {
           "role": "wheel",
+          "shape": "disc",
           "along_permille": [
-            620,
+            629,
             1000
           ],
           "up_permille": [
             0,
-            380
+            440
           ],
           "across_permille": 60
         },
         {
           "role": "frame",
+          "shape": "rod",
           "along_permille": [
-            200,
-            800
+            185,
+            450
           ],
           "up_permille": [
-            330,
+            220,
+            200
+          ],
+          "across_permille": 50
+        },
+        {
+          "role": "frame",
+          "shape": "rod",
+          "along_permille": [
+            185,
+            390
+          ],
+          "up_permille": [
+            220,
             560
           ],
-          "across_permille": 120
+          "across_permille": 50
+        },
+        {
+          "role": "frame",
+          "shape": "rod",
+          "along_permille": [
+            450,
+            390
+          ],
+          "up_permille": [
+            200,
+            560
+          ],
+          "across_permille": 50
+        },
+        {
+          "role": "frame",
+          "shape": "rod",
+          "along_permille": [
+            450,
+            735
+          ],
+          "up_permille": [
+            200,
+            540
+          ],
+          "across_permille": 50
+        },
+        {
+          "role": "frame",
+          "shape": "rod",
+          "along_permille": [
+            390,
+            720
+          ],
+          "up_permille": [
+            560,
+            620
+          ],
+          "across_permille": 50
+        },
+        {
+          "role": "frame",
+          "shape": "rod",
+          "along_permille": [
+            720,
+            815
+          ],
+          "up_permille": [
+            620,
+            220
+          ],
+          "across_permille": 50
+        },
+        {
+          "role": "seat",
+          "along_permille": [
+            345,
+            445
+          ],
+          "up_permille": [
+            560,
+            580
+          ],
+          "across_permille": 200
         },
         {
           "role": "frame",
           "along_permille": [
-            640,
-            700
+            710,
+            740
           ],
           "up_permille": [
-            560,
-            1000
+            620,
+            666
+          ],
+          "across_permille": 60
+        },
+        {
+          "role": "handlebar",
+          "along_permille": [
+            715,
+            735
+          ],
+          "up_permille": [
+            640,
+            666
           ],
           "across_permille": 700
         }
       ],
-      "reason": "Two wheels, a frame between them and the handlebar at the front; no rider, since the record states none."
+      "rider": {
+        "boxes": [
+          {
+            "role": "rider",
+            "along_permille": [
+              340,
+              450
+            ],
+            "up_permille": [
+              575,
+              640
+            ],
+            "across_permille": 420
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              395,
+              530
+            ],
+            "up_permille": [
+              600,
+              870
+            ],
+            "across_permille": 380
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              530,
+              725
+            ],
+            "up_permille": [
+              870,
+              655
+            ],
+            "across_permille": 110,
+            "across_offset_permille": 170
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              530,
+              725
+            ],
+            "up_permille": [
+              870,
+              655
+            ],
+            "across_permille": 110,
+            "across_offset_permille": -170
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              395,
+              540
+            ],
+            "up_permille": [
+              600,
+              420
+            ],
+            "across_permille": 150,
+            "across_offset_permille": 120
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              540,
+              470
+            ],
+            "up_permille": [
+              420,
+              200
+            ],
+            "across_permille": 130,
+            "across_offset_permille": 120
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              395,
+              540
+            ],
+            "up_permille": [
+              600,
+              420
+            ],
+            "across_permille": 150,
+            "across_offset_permille": -120
+          },
+          {
+            "role": "rider",
+            "shape": "rod",
+            "along_permille": [
+              540,
+              430
+            ],
+            "up_permille": [
+              420,
+              200
+            ],
+            "across_permille": 130,
+            "across_offset_permille": -120
+          },
+          {
+            "role": "rider_head",
+            "along_permille": [
+              530,
+              610
+            ],
+            "up_permille": [
+              880,
+              1000
+            ],
+            "across_permille": 260
+          }
+        ],
+        "reason": "A rider drawn only while the bicycle is on the move (any mode but parked): seated on the saddle, the hands on the bar, the feet on the cranks, the head's top at the class's envelope (a rider's eye height of 1,500 mm), in plain parts: one clothing colour that is no frame's, a dark helmet."
+      },
+      "reason": "Two wheels drawn as discs, a frame of rods between the hubs, the saddle and the handlebar near a metre up, nothing of the bicycle above it; its height is a rider's eye envelope, which the rider fills while it moves."
     }
   }
 };

@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import { SignalLights } from './signal-lights.js';
-import { type LookBox, VEHICLE_LOOKS_V1 } from './vehicle-looks.js';
+import { type LookBox, VEHICLE_LOOKS_V2 } from './vehicle-looks.js';
 import type { GroundAt, ToRenderer, TrafficWindow, VehicleSamples } from './types.js';
 
 /**
@@ -38,7 +38,7 @@ const BEHIND_SECONDS = 2;
 
 type Point = readonly [number, number];
 
-export const VEHICLE_LOOKS = VEHICLE_LOOKS_V1;
+export const VEHICLE_LOOKS = VEHICLE_LOOKS_V2;
 
 export class VehicleLookError extends Error {}
 
@@ -54,6 +54,8 @@ export interface VehicleBodies {
 
 interface Drawn {
   readonly root: pc.Entity;
+  /** Its rider (`rider` in its looks), shown only while it is not parked; null where it has none. */
+  readonly rider: pc.Entity | null;
 }
 
 interface Frame {
@@ -322,6 +324,12 @@ export class TrafficLayer {
           ? { frontAxle: from.front, rearAxle: from.rear }
           : poseBetween(from, next, fraction, row.dimensionsMm);
         if (!this.place(row, pose.frontAxle, pose.rearAxle)) hidden += 1;
+        // A rider rides while the vehicle is on the move, in any mode but parked.
+        const rider = this.drawn.get(row.vehicleId)?.rider ?? null;
+        if (rider !== null) {
+          const mode = window.modes[row.mode[whole - window.fromSecond] ?? -1];
+          rider.enabled = mode !== undefined && mode !== 'parked';
+        }
       }
     }
     this.hiddenCount = hidden;
@@ -382,29 +390,55 @@ export class TrafficLayer {
     if (body !== null) {
       root.addChild(body);
       this.root.addChild(root);
-      const drawn = { root };
+      const drawn = { root, rider: null };
       this.drawn.set(row.vehicleId, drawn);
       return drawn;
     }
-    const { length, width, height } = row.dimensionsMm;
-    for (const box of this.bodyBoxes(row.bodyFamily)) {
-      const part = new pc.Entity(box.role);
-      const [a0, a1] = box.along_permille;
-      const [u0, u1] = box.up_permille;
-      const along = ((a0 + a1) / 2 / PERMILLE - 0.5) * length;
-      part.setLocalPosition(0, ((u0 + u1) / 2 / PERMILLE) * height / MM_PER_METRE, -along / MM_PER_METRE);
-      part.setLocalScale(
-        (box.across_permille / PERMILLE) * width / MM_PER_METRE,
-        ((u1 - u0) / PERMILLE) * height / MM_PER_METRE,
-        ((a1 - a0) / PERMILLE) * length / MM_PER_METRE,
-      );
-      part.addComponent('render', { type: 'box', material: this.materialFor(box.role, row.colour) });
-      root.addChild(part);
+    for (const box of this.bodyBoxes(row.bodyFamily)) root.addChild(this.part(box, row));
+    const riding = VEHICLE_LOOKS.body_families[row.bodyFamily]?.rider;
+    let rider: pc.Entity | null = null;
+    if (riding !== undefined) {
+      rider = new pc.Entity('rider');
+      for (const box of riding.boxes) rider.addChild(this.part(box, row));
+      root.addChild(rider);
     }
     this.root.addChild(root);
-    const drawn = { root };
+    const drawn = { root, rider };
     this.drawn.set(row.vehicleId, drawn);
     return drawn;
+  }
+
+  /**
+   * One part of a vehicle's figure in the body's frame (across `x`, up `y`, forward `-z`), drawn by
+   * its shape inside its box: a box; a disc, the engine's cylinder turned to lie across the body,
+   * filling the box's along and up sides; or a rod, the cylinder from the part's first along and up
+   * point to its second, as thick as the box is across.
+   */
+  private part(box: LookBox, row: VehicleSamples): pc.Entity {
+    const { length, width, height } = row.dimensionsMm;
+    const part = new pc.Entity(box.role);
+    const [a0, a1] = box.along_permille;
+    const [u0, u1] = box.up_permille;
+    const metres = (permille: number, of: number) => (permille / PERMILLE) * of / MM_PER_METRE;
+    const across = metres(box.across_permille, width);
+    // Forward is -z, from the body's middle; up from the road.
+    const z0 = -(metres(a0, length) - length / 2 / MM_PER_METRE), z1 = -(metres(a1, length) - length / 2 / MM_PER_METRE);
+    const y0 = metres(u0, height), y1 = metres(u1, height);
+    part.setLocalPosition(metres(box.across_offset_permille ?? 0, width), (y0 + y1) / 2, (z0 + z1) / 2);
+    const shape = box.shape ?? 'box';
+    if (shape === 'disc') {
+      // The cylinder's axis (y) turned onto x: its local x then runs up and its z along.
+      part.setLocalEulerAngles(0, 0, 90);
+      part.setLocalScale(Math.abs(y1 - y0), across, Math.abs(z1 - z0));
+    } else if (shape === 'rod') {
+      // The cylinder's axis (y) turned about x onto the rod, from its first point to its second.
+      part.setLocalEulerAngles(Math.atan2(z1 - z0, y1 - y0) * DEGREES_PER_RADIAN, 0, 0);
+      part.setLocalScale(across, Math.hypot(z1 - z0, y1 - y0), across);
+    } else {
+      part.setLocalScale(across, Math.abs(y1 - y0), Math.abs(z1 - z0));
+    }
+    part.addComponent('render', { type: shape === 'box' ? 'box' : 'cylinder', material: this.materialFor(box.role, row.colour) });
+    return part;
   }
 
   private bodyBoxes(family: string): readonly LookBox[] {
