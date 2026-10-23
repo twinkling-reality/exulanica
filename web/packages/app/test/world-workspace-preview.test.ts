@@ -142,6 +142,23 @@ describe('the world workspace preview\'s edits to this app', () => {
     }
   }, 60_000);
 
+  it("draws a moment's kept preview its next society afresh, as when the world opened, so nobody walks there", async () => {
+    const { patchSource } = await seams();
+    const selection = 'web/packages/app/src/composition/environment-selection.ts';
+    const patched = patchSource(selection, source(selection), here)!;
+    const again = patched.split('\n').find((line) => line.includes('atlas.__workspaceDrawSocietyAgain = '));
+    expect(again).toBeDefined();
+    // Read first: a read whose digest is the last one drawn draws nothing new, and a moment's read keeps the served
+    // digest. Then the snapshot drawn is forgotten and the crowd cleared, and the view just read is drawn as a first
+    // one: everyone placed where it puts them, rather than walked there from the last moment.
+    const at = (text: string) => again!.indexOf(text);
+    expect(at('await liveSociety?.refresh()')).toBeGreaterThan(-1);
+    expect(at('renderedSnapshot = null')).toBeGreaterThan(at('await liveSociety?.refresh()'));
+    expect(at('atlas.authoredSociety?.clearSociety()')).toBeGreaterThan(at('await liveSociety?.refresh()'));
+    expect(at('reflectSavedWorldSociety(live.view)')).toBeGreaterThan(at('renderedSnapshot = null'));
+    expect(at('reflectSavedWorldSociety(live.view)')).toBeGreaterThan(at('atlas.authoredSociety?.clearSociety()'));
+  });
+
   it('keeps a town still baking under its opening and opens it, as a reload does, once baked (B1)', async () => {
     const { patchSource, BAKE_POLL_MS, BAKE_READS } = await seams() as Seams & { BAKE_POLL_MS: number; BAKE_READS: number };
     const main = 'web/packages/app/src/main.ts';

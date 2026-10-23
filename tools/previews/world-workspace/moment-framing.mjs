@@ -15,6 +15,8 @@ export const MOMENT_FRAMING = Object.freeze(framing);
 export const MOMENT_SCENE_KEY = 'exulanica.moment-scene.v1:';
 /** The message the preview frame answers with: the picture's bytes, or null. */
 export const MOMENT_PICTURE_MESSAGE = 'exulanica.moment-picture';
+/** The message a page sends a preview frame that has drawn a moment: draw this next moment of the same version. */
+export const MOMENT_ASK_MESSAGE = 'exulanica.moment-ask';
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const point = (value) => Array.isArray(value) && value.length === 2 && value.every(finite);

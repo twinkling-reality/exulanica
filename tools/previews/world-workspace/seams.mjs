@@ -78,9 +78,15 @@ export function patchSource(file, code, here) {
   }
   if (file === SELECTION) {
     // Build mode mounts the placed things' layer itself where nothing is placed yet, as a society does:
-    // its tray reads the library and draws through that layer.
+    // its tray reads the library and draws through that layer. A moment's kept preview draws its next
+    // moment from the society read again, then drawn afresh from that read, as when the world opened:
+    // nobody walks there. Forgotten only after the read, which draws nothing new where its digest is the
+    // last one drawn (a moment's read keeps the served digest).
     return code.replace(seam('picker hook'), '    atlas.__workspacePick = pickedAlong;\n    atlas.__workspaceThings = () => things;\n'
-      + '    atlas.__workspaceMountThings = () => drawPlacedThings(atlas, regionId, true).then(() => things);\n' + seam('picker hook'));
+      + '    atlas.__workspaceMountThings = () => drawPlacedThings(atlas, regionId, true).then(() => things);\n'
+      + '    atlas.__workspaceDrawSocietyAgain = async () => { await liveSociety?.refresh(); const live = liveSociety; if (live === null) return;'
+      + ' renderedSnapshot = null; atlas.authoredSociety?.clearSociety(); reflectSavedWorldSociety(live.view); };\n'
+      + seam('picker hook'));
   }
   return `import { mountContextualWorld } from '/@fs/${here}/contextual-world.ts';
 import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here}/front-door.ts';

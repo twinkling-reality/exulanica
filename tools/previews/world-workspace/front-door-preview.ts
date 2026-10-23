@@ -1,6 +1,6 @@
 import { isScenePreview, scenePreviewAddress } from './front-door-routes.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
-import { MOMENT_FRAMING, MOMENT_PICTURE_MESSAGE, MOMENT_SCENE_KEY, foregroundShare, framingInSight, momentSociety, overviewDistance, reframe } from './moment-framing.mjs';
+import { MOMENT_ASK_MESSAGE, MOMENT_FRAMING, MOMENT_PICTURE_MESSAGE, MOMENT_SCENE_KEY, foregroundShare, framingInSight, momentSociety, overviewDistance, reframe } from './moment-framing.mjs';
 import { frameJpeg, takeFrame } from '/src/composition/world-pictures.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
 
@@ -12,18 +12,22 @@ const previewPage = isScenePreview(new URL(location.href));
 const live = new URLSearchParams(location.search).get('livePreview') === '1';
 const momentKey = previewPage ? new URLSearchParams(location.search).get('moment') : null;
 
+/** A moment a page asks a preview to draw: the version it belongs to and the scene it recorded, or the world's first view (`first`, no scene). */
+type MomentAsk = { readonly versionId: string; readonly scene: unknown; readonly first?: boolean };
+
 /**
- * The moment this preview draws, as the History page left it: the version it belongs to and the
- * scene it recorded, or the world's first view (`first`, no scene). Null on any other preview, or
- * where nothing was left.
+ * The moment this preview draws now: first the one the History page left it, then each one the page
+ * asks for next (MOMENT_ASK_MESSAGE). Null on any other preview, or where nothing was left.
  */
-const moment: { readonly versionId: string; readonly scene: unknown; readonly first?: boolean } | null = (() => {
+let moment: MomentAsk | null = (() => {
   if (!momentKey) return null;
   try {
     const held = JSON.parse(sessionStorage.getItem(MOMENT_SCENE_KEY + momentKey) ?? 'null');
     return held && typeof held.versionId === 'string' ? held : null;
   } catch { return null; }
 })();
+/** The moment the latest society read was rewritten to: the one drawn, once a read asked after it has landed. */
+let served: MomentAsk | null = null;
 
 /** Whether this page is a scene preview. The workspace's world view never mounts in one. */
 export function scenePreviewPage(): boolean {
@@ -40,12 +44,15 @@ if (previewPage) {
       console.warn('Read-only world preview refused a ' + method + ' request.');
       return Promise.resolve(new Response(JSON.stringify({ detail: 'The world preview is read-only.' }), { status: 405, headers: { 'Content-Type': 'application/json' } }));
     }
-    // A moment's preview reads its version's society as the moment's tick drew it.
+    // A moment's preview reads its version's society as the moment's tick drew it: the moment asked
+    // for when the read was sent, which is the one drawn once it lands.
     const address = new URL(input instanceof Request ? input.url : String(input), location.href);
-    if (moment !== null && address.pathname.endsWith(`/world/versions/${encodeURIComponent(moment.versionId)}/society`)) {
+    const asked = moment;
+    if (asked !== null && address.pathname.endsWith(`/world/versions/${encodeURIComponent(asked.versionId)}/society`)) {
       return original(input, init).then(async (response) => {
         if (!response.ok) return response;
-        const drawn = momentSociety(await response.json(), moment.scene);
+        const drawn = momentSociety(await response.json(), asked.scene);
+        served = asked;
         return new Response(JSON.stringify(drawn), { status: response.status, headers: { 'Content-Type': 'application/json' } });
       });
     }
@@ -62,6 +69,25 @@ function useLens(binding: any, fovDeg: number): void {
 }
 
 /**
+ * How little the moment's subjects may move and turn between two looks half a second apart to stand settled, and
+ * the longest a fresh crowd is given to settle: about what a new preview's crowd has between its society read and
+ * its first look at its people (1.5 to 3 s in the traced previews).
+ */
+const SETTLED = Object.freeze({ metres: 0.01, radians: 0.01, mostMs: 3_000 });
+
+/** Where the preview's camera stood and how it saw as the world opened, before its first picture moved it. */
+let opening: { readonly pose: Record<string, number>; readonly fov: number | null; readonly horizontalFov: boolean | null } | null = null;
+
+/** The camera put back where the world opened: each moment is drawn from there, as the first was. */
+function backToOpening(binding: any): void {
+  if (opening === null || !binding?.controls) return;
+  binding.controls.setView({ ...opening.pose }, 'altitude');
+  const camera = binding.camera?.camera;
+  if (camera && opening.fov !== null) { camera.horizontalFov = opening.horizontalFov ?? camera.horizontalFov; camera.fov = opening.fov; }
+  binding.invalidate();
+}
+
+/**
  * A moment's picture, in the preview's own renderer: once the moment's subjects are drawn, the
  * camera the recipe frames them with, from the first of its sides and heights that sees them whole,
  * then the first frame that holds the world, at the recipe's size, posted to the page that asked as
@@ -75,6 +101,10 @@ async function drawMoment(renderer: any, key: string): Promise<void> {
   const subjects = people.slice(0, 2).map((one) => one.id);
   const wait = MOMENT_FRAMING.wait_ms;
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const lens = binding?.camera?.camera;
+  if (binding?.controls && opening === null) {
+    opening = { pose: { ...binding.controls.state }, fov: lens?.fov ?? null, horizontalFov: lens?.horizontalFov ?? null };
+  }
   // How the world began: the made world seen whole from above (the recipe's `beginning`: its pitch,
   // lens and margin), looking the way its first view looks, at the size a world's picture is kept.
   if (binding && moment?.first === true) {
@@ -178,9 +208,75 @@ function overviewPose(binding: any, beginning: typeof MOMENT_FRAMING.beginning):
   return { x: x + Math.sin(yaw) * back, y: ground + distance * Math.sin(pitch), z: z + Math.cos(yaw) * back, yaw, pitch: -pitch };
 }
 
+/**
+ * After its first moment, the preview stays and draws each next moment of the same version the page
+ * asks for (MOMENT_ASK_MESSAGE), one at a time: the society is read again as that moment drew it, the
+ * crowd drawn afresh from it (the seam's `__workspaceDrawSocietyAgain`), so its people stand where the
+ * moment recorded them rather than walking there, and the moment is drawn as the first was. A preview
+ * that cannot (a first view, another version, no seam) answers `fresh`: the page asks a new preview.
+ */
+function takeAsks(renderer: any, first: Promise<void>): void {
+  let queue = first;
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.origin !== location.origin || event.source !== window.parent) return;
+    const data = event.data as { type?: unknown; key?: unknown; held?: MomentAsk } | null;
+    if (!data || data.type !== MOMENT_ASK_MESSAGE || typeof data.key !== 'string') return;
+    const key = data.key, held = data.held;
+    queue = queue.then(() => drawAsked(renderer, key, held ?? null), () => drawAsked(renderer, key, held ?? null));
+  });
+}
+
+/** One asked moment drawn in this preview, or answered `fresh` where this preview cannot draw it. */
+async function drawAsked(renderer: any, key: string, held: MomentAsk | null): Promise<void> {
+  const fresh = () => window.parent.postMessage({ type: MOMENT_PICTURE_MESSAGE, key, picture: null, fresh: true }, location.origin);
+  const again = renderer.atlas?.binding?.__workspaceDrawSocietyAgain;
+  if (!held || held.first || moment === null || moment.first || held.versionId !== moment.versionId || typeof again !== 'function') return fresh();
+  moment = held;
+  // The crowd is drawn for where the camera stands: drawn from where the world opened, as the first moment was,
+  // so who is near and how they face are as a new preview would find them, and so is the picture.
+  backToOpening(renderer.atlas?.binding);
+  try {
+    await again();
+    // A read sent before this ask (the page's own poll) answers with the moment before: read once more.
+    if (served !== held) await again();
+  } catch { return fresh(); }
+  if (served !== held) return fresh();
+  await settled(renderer.atlas?.binding, held);
+  await drawMoment(renderer, key);
+}
+
+/**
+ * A crowd drawn afresh turns its people over its first frames (toward whoever they talk with, a near form
+ * toward the way it stands), which a new preview's crowd has done before it draws: waited for here until
+ * the moment's subjects stand and face as they did half a second before, at most `SETTLED.mostMs`, so the
+ * picture is the one a new preview would draw.
+ */
+async function settled(binding: any, held: MomentAsk): Promise<void> {
+  const society = binding?.authoredSociety ?? null;
+  if (!binding || !society) return;
+  const subjects = ((held.scene as { people?: { id: string }[] } | null)?.people ?? []).slice(0, 2).map((one) => one.id);
+  const wait = MOMENT_FRAMING.wait_ms;
+  const at = { x: 0, y: 0, z: 0, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; } };
+  const pose = () => subjects.map((id) => (society.groundOf(id, at) ? [at.x, at.z, society.headingOf?.(id) ?? NaN] : null));
+  const holds = (a: (number[] | null)[], b: (number[] | null)[]) => a.every((one, i) => {
+    const other = b[i];
+    if (!one || !other) return false;
+    const turn = Math.abs(Math.atan2(Math.sin(one[2]! - other[2]!), Math.cos(one[2]! - other[2]!)));
+    return Math.hypot(one[0]! - other[0]!, one[1]! - other[1]!) < SETTLED.metres && turn < SETTLED.radians;
+  });
+  let last = pose();
+  for (let waited = 0; waited < SETTLED.mostMs; waited += wait.retry) {
+    binding.invalidate();
+    await new Promise((resolve) => setTimeout(resolve, wait.retry));
+    const now = pose();
+    if (holds(now, last)) return;
+    last = now;
+  }
+}
+
 /** Camera motion in the preview's own renderer, held to the saved world it was asked for. */
 export function mountScenePreview({ state, renderer }: { readonly state: { readonly activeWorldEntry?: SavedWorldEntry | null }; readonly renderer: any }): void {
-  if (momentKey !== null && window.parent !== window) { void drawMoment(renderer, momentKey); return; }
+  if (momentKey !== null && window.parent !== window) { takeAsks(renderer, drawMoment(renderer, momentKey)); return; }
   if (!live || window.parent === window) return;
   const entry = state.activeWorldEntry, binding = renderer.atlas?.binding;
   if (!entry || !binding) return;
