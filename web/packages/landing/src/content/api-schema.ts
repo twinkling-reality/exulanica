@@ -1486,6 +1486,27 @@ export const API_SCHEMA: ApiSpec = {
             }
           ],
           "title": "Land Sha256"
+        },
+        "arrival_toward_mm": {
+          "anyOf": [
+            {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Arrival Toward Mm"
         }
       },
       "additionalProperties": false,

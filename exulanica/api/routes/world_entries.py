@@ -180,6 +180,10 @@ class GeneratedGroundView(BaseModel):
     #: (``GET /world/versions/{version_id}/land``) names it, with the chunks, backdrop and water
     #: drawn round the town. Null for a town on level ground.
     land_sha256: str | None = None
+    #: The way, a plan vector east then south, to what the town's first view looks toward: the sea
+    #: of the land it stands on, on its shore's side. Null for a town on level ground or on land
+    #: with no sea.
+    arrival_toward_mm: tuple[int, int] | None = None
 
 
 class GeneratedSiteView(BaseModel):

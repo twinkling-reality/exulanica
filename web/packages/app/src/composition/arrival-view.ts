@@ -106,6 +106,46 @@ export function openDistance(
   return nearest;
 }
 
+/**
+ * How many buildings show their fronts in a view: those whose face along the street (`street`, a unit
+ * plan direction; within a tenth of a right angle's tangent of it) is the first thing at eye height
+ * at least `least` of the view's sight lines meet, the lines `step` apart across `fanHalf` either
+ * side of `toward` and followed `reach` far. `fronts` are the buildings' outlines, `rings` everything
+ * that stands at eye height, those outlines among it.
+ */
+export function frontsInView(
+  from: readonly [number, number], toward: readonly [number, number], fronts: readonly SightBlocker[],
+  rings: readonly SightBlocker[], street: readonly [number, number], fanHalf: number, step: number, reach: number,
+  least = 1,
+): number {
+  const met = new Map<number, number>();
+  const lines = Math.floor(fanHalf / step);
+  for (let line = -lines; line <= lines; line += 1) {
+    const angle = line * step;
+    const way = [toward[0] * Math.cos(angle) - toward[1] * Math.sin(angle), toward[0] * Math.sin(angle) + toward[1] * Math.cos(angle)] as const;
+    const nearest = openDistance(from, way, rings, reach);
+    for (let index = 0; index < fronts.length; index += 1) {
+      const ring = fronts[index]!;
+      for (let i = 0; i < ring.length; i += 1) {
+        const a = ring[i]!;
+        const b = ring[(i + 1) % ring.length]!;
+        const ex = b[0] - a[0];
+        const ey = b[1] - a[1];
+        if (Math.abs(ex * street[1] - ey * street[0]) * 10 > Math.abs(ex * street[0] + ey * street[1])) continue;
+        const across = way[0] * ey - way[1] * ex;
+        if (Math.abs(across) < 1e-9) continue;
+        const t = ((a[0] - from[0]) * ey - (a[1] - from[1]) * ex) / across;
+        const u = ((a[0] - from[0]) * way[1] - (a[1] - from[1]) * way[0]) / across;
+        if (t > 0 && u >= 0 && u <= 1 && t <= nearest) {
+          met.set(index, (met.get(index) ?? 0) + 1);
+          break;
+        }
+      }
+    }
+  }
+  return [...met.values()].filter((lines) => lines >= least).length;
+}
+
 /** A parked vehicle's footprint, grown by `clearanceMm` all round, as a plan ring. */
 function footprintRing(footprint: PlanFootprint, clearanceMm: number): SightBlocker {
   const cos = Math.cos(footprint.heading);
@@ -292,7 +332,8 @@ function distanceToRing(point: readonly [number, number], ring: SightBlocker): n
  * at a slant one way or the other. It never looks straight across at the wall opposite.
  *
  * Under a rule that states how life is judged (version 2 of the catalog and later), the view taken
- * has nothing at eye height dead ahead nearer than the rule's floor and, where the rule states a
+ * has nothing at eye height dead ahead (across its middle third, for a seafront view of version 5)
+ * nearer than the rule's floor and, where the rule states a
  * least distance (version 3), no seat nearer than that inside its fan (where every view has one or
  * the other, the one with the most room before it, each against what the rule asks); of those the
  * most of the town's life in view; of equally alive views the most open, and of equally open ones
@@ -303,10 +344,31 @@ function distanceToRing(point: readonly [number, number], ring: SightBlocker): n
  * in its face only when every view has one. Standing off the walking line is preferred where the
  * ground lets a person stand there; of equally open views the nearest is taken, the first found.
  */
+/**
+ * The seafront view a first view is, if any: where the entry names a direction to look toward and the
+ * arrival faces away from it (a town by the sea arriving on its shore street's seaward footway, facing
+ * across the street to the land side's fronts with the sea behind) and the rule states a seafront view
+ * (version 5). It turns the seafront slant from straight across instead of the rule's slant, so the
+ * view runs along the shore with the fronts on the land side and the open view on the other, and
+ * keeps its middle third clear, not dead ahead alone. It takes the spot and way with the most
+ * buildings' fronts in view, then the most of the town's doors; its seats do not count.
+ */
+function seafrontOf(
+  ahead: readonly [number, number], rule: OpenViewRule, toward: readonly [number, number] | undefined,
+): OpenViewRule['seafront'] {
+  const length = toward === undefined ? 0 : Math.hypot(toward[0], toward[1]);
+  if (toward === undefined || rule.seafront === undefined || length === 0) return undefined;
+  // How far the arrival faces from straight away from the named direction, the way inland.
+  const inland = Math.acos(Math.max(-1, Math.min(1, -(ahead[0] * toward[0] + ahead[1] * toward[1]) / length)));
+  return inland <= rule.seafront.facingMost ? rule.seafront : undefined;
+}
+
 function openView(
   input: {
     readonly eastMm: number; readonly southMm: number;
     readonly ground: (eastMm: number, southMm: number) => boolean;
+    readonly toward?: readonly [east: number, south: number];
+    readonly fronts?: readonly SightBlocker[];
   },
   ahead: readonly [number, number], rings: readonly SightBlocker[], rule: OpenViewRule, life: TownLife,
 ): ArrivalView {
@@ -315,6 +377,7 @@ function openView(
   const turned = (angle: number): readonly [number, number] => [
     ahead[0] * Math.cos(angle) - ahead[1] * Math.sin(angle), ahead[0] * Math.sin(angle) + ahead[1] * Math.cos(angle),
   ];
+  const slant = seafrontOf(ahead, rule, input.toward)?.slant ?? rule.slant;
   let best: { view: ArrivalView; score: number; moved: number } | null = null;
   const backSteps = rule.backStepMm > 0 ? Math.floor(rule.backMaximumMm / rule.backStepMm) : 0;
   const alongSteps = rule.alongStepMm > 0 ? Math.floor(rule.alongMaximumMm / rule.alongStepMm) : 0;
@@ -327,7 +390,7 @@ function openView(
         const south = input.southMm + across[1] * along - ahead[1] * behind;
         if ((back > 0 || step > 0) && !input.ground(east, south)) continue;
         for (const way of [1, -1]) {
-          const toward = turned(way * rule.slant);
+          const toward = turned(way * slant);
           // Off the line people walk is worth a little: walkers then cross the view, not the viewer.
           const score = viewOpenness([east, south], toward, rings, rule) + (back > 0 ? rule.offLineBonus ?? FIRST_VIEW_DEFAULTS.offLineBonus : 0);
           const moved = Math.hypot(along, behind);
@@ -372,6 +435,11 @@ interface JudgedView {
    */
   readonly room: number;
   readonly clear: boolean;
+  /**
+   * How many buildings show their fronts in a seafront view (`frontsInView`), up to the least it asks
+   * for; 0 for any other view.
+   */
+  readonly fronts: number;
   readonly life: number;
   readonly open: number;
   readonly moved: number;
@@ -382,6 +450,8 @@ function liveliestView(
   input: {
     readonly eastMm: number; readonly southMm: number;
     readonly ground: (eastMm: number, southMm: number) => boolean;
+    readonly toward?: readonly [east: number, south: number];
+    readonly fronts?: readonly SightBlocker[];
   },
   ahead: readonly [number, number], every: readonly SightBlocker[],
   rule: OpenViewRule & { readonly life: LifeViewRule }, life: TownLife,
@@ -390,19 +460,30 @@ function liveliestView(
   const turned = (angle: number): readonly [number, number] => [
     ahead[0] * Math.cos(angle) - ahead[1] * Math.sin(angle), ahead[0] * Math.sin(angle) + ahead[1] * Math.cos(angle),
   ];
+  // A seafront view turns its own slant and keeps its middle third clear, where dead ahead is tested,
+  // and takes the spot and way with the most buildings' fronts across the street in view, up to the
+  // least it asks for and stepping as far along the footway as it says, then the most of the town's
+  // doors, each a front's, and not its seats: a bench on the promenade is not the town.
+  const seafront = seafrontOf(ahead, rule, input.toward);
+  const fronts = input.fronts ?? [];
+  const slant = seafront?.slant ?? rule.slant;
+  const centreHalf = seafront?.centreHalf ?? rule.life.centreHalf;
+  const alongMaximumMm = seafront?.alongMaximumMm ?? rule.alongMaximumMm;
+  const judgedLife: TownLife = seafront === undefined ? life : { seats: [], doors: life.doors };
   // Only what stands within sight of any spot the view may take is tested, so a larger town costs no more.
-  const within = Math.max(rule.reachMm, rule.life.farMm) + Math.hypot(rule.alongMaximumMm, rule.backMaximumMm);
+  const within = Math.max(rule.reachMm, rule.life.farMm) + Math.hypot(alongMaximumMm, rule.backMaximumMm);
   const rings = every.filter((ring) => distanceToRing([input.eastMm, input.southMm], ring) <= within);
   const better = (a: JudgedView, b: JudgedView): boolean => {
     if (a.clear !== b.clear) return a.clear;
     if (!a.clear && a.room !== b.room) return a.room > b.room;
+    if (a.fronts !== b.fronts) return a.fronts > b.fronts;
     if (Math.abs(a.life - b.life) > rule.life.tie) return a.life > b.life;
     if (Math.abs(a.open - b.open) > rule.tie) return a.open > b.open;
     return a.moved < b.moved;
   };
   let best: JudgedView | null = null;
   const backSteps = rule.backStepMm > 0 ? Math.floor(rule.backMaximumMm / rule.backStepMm) : 0;
-  const alongSteps = rule.alongStepMm > 0 ? Math.floor(rule.alongMaximumMm / rule.alongStepMm) : 0;
+  const alongSteps = rule.alongStepMm > 0 ? Math.floor(alongMaximumMm / rule.alongStepMm) : 0;
   for (let back = 0; back <= backSteps; back += 1) {
     for (let step = 0; step <= alongSteps; step += 1) {
       for (const side of step === 0 ? [1] : [1, -1]) {
@@ -412,10 +493,10 @@ function liveliestView(
           input.eastMm + across[0] * along - ahead[0] * behind, input.southMm + across[1] * along - ahead[1] * behind,
         ] as const;
         if ((back > 0 || step > 0) && !input.ground(spot[0], spot[1])) continue;
-        const seen = lifeSeenFrom(spot, life, rings, rule.life);
+        const seen = lifeSeenFrom(spot, judgedLife, rings, rule.life);
         for (const way of [1, -1]) {
-          const toward = turned(way * rule.slant);
-          const centre = nearestInWedge(spot, toward, rule.life.centreHalf, rings) / rule.life.centreFloorMm;
+          const toward = turned(way * slant);
+          const centre = nearestInWedge(spot, toward, centreHalf, rings) / rule.life.centreFloorMm;
           // A seat nearer than the least distance does not count as life, and a view that has one
           // inside its fan stands behind a bench: it is passed over as one with a post dead ahead is.
           const feet = rule.life.leastMm > 0
@@ -425,6 +506,12 @@ function liveliestView(
             view: { eastMm: spot[0], southMm: spot[1], yaw: Math.atan2(-toward[0], -toward[1]), moved: back > 0 || step > 0 },
             room,
             clear: room >= 1,
+            fronts: seafront === undefined ? 0 : Math.min(
+              seafront.frontsLeast,
+              frontsInView(
+                spot, toward, fronts, rings, across, seafront.frontHalf, seafront.frontStep, rule.life.farMm, seafront.frontLinesLeast,
+              ),
+            ),
             life: lifeInFan(seen, toward, rule.fanHalf),
             // Off the line people walk is worth a little: walkers then cross the view, not the viewer.
             open: viewOpenness(spot, toward, rings, rule) + (back > 0 ? rule.offLineBonus ?? FIRST_VIEW_DEFAULTS.offLineBonus : 0),
@@ -453,12 +540,23 @@ export function arrivalView(input: {
    */
   readonly blockers?: readonly SightBlocker[];
   /**
+   * The outlines of the town's buildings, among `blockers`, whose fronts a seafront view counts. Absent,
+   * none: a seafront view is then chosen by the town's doors.
+   */
+  readonly fronts?: readonly SightBlocker[];
+  /**
    * How to choose the view where nothing is placed. Absent, such a town is looked at the way its
    * entry says, straight across the road, as before.
    */
   readonly open?: OpenViewRule;
   /** The town's seats and doors, which a rule that judges by life chooses that view by. Absent, none. */
   readonly life?: TownLife;
+  /**
+   * A direction the town's first view looks toward, a plan vector east then south (the sea of a town
+   * on land that holds one): with nothing placed and the arrival facing it, a rule of version 5 looks
+   * along the shore at its seafront slant.
+   */
+  readonly toward?: readonly [east: number, south: number];
 }): ArrivalView {
   const { eastMm, southMm, facing } = input;
   const length = Math.hypot(facing[0], facing[1]) || 1;

@@ -1,0 +1,251 @@
+{
+  "profile": "exulanica.town-first-view/v5",
+  "note": "How the first view of a generated town is chosen. Where nothing is placed in it: by what of the town's life lies in view (its seats and its doors, from its own tiles), with openness to break a tie and nothing at eye height dead ahead. Where things are placed: facing them from the nearest spot that sees them past what the town's tiles stand at eye height and past parked vehicles, with nothing dead ahead nearer than centre_floor_mm. It is chosen from the town's tiles, its served arrival and what is placed, so a town opens the same way every time. Version 4 is version 3 with the figures the view of placed things and the walking-line preference were chosen by, which earlier versions left to the page: the page reads versions 1 to 3 with these same values. Version 5 is version 4 with a seafront view: where a town's entry names a direction its first view looks toward (the sea of a town on land that holds one) and its arrival faces away from it, across the shore street from its seaward footway, within seafront_facing_most_degrees, the view turns seafront_slant_degrees from straight across instead of slant_degrees, from the spot and the way with the most buildings' fronts in view up to seafront_fronts_least (seafront_front_half_degrees, seafront_front_step_degrees, seafront_front_lines_least), stepping up to seafront_along_maximum_mm along the footway, then the most of the town's doors (its seats do not count), and keeps nothing at eye height nearer than centre_floor_mm across its middle third (seafront_centre_half_degrees), not dead ahead alone. Every value is a chosen default with its reason: presentation only, changeable by a later version beside this one. Nothing here is a measured cost or a safety bound. Versions 1 to 4 stay beside this file and are read as before.",
+  "entries": [
+    {
+      "key": "slant_degrees",
+      "value": 60,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A town is served facing straight across its road, at the wall opposite. The first view is turned this far from that toward one way along the street: far enough that the footways run away into the picture and people on them are in it for many seconds, near enough to across that the opposite frontage stays in frame. At a 102 degree horizontal field (70 degrees vertical at 16:9) a view turned 60 degrees holds both the far side opposite and the street's length."
+    },
+    {
+      "key": "fan_half_degrees",
+      "value": 40,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A view is judged by what lies this far either side of where it looks: most of the 51 degree half field, leaving out its edges, where what is seen is least looked at. A seat or a door counts as in view inside this fan, and openness is the mean over sight lines spread across it."
+    },
+    {
+      "key": "sight_lines",
+      "value": 9,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "Nine lines across the fan are ten degrees apart, which at ten metres is under two metres: narrower than a building's front, so openness sees every frontage. A thin post can slip between two lines, so what stands dead ahead is not judged by these lines but by the whole of the middle (centre_half_degrees)."
+    },
+    {
+      "key": "reach_mm",
+      "value": 40000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A sight line is followed this far and no farther when openness is judged: a person 1.7 m tall stands about 33 px high at 40 m on a 1080 px frame at this field, and a view open beyond that shows nobody a person would notice."
+    },
+    {
+      "key": "life_near_mm",
+      "value": 25000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seat or a door in view counts whole up to this distance: a person 1.7 m tall there stands 52 px high on a 1080 px frame at a 70 degree vertical field, large enough that what they are doing is read at a glance."
+    },
+    {
+      "key": "life_far_mm",
+      "value": 60000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Beyond the near distance a seat or a door counts for less, in a straight line down to nothing at this distance, where a person stands 22 px high on the same frame: seen to be there, too small to read."
+    },
+    {
+      "key": "life_least_mm",
+      "value": 6000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seat or a door nearer than this is at the viewer's feet: it does not count as life in view, and a view with a seat that near inside its fan is passed over as one with a post dead ahead is, unless every view has one. Without it the view walks along the footway toward a town's benches and can stand behind one: under version 2 one town of five looked at opened 3.4 m behind a bench, which spans 410 px of a 1920 px frame there with its back 160 px below the middle, and with whatever is parked beyond it fills the lower middle of the picture. At 6 m the same bench spans 230 px and its back stands 90 px below the middle: furniture in the street, not in the way. Run on that town's tiles, the least distance alone left the view behind the bench at 6 m and at 10 m, because the other benches still called it to that spot; passing such a view over moved it 4.5 m along, to where the nearest seat in its fan is 21.7 m off."
+    },
+    {
+      "key": "seat_weight_milli",
+      "value": 4000,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "How many doors one seat in view is worth. A person who sits stays for minutes, and a person at a door is in view for the seconds of a walk beginning or ending. On the recorded first ten minutes of two towns made from a sentence (34 and 36 people, a minute in 8 s), 82 percent of the figure-seconds spent standing still within 60 m of the arrival were within 1.5 m of a seat: 220 to 280 figure-seconds a seat, against 18 to 21 moving figure-seconds a door, a ratio near 12 at that head count. Seats fill and walkers grow as a town holds more people, so the weight is set below that ratio: one seat outweighs the few doors by which two ways along a street differ, and doors still decide between views that hold the same seats."
+    },
+    {
+      "key": "life_tie_milli",
+      "value": 500,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "Two views whose life differs by less than half of one near door are equally alive, and the more open of them is taken: a difference that small is a door at the far edge of sight, not a street with more on it."
+    },
+    {
+      "key": "sight_margin_mm",
+      "value": 500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A door's threshold lies on its building's face and a seat stands on its own base, so a sight line to either ends on what it belongs to: something standing in the line within this distance of the point is the thing itself and does not hide it."
+    },
+    {
+      "key": "centre_half_degrees",
+      "value": 12,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "Dead ahead is this far either side of where the view looks: the middle sixth of a 102 degree frame. The whole of it is tested against what stands at eye height, not sampled lines, so a post 60 mm wide is found."
+    },
+    {
+      "key": "centre_floor_mm",
+      "value": 10000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Nothing at a standing person's eye height (a building, a trunk, a post) may stand dead ahead nearer than this: at 10 m a trunk or post 170 to 300 mm wide is 13 to 23 px of a 1920 px frame, a line in the picture and not a thing in the face; at 4 m, the distance version 1 held, it is 33 to 58 px and stands in the middle of the view. A view with something nearer is taken only when every view has one, and then the one whose nearest is farthest."
+    },
+    {
+      "key": "seat_top_minimum_mm",
+      "value": 350,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A part of street furniture is a seat by its shape, not its name: its top at least this far above the furniture's base, the height of a low wall a person sits on."
+    },
+    {
+      "key": "seat_top_maximum_mm",
+      "value": 600,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "And at most this far above it: higher is a ledge to lean on or the top of a bin, not a seat. The street furniture catalog's bench has its board's top at 480 mm."
+    },
+    {
+      "key": "seat_span_minimum_mm",
+      "value": 400,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seat is at least this long and this deep in plan, a little under a seated person's width: a bollard's cap and a hydrant's top are at seat height and are not seats."
+    },
+    {
+      "key": "back_step_mm",
+      "value": 750,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A town is served standing on the line its people walk, so walkers pass through the viewer. The first view may step back from the kerb in steps of this length: a little over a standing body's width, so one step is off the line."
+    },
+    {
+      "key": "back_maximum_mm",
+      "value": 2250,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Never farther back than three such steps: a footway is seldom wider behind its walking line, and drawn ground decides each step anyway."
+    },
+    {
+      "key": "along_step_mm",
+      "value": 1500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "The step along the footway the first view already takes past a parked car (ARRIVAL_STEP_MM)."
+    },
+    {
+      "key": "along_maximum_mm",
+      "value": 6000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Never farther along the footway than this from where the town says a person arrives: far enough to clear a tree, a lamp post and a sign in a row, near enough that the first view is still the place the town chose."
+    },
+    {
+      "key": "tie_milli",
+      "value": 20,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "Two equally alive views whose openness differs by less than this many thousandths are equally open, and the one nearer where the town says a person arrives is taken: without it the view backs to the wall behind for a gain of under one part in a hundred."
+    },
+    {
+      "key": "off_line_bonus_milli",
+      "value": 50,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "A spot back from the kerb, off the line people walk, adds this to a view's openness, so walkers cross the view rather than walk through the viewer; small enough that it only settles views that are otherwise nearly equal."
+    },
+    {
+      "key": "placed_step_mm",
+      "value": 1500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Where things are placed and the served spot does not see them, the view tries spots this far apart: along the footway, back from the kerb and out toward the street. About two paces: a parked car, a tree or a post is passed in one or two steps."
+    },
+    {
+      "key": "placed_steps_along",
+      "value": 8,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "How many steps along the footway either way the view of placed things tries, which with placed_step_mm reaches 12 m: past a row of two parked cars or a tree and a lamp post, still in sight of where the town says a person arrives."
+    },
+    {
+      "key": "placed_steps_back",
+      "value": 3,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "How many steps back from the kerb the view of placed things tries, 4.5 m with placed_step_mm: a footway is seldom wider than that behind its walking line, and drawn ground decides each step anyway."
+    },
+    {
+      "key": "placed_out_reach_mm",
+      "value": 12000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Where no spot near the footway sees what is placed, because it stands inside or close against a building, the view steps out toward and across the street this far at most: across a town street to the far footway, from which a front 10 m off fits the frame."
+    },
+    {
+      "key": "parked_clearance_mm",
+      "value": 300,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Room kept round a parked vehicle's footprint, so a sight line to what is placed does not graze its body and a view counts a car it only just misses as in the way."
+    },
+    {
+      "key": "parked_farther_mm",
+      "value": 500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Where a parked vehicle is in the way from every spot near, the spot whose nearest vehicle in the way is farthest is taken over another only when that vehicle is this much farther: a car's length in the view is the difference that matters, not a hand's width."
+    },
+    {
+      "key": "seafront_facing_most_degrees",
+      "value": 45,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A town's first view is a seafront view when its entry names a direction to look toward (the sea of a town on land that holds one) and its arrival faces away from that direction within this angle: a town by the sea arrives on the seaward footway of its shore street, facing across the street to the land side's fronts with the sea behind (town-arrival version 2 states the same 45 degrees). An arrival facing any other way opens on version 4's view, the town first."
+    },
+    {
+      "key": "seafront_slant_degrees",
+      "value": 86,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A seafront view turns this far from straight across the shore street, from the spot and the way with the most buildings' fronts in view (seafront_front_step_degrees), so it runs along the shore from the seaward footway, the fronts across the street on the land side and the open water on the other, the view's middle 4 degrees toward the land. Measured at 1920 x 1080 (the fronts each with a window or door drawn, the water in a band at least 54 px tall). The slant, from one spot of a small town: at 72 and 78 degrees the fronts hold but the water does not (26.6 and 31.2 percent of the width); at 84, 86 and 90 both hold, the fronts falling to 37.1 percent at 90, looking straight along the street. At 86, a small town and a market town at their own first views show 3 fronts each, across 39.5 and 41.9 percent of the width, and water across 35.6 and 38.1 percent, each over a third."
+    },
+    {
+      "key": "seafront_centre_half_degrees",
+      "value": 23,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A seafront view keeps its middle third clear, not dead ahead alone: nothing at a standing person's eye height (a building, a trunk, a post) may stand within this far either side of where the view looks nearer than centre_floor_mm, tested as dead ahead is. The middle third of a 102 degree frame reaches 22.4 degrees from its middle (tan 22.4 = tan 51 / 3), so 23 covers it. The outer thirds hold the frontages and the water, and the middle third carries the shore street away between them: a trunk or post a few metres off there stands across the line the view is for, where at 13 to 22 degrees from the middle the test of dead ahead does not find it. A view with one nearer is passed over as one with a post dead ahead is."
+    },
+    {
+      "key": "seafront_front_half_degrees",
+      "value": 51,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A seafront view's fronts are counted across the frame DESIGN measures them in: half of the 102 degree horizontal field of a 16:9 frame at the page's 70 degree vertical field, this far either side of the middle, not the 40 degree fan life is judged over. Counted over the fan alone, a market town whose third front stood near the frame's edge stepped 9 m along to bring it into the fan, under a row of street trees."
+    },
+    {
+      "key": "seafront_front_step_degrees",
+      "value": 1,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A seafront view is chosen first by how many buildings show their fronts in it: those whose face along the shore street is the first thing at eye height some of its sight lines meet (seafront_front_lines_least), the lines this far apart across seafront_front_half_degrees either side and followed life_far_mm far; then by the town's doors in view, each a front's, and not its seats, since a bench on the promenade is not the town. DESIGN asks for at least three buildings' fronts in a seafront view. One degree is about 15 of 1920 pixels at the 102 degree field."
+    },
+    {
+      "key": "seafront_front_lines_least",
+      "value": 2,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "A building's front counts in a seafront view once at least this many of its sight lines meet it: two lines one degree apart, a front at least about 15 and usually 30 pixels wide. One line can meet a sliver at the frame's edge or at the street's far end, which shows no window or door; DESIGN counts a front only with a window or door drawn."
+    },
+    {
+      "key": "seafront_fronts_least",
+      "value": 3,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "DESIGN asks for at least three buildings' fronts in a seafront view, each with a window or door drawn. Fronts count up to this many: a view showing three is not moved for a fourth, so the view stays as near where the town says a person arrives as it can, and the doors, openness and nearness choose among views that show three."
+    },
+    {
+      "key": "seafront_along_maximum_mm",
+      "value": 18000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seafront view may step this far along the footway from where the town says a person arrives, where along_maximum_mm's 6 m may not be enough for three fronts: on a small town whose shore row is three buildings over 71 m (26 m and 30 m fronts among them), three fronts show only from 16.5 m along from the middle of the block; on seven other towns measured, within 6 m. The arrival stands mid-block, so 18 m along still stands at least 27 m from either corner on the shortest block the schema admits (90 m), more than the 15 m DESIGN asked a seafront arrival to keep from a corner, and a view that already shows three fronts is not moved (seafront_fronts_least)."
+    }
+  ]
+}

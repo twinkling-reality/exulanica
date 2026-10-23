@@ -150,7 +150,7 @@ def test_a_resident_start_excludes_the_nearest_footway_spot(monkeypatch):
 
 
 def test_no_clear_spot_refuses_each_bounded_candidate(monkeypatch):
-    def no_spot(_place, _tiles, _records, _routine):
+    def no_spot(_place, _tiles, _records, _routine, sea=None):
         raise InvalidRecordError("town_arrival_clearance: no clear footway standing spot")
 
     monkeypatch.setattr(town, "_arrival_v2", no_spot)

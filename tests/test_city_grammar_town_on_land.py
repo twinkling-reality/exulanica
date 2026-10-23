@@ -20,8 +20,10 @@ import pytest
 from exulanica.grammar.grammars.city.descriptor import CITY_LAND_VERSIONS
 from exulanica.grammar.grammars.city.generation.massing import BuildingChange
 from exulanica.grammar.grammars.city.massing import MassingRecord
+from exulanica.grammar.grammars.city.streets import StreetSegmentRecord
 from exulanica.grammar.grammars.city.terrain import TerrainRecord
 from exulanica.grammar.landform import LandformRefused, land_recipes, land_rules
+from exulanica.world import generated_worlds
 from exulanica.world.composers import UnknownWorldComposer, seed_candidate
 from exulanica.world.composers import city_grammar_town as town
 from exulanica.world.errors import InvalidStructuralData
@@ -168,3 +170,76 @@ def test_the_land_drawn_round_a_town_is_the_land_its_terrain_was_graded_from():
     assert section["land_sha256"] == made.receipt["land_sha256"]
     assert land.frame.seed == made.receipt["seed"]
     assert {body["kind"] for body in section["water"]} >= {"sea"}, "the coast's town has its sea"
+
+
+def _spot(receipt: dict, sea: str | None):  # type: ignore[no-untyped-def,type-arg]
+    """The arrival the town's records give under arrival policy version 1, or 2 with ``sea``."""
+    generated = town.records(receipt)
+    routine = town_routine()
+    place = walking_surfaces_place(f"generated:{WORLD}", generated, routine=routine)
+    spot = town._arrival_v2(place, receipt["tiles"], generated, routine, sea=sea)
+    return {
+        "spot_id": spot["spot_id"],
+        "position_mm": list(spot["position_mm"]),
+        "support_z_mm": spot["support_z_mm"],
+        "facing_mm": town._facing(spot["position_mm"], generated),
+    }
+
+
+def test_a_town_by_the_sea_arrives_on_its_shore_street_s_seaward_footway():
+    """A town whose land holds a sea pins arrival policy version 2 and arrives on the seaward
+    footway of the street nearest the sea that runs along the shore, facing across it to the land
+    side's fronts (within 45 degrees of the way inland), the spot nearest the town's centre, with
+    nothing of the town between it and the sea; a town on land with no sea
+    pins version 1 and arrives nearest the town's centre on any street, as every town did before."""
+    coast = _made("coast").receipt
+    assert coast["arrival_policy"]["profile"] == "exulanica.town-arrival/v2"
+    # The coast's sea lies south (its shore's side): the way inland is north.
+    [shore] = [f for f in coast["land"]["features"] if f["kind"] == "shore"]
+    assert shore["side"] == "south"
+    east, north = coast["arrival"]["facing_mm"]
+    assert north > 0 and abs(east) <= north, "it does not face inland across a shore street"
+    assert coast["arrival"] == _spot(coast, "south")
+    # Mid-block, so the fronts across the street line the view: in the middle third of the street
+    # segment whose crown it faces.
+    x, y = coast["arrival"]["position_mm"]
+    crown = (x + east, y + north)
+    [(start, end)] = [
+        (segment.centreline_mm[0], segment.centreline_mm[-1])
+        for segment in town.records(coast)
+        if isinstance(segment, StreetSegmentRecord)
+        and segment.centreline_mm[0][1] == segment.centreline_mm[-1][1] == crown[1]
+        and min(segment.centreline_mm[0][0], segment.centreline_mm[-1][0])
+        <= crown[0]
+        <= max(segment.centreline_mm[0][0], segment.centreline_mm[-1][0])
+    ]
+    low, high = sorted((start[0], end[0]))
+    assert low + (high - low) // 3 <= x <= high - (high - low) // 3, "it stands near a corner"
+    # Every building stands inland of it: nothing of the town between it and the sea.
+    buildings = [r.extent for r in town.records(coast) if isinstance(r, MassingRecord)]
+    assert buildings
+    assert all(extent.min_y_mm > y for extent in buildings), "a building stands behind it"
+    # Version 1's spot is the one nearest the centre, inside the town, not on the shore street.
+    centre = _spot(coast, None)
+    assert centre != coast["arrival"]
+    assert centre["position_mm"][1] > coast["arrival"]["position_mm"][1]
+    rolling = _made("rolling").receipt
+    assert rolling["arrival_policy"]["profile"] == "exulanica.town-arrival/v1"
+    assert rolling["arrival"] == _spot(rolling, None)
+
+
+def test_a_town_by_the_sea_made_before_version_2_still_reads_by_version_1():
+    """A town on coast land made before arrival policy version 2 pins version 1 and its arrival
+    nearest the centre: it is read and generated again by that, and a version 2 pin on land with no
+    sea is refused by name."""
+    made = _made("coast")
+    before = _receipt(arrival_policy=town._arrival_policy_pin(), arrival=_spot(made.receipt, None))
+    assert town.records(before) == tuple(made.records)
+    # Its entry names no way to the sea, so its first view stays the one it was made with; a town
+    # made under version 2 names the way to its sea (south).
+    assert generated_worlds._sea_toward(before) is None
+    assert generated_worlds._sea_toward(made.receipt) == (0, 1_000)
+    rolling = copy.deepcopy(_made("rolling").receipt)
+    rolling["arrival_policy"] = town._arrival_policy_pin("south")
+    with pytest.raises(InvalidStructuralData, match="generated_world_arrival_policy_changed"):
+        town.records(rolling)

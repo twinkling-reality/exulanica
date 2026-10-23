@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  arrivalView, crosses, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
+  arrivalView, crosses, frontsInView, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
   type LifeViewRule, type OpenViewRule, type SightBlocker,
 } from '../src/composition/arrival-view.js';
 import { FIRST_VIEW_DEFAULTS } from '../src/town-first-view.js';
@@ -552,5 +552,127 @@ describe('the first view of a town with things placed, by what its records stand
     expect(view).toEqual(arrivalView({ ...dressed, targets: [], life }));
     // The town's own view looks along the street, toward its seat, not at the wall.
     expect(looks(view.yaw)[0]).toBeGreaterThan(0);
+  });
+});
+
+describe('the first view of a town whose entry names a direction to look toward', () => {
+  // Arriving on the seaward footway of a shore street, facing across it to the land side's fronts (north
+  // here), the sea behind (south).
+  const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+  const street = [opposite, behind];
+  const SEAFRONT = {
+    ...LIVELY,
+    seafront: {
+      facingMost: Math.PI / 4, slant: 72 * DEGREE, centreHalf: 23 * DEGREE, frontHalf: 40 * DEGREE, frontStep: DEGREE,
+      frontLinesLeast: 2, frontsLeast: 3, alongMaximumMm: 6_000,
+    },
+  };
+
+  it('looks along the shore at the seafront slant where the arrival faces away from the sea, the way with a door in view', () => {
+    for (const side of [1, -1]) {
+      // A door on the land side's front across the street, one way along it.
+      const life = { seats: [], doors: [[side * 20_000, -16_000]] as [number, number][] };
+      const view = arrivalView({ ...town, blockers: street, open: SEAFRONT, life, toward: [0, 1_000] });
+      expect(Math.sign(looks(view.yaw)[0])).toBe(side);
+      // 72 degrees from straight across, not the rule's 60.
+      expect(looks(view.yaw)[1]).toBeCloseTo(-Math.cos((72 * Math.PI) / 180), 9);
+    }
+  });
+
+  it('turns the way with more of the town\'s doors in view, not toward a seat', () => {
+    // A seat on the promenade 12 m east; two doors on the fronts across the street to the west.
+    const life = { seats: [[12_000, 1_500]] as [number, number][], doors: [[-20_000, -16_000], [-24_000, -16_000]] as [number, number][] };
+    // Positive control: version 4's view, by the town's life, turns east toward the seat (worth four doors).
+    expect(looks(arrivalView({ ...town, blockers: street, open: LIVELY, life }).yaw)[0]).toBeGreaterThan(0);
+    const view = arrivalView({ ...town, blockers: street, open: SEAFRONT, life, toward: [0, 1_000] });
+    expect(looks(view.yaw)[0]).toBeLessThan(0);
+    expect(looks(view.yaw)[1]).toBeCloseTo(-Math.cos(72 * DEGREE), 9);
+  });
+
+  it('takes the way with the most buildings\' fronts in view, before the town\'s doors', () => {
+    // Across the street (16 m north): three narrow buildings to the east, one wide one to the west with two doors.
+    const building = (west: number, east: number): SightBlocker => [[west, -16_000], [east, -16_000], [east, -30_000], [west, -30_000]];
+    const fronts = [building(6_000, 14_000), building(14_000, 22_000), building(22_000, 30_000), building(-40_000, -6_000)];
+    const life = { seats: [], doors: [[-10_000, -16_000], [-14_000, -16_000]] as [number, number][] };
+    const seafront = { ...town, blockers: fronts, open: SEAFRONT, life, toward: [0, 1_000] as const };
+    // Three fronts from the served spot looking east, one looking west.
+    const east = [Math.sin(72 * DEGREE), -Math.cos(72 * DEGREE)] as const;
+    const west = [-east[0], east[1]] as const;
+    expect(frontsInView([0, 0], east, fronts, fronts, [1, 0], 40 * DEGREE, DEGREE, LIFE.farMm)).toBe(3);
+    expect(frontsInView([0, 0], west, fronts, fronts, [1, 0], 40 * DEGREE, DEGREE, LIFE.farMm)).toBe(1);
+    // Positive control: with no outlines handed, the doors choose: west.
+    expect(looks(arrivalView(seafront).yaw)[0]).toBeLessThan(0);
+    expect(looks(arrivalView({ ...seafront, fronts }).yaw)[0]).toBeGreaterThan(0);
+  });
+
+  it('counts a front only where enough sight lines meet it', () => {
+    const building = (west: number, east: number): SightBlocker => [[west, -16_000], [east, -16_000], [east, -30_000], [west, -30_000]];
+    // From the served spot looking east 18 degrees north, the sight lines a degree apart meet the fronts 16 m
+    // north at whole degrees: a front 0.54 m wide between 45.5 and 46.5 degrees meets one, its neighbours many.
+    const fronts = [building(-20_000, 15_180), building(15_180, 15_720), building(15_720, 60_000)];
+    const east = [Math.sin(72 * DEGREE), -Math.cos(72 * DEGREE)] as const;
+    expect(frontsInView([0, 0], east, fronts, fronts, [1, 0], 40 * DEGREE, DEGREE, LIFE.farMm, 1)).toBe(3);
+    expect(frontsInView([0, 0], east, fronts, fronts, [1, 0], 40 * DEGREE, DEGREE, LIFE.farMm, 2)).toBe(2);
+  });
+
+  it('steps as far along the footway as its figure lets it to bring a third front into view', () => {
+    // Across the street (16 m north), three buildings whose fronts meet at 2 m and 40 m east: from the served
+    // spot the fan looking east reaches the fronts from 10 m along, so the first is out of it.
+    const building = (west: number, east: number): SightBlocker => [[west, -16_000], [east, -16_000], [east, -30_000], [west, -30_000]];
+    const fronts = [building(-20_000, 2_000), building(2_000, 40_000), building(40_000, 100_000)];
+    const seafront = { ...town, blockers: fronts, fronts, life: { seats: [], doors: [] }, toward: [0, 1_000] as const };
+    const count = (view: { eastMm: number; southMm: number; yaw: number }) =>
+      frontsInView([view.eastMm, view.southMm], looks(view.yaw), fronts, fronts, [1, 0], 40 * DEGREE, DEGREE, LIFE.farMm);
+    // Positive control: within 6 m along no spot shows the third.
+    expect(count(arrivalView({ ...seafront, open: SEAFRONT }))).toBe(2);
+    const far = { ...SEAFRONT, seafront: { ...SEAFRONT.seafront, alongMaximumMm: 15_000 } };
+    const view = arrivalView({ ...seafront, open: far });
+    expect(count(view)).toBe(3);
+    expect(view.eastMm).toBeLessThanOrEqual(-9_000);
+  });
+
+  it('is not moved for a fourth front where it shows three', () => {
+    const building = (west: number, east: number): SightBlocker => [[west, -16_000], [east, -16_000], [east, -30_000], [west, -30_000]];
+    // Three fronts in the fan from the served spot looking east; a fourth, ending 2 m east, from 9 m along.
+    const fronts = [building(-20_000, 2_000), building(9_000, 20_000), building(20_000, 30_000), building(30_000, 100_000)];
+    const far = { ...SEAFRONT, seafront: { ...SEAFRONT.seafront, alongMaximumMm: 15_000 } };
+    const seafront = { ...town, blockers: fronts, fronts, life: { seats: [], doors: [] }, toward: [0, 1_000] as const, open: far };
+    const count = (view: { eastMm: number; southMm: number; yaw: number }, least = 3) => Math.min(least,
+      frontsInView([view.eastMm, view.southMm], looks(view.yaw), fronts, fronts, [1, 0], 40 * DEGREE, DEGREE, LIFE.farMm, 2));
+    // Positive control: four fronts show from 9 m along.
+    expect(count({ eastMm: -9_000, southMm: 0, yaw: Math.atan2(-Math.sin(72 * DEGREE), Math.cos(72 * DEGREE)) }, 4)).toBe(4);
+    const view = arrivalView(seafront);
+    expect(count(view)).toBe(3);
+    expect(view.eastMm).toBeGreaterThan(-9_000);
+  });
+
+  it('passes over a view with a trunk or post nearer than the floor in its middle third, not dead ahead alone', () => {
+    const life = { seats: [], doors: [[20_000, -16_000]] as [number, number][] };
+    // A lamp post on the footway 6 m east, on the line the arrival stands on: 18 degrees from the middle of
+    // the view along the shore that way, outside dead ahead (12 degrees) and inside the middle third (23).
+    const blockers = [...street, post(6_000, 0)];
+    const third = (view: { eastMm: number; southMm: number; yaw: number }) =>
+      nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), SEAFRONT.seafront.centreHalf, blockers);
+    // Positive control: tested dead ahead alone, the view taken looks east with the post under 10 m off in
+    // its middle third (9 m, from 3 m west and a step back).
+    const sixth = { ...SEAFRONT, seafront: { ...SEAFRONT.seafront, centreHalf: LIFE.centreHalf } };
+    const before = arrivalView({ ...town, blockers, open: sixth, life, toward: [0, 1_000] });
+    expect(looks(before.yaw)[0]).toBeGreaterThan(0);
+    expect(third(before)).toBeLessThan(LIFE.centreFloorMm);
+    const view = arrivalView({ ...town, blockers, open: SEAFRONT, life, toward: [0, 1_000] });
+    expect(third(view)).toBeGreaterThanOrEqual(LIFE.centreFloorMm);
+    // Still a seafront view: 72 degrees from straight across, one way or the other.
+    expect(looks(view.yaw)[1]).toBeCloseTo(-Math.cos(72 * DEGREE), 9);
+  });
+
+  it('opens on version 4\'s view where the arrival does not face away from the named direction, or no seafront is stated', () => {
+    const life = { seats: [[-12_000, -1_500]] as [number, number][], doors: [] };
+    // Facing across the street with the sea to one side, or facing the sea: not a seafront arrival.
+    for (const toward of [[1_000, 0], [0, -1_000]] as const) {
+      expect(arrivalView({ ...town, blockers: street, open: SEAFRONT, life, toward }))
+        .toEqual(arrivalView({ ...town, blockers: street, open: LIVELY, life }));
+    }
+    expect(arrivalView({ ...town, blockers: street, open: LIVELY, life, toward: [0, 1_000] }))
+      .toEqual(arrivalView({ ...town, blockers: street, open: LIVELY, life }));
   });
 });

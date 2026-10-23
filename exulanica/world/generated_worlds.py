@@ -701,6 +701,38 @@ class GeneratedGround:
     #: The digest of the land document a town made on its land stands on, which its land section
     #: (``GET /world/versions/{version_id}/land``) names; None for a town on level ground.
     land_sha256: str | None = None
+    #: The way, as a plan vector in the region's frame (east, then south), to what a town's first
+    #: view looks toward: its land's sea, on the side the land document's shore states. None for a
+    #: town on level ground or on land with no sea.
+    arrival_toward_mm: tuple[int, int] | None = None
+
+
+#: The plan vector, in the region's frame (east, then south), toward each side a land document's
+#: shore may lie on. A town's land is laid in the city frame (x east, y north), so its south is the
+#: region's south.
+_SIDE_TOWARD_MM: Final = {
+    "north": (0, -1_000),
+    "south": (0, 1_000),
+    "east": (1_000, 0),
+    "west": (-1_000, 0),
+}
+
+
+def _sea_toward(receipt: Mapping[str, Any]) -> tuple[int, int] | None:
+    """Where a town arrives by its sea (its receipt pins town arrival policy version 2, which only a
+    town whose land holds a sea pins), the way to the sea from the town (:data:`_SIDE_TOWARD_MM` of
+    its shore's side), read from the land document its receipt keeps; None for every other town, so
+    a town by the sea made before version 2 keeps the first view it was made with."""
+    pin = receipt.get("arrival_policy")
+    if not isinstance(pin, Mapping) or pin.get("profile") != "exulanica.town-arrival/v2":
+        return None
+    land = receipt.get("land")
+    if not isinstance(land, Mapping):
+        return None
+    for feature in land.get("features", ()):
+        if feature.get("kind") == "shore":
+            return _SIDE_TOWARD_MM.get(str(feature.get("side")))
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -829,4 +861,5 @@ def generated_ground(
         specification=None if values is None else recipe["specification"],
         values=None if values is None else MappingProxyType(dict(sorted(values.items()))),
         land_sha256=receipt.get("land_sha256"),
+        arrival_toward_mm=_sea_toward(receipt),
     )

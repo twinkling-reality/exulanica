@@ -12,7 +12,9 @@ licence. Entries are in the order a sentence that names two is read in: the firs
 A recipe is chosen for a world before it is made, and the world's receipt keeps the land document
 itself, so a later version of a recipe never moves a world already made. The catalog changes by a
 new version, never by an edit of a shipped one; new worlds read the newest. Version 2's coast pours
-a cascade from the site's sea-facing edge into the sea; version 1 stays readable.
+a cascade from the site's sea-facing edge into the sea; version 3's coast brings the sea nearer, its
+shore 25 m from the place rather than 70 m, so a town or a site by the sea stands by it, and its
+cascade ends where the sea now begins. Versions 1 and 2 stay readable.
 """
 
 from __future__ import annotations
@@ -42,8 +44,8 @@ __all__ = [
 
 RECIPE_CATALOG_ID: Final = "exulanica.landform-recipe"
 #: Every version of the recipe catalog this code reads, and the newest, which new worlds read.
-RECIPE_VERSIONS: Final = (1, 2)
-RECIPE_VERSION: Final = 2
+RECIPE_VERSIONS: Final = (1, 2, 3)
+RECIPE_VERSION: Final = 3
 _ENVELOPE: Final = frozenset({"schema_version", "catalog_id", "catalog_version", "entries"})
 _FIELDS: Final = frozenset(
     {"key", "title", "words", "for_ground", "default", "land", "reason", "licence"}

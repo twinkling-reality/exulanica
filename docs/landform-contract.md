@@ -355,7 +355,15 @@ The town composer's version 3
 ([`city_grammar_town.py`](../exulanica/world/composers/city_grammar_town.py), `on_land`) makes such
 a town from a level town's recipe and a land document. It generates the recipe's specification
 carried to city grammar version 6 by that version's migration, with the land, and a person arrives
-on the graded footway as version 2 arrives. The receipt keeps the land document, its digest and the
+on the graded footway as version 2 arrives. Where the land holds a sea, the arrival is chosen by
+[`town-arrival.v2.json`](../exulanica/world/composers/town-arrival.v2.json): a seafront view, the
+clear spot on the seaward footway of the street nearest the sea that runs along the shore, facing
+across it to the land side's fronts with the sea the words or the setting named behind, the one
+nearest the town's centre, which stands mid-block (the city grammar centres a block on the town's
+centre) so the fronts across the street line the view; the town's entry names the way to the sea
+(`arrival_toward_mm`), and the page looks along that street, the fronts on the land side and open
+water on the seaward side (town first view version 5). Every other town, and every town made before, keeps version 1's spot nearest the
+centre, and its receipt pins the policy it was made by. The receipt keeps the land document, its digest and the
 land rules. The recipe's reference names the land's digest and rules, so a town's seeds, the land's
 noise drawn from them and each tile's bake key are that land's own. A stored town is generated
 again only after its land reads again under the rules its receipt names and to the digest it names
@@ -452,14 +460,14 @@ appearance are; that naming is planned, not built (see [Limits](#limits)).
 Where the deployment leaves it on (`EXULANICA_WORLDS_ON_LAND`, on unless set off, [deployment](deployment.md)), a
 place or a town drafted from a person's words (`POST /worlds/drafts`,
 [world kinds](world-kinds-contract.md#a-world-made-from-a-sentence)) stands on one of the land
-recipes in [`landform-recipe.v2.json`](../assets/catalogs/landform/landform-recipe.v2.json), read by
+recipes in [`landform-recipe.v3.json`](../assets/catalogs/landform/landform-recipe.v3.json), read by
 [`recipes.py`](../exulanica/grammar/landform/recipes.py). Each recipe is a whole land document, read
 by the landform reader as the catalog is read, with the words a made world's card says of it, the
 whole words that name it in a sentence, the setting's ground parts that bring it, and a reason:
 
 | Recipe | Named by words such as | Brought by the setting | What it is |
 | --- | --- | --- | --- |
-| `coast` | sea, coast, beach, shore, bay | By the sea | A beach and the sea below, a terraced hill behind, and a cascade stepping down from the place's sea-facing edge into the sea |
+| `coast` | sea, coast, beach, shore, bay | By the sea | A beach and the sea close below (the shore 25 m from the place), a terraced hill behind, and a cascade stepping down from the place's sea-facing edge, following the land to the waterline and falling into the sea there |
 | `valley` | valley, dale, glen | | A broad floor between two long ridges, ranges at both ends |
 | `upland` | mountains, peaks, highlands, fells | Snowfields | Rough fells and crags, peaks 1.5 to 2 km away on three sides |
 | `hillside` | hillside, hill, slope | | Rising ground under a terraced hillside, a mountain behind |
@@ -486,7 +494,14 @@ Version 2 differs from version 1 only in the coast, which gains its cascade: it 
 the place's south edge, centred, and falls in steps of at most 2 m to the sea 80 m out. A cascade's
 reach along its side is measured from the place's edge, so it clears a layout of any width and
 lies in its near land. Where the coast drops faster than the pools step, the cascade's lips stand
-as walls up to about 4 m.
+as walls up to about 4 m. Version 3 differs from version 2 only in the coast, which brings the sea
+nearer: its shore begins 25 m from the place rather than 70 m, so along the cascade's line the land
+meets the sea 23 to 36 m out rather than 62 to 78 m, and its cascade takes the `follow` course: it falls
+where the land falls and stops at the waterline, its last fall pouring off the shore, where version 2's
+equal course would carry its last pool on to 40 m over the sea between straight banks. A town by
+the sea then stands by it: measured at 1920 x 1080 from a town's seafront arrival, the shore 70 m out
+leaves no turn of the view with frontages and open water each across a third of the width (the best
+about a quarter each), and 25 m out gives both (frontages 34.8 percent, water 44.7 percent).
 
 ## Land for a town made from a preset
 

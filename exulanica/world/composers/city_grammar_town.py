@@ -25,7 +25,13 @@ world it made as a structural snapshot and a receipt:
   whose position keeps the declared clearance from furniture and tree extents and from the home
   nodes at which genesis starts residents. Ties use spot identity. The snapshot states that spot
   as the world's spawn. A person arriving there faces the nearest point of a street's crown line;
-  the receipt records that plan vector because a structural destination states no direction.
+  the receipt records that plan vector because a structural destination states no direction. A town
+  on land whose land holds a sea pins arrival policy version 2 instead: of those spots, one on the
+  seaward footway of the street nearest the sea that runs along the shore, facing across it to the
+  land side's fronts, the one nearest the centre, which stands mid-block since the grammar centres a
+  block on the town's centre, so its first view looks along the shore with the fronts across the
+  street on one side and the water on the other; every other town, and every town made before, pins
+  version 1.
 * **A town on land** is composer v3 (:func:`on_land`): a level town's recipe carrying a land
   document. It generates the recipe's specification, migrated to the city grammar version that lays
   a town on its land (:data:`~exulanica.grammar.grammars.city.descriptor.CITY_LAND_VERSIONS`),
@@ -162,6 +168,12 @@ _ARRIVING_ON_FOOTWAYS: Final = (2, LAND_COMPOSER_VERSION)
 _LAND_GRAMMAR_VERSION: Final = max(CITY_LAND_VERSIONS)
 _LEVEL_GRAMMAR_VERSION: Final = _LAND_GRAMMAR_VERSION - 1
 _ARRIVAL_POLICY_PATH: Final = Path(__file__).with_name("town-arrival.v1.json")
+#: The arrival policy a town on land whose land holds a sea is made by: version 1's clearances, and
+#: the spot on the seaward footway of the street nearest the sea that runs along the shore, facing
+#: the land side's fronts across it, mid-block.
+_SEA_ARRIVAL_POLICY_PATH: Final = Path(__file__).with_name("town-arrival.v2.json")
+#: The way, in the city frame (x east, y north), to each side a land's shore may lie on.
+_SIDE_WAY: Final = {"north": (0, 1), "south": (0, -1), "east": (1, 0), "west": (-1, 0)}
 #: The city grammar versions this composer generates: every version the city grammar itself
 #: generates. Each version reads its own catalogs, tile records and descriptor, and this composer
 #: reads them at the version a recipe names or a receipt records, so a world generated under
@@ -231,17 +243,39 @@ def _resident_starts(place: dict[str, Any], routine: RoutineModel) -> list[list[
     ]
 
 
+def _sea_side(land: object) -> str | None:
+    """The side a land document's shore lies on, or None where it states no sea."""
+    if not isinstance(land, Mapping):
+        return None
+    for feature in land.get("features", ()):
+        if isinstance(feature, Mapping) and feature.get("kind") == "shore":
+            side = str(feature.get("side"))
+            if side not in _SIDE_WAY:
+                raise InvalidRecordError(f"a shore lies on side {side!r}, which is no side")
+            return side
+    return None
+
+
 def _arrival_v2(
     place: dict[str, Any],
     tiles: Sequence[Sequence[int]],
     generated: Sequence[object],
     routine: RoutineModel,
+    sea: str | None = None,
 ) -> Mapping[str, Any]:
-    """Choose a non-seat standing spot clear of street objects and resident starts."""
+    """Choose a non-seat standing spot clear of street objects and resident starts, nearest the
+    world's centre: with ``sea`` (the side a town's land holds its sea on), on the seaward footway
+    of the street nearest the sea that runs along the shore, facing across it to the land side's
+    fronts, mid-block, where one has such a spot, as the arrival policy each states says."""
     from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, StreetTreeRecord
 
-    policy = json.loads(_ARRIVAL_POLICY_PATH.read_text())
-    if policy.get("profile") != "exulanica.town-arrival/v1":
+    policy_path, profile = (
+        (_ARRIVAL_POLICY_PATH, "exulanica.town-arrival/v1")
+        if sea is None
+        else (_SEA_ARRIVAL_POLICY_PATH, "exulanica.town-arrival/v2")
+    )
+    policy = json.loads(policy_path.read_text())
+    if policy.get("profile") != profile:
         raise InvalidRecordError("town arrival policy has an unsupported profile")
     object_clearance = policy["minimum_object_clearance_mm"]
     resident_clearance = policy["minimum_resident_clearance_mm"]
@@ -279,16 +313,42 @@ def _arrival_v2(
             for resident in residents
         )
 
-    eligible = [
-        spot
+    facings = {
+        spot["spot_id"]: _facing(spot["position_mm"], generated)
         for spot in place["spots"]
-        if spot["spot_id"].startswith("footway:")
-        and not spot["destination_ids"]
-        and clear(spot)
-        and any(_facing(spot["position_mm"], generated))
-    ]
+        if spot["spot_id"].startswith("footway:") and not spot["destination_ids"] and clear(spot)
+    }
+    eligible = [spot for spot in place["spots"] if any(facings.get(spot["spot_id"], ()))]
     if not eligible:
         raise InvalidRecordError("town_arrival_clearance: no clear footway standing spot")
+    if sea is not None:
+        most = policy["shore_street_most_permille"]
+        if isinstance(most, bool) or not isinstance(most, int) or most <= 0:
+            raise InvalidRecordError("town arrival policy states no street along the shore")
+        way = _SIDE_WAY[sea]
+
+        def on_seaward_footway(spot: Mapping[str, Any]) -> bool:
+            # A spot stands on the seaward footway of a street along the shore when the way it faces
+            # across the street, to its crown, points away from the sea, to the land side, within
+            # the policy's angle.
+            across = facings[spot["spot_id"]]
+            inland = -(across[0] * way[0] + across[1] * way[1])
+            aside = abs(across[0] * way[1] - across[1] * way[0])
+            return inland > 0 and aside * 1_000 <= inland * most
+
+        def crown_toward_sea(spot: Mapping[str, Any]) -> int:
+            # How far toward the sea the crown it faces lies: the same for every spot facing one
+            # street's crown line, so the street nearest the sea is the one this is greatest for.
+            x, y = spot["position_mm"]
+            across = facings[spot["spot_id"]]
+            return (x + across[0]) * way[0] + (y + across[1]) * way[1]
+
+        shore = [spot for spot in eligible if on_seaward_footway(spot)]
+        if shore:
+            nearest_sea = max(crown_toward_sea(spot) for spot in shore)
+            # The town's centre then picks the spot mid-block: the city grammar lays a block
+            # centred on it, so the spot nearest it stands in that block's middle.
+            eligible = [spot for spot in shore if crown_toward_sea(spot) == nearest_sea]
     return min(
         eligible,
         key=lambda spot: (
@@ -298,11 +358,30 @@ def _arrival_v2(
     )
 
 
-def _arrival_policy_pin() -> dict[str, str]:
-    return {
-        "profile": "exulanica.town-arrival/v1",
-        "sha256": hashlib.sha256(_ARRIVAL_POLICY_PATH.read_bytes()).hexdigest(),
-    }
+def _arrival_policy_pin(sea: str | None = None) -> dict[str, str]:
+    """The arrival policy a town's receipt pins: version 2 for a town whose land holds a sea,
+    version 1 for every other."""
+    path, profile = (
+        (_ARRIVAL_POLICY_PATH, "exulanica.town-arrival/v1")
+        if sea is None
+        else (_SEA_ARRIVAL_POLICY_PATH, "exulanica.town-arrival/v2")
+    )
+    return {"profile": profile, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def _pinned_sea(receipt: Mapping[str, Any]) -> str | None:
+    """The sea a town's arrival was chosen toward, by the policy its receipt pins: None for
+    version 1, which every town made before version 2 and every town with no sea pins; refused by
+    name where the pin is neither policy as this code holds it."""
+    pin = receipt.get("arrival_policy")
+    if pin == _arrival_policy_pin():
+        return None
+    sea = _sea_side(receipt.get("land"))
+    if sea is not None and pin == _arrival_policy_pin(sea):
+        return sea
+    raise InvalidStructuralData(
+        "generated_world_arrival_policy_changed: town arrival policy differs"
+    )
 
 
 def _facing(position: Sequence[int], generated: Sequence[object]) -> list[int]:
@@ -512,7 +591,7 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
                 f"generated:{world_id}", generated, routine=arrival_routine
             )
             arrival = (
-                _arrival_v2(place, tiles, generated, arrival_routine)
+                _arrival_v2(place, tiles, generated, arrival_routine, sea=_sea_side(recipe.land))
                 if arriving
                 else _arrival(place, tiles)
             )
@@ -558,7 +637,7 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
                 "facing_mm": _facing(arrival["position_mm"], generated),
                 **({"support_z_mm": arrival["support_z_mm"]} if arriving else {}),
             },
-            **({"arrival_policy": _arrival_policy_pin()} if arriving else {}),
+            **({"arrival_policy": _arrival_policy_pin(_sea_side(recipe.land))} if arriving else {}),
             **(
                 {"arrival_routine": arrival_routine.binding()}
                 if arrival_routine is not None
@@ -628,19 +707,14 @@ def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> N
         raise InvalidStructuralData(
             "generated_world_composer_changed: unknown town composer version"
         )
-    if (
-        composer["version"] in _ARRIVING_ON_FOOTWAYS
-        and receipt.get("arrival_policy") != _arrival_policy_pin()
-    ):
-        raise InvalidStructuralData(
-            "generated_world_arrival_policy_changed: town arrival policy differs"
-        )
     if composer["version"] in ON_LAND_VERSIONS:
         receipt_land(receipt)
     elif {"land", "land_sha256", "land_rules"} & set(receipt):
         raise InvalidStructuralData(
             "generated_world_land_changed: a town on level ground states no land"
         )
+    if composer["version"] in _ARRIVING_ON_FOOTWAYS:
+        _pinned_sea(receipt)
     grammar = receipt["grammar"]
     if grammar["descriptor_sha256"] != descriptor_sha256(CITY_DESCRIPTOR_PATHS[_version(receipt)]):
         raise InvalidStructuralData(
@@ -794,7 +868,7 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
         place = walking_surfaces_place(
             f"generated:{receipt['world_id']}", generated, routine=routine
         )
-        spot = _arrival_v2(place, receipt["tiles"], generated, routine)
+        spot = _arrival_v2(place, receipt["tiles"], generated, routine, sea=_pinned_sea(receipt))
         expected = {
             "spot_id": spot["spot_id"],
             "position_mm": list(spot["position_mm"]),

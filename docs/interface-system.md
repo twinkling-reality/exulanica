@@ -221,11 +221,19 @@ same way when it is made and each time it is opened again. Whether anything is p
 world's version and waited for; only a town with things placed asks what is parked, with a time limit,
 so a dressed town's standpoint can still differ by what is parked when it opens. Each figure of the rule,
 for a town with things placed in it as for one with none, is a chosen default stated with its reason in
-`assets/catalogs/arrival/town-first-view.v4.json`: the steps tried and how far, the room kept round a
-parked vehicle, how much farther a vehicle in the way must be for another spot to be taken, and what
-standing off the walking line is worth. Versions 1 to 3 of that catalog (by openness alone; by life with no
-least distance; with one) stay beside it and are read by the same reader, with those figures at the
-values version 4 states, so a town opens as it did under them. A world
+`assets/catalogs/arrival/town-first-view.v5.json`: the steps tried and how far, the room kept round a
+parked vehicle, how much farther a vehicle in the way must be for another spot to be taken, what
+standing off the walking line is worth, and a seafront view: where a town's entry names a direction
+its first view looks toward (the sea of a town on land that holds one, `arrival_toward_mm`) and its
+arrival faces away from it, across the shore street from its seaward footway, the view turns along the
+shore (86 degrees from straight across rather than 60), the fronts across the street on the land side
+and open water on the other, from the spot and the way with the most buildings' fronts in view (three
+asked, stepping up to 18 m along the footway for them), then the most of the town's doors,
+and nothing at eye height (a building, a trunk, a post) stands nearer than 10 m across its middle third,
+where other first views keep only the middle sixth clear. Versions 1 to 4 of that catalog (by openness alone;
+by life with no least distance; with one; with the figures of the view of placed things) stay beside
+it and are read by the same reader, with those figures at the values version 4 states, so a town
+opens as it did under them. A world
 with people in it that opens paused keeps "The world is paused. Press Play to let it
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
 not said for it again; the world never plays by itself. Where nothing is placed in it and none of its

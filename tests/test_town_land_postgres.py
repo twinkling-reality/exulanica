@@ -22,6 +22,7 @@ from test_world_kinds_postgres import _uploaded
 pytestmark = pytest.mark.postgres
 
 [ROLLING] = [recipe for recipe in land_recipes() if recipe.key == "rolling"]
+[COAST] = [recipe for recipe in land_recipes() if recipe.key == "coast"]
 #: How many times a land document is asked for while the kind worker is still making it: each ask
 #: waits as long as a request does, so this bounds a slow machine's wait at a few minutes.
 ASKS = 12
@@ -164,3 +165,15 @@ def test_a_card_town_its_land_refuses_is_made_level_and_its_receipt_says_which_l
         "land_sha256": land.land_sha256,
         "code": "generated_world_refused",
     }
+
+
+def test_a_town_by_the_sea_names_the_way_to_it_and_one_inland_names_none(made):
+    """A town on land that holds a sea names, for its first view, the way to the sea (its shore's
+    side, south on the coast, in the region's frame: east then south); a town on land with no sea,
+    and one on level ground, name none."""
+    api = made
+    coast = _town(api, land=dict(COAST.land), title="By the sea")
+    assert coast["generated_ground"]["arrival_toward_mm"] == [0, 1_000]
+    inland = _town(api, land=dict(ROLLING.land), title="Inland")
+    assert inland["generated_ground"]["arrival_toward_mm"] is None
+    assert _town(api, title="Level")["generated_ground"]["arrival_toward_mm"] is None

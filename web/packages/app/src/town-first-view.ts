@@ -1,6 +1,6 @@
 /**
  * How the first view of a generated town is chosen, read from the data files that state each value
- * with its reason, `assets/catalogs/arrival/town-first-view.v4.json` and the versions before it.
+ * with its reason, `assets/catalogs/arrival/town-first-view.v5.json` and the versions before it.
  * Presentation only.
  *
  * Version 1 chooses the most open view. Version 2 chooses by what of the town's life lies in view
@@ -8,10 +8,15 @@
  * 3 is version 2 with a least distance under which a seat or a door does not count, so the view
  * does not walk up to a bench to stand behind it. Version 4 is version 3 with the figures the view
  * of placed things and the preference for standing off the walking line were chosen by; it is the
- * version the page opens a town by. All stay readable: `firstViewRule` reads any of the four files,
- * and an earlier one with those figures as `FIRST_VIEW_DEFAULTS` states them.
+ * version 4 with a seafront view: where a town's entry names a direction its first view looks toward
+ * (the sea of a town on land that holds one) and its arrival faces away from it, across the shore
+ * street from its seaward footway, the view turns along the shore, the fronts on the land side and the
+ * open view on the other, with nothing near across its middle third; it is the version the page
+ * opens a town by. All stay readable:
+ * `firstViewRule` reads any of the five files, and an earlier one with the figures version 4 states
+ * as `FIRST_VIEW_DEFAULTS` states them.
  */
-import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v4.json?raw';
+import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v5.json?raw';
 
 /**
  * How a view is judged by the town's life, as version 2 of the catalog states it: angles in
@@ -84,6 +89,19 @@ export interface OpenViewRule {
   readonly offLineBonus?: number;
   /** How a view of placed things steps to a spot that sees them. */
   readonly placed?: PlacedViewRule;
+  /**
+   * Version 5: a seafront view, where an entry names a direction to look toward and the arrival faces
+   * away from it within `facingMost`: the view turns `slant` from straight across instead of the rule's slant,
+   * from the spot and the way with the most buildings' fronts in view, counted by sight lines `frontStep`
+   * apart across `frontHalf` either side, a front once `frontLinesLeast` of them meet it, up to
+   * `frontsLeast`, stepping up to `alongMaximumMm` along the footway, then the most doors, and
+   * nothing at eye height may stand nearer than the centre floor within `centreHalf` either side of where
+   * it looks (its middle third), not dead ahead alone. Absent before version 5.
+   */
+  readonly seafront?: {
+    readonly facingMost: number; readonly slant: number; readonly centreHalf: number; readonly frontHalf: number;
+    readonly frontStep: number; readonly frontLinesLeast: number; readonly frontsLeast: number; readonly alongMaximumMm: number;
+  };
 }
 
 /**
@@ -106,9 +124,9 @@ interface FirstViewEntry {
   readonly reason: string;
 }
 
-const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4> = new Map([
+const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4 | 5> = new Map([
   ['exulanica.town-first-view/v1', 1], ['exulanica.town-first-view/v2', 2], ['exulanica.town-first-view/v3', 3],
-  ['exulanica.town-first-view/v4', 4],
+  ['exulanica.town-first-view/v4', 4], ['exulanica.town-first-view/v5', 5],
 ]);
 
 /** The figures of version 4 an earlier version is read with. */
@@ -166,6 +184,18 @@ export function firstViewRule(text: string): OpenViewRule {
     alongMaximumMm: millimetres('along_maximum_mm'),
     tie: thousandths('tie_milli'),
     ...(version < 4 ? FIRST_VIEW_DEFAULTS_STATED : statedPlaced(stated, millimetres, thousandths)),
+    ...(version < 5 ? {} : {
+      seafront: Object.freeze({
+        facingMost: radians('seafront_facing_most_degrees'),
+        slant: radians('seafront_slant_degrees'),
+        centreHalf: radians('seafront_centre_half_degrees'),
+        frontHalf: radians('seafront_front_half_degrees'),
+        frontStep: radians('seafront_front_step_degrees'),
+        frontLinesLeast: stated('seafront_front_lines_least', 'count'),
+        frontsLeast: stated('seafront_fronts_least', 'count'),
+        alongMaximumMm: millimetres('seafront_along_maximum_mm'),
+      }),
+    }),
   };
   if (version === 1) return Object.freeze(rule);
   const life: LifeViewRule = Object.freeze({
@@ -182,7 +212,11 @@ export function firstViewRule(text: string): OpenViewRule {
     seatSpanMinimumMm: millimetres('seat_span_minimum_mm'),
   });
   if (!(life.farMm > life.nearMm) || !(life.nearMm > life.leastMm) || !(life.seatTopMaximumMm >= life.seatTopMinimumMm)
-    || !(life.centreHalf < Math.PI / 2)) {
+    || !(life.centreHalf < Math.PI / 2)
+    || (rule.seafront !== undefined && (!(rule.seafront.centreHalf < Math.PI / 2) || !(rule.seafront.frontStep > 0)
+      || !(rule.seafront.frontHalf > 0 && rule.seafront.frontHalf < Math.PI / 2)
+      || !Number.isInteger(rule.seafront.frontsLeast) || rule.seafront.frontsLeast < 1
+      || !Number.isInteger(rule.seafront.frontLinesLeast) || rule.seafront.frontLinesLeast < 1))) {
     throw new Error('the town first-view catalog states distances or an angle that cannot be held together');
   }
   return Object.freeze({ ...rule, life });

@@ -257,6 +257,11 @@ export interface GeneratedGround {
    * (`./composition/town-land.ts`); absent for a town on level ground.
    */
   readonly landSha256?: string;
+  /**
+   * The way, a plan vector east then south, to what the town's first view looks toward: the sea of
+   * the land it stands on. Absent for a town on level ground or on land with no sea.
+   */
+  readonly arrivalTowardMm?: readonly [east: number, south: number];
 }
 
 /** A world made from a world kind, as its saved entry declares it. */
@@ -1145,6 +1150,10 @@ function parseGeneratedGround(value: unknown): GeneratedGround | null {
   if (!Array.isArray(tiles) || tiles.length === 0) {
     throw new TypeError('The server returned a generated ground with no tiles.');
   }
+  const toward = row['arrival_toward_mm'];
+  if (toward !== undefined && toward !== null && (!Array.isArray(toward) || toward.length !== 2)) {
+    throw new TypeError('The server returned a generated ground whose first view looks toward no plan direction.');
+  }
   const served = row['values'];
   if (served !== undefined && served !== null && (typeof served !== 'object' || Array.isArray(served))) {
     throw new TypeError('The server returned a generated ground whose values are not a record.');
@@ -1173,6 +1182,12 @@ function parseGeneratedGround(value: unknown): GeneratedGround | null {
     specification,
     values,
     ...(row['land_sha256'] === undefined || row['land_sha256'] === null ? {} : { landSha256: sha256(row['land_sha256'], 'land digest') }),
+    ...(toward === undefined || toward === null ? {} : {
+      arrivalTowardMm: Object.freeze([
+        integer(toward[0], 'first view toward east'),
+        integer(toward[1], 'first view toward south'),
+      ]) as NonNullable<GeneratedGround['arrivalTowardMm']>,
+    }),
     tiles: Object.freeze(tiles.map((tile: unknown) => {
       const one = record(tile, 'generated tile');
       const state = one['state'];

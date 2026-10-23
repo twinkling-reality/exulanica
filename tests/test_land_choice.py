@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 from exulanica.api.instance_settings import SocietySettingRefused, _worlds_on_land
-from exulanica.grammar.landform import WorldFrame, land_recipes, read_land_document, water_bodies
+from exulanica.grammar.landform import (
+    CELL_MM,
+    WorldFrame,
+    height_at,
+    land_recipes,
+    read_land_document,
+    water_bodies,
+)
 from exulanica.world.composers import site_plan
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.land_choice import choose_land, said_by_land
@@ -48,6 +55,48 @@ def test_recipe_version_2_s_coast_pours_a_cascade_into_the_sea_and_version_1_rea
         water = water_bodies(coast, WorldFrame(width_mm=width, depth_mm=depth, seed="c" * 64))
         falls = [body for body in water if body.kind == "fall"]
         assert falls and falls[-1].bottom_mm == 0, "it falls into the sea in front of any site"
+
+
+def test_recipe_version_3_s_coast_meets_the_sea_nearer_and_version_2_reads_as_it_was():
+    """Version 3 differs from version 2 in the coast alone: its shore begins 25 m from the place
+    rather than 70 m, so in a town's frame and a site's the land meets the sea within 45 m of the
+    place's sea-facing edge, and its falls still end in the sea; its cascade follows the land, so
+    its last fall pours off the shore and no pool stands over the sea."""
+    second, third = land_recipes(2), land_recipes(3)
+    assert [recipe.key for recipe in second] == [recipe.key for recipe in third]
+    assert [new.key for old, new in zip(second, third, strict=True) if old != new] == ["coast"]
+
+    def shore(recipe):  # type: ignore[no-untyped-def]
+        return next(f for f in recipe.land["features"] if f["kind"] == "shore")
+
+    assert (shore(second[0])["distance_mm"], shore(third[0])["distance_mm"]) == (70_000, 25_000)
+    coast = read_land_document(dict(third[0].land))
+    for width, depth in ((256_000, 128_000), (96_000, 72_000)):
+        frame = WorldFrame(width_mm=width, depth_mm=depth, seed="c" * 64)
+        wet = next(
+            d for d in range(0, 200_001, 5_000) if height_at(coast, frame, width // 2, -d) <= 0
+        )
+        assert wet <= 45_000, (width, depth, wet)
+        falls = [body for body in water_bodies(coast, frame) if body.kind == "fall"]
+        assert falls and falls[-1].bottom_mm == 0
+    land = dict(third[0].land)
+    before = read_land_document(
+        {**land, "features": [f for f in land["features"] if f["kind"] != "cascade"]}
+    )
+    for width, depth in ((16_000, 20_000), (96_000, 72_000), (256_000, 128_000)):
+        for n in range(4):
+            frame = WorldFrame(width_mm=width, depth_mm=depth, seed=f"{n:x}" * 64)
+            bodies = [body for body in water_bodies(coast, frame) if body.id.startswith("falls")]
+            pools = [body for body in bodies if body.kind == "pool"]
+            last = [body for body in bodies if body.kind == "fall"][-1]
+            x = (pools[0].rect_mm[0] + pools[0].rect_mm[2]) // 2
+            # The last fall pours off the shore: the land there, before the cascade, is the sea's,
+            # and a cell landward it is dry.
+            y = last.rect_mm[1]
+            assert height_at(before, frame, x, y) <= 0 < height_at(before, frame, x, y + CELL_MM)
+            for pool in pools:
+                over = range(pool.rect_mm[1], pool.rect_mm[3] + 1, CELL_MM)
+                assert all(height_at(before, frame, x, y) > 0 for y in over), (frame, pool.id)
 
 
 @pytest.mark.parametrize("key", ["coast", "valley", "upland", "hillside", "rolling"])

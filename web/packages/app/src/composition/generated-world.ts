@@ -123,6 +123,16 @@ function streetFurnitureOfTown(
 const MASSING_OBSTACLE = 'city.massing:';
 
 /**
+ * The outlines of a town's buildings, as plan rings in the region's frame (millimetres east and
+ * south): each building's base, from the obstructions the loaded tiles already state.
+ */
+function buildingsOfTown(loaded: LoadedGeneratedTile): readonly SightBlocker[] {
+  return (loaded.routeObstructions?.obstacles ?? [])
+    .filter((obstacle) => obstacle.id.startsWith(MASSING_OBSTACLE))
+    .flatMap((obstacle) => obstacle.rings.map((ring) => ring.map((point) => [point.x * 1000, point.z * 1000] as const)));
+}
+
+/**
  * What stands in a sight line at a standing person's eye height in a town, as plan rings in the
  * region's frame (millimetres east and south): every building's base, from the obstructions the
  * loaded tiles already state, and each part of the town's street furniture and trees that crosses
@@ -136,9 +146,7 @@ function sightBlockersOfTown(
 ): readonly SightBlocker[] {
   try {
     const eyeMm = loaded.navigationWorld.eyeHeight * 1000;
-    const buildings = (loaded.routeObstructions?.obstacles ?? [])
-      .filter((obstacle) => obstacle.id.startsWith(MASSING_OBSTACLE))
-      .flatMap((obstacle) => obstacle.rings.map((ring) => ring.map((point) => [point.x * 1000, point.z * 1000] as const)));
+    const buildings = buildingsOfTown(loaded);
     const standing = containers.flatMap(({ bytes }) => route.sightBlockersOf?.(bytes, eyeMm) ?? []);
     return [...buildings, ...standing];
   } catch {
@@ -426,11 +434,16 @@ export async function loadGeneratedWorld(
   const sightBlockers = sightBlockersOfTown(route, containers, loaded);
   const view = arrivalView({
     eastMm: stand?.eastMm ?? east, southMm: stand?.southMm ?? south, facing: [facingEast, facingSouth],
+    // The way to the sea, where the town's land holds one: an arrival on the shore street's seaward
+    // footway, facing away from it, looks along the shore (town-first-view version 5).
+    ...(ground.arrivalTowardMm === undefined ? {} : { toward: ground.arrivalTowardMm }),
     targets, parked,
     ground: (e, s) => surface.sample(e / 1000, s / 1000) !== null,
     // What stands at eye height in the town's own records, how a town with nothing placed is looked
     // at, and the seats and doors that view is chosen by.
     blockers: sightBlockers,
+    // The buildings among them, whose fronts a seafront view counts.
+    fronts: buildingsOfTown(loaded),
     open: TOWN_FIRST_VIEW,
     life: lifeOfTown(route, containers, furniture),
   });
