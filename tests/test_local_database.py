@@ -470,13 +470,15 @@ def test_a_port_is_held_only_by_a_listener_and_a_drawn_port_is_never_one_the_sys
         client.connect(("127.0.0.1", listening))
         leftover = client.getsockname()[1]
         accepted, _ = server.accept()
-        if sys.platform == "darwin":
-            # Linux refuses a live connection's own port to PostgreSQL's bind as well, so only
-            # macOS, where the first run was refused, lends it while the connection lives.
+        # Linux refuses a connection's own port to PostgreSQL's bind as well, while it lives and
+        # until its close completes, so only macOS, where the first run was refused, lends it.
+        lent = sys.platform == "darwin"
+        if lent:
             assert cluster.port_is_free(leftover)
         client.close()
         accepted.close()
-        assert cluster.port_is_free(leftover)
+        if lent:
+            assert cluster.port_is_free(leftover)
     drawn = {cluster._free_port() for _ in range(20)}
     assert all(port in cluster.PORT_RANGE for port in drawn)
     assert cluster.PORT_RANGE.stop <= cluster.EPHEMERAL_FROM
