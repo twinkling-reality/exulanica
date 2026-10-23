@@ -147,6 +147,12 @@ def test_a_choice_takes_a_name_with_its_capitals_and_nothing_more():
     written = "say something to Ivo Reed (a villager), 3 m away"
     choice = ChoiceRequest(description="d", options=(written, "wait here a minute"))
     assert choice.options[0] == written
-    for refused in ('say "hello" to Ivo Reed', "say something to Ivo\nReed", "follow [Ivo Reed]"):
+    # A placeholder inside a label is refused as one at its end is.
+    for refused in (
+        'say "hello" to Ivo Reed',
+        "say something to Ivo\nReed",
+        "follow [Ivo Reed]",
+        "say something to [person A], 3 m away",
+    ):
         with pytest.raises(ValueError, match="is not a label"):
             ChoiceRequest(description="d", options=(refused, "wait here a minute"))
