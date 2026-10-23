@@ -84,9 +84,10 @@ LIMITS: dict[str, tuple[int, str]] = {
     ),
     "exulanica/selection/kind_brief.py": (1_529, "a kind of world as a model drafts it"),
     "tools/previews/world-workspace/contextual-world.ts": (
-        1_519,
-        "the world view's host: its corners, people, speech, building, History and "
-        "chosen-character hooks; the record pages' states are record-host.ts's",
+        1_526,
+        "the world view's host: its corners, people, speech, building (which lets go of a chosen "
+        "person as it starts), History and chosen-character hooks; the record pages' states are "
+        "record-host.ts's",
     ),
     "exulanica/api/routes/world_kinds.py": (
         1_537,
