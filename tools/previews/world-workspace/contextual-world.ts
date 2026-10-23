@@ -155,6 +155,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const readBackoff = createReadBackoff();
   let targetReachable = false;
   let following = null;
+  /** Dismisses the made note ("In it", "Set", "Spent") while it shows: the first key or click does (N14). */
+  let dismissMade = null;
   let lastMeasure = 0;
   const overlayCosts = [];
   const priorCallbacks = { pick: b.controls.onPointerPick, interact: b.controls.onInteract, summon: b.controls.onSummon, camera: b.controls.onCameraToggle, fly: b.controls.onFlyChange };
@@ -1144,6 +1146,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   window.addEventListener('blur', () => { dragging = null; corners.hold(false); }, { signal: lifetime.signal });
   window.addEventListener('keyup', event => { if (event.code === 'Tab') corners.hold(false); }, { signal: lifetime.signal });
   window.addEventListener('keydown', event => {
+    // The made note goes on the first key, whichever part of the page takes it, B included (N14).
+    dismissMade?.();
     if (!pageShown() && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) endPair();
     if (!pageShown() && wakesHints(event)) corners.wake();
     if (!pageShown() && !event.repeat) corners.pressed(event.code);
@@ -1514,9 +1518,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       root.append(note.root);
       const gone = new AbortController();
       lifetime.signal.addEventListener('abort', () => gone.abort(), { once: true });
-      const dismiss = () => { note.dismiss(); gone.abort(); };
-      window.addEventListener('keydown', dismiss, { capture: true, signal: gone.signal });
-      window.addEventListener('pointerdown', dismiss, { capture: true, signal: gone.signal });
+      // A key dismisses it from the page's key handler, which takes keys before any listener added here; a click, here.
+      dismissMade = () => { note.dismiss(); gone.abort(); dismissMade = null; };
+      window.addEventListener('pointerdown', dismissMade, { capture: true, signal: gone.signal });
     }
   }
 }
