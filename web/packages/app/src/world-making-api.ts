@@ -80,6 +80,11 @@ export interface WorldMakingDraft {
 /** Exact sealed server quote, forwarded without rounding or rebuilding its economic terms. */
 export interface WorldDraftOperation {
   readonly maximumUsd: string;
+  /**
+   * The most one step of the draft may hold, one request to one model at its worst case: what an allowance must have
+   * left for a draft to send anything. Null for a quote priced before steps were stated.
+   */
+  readonly stepUsdAtMost: string | null;
   readonly expiresAt: number;
   readonly document: Readonly<Record<string, unknown>>;
 }
@@ -113,6 +118,11 @@ export interface WorldDraftOffer {
   /** This person's own draft of a world still running here. */
   readonly runningDraftId: string | null;
   readonly refusals: readonly { readonly code: string; readonly meaning: string }[];
+  /**
+   * Where the workspace's own allowances have less left than the operation's most: what they have left, in USD, the
+   * most a draft started now may spend. A draft holds each step as it is sent and stops where this runs out.
+   */
+  readonly leftUsd: string | null;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -154,6 +164,13 @@ function maybeText(value: unknown, what: string): string | null {
   return value === null || value === undefined ? null : text(value, what);
 }
 
+/** A USD figure as the server states one: a decimal string of at most eight places, more than zero unless `none`. */
+function usd(value: unknown, what: string, none = false): string {
+  const figure = text(value, what);
+  if (!/^[0-9]{1,6}(\.[0-9]{1,8})?$/.test(figure) || (!none && Number(figure) <= 0)) fail(what);
+  return figure;
+}
+
 /**
  * How an operation's ceiling was priced: each request at its role's request envelope of input and its answer limit, or,
  * for a quote priced before envelopes, at its model's whole context window. Both are ceilings no request can pass.
@@ -163,13 +180,13 @@ const OPERATION_BASES: readonly unknown[] = ['request_envelope_ceiling', 'full_c
 function operation(value: unknown): WorldDraftOperation | null {
   if (value === null || value === undefined) return null;
   const held = object(value, 'world draft operation');
-  const maximum = text(held['maximum_usd'], 'reservation ceiling');
+  const maximum = usd(held['maximum_usd'], 'world draft operation');
+  const step = held['step_usd_at_most'] === undefined ? null : usd(held['step_usd_at_most'], 'world draft operation');
   const expires = Date.parse(text(held['expires_at'], 'operation expiry'));
   const readAt = Date.parse(text(held['read_at'], 'operation date'));
   if (held['profile'] !== 'exulanica.world-draft-operation/v1'
     || !OPERATION_BASES.includes(held['basis']) || held['estimate_is_expected_spend'] !== false
-    || !/^[0-9]{1,6}(\.[0-9]{1,8})?$/.test(maximum)
-    || Number(maximum) <= 0 || !Number.isFinite(expires) || !Number.isFinite(readAt) || expires <= readAt || expires > readAt + 60_000
+    || (step !== null && Number(step) > Number(maximum)) || !Number.isFinite(expires) || !Number.isFinite(readAt) || expires <= readAt || expires > readAt + 60_000
     || !/^[a-f0-9]{64}$/.test(text(held['document_sha256'], 'operation digest'))) fail('world draft operation');
   // Clone the complete quote; sending it later must not depend on a caller mutating the response.
   const freeze = (node: unknown): unknown => {
@@ -179,7 +196,7 @@ function operation(value: unknown): WorldDraftOperation | null {
     }
     return node;
   };
-  return Object.freeze({ maximumUsd: maximum, expiresAt: expires,
+  return Object.freeze({ maximumUsd: maximum, stepUsdAtMost: step, expiresAt: expires,
     document: freeze(JSON.parse(JSON.stringify(held))) as Json });
 }
 
@@ -208,6 +225,7 @@ export function parseWorldDraftOffer(raw: unknown): WorldDraftOffer {
     descriptionCharacters: characters,
     runningDraftId: maybeText(held['running_draft_id'], 'running draft'),
     refusals: codes(held['refusals']),
+    leftUsd: held['left_usd'] === null || held['left_usd'] === undefined ? null : usd(held['left_usd'], 'draft offer', true),
   });
 }
 

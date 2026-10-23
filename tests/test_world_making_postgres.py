@@ -966,56 +966,209 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
     assert {row["bound_id"] for row in used} <= {row["bound_id"] for row in bound}
 
 
-def test_an_allowance_left_below_a_draft_s_most_is_said_with_both_figures_before_a_word(
-    drafts, spine_schema, tmp_path
-):
-    """A workspace whose allowances have something left, but less than the most one draft may
-    spend, is told so by the offer with what is left (N31): not that its budget is spent."""
-    from exulanica.api.world_draft_offer import read_operation_sheet
+def _durable(spine_schema, tmp_path) -> tuple[Any, Any, Any]:
+    """The durable spending a public server runs, its database and its operator, with nothing
+    granted yet."""
     from exulanica.spending.ledger import DurableSpending, holder_label
     from exulanica.spending.operator import SpendingOperator
     from exulanica.spending.witness import FileSpendingWitness
 
     from tests_support_api import scratch_database
 
-    app, transport = drafts
     _psycopg, scratch = spine_schema
     database = scratch_database(scratch)
     witness = FileSpendingWitness(tmp_path / "spending-witness", lock_timeout_s=5.0)
-    operator = SpendingOperator(database, witness)
-    until = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
     durable = DurableSpending(database, witness, holder=holder_label("world-drafts"))
+    return database, SpendingOperator(database, witness), durable
+
+
+def _grant(operator: Any, ceilings: dict[str, Decimal]) -> None:
+    """The owner's workspace granted ``ceilings`` (a figure for each provider) by each provider's
+    authority."""
+    until = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    for provider, ceiling in sorted(ceilings.items()):
+        authority = operator.issue(
+            provider=provider,
+            ceiling_usd=Decimal("10"),
+            max_calls=1000,
+            valid_until=until,
+            dispatch_seconds=60,
+            witnessed=True,
+            operator="test-operator",
+            reason="a test installation's allowance",
+        )
+        operator.grant(
+            authority,
+            _workspace(),
+            ceiling_usd=ceiling,
+            max_calls=100,
+            valid_until=until,
+            operator="test-operator",
+            reason="a test workspace's small allowance",
+        )
+
+
+def _bounds(database) -> dict[str, Decimal]:
+    """Each world draft bound opened in the owner's workspace, by provider: its ceiling."""
+    with database.session(_workspace()) as connection:
+        rows = connection.execute(
+            "select b.provider, g.ceiling_usd from world_draft_bound b "
+            "join spending_grant g on g.grant_id = b.bound_id"
+        ).fetchall()
+    return {row["provider"]: row["ceiling_usd"] for row in rows}
+
+
+def test_an_allowance_left_below_a_draft_s_most_is_offered_and_bounds_the_draft_at_what_is_left(
+    drafts, spine_schema, tmp_path
+):
+    """A workspace whose allowances have less left than the most one draft may spend, but at least
+    one step of it, is offered the draft with what is left (a guest's small allowance): the draft
+    holds each step as it is sent, within a bound of what was left, never the whole operation."""
+    from exulanica.api.world_draft_offer import read_operation_sheet
+
+    app, transport = drafts
+    database, operator, durable = _durable(spine_schema, tmp_path)
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app(spending=durable) as client:
         quoted = read_operation_sheet(client.app.state.services.model_client)
-        # Each provider the operation reserves against is granted half its ceiling.
+        # Each provider the operation reserves against is granted half its ceiling: more than
+        # one step, less than the whole.
         halves = {p["provider"]: Decimal(p["ceiling_usd"]) / 2 for p in quoted["providers"]}
-        for provider, half in sorted(halves.items()):
-            authority = operator.issue(
-                provider=provider,
-                ceiling_usd=Decimal("10"),
-                max_calls=1000,
-                valid_until=until,
-                dispatch_seconds=60,
-                witnessed=True,
-                operator="test-operator",
-                reason="a test installation's allowance",
-            )
-            operator.grant(
-                authority,
-                _workspace(),
-                ceiling_usd=half,
-                max_calls=100,
-                valid_until=until,
-                operator="test-operator",
-                reason="a test workspace's small allowance",
-            )
+        steps = {p["provider"]: Decimal(p["step_usd_at_most"]) for p in quoted["providers"]}
+        assert all(halves[provider] >= steps[provider] for provider in halves)
+        _grant(operator, halves)
+        offered = _offer(client)
+        assert (offered["offered"], offered["code"]) == (True, None)
+        # Both figures are served: the most a draft may spend, and what is left for it here.
+        assert Decimal(offered["operation"]["maximum_usd"]) == Decimal(quoted["maximum_usd"])
+        assert Decimal(offered["left_usd"]) == sum(halves.values())
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+    # Each provider's bound is what its grant had left, not the operation's ceiling for it, and the
+    # draft says that is the most it may spend.
+    assert _bounds(database) == halves
+    assert Decimal(ended["funded_usd"]) == sum(halves.values()) < Decimal(quoted["maximum_usd"])
+
+
+def test_an_allowance_left_below_one_step_is_refused_before_a_word_with_what_is_left(
+    drafts, spine_schema, tmp_path
+):
+    """Less left than one step of a draft may hold is said by the offer before a word is typed,
+    with what is left (N31), and a start is refused before anything is sent or bound."""
+    from exulanica.api.world_draft_offer import read_operation_sheet
+
+    app, transport = drafts
+    database, operator, durable = _durable(spine_schema, tmp_path)
+    with app(spending=durable) as client:
+        quoted = read_operation_sheet(client.app.state.services.model_client)
+        shorts = {p["provider"]: Decimal(p["step_usd_at_most"]) / 2 for p in quoted["providers"]}
+        _grant(operator, shorts)
         short = _offer(client)
-    assert (short["offered"], short["code"]) == (False, "world_draft_bound_exceeds_left")
-    assert short["code"] in {code["code"] for code in short["refusals"]}
-    # Both figures are served: the most it may spend, and what is left for it here.
-    assert Decimal(short["operation"]["maximum_usd"]) == Decimal(quoted["maximum_usd"])
-    assert Decimal(short["left_usd"]) == sum(halves.values())
+        assert (short["offered"], short["code"]) == (False, "world_draft_bound_exceeds_left")
+        assert short["code"] in {code["code"] for code in short["refusals"]}
+        assert Decimal(short["left_usd"]) == sum(shorts.values())
+        refused = _start(client, FARM_WORDS)
+        assert (refused.status_code, refused.json()["code"]) == (
+            409,
+            "world_draft_bound_exceeds_left",
+        )
     assert transport.requests == []
+    assert _bounds(database) == {}
+
+
+def test_a_draft_whose_allowance_runs_out_part_way_stops_before_the_step_it_cannot_hold(
+    drafts, spine_schema, tmp_path
+):
+    """A draft holds each step as it is sent: where what is left no longer covers the next step's
+    worst case, that step is refused before it is sent, the draft ends saying so with what it spent,
+    and nothing is spent past what was left."""
+    from exulanica.api.world_draft_offer import read_operation_sheet
+
+    app, transport = drafts
+    database, operator, durable = _durable(spine_schema, tmp_path)
+    with app(spending=durable) as client:
+        quoted = read_operation_sheet(client.app.state.services.model_client)
+    steps = {p["provider"]: Decimal(p["step_usd_at_most"]) for p in quoted["providers"]}
+    _grant(operator, steps)
+    # The tool chooser answers at its worst case (its whole envelope in, its whole answer out), so
+    # what is left after it is less than the specification drafter's step.
+    chooser = next(
+        stage
+        for path in quoted["paths"]
+        for stage in path["stages"]
+        if stage["role"] == str(CHOOSER_ROLE)
+    )
+    worst = HttpResponse(
+        status_code=200,
+        text=json.dumps(
+            chat_body(
+                json.dumps({"tool": "town", "tool_words": ["a quiet town"]}),
+                model=CHOOSER,
+                prompt_tokens=chooser["request_bytes_at_most"],
+                completion_tokens=chooser["answer_tokens_at_most"],
+            )
+        ),
+    )
+    transport.responses.extend([worst, _json(_town_form()), *_plain()])
+    with app(spending=durable) as client:
+        assert _offer(client)["offered"] is True
+        ended = _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
+    # Refused by the durable authority at the draft's bound, said as a spent allowance.
+    assert (ended["state"], ended["refusal"]["code"]) == ("refused", "budget_exceeded")
+    # Only the step it could hold was sent; the drafter's was refused before it left.
+    assert len(transport.requests) == 1
+    with database.session(_workspace()) as connection:
+        held = connection.execute(
+            "select role, state, settled_usd from spending_reservation where workspace_id = %s",
+            (_workspace(),),
+        ).fetchall()
+    assert [(row["role"], row["state"]) for row in held] == [(str(CHOOSER_ROLE), "settled")]
+    assert 0 < held[0]["settled_usd"] <= sum(steps.values())
+    # The refusal states the bound's own figures, which the page says it with: what it held, what
+    # its steps committed, and the step it could not hold, more than what was left.
+    spending = ended["refusal"]["spending"]
+    assert (spending["reason"], spending["scope"], spending["detail"]) == (
+        "spending_limit_reached",
+        "workspace",
+        "usd",
+    )
+    assert Decimal(spending["limit"]) == sum(steps.values())
+    assert Decimal(spending["committed"]) == held[0]["settled_usd"]
+    assert Decimal(spending["requested"]) > Decimal(spending["limit"]) - held[0]["settled_usd"]
+    # The draft says what it spent: its calls add up to what was settled, nothing past it.
+    calls = ended["execution"]["calls"]
+    assert sum(Decimal(str(call["usd"] or 0)) for call in calls) == held[0]["settled_usd"]
+
+
+def test_a_start_stopped_before_its_bounds_opened_is_funded_on_recovery_as_it_stored(
+    drafts, spine_schema, tmp_path, monkeypatch
+):
+    """A start whose process stopped after it was stored and before its bounds were opened is
+    funded on recovery with the bounds its definition stored, what its grants had left at its
+    start: never the operation's ceilings, which those grants could not open."""
+    from exulanica.api.world_draft_offer import read_operation_sheet
+    from exulanica.world.world_draft_jobs import WorldDraftRepository
+
+    app, transport = drafts
+    database, operator, durable = _durable(spine_schema, tmp_path)
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app(spending=durable) as client:
+        quoted = read_operation_sheet(client.app.state.services.model_client)
+        halves = {p["provider"]: Decimal(p["ceiling_usd"]) / 2 for p in quoted["providers"]}
+        _grant(operator, halves)
+        # The start is stored and its process stops: no bound opened, nothing queued to run.
+        enqueue = WorldDraftRepository.enqueue
+        monkeypatch.setattr(world_making_routes, "funding_of", lambda _definition: [])
+        monkeypatch.setattr(WorldDraftRepository, "enqueue", lambda *_: None)
+        started = _start(client, FARM_WORDS)
+        assert started.status_code == 202, started.text
+        assert transport.requests == []
+        # The worker recovers it.
+        monkeypatch.setattr(WorldDraftRepository, "enqueue", enqueue)
+        client.app.state.world_draft_worker.notify(_workspace())
+        ended = _ended(client, started.json()["draft_id"])
+        assert ended["state"] == "ready", ended
+    assert _bounds(database) == halves
 
 
 def test_what_is_left_for_a_draft_counts_each_provider_at_most_its_ceiling():
@@ -1024,22 +1177,32 @@ def test_what_is_left_for_a_draft_counts_each_provider_at_most_its_ceiling():
     says the draft is short wherever one of its providers is, however much another has left."""
     from types import SimpleNamespace
 
-    from exulanica.api.routes.world_making import _left_for
+    from exulanica.api.routes.world_making import _left_by_provider, _short_of_a_step
 
     quote = {
         "maximum_usd": "2",
         "providers": [
-            {"provider": "plenty", "ceiling_usd": "1"},
-            {"provider": "short", "ceiling_usd": "1"},
+            {"provider": "plenty", "ceiling_usd": "1", "step_usd_at_most": "0.3"},
+            {"provider": "short", "ceiling_usd": "1", "step_usd_at_most": "0.3"},
         ],
     }
     figures = SimpleNamespace(available_usd={"plenty": Decimal("5"), "short": Decimal("0.2")})
     services = SimpleNamespace(spending_refusals=lambda _connection, _workspace: figures)
-    left = _left_for(services, None, uuid.uuid4(), quote)
-    assert left == Decimal("1.2") < Decimal(quote["maximum_usd"])
-    # Every provider covered: the whole most, no more.
-    figures.available_usd["short"] = Decimal("3")
-    assert _left_for(services, None, uuid.uuid4(), quote) == Decimal("2")
+    lefts = _left_by_provider(services, None, uuid.uuid4(), quote)
+    assert lefts == {"plenty": Decimal("1"), "short": Decimal("0.2")}
+    # One provider below its step: no draft could send that provider's step.
+    assert _short_of_a_step(quote, lefts)
+    # Every provider at a step or more: offered, whatever is short of the whole.
+    figures.available_usd["short"] = Decimal("0.5")
+    lefts = _left_by_provider(services, None, uuid.uuid4(), quote)
+    assert not _short_of_a_step(quote, lefts) and sum(lefts.values()) == Decimal("1.5")
+    # A quote priced before steps were stated needs each provider's whole ceiling.
+    old = {
+        "providers": [
+            {k: v for k, v in p.items() if k != "step_usd_at_most"} for p in quote["providers"]
+        ]
+    }
+    assert _short_of_a_step(old, lefts)
 
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")

@@ -205,7 +205,7 @@ describe('the made note', () => {
   it('is announced once, leaves an empty column out and leaves when dismissed', async () => {
     vi.useFakeTimers();
     const { madeNote } = await parts();
-    const note = madeNote([{ label: 'In it', value: 'Four pools, a hotel' }, { label: 'Not in it yet', value: ' ' }, { label: 'Spent', value: '$0.31 of the $1.43 set aside' }]);
+    const note = madeNote([{ label: 'In it', value: 'Four pools, a hotel' }, { label: 'Not in it yet', value: ' ' }, { label: 'Spent', value: '$0.31 of at most $1.43' }]);
     document.body.append(note.root);
     expect(note.root.getAttribute('role')).toBe('status');
     // On the page empty, then filled, so it is announced once (N24).
@@ -312,11 +312,11 @@ describe('Create a world as a page', () => {
     expect(document.querySelector<HTMLButtonElement>('.wu-light-orb')!.disabled).toBe(true);
   });
 
-  it('says what making could cost against what is left, with no field, where the budget left is short (N31)', async () => {
-    serve(offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.5' }));
+  it('says what a step of making could cost against what is left, with no field, where the budget left is short of one (N31, A1b)', async () => {
+    serve(offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.01', operation: { ...offerOf().operation, step_usd_at_most: '0.0344064' } }));
     await mount();
     const text = document.body.textContent!;
-    expect(text).toContain('Making a world from your words can cost up to $1.43, more than the $0.50 left for AI models here. You can still start from these:');
+    expect(text).toContain('Making a world from your words can cost up to $0.04 a step, more than the $0.01 left for AI models here. You can still start from these:');
     expect(text).not.toContain('The budget for AI models here is spent.');
     expect(document.querySelector('.wu-light-field')).toBeNull();
   });
@@ -329,6 +329,116 @@ describe('Create a world as a page', () => {
     expect(text).not.toContain('is spent');
     expect(text).not.toContain('spending_suspended');
     expect(document.querySelector('.wu-light-field')).toBeNull();
+  });
+
+  it('says the most is what is left where less than the whole is left, and the whole where it is (A1b)', async () => {
+    serve(offerOf({ left_usd: '0.05' }));
+    await mount();
+    expect(document.body.textContent).toContain('An open model makes it from your words: at most the $0.05 left for AI models here, and you see what it really spent.');
+    document.body.replaceChildren();
+    serve(offerOf());
+    await mount();
+    expect(document.body.textContent).toContain('An open model makes it from your words: at most $1.43, and you see what it really spent.');
+  });
+
+  describe('a draft held a step at a time (A1b)', () => {
+    const STEP = { ...offerOf().operation, step_usd_at_most: '0.0344064' };
+    const short = () => offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.0085632', operation: { ...STEP } });
+    /** The offer as `offers` give it, one per read and the last again; each draft read as `reads` give it. */
+    const answer = (offers: Record<string, unknown>[], reads: Record<string, unknown>[] = []): { offerReads: () => number } => {
+      let read = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        const body = address.endsWith('/worlds/drafts')
+          ? offers[Math.min(read++, offers.length - 1)]
+          : reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      return { offerReads: () => read };
+    };
+
+    it('says less than one step left at the press as the offer does before a word, with the cards, never "Something went wrong"', async () => {
+      const reads = answer([offerOf({ left_usd: '0.05', operation: { ...STEP } }), short()]);
+      startAnswer = async () => ({ draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_bound_exceeds_left' } });
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      const text = document.body.textContent!;
+      expect(reads.offerReads()).toBe(2);
+      expect(text).toContain('Making a world from your words can cost up to $0.04 a step, more than the $0.0085 left for AI models here. You can still start from these:');
+      expect(text).not.toContain('Something went wrong');
+      expect(document.querySelector('.wu-light-field')).toBeNull();
+      expect(document.querySelectorAll('.wu-film-card').length).toBeGreaterThan(0);
+    });
+
+    it('says a draft stopped part way with its next step, what was left and what it spent, then reads what is left again', async () => {
+      const reads = answer([offerOf({ left_usd: '0.0344064', operation: { ...STEP } }), short()], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        {
+          state: 'refused', elapsed_seconds: 2, poll_after_seconds: null, accounting: { reported_usd: '0.00583680' },
+          refusal: {
+            code: 'budget_exceeded',
+            spending: { reason: 'spending_limit_reached', retry: 'never', scope: 'workspace', detail: 'usd', limit: '0.03440640', committed: '0.02583680', requested: '0.03440640' },
+          },
+        },
+      ]);
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      const text = document.body.textContent!;
+      expect(text).toContain('Making stopped part way: its next step could cost up to $0.04, more than the $0.0085 left for AI models here. No world was made, and it spent $0.0058.');
+      // In place of the spent budget's words and what was spent, and with no price the offer read before it can no longer hold.
+      expect(text).not.toContain('The budget for AI models here is spent.');
+      expect(text).not.toContain('before it stopped');
+      expect(text).not.toContain('An open model makes it');
+      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('A quiet town');
+      expect(reads.offerReads()).toBe(1);
+      // The next word reads what is left again.
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town by the sea');
+      await settle();
+      expect(reads.offerReads()).toBe(2);
+      expect(document.body.textContent).toContain('can cost up to $0.04 a step, more than the $0.0085 left for AI models here.');
+    });
+
+    it('says what a draft spent of the most it was funded with, where that is less than the whole', async () => {
+      answer([offerOf({ left_usd: '0.05', operation: { ...STEP } })], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 30, accounting: { reported_usd: '0.0003' }, funded_usd: '0.05000000', operation: { ...STEP } },
+      ]);
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      expect(document.body.textContent).toContain('Spent $0.0003 of at most $0.05');
+    });
+
+    it('says the whole\u2019s most where the draft was funded with all of it: a control', async () => {
+      answer([offerOf({ operation: { ...STEP } })], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 30, accounting: { reported_usd: '0.0003' }, funded_usd: '1.42270000', operation: { ...STEP } },
+      ]);
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      expect(document.body.textContent).toContain('Spent $0.0003 of at most $1.43');
+    });
+
+    it('still says a spent budget and what was spent where the refusal states no figures: a control', async () => {
+      answer([offerOf({ operation: { ...STEP } })], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        { state: 'refused', elapsed_seconds: 2, poll_after_seconds: null, accounting: { reported_usd: '0.02' }, refusal: { code: 'budget_exceeded', spending: { reason: 'not_granted', retry: 'never' } } },
+      ]);
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      const text = document.body.textContent!;
+      expect(text).toContain('The budget for AI models here is spent.');
+      expect(text).toContain('Spent $0.02 before it stopped.');
+      expect(text).not.toContain('Making stopped part way');
+    });
   });
 
   it('still says a spent budget is spent: a control for N31', async () => {

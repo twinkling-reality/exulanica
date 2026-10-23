@@ -635,7 +635,13 @@ per-provider bounds, individual model rates, response digests and expiry. Its ba
 included, never more than the model's context window), which each stage states as
 `request_bytes_at_most`, and its answer limit; the draft's chain refuses any request beyond either
 before sending it, so the ceiling is the worst case the draft can reach. A quote priced before
-envelopes keeps its whole-context basis (`full_context_reservation_ceiling`) and is held to it;
+envelopes keeps its whole-context basis (`full_context_reservation_ceiling`) and is held to it.
+The operation also states `step_usd_at_most`, overall and for each provider: the dearest single
+request of any stage at its worst case, the least an allowance must leave for a draft to send
+anything;
+`left_usd`, where the workspace's own allowances have less left than the operation's
+`maximum_usd`: what they have left for it (each provider's at most its ceiling, summed), the most a
+draft started now may spend;
 `starts`, the hourly
 allowance and starts left for this actor across workspaces and API processes, counting both native
 kind and whole-world starts;
@@ -646,9 +652,12 @@ until, which the page says under the field. A page shows the calls
 and the starts before the words are sent. Another person's running draft is `kind_draft_busy`
 with no id. Every refusal that is known before a model is asked is answered by the start before
 one is, so nobody is charged to be told no: the server's switch, a missing model credential, an
-allowance that admits no attempt (429 `budget_exceeded`), a workspace holding as many generated
-worlds as it may (409 `world_limit_reached`), and a database role that cannot register a world
-(403 `worlds_read_only`). The world limit is asked again where it holds, as the world is
+allowance that admits no attempt (429 `budget_exceeded`), an allowance with less left than one
+step of the draft (409 `world_draft_bound_exceeds_left`, with `left_usd`), a workspace holding as
+many generated worlds as it may (409 `world_limit_reached`), and a database role that cannot
+register a world (403 `worlds_read_only`). An allowance with at least one step left but less than
+the operation's most is offered: the draft holds each step as it is sent and stops where what was
+left runs out. The world limit is asked again where it holds, as the world is
 registered. A draft cannot be withdrawn once started: it runs to its end, one at a time in a
 workspace.
 
@@ -696,10 +705,17 @@ same three budgets as a kind's draft; while one runs in a workspace the other is
 (`POST /selection/world-drafts/prepare`, world read) returns a digest-bound proposal with one
 explicit native `POST /worlds/drafts` step and the operation ceiling. Preparation creates no job
 and asks no model. The native POST requires world write and model invoke, rechecks the quote,
-opens durable provider bounds whose ceilings sum to its accepted total, and enqueues the existing
-world maker. Missing prices, changed configuration or an inactive worker are named refusals.
-The ceiling reserves full input contexts and actual output bounds; it is not expected spend or an
-invoice. `accounting` reads actual reservations, reported charges and unknown liability separately.
+opens one durable bound for each of the quote's providers, and enqueues the existing world maker.
+Each bound is the lesser of the quote's ceiling for that provider and what the workspace's grant
+there has left at the start, so the bounds sum to at most the accepted total. The definition stores
+them (`funding`), so a start recovered after its process stopped opens exactly those bounds. Every
+attempt is admitted against its bound at its own worst case as it is sent. Where a bound no longer
+covers the next attempt, that attempt is refused before it is sent and the draft ends refused with
+what it spent (`budget_exceeded`, its `spending` member naming `spending_limit_reached`); nothing is
+spent past what was left. Missing prices, changed configuration or an inactive worker are named
+refusals. The ceiling prices each request's envelope and its answer limit; it is not expected spend
+or an invoice. A draft's read states `funded_usd`, the most it may spend: its bounds' ceilings summed.
+`accounting` reads actual reservations, reported charges and unknown liability separately.
 `execution` names served models only where a response supplied that identity.
 
 An explicit `idempotency_key` binds the actor, workspace, description and accepted quote terms.

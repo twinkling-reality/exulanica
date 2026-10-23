@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
   CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, leftAmount, madeSpent, hostKeepsLine, priceLine,
-  priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime,
+  priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime, stoppedLine,
 } from './create-words.mjs';
 
 // Frame 20's words, as WORDS.md "Making a world" and N1 to N20 say them.
@@ -23,6 +23,11 @@ assert.equal(CREATE_WORDS.spendingPaused, 'Spending on AI models is paused here,
 assert.equal(CREATE_WORDS.offline, 'Not connected to your world. Trying again.');
 assert.equal(priceLine('0.20766720'), 'An open model makes it from your words: at most $0.21, and you see what it really spent.');
 assert.equal(priceLine('0.00410000'), 'An open model makes it from your words: at most $0.01, and you see what it really spent.');
+// A1b: less than the whole left, the most is what is left (rounded down); the whole left or more, A1's line.
+assert.equal(priceLine('0.20766720', '0.05'), 'An open model makes it from your words: at most the $0.05 left for AI models here, and you see what it really spent.');
+assert.equal(priceLine('0.20766720', '0.0599'), priceLine('0.20766720', '0.05'));
+assert.equal(priceLine('0.20766720', '0.20766720'), priceLine('0.20766720'));
+assert.equal(priceLine('0.20766720', null), priceLine('0.20766720'));
 assert.equal(hostKeepsLine('2026-12-15'), 'The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.');
 assert.equal(hostKeepsLine('2027-01-03'), 'The worlds you make here and the words you type stay on this server until it is deleted after 3\u00a0January\u00a02027.');
 for (const none of [undefined, null, '', '2026-13-01', '15/12/2026', '2026-12-15T00:00', 20261215]) assert.equal(hostKeepsLine(none), null, String(none));
@@ -45,19 +50,19 @@ assert.equal(CREATE_WORDS.creating, 'Creating your world');
 assert.deepEqual({ ...STEP_WORDS }, { queued: 'Waiting to start', choosing: 'Worked out what to make', drafting: 'Planning the place', making: 'Building it', land: 'Drawing its land' });
 assert.equal(CREATE_WORDS.leave, 'You can leave this page. It carries on, and it waits in Your worlds.');
 assert.equal(CREATE_WORDS.beingMade, 'Being made…');
-assert.equal(spendLine({ spentUsd: 0.12 }, '1.43'), 'Spent $0.12 of the $1.43 set aside');
-assert.equal(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.12 of the $1.43 set aside, and up to $0.03 not known yet');
+assert.equal(spendLine({ spentUsd: 0.12 }, '1.43'), 'Spent $0.12 of at most $1.43');
+assert.equal(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.12 of at most $1.43, and up to $0.03 not known yet');
 assert.equal(CREATE_WORDS.madeFromYourWords, 'Made from your words');
 assert.deepEqual([CREATE_WORDS.inIt, CREATE_WORDS.set, CREATE_WORDS.notInItYet, CREATE_WORDS.spent], ['In it', 'Set', 'Not in it yet', 'Spent']);
-assert.equal(madeSpent({ spentUsd: 0.31 }, '1.4227'), '$0.31 of the $1.43 set aside');
+assert.equal(madeSpent({ spentUsd: 0.31 }, '1.4227'), '$0.31 of at most $1.43');
 
 // Money (rule 5): a limit rounded up to the cent; under a cent four places; "less than $0.0001"; "$0".
 assert.equal(ceilingAmount('1.43'), '$1.43');
 assert.equal(ceilingAmount('1.4300001'), '$1.44');
-// N31: what making could cost against what is left, each served figure in the money format (the most up, the left down).
-assert.equal(budgetShort('1.4227', '0.5'),
-  'Making a world from your words can cost up to $1.43, more than the $0.50 left for AI models here. You can still start from these:');
-assert.equal(budgetShort('1.4227', '0.509'), budgetShort('1.4227', '0.5'));
+// N31, A1b: what one step could cost against what is left, each served figure in the money format (the step up, the left down).
+assert.equal(budgetShort('0.0344064', '0.01'),
+  'Making a world from your words can cost up to $0.04 a step, more than the $0.01 left for AI models here. You can still start from these:');
+assert.equal(budgetShort('0.0344064', '0.019'), budgetShort('0.0344064', '0.01'));
 // Under a cent left: P1's four places rounded down, never "$0" while something is left.
 assert.equal(leftAmount('0.00428'), '$0.0042');
 assert.equal(leftAmount('0.0099999'), '$0.0099');
@@ -65,16 +70,28 @@ assert.equal(leftAmount('0.01'), '$0.01');
 assert.equal(leftAmount('0.00004'), 'less than $0.0001');
 assert.equal(leftAmount('0.00009'), 'less than $0.0001');
 assert.equal(leftAmount('0'), '$0');
-assert.equal(budgetShort('1.4227', '0.00428'),
-  'Making a world from your words can cost up to $1.43, more than the $0.0042 left for AI models here. You can still start from these:');
+assert.equal(budgetShort('0.0344064', '0.00428'),
+  'Making a world from your words can cost up to $0.04 a step, more than the $0.0042 left for AI models here. You can still start from these:');
 // Below a ten-thousandth the sentence turns rather than say "more than the less than".
-assert.equal(budgetShort('1.4227', '0.00004'),
-  'Making a world from your words can cost up to $1.43, and less than $0.0001 is left for AI models here. You can still start from these:');
+assert.equal(budgetShort('0.0344064', '0.00004'),
+  'Making a world from your words can cost up to $0.04 a step, and less than $0.0001 is left for AI models here. You can still start from these:');
+// A1b: a draft stopped part way, from its refusal's served figures: the step it could not hold, what was left, what it spent.
+const bound = { reason: 'spending_limit_reached', scope: 'workspace', detail: 'usd', limit: '0.03440640', committed: '0.02583680', requested: '0.03440640' };
+assert.equal(stoppedLine(bound, { spentUsd: 0.0058368 }),
+  'Making stopped part way: its next step could cost up to $0.04, more than the $0.0085 left for AI models here. No world was made, and it spent $0.0058.');
+assert.equal(stoppedLine({ ...bound, committed: '0.0244064' }, { spentUsd: 0.0058368 }),
+  'Making stopped part way: its next step could cost up to $0.04, more than the $0.01 left for AI models here. No world was made, and it spent $0.0058.');
+assert.equal(stoppedLine({ ...bound, committed: '0.03440639' }, { spentUsd: 0.03, unknownUsd: 0.004 }),
+  'Making stopped part way: its next step could cost up to $0.04, and less than $0.0001 is left for AI models here. No world was made, and it spent $0.03, and up to $0.004 not known yet.');
+// Any other refusal, or one that states no figures, says "The budget for AI models here is spent." and what was spent.
+assert.equal(stoppedLine({ reason: 'not_granted', retry: 'never' }, { spentUsd: 0.01 }), null);
+assert.equal(stoppedLine({ reason: 'spending_limit_reached', retry: 'never' }, { spentUsd: 0.01 }), null);
+assert.equal(stoppedLine(null, { spentUsd: 0.01 }), null);
 // N32: a higher price is said with its new figure; the same or a lower one is never said at all.
 assert.equal(priceUp(ceilingAmount('1.6')), 'The price went up before it started. It can now spend at most $1.60.');
-assert.equal(madeSpent({ spentUsd: 0.0042 }, '1.43'), '$0.0042 of the $1.43 set aside');
-assert.equal(madeSpent({ spentUsd: 0.00001 }, '1.43'), 'less than $0.0001 of the $1.43 set aside');
-assert.equal(madeSpent({ spentUsd: 0 }, '1.43'), '$0 of the $1.43 set aside');
+assert.equal(madeSpent({ spentUsd: 0.0042 }, '1.43'), '$0.0042 of at most $1.43');
+assert.equal(madeSpent({ spentUsd: 0.00001 }, '1.43'), 'less than $0.0001 of at most $1.43');
+assert.equal(madeSpent({ spentUsd: 0 }, '1.43'), '$0 of at most $1.43');
 
 // Times (N11).
 assert.equal(stepTime(1), '1 s');
@@ -132,7 +149,8 @@ assert.equal(setValue(null), null);
 // Never on screen: a code, "US$", "provider", "session", an em dash; no line ends in the old "Design" line.
 const said = [
   ...Object.values(CREATE_WORDS), ...Object.values(STEP_WORDS), ...Object.values(REFUSAL_WORDS),
-  priceLine('1.43'), priceUp('$1.60'), budgetShort('1.43', '0.5'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2), refusalSpent({ spentUsd: 0.02 }),
+  priceLine('1.43'), priceLine('1.43', '0.05'), priceUp('$1.60'), budgetShort('0.0344', '0.01'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2),
+  refusalSpent({ spentUsd: 0.02 }), stoppedLine(bound, { spentUsd: 0.0058368 }),
   setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'By the sea' }], words: ['by the sea'] }),
 ];
 for (const line of said) {
@@ -163,7 +181,8 @@ if (words && existsSync(words)) {
     CREATE_WORDS.noModel, CREATE_WORDS.budgetSpent, CREATE_WORDS.leave, CREATE_WORDS.madeFromYourWords, CREATE_WORDS.notInItYet,
     STEP_WORDS.queued, STEP_WORDS.choosing, STEP_WORDS.drafting, STEP_WORDS.making, STEP_WORDS.land,
     REFUSAL_WORDS.hourlyLimit.replace('’', "'"), REFUSAL_WORDS.capacity, REFUSAL_WORDS.tooSlow, REFUSAL_WORDS.interrupted, REFUSAL_WORDS.failed,
-    'Spent $0.12 of the $1.43 set aside', '2 more worlds can be started this hour.', 'Spent $0.02 before it stopped.']) {
+    spendLine({ spentUsd: 0.12 }, '0.21'), '2 more worlds can be started this hour.', 'Spent $0.02 before it stopped.',
+    priceLine('0.2077', '0.05'), budgetShort('0.0344', '0.01'), stoppedLine({ ...bound, committed: '0.0244064' }, { spentUsd: 0.0058368 })]) {
     assert.ok(text.includes(line) || text.includes(line.replaceAll('’', "'")), `WORDS.md says: ${line}`);
   }
 }

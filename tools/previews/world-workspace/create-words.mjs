@@ -112,18 +112,41 @@ export function leftAmount(usd) {
   return four > 0 ? amount(four) : amount(0.00001);
 }
 
+/** Whether `leftUsd` is something, but under a ten-thousandth, where a sentence turns as "more than the less than" would not read. */
+const tinyLeft = (leftUsd) => {
+  const left = Number(leftUsd);
+  return left > 0 && Math.floor(left * 10000 + 1e-9) === 0;
+};
+
 /**
- * Making from words costs more than the budget has left (N31), from the two served figures: the
- * offer's most, rounded up to the cent as the price line says it, and what is left (`leftAmount`).
- * Below a ten-thousandth the sentence turns, as "more than the less than" would not read (DESIGN,
- * N31's later touch). In place of the field, naming the cards under it (N7).
+ * One step of making from words costs more than the budget has left (N31, A1b), from the two served
+ * figures: the offer's most for one step, rounded up to the cent, and what is left (`leftAmount`).
+ * Below a ten-thousandth the sentence turns (DESIGN, N31's later touch). In place of the field,
+ * naming the cards under it (N7); the same where a start meets it at the press.
  */
-export function budgetShort(maximumUsd, leftUsd) {
-  const most = ceilingAmount(maximumUsd), left = Number(leftUsd);
-  const tiny = left > 0 && Math.floor(left * 10000 + 1e-9) === 0;
-  return tiny
-    ? `Making a world from your words can cost up to ${most}, and ${leftAmount(leftUsd)} is left for AI models here. You can still start from these:`
-    : `Making a world from your words can cost up to ${most}, more than the ${leftAmount(leftUsd)} left for AI models here. You can still start from these:`;
+export function budgetShort(stepUsd, leftUsd) {
+  const step = ceilingAmount(stepUsd);
+  return tinyLeft(leftUsd)
+    ? `Making a world from your words can cost up to ${step} a step, and ${leftAmount(leftUsd)} is left for AI models here. You can still start from these:`
+    : `Making a world from your words can cost up to ${step} a step, more than the ${leftAmount(leftUsd)} left for AI models here. You can still start from these:`;
+}
+
+/**
+ * A draft stopped part way because its next step could cost more than was left (A1b), from its
+ * refusal's served `spending` figures: the step it could not hold (`requested`, rounded up to the
+ * cent), what was left (`limit` less `committed`), and what the draft spent. Said in place of "The
+ * budget for AI models here is spent." and what was spent; null where the refusal states no such
+ * figures, which then says those.
+ */
+export function stoppedLine(spending, { spentUsd, unknownUsd = 0 }) {
+  if (spending === null || typeof spending !== 'object' || spending.reason !== 'spending_limit_reached') return null;
+  const { requested, limit, committed } = spending;
+  if (![requested, limit, committed].every(figure => typeof figure === 'string' && Number.isFinite(Number(figure)))) return null;
+  const left = Math.max(0, Number(limit) - Number(committed));
+  const over = tinyLeft(left)
+    ? `and ${leftAmount(left)} is left for AI models here`
+    : `more than the ${leftAmount(left)} left for AI models here`;
+  return `Making stopped part way: its next step could cost up to ${ceilingAmount(requested)}, ${over}. No world was made, and it spent ${spentSoFar(spentUsd, unknownUsd)}.`;
 }
 
 /** A start refused for its price whose new most is higher than the one agreed to (N32): "$1.60" in, the sentence out. */
@@ -147,9 +170,15 @@ export function ceilingAmount(usd) {
   return amount(Math.ceil(value * 100 - 1e-9) / 100);
 }
 
-/** The line under the field with the offer's most (frame 20; DESIGN's A1 words: an open model, the honest worst case). */
-export const priceLine = maximumUsd =>
-  `An open model makes it from your words: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
+/**
+ * The line under the field with the offer's most (frame 20; DESIGN's A1 words: an open model, the
+ * honest worst case). Where less than that is left here (the offer's `left_usd`), the most is what is
+ * left (A1b): each step is held as it is sent, and making stops where it runs out.
+ */
+export const priceLine = (maximumUsd, leftUsd = null) =>
+  leftUsd !== null && Number(leftUsd) < Number(maximumUsd)
+    ? `An open model makes it from your words: at most the ${leftAmount(leftUsd)} left for AI models here, and you see what it really spent.`
+    : `An open model makes it from your words: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
 
 /** The months as a host's date is said in the line under Create's field ("15 December 2026"). */
 const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);
@@ -189,11 +218,14 @@ function spentSoFar(spentUsd, unknownUsd) {
   return Number(unknownUsd) > 0 ? `${spent}, and up to ${amount(unknownUsd)} not known yet` : spent;
 }
 
-/** The made note's Spent value (frame 22): "$0.31 of the $1.43 set aside", with a part not known yet. */
+/**
+ * The made note's Spent value (frame 22): "$0.31 of at most $1.43", with a part not known yet. Nothing
+ * is set aside for the whole (A1b): each step is held as it is sent.
+ */
 export const madeSpent = ({ spentUsd, unknownUsd = 0 }, maximumUsd) =>
-  `${amount(spentUsd)} of the ${ceilingAmount(maximumUsd)} set aside${Number(unknownUsd) > 0 ? `, and up to ${amount(unknownUsd)} not known yet` : ''}`;
+  `${amount(spentUsd)} of at most ${ceilingAmount(maximumUsd)}${Number(unknownUsd) > 0 ? `, and up to ${amount(unknownUsd)} not known yet` : ''}`;
 
-/** Under frame 21's steps, live (N10): "Spent $0.12 of the $1.43 set aside". */
+/** Under frame 21's steps, live (N10): "Spent $0.12 of at most $1.43". */
 export const spendLine = (spent, maximumUsd) => `Spent ${madeSpent(spent, maximumUsd)}`;
 
 /** Under a refusal where anything was spent (N9): "Spent $0.02 before it stopped." */

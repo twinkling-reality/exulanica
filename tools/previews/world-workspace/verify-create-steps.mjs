@@ -18,8 +18,10 @@ for (const code of ['budget_exceeded', 'process_budget_spent', 'process_share_sp
 // N34: spending held closed until an operator acts is paused, not spent, by its served code.
 assert.deepEqual(offerState({ offered: false, code: 'spending_suspended' }), { page: 'paused' });
 // N31: a budget with something left, less than making could cost, by its code and both served figures.
-assert.deepEqual(offerState({ offered: false, code: 'world_draft_bound_exceeds_left', operation: { maximum_usd: '1.4227' }, left_usd: '0.5' }),
-  { page: 'short', maximumUsd: '1.4227', leftUsd: '0.5' });
+assert.deepEqual(offerState({ offered: false, code: 'world_draft_bound_exceeds_left', operation: { maximum_usd: '1.4227', step_usd_at_most: '0.0344' }, left_usd: '0.01' }),
+  { page: 'short', stepUsd: '0.0344', leftUsd: '0.01' });
+// A quote that states no step says the budget is spent rather than a figure it does not have.
+assert.deepEqual(offerState({ offered: false, code: 'world_draft_bound_exceeds_left', operation: { maximum_usd: '1.4227' }, left_usd: '0.01' }), { page: 'budget' });
 assert.deepEqual(offerState({ offered: false, code: 'world_draft_bound_exceeds_left', operation: null, left_usd: null }), { page: 'budget' });
 assert.deepEqual(offerState({ offered: false, code: 'kind_draft_limit' }), { page: 'refused', code: 'kind_draft_limit' });
 assert.equal(canCreate({ offered: true, code: null }, 'a harbour'), true);
@@ -111,8 +113,8 @@ assert.equal(createKey(key('Escape'), { page: 'creating', focus: 'page' }), 'lea
 for (const code of ['Enter', 'KeyW', 'ArrowLeft', 'Space']) assert.equal(createKey(key(code), { page: 'creating', focus: 'page' }), 'silence', code);
 
 // The made note's columns, in order, an empty one left out (N13), and the handoff round trip.
-assert.deepEqual(madeColumns({ inIt: 'Four pools, a hotel', set: 'on gentle hills, with mountains far off', notInItYet: '', spent: '$0.31 of the $1.43 set aside' }).map(one => one.label), ['In it', 'Set', 'Spent']);
-const columns = madeColumns({ inIt: 'Four pools', notInItYet: 'a lighthouse', spent: '$0.31 of the $1.43 set aside' });
+assert.deepEqual(madeColumns({ inIt: 'Four pools, a hotel', set: 'on gentle hills, with mountains far off', notInItYet: '', spent: '$0.31 of at most $1.43' }).map(one => one.label), ['In it', 'Set', 'Spent']);
+const columns = madeColumns({ inIt: 'Four pools', notInItYet: 'a lighthouse', spent: '$0.31 of at most $1.43' });
 assert.equal(MADE_HANDOFF_KEY, 'exulanica.made.v1');
 assert.deepEqual(readMade(writeMade('w-1', columns), 'w-1'), { entryId: 'w-1', columns, build: false });
 // Blank's handoff opens build mode, with no note; a handoff that says nothing of it opens none.

@@ -44,7 +44,7 @@ const entry = {
 };
 
 const wire = (state: string, extra: Record<string, unknown> = {}) => ({
-  request_id: null, operation: null, recovered: false, accounting: null,
+  request_id: null, operation: null, funded_usd: null, recovered: false, accounting: null,
   draft_id: DRAFT, state, description: state === 'ready' || state === 'refused' ? '' : WORDS,
   started_at: '2026-10-10T12:00:00Z', elapsed_seconds: 4,
   poll_after_seconds: state === 'ready' || state === 'refused' ? null : 3, deadline_seconds: 240,
@@ -140,6 +140,8 @@ describe('what the server\u2019s draft routes answer', () => {
   it('is read whole by the page, each answer the server gives', () => {
     const offer = parseWorldDraftOffer(SERVED.offer);
     expect([offer.offered, offer.code, offer.runningDraftId]).toEqual([true, null, null]);
+    expect([offer.operation?.stepUsdAtMost, offer.leftUsd])
+      .toEqual([(SERVED.offer['operation'] as Record<string, unknown>)['step_usd_at_most'], null]);
     expect(offer.callsAtMost).toBeGreaterThan(0);
     expect(offer.starts.left).toBe(offer.starts.anHour);
     const mine = parseWorldDraftOffer(SERVED.offer_while_mine_runs);
@@ -731,6 +733,18 @@ describe('durable world creation consent and recovery', () => {
     // Priced at each request's envelope, or before envelopes at whole context windows; nothing else is a ceiling.
     expect(parseWorldDraftOffer(offerWire({ operation: { ...quote, basis: 'request_envelope_ceiling' } })).operation?.maximumUsd).toBe(quote.maximum_usd);
     expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, basis: 'expected_spend' } }))).toThrow();
+    // One step's most is read where the quote states it, never above the whole; a quote priced before steps has none.
+    expect(operation.stepUsdAtMost).toBeNull();
+    const stepped = parseWorldDraftOffer(offerWire({ operation: { ...quote, step_usd_at_most: '0.03440640' }, left_usd: '0.05000000' }));
+    expect([stepped.operation?.stepUsdAtMost, stepped.leftUsd]).toEqual(['0.03440640', '0.05000000']);
+    expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, step_usd_at_most: '0.73123457' } }))).toThrow('operation');
+    expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, step_usd_at_most: '0' } }))).toThrow('operation');
+    // What is left may be nothing, never a figure the server does not write.
+    expect(parseWorldDraftOffer(offerWire({ left_usd: '0.00000000' })).leftUsd).toBe('0.00000000');
+    expect(OFFER.leftUsd).toBeNull();
+    for (const left of ['-0.01', '1e-8', 0.05]) {
+      expect(() => parseWorldDraftOffer(offerWire({ left_usd: left }))).toThrow('draft offer');
+    }
     expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, expires_at: quote.read_at } }))).toThrow();
     expect(() => parseWorldDraftOffer(offerWire({ operation: operationWire('0') }))).toThrow();
     await expect(client.start(WORDS, { idempotencyKey: DRAFT, operation, maximumUsd: operation.maximumUsd })).rejects.toThrow('identity');

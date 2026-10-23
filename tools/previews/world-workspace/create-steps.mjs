@@ -20,14 +20,14 @@ export const NOT_OFFERED_CODES = Object.freeze(['not_authorised', 'world_draft_s
 export const BUDGET_CODES = Object.freeze(['budget_exceeded', 'process_budget_spent', 'process_share_spent']);
 /** Offer codes that mean spending on AI models is paused here, held closed until an operator acts, not spent (N34). */
 export const PAUSED_CODES = Object.freeze(['spending_suspended']);
-/** The offer code where the budget has something left, but less than making could cost (N31), served with both figures. */
+/** The offer code where the budget has less left than one step of making could cost (N31, A1b), served with both figures. */
 export const SHORT_CODE = 'world_draft_bound_exceeds_left';
 
 /**
  * The page's state from the offer read (`GET /worlds/drafts`, raw): 'loading' before it answers;
  * 'following' where this person's draft runs (N12 opens frame 21); 'no-model', 'budget', 'paused'
- * (spending held closed, N34) and 'short' (the budget left is less than making could cost, with both
- * figures, N31) put the sentence in place
+ * (spending held closed, N34) and 'short' (the budget left is less than one step of making could
+ * cost, with both figures, N31, A1b) put the sentence in place
  * of the field and orb (N7); 'refused' carries a code said under the field (N9);
  * 'offered' otherwise.
  */
@@ -42,8 +42,8 @@ export function offerState(offer) {
   if (BUDGET_CODES.includes(code)) return { page: 'budget' };
   // Told apart from a spent budget by its served code and figures, never by the detail's words (N31).
   if (code === SHORT_CODE) {
-    const most = offer.operation?.maximum_usd, left = offer.left_usd;
-    return typeof most === 'string' && typeof left === 'string' ? { page: 'short', maximumUsd: most, leftUsd: left } : { page: 'budget' };
+    const step = offer.operation?.step_usd_at_most, left = offer.left_usd;
+    return typeof step === 'string' && typeof left === 'string' ? { page: 'short', stepUsd: step, leftUsd: left } : { page: 'budget' };
   }
   return { page: 'refused', code };
 }

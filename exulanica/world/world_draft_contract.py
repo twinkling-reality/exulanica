@@ -50,3 +50,28 @@ def validate_definition(document: Mapping[str, Any]) -> None:
         calls += row["max_calls"]
     if str(total) != quote.get("maximum_usd") or calls != quote.get("calls_at_most"):
         raise ValueError("world_draft_definition_invalid")
+    # The bounds a start opened, where it states them: one for each of the quote's providers,
+    # never above its ceiling there and with its calls, so a start never funds more than quoted.
+    funding = document.get("funding")
+    if funding is None:
+        return
+    quoted = {row["provider"]: row for row in providers}
+    if not isinstance(funding, list) or sorted(
+        row.get("provider") for row in funding if isinstance(row, Mapping)
+    ) != sorted(quoted):
+        raise ValueError("world_draft_definition_invalid")
+    for row in funding:
+        amount = Decimal(row["ceiling_usd"])
+        if (
+            not amount.is_finite()
+            or not 0 < amount <= Decimal(quoted[row["provider"]]["ceiling_usd"])
+            or row.get("max_calls") != quoted[row["provider"]]["max_calls"]
+        ):
+            raise ValueError("world_draft_definition_invalid")
+
+
+def funding_of(definition: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """The bounds a draft's definition was funded with: its stored ``funding`` (each provider's
+    bound at the lesser of its quoted ceiling and what its grant had left), or, for a draft started
+    before funding was stored, its operation's own provider ceilings."""
+    return list(definition.get("funding") or definition["quote"]["providers"])

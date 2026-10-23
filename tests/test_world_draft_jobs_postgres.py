@@ -2,6 +2,7 @@
 
 import datetime as dt
 import uuid
+from decimal import Decimal
 
 import psycopg
 import pytest
@@ -63,6 +64,50 @@ def test_same_request_returns_one_identity_changed_terms_and_foreign_actor_are_r
         pytest.raises(WorldDraftRefused, match="unknown"),
     ):
         WorldDraftRepository(connection, uuid.uuid4()).get(actor, ident)
+
+
+@pytest.mark.parametrize("change", ["half", "above", "zero", "other", "missing", "calls"])
+def test_a_start_never_stores_funding_beyond_its_quote(draft_db, change):
+    """The bounds a start stores are one for each of its quote's providers, each at most the
+    quote's ceiling there with its calls: a start never funds more than the person confirmed."""
+    defined = definition()
+    funding = [dict(row) for row in defined["quote"]["providers"]]
+    for row in funding:
+        row.pop("step_usd_at_most")
+    first = funding[0]
+    if change == "half":
+        first["ceiling_usd"] = str(Decimal(first["ceiling_usd"]) / 2)
+    elif change == "above":
+        first["ceiling_usd"] = str(Decimal(first["ceiling_usd"]) + Decimal("0.00000001"))
+    elif change == "zero":
+        first["ceiling_usd"] = "0"
+    elif change == "other":
+        first["provider"] = "another_provider"
+    elif change == "missing":
+        funding.pop(0)
+    else:
+        first["max_calls"] += 1
+    workspace, actor = uuid.uuid4(), uuid.uuid4()
+    with draft_db.session(workspace) as connection:
+        repo = WorldDraftRepository(connection, workspace)
+
+        def start():
+            return repo.submit(
+                actor=actor,
+                request_id=uuid.uuid4(),
+                description="a small town",
+                terms_sha256=terms_sha256("a small town", None, None),
+                definition={**defined, "funding": funding},
+                guest=False,
+                starts_maximum=12,
+            )
+
+        if change == "half":
+            # Less than the quote, as a grant with less left funds it: stored as it was given.
+            assert repo.get(actor, start())["definition"]["funding"] == funding
+        else:
+            with pytest.raises(ValueError, match="world_draft_definition_invalid"):
+                start()
 
 
 def test_person_quota_survives_another_process_and_workspace_without_reading_foreign_rows(draft_db):

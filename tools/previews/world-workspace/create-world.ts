@@ -17,10 +17,11 @@ import {
 } from './world-ui-create.ts';
 import {
   CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, hostKeepsLine, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
-  stepTime,
+  stepTime, stoppedLine,
 } from './create-words.mjs';
 import {
-  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards, writeMade,
+  MADE_HANDOFF_KEY, SHORT_CODE, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards,
+  writeMade,
 } from './create-steps.mjs';
 import { chosenWorldPicture, openMadeWorld } from './front-door.ts';
 import { mountUiScale } from './world-ui.ts';
@@ -125,8 +126,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   // start whose answer was lost is never a second draft (the idempotency key).
   let submission: { readonly words: string; readonly sent: WorldMakingStart } | null = null;
   // A refusal said under the field, with what was spent, until the words change or the offer is read again;
-  // `words` where its sentence carries a figure (a higher price, N32).
-  let refusal: { readonly code: string; readonly spent: string | null; readonly words?: string } | null = null;
+  // `words` where its sentence carries a figure (a higher price, N32; a draft stopped part way, A1b, whose
+  // figures the offer read before it no longer holds, so no price line is drawn under it).
+  let refusal: { readonly code: string; readonly spent: string | null; readonly words?: string; readonly stopped?: true } | null = null;
   let offerFailures = 0, offerOffline = false;
   // The sentence that names the cards where no field is drawn (N24), else null.
   let sentenceId: string | null = null;
@@ -158,14 +160,20 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const sentence = document.createElement('p'); sentence.className = 'wu-light-sentence';
       sentence.id = sentenceId = 'wu-create-sentence';
       sentence.textContent = state.page === 'no-model' ? CREATE_WORDS.noModel : state.page === 'budget' ? CREATE_WORDS.budgetSpent : state.page === 'paused' ? CREATE_WORDS.spendingPaused
-        : state.page === 'short' ? budgetShort(state.maximumUsd, state.leftUsd) : CREATE_WORDS.notOffered;
+        : state.page === 'short' ? budgetShort(state.stepUsd, state.leftUsd) : CREATE_WORDS.notOffered;
       head.push(sentence);
       field = null; orb = null;
     } else {
       const limit = offer?.descriptionCharacters ?? 1000;
       field = sentenceField({ limit, value: keptWords, onInput: (words) => {
         keptWords = words;
-        if (refusal !== null && refusal.code !== 'world_draft_price_expired' && refusal.code !== PRICE_UP && refusal.code !== PRICE_UNAVAILABLE) { refusal = null; drawCreate(); field?.field.focus(); return; }
+        if (refusal !== null && refusal.code !== 'world_draft_price_expired' && refusal.code !== PRICE_UP && refusal.code !== PRICE_UNAVAILABLE) {
+          // After a draft stopped part way the offer read before it is out of date (A1b): read again for what is left.
+          const stale = refusal.stopped === true;
+          refusal = null; drawCreate(); field?.field.focus();
+          if (stale) void readOffer();
+          return;
+        }
         if (orb) setOrbReady(orb, ready());
         keys();
       } });
@@ -183,7 +191,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
           head.push(lightLine(refusal.words ?? refusalWords(refusal.code), refusal.code === PRICE_UNAVAILABLE ? { live: true } : { tone: 'refused', live: true }));
           if (refusal.spent) head.push(lightLine(refusal.spent, { tone: 'refused' }));
         }
-        if (offer?.operation) head.push(lightLine(priceLine(offer.operation.maximumUsd)));
+        if (offer?.operation && !refusal?.stopped) head.push(lightLine(priceLine(offer.operation.maximumUsd, offer.leftUsd)));
         const left = startsLeftLine(offer?.starts.left ?? Number.NaN);
         if (left) head.push(lightLine(left));
       }
@@ -342,7 +350,16 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
    */
   const refused = (code: string, spent: string | null, agreed: string | null = null): void => {
     if (PRICE_CODES.includes(code)) { void requote(code, spent, agreed, 0); return; }
+    // Less left than one step at the press (A1b): the offer read again says so in place of the field, with the cards.
+    if (code === SHORT_CODE) { refusal = null; void readOffer(); return; }
     refusal = { code, spent };
+    drawCreate();
+    field?.field.focus({ preventScroll: true });
+  };
+
+  /** A draft stopped part way (A1b): its sentence in place of the spent budget's and what was spent, with no price under it. */
+  const stoppedPartWay = (code: string, words: string): void => {
+    refusal = { code, spent: null, words, stopped: true };
     drawCreate();
     field?.field.focus({ preventScroll: true });
   };
@@ -416,14 +433,20 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       if (!quote.textContent && typeof raw['description'] === 'string' && raw['description']) { quote.textContent = `“${raw['description']}”`; sizeQuote(quote); }
       steps.set(draftSteps(reads));
       const spent = spentOf(raw['accounting']);
-      const most = typeof (raw['operation'] as { maximum_usd?: unknown } | null)?.maximum_usd === 'string'
+      const quoted = typeof (raw['operation'] as { maximum_usd?: unknown } | null)?.maximum_usd === 'string'
         ? (raw['operation'] as { maximum_usd: string }).maximum_usd : maximum;
+      // The most this draft may spend: what it was funded with where that is less than the whole (A1b).
+      const funded = typeof raw['funded_usd'] === 'string' ? raw['funded_usd'] : null;
+      const most = funded !== null && (quoted === null || Number(funded) < Number(quoted)) ? funded : quoted;
       if (spent !== null && most !== null) { spend.textContent = spendLine(spent, most); spend.hidden = false; }
       if (raw['state'] === 'ready') { await made(raw, spent, most); return; }
       if (raw['state'] === 'refused') {
         const code = typeof (raw['refusal'] as { code?: unknown } | null)?.code === 'string' ? (raw['refusal'] as { code: string }).code : 'world_draft_failed';
         keptWords = words || keptWords;
-        refused(code, spent === null ? null : refusalSpent(spent));
+        // Stopped part way where its next step could cost more than was left (A1b): said with its figures.
+        const stopped = spent === null ? null : stoppedLine((raw['refusal'] as { spending?: unknown } | null)?.spending ?? null, spent);
+        if (stopped !== null) stoppedPartWay(code, stopped);
+        else refused(code, spent === null ? null : refusalSpent(spent));
         return;
       }
       const delay = pollDelay(raw);

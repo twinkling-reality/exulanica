@@ -38377,6 +38377,17 @@
       ],
       "title": "Operation"
      },
+     "funded_usd": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Funded Usd"
+     },
      "recovered": {
       "type": "boolean",
       "title": "Recovered",

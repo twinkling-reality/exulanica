@@ -38,7 +38,11 @@ from exulanica.models.usage import CallUsage
 from exulanica.selection.calls import admitted_model_call
 from exulanica.selection.world_drafting import sendable
 from exulanica.world.workspace_model_bindings import _document
-from exulanica.world.world_draft_contract import OUTCOME_PROFILE, validate_definition
+from exulanica.world.world_draft_contract import (
+    OUTCOME_PROFILE,
+    funding_of,
+    validate_definition,
+)
 from exulanica.world.world_draft_jobs import ClaimedDraft, WorldDraftRefused, WorldDraftRepository
 
 _LOG = logging.getLogger(__name__)
@@ -341,7 +345,8 @@ class WorldDraftWorker:
             definition = row["definition"]
             quote = definition["quote"]
             try:
-                for provider in quote["providers"]:
+                # The bounds its start funded it with, which a recovery opens or matches exactly.
+                for provider in funding_of(definition):
                     key = f"world-draft:{row['draft_id']}:{provider['provider']}"
                     with self.database.session(workspace_id) as connection:
                         existing = connection.execute(
@@ -366,7 +371,7 @@ class WorldDraftWorker:
                             )
                 if dt.datetime.now(dt.UTC) >= dt.datetime.fromisoformat(quote["expires_at"]):
                     raise WorldDraftRefused("world_draft_price_expired")
-                for provider in quote["providers"]:
+                for provider in funding_of(definition):
                     bound = self.spending.open_bound(
                         workspace_id,
                         provider=provider["provider"],

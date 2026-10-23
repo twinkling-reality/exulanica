@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import math
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -70,7 +71,7 @@ from exulanica.models.usage import usd_string
 from exulanica.selection.calls import AttemptOutcome, CallCost, ModelCall
 from exulanica.selection.tool_choosing import chooser_prompt
 from exulanica.world.saved_entries import SavedWorldEntryRepository
-from exulanica.world.world_draft_contract import DEFINITION_PROFILE
+from exulanica.world.world_draft_contract import DEFINITION_PROFILE, funding_of
 from exulanica.world.world_draft_jobs import WorldDraftRefused, WorldDraftRepository, terms_sha256
 from exulanica.world.worlds import (
     GENERATED,
@@ -209,6 +210,10 @@ class MadeWorldDraftView(BaseModel):
     draft_id: uuid.UUID
     request_id: uuid.UUID | None = None
     operation: dict[str, Any] | None = None
+    #: The most this draft may spend, in USD: the ceilings of the bounds its start opened, summed,
+    #: the lesser of ``operation``'s ``maximum_usd`` and what the workspace's grants had left then.
+    #: Each step is held within them as it is sent.
+    funded_usd: str | None = None
     recovered: bool = False
     accounting: dict[str, Any] | None = None
     state: Literal["queued", "choosing", "drafting", "making", "ready", "refused"]
@@ -269,9 +274,11 @@ class WorldDraftOfferView(BaseModel):
     running_draft_id: uuid.UUID | None
     refusals: list[CodeView]
     operation: dict[str, Any] | None = None
-    #: With ``world_draft_bound_exceeds_left``: what the workspace's own allowances have left for
-    #: this draft, in USD (each of the operation's providers, at most its ceiling, summed), less
-    #: than ``operation``'s ``maximum_usd``. The workspace's figures only, never the authority's.
+    #: Where the workspace's own allowances have less left for this draft than ``operation``'s
+    #: ``maximum_usd``: what they have left, in USD (each of the operation's providers, at most its
+    #: ceiling, summed), the most a draft started now may spend; with
+    #: ``world_draft_bound_exceeds_left``, less than one step. The workspace's figures only, never
+    #: the authority's.
     left_usd: str | None = None
     #: The day this host keeps what is made on it until (``YYYY-MM-DD``), where the host states one
     #: (``EXULANICA_HOST_KEEPS_UNTIL``): the worlds made here and the words typed stay on it until
@@ -279,8 +286,10 @@ class WorldDraftOfferView(BaseModel):
     host_keeps_until: str | None = None
 
 
-#: The offer's code where the most a draft may spend is more than the workspace has left for it
-#: (``left_usd``), so a start could not be funded though the allowance is not spent.
+#: The offer's code where the workspace has less left (``left_usd``) than one step of a draft may
+#: hold (the operation's ``step_usd_at_most`` for a provider), so a draft could send nothing though
+#: the allowance is not spent. Less than the whole operation but at least a step is offered: the
+#: draft holds each step as it is sent and stops where what is left runs out.
 BOUND_EXCEEDS_LEFT: Final = "world_draft_bound_exceeds_left"
 
 
@@ -308,7 +317,7 @@ def _codes() -> list[CodeView]:
             "world_draft_configuration_changed": "The accepted model configuration changed.",
             "world_draft_funding_refused": "Durable provider bounds could not be opened.",
             "world_draft_interrupted": "The interrupted draft was not asked again.",
-            BOUND_EXCEEDS_LEFT: "The most a draft may spend is more than this workspace has left.",
+            BOUND_EXCEEDS_LEFT: "One step of a draft may spend more than this workspace has left.",
         }
     )
     return [CodeView(code=code, meaning=meaning) for code, meaning in sorted(listed.items())]
@@ -453,6 +462,12 @@ def _durable_view(row: dict[str, Any], connection: Any, services: Services) -> M
             "state": "queued" if row["state"] == "queued" else view.state,
             "request_id": row["request_id"],
             "operation": row["definition"]["quote"],
+            "funded_usd": usd_string(
+                sum(
+                    (Decimal(p["ceiling_usd"]) for p in funding_of(row["definition"])),
+                    Decimal(0),
+                )
+            ),
             "recovered": bool(doc.get("recovered")),
             "accounting": WorldDraftRepository(connection, row["workspace_id"]).accounting(
                 row["actor_id"], row["draft_id"]
@@ -575,6 +590,7 @@ def start_world_draft(
             manifest_sha256=manifest_sha256(client),
             deadline_seconds=deadline,
             funding_valid_until=(now + timedelta(seconds=deadline + 120)).isoformat(),
+            funding=_funding(quote, _left_by_provider(services, connection, workspace_id, quote)),
         )
         ident = repository.submit(
             actor=session.actor,
@@ -592,7 +608,7 @@ def start_world_draft(
         definition = stored["definition"]
         quote = definition["quote"]
         try:
-            for provider in quote["providers"]:
+            for provider in funding_of(definition):
                 bound = services.spending.open_bound(
                     workspace_id,
                     provider=provider["provider"],
@@ -691,10 +707,12 @@ def read_world_draft_offer(
             except WorldDraftOfferRefused as failure:
                 code, detail = failure.code, "A current operation sheet is unavailable."
             else:
-                left = _left_for(services, connection, workspace_id, quote)
+                lefts = _left_by_provider(services, connection, workspace_id, quote)
+                left = None if lefts is None else sum(lefts.values(), Decimal(0))
                 if left is not None and left < Decimal(quote["maximum_usd"]):
-                    code, detail = BOUND_EXCEEDS_LEFT, _codes_meaning(BOUND_EXCEEDS_LEFT)
                     left_usd = usd_string(left)
+                if lefts is not None and _short_of_a_step(quote, lefts):
+                    code, detail = BOUND_EXCEEDS_LEFT, _codes_meaning(BOUND_EXCEEDS_LEFT)
     if code is None:
         worker = getattr(request.app.state, "world_draft_worker", None)
         thread = getattr(request.app.state, "world_draft_thread", None)
@@ -731,23 +749,54 @@ def read_world_draft_offer(
     )
 
 
-def _left_for(
-    services: Services, connection: Any, workspace_id: uuid.UUID, quote: dict[str, Any]
-) -> Decimal | None:
-    """What this workspace's own allowances have left for a draft of ``quote``: for each provider
-    the operation reserves against, what its grant has left, at most that provider's ceiling,
-    summed; None in a process no durable authority admits, or where a provider states nothing
-    left here (its own refusal is answered first, by :func:`_unstartable`)."""
+def _left_by_provider(
+    services: Services, connection: Any, workspace_id: uuid.UUID, quote: Mapping[str, Any]
+) -> dict[str, Decimal] | None:
+    """What this workspace's own allowances have left for a draft of ``quote``, for each provider
+    the operation reserves against: what its grant has left, at most that provider's ceiling; None
+    in a process no durable authority admits, or where a provider states nothing left here (its own
+    refusal is answered first, by :func:`_unstartable`)."""
     refusals = services.spending_refusals(connection, workspace_id)
     if refusals is None:
         return None
-    left = Decimal(0)
+    lefts: dict[str, Decimal] = {}
     for provider in quote["providers"]:
         available = refusals.available_usd.get(provider["provider"])
         if available is None:
             return None
-        left += min(Decimal(available), Decimal(provider["ceiling_usd"]))
-    return left
+        lefts[provider["provider"]] = min(Decimal(available), Decimal(provider["ceiling_usd"]))
+    return lefts
+
+
+def _funding(quote: Mapping[str, Any], lefts: Mapping[str, Decimal] | None) -> list[dict[str, Any]]:
+    """The bound each provider's grant opens for a draft of ``quote``: the lesser of the
+    operation's ceiling for it and what the grant has left now (all of the ceiling in a process no
+    durable authority admits). Each step is then held as it is sent, within it, so the draft
+    spends at most what was left and stops where it runs out. Refused before anything runs where
+    a provider has less left than one step (:data:`BOUND_EXCEEDS_LEFT`)."""
+    if lefts is not None and _short_of_a_step(quote, lefts):
+        raise WorldDraftOfferRefused(BOUND_EXCEEDS_LEFT)
+    return [
+        dict(
+            provider=p["provider"],
+            ceiling_usd=str(
+                Decimal(p["ceiling_usd"])
+                if lefts is None
+                else min(Decimal(p["ceiling_usd"]), lefts[p["provider"]])
+            ),
+            max_calls=p["max_calls"],
+        )
+        for p in quote["providers"]
+    ]
+
+
+def _short_of_a_step(quote: Mapping[str, Any], lefts: Mapping[str, Decimal]) -> bool:
+    """Whether some provider has less left than one step of the draft holds against it, so the
+    draft could not send it. A quote priced before steps were stated needs its whole ceiling."""
+    return any(
+        lefts[p["provider"]] < Decimal(p.get("step_usd_at_most", p["ceiling_usd"]))
+        for p in quote["providers"]
+    )
 
 
 def _codes_meaning(code: str) -> str:

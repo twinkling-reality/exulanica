@@ -86,7 +86,7 @@
    },
    {
     "code": "world_draft_bound_exceeds_left",
-    "meaning": "The most a draft may spend is more than this workspace has left."
+    "meaning": "One step of a draft may spend more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",
@@ -169,12 +169,14 @@
    "read_at": "2026-01-01T00:00:00Z",
    "expires_at": "2026-01-01T00:01:00Z",
    "maximum_usd": "0.20766720",
+   "step_usd_at_most": "0.03440640",
    "calls_at_most": 16,
    "providers": [
     {
      "provider": "nebius_token_factory",
      "ceiling_usd": "0.20766720",
-     "max_calls": 16
+     "max_calls": 16,
+     "step_usd_at_most": "0.03440640"
     }
    ],
    "prices": [
@@ -607,7 +609,8 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720"
+     "ceiling_usd": "0.20766720",
+     "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
@@ -615,8 +618,10 @@
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
+   "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
+  "funded_usd": "0.20766720",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -718,7 +723,7 @@
    },
    {
     "code": "world_draft_bound_exceeds_left",
-    "meaning": "The most a draft may spend is more than this workspace has left."
+    "meaning": "One step of a draft may spend more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",
@@ -881,7 +886,7 @@
    },
    {
     "code": "world_draft_bound_exceeds_left",
-    "meaning": "The most a draft may spend is more than this workspace has left."
+    "meaning": "One step of a draft may spend more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",
@@ -1178,7 +1183,8 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720"
+     "ceiling_usd": "0.20766720",
+     "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
@@ -1186,8 +1192,10 @@
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
+   "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
+  "funded_usd": "0.20766720",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -1540,7 +1548,7 @@
    },
    {
     "code": "world_draft_bound_exceeds_left",
-    "meaning": "The most a draft may spend is more than this workspace has left."
+    "meaning": "One step of a draft may spend more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",
@@ -1834,7 +1842,8 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720"
+     "ceiling_usd": "0.20766720",
+     "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
@@ -1842,8 +1851,10 @@
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
+   "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
+  "funded_usd": "0.20766720",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -2145,7 +2156,7 @@
    },
    {
     "code": "world_draft_bound_exceeds_left",
-    "meaning": "The most a draft may spend is more than this workspace has left."
+    "meaning": "One step of a draft may spend more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",
@@ -2439,7 +2450,8 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720"
+     "ceiling_usd": "0.20766720",
+     "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
@@ -2447,8 +2459,10 @@
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
+   "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
+  "funded_usd": "0.20766720",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -2604,7 +2618,7 @@
    },
    {
     "code": "world_draft_bound_exceeds_left",
-    "meaning": "The most a draft may spend is more than this workspace has left."
+    "meaning": "One step of a draft may spend more than this workspace has left."
    },
    {
     "code": "world_draft_bound_too_small",

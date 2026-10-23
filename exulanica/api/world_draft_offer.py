@@ -81,7 +81,9 @@ def operation_sheet(
     *,
     now: dt.datetime,
 ) -> dict[str, Any]:
-    """A finite envelope for every native path, including retries and fallbacks.
+    """A finite envelope for every native path, including retries and fallbacks, and its largest
+    step: ``step_usd_at_most``, the dearest single dispatch's worst case, overall and for each
+    provider, the least a draft's bound must leave for it to send anything.
 
     Each per-model reservation prices the stage's request envelope of input (its role's, never
     more than the model's current context; a role with none is priced at that whole context) plus
@@ -95,6 +97,8 @@ def operation_sheet(
     rates: dict[tuple[str, str], dict[str, Any]] = {}
     provider_caps: dict[str, Decimal] = {}
     provider_calls: dict[str, int] = {}
+    # The dearest single dispatch each provider can be sent: what one step of the draft holds.
+    provider_steps: dict[str, Decimal] = {}
     for tool, stages_ in stages().items():
         path_caps: dict[str, Decimal] = {}
         path_calls: dict[str, int] = {}
@@ -161,6 +165,7 @@ def operation_sheet(
             count = repairs * wire
             cost = max(costs) * count
             provider = binding.provider
+            provider_steps[provider] = max(provider_steps.get(provider, Decimal(0)), max(costs))
             path_caps[provider] = path_caps.get(provider, Decimal(0)) + cost
             path_calls[provider] = path_calls.get(provider, 0) + count
             entries.append(
@@ -196,9 +201,15 @@ def operation_sheet(
                 at + dt.timedelta(seconds=PRICE_SECONDS) for at in read_at.values()
             ).isoformat(),
             maximum_usd=str(total),
+            step_usd_at_most=str(max(provider_steps.values())),
             calls_at_most=sum(provider_calls.values()),
             providers=[
-                dict(provider=p, ceiling_usd=str(provider_caps[p]), max_calls=provider_calls[p])
+                dict(
+                    provider=p,
+                    ceiling_usd=str(provider_caps[p]),
+                    max_calls=provider_calls[p],
+                    step_usd_at_most=str(provider_steps[p]),
+                )
                 for p in sorted(provider_caps)
             ],
             prices=[rates[k] for k in sorted(rates)],

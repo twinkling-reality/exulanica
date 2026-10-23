@@ -61,6 +61,24 @@ def test_full_operation_includes_actual_repairs_fallbacks_and_alternative_tool_p
         assert rate["rate_response_sha256"] == "f" * 64
 
 
+def test_the_sheet_states_its_largest_step_overall_and_for_each_provider():
+    """One step of a draft is one dispatch: the dearest model of any stage at its worst case. A
+    bound that leaves less than a provider's step can send nothing to it."""
+    manifest, prices, at, wire = inputs()
+    sheet = operation_sheet(manifest, prices, at, wire, now=NOW)
+    dearest: dict[str, Decimal] = {}
+    for path in sheet["paths"]:
+        for entry in path["stages"]:
+            for model in entry["models"]:
+                each = Decimal(model["reservation_usd"])
+                dearest[model["provider"]] = max(dearest.get(model["provider"], each), each)
+    for provider in sheet["providers"]:
+        step = Decimal(provider["step_usd_at_most"])
+        assert step == dearest[provider["provider"]]
+        assert 0 < step < Decimal(provider["ceiling_usd"])
+    assert Decimal(sheet["step_usd_at_most"]) == max(dearest.values())
+
+
 @pytest.mark.parametrize("attempts", [1, 3])
 def test_the_most_calls_without_prices_are_the_sheet_s_own(attempts):
     """A person is told the same most calls whether or not the server could read prices: every
