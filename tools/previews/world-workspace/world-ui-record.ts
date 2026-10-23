@@ -47,7 +47,13 @@ export function keyRow(keys: readonly HTMLButtonElement[]): HTMLDivElement {
   return row;
 }
 
-/** A picture, or the quiet tile while it does not exist (no spinner, no words); it fades in when it arrives. */
+/** The picture addresses the record pages have shown in this window: drawn again, they start shown, so none fades in twice. */
+const shownPictures = new Set<string>();
+
+/**
+ * A picture, or the quiet tile while it does not exist (no spinner, no words); it fades in once, when it first arrives,
+ * and a redraw of a picture already shown (a page drawn again each second during a run) starts shown.
+ */
 export function pictureBox(url: string | null, width: number, height: number): HTMLDivElement {
   const box = element('div', 'wu-hr-pic');
   box.style.width = `${width}px`;
@@ -55,7 +61,8 @@ export function pictureBox(url: string | null, width: number, height: number): H
   if (url) {
     const image = element('img');
     image.alt = '';
-    image.addEventListener('load', () => image.setAttribute('data-loaded', 'true'));
+    if (shownPictures.has(url)) image.setAttribute('data-loaded', 'true');
+    else image.addEventListener('load', () => { shownPictures.add(url); image.setAttribute('data-loaded', 'true'); });
     image.src = url;
     box.append(image);
   }

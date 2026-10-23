@@ -157,6 +157,23 @@ describe("Teo's day", () => {
     expect(one(root, '.wu-day-none')).toBe('No personality written yet.');
   });
 
+  it('fades a picture in once: drawn again, a picture already shown starts shown and one still coming still fades', async () => {
+    const { root, page } = await open();
+    // This case's own addresses, so no other case has shown them.
+    const state = (doing: string) => teoState({ doing, did: rows().map((row) => (row.picture ? { ...row, picture: `${row.picture}?once` } : row)) });
+    const loaded = () => [...root.querySelectorAll('.wu-hr-pic img')].map((image) => image.getAttribute('data-loaded'));
+    page.draw(state('Waiting by the bench'));
+    const before = root.querySelector('.wu-hr-pic img');
+    expect(loaded()).toEqual([null, null]);
+    root.querySelector('.wu-hr-pic img')!.dispatchEvent(new Event('load'));
+    expect(loaded()).toEqual(['true', null]);
+    // The page draws again with something else changed, as it does each second during a run: new pictures, the shown
+    // one already shown.
+    page.draw(state('Walking to the quay'));
+    expect(root.querySelector('.wu-hr-pic img')).not.toBe(before);
+    expect(loaded()).toEqual(['true', null]);
+  });
+
   it('draws What Teo did newest first on the path at x 880, the chosen card filled and offering its decision', async () => {
     const { root, act, page } = await open();
     page.draw(teoState());
