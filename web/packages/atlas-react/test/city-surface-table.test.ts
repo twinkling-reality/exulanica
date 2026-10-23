@@ -21,9 +21,9 @@ describe('the city surface table', () => {
     expect(await conformanceRows()).toEqual(conformance.rows);
   }, 60_000);
 
-  it('samples kerbs, footways, carriageways and a junction on both tiles', () => {
+  it('samples kerbs, footways, carriageways and a junction on every tile', () => {
     expect(table.profile).toBe('exulanica.city-surface-table/v1');
-    expect(table.tiles.map((tile) => tile.name)).toEqual(['conformance', 'small_town']);
+    expect(table.tiles.map((tile) => tile.name)).toEqual(['conformance', 'small_town', 'town_on_land']);
     for (const tile of table.tiles) {
       expect(new Set(tile.rows.map((row) => row[3]))).toEqual(new Set(['city.curb_edge', 'city.street_segment', 'city.junction']));
     }

@@ -13,9 +13,11 @@ records' own fields and the corner rule's measure; nothing is measured from a dr
 * **A footway** piece is the tessellator's ring for it: from the kerb top's back edge, at the kerb
   top's height, out to the frontage line, risen by ``footway_width_mm`` of crossfall. Where the
   piece meets a mitred corner (a width reaches the corner's radius) the ring gives way on the
-  mitre, through the corner's centre and frontage corner at the corner's own level. The ring is cut
-  into triangles by the ring rule (ear clipping, in the order the tessellator cuts), and a point's
-  height is its triangle's.
+  mitre, through the corner's centre and frontage corner at the corner's own level. Where that
+  piece's kerb line climbs or falls, the strip stands on its own heights up to a ramp into the
+  mitre, as long as the stretch the mitre takes, and the ramp is its own ring, as the tessellator
+  draws it. A ring is cut into triangles by the ring rule (ear clipping, in the order the
+  tessellator cuts), and a point's height is its triangle's.
 * **A carriageway and its gutters** lie on the camber plane from the crown line down to each kerb
   line, between the strip's two ends (:mod:`~exulanica.grammar.grammars.city.streets`, the
   segment's step 1). A crossing's band is drawn on that carriageway and states no surface of its
@@ -34,10 +36,10 @@ records' own fields and the corner rule's measure; nothing is measured from a dr
   points across its strip's end at the node), back along its kerb line, and round each corner's
   arc to the next leg, cut by the ring rule.
 
-Where surfaces overlap, the highest is the answer, as on the page. A footway piece whose sloping
-kerb line ramps into a mitred corner is not stated by this version, nor a corner's wedge the carve
-or the ring rule refuses: it answers ``None`` there, as it does where the records state no street
-surface at all (a lot, a building, open land). The caller keeps its own ground for ``None``.
+Where surfaces overlap, the highest is the answer, as on the page. A corner's wedge the carve or
+the ring rule refuses is not stated by this version: it answers ``None`` there, as it does where
+the records state no street surface at all (a lot, a building, open land). The caller keeps its
+own ground for ``None``.
 
 Heights are exact ratios of integers, rounded half away from zero once at the end. A reading
 indexes its pieces (each straight kerb top, footway triangle, carriageway strip, corner kerb-top
@@ -45,7 +47,7 @@ triangle, corner wedge triangle and junction fill triangle) by square plan cells
 asks only the pieces whose bounds reach its point's cell, in the order the rules above list them,
 so where two answer the same height the earlier still answers.
 ``tests/fixtures/city-surface-table.json`` holds every answer to the page's own walk surface on
-the conformance tile and a generated tile.
+the conformance tile, a generated town on level ground and a generated town on land.
 """
 
 from __future__ import annotations
@@ -560,19 +562,52 @@ def _junction_fill(
     return tuple(_ears(ring))
 
 
+def _ramp_start(near: Space, far: Space, frontage: Space) -> Plan | None:
+    """Where a footway whose kerb line climbs or falls begins its ramp into the mitred corner at
+    ``far``: the point of the kerb line from ``near`` to ``far`` (a piece along x or along y, walked
+    toward ``far``) as far before the mitre's frontage corner as ``far`` lies beyond it, so the ramp
+    is as long as the stretch of strip the mitre gives the corner; None where the piece runs along
+    neither axis or that point does not lie strictly between ``near`` and the frontage corner."""
+    axis = 0 if near[1] == far[1] else 1 if near[0] == far[0] else None
+    if axis is None:
+        return None
+    start = 2 * frontage[axis] - far[axis]
+    inside = (
+        near[axis] < start < frontage[axis]
+        if near[axis] < frontage[axis]
+        else frontage[axis] < start < near[axis]
+    )
+    if not inside:
+        return None
+    return (start, near[1]) if axis == 0 else (near[0], start)
+
+
+def _before(near: Space, far: Space, first: Plan, second: Plan) -> bool:
+    """Whether, walking a piece along x or along y from ``near`` to ``far``, ``first`` comes
+    before ``second``."""
+    axis = 0 if near[1] == far[1] else 1
+    return first[axis] < second[axis] if near[axis] < far[axis] else second[axis] < first[axis]
+
+
 def _footway(
     curb: CurbEdgeRecord, line: _Line, outward: Plan, turned: _Mitre | None, met: _Mitre | None
 ) -> tuple[Triangle, ...]:
-    """A curb's footway rings, piece by piece along its kerb line, cut into triangles; none where
-    a sloping kerb line ramps into a mitre, which this version does not state."""
+    """A curb's footway rings, piece by piece along its kerb line, cut into triangles. Where a
+    sloping kerb line meets a mitred corner, the strip stands on its own heights up to a ramp into
+    that corner: each ramp is its own ring, and so is the strip between them, as the tessellator
+    draws it; a level kerb line, or a strip whose two ramps would cross, keeps its one ring."""
     points = line.points
-    if any(point[2] != points[0][2] for point in points) and (turned or met):
-        return ()
+    sloping = any(point[2] != points[0][2] for point in points)
     height, kerb_width = curb.kerb_height_mm, curb.kerb_width_mm
     reach, rise = kerb_width + curb.footway_width_mm, footway_rise_mm(curb)
 
     def out(point: Space, distance: int, up: int) -> Space:
         return (*_moved(point, _along(outward, distance)), point[2] + up)
+
+    def across(on_kerb: Plan) -> tuple[Space, Space]:
+        # The kerb top's back and the footway's far edge, across the strip from a kerb line point.
+        kerb = (on_kerb[0], on_kerb[1], _height_on(points, line.direction, on_kerb))
+        return out(kerb, kerb_width, height), out(kerb, reach, height + rise)
 
     # A left curb is walked first point to last, a right one last to first: the walk's end piece
     # meets the corner this curb turns, its start piece the corner that turns into it.
@@ -580,16 +615,58 @@ def _footway(
     start, end = (0, 1) if on_left else (1, 0)
     pieces = len(points) - 1
     triangles: list[Triangle] = []
+
+    def ring_of(ring: list[Space]) -> None:
+        triangles.extend(_ears([point for at, point in enumerate(ring) if point != ring[at - 1]]))
+
     for index in range(pieces):
         ends = (points[index], points[index + 1])
         backs = [out(point, kerb_width, height) for point in ends]
         fronts = [out(point, reach, height + rise) for point in ends]
         turned_here = turned if index == (pieces - 1 if on_left else 0) else None
         met_here = met if index == (0 if on_left else pieces - 1) else None
-        ring = [backs[start], backs[end]]
-        ring += [fronts[end]] if turned_here is None else [turned_here.centre, turned_here.frontage]
-        ring += [fronts[start]] if met_here is None else [met_here.frontage, met_here.centre]
-        triangles += _ears([point for at, point in enumerate(ring) if point != ring[at - 1]])
+        walk_from, walk_to = ends[start], ends[end]
+        end_ramp = (
+            _ramp_start(walk_from, walk_to, turned_here.frontage)
+            if sloping and turned_here is not None
+            else None
+        )
+        start_ramp = (
+            _ramp_start(walk_to, walk_from, met_here.frontage)
+            if sloping and met_here is not None
+            else None
+        )
+        if (
+            end_ramp is not None
+            and start_ramp is not None
+            and not _before(walk_from, walk_to, start_ramp, end_ramp)
+        ):
+            end_ramp = start_ramp = None
+        start_edge = None if start_ramp is None else across(start_ramp)
+        end_edge = None if end_ramp is None else across(end_ramp)
+        if start_edge is not None and met_here is not None:
+            ring_of([backs[start], *start_edge, met_here.frontage, met_here.centre])
+        if end_edge is not None and turned_here is not None:
+            ring_of(
+                [end_edge[0], backs[end], turned_here.centre, turned_here.frontage, end_edge[1]]
+            )
+        ring = [
+            backs[start] if start_edge is None else start_edge[0],
+            backs[end] if end_edge is None else end_edge[0],
+        ]
+        if end_edge is not None:
+            ring.append(end_edge[1])
+        elif turned_here is None:
+            ring.append(fronts[end])
+        else:
+            ring += [turned_here.centre, turned_here.frontage]
+        if start_edge is not None:
+            ring.append(start_edge[1])
+        elif met_here is None:
+            ring.append(fronts[start])
+        else:
+            ring += [met_here.frontage, met_here.centre]
+        ring_of(ring)
     return tuple(triangles)
 
 

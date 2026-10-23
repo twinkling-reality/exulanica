@@ -3,7 +3,8 @@ height the page stands a person on.
 
 ``tests/fixtures/city-surface-table.json`` is the page's own walk surface (each tile's
 ``nav_envelope`` read by atlas-react's ``composedSupport``), sampled over the street surfaces of
-tess's conformance tile and tile (0, 0) of a small town, written by
+tess's conformance tile, tile (0, 0) of a small town and tile (0, 0) of the same small town made on
+the land recipes' default land (rolling, under the land rules in force), written by
 ``web/packages/atlas-react/test/write-city-surface-table.ts``. Every row is answered, from a kerb
 top, a footway (a corner's wedge included) or a carriageway, and every answer is held to it within
 the rounding of one millimetre. The table's point is the page's own placement, up to a millimetre
@@ -11,12 +12,14 @@ from the drawn one: where a corner wedge's thin triangle climbs several millimet
 millimetre of plan, a row is held to the answer within a millimetre of its point instead, and how
 many rows that is on each tile is pinned, so a rule that drifts fails here.
 
-Run as a script with a path, it writes the small town's tile (0, 0) document the table was made
-from: ``PYTHONPATH=. .venv/bin/python tests/test_city_surface.py <path>``.
+Run as a script with two paths, it writes the small town's tile (0, 0) document and that of the
+town on land the table was made from:
+``PYTHONPATH=. .venv/bin/python tests/test_city_surface.py <path> <land path>``.
 """
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import sys
@@ -42,16 +45,27 @@ TABLE: Final = ROOT / "tests" / "fixtures" / "city-surface-table.json"
 #: answer's own rounding and one millimetre of the tessellator's floored placement of a point.
 WITHIN_UM: Final = 1_500
 #: Rows each tile holds to an answer within a millimetre of their point (a wedge's thin triangle).
-PLACED_NEARBY: Final = {"conformance": 0, "small_town": 1}
+PLACED_NEARBY: Final = {"conformance": 0, "small_town": 1, "town_on_land": 0}
 
 
-def town_document_bytes(world_id: str, tile: tuple[int, int]) -> bytes:
-    """The small town ``world_id`` makes, tile ``tile``'s document bytes: what the tile worker
-    bakes for it."""
-    from exulanica.world.composers.city_grammar_town import tile_document_bytes, tile_documents
-    from exulanica.world.generated_worlds import compose_specified_world
+@functools.cache
+def town_document_bytes(world_id: str, tile: tuple[int, int], land: str | None = None) -> bytes:
+    """The small town ``world_id`` makes, on level ground or on the land recipe ``land`` (the
+    newest recipes'), tile ``tile``'s document bytes: what the tile worker bakes for it."""
+    from exulanica.grammar.landform import land_recipes
+    from exulanica.world.composers.city_grammar_town import (
+        on_land,
+        tile_document_bytes,
+        tile_documents,
+    )
+    from exulanica.world.generated_worlds import compose_generated_world, compose_specified_world
+    from exulanica.world.world_recipes import town_recipe
 
-    world = compose_specified_world("small_town", None, world_id)
+    if land is None:
+        world = compose_specified_world("small_town", None, world_id)
+    else:
+        [recipe] = [one for one in land_recipes() if one.key == land]
+        world = compose_generated_world(on_land(town_recipe("small_town"), recipe.land), world_id)
     for document in tile_documents(world.receipt, world.records):
         if (document.tile.tile_x, document.tile.tile_y) == tile:
             return tile_document_bytes(document)
@@ -72,7 +86,7 @@ def _records(name: str) -> list[object]:
         data = (ROOT / "web" / tile["document"]).read_bytes()
     else:
         town = tile["town"]
-        data = town_document_bytes(town["world_id"], tuple(town["tile"]))
+        data = town_document_bytes(town["world_id"], tuple(town["tile"]), town.get("land"))
     assert hashlib.sha256(data).hexdigest() == tile["document_sha256"]
     document = read_tile_document(data)
     return [record for grammar in document.grammars for record in (*grammar.owned, *grammar.halo)]
@@ -83,7 +97,7 @@ def conformance() -> list[object]:
     return _records("conformance")
 
 
-@pytest.mark.parametrize("name", ["conformance", "small_town"])
+@pytest.mark.parametrize("name", ["conformance", "small_town", "town_on_land"])
 def test_every_answer_is_the_height_the_page_stands_a_person_on(name: str) -> None:
     reading = city_surface_reading(_records(name))
     rules: Counter[str] = Counter()
@@ -162,9 +176,10 @@ def test_a_footway_rises_by_its_crossfall_from_the_kerb_top(conformance: list[ob
 
 if __name__ == "__main__":
     Path(sys.argv[1]).write_bytes(town_document_bytes("city-surface-table", (0, 0)))
+    Path(sys.argv[2]).write_bytes(town_document_bytes("city-surface-table", (0, 0), "rolling"))
 
 
-@pytest.mark.parametrize("name", ["conformance", "small_town"])
+@pytest.mark.parametrize("name", ["conformance", "small_town", "town_on_land"])
 def test_a_read_asks_only_its_cells_pieces_and_answers_as_asking_every_piece(
     name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
