@@ -19,6 +19,11 @@ processes, at the priority it was started with: lowered, the bakes were starved 
 without sparing the kind worker's process. It says how many it bakes at once in its ``startup``
 event, and each ``bake`` event states its seconds.
 
+A pass that fails once started (the database or the account source gone for a moment) costs that
+pass, never the worker: it says ``pass_failed`` with the failure's class and words and tries again
+after a wait that doubles from its poll to :data:`PASS_RETRY_MOST_SECONDS`, and the first pass that
+drains again waits its poll once more. Only a startup it cannot make ends it.
+
 Nothing here downloads anything. The tessellator runs either compiled (``EXULANICA_TESS_CLI``, a
 ``cli.js`` built by ``tsc``, run by ``EXULANICA_NODE`` or the ``node`` on ``PATH``), as the tile
 worker's image carries it, or from the checkout's TypeScript through ``tsx``
@@ -56,6 +61,7 @@ from exulanica.store.configured import content_stores
 __all__ = [
     "BAKES_AT_ONCE_ENV",
     "MOST_BAKES_AT_ONCE",
+    "PASS_RETRY_MOST_SECONDS",
     "PUBLISHER_ENV",
     "bakes_at_once",
     "check_publisher",
@@ -67,6 +73,8 @@ PUBLISHER_ENV: Final = env_name("TILE_PUBLISHER_DATABASE_URL")
 BAKES_AT_ONCE_ENV: Final = env_name("TILE_BAKES_AT_ONCE")
 #: The most tiles a worker bakes at once: each bake is two tessellator processes.
 MOST_BAKES_AT_ONCE: Final = 4
+#: The longest a worker waits before trying a failed pass again.
+PASS_RETRY_MOST_SECONDS: Final = 30.0
 _CHECKOUT_WEB: Final = Path(__file__).resolve().parents[2] / "web"
 
 
@@ -226,9 +234,29 @@ def main(
         mode="once" if args.once else "daemon",
         bakes_at_once=slots,
     )
+    failed_passes = 0
     while True:
+        try:
+            outcomes = baker.drain(workspaces | (source() if source is not None else frozenset()))
+        except Exception as error:
+            # Counted only as far as the wait can still grow, so a worker failing for hours never
+            # computes a wait too large to hold.
+            failed_passes = min(failed_passes + 1, 32)
+            retry = min(args.poll_seconds * 2**failed_passes, PASS_RETRY_MOST_SECONDS)
+            _emit(
+                output,
+                "pass_failed",
+                failure_class=type(error).__name__,
+                message=str(error)[:500],
+                retry_seconds=retry,
+            )
+            if args.once:
+                return 1
+            time.sleep(retry)
+            continue
+        failed_passes = 0
         failed = 0
-        for outcome in baker.drain(workspaces | (source() if source is not None else frozenset())):
+        for outcome in outcomes:
             failed += outcome.status != "baked"
             _emit(
                 output,

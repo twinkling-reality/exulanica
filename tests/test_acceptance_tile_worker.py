@@ -82,11 +82,23 @@ def test_a_personal_install_s_worker_bakes_a_town_s_two_tiles_at_once_by_its_env
     assert "EXULANICA_TILE_BAKES_AT_ONCE" not in shared["environment"]
 
 
+class _Stopped(BaseException):
+    """Ends a worker the test runs in daemon mode, as nothing the worker catches would."""
+
+
 def _command(
-    monkeypatch: pytest.MonkeyPatch, argv: list[str], environ: dict[str, str]
-) -> tuple[int, list[dict], dict]:
-    """The worker's command run once, its database, roles and stores stood in for: what it answered,
-    the events it said and what its baker was given."""
+    monkeypatch: pytest.MonkeyPatch,
+    argv: list[str],
+    environ: dict[str, str],
+    *,
+    passes: list[object] | None = None,
+    sleeps: list[float] | None = None,
+    once: bool = True,
+) -> tuple[int | None, list[dict], dict]:
+    """The worker's command run, its database, roles and stores stood in for: what it answered (None
+    when stopped while running), the events it said and what its baker was given. Each of ``passes``
+    is one drain: an exception it raises, or ``"baked"`` for one tile baked; past the last the
+    worker is stopped. Every wait it asks for is put in ``sleeps``."""
     import contextlib
     import io
     import uuid
@@ -102,6 +114,12 @@ def _command(
             given.update(kwargs)
 
         def drain(self, workspaces: object) -> list[BakeOutcome]:
+            if passes is not None:
+                if not passes:
+                    raise _Stopped
+                step = passes.pop(0)
+                if isinstance(step, Exception):
+                    raise step
             tile = BakeOutcome(uuid.uuid4(), "world:generated:w", (0, 0), "baked", "", None, 6.25)
             return [tile]
 
@@ -116,10 +134,15 @@ def _command(
         command, "content_stores", lambda environ: SimpleNamespace(tiles=None, version_tiles=None)
     )
     monkeypatch.setattr(command, "GeneratedTileBaker", Baker)
+    monkeypatch.setattr(command.time, "sleep", (sleeps if sleeps is not None else []).append)
     stream = io.StringIO()
     environ = {"EXULANICA_TILE_PUBLISHER_DATABASE_URL": "postgresql://unused", **environ}
-    workspace = ["--workspace", str(uuid.uuid4()), "--once"]
-    answered = command.main([*workspace, *argv], environ=environ, stream=stream)
+    workspace = ["--workspace", str(uuid.uuid4()), *(["--once"] if once else [])]
+    answered: int | None
+    try:
+        answered = command.main([*workspace, *argv], environ=environ, stream=stream)
+    except _Stopped:
+        answered = None
     events = [json.loads(line) for line in stream.getvalue().splitlines()]
     return answered, events, given
 
@@ -147,6 +170,38 @@ def test_the_worker_bakes_as_many_tiles_at_once_as_it_is_told_and_refuses_any_ot
         assert (answered, failed["event"], given) == (1, "startup_failed", {})
         assert failed["message"].startswith("tile_bakes_at_once_out_of_bounds: ")
         assert "EXULANICA_TILE_BAKES_AT_ONCE" in failed["message"]
+
+
+def test_a_pass_that_fails_costs_that_pass_and_the_worker_tries_again_after_a_growing_wait(
+    monkeypatch,
+):
+    from exulanica.ingest.generated_tiles_command import PASS_RETRY_MOST_SECONDS
+
+    failure = RuntimeError("the database did not answer")
+    sleeps: list[float] = []
+    passes: list[object] = [failure] * 6 + ["baked", failure]
+    answered, events, _ = _command(monkeypatch, [], {}, passes=passes, sleeps=sleeps, once=False)
+    # Still running when stopped: no failed pass ended it.
+    assert answered is None
+    assert [e["event"] for e in events] == ["startup", *["pass_failed"] * 6, "bake", "pass_failed"]
+    said = {(e["failure_class"], e["message"]) for e in events if e["event"] == "pass_failed"}
+    assert said == {("RuntimeError", "the database did not answer")}
+    # The wait doubles from the poll to its bound, is the poll once a pass drains again, and then
+    # doubles from the start.
+    most = PASS_RETRY_MOST_SECONDS
+    assert sleeps == [2.0, 4.0, 8.0, 16.0, most, most, 1.0, 2.0]
+    assert [e["retry_seconds"] for e in events if e["event"] == "pass_failed"] == [
+        2.0,
+        4.0,
+        8.0,
+        16.0,
+        most,
+        most,
+        2.0,
+    ]
+    # Told to bake what waits and stop, a failed pass is its answer.
+    answered, events, _ = _command(monkeypatch, [], {}, passes=[failure])
+    assert answered == 1 and events[-1]["event"] == "pass_failed"
 
 
 def test_worker_runs_by_the_checkout_s_interpreter_so_a_trampoline_script_is_recognised(

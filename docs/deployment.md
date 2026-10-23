@@ -1713,7 +1713,9 @@ claiming jobs no other slot holds. The bakes run at the priority the worker was 
 lowered, they were starved by other work without sparing the kind worker's process. Its `startup`
 event states how many it bakes at once, and each `bake` event the seconds from the job's claim. The
 acceptance launcher's personal install bakes two at once; `compose.yaml` states none, so a server
-bakes one.
+bakes one. A pass that fails once the worker has started (the database or the account source away
+for a moment) is said as `pass_failed`, with its class and words, and tried again after a wait that
+doubles from the poll to 30 s; only a startup it cannot make ends the worker.
 
 `single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
