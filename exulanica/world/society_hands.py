@@ -22,7 +22,6 @@ never says anything.
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
@@ -30,6 +29,7 @@ from typing import Any, Final
 from exulanica.abilities.registry import HANDS, ability_module, recorded_row
 from exulanica.things.catalogs import Socket
 from exulanica.world.society_kinds import kind_here, sockets_of
+from exulanica.world.society_surroundings import straight_mm
 
 __all__ = [
     "ACTS",
@@ -138,7 +138,7 @@ def approach_node(
             near = [
                 ((nodes[node][0] - x) ** 2 + (nodes[node][1] - z) ** 2, node)
                 for node in pool
-                if _distance(nodes[node], point) <= within
+                if straight_mm(nodes[node], point) <= within
             ]
             if near:
                 return min(near)[1]
@@ -146,7 +146,7 @@ def approach_node(
     node = open_node_near(dict(document), others, list(point))
     if node is None:
         return None
-    return node if _distance(nodes[node], point) <= within else None
+    return node if straight_mm(nodes[node], point) <= within else None
 
 
 def acts_offered(
@@ -193,10 +193,6 @@ def _length_mm(kind: Any) -> int:
     """A rigid thing's longest side."""
     box = kind.document["body"].get("box_mm")
     return 0 if box is None else max(int(box["width"]), int(box["depth"]), int(box["height"]))
-
-
-def _distance(a: Sequence[int], b: Sequence[int]) -> int:
-    return math.isqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
 def socket_of_held(state: Mapping[str, Any], thing: Mapping[str, Any]) -> str | None:
@@ -274,7 +270,7 @@ def hand_over_mm(document: Mapping[str, Any]) -> int:
     navigation = document["navigation"]
     nodes = {node["node_id"]: node["position_mm"] for node in navigation["nodes"]}
     steps = (
-        _distance(nodes[edge["from_node_id"]], nodes[edge["to_node_id"]])
+        straight_mm(nodes[edge["from_node_id"]], nodes[edge["to_node_id"]])
         for edge in navigation["edges"]
     )
     return max([reach_mm(), *steps])
@@ -312,7 +308,7 @@ def _acts_within(
             if "pick_up" not in abilities or "holdable" not in _offers(thing_kind):
                 continue
             # Distance first: only a thing within reach is worth a search of the being's sockets.
-            distance = _distance(here, thing["position_mm"])
+            distance = straight_mm(here, thing["position_mm"])
             if distance > reach or "height_mm" in thing:
                 continue
             socket = _free_socket(state, being, thing_kind)
@@ -325,7 +321,7 @@ def _acts_within(
                 for other in state["inhabitants"]:
                     if other["id"] == being["id"] or inside(other):
                         continue
-                    distance = _distance(here, other["position_mm"])
+                    distance = straight_mm(here, other["position_mm"])
                     if distance > between or "receive" not in _offers(_kind(state, other["kind"])):
                         continue
                     socket = _free_socket(state, other, thing_kind)
@@ -339,7 +335,7 @@ def _acts_within(
             other = people[holder]
             if inside(other):
                 continue
-            distance = _distance(here, other["position_mm"])
+            distance = straight_mm(here, other["position_mm"])
             socket = _free_socket(state, being, thing_kind)
             if (
                 distance <= between

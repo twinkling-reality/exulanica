@@ -23,6 +23,7 @@ from __future__ import annotations
 import ast
 import copy
 import json
+import math
 import uuid
 from pathlib import Path
 
@@ -600,6 +601,63 @@ def test_a_being_that_can_say_something_is_offered_to_say_it_to_whoever_hears_it
     busy = _under_way(state, villager["id"])
     theirs = choice_options(busy, document, villager["id"], contract, seed=SEED)
     assert knight["id"] in {o.addressee_id for o in theirs if o.kind == "say_to"}
+
+
+def _metres_by_being(state, document, action: int) -> dict[tuple[str, str], set[str]]:
+    """Under the ``action`` catalog, each decider's options naming one being, by (decider, being):
+    the distances their labels state."""
+    contract = person_role().contract(
+        {"society-decision-action": action, "society-decision-policy": 8}
+    )
+    named: dict[tuple[str, str], set[str]] = {}
+    for person in state["inhabitants"]:
+        for option in choice_options(state, document, person["id"], contract, seed=SEED):
+            being = option.partner_id if option.kind == "talk" else option.addressee_id
+            if being is not None:
+                metres = option.label.rsplit(", ", 1)[1].removesuffix(" m away")
+                named.setdefault((person["id"], being), set()).add(metres)
+    return named
+
+
+def test_one_decision_s_choices_state_one_distance_for_each_being_from_the_ninth_catalog():
+    """Talk measured the walk to its partner and every other option naming a being the straight
+    line, so one decision could state two distances for one being (F10). From the ninth action
+    catalog every option naming a being states the straight line; the eighth's words stand."""
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    knight = _person(state, came_by="placed")
+    villager = _person(state, came_by="populated")
+    state = _beside(state, villager, knight)
+    eighth, ninth = _metres_by_being(state, document, 8), _metres_by_being(state, document, 9)
+    # The same deciders are offered the same beings under both; some by talk and another option.
+    assert eighth.keys() == ninth.keys()
+    people = {p["id"]: p for p in state["inhabitants"]}
+    twice = [key for key in ninth if key in _talking(state, document, people)]
+    assert twice
+    # The eighth catalog keeps the walk in talk's label, which is longer than the straight line.
+    assert any(len(eighth[key]) == 2 for key in twice)
+    for decider, being in twice:
+        straight = math.isqrt(
+            sum(
+                (a - b) ** 2
+                for a, b in zip(
+                    people[decider]["position_mm"], people[being]["position_mm"], strict=True
+                )
+            )
+        )
+        assert ninth[(decider, being)] == {str(round(straight / 1000))}
+
+
+def _talking(state, document, people) -> set[tuple[str, str]]:
+    """The (decider, partner) pairs the ninth catalog offers talk and another option for."""
+    contract = person_role().contract({"society-decision-action": 9, "society-decision-policy": 8})
+    pairs: set[tuple[str, str]] = set()
+    for decider in people:
+        options = choice_options(state, document, decider, contract, seed=SEED)
+        talks = {o.partner_id for o in options if o.kind == "talk"}
+        others = {o.addressee_id for o in options if o.kind != "talk" and o.addressee_id}
+        pairs |= {(decider, being) for being in talks & others}
+    return pairs
 
 
 def test_a_being_with_something_under_way_may_go_on_say_something_or_leave():

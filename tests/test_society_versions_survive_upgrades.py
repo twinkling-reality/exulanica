@@ -265,7 +265,7 @@ RELEASED_CATALOGS = {
         "b32474dfc62b91bbc6fd748a284804c3b821763527a0488dbb2b47a302596eb3"
     ),
     "society-decision-action.v9.json": (
-        "8a5f35c26583e8b8df0ba039c541d03f913b8080c39edf76b16888dd7802c816"
+        "765a7d67197511d2e58d62488ee0aa080c7d4b2c20f49aa6bf77e941b055cdb2"
     ),
     "society-decision-policy.v5.json": (
         "67744ddc361badc5816f032f87880f05baf15ed25764d9e29fd3e4780c07fbf2"

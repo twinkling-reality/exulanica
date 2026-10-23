@@ -41,8 +41,10 @@ __all__ = [
     "MORE_MAXIMUM",
     "SURROUNDINGS_VERSION",
     "NoticeTerms",
+    "straight_mm",
     "surroundings",
     "surroundings_lines",
+    "whole_metres",
     "withhold",
 ]
 
@@ -80,7 +82,8 @@ class NoticeTerms:
             raise ValueError("the hearing reach and the offers version are whole numbers")
 
 
-def _distance(a: Sequence[int], b: Sequence[int]) -> int:
+def straight_mm(a: Sequence[int], b: Sequence[int]) -> int:
+    """The whole millimetres in a straight line between two points of the ground."""
     return math.isqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
@@ -96,8 +99,8 @@ def _offers(kind: Any) -> list[str]:
     return [str(offer["key"]) for offer in kind.document["offers"]]
 
 
-def _metres(distance_mm: int) -> int:
-    """Whole metres, rounded as the say and hands options round their distances."""
+def whole_metres(distance_mm: int) -> int:
+    """Whole metres, as every option naming a being and the near block state a distance."""
     return round(distance_mm / 1000)
 
 
@@ -177,7 +180,7 @@ def _at(
     from exulanica.world.society_decision_contract import _activity_label
 
     near = sorted(
-        (_distance(person["position_mm"], point), target_id, target)
+        (straight_mm(person["position_mm"], point), target_id, target)
         for point, target_id, target in _of_input(document, "places", lambda: _places(document))
     )
     if not near or near[0][0] > _AT_PLACE_MM:
@@ -217,7 +220,7 @@ def surroundings(
             held.setdefault(thing["held_by"], []).append(_label(state, thing["kind"]))
 
     beings = sorted(
-        (_distance(me["position_mm"], other["position_mm"]), other["id"], other)
+        (straight_mm(me["position_mm"], other["position_mm"]), other["id"], other)
         for other in state["inhabitants"]
         if other["id"] != subject_id and same_space(me, other)
     )
@@ -226,7 +229,7 @@ def surroundings(
         {
             "who": _who(other, state, terms.names_as_written),
             "kind": str(kind_of(other, state).document["label"]),
-            "metres": _metres(distance),
+            "metres": whole_metres(distance),
             "doing": _doing(other, people, targets, routine, state),
             "holding": held.get(other["id"], []),
             "from_elsewhere": other.get("came_by") == "crossed",
@@ -235,7 +238,7 @@ def surroundings(
         for distance, _, other in beings[: terms.beings_maximum]
     ]
     things = sorted(
-        (_distance(me["position_mm"], thing["position_mm"]), thing["id"], thing)
+        (straight_mm(me["position_mm"], thing["position_mm"]), thing["id"], thing)
         for thing in state["things"]
         if thing["held_by"] is None and thing.get("position_mm") is not None and not inside(me)
     )
@@ -246,7 +249,7 @@ def surroundings(
         listed_things.append(
             {
                 "what": str(kind.document["label"]),
-                "metres": _metres(distance),
+                "metres": whole_metres(distance),
                 "good_for": [words[key].words for key in _offers(kind) if key in words],
             }
         )

@@ -94,6 +94,7 @@ from exulanica.world.society_planner import (
     talk_spots,
     within_talk_reach,
 )
+from exulanica.world.society_surroundings import straight_mm, whole_metres
 
 __all__ = [
     "ACTION_FIELDS",
@@ -424,9 +425,7 @@ def hearers(
             or not same_space(speaker, other)
         ):
             continue
-        distance = math.isqrt(
-            (other["position_mm"][0] - x) ** 2 + (other["position_mm"][1] - y) ** 2
-        )
+        distance = straight_mm((x, y), other["position_mm"])
         if distance <= reach_mm:
             found.append((distance, other))
     return sorted(found, key=lambda row: (row[0], row[1]["ordinal"]))
@@ -475,7 +474,7 @@ def things_options(
                         who=kind_of(other, state).document["label"],
                         number=other["ordinal"] + 1,
                         name=option_name(other, state, contract),
-                        metres=round(distance / 1000),
+                        metres=whole_metres(distance),
                     ),
                     addressee_id=other["id"],
                 )
@@ -543,9 +542,7 @@ def follow_options(
             or not _offers(kind_of(other, state), "be_followed")
         ):
             continue
-        distance = math.isqrt(
-            (other["position_mm"][0] - x) ** 2 + (other["position_mm"][1] - y) ** 2
-        )
+        distance = straight_mm((x, y), other["position_mm"])
         if distance <= reach:
             near.append((distance, other["ordinal"], other))
     for distance, _ordinal, other in sorted(near, key=lambda row: row[:2])[
@@ -559,7 +556,7 @@ def follow_options(
                     who=kind_of(other, state).document["label"],
                     number=other["ordinal"] + 1,
                     name=option_name(other, state, contract),
-                    metres=round(distance / 1000),
+                    metres=whole_metres(distance),
                 ),
                 addressee_id=other["id"],
             )
@@ -606,7 +603,7 @@ def hands_options(
         thing = kind_here(state, things[act.thing_id]["kind"])
         words: dict[str, Any] = {"thing": thing.document["label"]}
         if act.ability in ("pick_up", "give", "take"):
-            words["metres"] = round(act.distance_mm / 1000)
+            words["metres"] = whole_metres(act.distance_mm)
         if act.other_id is not None:
             other = people[act.other_id]
             words.update(
@@ -843,14 +840,16 @@ def choice_options(
             )
         )
     talk = _off_place(routine, document, "pair")
+    straight = "straight_line_distances" in contract.label_rules  # F10: one distance a being
     for walk, other in sorted(near, key=lambda row: row[1]["ordinal"]):
+        apart = straight_mm(person["position_mm"], other["position_mm"]) if straight else walk
         options.append(
             DecisionOption(
                 # The number their simulated name ends with: theirs for the society's life.
                 label=contract.words["talk"].format(
                     number=other["ordinal"] + 1,
                     name=option_name(other, state, contract),
-                    metres=round(walk / 1000),
+                    metres=whole_metres(apart),
                 ),
                 kind="talk",
                 action=contract.action_keys["talk"],
