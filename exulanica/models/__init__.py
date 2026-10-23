@@ -1,9 +1,10 @@
 """Model access: one manifest, one client, one structured-output mechanism.
 
 Callers name a role. No provider identifier appears anywhere in this package's Python source;
-they live in ``models.manifest.json``, and ``tests/test_models_manifest.py`` fails if one leaks into
-code. Nothing here can reach the ``guided_json`` parameter, which this endpoint accepts, ignores,
-and answers with prose and an HTTP 200.
+they live in ``models.manifest.json`` (and the model cards beside it, ``model-cards.v1.json``,
+which name the models they describe), and ``tests/test_models_manifest.py`` fails if one leaks
+into code. Nothing here can reach the ``guided_json`` parameter, which this endpoint accepts,
+ignores, and answers with prose and an HTTP 200.
 """
 
 from __future__ import annotations

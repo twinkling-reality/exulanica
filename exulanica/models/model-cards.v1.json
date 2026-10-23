@@ -1,0 +1,69 @@
+{
+  "profile": "exulanica.model-cards/v1",
+  "note": "What each offered model's maker says of it, read once from the model's own card on Hugging Face at a pinned revision: the maker, the parameters as the card states them (null where it states none), the licence the card states, by its plain name as docs/license-matrix.md reads it, and one short quote, a whole sentence or clause of about 120 characters at most, of what the maker says the model is for. Every word in says is the maker's; nothing here is this product's claim about a model, and nothing compares one model with another. A model served on this computer names the card of the open model it is built from.",
+  "cards": {
+    "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+      "maker": "Qwen",
+      "card": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "revision": "ac9c66cc9b46af7306746a9250f23d47083d689e",
+      "parameters": {"total": "235B", "active": "22B"},
+      "licence": "Apache 2.0",
+      "says": "instruction following, logical reasoning, text comprehension, mathematics, science, coding and tool usage",
+      "read_on": "2026-10-23"
+    },
+    "deepseek-ai/DeepSeek-V4-Flash-0731": {
+      "maker": "DeepSeek",
+      "card": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+      "parameters": null,
+      "licence": "MIT",
+      "says": "substantially enhanced agentic capabilities",
+      "read_on": "2026-10-23"
+    },
+    "exulanica-qwen3-4b-instruct-2507-nothink": {
+      "maker": "Qwen",
+      "card": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "parameters": {"total": "4.0B", "active": null},
+      "licence": "Apache 2.0",
+      "says": "instruction following, logical reasoning, text comprehension, mathematics, science, coding and tool usage",
+      "read_on": "2026-10-23"
+    },
+    "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+      "maker": "NVIDIA",
+      "card": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+      "revision": "bf77c3174f68ad409e1c2aa60daeb46e32d1c606",
+      "parameters": {"total": "30B", "active": "3.5B"},
+      "licence": "NVIDIA Nemotron Open Model License",
+      "says": "a general purpose reasoning and chat model intended to be used in English and coding languages",
+      "read_on": "2026-10-23"
+    },
+    "nvidia/Nemotron-3-Ultra-550b-a55b": {
+      "maker": "NVIDIA",
+      "card": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16",
+      "revision": "77df655d5e9f8362164ed14dd8b48f8bce657498",
+      "parameters": {"total": "550B", "active": "55B"},
+      "licence": "OpenMDW 1.1",
+      "says": "This model is optimized for complex agentic workflows, long-context reasoning, and high-stakes analytical workloads.",
+      "read_on": "2026-10-23"
+    },
+    "nvidia/Nemotron-3_5-Lightning": {
+      "maker": "NVIDIA",
+      "card": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+      "revision": "a9904d24bcc1d289a1950fa9d2b978c47cf903b9",
+      "parameters": {"total": "30B", "active": "3B"},
+      "licence": "OpenMDW 1.1",
+      "says": "a general purpose reasoning and chat model",
+      "read_on": "2026-10-23"
+    },
+    "nvidia/nemotron-3-super-120b-a12b": {
+      "maker": "NVIDIA",
+      "card": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
+      "revision": "2dc98e2afe4face0e4ce40972a915c45368bd34a",
+      "parameters": {"total": "120B", "active": "12B"},
+      "licence": "NVIDIA Nemotron Open Model License",
+      "says": "This model is optimized for collaborative agents and high-volume workloads.",
+      "read_on": "2026-10-23"
+    }
+  }
+}

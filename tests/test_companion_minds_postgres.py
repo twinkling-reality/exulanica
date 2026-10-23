@@ -142,7 +142,8 @@ def test_a_mind_for_the_knight_is_the_models_route_s_request_and_the_choice_it_r
     society = _town(client, world)
     [knight] = _of_kind(society, "knight")
     people = _models_read(client, world)
-    offered = people["view"]["models"][0]
+    # The first model a key pays for: the read lists what this computer runs first, at no cost.
+    offered = next(model for model in people["view"]["models"] if not model["on_this_computer"])
     labels = things._look(client, world, transport, "let a model decide for the knight")
     _routine, model_label = _mind_labels(labels, offered["name"])
     group = things._label(labels, "every knight (1)")

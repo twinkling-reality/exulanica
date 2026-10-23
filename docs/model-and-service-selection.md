@@ -211,6 +211,18 @@ it; the deployment's `exulanica-preflight` command (`exulanica/orchestration/cat
 and the ingestion, orchestration and evaluation commands give it the registry's roles, so a model a
 role is offered is held to that role's use cases.
 
+Each model a chosen role offers carries its maker's card (`exulanica/models/model-cards.v1.json`,
+read by `exulanica/models/model_cards.py`), read once from the model's own card on Hugging Face at
+a pinned revision: the maker, the parameters as the card states them (none where it states none),
+the licence the card states (by its plain name, as the [licence matrix](license-matrix.md) reads
+it), one short quote of what the maker says the model is for, and the card's address at that
+revision with the day it was read. A model served from this computer names the card of the open model it is
+built from. The models read serves the card beside each model as `card` and lists what this
+computer runs first, then the rest in the manifest's order. The quote is the maker's words, never
+this product's claim, and nothing in a card compares one model with another.
+`tests/test_model_cards.py` fails by name when a card names a model the manifest does not declare
+or a model a chosen role offers has no card, so a card is read again when its model changes.
+
 Four open models were probed on six recorded choices each, once by each mechanism
 ([probe record](evaluation/2026-09-25-society-person-models-probe.json)), under one
 [pre-registration](evaluation/2026-09-25-society-person-models-preregistration.json) that states

@@ -1,4 +1,6 @@
-"""The model manifest: the one place a model identifier is allowed to exist.
+"""The model manifest: the one place a model identifier is allowed to exist, but for the model
+cards beside it (``model-cards.v1.json``, :mod:`exulanica.models.model_cards`), whose test holds
+each card to an identifier declared here.
 
 Every caller names a **role**. Roles are stable; identifiers are not. Two deprecation rounds
 landed in roughly ten weeks before this was written, and the demo has to survive unattended from

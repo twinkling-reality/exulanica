@@ -302,7 +302,12 @@ def test_a_model_nobody_measured_has_no_typical_figure_and_the_sheet_says_neithe
     society = minds._town(client, world)
     [knight] = minds._of_kind(society, "knight")
     people = minds._models_read(client, world)
-    other = next(model for model in people["view"]["models"] if model["model_id"] != NANO)
+    # Another model a key pays for: the read lists what this computer runs first, at no cost.
+    other = next(
+        model
+        for model in people["view"]["models"]
+        if model["model_id"] != NANO and not model["on_this_computer"]
+    )
     chosen = minds._choose(
         client, world, [knight], {"provider": other["provider"], "model_id": other["model_id"]}
     )

@@ -39,6 +39,7 @@ from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
 from exulanica.models.manifest import Manifest, load_manifest
+from exulanica.models.model_cards import model_card
 from exulanica.models.usage import usd_string
 from exulanica.spending.status import SpendingRefusals
 from exulanica.world.deciders import is_played
@@ -325,9 +326,12 @@ def offered_models(
     manifest: Manifest | None = None,
 ) -> list[dict[str, Any]]:
     """Every model the manifest offers ``role`` that ``contract`` can ask (the role's own where
-    none is given), each in the words a read names it by and with why this process asks nothing
-    its provider serves, if it asks nothing. The world's own models read names every role's models
-    this way; a society's read names them under the contract its engine is asked under."""
+    none is given), each in the words a read names it by, with what its maker says of it (its
+    card, or ``None``: :mod:`exulanica.models.model_cards`) and with why this process asks nothing
+    its provider serves, if it asks nothing. A model served from this computer, which costs
+    nothing, comes first; the rest keep the manifest's order. The world's own models read names
+    every role's models this way; a society's read names them under the contract its engine is
+    asked under."""
     manifest = load_manifest() if manifest is None else manifest
     contract = role.contract() if contract is None else contract
     models = []
@@ -335,6 +339,7 @@ def offered_models(
         mechanism = contract.mechanism_for(spec)
         if mechanism is None:
             continue
+        card = model_card(spec.model_id)
         models.append(
             {
                 "provider": spec.provider,
@@ -355,9 +360,11 @@ def offered_models(
                 if spec.model_id in load_manifest().models
                 else "workspace_probe",
                 "fresh_rates_required": spec.model_id not in load_manifest().models,
+                "card": None if card is None else card.served(),
             }
         )
-    return models
+    # Free first: what this computer serves before what a provider bills, each in its order.
+    return sorted(models, key=lambda model: not model["on_this_computer"])
 
 
 def society_models_view(

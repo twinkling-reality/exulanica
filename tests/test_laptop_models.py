@@ -454,6 +454,28 @@ def test_the_models_read_says_which_offered_models_run_on_this_computer():
     assert all(served[model_id] is (model_id in laptop) for model_id in served)
 
 
+def test_the_models_read_offers_what_this_computer_runs_first_each_with_its_makers_card():
+    """Free first (APPROVALS item 29): a model on this computer, which costs nothing, leads the
+    list; the hosted ones follow in the manifest's order. Each model carries what its maker says
+    of it, from its own card."""
+
+    class Services:
+        def provider_refusal(self, provider: str) -> None:
+            return None
+
+    manifest = load_manifest()
+    person = decision_roles().role("society_decision")
+    served = offered_models(person, Services(), manifest=manifest)  # type: ignore[arg-type]
+    laptop = {spec.model_id for spec in _laptop_models(manifest)}
+    order = [model["model_id"] for model in served]
+    assert set(order[: len(laptop)]) == laptop, "what this computer runs comes first"
+    hosted = [spec.model_id for spec in manifest.offered_models(person.chosen)]
+    assert order[len(laptop) :] == [
+        model_id for model_id in hosted if model_id in order[len(laptop) :]
+    ]
+    assert all(model["card"]["maker"] and model["card"]["says"] for model in served)
+
+
 def test_the_laptop_model_s_context_holds_the_largest_request_the_contract_sends():
     """What a being is shown is bounded in bytes by the decision contract; the budget guard reads
     three characters a token. The recipe's context must hold the largest instruction, twice the

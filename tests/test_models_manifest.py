@@ -117,10 +117,13 @@ FROZEN_MIGRATIONS_THROUGH = 116
 
 def product_files(repository: Path) -> list[Path]:
     """Every text file of product code: the package and the browser packages' sources, except
-    the manifest itself and the migrations applied when the scan was widened."""
+    the manifest itself, the model cards beside it and the migrations applied when the scan was
+    widened."""
     package = repository / "exulanica"
     roots = [package, *sorted((repository / "web" / "packages").glob("*/src"))]
-    frozen = {package / "models" / "models.manifest.json"}
+    # A model's card must name its model and its source, which spells the identifier;
+    # tests/test_model_cards.py holds every card to an identifier the manifest declares.
+    frozen = {package / "models" / name for name in ("models.manifest.json", "model-cards.v1.json")}
     found = []
     for root in roots:
         for candidate in sorted(root.rglob("*")):
