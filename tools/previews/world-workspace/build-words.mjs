@@ -21,6 +21,25 @@ export function thingName(document, kindLabel = () => null) {
 }
 
 /**
+ * A being of a kind its workspace made, as the page names it: the kind's own label, the name its maker's words gave it,
+ * which a society never holds (its records name a made kind by its body), numbered among the beings of that kind present
+ * by their order of arrival ("Round yellow body", "Round yellow body 2"). Null for anyone else, or until the label is read, so the
+ * society's own name stands.
+ */
+export function madeBeingName(person, people, kindLabel) {
+  const kind = person?.kind;
+  if (kind?.source !== 'workspace') return null;
+  const label = kindLabel(kind);
+  if (typeof label !== 'string' || !label.trim()) return null;
+  const same = (people ?? [])
+    .filter((other) => other?.kind?.source === 'workspace' && other.kind.sha256 === kind.sha256)
+    .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || String(a.id).localeCompare(String(b.id)));
+  const place = same.findIndex((other) => other.id === person.id);
+  const name = titled(label.trim());
+  return place > 0 ? `${name} ${place + 1}` : name;
+}
+
+/**
  * The labels of the kinds a workspace made, read by digest through `read(path)` (the page's own read
  * of GET /things/kinds/{sha256}) and `labelOf(document)`, for `thingName`'s reader: `label(kind)` is
  * null until its read lands, then the label from memory. A read that fails is asked again only once

@@ -28,7 +28,7 @@ import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-
 import { historyHooks, historyWrite, recordPictures } from './history-host.ts';
 import { dayFocus, readDayEvents, readNewerEvents, recordStates } from './record-host.ts';
 import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
-import { createKindLabels, placedLine } from './build-words.mjs';
+import { createKindLabels, madeBeingName, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { areaBanner, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
@@ -191,7 +191,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         groundOf: (id, out) => b.authoredSociety?.groundOf(id, out) ?? false,
         heightOf: (id) => b.authoredSociety?.heightOf(id) ?? null,
         // A person's own name only: someone the world has not named is not labelled over their head.
-        name: (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? null,
+        name: (id) => madeName(id) ?? subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? null,
         // The society read the names come from, refreshed no more often than any subject read.
         refresh: () => refreshSubjectReads(performance.now()),
       },
@@ -200,6 +200,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // Building starts with nobody chosen or followed, so its tray shows wherever the person stands (B never opens on nothing).
       onStart: () => { if (held) release(); },
     }) : null;
+  const kindLabels = build?.kindLabels ?? createKindLabels(read, kindDocumentLabel);
   worldHints();
   function notice(words) {
     if (words) corners.notes.show(words); else corners.notes.clear();
@@ -261,14 +262,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   /** A character's row by its society id. */
   const beingRow = (id) => rows.find(item => item.scene?.type === 'being' && item.scene.id === id) ?? null;
-  const personName = (id) => subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? selection.societyNames?.()?.people.get(id) ?? null;
+  const madeName = (id) => madeBeingName(subjectReads.society?.state?.inhabitants?.find(one => one.id === id), subjectReads.society?.state?.inhabitants, kindLabels.label), personName = (id) => { const made = madeName(id); return made ? called({ name: null, kind: made }).within : subjectReads.society?.state?.inhabitants?.find(person => person.id === id)?.display_name ?? selection.societyNames?.()?.people.get(id) ?? null; };
   /** A person inside History's sentences and the record pages (J20, T12): in the same words as the plate and tags (whoOf). */
   const calledAs = (id) => whoOf(id);
   const calledWithin = (id) => calledAs(id).within;
-  /** A person as the tag and card call them (J20), by society id: from their offer, else their society name, else "the" and their kind. */
+  /** A person as the tag and card call them (J20), by society id: a made kind's own name ("Round yellow body 2"), else their offer, else their society name, else "the" and their kind. */
   function whoOf(id) {
-    const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null, offer = row ? offers.get(row.key)?.offer ?? null : null;
-    return knownWho(row ? subjectWho(row, offer, kind) : called({ name: null, kind }), personName(id), offer?.subject?.kind?.body?.name);
+    const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null, offer = row ? offers.get(row.key)?.offer ?? null : null, made = madeName(id);
+    return made ? called({ name: null, kind: made }) : knownWho(row ? subjectWho(row, offer, kind) : called({ name: null, kind }), personName(id), offer?.subject?.kind?.body?.name);
   }
   const popScale = () => Number.parseFloat(root.style.getPropertyValue('--ui-scale')) || 1;
   /**
@@ -289,7 +290,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!being) return { being, who: subjectWho(row, offer), offer, reading: !offers.has(row.key), thingLine: placedLine() };
     const choice = subjectReads.models?.choices.find(item => item.subjectId === row.scene.id) ?? null;
     const facts = characterFacts(subjectReads.society, row.scene.id, choice?.played !== undefined);
-    const who = subjectWho(row, offer, facts?.kind ?? null);
+    const made = madeName(row.scene.id), who = made ? called({ name: null, kind: made }) : subjectWho(row, offer, facts?.kind ?? null);
     const latest = subjectReads.models?.latest.find(item => item.subjectId === row.scene.id) ?? null;
     const decision = facts ? chosenDecision({ person: facts.person, latest, living: facts.living, startMinute: facts.startMinute,
       options: latest?.requestId && held?.key === row.key ? decisionOptions(latest.requestId) : null }) : null;
@@ -1027,7 +1028,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
   }
 
-  const kindLabels = build?.kindLabels ?? createKindLabels(read, kindDocumentLabel);
   // History (H, from the world and from build mode): every change of this world version over the
   // dimmed world, read from the server alone. Undo and redo there are build mode's own.
   const history = mountHistory({

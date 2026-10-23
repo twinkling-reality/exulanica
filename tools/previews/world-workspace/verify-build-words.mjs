@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, namesTogether, nothingInView, nothingPlaceable, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, madeBeingName, namesTogether, nothingInView, nothingPlaceable, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { townThingName } from './town-thing-names.mjs';
+import { called } from './character-words.mjs';
 
 // What build mode's note says: History's sentence for a change build mode made, or for an undo's or a redo's preview.
 const did = (edit, name, partName = () => null) => youChangeWords(changeParts(edit, [], () => name, partName));
@@ -23,6 +24,29 @@ assert.equal(titled(thingName(made, () => null)), 'Creature');
 assert.equal(thingName(made, () => '   '), 'creature');
 assert.equal(thingName(made, () => 'NASA rover'), 'NASA rover');
 for (const name of [thingName(made), thingName(made, label)]) assert.doesNotMatch(name, /you made/);
+// A being of a made kind is named by its kind's own label, which its society never holds (it names the body), numbered
+// among the beings of that kind by arrival; anyone else, or a label not read yet, keeps the society's own name (null).
+{
+  const kindB = { source: 'workspace', sha256: 'b'.repeat(64) }, kindC = { source: 'workspace', sha256: 'c'.repeat(64) };
+  const people = [
+    { id: 'p-9', ordinal: 9, kind: kindB, display_name: 'Winged two legged creature 3' },
+    { id: 'p-4', ordinal: 4, kind: kindB, display_name: 'Winged two legged creature' },
+    { id: 'p-6', ordinal: 6, kind: kindC, display_name: 'Winged two legged creature 2' },
+    { id: 'p-1', ordinal: 1, kind: { kind: 'villager', version: 1, sha256: 'd'.repeat(64) }, display_name: 'Ivo Reed' },
+  ];
+  const own = (kind) => (kind.sha256 === 'b'.repeat(64) ? 'round yellow body' : kind.sha256 === 'c'.repeat(64) ? 'emerald round body' : null);
+  assert.equal(madeBeingName(people[1], people, own), 'Round yellow body');
+  assert.equal(madeBeingName(people[0], people, own), 'Round yellow body 2');
+  assert.equal(madeBeingName(people[2], people, own), 'Emerald round body');
+  assert.equal(madeBeingName(people[3], people, own), null);
+  assert.equal(madeBeingName(people[3], people, () => 'anything read'), null);
+  assert.equal(madeBeingName(people[1], people, () => null), null);
+  assert.equal(madeBeingName(people[1], people, () => '  '), null);
+  assert.equal(madeBeingName(undefined, people, own), null);
+  // As a title over its head and on its tag; inside a sentence the page says it as a kind (DESIGN 13:41, called()).
+  assert.deepEqual(called({ name: null, kind: madeBeingName(people[0], people, own) }), { title: 'Round yellow body 2', start: 'The round yellow body 2', within: 'the round yellow body 2', named: false });
+  assert.equal(called({ name: null, kind: madeBeingName(people[1], people, own) }).within, 'the round yellow body');
+}
 // A thing whose kind its workspace no longer holds is "creature", and its label is never asked for.
 assert.equal(thingName({ ...made, gone: true }, () => { throw Error('asked'); }), 'creature');
 // The labels are read once by digest; a failed read is asked again only after the page's quiet-read
