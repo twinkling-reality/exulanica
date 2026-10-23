@@ -802,6 +802,11 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
         ("POST", "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts"): (
             "experiments run over an owned district's living society, which no saved world holds"
         ),
+        ("POST", "/world/versions/{version_id}/tiles/bakes"): (
+            "asks a generated town's failed or missing tile bakes to be made again when a person "
+            "opens it from Your worlds; it changes nothing a version action reads, and no "
+            "Companion plan step makes it"
+        ),
     }
 )
 
