@@ -179,7 +179,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   at(pill('Terraces on the bay', divider, people), 'position:absolute;left:50%;top:var(--edge-inset);transform:translateX(-50%)');
   at(pill('06:55 · Day 1'), 'position:absolute;right:var(--edge-inset);top:var(--edge-inset)');
   at(tip('History', 'H'), 'position:absolute;left:calc(var(--edge-inset) + 56 * var(--u));top:calc(var(--edge-inset) + 4 * var(--u))');
-  at(pill('W A S D to walk, the mouse to look'), 'position:absolute;left:50%;bottom:var(--edge-inset);transform:translateX(-50%);font-size:max(13px, calc(14 * var(--u)))');
+  at(pill('W A S D to walk, drag to look, click someone to choose them'), 'position:absolute;left:50%;bottom:var(--edge-inset);transform:translateX(-50%);font-size:max(13px, calc(14 * var(--u)))');
   // Speech over a person, and a name further off.
   const said = at(shade(), 'left:calc(700 * var(--u));top:calc(300 * var(--u));text-align:center;white-space:nowrap;--shade-pad:calc(14 * var(--u));--shade-feather:calc(9 * var(--u));--shade-radius:calc(16 * var(--u))');
   said.innerHTML = '<div style="font:500 calc(14 * var(--u))/calc(20 * var(--u)) var(--font-sans)">Ines, to Teo</div><div style="margin-top:var(--space-8);font:italic 450 calc(20 * var(--u))/calc(24 * var(--u)) var(--font-sans)">\u201cThe boats are out early.\u201d</div>';

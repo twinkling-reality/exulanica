@@ -3,7 +3,7 @@ import { buildInventoryRows, inventoryDetailPath, rowForSceneSelection } from '.
 import { assertSelectedOffer } from './entity-inspection.mjs';
 import { THING_RING, mountBuildMode } from './build-mode.ts';
 import { mountFrameMeasurement } from './frame-measurement.mjs';
-import { inspectionReach } from './discovery-policy.mjs';
+import { DISCOVERY, clickReach, inspectionReach } from './discovery-policy.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
 import { keepWorldInAddress, returnToFrontDoor } from './front-door.ts';
 import { keepWorldPicture } from '/src/composition/world-pictures.ts';
@@ -147,7 +147,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     pose: () => { const at = b.controls.state; return at ? { x: at.x, z: at.z, yaw: at.yaw, pitch: at.pitch } : null; } });
   const guidance = corners.hintsRoot, worlds = corners.backRoot, worldNotes = corners.notes;
   let rows = [], inventory = null, target = null, held = null;
-  let dragging = null, serial = 0, lastPick = 0, frameId = 0;
+  let dragging = null, serial = 0, lastPick = 0, frameId = 0, lookedAt = null;
   const offers = new Map(), offerReads = new Map(), offerSerials = new Map();
   // Automatic reads of a subject whose read failed wait longer each time (read-backoff.mjs).
   const readBackoff = createReadBackoff();
@@ -472,13 +472,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // the design's --live.
   const groundRing = createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } });
   const presence = mountCharacterPresence(beside, {
-    onInspect: () => { void choose(); },
+    onInspect: () => { void choose(target ?? (lookedAt && performance.now() < lookedAt.until ? rows.find(item => item.key === lookedAt.key) : undefined)); },
     onAction: (action) => questionAct(action),
   });
-  /** Chooses the subject at the reticle (E): its ring and card; the world keeps moving. */
-  async function choose(row = target) {
+  /** Chooses the subject at the reticle (E), or one clicked (`clicked`: anyone seen within the click's reach): its ring and card; the world keeps moving. */
+  async function choose(row = target, clicked = false) {
     if (!row || pageShown()) return;
-    if (!inspectionReach(reachDistance(row), row.key === target?.key && targetReachable)) return;
+    if (clicked ? !clickReach(reachDistance(row)) || !seen(row, screenFrame(row)) : !inspectionReach(reachDistance(row), row.key === target?.key && targetReachable)) return;
     if (held?.key !== row.key) stopFollowing();
     held = row;
     root.dataset.held = row.key;
@@ -1135,8 +1135,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     root.dataset.gesture = JSON.stringify({ start: [press.startX, press.startY], end: [event.clientX, event.clientY], dragged: press.moved });
     rememberView();
     if (pageShown()) return;
-    if (!press.moved && press.button === 0) build?.click(event.clientX, event.clientY);
-    // The centre aim controls E. Canvas clicks do not select whatever lies under a spare cursor.
+    if (!press.moved && press.button === 0) { if (build?.active()) build.click(event.clientX, event.clientY); else { const row = picked(event.clientX, event.clientY); if (row) void choose(row, true); } }
+    // Out of build mode, a click without a drag chooses whom it lands on, as E does at the reticle (F3).
   }, { capture: true, signal: lifetime.signal });
   canvas.addEventListener('contextmenu', event => event.preventDefault(), { signal: lifetime.signal });
   window.addEventListener('blur', () => { dragging = null; corners.hold(false); }, { signal: lifetime.signal });
@@ -1274,7 +1274,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn(), scene: root.dataset.scene === 'talking' }, Boolean((event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
-    if (fate === 'inspect') void choose();
+    if (fate === 'inspect') void choose(target ?? (lookedAt && performance.now() < lookedAt.until ? rows.find(item => item.key === lookedAt.key) : undefined));
     else if (fate === 'leave') { if (!corners.closeKeys()) leaveWorld(); }
     else if (fate === 'play') corners.togglePlay();
     else if (fate === 'bring-in') corners.bringIn();
@@ -1324,11 +1324,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const scened = scene.shown(now, exchange);
     drawScene(scened);
     const inScene = new Set(scened.showing ? [held.scene.id, exchange?.other ?? scened.now.to, scened.now.speaker].filter(Boolean) : []);
-    const looking = !pageShown() && !asking && !dragging && targetReachable && target.key !== held?.key && targetFrame?.headInView && seen(target, targetFrame);
-    if (looking) {
-      const view = subjectView(target);
-      if (!view.offer && !offers.has(target.key) && readBackoff.ready(target.key, performance.now())) void entityOffer(target).catch(() => {});
-      presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.chip ?? null, live: Boolean(runWatch.run && view.model), popping: shownPops.some(item => item.subjectId === target.scene.id) }), { x: targetFrame.overhead.x, y: targetFrame.overhead.y }, true);
+    const looking = !pageShown() && !asking && !dragging && targetReachable && target.key !== held?.key && targetFrame?.headInView && seen(target, targetFrame); if (looking) lookedAt = { key: target.key, until: now + DISCOVERY.lookStayMs };
+    const lookRow = looking ? target : lookedAt && now < lookedAt.until && !pageShown() && !asking && !dragging && lookedAt.key !== held?.key ? rows.find(item => item.key === lookedAt.key) ?? null : null, lookFrame = lookRow && (looking ? targetFrame : screenFrame(lookRow)); if (lookRow && lookFrame?.headInView && seen(lookRow, lookFrame)) {
+      const view = subjectView(lookRow);
+      if (!view.offer && !offers.has(lookRow.key) && readBackoff.ready(lookRow.key, performance.now())) void entityOffer(lookRow).catch(() => {});
+      presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.chip ?? null, live: Boolean(runWatch.run && view.model), popping: shownPops.some(item => item.subjectId === lookRow.scene.id) }), { x: lookFrame.overhead.x, y: lookFrame.overhead.y }, true);
     } else presence.look(null);
     // Chosen: the ring at its feet, drawn in the world so walls cover it as they cover the feet (J21),
     // and the card beside it while it is seen, placed from the ring's projected ellipse; both follow it.
