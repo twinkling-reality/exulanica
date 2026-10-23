@@ -31,7 +31,7 @@ Begin here for scope, system boundaries and contributor workflow.
 | --- | --- | --- |
 | [Product direction](product-direction.md) | overview | Product scope, delivery order, milestone status and acceptance gates |
 | [Architecture overview](architecture-overview.md) | overview | System shape, backend layers, source-code entry points and language adoption |
-| [Development setup and operations](development-setup.md) | guide | Installation, test and API servers, workers and focused verification |
+| [Development setup and operations](development-setup.md) | guide | Installation, running your own install, test and API servers, workers and focused verification |
 | [Documentation standard](documentation-standard.md) | standard | Documentation ownership, lifecycle and review rubric |
 
 <a id="capabilities"></a>
