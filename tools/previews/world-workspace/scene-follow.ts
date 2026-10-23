@@ -12,7 +12,11 @@
 // nearer and larger than them from the frame held (the framing's own band) and drawn over the speaker or the one
 // spoken to (their boxes widened by `besideShare` of the frame's width), at `crowdedChecks` checks in a row:
 // someone who stops or walks along the line, never one crossing it within a check nor one at the edge clear of both.
-// The one spoken to counts too where they stand nearer than the speaker over the speaker's head.
+// The one spoken to counts too where they stand nearer than the speaker over the speaker's head. (T1b) Nothing
+// the scene draws stands across the line's people either: the sight the framing asks of each of their points is
+// asked across their boxes (widened as above, `sightStepMetres` apart, so a post or a trunk between two rays is
+// met), and the frame held is asked again at `crowdedChecks` checks in a row with something drawn across them,
+// or with something nearer than `nearShare` of the speaker's distance over more than `foregroundShare` of the frame.
 import { easePose } from './character-view.mjs';
 import { MOMENT_FRAMING, foregroundShare, framingInSight, lensOf, standsInBand } from './moment-framing.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
@@ -23,12 +27,15 @@ import { TALK_FRAMING } from './talk-pops.mjs';
  * metres; the middle share of the width the speaker (and a listener framed with them) is kept inside; the
  * least time between two frames asked in one scene, ms; how long the camera eases to a new one, ms; and at how
  * many checks in a row a passer-by in front of the speaker asks for a new frame (two: about a second); how wide a
- * person is drawn for that, metres; by what share of the frame's width the line's people's boxes are widened; and
- * how far down from the top of the speaker their head reaches, metres.
+ * person is drawn for that, metres; by what share of the frame's width the line's people's boxes are widened; how
+ * far down from the top of the speaker their head reaches, metres; how far apart, metres at the person, the rays
+ * of sight across a box are cast; and how near the camera, as a share of the speaker's distance, something over
+ * how much of the frame asks for a new one.
  */
 export const SCENE_FOLLOW = Object.freeze({
   checkMs: 500, nearMetres: 20, middleShare: 0.8, reaskLeastMs: 2000, easeMs: TALK_FRAMING.easeMs,
   crowdedChecks: 2, bodyWidthMetres: 0.5, besideShare: 0.1, headMetres: 0.3,
+  sightStepMetres: 0.1, nearShare: 0.5, foregroundShare: 0.1,
 });
 
 type Point = { x: number; y: number; z: number };
@@ -56,8 +63,8 @@ export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = 
   let easedFrom: Pose | null = null, easedAt = 0, framedAt = 0, listenerIn = false;
   // Where the speaker stood when the frame was asked: the frame is carried by how far they have walked since.
   let speakerAt: Point | null = null;
-  // At how many checks in a row a passer-by has stood in front of the speaker.
-  let crowded = 0;
+  // At how many checks in a row a passer-by has stood in front of the speaker, and something drawn in the way.
+  let crowded = 0, hidden = 0;
 
   /** The live lens: the recipe's framing at the world camera's field of view and the window's shape. */
   const live = () => ({ ...recipe, fov_deg: binding.camera?.camera?.fov ?? recipe.fov_deg, size_px: [innerWidth, innerHeight] });
@@ -75,7 +82,7 @@ export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = 
     const lens = live();
     hit = sceneHit(binding.app);
     const scene = hit;
-    const framing = (who: readonly object[]) => framingInSight(who, sceneSight(scene, recipe.sight.own_m), lens as typeof recipe,
+    const framing = (who: readonly object[]) => framingInSight(who, acrossSight(scene, lens), lens as typeof recipe,
       (at: Pose, framed: readonly object[]) => foregroundShare(at, framed, scene, lens as typeof recipe), bystanders) as Pose | null;
     // The listener only where both fit: a frame of the two that leaves the speaker outside the middle of the
     // width gives way to one of the speaker alone.
@@ -86,6 +93,52 @@ export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = 
     // pose and the camera's position say by how much.
     const eye = binding.camera.getPosition(), held = binding.controls.state;
     return { ...sighted, x: sighted.x + held.x - eye.x, y: sighted.y + held.y - eye.y, z: sighted.z + held.z - eye.z };
+  }
+
+  /**
+   * Whether nothing the scene draws stands between a camera and a point of someone framed (render space), nor
+   * between it and points across them, out to half a body's width and `besideShare` of the frame's width either
+   * side at their distance, at most `sightStepMetres` apart: the framing's sight test, widened as the line's
+   * people's boxes are.
+   */
+  function acrossSight(scene: ReturnType<typeof sceneHit>, lens: ReturnType<typeof live>) {
+    const clear = sceneSight(scene, recipe.sight.own_m);
+    const tan = Math.tan(lensOf(lens as typeof recipe).horizontal);
+    return (from: Point, to: Point): boolean => {
+      const dx = to.x - from.x, dz = to.z - from.z, plan = Math.hypot(dx, dz);
+      if (!(plan > 0)) return clear(from, to);
+      const half = rule.bodyWidthMetres / 2 + rule.besideShare * 2 * plan * tan;
+      const count = Math.ceil(half / rule.sightStepMetres);
+      const side = { x: -dz / plan, z: dx / plan };
+      for (let k = 0; k <= 2 * count; k += 1) {
+        // The point itself first, then outward either side by turns.
+        const by = (k % 2 === 0 ? k / 2 : -(k + 1) / 2) * (half / count);
+        if (!clear(from, { x: to.x + side.x * by, y: to.y, z: to.z + side.z * by })) return false;
+      }
+      return true;
+    };
+  }
+
+  /**
+   * Whether, from the frame held (the controls' frame), something the scene draws stands across the speaker's or
+   * the one spoken to's widened box at any of the framing's points, or nearer than `nearShare` of the speaker's
+   * distance over more than `foregroundShare` of the frame.
+   */
+  function hiddenFrom(at: Pose, speaker: string, listener: string | null): boolean {
+    const society = binding.authoredSociety;
+    const first = anchorOf(society, speaker);
+    if (first === null || hit === null) return false;
+    const eye = binding.camera.getPosition(), state = binding.controls.state;
+    const seen = { ...at, x: at.x - state.x + eye.x, y: at.y - state.y + eye.y, z: at.z - state.z + eye.z };
+    const lens = live();
+    const sight = acrossSight(hit, lens);
+    const second = listener ? anchorOf(society, listener) : null;
+    const across = [first, second].some((one) => one !== null
+      && recipe.sight.points_m.some((height: number) => !sight(seen, { x: one.x, y: one.y + height, z: one.z })));
+    if (across) return true;
+    const distance = Math.hypot(first.x - seen.x, first.z - seen.z);
+    const near = { ...lens.sight, foreground: { ...lens.sight.foreground, nearer_m: distance * (1 - rule.nearShare) } };
+    return foregroundShare(seen, [first], hit, { ...lens, sight: near } as typeof recipe) > rule.foregroundShare;
   }
 
   /** Whether a point stands before a pose within the middle `middleShare` of the lens's width. */
@@ -223,24 +276,26 @@ export function createSceneFollow(binding: any, recipe: typeof MOMENT_FRAMING = 
     saw(next: Shown): void { shown = next; },
     pose(now: number): Pose | null {
       const line = shown?.showing ? shown.now : null;
-      if (!line) { key = null; pose = null; hit = null; easedFrom = null; listenerIn = false; speakerAt = null; crowded = 0; return null; }
+      if (!line) { key = null; pose = null; hit = null; easedFrom = null; listenerIn = false; speakerAt = null; crowded = 0; hidden = 0; return null; }
       const asked = `${line.speaker}|${line.to ?? ''}`, listener = line.to ?? null;
       if (asked !== key) {
         // A new line's people: framePair eases to the first frame from where the camera stands.
-        key = asked; checkedAt = now; framedAt = now; easedFrom = null; listenerIn = false; crowded = 0;
+        key = asked; checkedAt = now; framedAt = now; easedFrom = null; listenerIn = false; crowded = 0; hidden = 0;
         pose = frame(line.speaker, listener); speakerAt = groundOf(line.speaker);
       } else if (now - checkedAt >= rule.checkMs) {
         checkedAt = now;
         const lost = !stillSeen(line.speaker), walkedOn = drifted(line.speaker, listener);
         const holding = held(now, line.speaker);
         crowded = holding !== null && crowdedFrom(holding, line.speaker, listener) ? crowded + 1 : 0;
-        if ((lost || walkedOn || crowded >= rule.crowdedChecks) && now - framedAt >= rule.reaskLeastMs) {
+        hidden = holding !== null && hiddenFrom(holding, line.speaker, listener) ? hidden + 1 : 0;
+        const blocked = crowded >= rule.crowdedChecks || hidden >= rule.crowdedChecks;
+        if ((lost || walkedOn || blocked) && now - framedAt >= rule.reaskLeastMs) {
           const from = held(now, line.speaker), next = frame(line.speaker, listener);
           framedAt = now;
           if (next !== null) {
             // With no frame held before, framePair eases to this one from where the camera stands.
             if (from !== null) { easedFrom = from; easedAt = now; }
-            pose = next; listenerIn = false; speakerAt = groundOf(line.speaker); crowded = 0;
+            pose = next; listenerIn = false; speakerAt = groundOf(line.speaker); crowded = 0; hidden = 0;
           }
         }
       }
