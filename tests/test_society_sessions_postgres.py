@@ -51,6 +51,16 @@ def _open(w, *, request_id=None, revision=0, limits=LIMITS, tick=None, digest=No
     )
 
 
+def _began_playing(w, run) -> bool | None:
+    """Whether the run's opening receipt records the world playing when it began."""
+    (opening,) = [
+        event
+        for event in control.controls(w).events(w["binding"].version_id)
+        if event["kind"] == "session_opened" and event["session_id"] == run["session_id"]
+    ]
+    return opening.get("began_playing")
+
+
 def _kinds(w) -> list[str]:
     return [event["kind"] for event in control.controls(w).events(w["binding"].version_id)][::-1]
 
@@ -153,6 +163,65 @@ def test_a_stopped_session_stays_closed(runtime_world):
     later = _open(w, revision=repo.read(vid)["revision"])
     assert later["session_id"] != opened["session_id"]
     assert [one["state"] for one in repo.sessions(vid)] == ["open", "closed"]
+
+
+def test_a_run_begun_on_a_playing_world_hands_it_back_playing_at_its_end(runtime_world):
+    w = runtime_world
+    control.create(w)
+    control.save(w)  # playing, with no session
+    repo = control.controls(w)
+    vid = w["binding"].version_id
+
+    def opened_playing():
+        run = _open(w, revision=repo.read(vid)["revision"])
+        assert _began_playing(w, run) is True
+        return run
+
+    # Stop: the session closes by the person and the world plays on, its next minute due.
+    run = opened_playing()
+    stopped = repo.stop_session(
+        vid, actor=w["session"].actor, session_id=uuid.UUID(run["session_id"])
+    )
+    assert stopped["closed"]["reason"] == "stopped_by_person"
+    assert stopped["closed"]["closed_by"] == str(w["session"].actor)
+    after = repo.read(vid)
+    assert after["mode"] == "playing" and after["next_due_at"] is not None
+    assert _kinds(w)[-1] == "session_closed"
+    # Its time or money: the worker closes it at a limit under its claim, and the world plays on.
+    run = opened_playing()
+    control.overdue(w)
+    claim = control.take_claim(w)
+    repo.close_session_at_limit(claim, "session_minutes")
+    closed = repo.session(vid, uuid.UUID(run["session_id"]))
+    assert closed["closed"]["reason"] == "session_minutes" and closed["closed"]["closed_by"] is None
+    after = repo.read(vid)
+    assert after["mode"] == "playing" and after["next_due_at"] is not None
+    # The claim the close ended takes no minute; the next due one does.
+    with pytest.raises(LeaseLost):
+        repo.execute(claim)
+    control.overdue(w)
+    assert control.take_claim(w) is not None
+    # A person's pause ends a run begun playing with the world paused, as P always does.
+    run = opened_playing()
+    control.save(w, revision=repo.read(vid)["revision"], mode="paused")
+    paused = repo.session(vid, uuid.UUID(run["session_id"]))
+    assert paused["closed"]["reason"] == "paused_by_person" and repo.read(vid)["mode"] == "paused"
+
+
+def test_a_run_begun_on_a_paused_world_ends_paused_at_its_limit(runtime_world):
+    w = runtime_world
+    control.create(w)
+    repo = control.controls(w)
+    vid = w["binding"].version_id
+    run = _open(w)
+    assert _began_playing(w, run) is False
+    control.overdue(w)
+    claim = control.take_claim(w)
+    repo.close_session_at_limit(claim, "session_decisions")
+    closed = repo.session(vid, uuid.UUID(run["session_id"]))
+    assert closed["closed"]["reason"] == "session_decisions"
+    after = repo.read(vid)
+    assert (after["mode"], after["next_due_at"]) == ("paused", None)
 
 
 def test_a_person_s_pause_closes_the_open_session(runtime_world):

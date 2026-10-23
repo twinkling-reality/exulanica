@@ -1537,9 +1537,11 @@ the world plays takes over its time. One session is open at a time per society, 
 workspace lock every playback write takes. The same `request_id` answers the session it opened,
 whatever happened since; with other limits it is refused. A session is open until its closing
 receipt, and a closed session is never open again: the next stretch is a new session from the
-society's current tick and digest. A session closes when:
+society's current tick and digest. A session records whether the society was playing when it
+opened (`began_playing`; a session opened before the field reads as paused). A session closes when:
 
-- a person stops it (`stopped_by_person`), which pauses the society;
+- a person stops it (`stopped_by_person`), which hands the world back as the run found it: playing,
+  its next minute due, where it began playing, else paused;
 - a person pauses the society (`paused_by_person`); another speed while playing keeps it open;
 - the worker pauses the society for an error, with that pause's own reason
   (`lease_recovery_limit`, `source_unavailable` or `invalid_society_state`) and no person;
@@ -1547,6 +1549,10 @@ society's current tick and digest. A session closes when:
 - the worker's reaper finds it past its wall deadline in a world whose minutes are no longer
   claimed (`session_deadline`, no person). The reaper runs before a workspace's first round and
   then at most every 30 seconds (`REAP_SECONDS`, `exulanica/api/society_control_worker.py`).
+
+A session that ends by its time or its money hands the world back as Stop does: a world that was
+playing when the run began plays on, asking no model, and one that was paused pauses. A person's
+pause and the worker's pause for an error leave the world paused.
 
 Under the base route, `/sessions`:
 

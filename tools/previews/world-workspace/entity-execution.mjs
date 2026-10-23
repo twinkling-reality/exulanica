@@ -55,7 +55,7 @@ export async function startRun({ modelsClient, controlClient, entry, subjectId, 
   return verified;
 }
 
-/** Stop the open run: the world pauses and the run closes, as the server answers it. */
+/** Stop the open run: it closes and the world is handed back as the run found it, as the server answers it. */
 export async function stopRun({ controlClient, entry, current }) {
   const control = await controlClient.read(entry.authoredVersionId);
   if (control.versionId !== entry.authoredVersionId || !current()) throw Error('The world changed. Open it again.');

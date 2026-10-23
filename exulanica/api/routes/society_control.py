@@ -549,8 +549,9 @@ def stop_living_session(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    """Stop a living session: pause the society and close the session, ``stopped_by_person``. A
-    session that already closed is answered as it closed."""
+    """Stop a living session and close it, ``stopped_by_person``, the world handed back as the run
+    found it (playing where it began playing, else paused). A session that already closed is
+    answered as it closed."""
     return call(
         lambda: repository(connection, session, request, world_id).stop_session(
             version_id, actor=session.actor, session_id=session_id

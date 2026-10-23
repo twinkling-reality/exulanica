@@ -655,6 +655,8 @@ class SocietyControlRepository:
                     "limits": stated,
                     "start_tick": start_tick,
                     "start_state_sha256": start_sha256,
+                    # How the run found the world, which its end hands back (DESIGN's R3).
+                    "began_playing": playing,
                     "opened_at": utc(now),
                     "ends_by": utc(now + dt.timedelta(seconds=stated["wall_seconds"])),
                 },
@@ -710,17 +712,37 @@ class SocietyControlRepository:
             )
             return self.read(version_id)
 
-    def _pause_for_session(self, society: dict, opened: dict, reason: str) -> dict:
-        """Pause the society because its open session reached a limit, and close the session
-        with that reason and no person: the system closed it."""
-        self.connection.execute(
-            "update world_society_control set mode='paused',"
-            "revision=revision+1,reason=%s,next_due_at=null,lease_token=null,"
-            "claimed_at=null,lease_expires_at=null where workspace_id=%s and "
-            "society_id=%s",
-            (reason, self.workspace_id, society["society_id"]),
-        )
-        return self._close_session(society, opened, reason=reason, closed_by=None)
+    def _hand_back(
+        self, society: dict, opened: dict, reason: str, closed_by: uuid.UUID | None = None
+    ) -> dict:
+        """End the open session by its time, its money or Stop and hand the world back as the
+        run found it (DESIGN's R3): playing, its next minute due as configuring it to play
+        would set it, where the run began on a playing world (``began_playing``), else paused
+        with ``reason``; an opening receipt written before the field reads as paused. The
+        session closes with ``reason`` and who closed it (None: the system)."""
+        control = self._control(society["society_id"])
+        if opened.get("began_playing") is True and control is not None:
+            due = playing_due_at(
+                self._now(),
+                self._last_minute_at(society["society_id"]),
+                self.base_tick_interval_ms // control["speed"],
+            )
+            self.connection.execute(
+                "update world_society_control set mode='playing',"
+                "revision=revision+1,reason=null,next_due_at=%s,lease_token=null,"
+                "claimed_at=null,lease_expires_at=null,claim_attempts=0 "
+                "where workspace_id=%s and society_id=%s",
+                (due, self.workspace_id, society["society_id"]),
+            )
+        else:
+            self.connection.execute(
+                "update world_society_control set mode='paused',"
+                "revision=revision+1,reason=%s,next_due_at=null,lease_token=null,"
+                "claimed_at=null,lease_expires_at=null where workspace_id=%s and "
+                "society_id=%s",
+                (reason, self.workspace_id, society["society_id"]),
+            )
+        return self._close_session(society, opened, reason=reason, closed_by=closed_by)
 
     def session_limit(self, claim: ControlClaim, now: dt.datetime | None = None) -> str | None:
         """The limit the claimed society's open session has reached, or None while it has
@@ -749,7 +771,7 @@ class SocietyControlRepository:
             self._check_lease(self._control(society["society_id"]), claim)
             opened = self._open_session(society["society_id"])
             if opened is not None:
-                self._pause_for_session(society, opened, reason)
+                self._hand_back(society, opened, reason)
             return self.read(claim.version_id)
 
     def close_session_past_deadline(self, version_id: uuid.UUID) -> bool:
@@ -760,13 +782,14 @@ class SocietyControlRepository:
             opened = self._open_session(society["society_id"])
             if opened is None or self._now() < dt.datetime.fromisoformat(opened["ends_by"]):
                 return False
-            self._pause_for_session(society, opened, SESSION_DEADLINE)
+            self._hand_back(society, opened, SESSION_DEADLINE)
             return True
 
     def stop_session(
         self, version_id: uuid.UUID, *, actor: uuid.UUID, session_id: uuid.UUID
     ) -> dict:
-        """Stop a living session: pause the society and close it (``stopped_by_person``).
+        """Stop a living session and close it (``stopped_by_person``), the world handed back as the
+        run found it: playing where it began playing, else paused.
 
         A session that already closed is answered as it closed, and nothing is written; one the
         society never had is refused ``session_unknown``.
@@ -776,6 +799,10 @@ class SocietyControlRepository:
             found = self.session(version_id, session_id)
             if found["state"] == "closed":
                 return found
+            opened = self._open_session(society["society_id"])
+            if opened is not None and opened.get("began_playing") is True:
+                self._hand_back(society, opened, STOPPED_BY_PERSON, actor)
+                return self.session(version_id, session_id)
             control = self._control(society["society_id"])
             self.configure(
                 version_id,

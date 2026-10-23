@@ -404,7 +404,10 @@ export class SocietyControlClient {
     }).then(parseSessionAnswer);
   }
 
-  /** Stop a living session: the society pauses and it closes; one already closed answers as it closed. */
+  /**
+   * Stop a living session: it closes and the world is handed back as the run found it (playing where it
+   * began playing, else paused); one already closed answers as it closed.
+   */
   async stopSession(versionId: string, sessionId: string): Promise<LivingSessionAnswer> {
     return this.#transport.postJson<unknown>(this.#path(versionId, `/sessions/${encodeURIComponent(sessionId)}/stop`), {})
       .then(parseSessionAnswer);

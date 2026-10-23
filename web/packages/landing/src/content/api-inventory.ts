@@ -3424,7 +3424,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "post",
     "id": "stop_living_session_world_versions__version_id__society_control_sessions__session_id__stop_post",
     "title": "Stop Living Session",
-    "description": "Stop a living session: pause the society and close the session, ``stopped_by_person``. A\nsession that already closed is answered as it closed.",
+    "description": "Stop a living session and close it, ``stopped_by_person``, the world handed back as the run\nfound it (playing where it began playing, else paused). A session that already closed is\nanswered as it closed.",
     "group": "society",
     "permission": {
       "requires": [
