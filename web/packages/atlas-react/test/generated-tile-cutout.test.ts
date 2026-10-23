@@ -6,7 +6,7 @@ import * as pc from 'playcanvas';
 import { parseTextureSetManifest, type TextureSetDigest } from '@exulanica/atlas-core';
 import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import { coveragePreservingMips, coverageShare } from '../src/playcanvas/generated-tile/cutout-coverage.js';
-import { TileTextureLibrary } from '../src/playcanvas/generated-tile/texture-materials.js';
+import { CUTOUT_MIP_BIAS, TileTextureLibrary } from '../src/playcanvas/generated-tile/texture-materials.js';
 import { leafCoverageField } from './generated-tile-bench/test-cutout.js';
 
 const subtle = webcrypto.subtle as unknown as TextureSetDigest;
@@ -94,6 +94,21 @@ describe('a cutout set as a material', () => {
     const wanted = colour._levels.map((level) => Math.round((parameters.coveragePermille / 1000) * (level.length / 4)));
     expect(covered.slice(0, 2)).toEqual(wanted.slice(0, 2));
     covered.forEach((count, level) => expect(count).toBeGreaterThanOrEqual(wanted[level]!));
+    textures.destroy();
+  });
+
+  it('reads its maps coarser so its leaves stop shimmering, and only a cutout does', async () => {
+    const device = new pc.NullGraphicsDevice(document.createElement('canvas'));
+    const textures = new TileTextureLibrary(device, TILE_LOOK_V1, fixtures, async (entry) =>
+      new Uint8Array(readFileSync(`${CONFORMANCE}${entry.setId}.ltex`)), subtle);
+    const cutout = await textures.resolve('fixture.cutout');
+    const opaque = await textures.resolve('fixture.opaque');
+    if (cutout.state !== 'available' || opaque.state !== 'available') throw new Error('the fixtures draw');
+    expect(CUTOUT_MIP_BIAS).toBe(2.5);
+    expect((cutout.material.getParameter('textureBias') as { data?: unknown } | undefined)?.data).toBe(CUTOUT_MIP_BIAS);
+    // Still the plain test: no alpha to coverage, which let the sky through the gaps.
+    expect(cutout.material.alphaToCoverage).toBe(false);
+    expect(opaque.material.getParameter('textureBias')).toBeUndefined();
     textures.destroy();
   });
 });

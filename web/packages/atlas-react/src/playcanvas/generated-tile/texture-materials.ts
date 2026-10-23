@@ -161,6 +161,17 @@ export function undrawnClassReason(set: Pick<DecodedTextureSet, 'materialClass'>
 /** The classes this runtime draws. A class added to the closed list draws unavailable until it is added here. */
 const DRAWN_CLASSES: readonly DecodedTextureSet['materialClass'][] = ['opaque', 'cutout', 'decal', 'glazing'];
 
+/**
+ * How many mip levels coarser a cutout set's maps are read, colour and coverage alike. At street distances its
+ * leaves are about a pixel on screen, so the test re-samples a different speckle at every sub-pixel step of the
+ * view and a crown shimmers as it moves. Read 2.5 levels coarser, a crown's pixels change 0.46 as much from frame to
+ * frame in a slow pan, and its mean colour stays within dE 0.8 (measured at 1920 on a town's arrival): the
+ * coverage-keeping levels hold the leaf share at every level, so a coarser one covers as much. Alpha to coverage
+ * was measured too and left out: it softened each gap but let the sky through, lighter by dE 6, and calmed little.
+ * The shadow pass reads the same levels.
+ */
+export const CUTOUT_MIP_BIAS = 2.5;
+
 /** Whether surfaces of this class cast shadows: glazing and decal cast none. */
 export function castsShadow(set: Pick<DecodedTextureSet, 'materialClass'>): boolean {
   return set.materialClass !== 'glazing' && set.materialClass !== 'decal';
@@ -424,6 +435,8 @@ export class TileTextureUploads {
       material.alphaTest = cutout.alphaCutoff / 255;
       material.blendType = pc.BLEND_NONE;
       material.depthWrite = true;
+      // Its maps read coarser, so its leaves stop shimmering in motion (CUTOUT_MIP_BIAS).
+      material.setParameter('textureBias', CUTOUT_MIP_BIAS);
       // glTF doubleSided: both faces drawn and lit, a back face with its normal reversed.
       material.cull = cutout.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
       material.twoSidedLighting = cutout.doubleSided;
