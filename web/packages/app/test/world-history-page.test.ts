@@ -467,6 +467,41 @@ describe('History', () => {
     }
   });
 
+  it('keeps a run\'s time left and Now true while it is open, reading again only while a run is open', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+    try {
+      const running: Record<string, unknown> = { session_id: 's1', opened: { start_tick: 360, ends_by: new Date(Date.now() + 5 * 60_000).toISOString() },
+        closed: null, used: { usd: '0.0010' } };
+      const { read, asked } = reads({ [`/world/versions/${VERSION}/society/control/sessions/s1`]: running });
+      let minute = 435;
+      const made = host(read, { worldNow: () => minute });
+      const history = (await module()).mountHistory(made);
+      await history.open();
+      const run = () => made.root.querySelector('.wu-hr-run')?.textContent;
+      const now = () => made.root.querySelector('.wu-hr-now')?.textContent;
+      expect([run(), now()]).toEqual(["Teo's model is deciding · 06:00 to now · 5:00 left", 'Now07:15 · Day 1']);
+      // A minute later the time left and Now have moved with it.
+      minute = 436;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect([run(), now()]).toEqual(["Teo's model is deciding · 06:00 to now · 4:00 left", 'Now07:16 · Day 1']);
+      // The run ends: the next read says so, and once no run is open nothing more is read.
+      running['closed'] = { end_tick: 437, reason: 'session_deadline', words: 'The run ended.' };
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(run()).toBe("Teo's model was deciding · 06:00 to 07:17 · spent $0.0010");
+      const before = asked.length;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(asked.length).toBe(before);
+      // Closed, its timers are gone and nothing is read again.
+      running['closed'] = null;
+      history.close();
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(asked.length).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says a paused project is paused when GitHub no longer answers, never that its changes will be sent (GH6)', async () => {
     const gone = { version_id: VERSION, link: { repository: 'learner/terraces-on-the-bay', publish: 'automatic' },
       github: { reached: false, visibility: 'PRIVATE', not_sent: 0, pull_request: { number: 3, title: 'Moved the bench' }, paused: { at: at(5), reason: 'GitHub refused or failed the request.' } } };

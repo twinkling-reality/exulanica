@@ -29,6 +29,10 @@ const WATCH_MS = 3000;
 /** How long after K the page keeps saying a project is starting though the follower has taken the request and its
  * project is not listed yet (F13); after it, the page reads where the world is kept as it stands. */
 const STARTING_MS = 120_000;
+/** While History is open, what moves with time (a run's time left, Now) is composed again this often. */
+const LIVE_MS = 1000;
+/** While a run is open, History's reads are asked again this often: a run that ends says so, new moments join. */
+const LIVE_READ_MS = 10_000;
 
 type Json = Record<string, any>;
 export interface Picture { readonly sha256: string; readonly width: number; readonly height: number }
@@ -132,6 +136,11 @@ export function mountHistory(host: HistoryHost): History {
   let held: { readonly compose: () => ReturnType<typeof historyPath> } | null = null;
   let unlisten: (() => void) | null = null;
   let making: AbortController | null = null;
+  /** While open: the timer keeping time-bound words true, when the reads were last asked, whether a run is open. */
+  let live: ReturnType<typeof setInterval> | null = null;
+  let liveReadAt = 0;
+  let liveReading = false;
+  let runOpen = false;
   /** The cards drawn whole in the last view: their pictures are made first. */
   let inView = new Set<string>();
   /** What the characters are called, from the last read. */
@@ -225,7 +234,9 @@ export function mountHistory(host: HistoryHost): History {
       : null;
     const nowTick = moments?.now?.tick ?? host.worldNow?.() ?? null;
     const listing = { creation, edits: view.edits ?? [], models: choices, characters: records, runs, moments: momentList, nowTick };
-    held = { compose: () => historyPath(listing, names, (edit: Json, edits: Json[]) => changeParts(edit, edits, (id: string) => thingOf(id), partNameOf), clock, Date.now()) };
+    runOpen = runs.some((run: Json) => !run.closed);
+    // Now stands at the world's own minute as the page keeps it, as each composing finds it, else the read's.
+    held = { compose: () => historyPath({ ...listing, nowTick: host.worldNow?.() ?? nowTick }, names, (edit: Json, edits: Json[]) => changeParts(edit, edits, (id: string) => thingOf(id), partNameOf), clock, Date.now()) };
     path = held.compose();
     // History opens at its newest end (GH3): on the newest moment or change.
     const newest = [...path.items].reverse().find((item: Json) => item.kind === 'moment' || item.kind === 'change');
@@ -243,6 +254,46 @@ export function mountHistory(host: HistoryHost): History {
     }
     draw();
     void makePictures();
+    if (state === 'ready') keepLive();
+  }
+
+  /**
+   * While History is open, its words that move with time stay true: each second the path is composed again (a run's
+   * time left, Now at the world's minute) and drawn where those words changed; while a run is open the reads are asked
+   * again every LIVE_READ_MS, so a run that ends says so and new moments join, the chosen moment and the view kept.
+   */
+  function keepLive() {
+    if (live !== null) return;
+    liveReadAt = Date.now();
+    live = setInterval(() => { void liveStep(); }, LIVE_MS);
+  }
+
+  async function liveStep() {
+    if (!made || state !== 'ready' || !held || !path || liveReading || paging) return;
+    if (runOpen && Date.now() - liveReadAt >= LIVE_READ_MS) {
+      liveReading = true;
+      liveReadAt = Date.now();
+      try {
+        await reads();
+      } catch {
+        // A read that fails keeps what was read, and is asked again at the next turn.
+      } finally {
+        liveReading = false;
+      }
+      if (!made) return;
+      draw();
+      void makePictures();
+      return;
+    }
+    const next = held.compose();
+    if (timeWords(next) === timeWords(path)) return;
+    path = next;
+    draw();
+  }
+
+  /** The path's words that move with time: each run's bracket and Now. */
+  function timeWords(of: ReturnType<typeof historyPath>): string {
+    return JSON.stringify([of.spans.map((span: Json) => span.words), of.now]);
   }
 
   /**
@@ -848,6 +899,9 @@ export function mountHistory(host: HistoryHost): History {
     making?.abort();
     making = null;
     inView = new Set();
+    if (live !== null) clearInterval(live);
+    live = null;
+    runOpen = false;
     // The host takes back the addresses it made for this page as it closes; the next open reads them again.
     pictures.clear();
     portraits.clear();
