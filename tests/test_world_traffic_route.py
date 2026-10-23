@@ -20,12 +20,13 @@ from types import MappingProxyType
 import pytest
 from exulanica.api.permissions import ROUTE_RULES, SELF_CHARGING_TILE_ROUTES, Permission
 from exulanica.traffic.errors import UnsupportedNetworkError
-from exulanica.world import generated_worlds, traffic_host
+from exulanica.world import generated_worlds, thing_landing, traffic_host
 from exulanica.world import saved_entries as saved_entries_module
 from exulanica.world import world_recipes as recipe_catalog
 from exulanica.world.composers import city_grammar_town, receipt_sha256
 from exulanica.world.generated_worlds import compose_specified_world, generation_receipt
-from exulanica.world.traffic_episodes import EPISODE, prepared, traffic_input
+from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.traffic_episodes import EPISODE, MODES, prepared, traffic_input
 from exulanica.world.world_recipes import (
     CANDIDATES_MAXIMUM,
     load_world_recipes,
@@ -228,3 +229,122 @@ def test_roads_the_traffic_cannot_drive_are_refused_with_the_compilers_reason(ma
     assert answer.status_code == 409, answer.text
     assert answer.json()["code"] == "roads_unavailable"
     assert "stop line" in answer.json()["detail"]
+
+
+# -- a thing in the road (traffic rules 2) -------------------------------------------------------
+
+BENCH = {"kind": "bench", "version": 2}
+
+
+def _found(document, key: str):
+    """The first value of ``key`` anywhere in a JSON document."""
+    if isinstance(document, dict):
+        if key in document:
+            return document[key]
+        document = list(document.values())
+    if isinstance(document, list):
+        for item in document:
+            found = _found(item, key)
+            if found is not None:
+                return found
+    return None
+
+
+def _lane_middle(api, entry) -> tuple[str, tuple[int, int]]:
+    """A traffic lane of the town's roads and its middle (plan frame, east and north)."""
+    value = traffic_host.saved_world_roads(
+        api.repository.connection,
+        api.repository.workspace_id,
+        entry["world_id"],
+        uuid.UUID(entry["source_snapshot_id"]),
+    )
+    network = prepared(value).network
+    lane = next(
+        path
+        for path in network.paths.values()
+        if path.kind == "lane" and "passenger_car" in path.classes and path.length > 8_000
+    )
+    return lane.path_id, lane.line.point_at(lane.length // 2)
+
+
+def _bench_on(api, entry, point: tuple[int, int]) -> dict:
+    """A bench placed at a plan point, standing where the placing's preview says it rests."""
+    root = f"/world/versions/{entry['authored_version_id']}"
+    scope = f"?world_id={entry['world_id']}"
+    base = api.get(root + scope).json()["state_sha256"]
+    body = {
+        "base_state_sha256": base,
+        "thing_id": "bench-in-the-road",
+        "kind": BENCH,
+        "region_id": "region:generated",
+        "pose": {"x_mm": point[0], "y_mm": 0, "z_mm": -point[1], "yaw_microradians": 0},
+        "origin_role": "fictional",
+    }
+    preview = api.post(root + "/things/preview" + scope, body)
+    assert preview.status_code == 200, preview.text
+    rest = _found(preview.json(), "rest_y_mm")
+    assert rest is not None, preview.text
+    placed = api.post(root + "/things" + scope, {**body, "pose": {**body["pose"], "y_mm": rest}})
+    assert placed.status_code == 201, placed.text
+    return placed.json()
+
+
+def _window(api, entry, from_second: int) -> dict:
+    answer = _traffic(api, entry, f"from_second={from_second}&seconds=60")
+    assert answer.status_code == 200, answer.text
+    return answer.json()
+
+
+def test_a_bench_on_a_lane_of_a_rules_2_town_closes_it_and_starts_the_next_traffic(
+    made, monkeypatch
+):
+    api = made
+    _identity(monkeypatch, _driven()[0])
+    entry = _made(api, "A bench in the road")
+    connection, workspace = api.repository.connection, api.repository.workspace_id
+    snapshot = uuid.UUID(entry["source_snapshot_id"])
+    assert (
+        generation_receipt(connection, workspace, entry["world_id"], snapshot)[1]["traffic_rules"]
+        == 2
+    )
+    lane, point = _lane_middle(api, entry)
+    start = traffic_host.traffic_clock()
+    before = _window(api, entry, start)
+    _bench_on(api, entry, point)
+    version = WorldObjectRepository(connection, workspace, world_id=entry["world_id"]).version(
+        uuid.UUID(entry["authored_version_id"]), with_availability=False
+    )
+    blocking = tuple(part.ring for part in thing_landing.blocking_things(version.things, moving=""))
+    value, generation = traffic_host.version_world_roads(
+        connection, workspace, entry["world_id"], version, blocking
+    )
+    assert generation == version.edit_seq and value.obstacles
+    assert value.line_version == entry["authored_version_id"]
+    closed = prepared(value).network
+    assert lane in closed.document["closures"]["lanes"] and closed.paths[lane].classes == ()
+    after = _window(api, entry, start)
+    assert after != before, "the placing started the version's next traffic"
+    # Over two minutes from the placing, no vehicle drives through the bench.
+    for second in (start, start + 60):
+        for row in _window(api, entry, second)["vehicles"]:
+            for offset, mode in enumerate(row["mode"]):
+                if MODES[mode] != "driving":
+                    continue
+                for field in ("front_axle_mm", "rear_axle_mm"):
+                    x, y = row[field][2 * offset : 2 * offset + 2]
+                    assert not (abs(x - point[0]) <= 300 and abs(y - point[1]) <= 300), row
+    # The episodes the worker holds are the closing input's alone.
+    assert {key[0] for key in traffic_host._episodes.held()} <= {value.sha256}
+
+
+def test_a_town_made_under_rules_1_keeps_its_traffic_whatever_is_placed(made, monkeypatch):
+    api = made
+    _identity(monkeypatch, _driven()[0])
+    monkeypatch.setattr(city_grammar_town, "TRAFFIC_RULES", 1)
+    entry = _made(api, "An older town")
+    _, point = _lane_middle(api, entry)
+    start = traffic_host.traffic_clock()
+    before = _window(api, entry, start)
+    _bench_on(api, entry, point)
+    after = _window(api, entry, start)
+    assert {**after, "clock_second": None} == {**before, "clock_second": None}

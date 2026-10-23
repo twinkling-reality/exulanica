@@ -57,6 +57,7 @@ from exulanica.movement.registry import ROADS, MovementError, built_module
 from exulanica.traffic.catalogs import TrafficCatalogs, load_traffic_catalogs
 from exulanica.traffic.city_derivation import PLACEMENT_KEY, DerivedRoads, derive_road_records
 from exulanica.traffic.city_roads import READ_KINDS, road_input_from_city
+from exulanica.traffic.closures import close_network
 from exulanica.traffic.inputs import (
     CROSSING_FEED_PROFILE,
     LOOKAHEAD_S,
@@ -71,8 +72,10 @@ from exulanica.traffic.routing import plan_route
 from exulanica.traffic.signal_actuation import SignalTimeline, signal_actuation, signal_observation
 from exulanica.traffic.signals import PEDESTRIAN_INDICATIONS, VEHICLE_INDICATIONS
 from exulanica.traffic.simulation import advance_traffic, initial_traffic, state_sha256
+from exulanica.world.traffic_closures import closures
 
 __all__ = [
+    "CLOSING_INPUT_PROFILE",
     "COUPLED_WINDOW_PROFILE",
     "EPISODE",
     "INPUT_PROFILE",
@@ -98,10 +101,15 @@ __all__ = [
     "window_of",
     "window_of_segments",
     "wire",
+    "with_obstacles",
 ]
 
 ROADS_MODULE: Final = built_module(ROADS)
 INPUT_PROFILE: Final = "exulanica.traffic-input/v1"
+#: The input of a town under traffic rules 2 whose placed things close some of its traffic
+#: (:mod:`exulanica.world.traffic_closures`); an input with no obstacle keeps the first profile and
+#: its bytes, so every episode already served is served again unchanged.
+CLOSING_INPUT_PROFILE: Final = "exulanica.traffic-input/v2"
 WINDOW_PROFILE: Final = ROADS_MODULE.output_profile
 #: A window of a coupled world's traffic: its seconds are on the world's traffic timeline and its
 #: crossings are fed. Its own profile, so a reader of the shared-real-time window refuses it rather
@@ -185,6 +193,13 @@ class TrafficInput:
     grammar_version: int
     records: tuple[object, ...]
     sha256: str
+    #: The footprints (plan frame, east and north) of the placed things standing on its lanes,
+    #: under traffic rules 2: what closes lanes and spaces. Empty under rules 1 or with none.
+    obstacles: tuple[tuple[tuple[int, int], ...], ...] = ()
+    #: The world version whose traffic this is, where its traffic follows the version's edits
+    #: (rules 2): the episode worker's line, so an edit's input replaces the one before it. Empty
+    #: where every version of the world shares the input. Not part of the digest.
+    line_version: str = ""
 
     @property
     def seed(self) -> str:
@@ -209,21 +224,25 @@ def road_records(records: Sequence[object]) -> tuple[object, ...]:
 
 
 def _digest(
-    world_id: str, version_id: str, city: str, grammar_version: int, records: Sequence[object]
+    world_id: str,
+    version_id: str,
+    city: str,
+    grammar_version: int,
+    records: Sequence[object],
+    obstacles: Sequence[Sequence[tuple[int, int]]] = (),
 ) -> str:
-    return hashlib.sha256(
-        canonical_json(
-            {
-                "profile": INPUT_PROFILE,
-                "world_id": world_id,
-                "version_id": version_id,
-                "city_identity": city,
-                "grammar_version": grammar_version,
-                "module": ROADS,
-                "records": [record_payload(record) for record in records],
-            }
-        )
-    ).hexdigest()
+    document: dict[str, Any] = {
+        "profile": CLOSING_INPUT_PROFILE if obstacles else INPUT_PROFILE,
+        "world_id": world_id,
+        "version_id": version_id,
+        "city_identity": city,
+        "grammar_version": grammar_version,
+        "module": ROADS,
+        "records": [record_payload(record) for record in records],
+    }
+    if obstacles:
+        document["obstacles"] = [[list(point) for point in ring] for ring in obstacles]
+    return hashlib.sha256(canonical_json(document)).hexdigest()
 
 
 def traffic_input(
@@ -233,15 +252,39 @@ def traffic_input(
     city_identity: str,
     grammar_version: int,
     records: Sequence[object],
+    obstacles: Sequence[Sequence[tuple[int, int]]] = (),
+    line_version: str = "",
 ) -> TrafficInput:
     carried = road_records(records)
+    held = tuple(sorted(tuple((int(x), int(y)) for x, y in ring) for ring in obstacles))
     return TrafficInput(
         world_id=world_id,
         version_id=version_id,
         city_identity=city_identity,
         grammar_version=grammar_version,
         records=carried,
-        sha256=_digest(world_id, version_id, city_identity, grammar_version, carried),
+        sha256=_digest(world_id, version_id, city_identity, grammar_version, carried, held),
+        obstacles=held,
+        line_version=line_version,
+    )
+
+
+def with_obstacles(
+    value: TrafficInput,
+    obstacles: Sequence[Sequence[tuple[int, int]]],
+    *,
+    line_version: str,
+) -> TrafficInput:
+    """``value`` read with the placed things on its lanes, for the world version ``line_version``
+    (traffic rules 2): a new input wherever there is an obstacle, the same records and seed."""
+    return traffic_input(
+        world_id=value.world_id,
+        version_id=value.version_id,
+        city_identity=value.city_identity,
+        grammar_version=value.grammar_version,
+        records=value.records,
+        obstacles=obstacles,
+        line_version=line_version,
     )
 
 
@@ -254,6 +297,11 @@ def wire(value: TrafficInput) -> dict[str, Any]:
         "city_identity": value.city_identity,
         "grammar_version": value.grammar_version,
         "records": [record_payload(record) for record in value.records],
+        **(
+            {"obstacles": [[list(point) for point in ring] for ring in value.obstacles]}
+            if value.obstacles
+            else {}
+        ),
     }
 
 
@@ -271,6 +319,7 @@ def from_wire(data: Mapping[str, Any]) -> TrafficInput:
         city_identity=data["city_identity"],
         grammar_version=data["grammar_version"],
         records=records,
+        obstacles=[tuple(tuple(point) for point in ring) for ring in data.get("obstacles", ())],
     )
     if rebuilt.sha256 != data["input_sha256"]:
         raise ValueError("the traffic's wire form does not rebuild the input it names")
@@ -348,6 +397,8 @@ def prepared(value: TrafficInput) -> Prepared:
         ),
         catalogs,
     )
+    if value.obstacles:
+        network = close_network(network, *closures(network, value.records, value.obstacles))
     found = Prepared(derived, network, catalogs, _fleet(network, catalogs))
     _prepared[value.sha256] = found
     while len(_prepared) > _PREPARED_LIMIT:

@@ -17,7 +17,11 @@ a read that names no ``from_second`` starts at the last sealed minute, and a sec
 sealed is refused, 409 ``traffic_not_yet_sealed``, which a page reads again once the clock moves.
 The answer names the world and version it was asked for, and the version of the world's roads
 (``roads_version``, the digest of the receipt its records come from), which every version of one
-world shares.
+world shares. In a town made under traffic rules 2 (:mod:`exulanica.world.traffic_closures`), a
+version without a signal choice reads its placed things: one that blocks walking on a lane closes
+that lane, and each edit of its things starts its next traffic (an input on the version's own line
+with its edit sequence, which replaces the one before; a read composed before the edit is refused
+503 ``traffic_worker_unavailable`` and read again).
 
 Refusals, each by name: a window beyond the module's bounds or more than ``clock_reach_steps`` from
 the clock is 422 before anything is read; a version the world does not hold is 404
@@ -43,8 +47,14 @@ from exulanica.api.world_edit import ReadObjects
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import unreadable_reason
+from exulanica.world.thing_landing import blocking_things
 from exulanica.world.traffic_episodes import TrafficRefused, check_clock, check_request
-from exulanica.world.traffic_host import saved_world_roads, served_window, traffic_clock
+from exulanica.world.traffic_host import (
+    saved_world_roads,
+    served_window,
+    traffic_clock,
+    version_world_roads,
+)
 from exulanica.world.traffic_signal_repository import SignalChoiceRefused, TrafficSignalRepository
 from exulanica.world.world_clock import ClockRefused
 from exulanica.world.world_clock_repository import WorldClockRepository, era_of
@@ -88,16 +98,28 @@ def world_traffic(
         return _problem(refusal_status(error), error.code, error.detail)
     version = repository.version(version_id, with_availability=False)
     try:
-        value = saved_world_roads(
-            repository.connection,
-            repository.workspace_id,
-            repository.world_id,
-            version.source_snapshot_id,
-        )
         signal_facts = TrafficSignalRepository(
             repository.connection, repository.workspace_id, repository.world_id, version_id
         )
         choices = signal_facts._choices()
+        # A version with a signal choice keeps the input its sealed minutes bind; any other reads
+        # its town's traffic rules, under which its placed things may close lanes.
+        generation = None
+        if choices:
+            value = saved_world_roads(
+                repository.connection,
+                repository.workspace_id,
+                repository.world_id,
+                version.source_snapshot_id,
+            )
+        else:
+            value, generation = version_world_roads(
+                repository.connection,
+                repository.workspace_id,
+                repository.world_id,
+                version,
+                tuple(part.ring for part in blocking_things(version.things, moving="")),
+            )
         if choices and start + seconds > min(row["effective_second"] for row in choices):
             controller = getattr(request.app.state, "traffic_signal_controller", None)
             if controller is None:
@@ -111,7 +133,7 @@ def world_traffic(
                 seconds,
             )
         else:
-            window = served_window(value, start, seconds)
+            window = served_window(value, start, seconds, generation=generation)
     except TrafficRefused as error:
         return _problem(refusal_status(error), error.code, error.detail)
     except UnsupportedNetworkError as error:

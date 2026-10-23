@@ -64,9 +64,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "photographs from one standpoint, joined by the rotation between them",
     ),
     "web/packages/app/src/main.ts": (
-        2_042,
+        2_044,
         "the legacy app shell's boot and world mount, the picture of a saved world it keeps "
-        "on the server once a frame holds the drawn world, and a site redrawn after a part changes",
+        "on the server once a frame holds the drawn world, a site redrawn after a part changes, "
+        "and the traffic read again after a thing's edit",
     ),
     "exulanica/world/saved_entries.py": (
         1_944,

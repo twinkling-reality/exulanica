@@ -1582,6 +1582,8 @@ async function mountWorld(): Promise<void> {
       await recordAuthoredEntryAdvance(version, binding);
       await objects.begin(version.versionId);
       await environmentSelection.afterAuthoredEdit(version.versionId);
+      // A thing's edit may close a lane (traffic rules 2): the version's next traffic, read at once.
+      if (request.actionId.startsWith('things.')) (await import('./composition/tile-traffic.js')).restartTileTraffic();
       // The made world drawn again as it now stands, its walking world handed to the binding: only
       // when its drawing changed, so a thing's undo costs one read of the site.
       const now = state.activeWorldEntry;

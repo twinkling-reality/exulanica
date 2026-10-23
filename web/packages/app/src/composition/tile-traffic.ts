@@ -129,7 +129,22 @@ export function withTraffic(
 
 export interface TileTraffic {
   readonly animating: boolean;
+  /** Read the traffic again from the clock now, letting go of what is held ahead. */
+  restart(): void;
   stop(): void;
+}
+
+/** Every traffic drawn now, by its restart: a thing placed, moved or taken away restarts them. */
+const running = new Set<() => void>();
+
+/**
+ * Read every drawn traffic again from the clock now. A placing, a move, a removal, an undo or a redo
+ * of a thing may close a lane (traffic rules 2), and the server then starts the version's next
+ * traffic, a new input: this asks for it at once instead of after the half minute held ahead, and
+ * the layer, handed a window of another input, lets go of everything it held.
+ */
+export function restartTileTraffic(): void {
+  for (const restart of running) restart();
 }
 
 /** Draw a city's traffic under the host's environment root, reading windows ahead of its clock. */
@@ -203,7 +218,8 @@ export function startTileTraffic(
       reason = null;
       backoffMs = 0;
     } catch (error) {
-      if (stopped) return;
+      // A read let go by a restart is not a failure: the restart's own read answers.
+      if (stopped || abort.signal.aborted) return;
       if (fromSecond !== null && error instanceof ApiError && error.code === 'traffic_second_out_of_range') {
         await read(null);
         return;
@@ -240,12 +256,24 @@ export function startTileTraffic(
   void poll();
   report();
 
+  const restart = (): void => {
+    if (stopped || refused) return;
+    reading?.abort();
+    reading = null;
+    retryAtMs = 0;
+    backoffMs = 0;
+    void ready.then(() => (stopped || reading !== null ? undefined : read(null)));
+  };
+  running.add(restart);
+
   return {
     get animating() {
       return layer?.animating ?? false;
     },
+    restart,
     stop() {
       stopped = true;
+      running.delete(restart);
       unsubscribe?.();
       clearTimer(timer);
       reading?.abort();

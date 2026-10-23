@@ -6,6 +6,7 @@ import {
   POLL_MS,
   TILE_TRAFFIC_ATTRIBUTE,
   WINDOW_SECONDS,
+  restartTileTraffic,
   startTileTraffic,
   withTileTraffic,
   type TileTrafficState,
@@ -101,6 +102,50 @@ describe('the tile traffic', { timeout: 3 * EVENTUALLY.timeout }, () => {
     traffic.stop();
     expect(timer).toBeNull();
     expect(POLL_MS).toBeLessThan(AHEAD_MS);
+  });
+
+  it('reads again from the clock at once when a thing is edited, letting go of a read in flight', async () => {
+    let nowMs = 0;
+    const asked: (number | null)[] = [];
+    const states: TileTrafficState[] = [];
+    let timer: (() => void) | null = null;
+    let hold: ((answer: TrafficRead) => void) | null = null;
+    const traffic = startTileTraffic(host(), tile, {
+      reader: {
+        window: (from: number | null, _seconds: number, signal: AbortSignal) => {
+          asked.push(from);
+          // The second read (from where the served seconds end) waits until let go.
+          if (asked.length === 2) {
+            return new Promise<TrafficRead>((resolve, reject) => {
+              hold = resolve;
+              signal.addEventListener('abort', () => reject(new DOMException('let go', 'AbortError')));
+            });
+          }
+          return Promise.resolve(read(from ?? 1000, 1000));
+        },
+      },
+      now: () => nowMs,
+      setTimer: (callback) => { timer = callback; return 1; },
+      clearTimer: () => { timer = null; },
+      report: (state) => states.push(state),
+    });
+    await vi.waitFor(() => expect(asked).toEqual([null]), EVENTUALLY);
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({ state: 'driving' }), EVENTUALLY);
+    nowMs = WINDOW_SECONDS * 1000 - AHEAD_MS + 5_000;
+    timer!();
+    await vi.waitFor(() => expect(asked).toEqual([null, 1000 + WINDOW_SECONDS]), EVENTUALLY);
+    expect(hold).not.toBeNull();
+    // A thing placed: the read in flight is let go and the traffic is read from the clock now,
+    // not after the half minute held ahead; the read let go is no failure.
+    restartTileTraffic();
+    await vi.waitFor(() => expect(asked).toEqual([null, 1000 + WINDOW_SECONDS, null]), EVENTUALLY);
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({ state: 'driving', reason: null }), EVENTUALLY);
+    expect(states.some((state) => state.state === 'retrying')).toBe(false);
+    // A traffic taken down is not read again.
+    traffic.stop();
+    restartTileTraffic();
+    await settle();
+    expect(asked).toHaveLength(3);
   });
 
   it('reads again from the clock when its second is too far from it, and stops on a refusal it will keep', async () => {

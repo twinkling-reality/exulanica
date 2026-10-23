@@ -128,6 +128,7 @@ from exulanica.world.society_walking_surfaces import place_residents, walking_su
 from exulanica.world.society_water import land_water
 from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_SHA256
 from exulanica.world.structure import SpatialCandidate
+from exulanica.world.traffic_closures import TRAFFIC_RULES, UNPINNED_RULES
 from exulanica.world.world_recipes import WorldRecipe, read_specification
 
 __all__ = [
@@ -631,6 +632,8 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
             "output_digest": generation.receipt.output_digest,
             "record_count": len(generated),
             "tiles": [list(tile) for tile in tiles],
+            # The traffic rules the town is made under; rules 1 pins none, as a town made before.
+            **({"traffic_rules": TRAFFIC_RULES} if TRAFFIC_RULES != UNPINNED_RULES else {}),
             "arrival": {
                 "spot_id": arrival["spot_id"],
                 "position_mm": list(arrival["position_mm"]),

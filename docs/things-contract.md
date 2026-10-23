@@ -73,7 +73,7 @@ canonical JSON with no floats, and every object in it states exactly its keys:
 | `profile`, `kind`, `version` | `exulanica.thing-kind/v1`; a lowercase key; a whole number from 1 |
 | `label`, `summary` | lowercase words, 2 to 40 letters and spaces (a creature drafted from words, 2 to 32, as its plan's key is), the words an option or a card uses ("lantern spirit"); one line of at most 160 plain characters |
 | `class` | `being`, which acts and has a decider, or `object`, which decides nothing and does nothing |
-| `body` | its body plan and the figures the plan bounds: a height range `{from, to}` for a humanoid, a radius for a bodiless thing, a box `{width, depth, height}` and whether it blocks walking for a rigid one |
+| `body` | its body plan and the figures the plan bounds: a height range `{from, to}` for a humanoid, a radius for a bodiless thing, a box `{width, depth, height}` and whether it blocks walking for a rigid one; an object that blocks walking, placed on a lane of a town made under traffic rules 2, closes that lane to the town's traffic ([traffic](traffic-contract.md#served-traffic)) |
 | `origin` | its [origin record](#the-origin-record) |
 | `moves` | the movement modules it moves by, each one its plan moves by; none for an object |
 | `abilities`, `offers` | `[{key, parameters}]` from the [catalogs](#abilities-and-offers), each parameter within its bounds |

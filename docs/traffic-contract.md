@@ -482,6 +482,30 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   `roads_not_stated`, as are records that state no lane. The input's version is the receipt's
   digest, its city identity the receipt's subject identity and its grammar version the receipt's, so
   every version of one world shares its roads.
+- **A thing in the road (traffic rules 2).** A town's receipt pins the traffic rules it was made
+  under (`traffic_rules`, `exulanica/world/traffic_closures.py`); a town made from rules 2 on reads
+  its version's placed things, and a town whose receipt pins none keeps rules 1, where traffic
+  reads no placed things and its traffic is unchanged. Under rules 2,
+  `version_world_roads(connection, workspace_id, world_id, version, blocking)` takes the saved
+  world's input and the turned footprints of the version's placed objects whose kinds block walking
+  (the parts a moved thing may not be stood on), keeps those that stand on a lane of the town's
+  records (`obstacles_on_lanes`, each lane piece's rectangle of half its width), and carries them
+  as the input's `obstacles`. Each obstacle closes every traffic lane it stands on, the lane path
+  between its two junctions, and every space it stands in (`closures`); closing a lane takes every
+  class from it and from the connections into and out of it and drops every space reached from a
+  closed path (`exulanica/traffic/closures.py` `close_network`, whose network document names the
+  closures, `exulanica.traffic-closures/v1`, and whose digest covers them). Routes never use what
+  is closed, so no vehicle parks, starts, ends a trip or drives inside the thing; across every lane
+  of a street it closes the street. A vehicle never waits behind a thing or changes lanes round it.
+  An input with an obstacle is `exulanica.traffic-input/v2`, its digest covering the obstacles; one
+  with none keeps `exulanica.traffic-input/v1` and its bytes, so its episodes are the ones already
+  served. The seed stays the world's and the receipt's. The input names the world version it is
+  read for (`line_version`, outside the digest) and is read with the version's edit sequence, so a
+  placing, a move, a removal, an undo or a redo of a thing starts the version's next traffic: the
+  worker lets go of the episodes of the input before it, and a read composed before the edit is
+  refused as `traffic_worker_unavailable` and read again. A being, a kind the workspace
+  keeps, a thing off the lanes, or one inside a junction (see the limits) closes nothing; people
+  still walk round a thing as anywhere else.
 - **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
   shows its vehicles in the same places. A saved world whose clock is coupled keys its traffic by
   its own traffic timeline instead ([world clock](world-clock-contract.md#coupled-traffic)).
@@ -545,7 +569,13 @@ reader's name (`generated_world_grammar_changed`, `generated_world_catalogs_chan
 whose clock is coupled answers `exulanica.traffic-window/v3` from its sealed minutes instead:
 `timebase: "world"`, `crossings_fed` true, `sealed_minutes`, and a second not yet sealed refused
 409 `traffic_not_yet_sealed` ([world clock](world-clock-contract.md#coupled-traffic)); the page's
-reader refuses that profile by name rather than reading its seconds as Unix seconds.
+reader refuses that profile by name rather than reading its seconds as Unix seconds. A version
+without a signal choice in a town under traffic rules 2 answers from `version_world_roads`, so its
+placed things on the road close what they stand on ([a thing in the road](#served-traffic)); a
+version with a signal choice, and a coupled one, keep the input their sealed minutes bind. After an
+edit of a thing the page reads the traffic again from the clock at once (`restartTileTraffic` in
+`web/packages/app/src/composition/tile-traffic.ts`), and a window of another input replaces what the
+layer held.
 
 ## Signal comparisons
 
@@ -648,6 +678,13 @@ changes those two files.
 
 - **Right-hand traffic only**, and no lane changes between junctions: a vehicle picks its lane only
   through a junction's connections.
+- **A placed thing closes, never narrows.** Under traffic rules 2 a thing on a lane closes the
+  whole stretch between its junctions; no vehicle waits behind it or passes it in the other lane. A
+  thing standing inside a junction closes nothing: closures read lane records only, and a
+  junction's connections state none, so vehicles drive through it. A coupled version, or one with a
+  signal choice, reads the town's shared input, so its placed things close nothing; a version's
+  first signal choice therefore reopens its closed lanes for the whole version, the seconds before
+  the choice included.
 - **Conservative pedestrian windows.** A vehicle enters a junction only if no pedestrian is due, at
   any time from now until it has cleared the whole region, on any crosswalk its movement crosses,
   even one it would already have passed; walkers never wait for vehicles. Under a busy crossing feed

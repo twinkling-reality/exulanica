@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 from exulanica.world import society_catalogs
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
+from exulanica.world.composers import city_grammar_town
 from exulanica.world.generated_worlds import compose_generated_world
 from exulanica.world.society_authored_ground import StandingPolicy, authored_ground_from_snapshot
 from exulanica.world.society_living import current_routine, town_routine
@@ -23,6 +24,7 @@ from exulanica.world.society_walking_surfaces import (
     build_walking_surfaces_input,
     walking_surfaces_place,
 )
+from exulanica.world.traffic_closures import UNPINNED_RULES
 from exulanica.world.world_recipes import town_recipe
 
 #: The seed a town's society is made with in these tests: any lowercase SHA-256 text.
@@ -37,7 +39,10 @@ def per_town_routine(function: Callable[..., Any]) -> Callable[..., Any]:
 
     @functools.wraps(function)
     def kept(*args: Any, **kwargs: Any) -> Any:
-        made_under = tuple(sorted(society_catalogs.TOWN_ROUTINE_VERSIONS.items()))
+        made_under = (
+            tuple(sorted(society_catalogs.TOWN_ROUTINE_VERSIONS.items())),
+            city_grammar_town.TRAFFIC_RULES,
+        )
         key = (made_under, args, tuple(sorted(kwargs.items())))
         if key not in held:
             held[key] = function(*args, **kwargs)
@@ -49,13 +54,15 @@ def per_town_routine(function: Callable[..., Any]) -> Callable[..., Any]:
 @pytest.fixture
 def before_floor_area(monkeypatch: pytest.MonkeyPatch) -> None:
     """Towns made in the test are made under the routine towns were made under before their homes
-    followed floor area, as every such town's receipt pins it: for tests that hold a town's bytes
-    to digests read from a tree of that time. A module imports this and marks itself with it."""
+    followed floor area, as every such town's receipt pins it, and pin no traffic rules, as no town
+    of that time did: for tests that hold a town's bytes to digests read from a tree of that time.
+    A module imports this and marks itself with it."""
     monkeypatch.setattr(
         society_catalogs,
         "TOWN_ROUTINE_VERSIONS",
         dict(society_catalogs.TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA),
     )
+    monkeypatch.setattr(city_grammar_town, "TRAFFIC_RULES", UNPINNED_RULES)
 
 
 def version_of(world_id: str, snapshot_id: uuid.UUID) -> AlternateVersion:

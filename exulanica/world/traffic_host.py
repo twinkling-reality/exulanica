@@ -19,7 +19,12 @@ version, through one function per kind of world that states them:
   world; its version is the receipt's digest, so every version of one world drives the same
   traffic, and a world generated again under other records is other traffic. Nothing is read from
   the store. A world whose snapshot states no records, or whose records state no lane, is refused
-  as ``roads_not_stated``: the rule is the world's records, never its kind or its name.
+  as ``roads_not_stated``: the rule is the world's records, never its kind or its name;
+- :func:`version_world_roads`, a saved world version under the traffic rules its town was made
+  under (:mod:`exulanica.world.traffic_closures`): under rules 1 the saved world's input as it is;
+  under rules 2 that input with the version's placed things that stand on its lanes, which close
+  them, on the version's own line, with the version's edit sequence, so a placing, a move, a
+  removal, an undo or a redo starts the version's next traffic.
 
 **The clock** is shared real time (:func:`traffic_clock`): second ``n`` is the ``n``\\ th second
 since the Unix epoch, so every page showing a world shows its vehicles in the same places.
@@ -31,6 +36,7 @@ digest, the next asked for ahead of need. A request's own work is its window cut
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import struct
@@ -38,7 +44,7 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Executor
 from typing import Any, Final
 
@@ -52,6 +58,7 @@ from exulanica.grammar.grammars.city import CITY_SHAPES_BY_TYPE
 from exulanica.grammar.grammars.city.descriptor import CITY_GENERATING_VERSIONS, CITY_GRAMMAR_ID
 from exulanica.grammar.grammars.city.roads import LaneRecord
 from exulanica.movement.flight_episodes import watch_parent
+from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.baked_tiles import BakedTile, BakedTileRepository, TileBytesMissing
 from exulanica.world.episode_worker import (
     EPISODE_LIMIT,
@@ -62,6 +69,7 @@ from exulanica.world.episode_worker import (
     worker_pool,
 )
 from exulanica.world.generated_worlds import generation_receipt, states_records, town_records
+from exulanica.world.traffic_closures import CLOSING_RULES, obstacles_on_lanes, traffic_rules_of
 from exulanica.world.traffic_episodes import (
     EPISODE,
     PackedTrafficEpisode,
@@ -73,6 +81,7 @@ from exulanica.world.traffic_episodes import (
     traffic_input,
     window_of,
     wire,
+    with_obstacles,
 )
 
 __all__ = [
@@ -84,6 +93,7 @@ __all__ = [
     "served_window",
     "traffic_clock",
     "traffic_process_pool",
+    "version_world_roads",
 ]
 
 #: A container's layout, as the tessellator writes it (``web/packages/loom-tess/README.md``): four
@@ -96,6 +106,9 @@ _SHAPES_BY_KIND: Final = {shape.kind: shape for shape in CITY_SHAPES_BY_TYPE.val
 _TILE_KIND: Final = "city.tile"
 #: Composed inputs kept, by everything they are made from; a page reads one world at a time.
 _INPUT_LIMIT: Final = 8
+#: A version's inputs with placed things on its lanes kept, apart from the inputs they are read
+#: from, so reading a version never evicts a town's records' input (which takes seconds to make).
+_VERSION_INPUT_LIMIT: Final = 8
 
 
 class TrafficWorkerUnavailable(TrafficRefused):
@@ -129,7 +142,7 @@ class _Roads:
         return value.sha256
 
     def line(self, value: TrafficInput) -> Line:
-        return (value.world_id, value.version_id)
+        return (value.world_id, value.line_version or value.version_id)
 
     def wire(self, value: TrafficInput) -> dict[str, Any]:
         return wire(value)
@@ -200,6 +213,7 @@ def _header(data: bytes, what: str) -> dict[str, Any]:
 
 
 _inputs: OrderedDict[tuple[Any, ...], TrafficInput] = OrderedDict()
+_version_inputs: OrderedDict[tuple[Any, ...], TrafficInput] = OrderedDict()
 _inputs_lock = threading.Lock()
 
 
@@ -321,6 +335,43 @@ def saved_world_roads(
     return made
 
 
+def version_world_roads(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version: AlternateVersion,
+    blocking: Sequence[Sequence[tuple[int, int]]],
+) -> tuple[TrafficInput, int | None]:
+    """A saved world version's traffic input, and the edit sequence it was read at (``None`` where
+    the version's edits do not change its traffic).
+
+    A town made under traffic rules 1 (its receipt pins none) answers :func:`saved_world_roads` as
+    it is, shared by every version. Under rules 2 the input carries the version's placed things that
+    stand on its lanes (:func:`~exulanica.world.traffic_closures.obstacles_on_lanes`), on the
+    version's own line, with its edit sequence: an input with no such thing keeps the shared input's
+    digest and episodes, and one with any is a new input whose episodes close what they stand on.
+    The first is the shared input on the version's line, made at once; only the second is kept,
+    apart from the shared inputs (``_version_inputs``).
+    """
+    value = saved_world_roads(connection, workspace_id, world_id, version.source_snapshot_id)
+    _, receipt = generation_receipt(connection, workspace_id, world_id, version.source_snapshot_id)
+    if traffic_rules_of(receipt) < CLOSING_RULES:
+        return value, None
+    obstacles = obstacles_on_lanes(value.records, blocking)
+    if not obstacles:
+        return dataclasses.replace(value, line_version=str(version.version_id)), version.edit_seq
+    key = (value.sha256, str(version.version_id), obstacles)
+    with _inputs_lock:
+        found = _version_inputs.get(key)
+        if found is None:
+            found = with_obstacles(value, obstacles, line_version=str(version.version_id))
+            _version_inputs[key] = found
+        _version_inputs.move_to_end(key)
+        while len(_version_inputs) > _VERSION_INPUT_LIMIT:
+            _version_inputs.popitem(last=False)
+    return found, version.edit_seq
+
+
 # -- the clock and the episodes ------------------------------------------------------------------
 
 
@@ -338,11 +389,14 @@ def traffic_clock() -> int:
 _episodes = TrafficEpisodes()
 
 
-def served_window(value: TrafficInput, from_second: int, seconds: int) -> dict[str, Any]:
+def served_window(
+    value: TrafficInput, from_second: int, seconds: int, *, generation: int | None = None
+) -> dict[str, Any]:
     """The window of ``seconds`` seconds from ``from_second``, cut from episodes the worker
-    computes; the request's thread computes no second. Raises :class:`TrafficWorkerUnavailable`
-    when the worker has stopped or does not finish in time."""
-    return _episodes.window(value, from_second, seconds)
+    computes; the request's thread computes no second. ``generation`` is the edit sequence the
+    input was read at (:func:`version_world_roads`): a later one's input replaces it. Raises
+    :class:`TrafficWorkerUnavailable` when the worker has stopped or does not finish in time."""
+    return _episodes.window(value, from_second, seconds, generation=generation)
 
 
 def traffic_episodes() -> TrafficEpisodes:

@@ -21,7 +21,9 @@ from typing import Any
 import pytest
 from exulanica.traffic import admission, simulation
 from exulanica.world import traffic_episodes
+from exulanica.world.composers import city_grammar_town
 from exulanica.world.generated_worlds import compose_generated_world
+from exulanica.world.traffic_closures import UNPINNED_RULES
 from exulanica.world.traffic_episodes import prepared, traffic_input
 from exulanica.world.world_recipes import load_world_recipes
 
@@ -56,6 +58,9 @@ def _episode(monkeypatch, guard) -> tuple[dict[str, Any], int, list[dict[str, An
         for recipe in load_world_recipes(catalog_version=RECIPE_CATALOG_VERSION)
         if recipe.key == PRESET
     ]
+    # Made as it was measured, before a town pinned its traffic rules: the receipt's digest seeds
+    # the traffic, and a pin would draw another day.
+    monkeypatch.setattr(city_grammar_town, "TRAFFIC_RULES", UNPINNED_RULES)
     composed = compose_generated_world(recipe, WORLD_ID)
     value = traffic_input(
         world_id=WORLD_ID,
