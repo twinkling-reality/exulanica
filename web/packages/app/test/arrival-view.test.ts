@@ -365,6 +365,19 @@ describe('the first view of a town with nothing placed, chosen by its life', () 
     }
   });
 
+  it('keeps its middle third clear under version 5, not dead ahead alone', () => {
+    const life = { seats: [[12_000, -1_500]] as [number, number][], doors: [] };
+    // A post on the footway 6 m off, 17 degrees from the middle of the view the seat turns it to: outside
+    // dead ahead (12 degrees), inside the middle third (23).
+    const blockers = [...street, post(5_846, -1_350)];
+    const third = (view: { eastMm: number; southMm: number; yaw: number }) =>
+      nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), 23 * DEGREE, blockers);
+    // Positive control: tested dead ahead alone, the view keeps the post under 10 m off in its middle third.
+    expect(third(arrivalView({ ...town, blockers, open: LIVELY, life }))).toBeLessThan(LIFE.centreFloorMm);
+    const view = arrivalView({ ...town, blockers, open: { ...LIVELY, middleThirdHalf: 23 * DEGREE }, life });
+    expect(third(view)).toBeGreaterThanOrEqual(LIFE.centreFloorMm);
+  });
+
   it('takes the livelier way even where the other is more open', () => {
     const blockers = [...street, westEnd];
     const life = { seats: [[-12_000, -1_500]] as [number, number][], doors: [] };
@@ -518,6 +531,20 @@ describe('the first view of a town with things placed, by what its records stand
   const between = (_east: number, south: number) => south > -16_000 && south < 3_000;
   const dressed = { eastMm: 0, southMm: 0, facing: [0, -1] as const, parked: [], ground: between, blockers: street, open: LIVELY };
 
+  it('keeps the middle third of a view of placed things clear under version 5', () => {
+    // A post 5 m off, 17 degrees from the line to the scene: outside dead ahead, inside the middle third.
+    const blockers = [...street, post(1_462, -4_782)];
+    const third = (view: { eastMm: number; southMm: number; yaw: number }) =>
+      nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), 23 * DEGREE, blockers);
+    // Positive control: tested dead ahead alone, the served spot sees the scene with the post in its middle third.
+    const before = arrivalView({ ...dressed, blockers, targets: scene });
+    expect(before).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
+    expect(third(before)).toBeLessThan(LIFE.centreFloorMm);
+    const view = arrivalView({ ...dressed, blockers, targets: scene, open: { ...LIVELY, middleThirdHalf: 23 * DEGREE } });
+    expect(view.moved).toBe(true);
+    expect(third(view)).toBeGreaterThanOrEqual(LIFE.centreFloorMm);
+  });
+
   it('keeps the served spot facing a scene across the street, with room before it', () => {
     const view = arrivalView({ ...dressed, targets: scene });
     expect(view).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
@@ -562,8 +589,9 @@ describe('the first view of a town whose entry names a direction to look toward'
   const street = [opposite, behind];
   const SEAFRONT = {
     ...LIVELY,
+    middleThirdHalf: 23 * DEGREE,
     seafront: {
-      facingMost: Math.PI / 4, slant: 72 * DEGREE, centreHalf: 23 * DEGREE, frontHalf: 40 * DEGREE, frontStep: DEGREE,
+      facingMost: Math.PI / 4, slant: 72 * DEGREE, frontHalf: 40 * DEGREE, frontStep: DEGREE,
       frontLinesLeast: 2, frontsLeast: 3, alongMaximumMm: 6_000,
     },
   };
@@ -652,10 +680,10 @@ describe('the first view of a town whose entry names a direction to look toward'
     // the view along the shore that way, outside dead ahead (12 degrees) and inside the middle third (23).
     const blockers = [...street, post(6_000, 0)];
     const third = (view: { eastMm: number; southMm: number; yaw: number }) =>
-      nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), SEAFRONT.seafront.centreHalf, blockers);
+      nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), SEAFRONT.middleThirdHalf, blockers);
     // Positive control: tested dead ahead alone, the view taken looks east with the post under 10 m off in
     // its middle third (9 m, from 3 m west and a step back).
-    const sixth = { ...SEAFRONT, seafront: { ...SEAFRONT.seafront, centreHalf: LIFE.centreHalf } };
+    const { middleThirdHalf: _third, ...sixth } = SEAFRONT;
     const before = arrivalView({ ...town, blockers, open: sixth, life, toward: [0, 1_000] });
     expect(looks(before.yaw)[0]).toBeGreaterThan(0);
     expect(third(before)).toBeLessThan(LIFE.centreFloorMm);

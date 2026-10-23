@@ -90,16 +90,21 @@ export interface OpenViewRule {
   /** How a view of placed things steps to a spot that sees them. */
   readonly placed?: PlacedViewRule;
   /**
+   * Version 5: how far either side of where a first view looks nothing at eye height may stand nearer
+   * than the centre floor: its middle third, where earlier versions test dead ahead alone (the life
+   * rule's `centreHalf`). Absent before version 5.
+   */
+  readonly middleThirdHalf?: number;
+  /**
    * Version 5: a seafront view, where an entry names a direction to look toward and the arrival faces
    * away from it within `facingMost`: the view turns `slant` from straight across instead of the rule's slant,
    * from the spot and the way with the most buildings' fronts in view, counted by sight lines `frontStep`
    * apart across `frontHalf` either side, a front once `frontLinesLeast` of them meet it, up to
-   * `frontsLeast`, stepping up to `alongMaximumMm` along the footway, then the most doors, and
-   * nothing at eye height may stand nearer than the centre floor within `centreHalf` either side of where
-   * it looks (its middle third), not dead ahead alone. Absent before version 5.
+   * `frontsLeast`, stepping up to `alongMaximumMm` along the footway, then the most doors. Absent before
+   * version 5.
    */
   readonly seafront?: {
-    readonly facingMost: number; readonly slant: number; readonly centreHalf: number; readonly frontHalf: number;
+    readonly facingMost: number; readonly slant: number; readonly frontHalf: number;
     readonly frontStep: number; readonly frontLinesLeast: number; readonly frontsLeast: number; readonly alongMaximumMm: number;
   };
 }
@@ -185,10 +190,10 @@ export function firstViewRule(text: string): OpenViewRule {
     tie: thousandths('tie_milli'),
     ...(version < 4 ? FIRST_VIEW_DEFAULTS_STATED : statedPlaced(stated, millimetres, thousandths)),
     ...(version < 5 ? {} : {
+      middleThirdHalf: radians('middle_third_half_degrees'),
       seafront: Object.freeze({
         facingMost: radians('seafront_facing_most_degrees'),
         slant: radians('seafront_slant_degrees'),
-        centreHalf: radians('seafront_centre_half_degrees'),
         frontHalf: radians('seafront_front_half_degrees'),
         frontStep: radians('seafront_front_step_degrees'),
         frontLinesLeast: stated('seafront_front_lines_least', 'count'),
@@ -213,7 +218,8 @@ export function firstViewRule(text: string): OpenViewRule {
   });
   if (!(life.farMm > life.nearMm) || !(life.nearMm > life.leastMm) || !(life.seatTopMaximumMm >= life.seatTopMinimumMm)
     || !(life.centreHalf < Math.PI / 2)
-    || (rule.seafront !== undefined && (!(rule.seafront.centreHalf < Math.PI / 2) || !(rule.seafront.frontStep > 0)
+    || (rule.middleThirdHalf !== undefined && !(rule.middleThirdHalf >= life.centreHalf && rule.middleThirdHalf < Math.PI / 2))
+    || (rule.seafront !== undefined && (!(rule.seafront.frontStep > 0)
       || !(rule.seafront.frontHalf > 0 && rule.seafront.frontHalf < Math.PI / 2)
       || !Number.isInteger(rule.seafront.frontsLeast) || rule.seafront.frontsLeast < 1
       || !Number.isInteger(rule.seafront.frontLinesLeast) || rule.seafront.frontLinesLeast < 1))) {

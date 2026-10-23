@@ -112,9 +112,9 @@ describe('the town first-view catalog', () => {
     expect(rule.seafront!.slant).toBeCloseTo(v5.get('seafront_slant_degrees')!.value * DEGREE, 12);
     expect(rule.seafront!.slant).toBeGreaterThan(rule.slant);
     // Its middle third, tested as dead ahead is: the third of a 102 degree frame reaches 22.4 degrees.
-    expect(rule.seafront!.centreHalf).toBeCloseTo(v5.get('seafront_centre_half_degrees')!.value * DEGREE, 12);
-    expect(rule.seafront!.centreHalf).toBeGreaterThanOrEqual(Math.atan(Math.tan(51 * DEGREE) / 3));
-    expect(rule.seafront!.centreHalf).toBeGreaterThan(rule.life!.centreHalf);
+    expect(rule.middleThirdHalf).toBeCloseTo(v5.get('middle_third_half_degrees')!.value * DEGREE, 12);
+    expect(rule.middleThirdHalf).toBeGreaterThanOrEqual(Math.atan(Math.tan(51 * DEGREE) / 3));
+    expect(rule.middleThirdHalf).toBeGreaterThan(rule.life!.centreHalf);
     expect(rule.seafront!.frontStep).toBeCloseTo(v5.get('seafront_front_step_degrees')!.value * DEGREE, 12);
     expect(rule.seafront!.frontsLeast).toBe(v5.get('seafront_fronts_least')!.value);
     expect(rule.seafront!.frontLinesLeast).toBe(v5.get('seafront_front_lines_least')!.value);
@@ -127,15 +127,15 @@ describe('the town first-view catalog', () => {
     const before = entries(4);
     expect([...v5.keys()].slice(0, before.size)).toEqual([...before.keys()]);
     for (const [key, entry] of before) expect([key, v5.get(key)!.value, v5.get(key)!.unit]).toEqual([key, entry.value, entry.unit]);
-    const { seafront: _seafront, ...withoutSeafront } = rule;
-    expect(firstViewRule(file(4))).toEqual(withoutSeafront);
+    const { seafront: _seafront, middleThirdHalf: _third, ...versionFour } = rule;
+    expect(firstViewRule(file(4))).toEqual(versionFour);
     expect(TOWN_FIRST_VIEW).toEqual(rule);
     // A version 5 that does not state its seafront slant is refused.
     const v5file = JSON.parse(file(5)) as { profile: string; entries: Entry[] };
     expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.filter((entry) => entry.key !== 'seafront_slant_degrees') })))
       .toThrow('seafront_slant_degrees');
     expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.map((entry) => (
-      entry.key === 'seafront_centre_half_degrees' ? { ...entry, value: 90 } : entry)) }))).toThrow('cannot be held together');
+      entry.key === 'middle_third_half_degrees' ? { ...entry, value: 90 } : entry)) }))).toThrow('cannot be held together');
     expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.map((entry) => (
       entry.key === 'seafront_front_step_degrees' ? { ...entry, value: 0 } : entry)) }))).toThrow('cannot be held together');
     expect(() => firstViewRule(JSON.stringify({ ...v5file, entries: v5file.entries.map((entry) => (

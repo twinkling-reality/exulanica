@@ -210,8 +210,8 @@ or a few steps from it on drawn ground (back from the kerb, off the line people 
 footway). It takes the spot and the way that hold most of the town's life: its seats, found among its
 street furniture by shape, and its doors onto a footway, each counted where nothing at eye height
 hides it, a seat for more than a door and both for less with distance. Nothing at eye height stands
-dead ahead of it nearer than a stated distance (the whole middle of the view is tested, so a thin post
-is found), and no seat stands at its feet: a seat or a door nearer than a stated least distance does not
+across the middle third of it nearer than a stated distance (10 m; the whole middle of the view is
+tested, so a thin post is found), and no seat stands at its feet: a seat or a door nearer than a stated least distance does not
 count, and a view with a seat that near inside its fan is passed over, so the view does not walk up to a
 bench to stand behind it. Where every view has one or the other, the one with the most room before it is
 taken. Of equally alive views it takes the most open over a fan of sight lines, and of those the nearest
@@ -228,9 +228,9 @@ its first view looks toward (the sea of a town on land that holds one, `arrival_
 arrival faces away from it, across the shore street from its seaward footway, the view turns along the
 shore (86 degrees from straight across rather than 60), the fronts across the street on the land side
 and open water on the other, from the spot and the way with the most buildings' fronts in view (three
-asked, stepping up to 18 m along the footway for them), then the most of the town's doors,
-and nothing at eye height (a building, a trunk, a post) stands nearer than 10 m across its middle third,
-where other first views keep only the middle sixth clear. Versions 1 to 4 of that catalog (by openness alone;
+asked, stepping up to 18 m along the footway for them), then the most of the town's doors; and the
+middle third every first view keeps clear, where earlier versions test only its middle sixth. Versions 1
+to 4 of that catalog (by openness alone;
 by life with no least distance; with one; with the figures of the view of placed things) stay beside
 it and are read by the same reader, with those figures at the values version 4 states, so a town
 opens as it did under them. A world
