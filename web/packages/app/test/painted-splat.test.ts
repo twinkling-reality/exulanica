@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { splatsAfterToneMapping } from '@exulanica/atlas-react/playcanvas';
+import { createSceneSplatAsset, splatsAfterToneMapping, validateSogBundle } from '@exulanica/atlas-react/playcanvas';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   PAINTED_FRAME_ROUTE,
@@ -10,6 +10,7 @@ import {
   PAINTED_SPLAT_ROUTE,
   layoutUndrawn,
   openPaintedLab,
+  paintedColour,
   paintedLabAsked,
   paintedLayout,
   paintedPush,
@@ -17,9 +18,12 @@ import {
 } from '../src/dev/painted-splat.js';
 
 // The display itself is atlas-react's (splat-display.test.ts); here only that the lab hands it its splat.
+// Loading a SOG at its base colour is atlas-react's too (scene-splats.test.ts); here only what the lab asks for.
 vi.mock('@exulanica/atlas-react/playcanvas', async (original) => ({
   ...await original<typeof import('@exulanica/atlas-react/playcanvas')>(),
   splatsAfterToneMapping: vi.fn(),
+  createSceneSplatAsset: vi.fn(),
+  validateSogBundle: vi.fn(),
 }));
 
 describe('painted lab: who may ask', () => {
@@ -108,6 +112,48 @@ describe('painted lab: the splat on the screen', () => {
       lab.dispose();
       expect(shown.dispose).toHaveBeenCalledOnce();
       expect(lab.state().display).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('painted lab: the splat\'s colour', () => {
+  it('is the base colour unless the page asks for exactly bands=3', () => {
+    expect(paintedColour('?painted=1')).toBe('base');
+    expect(paintedColour('?painted=1&bands=3')).toBe('stored');
+    for (const other of ['?bands=', '?bands=0', '?bands=1', '?bands=2', '?bands=03', '?bands=3&bands=3', '?bands=3%20', '?bands=all']) {
+      expect(paintedColour(other), other).toBe('base');
+    }
+  });
+
+  it('loads a SOG in the colour asked and names the degree its resource draws', async () => {
+    vi.mocked(splatsAfterToneMapping).mockReturnValue({ active: true, splats: 1, refresh: vi.fn(), dispose: vi.fn() });
+    vi.mocked(validateSogBundle).mockReturnValue({ pointCount: 512 });
+    vi.mocked(createSceneSplatAsset).mockImplementation(async (_app, _value, colour) =>
+      ({ resource: { gsplatData: { shBands: colour === 'base' ? 0 : 3 } }, unload: () => undefined }) as never);
+    class Piece {
+      constructor(readonly name: string) {}
+      setLocalPosition(): void {}
+      setLocalRotation(): void {}
+      addChild(): void {}
+      addComponent(): void {}
+      destroy(): void {}
+    }
+    const app = { on: () => undefined, off: () => undefined, assets: { remove: () => undefined } };
+    const camera = { camera: { name: 'the scene camera' } };
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => (url === PAINTED_FRAME_ROUTE
+      ? new Response(null, { status: 404 })
+      : new Response(init?.method === 'HEAD' ? null : new ArrayBuffer(8), { status: 200, headers: { 'x-painted-lab-format': 'sog' } })));
+    try {
+      for (const [search, colour, degree] of [['?painted=1', 'base', 0], ['?painted=1&bands=3', 'stored', 3]] as const) {
+        const lab = openPaintedLab({ app, environmentRoot: new Piece('environment'), camera } as never, [], search)!;
+        await vi.waitFor(() => expect(lab.state().phase).toBe('drawn'));
+        expect(vi.mocked(createSceneSplatAsset).mock.lastCall?.[2], search).toBe(colour);
+        expect(lab.state(), search).toMatchObject({ format: 'sog', colour, colourDegree: degree });
+        lab.dispose();
+      }
     } finally {
       vi.unstubAllGlobals();
     }

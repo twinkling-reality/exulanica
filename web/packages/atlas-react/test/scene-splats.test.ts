@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { crc32 } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import type * as pc from 'playcanvas';
-import { createSceneSplatAsset, trainedSceneFootprint, validateSogBundle,
-  validateTrainedSceneGeometry, type TrainedSceneGeometry } from '../src/playcanvas/scene-splats.js';
+import { createSceneSplatAsset, storedSogBundle, trainedSceneFootprint, validateSogBundle,
+  validateTrainedSceneGeometry, withoutViewBands, type TrainedSceneGeometry } from '../src/playcanvas/scene-splats.js';
 
 function fixture(): ArrayBuffer {
   const bytes = readFileSync(`${process.cwd()}/test-data/compressor-3.3.3-format-only.sog`);
@@ -72,5 +73,72 @@ describe('native authenticated trained scene boundary', () => {
     assets.load.mockClear();
     await expect(createSceneSplatAsset(app, geometry(new ArrayBuffer(0)))).rejects.toThrow();
     expect(assets.load).not.toHaveBeenCalled();
+  });
+});
+
+/** An archive's members as its central directory names them: body and stated checksum, read as the engine reads. */
+function members(bytes: ArrayBuffer): Map<string, { body: Uint8Array; crc: number }> {
+  const data = new DataView(bytes);
+  const end = bytes.byteLength - 22;
+  const found = new Map<string, { body: Uint8Array; crc: number }>();
+  let at = data.getUint32(end + 16, true);
+  for (let index = 0; index < data.getUint16(end + 10, true); index += 1) {
+    const nameLength = data.getUint16(at + 28, true);
+    const local = data.getUint32(at + 42, true);
+    const body = local + 30 + data.getUint16(local + 26, true) + data.getUint16(local + 28, true);
+    const name = new TextDecoder().decode(new Uint8Array(bytes, at + 46, nameLength));
+    found.set(name, { body: new Uint8Array(bytes, body, data.getUint32(at + 20, true)), crc: data.getUint32(at + 16, true) });
+    at += 46 + nameLength + data.getUint16(at + 30, true) + data.getUint16(at + 32, true);
+  }
+  return found;
+}
+
+/** The fixture with view-dependent bands added: two textures and their `shN` section, as a trainer's SOG carries. */
+function banded(): ArrayBuffer {
+  const plain = members(fixture());
+  const meta = JSON.parse(new TextDecoder().decode(plain.get('meta.json')!.body)) as Record<string, unknown>;
+  meta['shN'] = { mins: -1, maxs: 1, files: ['shN_centroids.webp', 'shN_labels.webp'] };
+  const map = new Map<string, Uint8Array>();
+  for (const [name, { body }] of plain) map.set(name, name === 'meta.json' ? new TextEncoder().encode(JSON.stringify(meta)) : body);
+  map.set('shN_centroids.webp', new Uint8Array([82, 73, 70, 70, 1, 2, 3]));
+  map.set('shN_labels.webp', new Uint8Array([82, 73, 70, 70, 4, 5, 6]));
+  return storedSogBundle(map);
+}
+
+describe('a SOG at its base colour', () => {
+  it('leaves out the view-dependent bands and keeps every other member byte for byte', () => {
+    const input = banded();
+    expect(validateSogBundle(input)).toEqual({ pointCount: 512 });
+    expect([...members(input).keys()]).toContain('shN_labels.webp');
+    const output = withoutViewBands(input);
+    expect(validateSogBundle(output)).toEqual({ pointCount: 512 });
+    const before = members(fixture());
+    const after = members(output);
+    expect([...after.keys()]).toEqual([...before.keys()]);
+    for (const [name, { body, crc }] of after) {
+      expect(crc, name).toBe(crc32(body));
+      if (name !== 'meta.json') expect(Buffer.from(body).equals(Buffer.from(before.get(name)!.body)), name).toBe(true);
+    }
+    const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder().decode(bytes));
+    expect(decode(after.get('meta.json')!.body)).toEqual(decode(before.get('meta.json')!.body));
+  });
+
+  it('hands on a bundle that carries no bands as it is', () => {
+    const bytes = fixture();
+    expect(withoutViewBands(bytes)).toBe(bytes);
+  });
+
+  it('is what the native loader is given when asked for the base colour, and the stored bytes otherwise', async () => {
+    const value = geometry(banded());
+    const given: ArrayBuffer[] = [];
+    const assets = { add: vi.fn(), remove: vi.fn(), load: vi.fn((asset: pc.Asset) => {
+      given.push((asset.file as { contents: ArrayBuffer }).contents);
+      asset.resource = { destroy: vi.fn() };
+      asset.fire('load', asset);
+    }) };
+    await createSceneSplatAsset({ assets } as unknown as pc.AppBase, value, 'base');
+    await createSceneSplatAsset({ assets } as unknown as pc.AppBase, value);
+    expect([...members(given[0]!).keys()].some((name) => name.startsWith('shN'))).toBe(false);
+    expect(given[1]).toBe(value.bytes);
   });
 });

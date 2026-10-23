@@ -12,8 +12,26 @@ export interface TrainedSceneGeometry {
   readonly pointCount: number;
 }
 
+/**
+ * Which colour a SOG is loaded with: `stored`, every band its bundle carries, so a gaussian's colour turns with the
+ * view as it was trained; `base`, its base colour alone (degree 0), the view-dependent bands (`shN`) left out at load,
+ * so each gaussian shows one colour from every side.
+ */
+export type SplatColour = 'stored' | 'base';
+
+interface SogBundle {
+  readonly pointCount: number;
+  /** The archive's members by name, in archive order. */
+  readonly files: ReadonlyMap<string, Uint8Array>;
+  readonly meta: Record<string, unknown>;
+}
+
 /** Reject incomplete SOG bundles before PlayCanvas can fall back to fetching missing textures. */
 export function validateSogBundle(bytes: ArrayBuffer): { readonly pointCount: number } {
+  return Object.freeze({ pointCount: readSogBundle(bytes).pointCount });
+}
+
+function readSogBundle(bytes: ArrayBuffer): SogBundle {
   const data = new DataView(bytes);
   const length = bytes.byteLength;
   const requireRange = (offset: number, size: number): void => {
@@ -97,7 +115,89 @@ export function validateSogBundle(bytes: ArrayBuffer): { readonly pointCount: nu
       throw new TypeError(`SOG ${key} references missing or external texture bytes`);
     }
   }
-  return Object.freeze({ pointCount: meta['count'] as number });
+  return { pointCount: meta['count'] as number, files, meta };
+}
+
+let crcTable: Uint32Array | null = null;
+
+/** The ZIP checksum (CRC-32, polynomial 0xEDB88320) of `bytes`. */
+function crc32(bytes: Uint8Array): number {
+  if (crcTable === null) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n += 1) {
+      let c = n;
+      for (let k = 0; k < 8; k += 1) c = (c & 1) !== 0 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      crcTable[n] = c >>> 0;
+    }
+  }
+  let c = 0xffffffff;
+  for (const byte of bytes) c = crcTable[(c ^ byte) & 0xff]! ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * A SOG bundle of `members`, in their order, as ZIP STORE with each member's size and checksum in its own local
+ * header (no streamed descriptor), which `validateSogBundle` and the engine's archive reader both read.
+ */
+export function storedSogBundle(members: ReadonlyMap<string, Uint8Array>): ArrayBuffer {
+  const encoder = new TextEncoder();
+  const entries = [...members].map(([name, body]) => ({ name: encoder.encode(name), body, crc: crc32(body) }));
+  const local = entries.reduce((sum, entry) => sum + 30 + entry.name.length + entry.body.length, 0);
+  const directory = entries.reduce((sum, entry) => sum + 46 + entry.name.length, 0);
+  const out = new ArrayBuffer(local + directory + 22);
+  const view = new DataView(out);
+  const bytes = new Uint8Array(out);
+  const offsets: number[] = [];
+  let at = 0;
+  for (const entry of entries) {
+    offsets.push(at);
+    view.setUint32(at, 0x04034b50, true);
+    view.setUint16(at + 4, 20, true);
+    view.setUint32(at + 14, entry.crc, true);
+    view.setUint32(at + 18, entry.body.length, true);
+    view.setUint32(at + 22, entry.body.length, true);
+    view.setUint16(at + 26, entry.name.length, true);
+    bytes.set(entry.name, at + 30);
+    bytes.set(entry.body, at + 30 + entry.name.length);
+    at += 30 + entry.name.length + entry.body.length;
+  }
+  entries.forEach((entry, index) => {
+    view.setUint32(at, 0x02014b50, true);
+    view.setUint16(at + 4, 20, true);
+    view.setUint16(at + 6, 20, true);
+    view.setUint32(at + 16, entry.crc, true);
+    view.setUint32(at + 20, entry.body.length, true);
+    view.setUint32(at + 24, entry.body.length, true);
+    view.setUint16(at + 28, entry.name.length, true);
+    view.setUint32(at + 42, offsets[index]!, true);
+    bytes.set(entry.name, at + 46);
+    at += 46 + entry.name.length;
+  });
+  view.setUint32(at, 0x06054b50, true);
+  view.setUint16(at + 8, entries.length, true);
+  view.setUint16(at + 10, entries.length, true);
+  view.setUint32(at + 12, directory, true);
+  view.setUint32(at + 16, local, true);
+  return out;
+}
+
+/**
+ * A SOG bundle at its base colour: every member but the view-dependent bands' two textures, and its metadata without
+ * their `shN` section, so the engine loads it with no bands (degree 0). A bundle that carries no bands is returned as
+ * it is. Refuses what `validateSogBundle` refuses.
+ */
+export function withoutViewBands(bytes: ArrayBuffer): ArrayBuffer {
+  const bundle = readSogBundle(bytes);
+  const bands = bundle.meta['shN'] as { files: string[] } | undefined;
+  if (bands === undefined) return bytes;
+  const meta = { ...bundle.meta };
+  delete meta['shN'];
+  const members = new Map<string, Uint8Array>();
+  for (const [name, body] of bundle.files) {
+    if (bands.files.includes(name)) continue;
+    members.set(name, name === 'meta.json' ? new TextEncoder().encode(JSON.stringify(meta)) : body);
+  }
+  return storedSogBundle(members);
 }
 
 export function validateTrainedSceneGeometry(value: TrainedSceneGeometry): void {
@@ -172,13 +272,19 @@ fn modifySplatColor(center : vec3f, color : ptr<function, vec4f>) {
 `,
 });
 
-/** Native SOG decoder, supplied only authenticated, digest-verified, self-contained bytes. */
-export async function createSceneSplatAsset(app: pc.AppBase, value: TrainedSceneGeometry): Promise<pc.Asset> {
+/**
+ * Native SOG decoder, supplied only authenticated, digest-verified, self-contained bytes: as they are, or at their
+ * base colour (`colour` `base`, `withoutViewBands`).
+ */
+export async function createSceneSplatAsset(
+  app: pc.AppBase, value: TrainedSceneGeometry, colour: SplatColour = 'stored',
+): Promise<pc.Asset> {
   validateTrainedSceneGeometry(value);
   validateSogBundle(value.bytes);
+  const contents = colour === 'base' ? withoutViewBands(value.bytes) : value.bytes;
   const filename = `${value.artifactId}.sog`;
   const asset = new pc.Asset(`reconstruction:${value.artifactId}`, 'gsplat', {
-    url: `verified-scene/${filename}`, filename, contents: value.bytes,
+    url: `verified-scene/${filename}`, filename, contents,
   });
   app.assets.add(asset);
   let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;

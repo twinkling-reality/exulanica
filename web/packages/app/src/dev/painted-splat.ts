@@ -24,6 +24,11 @@
  * Its frame is the layout's (x east, y up, z south, metres) unless the server was also given a
  * frame (`EXULANICA_PAINTED_FRAME`), a rigid row-major transform from the splat to the layout.
  *
+ * A SOG is drawn at its base colour (degree 0): its view-dependent bands are left out at load, so each
+ * gaussian shows one colour from every side, as the lab's judged views read best (run 4's degree 3 bands
+ * washed the main walk a yellow its stone does not have). `bands=3` beside the word draws every band the
+ * SOG carries, to compare. A `.ply` stand-in is drawn as it is. The page state names the degree drawn.
+ *
  * Nothing here is reachable from a production build: the only importer is
  * `composition/site-world.ts`, behind `import.meta.env.DEV`, and `test/painted-splat.test.ts`
  * builds the app and proves no part of this module or its route is emitted.
@@ -71,6 +76,12 @@ export function paintedPush(search: string): number | null {
   if (values.length !== 1 || !/^\d{1,2}(?:\.\d{1,2})?$/.test(values[0]!)) return null;
   const metres = Number(values[0]);
   return metres <= 10 ? metres : null;
+}
+
+/** A SOG's colour on the lab: its base colour alone, unless the page asks for exactly `bands=3`, every band it carries. */
+export function paintedColour(search: string): 'base' | 'stored' {
+  const values = new URLSearchParams(search).getAll('bands');
+  return values.length === 1 && values[0] === '3' ? 'stored' : 'base';
 }
 
 /**
@@ -127,6 +138,10 @@ export interface PaintedLabState {
   readonly label: string | null;
   readonly frame: readonly number[];
   readonly pointCount: number | null;
+  /** The colour the page asked a SOG to be loaded with: its base colour alone, or every band it carries (`bands=3`). */
+  readonly colour: 'base' | 'stored';
+  /** The colour bands the loaded splat draws with, as its resource states: 0 is one colour from every side, 3 the most. */
+  readonly colourDegree: number | null;
   /** How the layout lies under the splat: held undrawn, or depth-only (`layout=depth`). */
   readonly layout: 'undrawn' | 'depth';
   /** How far a depth-only layout is pushed back from the eye, in metres. */
@@ -182,8 +197,16 @@ export function layoutUndrawn(roots: readonly Entity[], app: Pick<App, 'on' | 'o
   };
 }
 
-/** The splat's asset: a validated SOG from its bytes, or a `.ply` stand-in by its file name. */
-async function splatAsset(app: App, frame: readonly number[]): Promise<{ asset: Asset; format: 'sog' | 'ply'; pointCount: number | null }> {
+/** The colour bands a loaded splat's resource draws with, or null where it states none. */
+function drawnDegree(asset: Asset): number | null {
+  const bands = (asset.resource as { gsplatData?: { shBands?: unknown } } | null | undefined)?.gsplatData?.shBands;
+  return typeof bands === 'number' ? bands : null;
+}
+
+/** The splat's asset: a validated SOG from its bytes, in `colour`, or a `.ply` stand-in by its file name. */
+async function splatAsset(
+  app: App, frame: readonly number[], colour: 'base' | 'stored',
+): Promise<{ asset: Asset; format: 'sog' | 'ply'; pointCount: number | null }> {
   const head = await fetch(PAINTED_SPLAT_ROUTE, { method: 'HEAD', credentials: 'same-origin' });
   const format = head.headers.get('x-painted-lab-format');
   if (!head.ok || (format !== 'sog' && format !== 'ply')) throw new Error(`The lab's splat is unavailable: HTTP ${head.status}.`);
@@ -205,7 +228,7 @@ async function splatAsset(app: App, frame: readonly number[]): Promise<{ asset: 
     bounds: { min: [0, 0, 0], max: [0, 0, 0] },
     pointCount: validateSogBundle(bytes).pointCount,
   };
-  return { asset: await createSceneSplatAsset(app, geometry), format, pointCount: geometry.pointCount };
+  return { asset: await createSceneSplatAsset(app, geometry, colour), format, pointCount: geometry.pointCount };
 }
 
 /** The frame the server was given for the splat, or the layout's own. */
@@ -225,9 +248,10 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
   if (!paintedLabAsked(search, import.meta.env.DEV)) return null;
   const look = { ...SPLAT_OCCLUSION, pushMetres: paintedPush(search) ?? SPLAT_OCCLUSION.pushMetres };
   const layout = paintedLayout(search);
+  const colour = paintedColour(search);
   let state: PaintedLabState = {
     phase: 'loading', format: null, standIn: false, label: null, frame: IDENTITY, pointCount: null,
-    layout, pushMetres: look.pushMetres, display: false, reason: null,
+    colour, colourDegree: null, layout, pushMetres: look.pushMetres, display: false, reason: null,
   };
   let splat: Entity | null = null;
   let display: SplatDisplay | null = null;
@@ -246,7 +270,7 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
   void (async () => {
     try {
       const frame = await paintedFrame();
-      const made = await splatAsset(host.app, frame);
+      const made = await splatAsset(host.app, frame, colour);
       asset = made.asset;
       if (disposed) throw new Error('The lab closed before its splat arrived.');
       const entity = new (host.environmentRoot.constructor as new (name: string) => Entity)(PAINTED_LAB_MARKER);
@@ -260,6 +284,7 @@ export function openPaintedLab(host: GeneratedTileHost, siteRoots: Iterable<obje
       if (camera !== undefined && camera !== null) display = splatsAfterToneMapping(entity, camera);
       state = {
         ...state, phase: 'drawn', format: made.format, standIn: made.format === 'ply', frame, pointCount: made.pointCount,
+        colourDegree: drawnDegree(made.asset),
         label: made.format === 'ply' ? 'A layout-shaped stand-in splat, not paint.' : 'Invented appearance: a SOG held to the trained scene checks.',
       };
     } catch (error) {
