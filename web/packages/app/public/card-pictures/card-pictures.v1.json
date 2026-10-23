@@ -41,21 +41,23 @@
         }
       },
       "picture": "recipe-small_town.jpg",
-      "picture_sha256": "34ff2ab7337315359b084439af3fbc70e684e4027ee19ef10c0b9a6883d78a7b",
+      "picture_sha256": "a471ae3723d9c1a85e475435449f65233a91ac645792cf966957a7ab6cef10b4",
       "width": 640,
       "height": 360,
-      "world_id": "world:generated:d6b3127e-8e91-4d3e-939e-a4368fde7146",
-      "entry_id": "01a167a4-3d3a-7a40-95b4-c647012fa7bf",
-      "commit": "5f385ea18ea8439cd5f58a4495fc882aed9c7bc0",
+      "world_id": "world:generated:44ed35d1-fd17-4bd1-8bc5-cc810e85c357",
+      "entry_id": "01a169a3-3450-732d-8273-961a3a669245",
+      "commit": "cd8a0faeb44a9e7b841e3fb2f6633d78e40d570f",
       "tree_changes": [
-        "tools/previews/world-workspace/create-world.ts",
-        "web/packages/app/public/your-worlds/market_town.jpg",
-        "web/packages/app/public/your-worlds/small_town.jpg",
-        "web/packages/app/src/composition/world-pictures.ts",
-        "web/packages/app/src/ui/recipe-pictures.ts",
-        "web/packages/app/src/ui/world-recipes.ts",
-        "web/packages/app/test/world-create.test.ts",
-        "web/packages/app/test/your-worlds.test.ts"
+        "assets/catalogs/world-kinds/street-furniture-form.v3.json",
+        "docs/style-pack-contract.md",
+        "web/packages/app/public/card-pictures/card-pictures.v1.json",
+        "web/packages/app/public/card-pictures/kind-town.jpg",
+        "web/packages/app/public/card-pictures/recipe-market_town.jpg",
+        "web/packages/app/public/card-pictures/recipe-small_town.jpg",
+        "web/packages/app/src/street-furniture-forms.ts",
+        "web/packages/atlas-core/src/street-furniture-form.ts",
+        "web/packages/atlas-core/test/street-furniture-form.test.ts",
+        "web/packages/atlas-react/test/generated-site.test.ts"
       ],
       "captured_on": "2026-10-23"
     },
@@ -99,21 +101,23 @@
         }
       },
       "picture": "recipe-market_town.jpg",
-      "picture_sha256": "1e6f1aac35e60d9c39181562755bf6e5ef51505ef277f64eaa8ded1a992947f0",
+      "picture_sha256": "b983e6f671be3aabff1e81c312cfd7f0dc02e6168de97644f12f3ca3b1ee8742",
       "width": 640,
       "height": 360,
-      "world_id": "world:generated:7aa3034a-7962-4ab6-877f-6548265236d6",
-      "entry_id": "01a167a4-f09c-7cc8-ad99-ef19cc23cf74",
-      "commit": "5f385ea18ea8439cd5f58a4495fc882aed9c7bc0",
+      "world_id": "world:generated:b452ebd4-d7de-45c6-8a1c-ced09fa05242",
+      "entry_id": "01a169a5-efaf-79ef-b17f-0d26f16280ed",
+      "commit": "cd8a0faeb44a9e7b841e3fb2f6633d78e40d570f",
       "tree_changes": [
-        "tools/previews/world-workspace/create-world.ts",
-        "web/packages/app/public/your-worlds/market_town.jpg",
-        "web/packages/app/public/your-worlds/small_town.jpg",
-        "web/packages/app/src/composition/world-pictures.ts",
-        "web/packages/app/src/ui/recipe-pictures.ts",
-        "web/packages/app/src/ui/world-recipes.ts",
-        "web/packages/app/test/world-create.test.ts",
-        "web/packages/app/test/your-worlds.test.ts"
+        "assets/catalogs/world-kinds/street-furniture-form.v3.json",
+        "docs/style-pack-contract.md",
+        "web/packages/app/public/card-pictures/card-pictures.v1.json",
+        "web/packages/app/public/card-pictures/kind-town.jpg",
+        "web/packages/app/public/card-pictures/recipe-market_town.jpg",
+        "web/packages/app/public/card-pictures/recipe-small_town.jpg",
+        "web/packages/app/src/street-furniture-forms.ts",
+        "web/packages/atlas-core/src/street-furniture-form.ts",
+        "web/packages/atlas-core/test/street-furniture-form.test.ts",
+        "web/packages/atlas-react/test/generated-site.test.ts"
       ],
       "captured_on": "2026-10-23"
     },
@@ -125,29 +129,51 @@
         "sha256": "59cb72a26dfe79dc87abf59ecaa08d7a0a262546874650105117669f9ffef119"
       },
       "picture": "kind-town.jpg",
-      "picture_sha256": "f804e61f625276ee34d396d4ee872c761d4c003c1b9a09b2d673cec886375ff1",
+      "picture_sha256": "171f588fb29d52af3a6a20732faed67a92f62e99d2baee312e78c139dd92e12d",
       "width": 640,
       "height": 360,
-      "world_id": "world:generated:643dcb13-acb8-4c57-b9dd-544fb44f92b7",
-      "entry_id": "01a167a5-b061-7290-a884-42ff1ed6ff45",
-      "commit": "5f385ea18ea8439cd5f58a4495fc882aed9c7bc0",
+      "world_id": "world:generated:1a94d1e9-5e7d-4389-a62f-9a8d38ce1cc1",
+      "entry_id": "01a169aa-6966-7574-8d27-84114a717a95",
+      "commit": "cd8a0faeb44a9e7b841e3fb2f6633d78e40d570f",
       "tree_changes": [
-        "tools/previews/world-workspace/create-world.ts",
-        "web/packages/app/public/your-worlds/market_town.jpg",
-        "web/packages/app/public/your-worlds/small_town.jpg",
-        "web/packages/app/src/composition/world-pictures.ts",
-        "web/packages/app/src/ui/recipe-pictures.ts",
-        "web/packages/app/src/ui/world-recipes.ts",
-        "web/packages/app/test/world-create.test.ts",
-        "web/packages/app/test/your-worlds.test.ts"
+        "assets/catalogs/world-kinds/street-furniture-form.v3.json",
+        "docs/style-pack-contract.md",
+        "web/packages/app/public/card-pictures/card-pictures.v1.json",
+        "web/packages/app/public/card-pictures/kind-town.jpg",
+        "web/packages/app/public/card-pictures/recipe-market_town.jpg",
+        "web/packages/app/public/card-pictures/recipe-small_town.jpg",
+        "web/packages/app/src/street-furniture-forms.ts",
+        "web/packages/atlas-core/src/street-furniture-form.ts",
+        "web/packages/atlas-core/test/street-furniture-form.test.ts",
+        "web/packages/atlas-react/test/generated-site.test.ts"
+      ],
+      "captured_on": "2026-10-23"
+    },
+    {
+      "card": "kind:island_hamlet",
+      "reference": {
+        "kind": "island_hamlet",
+        "version": 1,
+        "sha256": "a087c11576508102cc90096ed3c120cab50d3107ce5b04cfd9c9ab3df742fcc8"
+      },
+      "picture": "kind-island_hamlet.jpg",
+      "picture_sha256": "c2ff4bbede025226c30fab7cee48bc318b2ad5782b724a0a9456a9849cbbc9db",
+      "width": 640,
+      "height": 360,
+      "world_id": "world:generated:c93678c1-e135-401f-9b34-239aad796f3d",
+      "entry_id": "01a16996-8464-74f5-bb1e-8f6d32294f30",
+      "commit": "cd8a0faeb44a9e7b841e3fb2f6633d78e40d570f",
+      "tree_changes": [
+        "assets/catalogs/world-kinds/street-furniture-form.v3.json",
+        "docs/style-pack-contract.md",
+        "web/packages/app/public/card-pictures/card-pictures.v1.json",
+        "web/packages/app/src/street-furniture-forms.ts",
+        "web/packages/atlas-core/src/street-furniture-form.ts",
+        "web/packages/atlas-core/test/street-furniture-form.test.ts",
+        "web/packages/atlas-react/test/generated-site.test.ts"
       ],
       "captured_on": "2026-10-23"
     }
   ],
-  "held": [
-    {
-      "card": "kind:island_hamlet",
-      "reason": "Its first view shows sky and a green rise, not the hamlet; it is captured once its kind's first view shows the place."
-    }
-  ]
+  "held": []
 }
