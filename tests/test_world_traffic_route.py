@@ -26,6 +26,7 @@ from exulanica.world import world_recipes as recipe_catalog
 from exulanica.world.composers import city_grammar_town, receipt_sha256
 from exulanica.world.generated_worlds import compose_specified_world, generation_receipt
 from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.traffic_closures import CLOSING_RULES, JUNCTION_RULES, obstacles_on_lanes
 from exulanica.world.traffic_episodes import EPISODE, MODES, prepared, traffic_input
 from exulanica.world.world_recipes import (
     CANDIDATES_MAXIMUM,
@@ -300,6 +301,7 @@ def test_a_bench_on_a_lane_of_a_rules_2_town_closes_it_and_starts_the_next_traff
 ):
     api = made
     _identity(monkeypatch, _driven()[0])
+    monkeypatch.setattr(city_grammar_town, "TRAFFIC_RULES", 2)
     entry = _made(api, "A bench in the road")
     connection, workspace = api.repository.connection, api.repository.workspace_id
     snapshot = uuid.UUID(entry["source_snapshot_id"])
@@ -335,6 +337,91 @@ def test_a_bench_on_a_lane_of_a_rules_2_town_closes_it_and_starts_the_next_traff
                     assert not (abs(x - point[0]) <= 300 and abs(y - point[1]) <= 300), row
     # The episodes the worker holds are the closing input's alone.
     assert {key[0] for key in traffic_host._episodes.held()} <= {value.sha256}
+
+
+def _junction_middle(api, entry) -> tuple[str, tuple[int, int]]:
+    """A lane connection a car takes through a junction, and the middle of its path, where a thing
+    a bench's size stands on no lane (plan frame, east and north)."""
+    value = traffic_host.saved_world_roads(
+        api.repository.connection,
+        api.repository.workspace_id,
+        entry["world_id"],
+        uuid.UUID(entry["source_snapshot_id"]),
+    )
+    network = prepared(value).network
+    for path in sorted(network.paths.values(), key=lambda one: -one.length):
+        if path.kind != "connector" or "passenger_car" not in path.classes:
+            continue
+        x, y = path.line.point_at(path.length // 2)
+        square = [
+            (x - 1_200, -y - 1_200),
+            (x + 1_200, -y - 1_200),
+            (x + 1_200, -y + 1_200),
+            (x - 1_200, -y + 1_200),
+        ]
+        if obstacles_on_lanes(value.records, [square], CLOSING_RULES) == ():
+            return path.path_id, (x, y)
+    raise AssertionError("no junction of the town has a connection's middle clear of every lane")
+
+
+def _version_roads(api, entry):
+    connection, workspace = api.repository.connection, api.repository.workspace_id
+    version = WorldObjectRepository(connection, workspace, world_id=entry["world_id"]).version(
+        uuid.UUID(entry["authored_version_id"]), with_availability=False
+    )
+    blocking = tuple(part.ring for part in thing_landing.blocking_things(version.things, moving=""))
+    return traffic_host.version_world_roads(
+        connection, workspace, entry["world_id"], version, blocking
+    )
+
+
+def test_a_bench_inside_a_junction_of_a_rules_3_town_closes_the_turns_it_stands_on(
+    made, monkeypatch
+):
+    api = made
+    _identity(monkeypatch, _driven()[0])
+    entry = _made(api, "A bench in the junction")
+    connection, workspace = api.repository.connection, api.repository.workspace_id
+    snapshot = uuid.UUID(entry["source_snapshot_id"])
+    receipt = generation_receipt(connection, workspace, entry["world_id"], snapshot)[1]
+    assert receipt["traffic_rules"] == JUNCTION_RULES == 3
+    connector, point = _junction_middle(api, entry)
+    start = traffic_host.traffic_clock()
+    _bench_on(api, entry, point)
+    value, _ = _version_roads(api, entry)
+    assert value.obstacles and value.closing_rules == JUNCTION_RULES
+    closed = prepared(value).network
+    assert connector in closed.document["closures"]["connectors"]
+    assert closed.paths[connector].classes == ()
+    assert closed.document["closures"]["lanes"] == []
+    # Every turn the bench does not stand on is driven as before.
+    shut = set(closed.document["closures"]["connectors"])
+    opened = prepared(
+        traffic_host.saved_world_roads(connection, workspace, entry["world_id"], snapshot)
+    )
+    for path_id, path in closed.paths.items():
+        if path_id not in shut:
+            assert path.classes == opened.network.paths[path_id].classes, path_id
+    # Over two minutes from the placing, no vehicle drives through the bench.
+    for second in (start, start + 60):
+        for row in _window(api, entry, second)["vehicles"]:
+            for offset, mode in enumerate(row["mode"]):
+                if MODES[mode] != "driving":
+                    continue
+                for field in ("front_axle_mm", "rear_axle_mm"):
+                    x, y = row[field][2 * offset : 2 * offset + 2]
+                    assert not (abs(x - point[0]) <= 300 and abs(y - point[1]) <= 300), row
+
+
+def test_a_bench_inside_a_junction_of_a_rules_2_town_closes_nothing(made, monkeypatch):
+    api = made
+    _identity(monkeypatch, _driven()[0])
+    monkeypatch.setattr(city_grammar_town, "TRAFFIC_RULES", 2)
+    entry = _made(api, "A rules 2 junction")
+    _, point = _junction_middle(api, entry)
+    _bench_on(api, entry, point)
+    value, _ = _version_roads(api, entry)
+    assert value.obstacles == ()
 
 
 def test_a_town_made_under_rules_1_keeps_its_traffic_whatever_is_placed(made, monkeypatch):

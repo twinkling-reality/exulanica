@@ -16,15 +16,28 @@ import uuid
 
 import pytest
 from exulanica.canonical import canonical_json
-from exulanica.grammar.grammars.city.roads import LaneRecord
-from exulanica.traffic.closures import CLOSURES_PROFILE, close_network
+from exulanica.grammar.grammars.city.roads import JunctionRecord, LaneRecord
+from exulanica.traffic.closures import (
+    CLOSURES_PROFILE,
+    CONNECTION_CLOSURES_PROFILE,
+    close_network,
+)
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.traffic.routing import plan_route
 from exulanica.world import traffic_episodes, traffic_host
-from exulanica.world.traffic_closures import closures, obstacles_on_lanes, traffic_rules_of
+from exulanica.world.traffic_closures import (
+    CLOSING_RULES,
+    JUNCTION_RULES,
+    TRAFFIC_RULES,
+    closed_connections,
+    closures,
+    obstacles_on_lanes,
+    traffic_rules_of,
+)
 from exulanica.world.traffic_episodes import (
     CLOSING_INPUT_PROFILE,
     EPISODE,
+    JUNCTION_INPUT_PROFILE,
     MODES,
     compute_episode,
     from_wire,
@@ -267,3 +280,109 @@ def test_a_thing_across_every_lane_of_a_street_closes_the_street(driven):
 
 def _fields(value) -> dict:
     return {name: getattr(value, name) for name in value.__dataclass_fields__}
+
+
+# -- a thing inside a junction (traffic rules 3) --------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def junction_driven():
+    """A point inside a junction of the open corridor, off every lane, that a vehicle drives through
+    on a lane connection in the first episode."""
+    value = corridor.value()
+    episode = compute_episode(wire(value), 0)
+    records = corridor.records()
+    for _, point in _axles(value, episode):
+        centre = (point[0], point[1])
+        square = _square(centre)
+        if obstacles_on_lanes(records, [square]) == () and obstacles_on_lanes(
+            records, [square], JUNCTION_RULES
+        ):
+            return episode, centre
+    raise AssertionError("no vehicle drove a junction off its lanes in the open corridor")
+
+
+def test_a_thing_inside_a_junction_is_an_obstacle_only_under_rules_3(junction_driven):
+    _, centre = junction_driven
+    records = corridor.records()
+    assert obstacles_on_lanes(records, [_square(centre)], CLOSING_RULES) == ()
+    assert len(obstacles_on_lanes(records, [_square(centre)], JUNCTION_RULES)) == 1
+    assert TRAFFIC_RULES == JUNCTION_RULES == 3
+
+
+def test_a_thing_inside_a_junction_closes_the_connections_it_stands_on_and_no_other(
+    junction_driven,
+):
+    _, centre = junction_driven
+    network = corridor.prepared().network
+    obstacles = obstacles_on_lanes(corridor.records(), [_square(centre)], JUNCTION_RULES)
+    connectors = closed_connections(network, corridor.records(), obstacles)
+    assert connectors and all(network.paths[path].kind == "connector" for path in connectors)
+    assert closures(network, corridor.records(), obstacles) == ((), ())
+    shut = close_network(network, (), (), connectors)
+    for path_id, path in shut.paths.items():
+        if path_id in connectors:
+            assert path.classes == () and network.paths[path_id].classes
+        else:
+            assert path.classes == network.paths[path_id].classes, path_id
+    assert shut.document["closures"] == {
+        "profile": CONNECTION_CLOSURES_PROFILE,
+        "lanes": [],
+        "spaces": [],
+        "connectors": list(connectors),
+    }
+    with pytest.raises(UnsupportedNetworkError):
+        close_network(network, (), (), ["lane:not a connection"])
+
+
+def test_a_thing_over_every_connection_of_a_junction_closes_the_junction():
+    network = corridor.prepared().network
+    records = corridor.records()
+    junction = next(r for r in records if isinstance(r, JunctionRecord))
+    extent = junction.extent
+    box = (
+        (extent.min_x_mm, extent.min_y_mm),
+        (extent.max_x_mm, extent.min_y_mm),
+        (extent.max_x_mm, extent.max_y_mm),
+        (extent.min_x_mm, extent.max_y_mm),
+    )
+    connectors = closed_connections(network, records, [box])
+    own = {
+        path_id
+        for path_id, path in network.paths.items()
+        if path.kind == "connector" and path.start_junction == junction.identity
+    }
+    assert own and own <= set(connectors)
+
+
+def test_an_episode_under_rules_3_drives_no_vehicle_through_a_thing_in_a_junction(junction_driven):
+    episode, centre = junction_driven
+    value = corridor.value()
+    assert any(_inside(point, centre) for _, point in _axles(value, episode))
+    obstacles = obstacles_on_lanes(corridor.records(), [_square(centre)], JUNCTION_RULES)
+    closed = with_obstacles(
+        value, obstacles, line_version="a version", closing_rules=JUNCTION_RULES
+    )
+    assert closed.sha256 != value.sha256 and closed.seed == value.seed
+    assert from_wire(wire(closed)) == closed.__class__(**{**_fields(closed), "line_version": ""})
+    after = compute_episode(wire(closed), 0)
+    assert after.input_sha256 == closed.sha256
+    assert traffic_episodes.prepared(closed).network.document["closures"]["connectors"]
+    assert not any(_inside(point, centre) for _, point in _axles(closed, after))
+    # The same thing read under rules 2 closes no connection: vehicles still drive through it.
+    open_rules = with_obstacles(value, obstacles, line_version="a version")
+    assert open_rules.sha256 != closed.sha256
+    unclosed = corridor.prepared().network.digest
+    assert traffic_episodes.prepared(open_rules).network.digest == unclosed
+
+
+def test_a_rules_3_input_names_its_rules_only_with_an_obstacle(junction_driven):
+    _, centre = junction_driven
+    value = corridor.value()
+    obstacles = obstacles_on_lanes(corridor.records(), [_square(centre)], JUNCTION_RULES)
+    closed = with_obstacles(value, obstacles, line_version="v", closing_rules=JUNCTION_RULES)
+    assert wire(closed)["closing_rules"] == JUNCTION_RULES
+    assert JUNCTION_INPUT_PROFILE == "exulanica.traffic-input/v3"
+    # With nothing in the road a rules-3 version keeps the first profile and its bytes.
+    none = with_obstacles(value, (), line_version="v", closing_rules=JUNCTION_RULES)
+    assert none.sha256 == value.sha256 and wire(none) == wire(value)

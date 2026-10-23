@@ -12,6 +12,12 @@ stretch between that lane's two junctions, and every space it stands in
 the street. A being, or a kind the workspace keeps, has no footprint here and closes nothing.
 People still walk round a thing as they do anywhere else; this is the traffic's reading alone.
 
+Under rules 3 (DESIGN's ruling: a thing inside a junction) a footprint inside a junction's extent is
+an obstacle too, and it closes each lane connection whose path it stands on
+(:func:`closed_connections`, read against the compiled network, since the connections are
+derived); over every connection of a junction it closes the junction. A town made under rules 2
+keeps junctions open to its things, as it was made.
+
 Footprints are in the region's frame (east and south); the town's records and its traffic in the
 city plan (east and north), so a point ``(x, z)`` is ``(x, -z)`` there.
 """
@@ -22,23 +28,28 @@ from collections.abc import Mapping, Sequence
 from itertools import pairwise
 from typing import Any, Final
 
-from exulanica.grammar.grammars.city.roads import LaneRecord
+from exulanica.grammar.grammars.city.roads import JunctionRecord, LaneRecord
 from exulanica.traffic.geometry import Point, convex_overlap, rectangle
 from exulanica.traffic.network import RoadNetwork
 
 __all__ = [
     "CLOSING_RULES",
+    "JUNCTION_RULES",
     "TRAFFIC_RULES",
     "UNPINNED_RULES",
+    "closed_connections",
     "closures",
     "obstacles_on_lanes",
     "traffic_rules_of",
 ]
 
 #: The traffic rules a town made now is pinned to.
-TRAFFIC_RULES: Final = 2
+TRAFFIC_RULES: Final = 3
 #: The first traffic rules under which placed things close lanes.
 CLOSING_RULES: Final = 2
+#: The first traffic rules under which a placed thing inside a junction closes the connections it
+#: stands on.
+JUNCTION_RULES: Final = 3
 #: The rules of a town whose receipt pins none: made before the rules were pinned, or under them.
 UNPINNED_RULES: Final = 1
 
@@ -68,14 +79,40 @@ def _lane_pieces(records: Sequence[object]) -> list[tuple[str, Ring]]:
     return pieces
 
 
+def _junction_boxes(records: Sequence[object]) -> list[tuple[str, Ring]]:
+    """Each junction of the records as the plan rectangle of its extent."""
+    boxes = []
+    for record in records:
+        if not isinstance(record, JunctionRecord):
+            continue
+        e = record.extent
+        boxes.append(
+            (
+                record.identity,
+                (
+                    (e.min_x_mm, e.min_y_mm),
+                    (e.max_x_mm, e.min_y_mm),
+                    (e.max_x_mm, e.max_y_mm),
+                    (e.min_x_mm, e.max_y_mm),
+                ),
+            )
+        )
+    return boxes
+
+
 def obstacles_on_lanes(
-    records: Sequence[object], footprints: Sequence[Sequence[tuple[int, int]]]
+    records: Sequence[object],
+    footprints: Sequence[Sequence[tuple[int, int]]],
+    rules: int = CLOSING_RULES,
 ) -> tuple[Ring, ...]:
     """Of ``footprints``, the turned footprints of a version's placed things that block walking
     (the region's frame, east and south: ``BlockedPart.ring`` of
     :func:`~exulanica.world.thing_landing.blocking_things`), those that stand on a lane of
-    ``records``, in the plan frame and in order: what a town's traffic under rules 2 reads."""
+    ``records`` or, under ``rules`` 3, inside a junction's extent, in the plan frame and in order:
+    what a town's traffic under rules 2 or 3 reads."""
     pieces = _lane_pieces(records)
+    if rules >= JUNCTION_RULES:
+        pieces += _junction_boxes(records)
     found = set()
     for footprint in footprints:
         ring = tuple((round(x), -round(z)) for x, z in footprint)
@@ -111,3 +148,32 @@ def closures(
         )
     )
     return closed, spaces
+
+
+def closed_connections(
+    network: RoadNetwork, records: Sequence[object], obstacles: Sequence[Ring]
+) -> tuple[str, ...]:
+    """The lane connections of ``network`` the ``obstacles`` stand on, in order (rules 3): each
+    ``connector`` path whose line, piece by piece at half the width of the lane it leaves, an
+    obstacle overlaps."""
+    if not obstacles:
+        return ()
+    widths = {
+        f"lane:{record.identity}": record.width_mm
+        for record in records
+        if isinstance(record, LaneRecord)
+    }
+    found = []
+    for path_id, path in network.paths.items():
+        if path.kind != "connector":
+            continue
+        width = max((widths.get(lane, 0) for lane in path.predecessors), default=0)
+        half = -(-width // 2)
+        if half <= 0:
+            continue
+        for a, b in pairwise(path.line.points):
+            ring = rectangle(a, b, half, half)
+            if ring is not None and any(convex_overlap(ring, obstacle) for obstacle in obstacles):
+                found.append(path_id)
+                break
+    return tuple(sorted(found))

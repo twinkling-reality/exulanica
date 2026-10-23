@@ -72,13 +72,14 @@ from exulanica.traffic.routing import plan_route
 from exulanica.traffic.signal_actuation import SignalTimeline, signal_actuation, signal_observation
 from exulanica.traffic.signals import PEDESTRIAN_INDICATIONS, VEHICLE_INDICATIONS
 from exulanica.traffic.simulation import advance_traffic, initial_traffic, state_sha256
-from exulanica.world.traffic_closures import closures
+from exulanica.world.traffic_closures import JUNCTION_RULES, closed_connections, closures
 
 __all__ = [
     "CLOSING_INPUT_PROFILE",
     "COUPLED_WINDOW_PROFILE",
     "EPISODE",
     "INPUT_PROFILE",
+    "JUNCTION_INPUT_PROFILE",
     "MODES",
     "WINDOW_PROFILE",
     "PackedTrafficEpisode",
@@ -110,6 +111,9 @@ INPUT_PROFILE: Final = "exulanica.traffic-input/v1"
 #: (:mod:`exulanica.world.traffic_closures`); an input with no obstacle keeps the first profile and
 #: its bytes, so every episode already served is served again unchanged.
 CLOSING_INPUT_PROFILE: Final = "exulanica.traffic-input/v2"
+#: The input of a town under traffic rules 3 with an obstacle: its profile names the rules in its
+#: digest, since a thing inside a junction closes the connections it stands on there, not under 2.
+JUNCTION_INPUT_PROFILE: Final = "exulanica.traffic-input/v3"
 WINDOW_PROFILE: Final = ROADS_MODULE.output_profile
 #: A window of a coupled world's traffic: its seconds are on the world's traffic timeline and its
 #: crossings are fed. Its own profile, so a reader of the shared-real-time window refuses it rather
@@ -196,6 +200,9 @@ class TrafficInput:
     #: The footprints (plan frame, east and north) of the placed things standing on its lanes,
     #: under traffic rules 2: what closes lanes and spaces. Empty under rules 1 or with none.
     obstacles: tuple[tuple[tuple[int, int], ...], ...] = ()
+    #: The traffic rules its obstacles close by: 2 (lanes and spaces), or 3 (also the connections a
+    #: thing inside a junction stands on); in the digest by its profile, with an obstacle.
+    closing_rules: int = 2
     #: The world version whose traffic this is, where its traffic follows the version's edits
     #: (rules 2): the episode worker's line, so an edit's input replaces the one before it. Empty
     #: where every version of the world shares the input. Not part of the digest.
@@ -230,9 +237,15 @@ def _digest(
     grammar_version: int,
     records: Sequence[object],
     obstacles: Sequence[Sequence[tuple[int, int]]] = (),
+    closing_rules: int = 2,
 ) -> str:
+    junctions = bool(obstacles) and closing_rules >= JUNCTION_RULES
     document: dict[str, Any] = {
-        "profile": CLOSING_INPUT_PROFILE if obstacles else INPUT_PROFILE,
+        "profile": JUNCTION_INPUT_PROFILE
+        if junctions
+        else CLOSING_INPUT_PROFILE
+        if obstacles
+        else INPUT_PROFILE,
         "world_id": world_id,
         "version_id": version_id,
         "city_identity": city,
@@ -254,17 +267,20 @@ def traffic_input(
     records: Sequence[object],
     obstacles: Sequence[Sequence[tuple[int, int]]] = (),
     line_version: str = "",
+    closing_rules: int = 2,
 ) -> TrafficInput:
     carried = road_records(records)
     held = tuple(sorted(tuple((int(x), int(y)) for x, y in ring) for ring in obstacles))
+    rules = int(closing_rules) if held else 2
     return TrafficInput(
         world_id=world_id,
         version_id=version_id,
         city_identity=city_identity,
         grammar_version=grammar_version,
         records=carried,
-        sha256=_digest(world_id, version_id, city_identity, grammar_version, carried, held),
+        sha256=_digest(world_id, version_id, city_identity, grammar_version, carried, held, rules),
         obstacles=held,
+        closing_rules=rules,
         line_version=line_version,
     )
 
@@ -274,9 +290,11 @@ def with_obstacles(
     obstacles: Sequence[Sequence[tuple[int, int]]],
     *,
     line_version: str,
+    closing_rules: int = 2,
 ) -> TrafficInput:
-    """``value`` read with the placed things on its lanes, for the world version ``line_version``
-    (traffic rules 2): a new input wherever there is an obstacle, the same records and seed."""
+    """``value`` read with the placed things on its lanes (and, under ``closing_rules`` 3, inside
+    its junctions), for the world version ``line_version``: a new input wherever there is an
+    obstacle, the same records and seed."""
     return traffic_input(
         world_id=value.world_id,
         version_id=value.version_id,
@@ -285,6 +303,7 @@ def with_obstacles(
         records=value.records,
         obstacles=obstacles,
         line_version=line_version,
+        closing_rules=closing_rules,
     )
 
 
@@ -302,6 +321,7 @@ def wire(value: TrafficInput) -> dict[str, Any]:
             if value.obstacles
             else {}
         ),
+        **({"closing_rules": value.closing_rules} if value.closing_rules != 2 else {}),
     }
 
 
@@ -320,6 +340,7 @@ def from_wire(data: Mapping[str, Any]) -> TrafficInput:
         grammar_version=data["grammar_version"],
         records=records,
         obstacles=[tuple(tuple(point) for point in ring) for ring in data.get("obstacles", ())],
+        closing_rules=data.get("closing_rules", 2),
     )
     if rebuilt.sha256 != data["input_sha256"]:
         raise ValueError("the traffic's wire form does not rebuild the input it names")
@@ -398,7 +419,13 @@ def prepared(value: TrafficInput) -> Prepared:
         catalogs,
     )
     if value.obstacles:
-        network = close_network(network, *closures(network, value.records, value.obstacles))
+        lanes, spaces = closures(network, value.records, value.obstacles)
+        connectors = (
+            closed_connections(network, value.records, value.obstacles)
+            if value.closing_rules >= JUNCTION_RULES
+            else ()
+        )
+        network = close_network(network, lanes, spaces, connectors)
     found = Prepared(derived, network, catalogs, _fleet(network, catalogs))
     _prepared[value.sha256] = found
     while len(_prepared) > _PREPARED_LIMIT:

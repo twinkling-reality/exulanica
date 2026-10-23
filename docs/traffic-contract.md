@@ -508,8 +508,18 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   placing, a move, a removal, an undo or a redo of a thing starts the version's next traffic: the
   worker lets go of the episodes of the input before it, and a read composed before the edit is
   refused as `traffic_worker_unavailable` and read again. A being, a kind the workspace
-  keeps, a thing off the lanes, or one inside a junction (see the limits) closes nothing; people
-  still walk round a thing as anywhere else.
+  keeps, or a thing off the lanes and outside every junction closes nothing; people still walk round
+  a thing as anywhere else.
+- **A thing inside a junction (traffic rules 3).** A town made from rules 3 on also reads the placed
+  things standing inside a junction's extent (`obstacles_on_lanes` with the town's rules), and each
+  closes every lane connection whose path it stands on, at half the width of the lane the
+  connection leaves (`closed_connections`, read against the compiled network, since the connections
+  are derived); the others stay driven, and a thing over every connection of a junction closes the
+  junction. As on a lane, nothing waits or swerves, each edit starts the version's next traffic and
+  people walk round it. Its input is `exulanica.traffic-input/v3`, the profile in its digest
+  naming the closing rules, and its network's closures name the connections (`exulanica.traffic-closures/v2`); an
+  input with no obstacle keeps the first profile and its bytes. A town made under rules 2 keeps its
+  junctions open to its things, as it was made.
 - **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
   shows its vehicles in the same places. A saved world whose clock is coupled keys its traffic by
   its own traffic timeline instead ([world clock](world-clock-contract.md#coupled-traffic)).
@@ -683,9 +693,9 @@ changes those two files.
 - **Right-hand traffic only**, and no lane changes between junctions: a vehicle picks its lane only
   through a junction's connections.
 - **A placed thing closes, never narrows.** Under traffic rules 2 a thing on a lane closes the
-  whole stretch between its junctions; no vehicle waits behind it or passes it in the other lane. A
-  thing standing inside a junction closes nothing: closures read lane records only, and a
-  junction's connections state none, so vehicles drive through it. A coupled version, or one with a
+  whole stretch between its junctions; no vehicle waits behind it or passes it in the other lane. In
+  a town made under rules 2 a thing standing inside a junction closes nothing and is driven through;
+  rules 3 closes the connections it stands on. A coupled version, or one with a
   signal choice, reads the town's shared input, so its placed things close nothing; a version's
   first signal choice therefore reopens its closed lanes for the whole version, the seconds before
   the choice included.

@@ -347,7 +347,8 @@ def version_world_roads(
 
     A town made under traffic rules 1 (its receipt pins none) answers :func:`saved_world_roads` as
     it is, shared by every version. Under rules 2 the input carries the version's placed things that
-    stand on its lanes (:func:`~exulanica.world.traffic_closures.obstacles_on_lanes`), on the
+    stand on its lanes (:func:`~exulanica.world.traffic_closures.obstacles_on_lanes`; under rules 3
+    also those inside its junctions, which close the connections they stand on), on the
     version's own line, with its edit sequence: an input with no such thing keeps the shared input's
     digest and episodes, and one with any is a new input whose episodes close what they stand on.
     The first is the shared input on the version's line, made at once; only the second is kept,
@@ -355,16 +356,19 @@ def version_world_roads(
     """
     value = saved_world_roads(connection, workspace_id, world_id, version.source_snapshot_id)
     _, receipt = generation_receipt(connection, workspace_id, world_id, version.source_snapshot_id)
-    if traffic_rules_of(receipt) < CLOSING_RULES:
+    rules = traffic_rules_of(receipt)
+    if rules < CLOSING_RULES:
         return value, None
-    obstacles = obstacles_on_lanes(value.records, blocking)
+    obstacles = obstacles_on_lanes(value.records, blocking, rules)
     if not obstacles:
         return dataclasses.replace(value, line_version=str(version.version_id)), version.edit_seq
     key = (value.sha256, str(version.version_id), obstacles)
     with _inputs_lock:
         found = _version_inputs.get(key)
         if found is None:
-            found = with_obstacles(value, obstacles, line_version=str(version.version_id))
+            found = with_obstacles(
+                value, obstacles, line_version=str(version.version_id), closing_rules=rules
+            )
             _version_inputs[key] = found
         _version_inputs.move_to_end(key)
         while len(_version_inputs) > _VERSION_INPUT_LIMIT:
