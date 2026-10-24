@@ -97,7 +97,7 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
 ` + code
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
-      const reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
+      let reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
       if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) {
         // A tile that could not be baked stays so: Your worlds says which world did not open and why.
         await mountNoWorld({ retry: () => start(token, csrfToken), failed: fill('world.opening.didNotOpen', { title: reviewEntry.title }) + ' ' + say('world.generated.failed') + ' ' + say('world.generated.openTriesAgain') });
@@ -107,14 +107,22 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
         // Its land is asked for now, so the server makes it beside the bakes; nothing waits on it.
         const asking = state.credentials;
         if (asking) void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry), () => {});
-        // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads; then the page opens again with whatever it reads.
+        // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads.
+        let again = null;
         for (let read = 0, baking = true; baking && read < ${BAKE_READS}; read += 1) {
           await new Promise((done) => setTimeout(done, ${BAKE_POLL_MS}));
-          const again = await state.worldEntries?.entry(reviewEntry.entryId).catch(() => null);
+          again = await state.worldEntries?.entry(reviewEntry.entryId).catch(() => null) ?? null;
           baking = again?.generatedGround?.tiles.some((tile) => tile.state === 'baking') ?? true;
         }
-        location.reload();
-        return;
+        // A tile that failed, or one still baking after every read, opens the page again, which says so.
+        if (!again || again.generatedGround?.tiles.some((tile) => tile.state === 'baking' || tile.state === 'failed')) {
+          location.reload();
+          return;
+        }
+        // Baked: the fresh entry opens below, as a baked town opens from its address, with no second page load and
+        // its land's ask kept.
+        state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) => candidate.entryId === again.entryId ? again : candidate));
+        reviewEntry = again;
       }
       if (reviewEntry) { await openWorldEntryContext(state, reviewEntry); ${report(0, 'reviewEntry.title')} state.worldEntryError = null; shell.removeAttribute('data-world-state'); await mount(); return; }
       pendingEntryProblem = 'This saved world is no longer available. Choose a world here.';

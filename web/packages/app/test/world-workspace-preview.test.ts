@@ -162,23 +162,32 @@ describe('the world workspace preview\'s edits to this app', () => {
     expect(at('reflectSavedWorldSociety(live.view)')).toBeGreaterThan(at('atlas.authoredSociety?.clearSociety()'));
   });
 
-  it('keeps a town still baking under its opening and opens it, as a reload does, once baked (B1)', async () => {
+  it('keeps a town still baking under its opening and opens it in place once baked, with no second page load (B1)', async () => {
     const { patchSource, BAKE_POLL_MS, BAKE_READS } = await seams() as Seams & { BAKE_POLL_MS: number; BAKE_READS: number };
     const main = 'web/packages/app/src/main.ts';
     const patched = patchSource(main, source(main), here)!;
     const opened = patched.slice(patched.indexOf('const reviewEntryId'));
     const waits = opened.indexOf("if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'baking')) {");
+    const reloads = opened.indexOf('location.reload();');
+    const taken = opened.indexOf('reviewEntry = again;');
     const mounts = opened.indexOf('await mount(); return;');
-    // While a tile bakes the address waits, reading the entry again, and opens again as a reload does:
-    // nothing is mounted before then.
+    // While a tile bakes the address waits, reading the entry again; nothing is mounted until it reads baked.
     expect(waits).toBeGreaterThan(-1);
-    expect(waits).toBeLessThan(mounts);
-    const waiting = opened.slice(waits, mounts);
+    expect(reloads).toBeGreaterThan(waits);
+    const waiting = opened.slice(waits, reloads);
     expect(waiting).toContain('await state.worldEntries?.entry(reviewEntry.entryId)');
     expect(waiting).toContain(`setTimeout(done, ${BAKE_POLL_MS})`);
     expect(waiting).toContain(`read < ${BAKE_READS}`);
-    expect(waiting).toContain('location.reload();');
     expect(waiting).not.toContain('mount(');
+    // A tile that failed, or one still baking after every read, opens the page again, which says so.
+    expect(waiting).toMatch(/if \(!again \|\| again\.generatedGround\?\.tiles\.some\(\(tile\) => tile\.state === 'baking' \|\| tile\.state === 'failed'\)\) \{\n\s*$/u);
+    // Baked: the fresh entry takes the saved one's place and opens through the same lines as a baked town opened from
+    // its address, with no second page load.
+    expect(taken).toBeGreaterThan(reloads);
+    expect(mounts).toBeGreaterThan(taken);
+    expect(opened.slice(reloads, taken)).toContain('candidate.entryId === again.entryId ? again : candidate');
+    expect(opened.slice(taken, mounts)).toMatch(/^reviewEntry = again;\n\s*\}\n\s*if \(reviewEntry\) \{ await openWorldEntryContext\(state, reviewEntry\);/u);
+    expect(opened.slice(taken, mounts)).not.toContain('location.reload');
     // Its land is asked for before the first wait, and nothing waits on the ask.
     const asks = waiting.indexOf("void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry)");
     expect(asks).toBeGreaterThan(-1);
