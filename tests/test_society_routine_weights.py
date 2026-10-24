@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 
 import pytest
-from exulanica.abilities.registry import PURPOSEFUL_OUTDOORS_TAKE_IN
+from exulanica.abilities.registry import PURPOSEFUL_AT_HOME
 from exulanica.selection.creature_drafting import assembled_form
 from exulanica.things.bodies import body_grammar, read_body_recipe
 from exulanica.things.creatures import assemble_creature
@@ -55,8 +55,8 @@ def scenario(*preferences, resting=True, walking=True):
             _placed(f"weighted:{number}", creature.kind.sha256, -2000 + number * 4000, 4000)
         )
     document = compose(tuple(placed), made_kinds=kinds)
-    # A society made now records the fourth version, which reads the weights as the third does.
-    assert PURPOSEFUL_OUTDOORS_TAKE_IN in document["modules"]
+    # A society made now records the fifth version, which reads the weights as the third does.
+    assert PURPOSEFUL_AT_HOME in document["modules"]
     state = initial_things_society(SOCIETY, SEED, document, population=6)
     for person in state["inhabitants"]:
         person["need_milli"] = 0

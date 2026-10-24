@@ -1,6 +1,6 @@
 """Recorded kind preferences for autonomous purposeful choices, without changing abilities.
 
-Only purposeful/v3 reads these weights. An omitted key is zero: creature assembly omits
+Purposeful/v3 and later read these weights. An omitted key is zero: creature assembly omits
 zero-weight entries while retaining the corresponding ability. No kind means the world's
 routine still decides; an erased kind instead has no weighted activity. Other abilities' weights
 remain outside this module, including hands and following.

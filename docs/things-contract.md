@@ -221,7 +221,7 @@ from it (`+y`), so a visitor steps out of the gate into the world.
 
 The world object catalog's uses map onto offers: `rest` to `rest_at` with its places and seats,
 `visit` to `visit`, perches to `perch` and hosted flyers to `host`. A kind may state weights for
-its purposeful activities, hands abilities and following. Recorded purposeful/v3 and v4 read only
+its purposeful activities, hands abilities and following. Recorded purposeful/v3 and later read only
 `wait`, `stand`, `talk`, `rest` and `visit` for ordinary autonomous choices. Missing keys and
 explicit zero weights both mean no preference; an empty or unavailable distribution waits
 safely. Automatic conversation requires positive talk preference from both participants.
@@ -982,7 +982,7 @@ account or list names it) waits with its words until one does.
 A creature its workspace keeps lives in a society of things as any being does
 ([society contract](synthetic-society-contract.md#the-society-of-things-v7)): placed by its kind's
 digest, it arrives at the open node nearest where it was put (never at a door's, in a society
-recording purposeful/v4), walks, rests, visits, stands and
+recording purposeful/v4 or later), walks, rests, visits, stands and
 talks by the routine as far as its kind lists each, says lines and uses what it holds with where a
 decider chooses, may be decided for by a model or played by a person where its kind allows, and
 leaves when its author removes it. Nothing in the kind changes for this, so every creature a
@@ -1665,7 +1665,7 @@ These are material limits of the boundary above, not partial behaviour:
   route is still the shortest by length whoever walks it, a follower slower than the one it
   follows falls behind, and the minutes a hands act may take to reach its thing are the same for
   every body, so a slow one may not reach it in time. Its routine is the purposeful routine held to
-  the abilities its kind lists. Recorded purposeful/v3 and v4 read its five purposeful weights; earlier
+  the abilities its kind lists. Recorded purposeful/v3 and later read its five purposeful weights; earlier
   versions retain world-routine selection. A wait preference does not remove movement or rest
   capability, and tiredness and making room remain exceptions to ordinary waiting. A creature
   whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its

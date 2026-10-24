@@ -152,8 +152,9 @@ def test_the_premises_a_being_stands_at_is_told_by_its_name_from_the_twelfth_cat
 def _as_sealed(monkeypatch) -> None:
     """The town composed as the code that sealed the stored eleventh request composed it: its first
     input recording the purposeful planner's third version. A society made since records the
-    fourth, whose take-in outdoors changes nothing here but the module it names, so the request's
-    bytes are the ones a society stored then rebuilds."""
+    fourth or later: the fourth's take-in outdoors changes nothing here but the module it names,
+    and the fifth starts residents by their own doors, which moves who stands near the villager.
+    Composed so, the request's bytes are the ones a society stored then rebuilds."""
     current = registry.current_modules
     monkeypatch.setattr(
         registry,

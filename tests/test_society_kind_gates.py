@@ -23,8 +23,8 @@ from pathlib import Path
 import pytest
 from exulanica.abilities.registry import (
     PURPOSEFUL,
+    PURPOSEFUL_AT_HOME,
     PURPOSEFUL_BY_KIND,
-    PURPOSEFUL_OUTDOORS_TAKE_IN,
 )
 from exulanica.api.thing_card import _abilities, _offers
 from exulanica.canonical import canonical_json
@@ -122,7 +122,7 @@ def _events_sha256(events) -> str:
 
 def test_both_current_and_second_version_societies_hold_the_routine_to_kind():
     current = current_compose((GATE, SPIRIT, KNIGHT))
-    assert PURPOSEFUL_OUTDOORS_TAKE_IN in current["modules"]
+    assert PURPOSEFUL_AT_HOME in current["modules"]
     current_state = initial_things_society(SOCIETY, SEED, current, population=4)
     assert (
         routine_withheld(current_state, _being(current_state, "lantern_spirit"))

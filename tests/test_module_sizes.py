@@ -50,8 +50,8 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the frame and the segment overlay",
     ),
     "exulanica/world/society_planner.py": (
-        2_664,
-        "the v2 society's input, graph, spots, talk and minute",
+        2_680,
+        "the v2 society's input, graph, spots, talk and minute, and where residents start",
     ),
     "exulanica/api/society_runtime.py": (
         2_424,
@@ -60,7 +60,7 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the world's setting",
     ),
     "exulanica/world/society_things.py": (
-        2_292,
+        2_295,
         "the society of things, exulanica-society/v7, and its outdoors take-in (purposeful/v4)",
     ),
     "exulanica/reconstruction/standpoint.py": (

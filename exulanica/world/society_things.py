@@ -1176,6 +1176,9 @@ def initial_things_society(
     keep_first_records(state, document, seed)
     if "people" in document:
         _house_the_population(state, seed, document["people"])
+        from exulanica.world.society_planner import start_at_home
+
+        start_at_home(state, document)
     from exulanica.world.society_resident_day import initialize
 
     initialize(state, document, seed)

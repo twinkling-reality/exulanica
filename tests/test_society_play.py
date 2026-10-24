@@ -208,9 +208,9 @@ SEVENTH_PLAY_REQUEST_SHA256 = "343f21b0312924ccfd6e2fd2f1c39f14120d2722d0200b031
 @pytest.fixture
 def sealed_square(monkeypatch):
     """The square composed as the code that sealed the pinned requests composed it: its first input
-    recording the purposeful planner's third version. A society made since records the fourth,
-    whose take-in outdoors changes nothing here but the module it names, so the requests' bytes
-    are the ones a society stored then rebuilds."""
+    recording the purposeful planner's third version. A society made since records the fourth or
+    later, whose take-in outdoors changes nothing here but the module it names, so the requests'
+    bytes are the ones a society stored then rebuilds."""
     from exulanica.abilities import registry
 
     current = registry.current_modules

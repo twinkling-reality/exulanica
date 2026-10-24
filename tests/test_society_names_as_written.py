@@ -47,9 +47,9 @@ REQUEST_BUILDERS = ("role_request", "person_request", "play_minutes")
 @pytest.fixture
 def sealed_square(monkeypatch):
     """The square composed as the code that sealed the pinned requests composed it: its first input
-    recording the purposeful planner's third version. A society made since records the fourth,
-    whose take-in outdoors changes nothing here but the module it names, so the requests' bytes
-    are the ones a society stored then rebuilds."""
+    recording the purposeful planner's third version. A society made since records the fourth or
+    later, whose take-in outdoors changes nothing here but the module it names, so the requests'
+    bytes are the ones a society stored then rebuilds."""
     from exulanica.abilities import registry
 
     current = registry.current_modules

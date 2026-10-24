@@ -45,6 +45,7 @@ __all__ = [
     "MODULES_PATH",
     "NOTICE",
     "PURPOSEFUL",
+    "PURPOSEFUL_AT_HOME",
     "PURPOSEFUL_BY_KIND",
     "PURPOSEFUL_BY_KIND_WEIGHTS",
     "PURPOSEFUL_OUTDOORS_TAKE_IN",
@@ -75,6 +76,8 @@ PURPOSEFUL_BY_KIND: Final = "exulanica-ability/purposeful/v2"
 PURPOSEFUL_BY_KIND_WEIGHTS: Final = "exulanica-ability/purposeful/v3"
 #: Version 3's choices, and a placed being taken in outdoors only, never at a door's node.
 PURPOSEFUL_OUTDOORS_TAKE_IN: Final = "exulanica-ability/purposeful/v4"
+#: Version 4's choices, and a town's residents starting outdoors by their own home's door.
+PURPOSEFUL_AT_HOME: Final = "exulanica-ability/purposeful/v5"
 SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
 #: Crossing whose summaries name a visitor by what it is, from outside, never as simulated.

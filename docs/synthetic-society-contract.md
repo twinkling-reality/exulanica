@@ -1687,7 +1687,7 @@ being put down at a point of the region's frame would stand: the walking node of
 latest input it would be taken in at now, by the rules a placed being is taken in by (the nearest
 node by distance and then id that is no activity's place, has an edge and that nobody stands at or
 is headed to, first among those nobody waiting would be in the way at, and, in a society that
-records the purposeful module's fourth version, no door's node), as `stand`
+records the purposeful module's fourth version or later, no door's node), as `stand`
 `{node_id, position_mm, height_mm}`, or null where none is open. A walking node holds a position on
 the ground plane and no height; `height_mm` is the height a thing placed at the node rests at, as a
 placing is held to the world's ground (a town's street surface, a site's surface, a plane's
@@ -2284,7 +2284,7 @@ people.
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
 exactly those for its whole life, whatever a later table adds; no later input states them. A new
 society records the default modules at their newest built versions: purposeful
-(`exulanica-ability/purposeful/v4`, below), say, crossing, hands (`exulanica-ability/hands/v2`,
+(`exulanica-ability/purposeful/v5`, below), say, crossing, hands (`exulanica-ability/hands/v2`,
 below), follow (`exulanica-ability/follow/v3`), notice (`exulanica-ability/notice/v1`), memory
 (`exulanica-ability/remember/v2`, which also keeps a being's recent choices) and character
 (`exulanica-ability/character/v1`), the last three as the [minds contract](minds-contract.md)
@@ -2351,8 +2351,8 @@ state, hide interior occupants from the exterior crowd, and present day actions 
 backend checks exercise a full-occupancy town, a farm day, retained-input checkpoint replay,
 unavailable inputs, explicit choices and interior interaction boundaries.
 
-**The routine held to each kind.** Under the purposeful module's second, third and fourth versions
-(`exulanica-ability/purposeful/v2`, `/v3` and `/v4`), a being does only the routine's activities its kind lists. The
+**The routine held to each kind.** Under the purposeful module's second version and every later one
+(`exulanica-ability/purposeful/v2` to `/v5`), a being does only the routine's activities its kind lists. The
 routine never sets out for it to rest, visit, stand or talk where its kind does not list that
 activity, and the options its decider is asked with leave the same out. A talk takes two beings
 whose kinds both list talk, so a villager never stops to talk with a lantern spirit. A request
@@ -2366,7 +2366,7 @@ the first version runs it for its whole life, every being doing all five as befo
 minutes replay byte for byte (`tests/test_society_kind_gates.py`, a history the code before the
 second version recorded, a spirit resting, standing, visiting and talking in it).
 
-The third and fourth versions also use the admitted kind's authored weights for ordinary autonomous
+The third version and every later one also use the admitted kind's authored weights for ordinary autonomous
 `wait`, `stand`, `talk`, `rest` and `visit` choices. An omitted or zero weight excludes an
 activity from that distribution; an empty map or no available weighted activity leads to safe
 waiting, never an implicit return to world defaults. Only these five preferences are read:
@@ -2382,6 +2382,15 @@ taken in at the nearest open node that is not, never in a shop's doorway; where 
 refused as any placing with nowhere to stand is. The first take-in, a move by an edit and the stand
 read follow it. A society that recorded an earlier version takes its placed beings in as it did, and
 its stored minutes replay byte for byte (`tests/test_society_take_in_outdoors.py`).
+
+**Residents start by their own door.** The fifth version (`exulanica-ability/purposeful/v5`) makes the
+fourth's choices and take-ins, and starts a town's residents at home: at genesis each of the ground's
+population that the town's people give a home starts outdoors, in ordinal order, at the node nearest
+their own home's door of those anybody new may start at (clear of where a person arrives and of every
+destination) that nobody stands at yet. A household starts round its door, not on one node. One
+whose door the walking graph does not reach, or who finds no such node left, keeps the place genesis
+spread it to. Nobody is placed for a view. A society that recorded an earlier version starts its
+people where genesis spread them, and replays so (`tests/test_society_start_at_home.py`).
 
 Conversation remains the first draw, with positive talk preference required on both sides of
 an automatic pairing. Explicit admitted conversation choices do not inherit that preference
@@ -2435,7 +2444,9 @@ people who live there: where a first input offers no target at all but states it
 people stand and talk, which is all the purposeful routine offers where there is nothing to visit;
 the day module is what gives them a day. An input that offers any target is read as it always
 was, so no society that exists starts anywhere else, and an input with neither a target nor
-people starts nobody (`409 no_reachable_targets`).
+people starts nobody (`409 no_reachable_targets`). A society of things that records the purposeful
+module's fifth version then starts each of a town's residents by their own home's door, as
+**Residents start by their own door** states.
 
 **The water its swimmers cross.** A things input of a society that swims carries `water`
 (`exulanica.society-water/v1`, [`society_water.py`](../exulanica/world/society_water.py)), the
@@ -2550,7 +2561,7 @@ town.
 first, unchanged, and every event they record names v7; then the things phase:
 
 * placed beings follow the latest input: one an edit places arrives at the open node nearest where
-  it was placed, outdoors under the purposeful module's fourth version (`thing_arrived`,
+  it was placed, outdoors under the purposeful module's fourth version or later (`thing_arrived`,
   `placed_by_author`), one an edit moves is put where the edit says
   (`thing_moved`, `moved_by_author`), one an edit removes or replaces leaves (`thing_departed`,
   `removed_by_author`), and one whose kind its workspace erased leaves for that reason

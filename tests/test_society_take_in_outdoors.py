@@ -19,6 +19,7 @@ from exulanica.abilities.registry import (
     PURPOSEFUL_BY_KIND_WEIGHTS,
     PURPOSEFUL_OUTDOORS_TAKE_IN,
     current_modules,
+    recorded_row,
 )
 from exulanica.world.society_planner import open_node_near, takes_in_outdoors
 from exulanica.world.society_stand import stand_near
@@ -216,8 +217,9 @@ def test_in_a_town_a_being_put_down_at_a_shop_s_door_is_taken_in_beside_it():
 
     door, (east, south) = _a_door(town._compose())
     document = town._compose(_knight_at(east, south))
-    # A new society records version 4: the knight stands on the footway the door is reached from.
-    assert PURPOSEFUL_OUTDOORS_TAKE_IN in document["modules"]
+    # A new society records version 4 or later: the knight stands on the footway the door is
+    # reached from.
+    assert recorded_row(document["modules"], "purposeful").version >= 4
     state = _genesis(document)
     assert _knight(state)["location"]["node_id"] == _footway_of(document, door)
     # The stand read says where the society took it in.

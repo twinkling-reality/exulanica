@@ -520,6 +520,21 @@
       "reason": "The purposeful planner's choices as version 3 makes them, and a being placed by the world's author is taken in only outdoors: at the open node nearest where it was put down that is no door's node (one every edge of which is the way to a door), never in a shop's doorway, since a placed being has no day and never goes in. The stand a being would be put down at is read by the same rule. Earlier module versions retain their recorded take-ins."
     },
     {
+      "module": "exulanica-ability/purposeful/v5",
+      "abilities": [
+        "wait",
+        "stand",
+        "talk",
+        "rest",
+        "visit"
+      ],
+      "parameters": [],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "The purposeful planner's choices and take-ins as version 4 makes them, and a town's residents start their first minute at home: at genesis each of the ground's population the town's people give a home starts outdoors, in ordinal order, at the node nearest their own home's door of those anybody new may start at (clear of where a person arrives and of every destination) that nobody stands at yet; one with no such node left keeps the place genesis spread it to. Nobody is placed for a view. Earlier module versions start their people where they always did."
+    },
+    {
       "module": "exulanica-ability/character/v1",
       "abilities": [],
       "parameters": [

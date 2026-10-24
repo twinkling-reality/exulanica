@@ -892,6 +892,50 @@ def spawn_nodes(document: dict[str, Any]) -> list[str]:
     return _spawn_nodes(document)[1]
 
 
+def start_at_home(state: dict[str, Any], document: Mapping[str, Any]) -> None:
+    """Where a town's residents start in a society that records the purposeful module's fifth
+    version (:data:`~exulanica.abilities.registry.PURPOSEFUL_AT_HOME`): each of the ground's
+    population with a home, in ordinal order, at the node nearest their own home's door of those
+    anybody new may start at (:func:`spawn_nodes`) that nobody stands at yet. One whose door the
+    walking graph does not reach, or who finds no such node left, keeps the place genesis spread
+    it to. A society recording an earlier version starts its people where it always did."""
+    from exulanica.abilities.registry import recorded_row
+
+    row = recorded_row(state.get("modules", ()), "purposeful")
+    if row is None or row.version < 5:
+        return
+    nodes = {node["node_id"]: node["position_mm"] for node in document["navigation"]["nodes"]}
+    doors = {stated["subject_id"]: stated["node_id"] for stated in document["people"]["premises"]}
+    premises = state["people"]["premises"]
+    free = set(spawn_nodes(dict(document)))
+    starting = []
+    for person in state["inhabitants"]:
+        resident = person.get("resident")
+        door = None
+        if person.get("came_by") == "populated" and resident is not None:
+            door = nodes.get(doors[premises[resident["home"]["premises"]]["subject_id"]])
+        if door is None:
+            # Nobody else starts where one who stays where they were spread stands.
+            free.discard(person["location"]["node_id"])
+        else:
+            starting.append((person, door))
+    for person, (x, y) in starting:
+        node = min(
+            free,
+            key=lambda node: ((nodes[node][0] - x) ** 2 + (nodes[node][1] - y) ** 2, node),
+            default=None,
+        )
+        if node is None:
+            continue
+        free.discard(node)
+        point = list(nodes[node])
+        person.update(
+            position_mm=point,
+            location={"node_id": node, "edge": None},
+            motion_path_mm=[list(point)],
+        )
+
+
 def _newcomers(
     society_id: uuid.UUID,
     seed: str,

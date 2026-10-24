@@ -23,6 +23,7 @@ from exulanica.abilities.registry import (
     FOLLOW_PERSISTENT,
     MODULES_PATH,
     PURPOSEFUL,
+    PURPOSEFUL_AT_HOME,
     PURPOSEFUL_BY_KIND,
     PURPOSEFUL_BY_KIND_WEIGHTS,
     PURPOSEFUL_OUTDOORS_TAKE_IN,
@@ -87,7 +88,7 @@ def test_a_new_society_records_each_module_at_its_newest_built_version_and_older
     (tests/test_society_kind_gates.py reads a stored society of it through the planner, the
     options, a request and the card)."""
     newest = current_modules()
-    assert PURPOSEFUL_OUTDOORS_TAKE_IN in newest
+    assert PURPOSEFUL_AT_HOME in newest and PURPOSEFUL_OUTDOORS_TAKE_IN not in newest
     assert PURPOSEFUL_BY_KIND_WEIGHTS not in newest and PURPOSEFUL not in newest
     for module in newest:
         row = ability_module(module)
@@ -187,6 +188,9 @@ ROWS_SHA256 = {
     ),
     "exulanica-ability/purposeful/v4": (
         "a330d170f6abaf0e1e0a16cc364e6452a638311cf064a8e0848a820ba131e3c2"
+    ),
+    "exulanica-ability/purposeful/v5": (
+        "c24c7c9c73b6e247e843fd45a21016a6af79e2a7565b0c7bd10d41414505c4cc"
     ),
     "exulanica-ability/purposeful/v2": (
         "6b0441b5bc9b980070864ea1368d6c1d4595116131289752d02d73ffd06102be"
