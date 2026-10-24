@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { COMPARE_WORDS, again, answerTag, askLine, asking, atMoment, cannotAskAgain, atMost, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultSub, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { called } from './character-words.mjs';
+import { compareFirst, compareStep } from './compare-words.mjs';
 
 const teo = called({ name: 'Teo' }), resident = called({ kind: 'resident' });
 const NANO = 'Nemotron 3 Nano 30B', QWEN = 'Qwen3 235B Instruct';
@@ -104,4 +105,15 @@ for (const line of [...whatEachChose({ recordedName: NANO, otherName: QWEN, othe
   assert.doesNotMatch(line, /\b(better|worse|best|wins?)\b/i, line);
   assert.doesNotMatch(line, /\u2014|_/, line);
 }
+// A guest's model too dear to ask once stays in Compare's list, faint (`over`): the arrows pass over it, and Compare opens
+// on the first a guest can afford, or the first where every one is faint (ROOT 11:29, with U2's threshold).
+const listed = [{ name: 'a' }, { name: 'dear', over: 'Asking it once can cost up to $0.086, more than the $0.03 left for AI models here.' }, { name: 'c' }];
+assert.equal(compareStep(listed, 0, 1), 2, 'down past the faint one');
+assert.equal(compareStep(listed, 2, -1), 0, 'up past it too');
+assert.equal(compareStep(listed, 2, 1), 2, 'nothing further: the focus stays');
+assert.equal(compareStep([{ over: 'x' }, { name: 'b' }, { over: 'y' }], 1, 1), 1, 'only faint ones that way: it stays');
+assert.equal(compareFirst(listed), 0);
+assert.equal(compareFirst([{ over: 'x' }, { name: 'b' }]), 1);
+assert.equal(compareFirst([{ over: 'x' }, { over: 'y' }]), 0, 'every one faint: the first');
+assert.equal(compareFirst([]), 0);
 console.log('Compare words checks passed: the frames’ lines, the moments asked, the counts, the band and r12’s small sentence.');

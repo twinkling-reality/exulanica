@@ -58,6 +58,8 @@ export interface ModelChoice {
     readonly providerDescription?: string; readonly card?: ModelCard | null;
   } | null;
   readonly current: boolean;
+  /** Why a guest cannot ask it here, in U2's words, where asking it once can cost more than they have left; faint. */
+  readonly over?: string | null;
 }
 
 export interface CharacterPageState {
@@ -516,7 +518,8 @@ function modelRows(choices: readonly ModelChoice[], focus: number, labelled: str
   list.setAttribute('role', 'listbox');
   list.setAttribute('aria-label', labelled);
   choices.forEach((choice, index) => {
-    const item = element('li', 'wu-model-row');
+    const over = choice.over ?? null;
+    const item = element('li', over ? 'wu-model-row wu-model-over' : 'wu-model-row');
     item.setAttribute('role', 'option');
     item.setAttribute('aria-selected', String(index === focus));
     const name = element('span', 'wu-model-name', choice.model ? choice.model.name : CHARACTER_WORDS.routine);
@@ -532,7 +535,12 @@ function modelRows(choices: readonly ModelChoice[], focus: number, labelled: str
       item.append(cap);
     }
     item.append(name, element('span', 'wu-model-price', choice.model ? priceWords(choice.model) ?? '' : routineRow()));
-    if (onChoose) item.addEventListener('click', () => onChoose(index));
+    if (over) {
+      // Faint and never chosen here: why, on its own line under it.
+      item.setAttribute('aria-disabled', 'true');
+      item.append(element('span', 'wu-model-why wu-small-text', over));
+    }
+    else if (onChoose) item.addEventListener('click', () => onChoose(index));
     if (onUse) item.addEventListener('dblclick', () => onUse(index));
     list.append(item);
   });

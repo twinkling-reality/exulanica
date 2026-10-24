@@ -11,9 +11,10 @@ import { accessHeaders } from '/src/config.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, overRows, questionGroup } from './character-group.mjs';
+import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, overBudget, overRows, questionGroup } from './character-group.mjs';
+import { compareFirst, compareStep } from './compare-words.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
-import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
+import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, overLine, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { WATCH_MS, mountRunWatch } from './run-watch.ts';
@@ -746,8 +747,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (compare) { pageView.compare = null; drawPage(); }
       else if (editing) { pageView.editing = null; drawPage(); } else if (choosing) { pageView.choosing = null; drawPage(); } else if (pageView.ask) { pageView.ask = null; drawPage(); } else closePage();
     }
-    else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: 0, offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
-    else if (action === 'compareChoose' && compare && !compare.asking) { compare.focus = index; readOffer(pageView); drawPage(); }
+    else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: compareFirst(compareModels(pageView.row) ?? []), offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
+    else if (action === 'compareChoose' && compare && !compare.asking && !compareModels(pageView.row)?.[index]?.over) { compare.focus = index; readOffer(pageView); drawPage(); }
     else if (action === 'compareStart' && compare && !compare.asking) void compareAsk(pageView);
     else if (action === 'row' && pageView.did?.[index] && !pageView.did[index].heard) { pageView.didFocus = index; pageView.didMoved = index > (dayFocus({ rows: pageView.did, focus: null }) ?? -1); drawPage(); }
     else if (action === 'inspect' && !choosing && !pageView.ask) void openDecision(index ?? pageView.didFocus);
@@ -897,11 +898,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // the bounds are the server's offer; each ask is one D1 ask; nothing is applied.
   const decisionAsks = new DecisionAsksClient(credentials);
   const modelKey = (model) => model ? `${model.provider}/${model.modelId}` : '';
-  /** The models to ask beside the recorded one: every model offered here but the character's own; none where nothing is asked again. */
+  /** The models to ask beside the recorded one: every model offered here but the character's own, a guest's too dear to ask once faint with U2's line (`over`); none where nothing is asked again. */
   function compareModels(row) {
     if (!subjectReads.models || subjectReads.models.asksAgain === false) return null;
     const own = modelOf(row).model;
-    return subjectReads.models.models.filter(item => !item.refusal && !(own && item.provider === own.provider && item.modelId === own.modelId));
+    return subjectReads.models.models.filter(item => !item.refusal && !(own && item.provider === own.provider && item.modelId === own.modelId)).map(item => (overBudget(item, subjectReads.models) ? { ...item, over: overLine(item.attemptMostUsd, subjectReads.models.spendHereUsd[item.provider]) } : item));
   }
   /** [C] is drawn only where it works (C4, K6): a model to ask beside the character's own, and a decision a model answered. */
   const comparable = (showing) => !readOnly && Boolean(showing && compareModels(showing.row)?.length);
@@ -1183,8 +1184,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         else if (nothing && event.code !== 'Tab') event.preventDefault();
         else if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && !compare.asking) {
           event.preventDefault();
-          const last = (compareModels(pageView.row)?.length ?? 1) - 1;
-          pageAct('compareChoose', Math.max(0, Math.min(last, compare.focus + (event.code === 'ArrowUp' ? -1 : 1))));
+          pageAct('compareChoose', compareStep(compareModels(pageView.row) ?? [], compare.focus, event.code === 'ArrowUp' ? -1 : 1));
         }
         else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
         else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('compareStart'); }

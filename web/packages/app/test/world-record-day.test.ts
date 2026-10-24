@@ -455,6 +455,23 @@ describe("Teo's day keys", () => {
     expect(items(root)[2]!.getAttribute('aria-current')).toBe('true');
   });
 
+  it("keeps a guest's model too dear to ask once in Compare's list, faint, with why, and never chosen there", async () => {
+    const { root, act, page } = await open();
+    const why = 'Asking it once can cost up to $0.086, more than the $0.03 left for AI models here.';
+    const choices = [
+      { model: { provider: 'nebius', modelId: 'nvidia/ultra', name: 'Nemotron 3 Ultra', price: { input: '0.60', output: '2.40' } }, current: false, over: why },
+      { model: { provider: 'nebius', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' } }, current: false, over: null },
+    ];
+    page.draw(teoState({ compare: { nothing: null, big: 'Ask another model', explain: 'The same moments.', choices, focus: 1, figure: 'At most $0.01', asking: false, note: null, canStart: true } }));
+    const rows = [...root.querySelectorAll<HTMLElement>('.wu-cmp-ask .wu-model-row')];
+    expect(rows.map((row) => [row.classList.contains('wu-model-over'), row.getAttribute('aria-disabled')])).toEqual([[true, 'true'], [false, null]]);
+    expect(all(root, '.wu-cmp-ask .wu-model-why')).toEqual([why]);
+    rows[0]!.click();
+    expect(act).not.toHaveBeenCalledWith('compareChoose', 0);
+    rows[1]!.click();
+    expect(act).toHaveBeenLastCalledWith('compareChoose', 1);
+  });
+
   it("draws the chooser as a gallery: free first in groups, maker and size, the focused row opened with its maker's words (A3)", async () => {
     const { root, page } = await open();
     const card = (maker: string, total: string, says: string, licence: string) => ({

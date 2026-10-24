@@ -358,12 +358,12 @@ export function recordStates(host: RecordHost) {
         nothing,
         big: offer && decisions.length ? askLine(who, decisions.length, compare.single !== null) : '',
         explain: offer && decisions.length ? explanation(who, recordedName) : '',
-        choices: models ? models.map((item) => ({ model: item, current: false })) : null,
+        choices: models ? models.map((item) => ({ model: item, current: false, over: item.over ?? null })) : null,
         focus: compare.focus,
         figure: offer && decisions.length ? atMost(most) : null,
         asking: false,
         note,
-        canStart: Boolean(offer && decisions.length && !offer.refusal),
+        canStart: Boolean(offer && decisions.length && !offer.refusal && !model?.over),
       };
     },
 

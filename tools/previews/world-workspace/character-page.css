@@ -18,6 +18,10 @@
 /* r07's number key on each of the first nine rows, as Choose a model's on the card (F11). */
 .wu-model-row > .wu-key { margin-right: calc(16 * var(--u)); }
 .wu-model-row > .wu-model-name { flex: 1; }
+/* A guest's model asking which once can cost more than they have left (Compare, with U2's line): faint, its why on a line
+   of its own under it, never chosen. */
+.wu-model-row.wu-model-over { flex-wrap: wrap; height: auto; min-height: calc(62 * var(--u)); color: var(--ink-2); cursor: default; }
+.wu-model-row.wu-model-over > .wu-model-why { flex-basis: 100%; margin: calc(-6 * var(--u)) 0 calc(14 * var(--u)); text-wrap: pretty; }
 /* The chooser as a gallery that teaches (A3): rows in groups under their labels in the faint ink; a model's maker and
    size under its name; the focused row opened beneath, inside the row, with its maker's own words. */
 .wu-gallery .wu-gallery-label { padding: calc(14 * var(--u)) calc(20 * var(--u)) calc(6 * var(--u)); }

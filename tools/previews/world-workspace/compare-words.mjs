@@ -164,3 +164,15 @@ export function whatEachChose({ recordedName, otherName, other, again: rerun, co
 
 /** "Use Qwen3 235B Instruct for Teo". */
 export const useFor = (name, who) => `Use ${name} for ${who.within}`;
+
+/**
+ * The model Compare's arrows reach from `focus` by `delta` (ROOT 11:29, with U2's threshold): the next one a guest can
+ * afford to ask, past any faint one (`over`, the line saying why); where none lies that way, the focus stays.
+ */
+export function compareStep(models, focus, delta) {
+  for (let at = focus + delta; at >= 0 && at < models.length; at += delta) if (!models[at]?.over) return at;
+  return focus;
+}
+
+/** The model Compare opens on: the first a guest can afford to ask, or the first where every one is faint. */
+export const compareFirst = models => Math.max(0, models.findIndex(model => !model?.over));
